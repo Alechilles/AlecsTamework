@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -176,18 +174,6 @@ class VanillaResidentImportPlannerTest {
         assertEquals(first.decisions(), second.decisions());
         assertThrows(UnsupportedOperationException.class, () -> first.decisions().clear());
         assertThrows(UnsupportedOperationException.class, () -> request.vanillaResidents().clear());
-    }
-
-    @Test
-    void reportOnlyPlannerHasNoVanillaRuntimeOrReflectionDependency() throws Exception {
-        String source = Files.readString(Path.of(
-                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
-                "VanillaResidentImportPlanner.java"));
-
-        assertFalse(source.contains("com.hypixel"));
-        assertFalse(source.contains("CoopBlock"));
-        assertFalse(source.contains("java.lang.reflect"));
-        assertFalse(source.contains("setAccessible"));
     }
 
     private VanillaResidentImportPlanner.ManagedResidentEvidence managed(

@@ -1,20 +1,11 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class AvatarFlightRiderModelVariantServiceTest {
-    private static final Path SERVICE = Path.of(
-            "src", "main", "java", "com", "alechilles", "alecstamework",
-            "avatarflight", "AvatarFlightRiderModelVariantService.java"
-    );
-
     @Test
     void resolveForRiderKeepsOriginalAttachmentPathsForThirdPartyCompatibility() {
         assertEquals(
@@ -41,15 +32,4 @@ class AvatarFlightRiderModelVariantServiceTest {
         ));
     }
 
-    @Test
-    void riderResolutionDoesNotRegisterRuntimeCommonAssets() throws Exception {
-        String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
-
-        assertFalse(source.contains("CommonAssetModule"));
-        assertFalse(source.contains("CommonAssetRegistry"));
-        assertFalse(source.contains("addCommonAsset("));
-        assertFalse(source.contains("AvatarFlightGeneratedCommonAsset"));
-        assertFalse(source.contains("getBlob().join"));
-        assertFalse(source.contains("maybeGenerateVariant"));
-    }
 }

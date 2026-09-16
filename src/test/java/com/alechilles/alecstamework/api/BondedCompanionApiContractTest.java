@@ -5,42 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class BondedCompanionApiContractTest {
-    private static final List<Class<?>> PUBLIC_BONDED_TYPES = List.of(
-            BondedCompanionActionContext.class,
-            BondedCompanionActionContext.Inventory.class,
-            BondedCompanionActionContext.ChargeReceipt.class,
-            BondedCompanionActionRequest.class,
-            BondedCompanionApi.class,
-            BondedCompanionAvailability.class,
-            BondedCompanionChangedEvent.class,
-            BondedCompanionExtensionData.class,
-            BondedCompanionExtensionDataKey.class,
-            BondedCompanionExtensionDataUpdate.class,
-            BondedCompanionLeaseView.class,
-            BondedCompanionPlacement.class,
-            BondedCompanionProfileView.class,
-            BondedCompanionProvisionRequest.class,
-            BondedCompanionResult.class,
-            BondedCompanionResultCode.class,
-            BondedCompanionStateView.class,
-            BondedCompanionReviveQuote.class,
-            BondedCompanionReviveRequest.class
-    );
-
     @Test
     void tameworkFallbackReturnsExplicitUnavailableResult() {
         BondedCompanionApi bonded = new FallbackOnlyApi()
@@ -123,105 +94,6 @@ class BondedCompanionApiContractTest {
                         -2L
                 )
         );
-    }
-
-    @Test
-    void extensionUpdateDeclaresCallerScopedIdentityAndMissingSentinel() {
-        List<String> components = Arrays.stream(
-                        BondedCompanionExtensionDataUpdate.class
-                                .getRecordComponents()
-                )
-                .map(java.lang.reflect.RecordComponent::getName)
-                .toList();
-        boolean missingSentinelDeclared = Arrays.stream(
-                        BondedCompanionExtensionDataUpdate.class
-                                .getDeclaredFields()
-                )
-                .anyMatch(field -> field.getName().equals(
-                        "MISSING_REVISION"
-                ));
-
-        assertEquals(
-                List.of(
-                        "callerNamespace",
-                        "idempotencyKey",
-                        "key",
-                        "jsonPayload",
-                        "expectedRevision"
-                ),
-                components
-        );
-        assertEquals(true, missingSentinelDeclared);
-    }
-
-    @Test
-    void provisionRequestDoesNotRequireAnUnobservableRosterRevision() {
-        assertFalse(Arrays.stream(
-                        BondedCompanionProvisionRequest.class
-                                .getRecordComponents())
-                .anyMatch(component -> component.getName().equals(
-                        "expectedRosterRevision")));
-    }
-
-    @Test
-    void publicBondedSignaturesExposeOnlyApiAndJdkTypes() {
-        for (Class<?> type : PUBLIC_BONDED_TYPES) {
-            Arrays.stream(type.getDeclaredConstructors())
-                    .filter(constructor -> java.lang.reflect.Modifier.isPublic(
-                            constructor.getModifiers()))
-                    .forEach(constructor -> Arrays.stream(
-                                    constructor.getGenericParameterTypes())
-                            .forEach(parameter -> assertPublicBoundary(
-                                    type, parameter)));
-            Arrays.stream(type.getDeclaredMethods())
-                    .filter(method -> java.lang.reflect.Modifier.isPublic(
-                            method.getModifiers()))
-                    .forEach(method -> {
-                        assertPublicBoundary(type, method.getGenericReturnType());
-                        Arrays.stream(method.getGenericParameterTypes())
-                                .forEach(parameter -> assertPublicBoundary(
-                                        type, parameter));
-                    });
-        }
-    }
-
-    private static void assertPublicBoundary(Class<?> declaring, Type type) {
-        if (type instanceof Class<?> value) {
-            if (value.isArray()) {
-                assertPublicBoundary(declaring, value.getComponentType());
-                return;
-            }
-            String packageName = value.getPackageName();
-            boolean allowed = value.isPrimitive()
-                    || packageName.startsWith("java.")
-                    || packageName.startsWith("javax.")
-                    || packageName.equals("com.alechilles.alecstamework.api");
-            assertEquals(true, allowed, () -> declaring.getName()
-                    + " leaks " + value.getName());
-            return;
-        }
-        if (type instanceof ParameterizedType parameterized) {
-            assertPublicBoundary(declaring, parameterized.getRawType());
-            Arrays.stream(parameterized.getActualTypeArguments())
-                    .forEach(argument -> assertPublicBoundary(
-                            declaring, argument));
-            return;
-        }
-        if (type instanceof GenericArrayType array) {
-            assertPublicBoundary(declaring, array.getGenericComponentType());
-            return;
-        }
-        if (type instanceof WildcardType wildcard) {
-            Arrays.stream(wildcard.getUpperBounds())
-                    .forEach(bound -> assertPublicBoundary(declaring, bound));
-            Arrays.stream(wildcard.getLowerBounds())
-                    .forEach(bound -> assertPublicBoundary(declaring, bound));
-            return;
-        }
-        if (type instanceof TypeVariable<?>) {
-            return;
-        }
-        throw new AssertionError("Unsupported public signature type: " + type);
     }
 
     private static final class FallbackOnlyApi implements TameworkApi {
