@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Removed the unused `ItemFeatureConfig` whistle settings from the Java API.
+  Integrations must remove calls to `isWhistleEnabled()`, `getWhistleRadius()`,
+  `Builder.whistleEnabled(...)`, and `Builder.whistleRadius(...)` when rebuilding.
+
 - Integrations can apply tool-based harvest conversions and chain shearing to one
   nearby eligible owned animal. Harvest and cull activities include the acting
   player and captured tool so profession bonuses use the tool that performed the action.

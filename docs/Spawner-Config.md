@@ -14,6 +14,11 @@ Spawner runtime is split into an orchestrator plus focused services:
 
 When extending spawner behavior, add logic to these service domains instead of centralizing it in the orchestrator.
 
+The obsolete `ItemFeatureConfig` whistle fields have been removed. Java integrations
+must remove calls to `isWhistleEnabled()`, `getWhistleRadius()`,
+`Builder.whistleEnabled(...)`, and `Builder.whistleRadius(...)` and rebuild.
+These fields had no runtime effect; no spawner asset migration is needed.
+
 ## Asset location
 `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 

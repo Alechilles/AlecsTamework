@@ -491,7 +491,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
         return ItemFeatureConfig.builder()
             .spawnerEnabled(true)
-            .whistleEnabled(false)
             .captureClearsOwner(captureSettings.clearsOwner)
             .captureRequireTamed(captureSettings.requireTamed)
             .captureTamesTarget(captureSettings.tamesTarget)

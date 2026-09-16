@@ -53,14 +53,12 @@ public final class ItemFeatureConfig {
     }
 
     private final boolean spawnerEnabled;
-    private final boolean whistleEnabled;
     private final boolean captureClearsOwner;
     private final boolean captureRequireTamed;
     private final boolean captureTamesTarget;
     private final boolean captureOwnerRestricted;
     private final boolean spawnAssignsOwner;
     private final boolean spawnOwnerRestricted;
-    private final int whistleRadius;
     private final List<String> spawnerRoleAllowlist;
     private final List<String> spawnerRoleDenylist;
     private final RoleListMode spawnerRoleListMode;
@@ -86,14 +84,12 @@ public final class ItemFeatureConfig {
 
     private ItemFeatureConfig(Builder builder) {
         this.spawnerEnabled = builder.spawnerEnabled;
-        this.whistleEnabled = builder.whistleEnabled;
         this.captureClearsOwner = builder.captureClearsOwner;
         this.captureRequireTamed = builder.captureRequireTamed;
         this.captureTamesTarget = builder.captureTamesTarget;
         this.captureOwnerRestricted = builder.captureOwnerRestricted;
         this.spawnAssignsOwner = builder.spawnAssignsOwner;
         this.spawnOwnerRestricted = builder.spawnOwnerRestricted;
-        this.whistleRadius = builder.whistleRadius;
         this.spawnerRoleAllowlist = builder.spawnerRoleAllowlist;
         this.spawnerRoleDenylist = builder.spawnerRoleDenylist;
         this.spawnerRoleListMode = builder.spawnerRoleListMode;
@@ -126,10 +122,6 @@ public final class ItemFeatureConfig {
         return spawnerEnabled;
     }
 
-    public boolean isWhistleEnabled() {
-        return whistleEnabled;
-    }
-
     public boolean isCaptureClearsOwner() {
         return captureClearsOwner;
     }
@@ -156,10 +148,6 @@ public final class ItemFeatureConfig {
 
 
 
-
-    public int getWhistleRadius() {
-        return whistleRadius;
-    }
 
     public List<String> getSpawnerRoleAllowlist() {
         return spawnerRoleAllowlist;
@@ -402,14 +390,12 @@ public final class ItemFeatureConfig {
 
     public static final class Builder {
         private boolean spawnerEnabled;
-        private boolean whistleEnabled;
         private boolean captureClearsOwner = true;
         private boolean captureRequireTamed = true;
         private boolean captureTamesTarget;
         private boolean captureOwnerRestricted = true;
         private boolean spawnAssignsOwner = true;
         private boolean spawnOwnerRestricted = true;
-        private int whistleRadius = 64;
         private List<String> spawnerRoleAllowlist = Collections.emptyList();
         private List<String> spawnerRoleDenylist = Collections.emptyList();
         private RoleListMode spawnerRoleListMode = RoleListMode.ANY;
@@ -438,11 +424,6 @@ public final class ItemFeatureConfig {
 
         public Builder spawnerEnabled(boolean spawnerEnabled) {
             this.spawnerEnabled = spawnerEnabled;
-            return this;
-        }
-
-        public Builder whistleEnabled(boolean whistleEnabled) {
-            this.whistleEnabled = whistleEnabled;
             return this;
         }
 
@@ -478,11 +459,6 @@ public final class ItemFeatureConfig {
 
 
 
-
-        public Builder whistleRadius(int whistleRadius) {
-            this.whistleRadius = whistleRadius;
-            return this;
-        }
 
         public Builder spawnerRoleAllowlist(List<String> spawnerRoleAllowlist) {
             if (spawnerRoleAllowlist == null || spawnerRoleAllowlist.isEmpty()) {
@@ -629,14 +605,12 @@ public final class ItemFeatureConfig {
         }
         ItemFeatureConfig other = (ItemFeatureConfig) obj;
         return spawnerEnabled == other.spawnerEnabled
-                && whistleEnabled == other.whistleEnabled
                 && captureClearsOwner == other.captureClearsOwner
                 && captureRequireTamed == other.captureRequireTamed
                 && captureTamesTarget == other.captureTamesTarget
                 && captureOwnerRestricted == other.captureOwnerRestricted
                 && spawnAssignsOwner == other.spawnAssignsOwner
                 && spawnOwnerRestricted == other.spawnOwnerRestricted
-                && whistleRadius == other.whistleRadius
                 && spawnerRoleListMode == other.spawnerRoleListMode
                 && Objects.equals(captureRequireOwnerOverride, other.captureRequireOwnerOverride)
                 && Objects.equals(spawnRequireOwnerOverride, other.spawnRequireOwnerOverride)
@@ -665,14 +639,12 @@ public final class ItemFeatureConfig {
     public int hashCode() {
         return Objects.hash(
                 spawnerEnabled,
-                whistleEnabled,
                 captureClearsOwner,
                 captureRequireTamed,
                 captureTamesTarget,
                 captureOwnerRestricted,
                 spawnAssignsOwner,
                 spawnOwnerRestricted,
-                whistleRadius,
                 spawnerRoleListMode,
                 captureRequireOwnerOverride,
                 spawnRequireOwnerOverride,
