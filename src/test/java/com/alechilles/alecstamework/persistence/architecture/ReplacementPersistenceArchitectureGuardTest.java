@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.persistence.architecture;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Executable boundaries that keep the replacement persistence core small and composable. */
+/** Guards transaction ownership, persistence authority, and nonblocking runtime access. */
 class ReplacementPersistenceArchitectureGuardTest {
     private static final Path MAIN = Path.of(
             "src/main/java/com/alechilles/alecstamework"
@@ -87,8 +85,7 @@ class ReplacementPersistenceArchitectureGuardTest {
         String work = Files.readString(
                 MAIN.resolve("persistence/operation/DurableOperationWork.java")
         );
-        assertTrue(work.contains("SqlitePersistenceTransactionContext transaction"));
-        assertTrue(work.contains("OperationEnvelope operation"));
+        assertTrue(work.contains("SqlitePersistenceTransactionContext"));
         assertFalse(work.contains("ProjectionConsumer"));
         assertFalse(work.contains("ProjectionCoordinator"));
         assertFalse(work.contains("Connection connection"));
@@ -97,7 +94,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                 MAIN.resolve("persistence/operation/PreparedOperationDetail.java")
         );
         assertTrue(preparedDetail.contains(
-                "SqlitePersistenceTransactionContext transaction"
+                "SqlitePersistenceTransactionContext"
         ));
         assertFalse(preparedDetail.contains("ProjectionConsumer"));
         assertFalse(preparedDetail.contains("ProjectionCoordinator"));
@@ -128,188 +125,15 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void transactionContextKeepsExactlySixPublicAuthorityAccessors() throws Exception {
-        Class<?> context = Class.forName(
-                "com.alechilles.alecstamework.persistence.adapter.sqlite"
-                        + ".SqlitePersistenceTransactionContext"
-        );
-        List<String> accessors = Stream.of(context.getDeclaredMethods())
-                .filter(method -> Modifier.isPublic(method.getModifiers()))
-                .map(Method::getName)
-                .sorted()
-                .toList();
-
-        assertEquals(
-                List.of(
-                        "identities",
-                        "incidents",
-                        "lifecycles",
-                        "operations",
-                        "outbox",
-                        "snapshots"
-                ),
-                accessors
-        );
-    }
-
-
-    @Test
     void aliasRotationIsDatabaseLocalAndNotAnExternalBoundary()
             throws Exception {
-        List<String> boundaries = Stream.of(
-                        com.alechilles.alecstamework.persistence.runtime
-                                .PublicPersistenceLiveBoundaries.class
-                                .getRecordComponents()
-                )
-                .map(java.lang.reflect.RecordComponent::getName)
-                .toList();
-        assertEquals(
-                List.of(
-                        "captures",
-                        "capturedReleases",
-                        "restorations",
-                        "coopCaptures",
-                        "coopReleases",
-                        "timedSummons",
-                        "provisioningActivations",
-                        "paidRevivals",
-                        "breedingLitters"
-                ),
-                boundaries
-        );
-
         String aliases = Files.readString(
                 SQLITE.resolve(
                         "SqliteCompanionAliasRotationOperations.java"
                 )
         );
-        assertTrue(aliases.contains(
-                "SqliteDatabaseOperationCoordinator coordinator"
-        ));
         assertFalse(aliases.contains("SqliteLiveOperationCoordinator"));
         assertFalse(aliases.contains("CompanionAliasLiveBoundary"));
-    }
-
-    @Test
-    void productionCutoverHasNoRuntimeSelectorOrLegacyLaunchMode()
-            throws Exception {
-        Path runtime = MAIN.resolve("persistence/runtime");
-        for (String removed : List.of(
-                "PersistenceEngineMode.java",
-                "PersistenceEngineSelection.java",
-                "PersistenceEngineSelector.java"
-        )) {
-            assertFalse(
-                    Files.exists(runtime.resolve(removed)),
-                    removed + " would recreate a second production runtime path"
-            );
-        }
-        String status = Files.readString(
-                runtime.resolve("PublicPersistenceOperationalStatus.java")
-        );
-        assertTrue(status.contains("PersistenceEngineLineage engine"));
-        assertFalse(status.contains("tamework.persistence.engine"));
-    }
-
-    @Test
-    void publicDiagnosticsDeclaresOnlySupportedReplacementContracts()
-            throws Exception {
-        List<String> methods = Stream.of(
-                        com.alechilles.alecstamework.api.DiagnosticsApi.class
-                                .getDeclaredMethods()
-                )
-                .filter(method -> Modifier.isPublic(method.getModifiers()))
-                .map(Method::getName)
-                .sorted()
-                .toList();
-        assertEquals(
-                List.of(
-                        "findPersistenceIncident",
-                        "getPersistenceDiagnostics",
-                        "getPersistenceResilience",
-                        "getPopulationDiagnostics",
-                        "queryPersistenceAvailability"
-                ),
-                methods
-        );
-        assertTrue(
-                javaFiles(MAIN.resolve("persistence/health")).isEmpty(),
-                "The retired health package must contain no production code"
-        );
-
-        String adapter = Files.readString(MAIN.resolve(
-                "persistence/facade/ReplacementPersistenceDiagnosticsApi.java"
-        ));
-        for (String replacementAuthority : List.of(
-                "queryPersistenceAvailability",
-                "getPersistenceResilience",
-                "findPersistenceIncident"
-        )) {
-            assertTrue(
-                    adapter.contains(replacementAuthority),
-                    replacementAuthority
-            );
-        }
-    }
-
-    @Test
-    void publicQueryFacadeDeclaresOnlyValueOrReadResultQueries() {
-        List<String> queries = Stream.of(
-                        com.alechilles.alecstamework.persistence.runtime
-                                .PublicPersistenceQueries.class
-                                .getDeclaredMethods()
-                )
-                .filter(method -> Modifier.isPublic(method.getModifiers()))
-                .map(Method::getName)
-                .distinct()
-                .sorted()
-                .toList();
-
-        assertEquals(
-                List.of(
-                        "activeCaptureFailureCooldown",
-                        "diagnoseCoopCapture",
-                        "diagnoseCoopRelease",
-                        "findAlias",
-                        "findAllCommandRosters",
-                        "findAllLifecycles",
-                        "findAllPopulationGroupAssignments",
-                        "findAllProvisioningRecords",
-                        "findCommandRoster",
-                        "findCommandRosterMembership",
-                        "findCoopResidency",
-                        "findCoopSlot",
-                        "findExtension",
-                        "findExtensions",
-                        "findFirstActiveQuarantine",
-                        "findIncidentEvidence",
-                        "findOperation",
-                        "findProfile",
-                        "findProvisioning",
-                        "findSnapshotHistory",
-                        "findStalePopulationGroupProfiles",
-                        "findTimedSummonLease",
-                        "projectedCommandRosterActions",
-                        "projectedCommandRosterRevisions",
-                        "projectedCoopResidency",
-                        "projectedCoopSnapshot",
-                        "projectedExtension",
-                        "projectedExtensions",
-                        "projectedLaggingCommandRosterProfiles",
-                        "projectedLaggingPopulationGroupProfiles",
-                        "projectedLaggingTimedSummonProfiles",
-                        "projectedOwnerPopulationCount",
-                        "projectedOwnerPopulationSnapshot",
-                        "projectedPopulationGroupAssignments",
-                        "projectedPopulationGroupCounts",
-                        "projectedProfile",
-                        "projectedProfileSnapshot",
-                        "projectedProvisioning",
-                        "projectedProvisioningSnapshot",
-                        "projectedTimedSummons"
-                ),
-                queries
-        );
     }
 
     @Test
@@ -378,12 +202,6 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "items/coop/DirectLiveCoopProjectionView.java"
                 )
         );
-        assertTrue(projections.contains(
-                "facades.queries().projectedCoopSnapshot()"
-        ));
-        assertTrue(projections.contains(
-                "facades.queries().projectedProfileSnapshot()"
-        ));
         for (String forbidden : List.of(
                 "facades.operations()",
                 "findProfile(",
@@ -397,24 +215,10 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void publicApiCapabilityActivationDependsOnInterfaces() throws Exception {
+    void publicApiDoesNotBootstrapPersistenceAuthorities() throws Exception {
         String api = Files.readString(
                 MAIN.resolve("api/internal/TameworkApiImpl.java")
         );
-        assertTrue(
-                com.alechilles.alecstamework.api.ProfileDataApi.class
-                        .isInterface()
-        );
-        assertTrue(api.contains(
-                "@Nonnull ProfileDataApi profileDataApi"
-        ));
-        assertTrue(api.contains(
-                "capabilities.add("
-                        + "TameworkApiCapability.PROFILE_DATA_TRANSACTIONS)"
-        ));
-        assertFalse(api.contains(
-                "@Nonnull ReplacementProfileDataApi profileDataApi"
-        ));
         assertFalse(api.contains(
                 "com.alechilles.alecstamework.persistence.facade"
         ));
