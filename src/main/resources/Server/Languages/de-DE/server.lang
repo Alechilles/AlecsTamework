@@ -1280,8 +1280,8 @@ tamework.commands.setTraits.result.clamped=Eigenschaften für NPC {0} gesetzt: A
 tamework.commands.traits.invalid.input=Die Eigenschaftseingabe ist ungültig.
 tamework.commands.traits.trait.id.empty=Die Eigenschafts-ID bei Argument {0} ist leer.
 tamework.commands.traits.trait.value.invalid=Der Wert für Eigenschaft '{0}' ist ungültig.
-tamework.commands.traits.usage.addTrait=Verwendung: /tw addEigenschaft <EigenschaftId> <Value>
-tamework.commands.traits.usage.setTraits=Verwendung: /tw setEigenschaften <EigenschaftId> <Value> [EigenschaftId Value ...]
+tamework.commands.traits.usage.addTrait=Verwendung: /tw debug set trait <EigenschaftId> <Value>
+tamework.commands.traits.usage.setTraits=Verwendung: /tw debug set traits <EigenschaftId> <Value> [EigenschaftId Value ...]
 tamework.commands.traits.values.missing=Es wurden keine Eigenschaftswerte angegeben.
 tamework.commands.activationStatus.activation.fingerprint.reload=Aktivierungs-Fingerabdruck={0}, Neu laden={1}.
 tamework.commands.activationStatus.description=Zeige Tamework runtime activation status.

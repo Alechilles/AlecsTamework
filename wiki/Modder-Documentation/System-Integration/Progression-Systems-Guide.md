@@ -148,8 +148,8 @@ Use:
 - `/tw getneeds`
 - `/tw setneeds`
 - `/tw gettraits`
-- `/tw settraits`
-- `/tw addtrait`
+- `/tw debug set traits`
+- `/tw debug set trait`
 - `/tw getlifestage`
 
 For breeding issues, also verify:

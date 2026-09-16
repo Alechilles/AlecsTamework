@@ -1644,8 +1644,8 @@ tamework.commands.npcSpawnTamed.result.stopped.worldDispatchSettlement=World dis
 tamework.ui.commandMenu.flightToggle=Flight Toggle
 
 tamework.commands.traits.invalid.input=Trait input is invalid.
-tamework.commands.traits.usage.setTraits=Usage: /tw settraits <TraitId> <Value> [TraitId Value ...]
-tamework.commands.traits.usage.addTrait=Usage: /tw addtrait <TraitId> <Value>
+tamework.commands.traits.usage.setTraits=Usage: /tw debug set traits <TraitId> <Value> [TraitId Value ...]
+tamework.commands.traits.usage.addTrait=Usage: /tw debug set trait <TraitId> <Value>
 tamework.commands.traits.trait.id.empty=Trait id at argument {0} is empty.
 tamework.commands.traits.trait.value.invalid=Value for trait '{0}' is invalid.
 tamework.commands.traits.values.missing=No trait values were provided.

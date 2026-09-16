@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed argument parsing and usage hints for /tw debug set traits and /tw debug set trait.
+
 - Removed the unused `ItemFeatureConfig` whistle settings from the Java API.
   Integrations must remove calls to `isWhistleEnabled()`, `getWhistleRadius()`,
   `Builder.whistleEnabled(...)`, and `Builder.whistleRadius(...)` when rebuilding.

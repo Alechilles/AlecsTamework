@@ -13,11 +13,11 @@ final class TameworkTraitCommandInputParser {
     }
 
     static ParseResult parseSetTraits(@Nullable String input) {
-        String[] tokens = tokenize(input);
-        if (tokens.length < 4) {
+        String[] tokens = TameworkCommandInput.argumentsAfter(input, "traits");
+        if (tokens.length < 2) {
             return ParseResult.error("Usage: /tw settraits <TraitId> <Value> [TraitId Value ...]");
         }
-        int argumentCount = tokens.length - 2;
+        int argumentCount = tokens.length;
         if ((argumentCount % 2) != 0) {
             return ParseResult.error("Usage: /tw settraits <TraitId> <Value> [TraitId Value ...]");
         }
@@ -25,8 +25,8 @@ final class TameworkTraitCommandInputParser {
     }
 
     static ParseResult parseAddTrait(@Nullable String input) {
-        String[] tokens = tokenize(input);
-        if (tokens.length != 4) {
+        String[] tokens = TameworkCommandInput.argumentsAfter(input, "trait");
+        if (tokens.length != 2) {
             return ParseResult.error("Usage: /tw addtrait <TraitId> <Value>");
         }
         ParseResult parsed = parsePairs(tokens, "addtrait");
@@ -41,7 +41,7 @@ final class TameworkTraitCommandInputParser {
 
     private static ParseResult parsePairs(String[] tokens, String commandName) {
         ArrayList<TraitRequest> requests = new ArrayList<>();
-        for (int i = 2; i < tokens.length; i += 2) {
+        for (int i = 0; i < tokens.length; i += 2) {
             String traitId = tokens[i];
             if (traitId == null || traitId.isBlank()) {
                 return ParseResult.error("Trait id at argument " + (i + 1) + " is empty.");
@@ -72,13 +72,6 @@ final class TameworkTraitCommandInputParser {
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private static String[] tokenize(@Nullable String input) {
-        if (input == null || input.isBlank()) {
-            return new String[0];
-        }
-        return input.trim().split("\\s+");
     }
 
     static final class ParseResult {

@@ -12,7 +12,7 @@ class TameworkTraitCommandInputParserTest {
     @Test
     void parseSetTraitsParsesPairs() {
         TameworkTraitCommandInputParser.ParseResult parsed =
-                TameworkTraitCommandInputParser.parseSetTraits("tw settraits Trait_A 1.2 Trait_B 0.9");
+                TameworkTraitCommandInputParser.parseSetTraits("/tw debug set traits Trait_A 1.2 Trait_B 0.9");
 
         assertTrue(parsed.isSuccess());
         assertEquals(2, parsed.requests().size());
@@ -25,7 +25,7 @@ class TameworkTraitCommandInputParserTest {
     @Test
     void parseSetTraitsRejectsOddPairCount() {
         TameworkTraitCommandInputParser.ParseResult parsed =
-                TameworkTraitCommandInputParser.parseSetTraits("tw settraits Trait_A 1.2 Trait_B");
+                TameworkTraitCommandInputParser.parseSetTraits("/tw debug set traits Trait_A 1.2 Trait_B");
 
         assertFalse(parsed.isSuccess());
     }
@@ -33,7 +33,7 @@ class TameworkTraitCommandInputParserTest {
     @Test
     void parseSetTraitsRejectsInvalidValue() {
         TameworkTraitCommandInputParser.ParseResult parsed =
-                TameworkTraitCommandInputParser.parseSetTraits("tw settraits Trait_A nope");
+                TameworkTraitCommandInputParser.parseSetTraits("/tw debug set traits Trait_A nope");
 
         assertFalse(parsed.isSuccess());
     }
@@ -41,7 +41,7 @@ class TameworkTraitCommandInputParserTest {
     @Test
     void parseAddTraitParsesSinglePair() {
         TameworkTraitCommandInputParser.ParseResult parsed =
-                TameworkTraitCommandInputParser.parseAddTrait("tw addtrait Trait_Health 1.15");
+                TameworkTraitCommandInputParser.parseAddTrait("/tw debug set trait Trait_Health 1.15");
 
         assertTrue(parsed.isSuccess());
         assertEquals(1, parsed.requests().size());
@@ -52,7 +52,7 @@ class TameworkTraitCommandInputParserTest {
     @Test
     void parseAddTraitRejectsExtraArguments() {
         TameworkTraitCommandInputParser.ParseResult parsed =
-                TameworkTraitCommandInputParser.parseAddTrait("tw addtrait Trait_Health 1.15 Extra 1.0");
+                TameworkTraitCommandInputParser.parseAddTrait("/tw debug set trait Trait_Health 1.15 Extra 1.0");
 
         assertFalse(parsed.isSuccess());
     }

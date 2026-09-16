@@ -328,8 +328,8 @@ specific to each NPC.
 - `/tw debug set breeding ready [--mode=true|false|toggle] [NPC selectors]`
 - `/tw spawntamed <role> [--count=<quantity>] [--radius=<blocks>] [--attachment=<slot:value>]`
 - `/tw gettraits`
-- `/tw settraits <TraitId> <Value> [TraitId Value ...]`
-- `/tw addtrait <TraitId> <Value>`
+- `/tw debug set traits <TraitId> <Value> [TraitId Value ...]`
+- `/tw debug set trait <TraitId> <Value>`
 - `/tw getlifestage`
 - `/tw findnpc <uuid> [mark:on|off]`
 - `/tw getflockdebug`
