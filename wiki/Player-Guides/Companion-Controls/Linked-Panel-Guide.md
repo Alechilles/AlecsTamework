@@ -159,7 +159,7 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   show a confirmation with exact item costs; legacy item-linked flows may be
   free.
 - The red X opens `Release` and `Unlink` in Linked, Nearby, and Owned modes. `Cull` also appears for loaded, living animals. Unlink is dimmed when the animal has no item link.
-- `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Captured animals and coop occupants must leave storage first.
+- `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Loaded animals are removed immediately. Captured animals and coop occupants must leave storage first.
 - Action buttons share normal and hovered frames. Flight, shoulder, and breeding icons show the current mode.
 
 ## Special statuses

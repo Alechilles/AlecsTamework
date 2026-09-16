@@ -372,13 +372,29 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void releaseRemovesOwnedNpcWithoutWaitingForNpcTicks() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            CommandOwnerReleaseService release = new CommandOwnerReleaseService(
+                    new CommandLinkPolicyService(),
+                    new CommandFeedbackService(null),
+                    new CommandNpcNameResolver());
+
+            release.release(target.player, "generic-tool", genericConfig(),
+                    target.uuid);
+
+            // Release must remove the entity even when no NPC tick advances its timer.
+            assertEquals(List.of(target.reference), scope.removedEntities);
+        }
+    }
+
+    @Test
     void forgedGenericReleaseLeavesBondedTargetOwnershipUntouched()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveBondedTarget();
             CommandOwnerReleaseService release = new CommandOwnerReleaseService(
                     new CommandLinkPolicyService(),
-                    new CommandStepExecutionService(null, null, null),
                     new CommandFeedbackService(null),
                     new CommandNpcNameResolver());
 
@@ -387,6 +403,7 @@ class CommandGenericTargetAuthorityTest {
 
             assertEquals(target.owner, scope.store.getComponent(
                     target.reference, scope.ownerType).getOwnerId());
+            assertTrue(scope.removedEntities.isEmpty());
         }
     }
 
@@ -1035,6 +1052,7 @@ class CommandGenericTargetAuthorityTest {
     }
 
     private static final class ProjectionScope implements AutoCloseable {
+        private final List<Ref<EntityStore>> removedEntities = new java.util.ArrayList<>();
         private final Object oldTamework;
         private final Object oldEntityModule;
         private final ComponentType<EntityStore, NPCEntity> npcType =
@@ -1063,7 +1081,16 @@ class CommandGenericTargetAuthorityTest {
             this.world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
             this.entityStore = new TestEntityStore(world);
             this.world.bind(entityStore);
-            this.store = new TestEntityComponentStore(entityStore);
+            this.store = new TestEntityComponentStore(entityStore) {
+                @Override
+                public com.hypixel.hytale.component.Holder<EntityStore> removeEntity(
+                        Ref<EntityStore> reference,
+                        com.hypixel.hytale.component.RemoveReason reason) {
+                    assertEquals(com.hypixel.hytale.component.RemoveReason.REMOVE, reason);
+                    removedEntities.add(reference);
+                    return null;
+                }
+            };
             entityStore.store = store;
         }
 

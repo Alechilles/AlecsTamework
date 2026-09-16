@@ -358,7 +358,6 @@ public final class CommandItemFeatureHandler {
                 );
         this.ownerReleaseService = new CommandOwnerReleaseService(
                 linkPolicyService,
-                stepExecutionService,
                 feedbackService,
                 npcNameResolver,
                 persistence,

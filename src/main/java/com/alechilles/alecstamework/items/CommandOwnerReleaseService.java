@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades
 import com.alechilles.alecstamework.ui.CommandUiHostPage;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -35,11 +36,7 @@ import javax.annotation.Nullable;
 
 /** Commits permanent release, then applies live cleanup on the current world thread. */
 final class CommandOwnerReleaseService {
-    private static final float RELEASE_DESPAWN_DELAY_SECONDS = 4.0F;
-    private static final String[] RELEASE_STATE_CANDIDATES = new String[] { "Flee", "Wander", "Idle" };
-
     private final CommandLinkPolicyService linkPolicyService;
-    private final CommandStepExecutionService stepExecutionService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
     @Nullable private final PersistenceDomainFacades persistence;
@@ -47,17 +44,15 @@ final class CommandOwnerReleaseService {
     private final CommandUiHostPage.WorldDispatcher worldDispatcher;
 
     CommandOwnerReleaseService(CommandLinkPolicyService linkPolicyService,
-                               CommandStepExecutionService stepExecutionService,
                                CommandFeedbackService feedbackService,
                                CommandNpcNameResolver npcNameResolver) {
-        this(linkPolicyService, stepExecutionService, feedbackService,
+        this(linkPolicyService, feedbackService,
                 npcNameResolver, null, null,
                 CommandUiCurrentWorldDispatcher.production());
     }
 
     CommandOwnerReleaseService(
             CommandLinkPolicyService linkPolicyService,
-            CommandStepExecutionService stepExecutionService,
             CommandFeedbackService feedbackService,
             CommandNpcNameResolver npcNameResolver,
             @Nullable PersistenceDomainFacades persistence,
@@ -65,7 +60,6 @@ final class CommandOwnerReleaseService {
             CommandUiHostPage.WorldDispatcher worldDispatcher
     ) {
         this.linkPolicyService = linkPolicyService;
-        this.stepExecutionService = stepExecutionService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
         this.persistence = persistence;
@@ -240,11 +234,7 @@ final class CommandOwnerReleaseService {
             return;
         }
         String displayName = resolveDisplayName(player, npcRef, store, npc);
-        clearOwner(npcRef, store);
-        clearTamedAndLinks(npcRef, store);
-        applyReleaseState(npcRef, npc, store);
-        npc.setToDespawn();
-        npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
+        removeReleasedNpc(npcRef, store);
         feedbackService.showSuccessKey(
                 player,
                 "tamework.ui.notifications.command.release.success",
@@ -263,11 +253,15 @@ final class CommandOwnerReleaseService {
                 || !linkPolicyService.passesOwnerAndTamed(true, false, npcRef, ownerUuid, store)) {
             return;
         }
+        removeReleasedNpc(npcRef, store);
+    }
+
+    private void removeReleasedNpc(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         clearOwner(npcRef, store);
         clearTamedAndLinks(npcRef, store);
-        applyReleaseState(npcRef, npc, store);
-        npc.setToDespawn();
-        npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
+        // Release runs on the owning world thread, outside an ECS system callback.
+        // NPC despawn timers cannot finish while the entity is frozen or non-ticking.
+        store.removeEntity(npcRef, RemoveReason.REMOVE);
     }
 
     private boolean canRelease(Player player,
@@ -307,10 +301,8 @@ final class CommandOwnerReleaseService {
         if (links == null) {
             return;
         }
-        links.setOwnerId(null);
-        links.setToolIds(new String[0]);
-        links.setHomePosition(null);
-        store.putComponent(npcRef, linksType, links);
+        // Match Cull: terminal removal must not be observed as a lost linked companion.
+        store.removeComponent(npcRef, linksType);
     }
 
     private void clearOwner(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -321,17 +313,6 @@ final class CommandOwnerReleaseService {
             owner.setOwnerId(null);
             owner.setOwnerName(null);
             store.putComponent(npcRef, ownerType, owner);
-        }
-    }
-
-    private void applyReleaseState(Ref<EntityStore> npcRef,
-                                   NPCEntity npc,
-                                   Store<EntityStore> store) {
-        for (String state : RELEASE_STATE_CANDIDATES) {
-            if (stepExecutionService.applyState(npcRef, npc, store, state, null)
-                    || stepExecutionService.applyState(npcRef, npc, store, "$" + state, null)) {
-                return;
-            }
         }
     }
 
