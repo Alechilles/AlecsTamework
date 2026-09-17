@@ -95,7 +95,7 @@ public final class AnimalProgressionService {
         long adultElapsed = newlyInitialized || !tamed ? 0 : Math.max(0, elapsed - juvenileElapsed);
         AnimalAgingPolicy.Progress result = AnimalAgingPolicy.advance(aging, state.getAgeProgressMs(),
                 adultElapsed, loaded, hunger, thirst);
-        state.setAgeProgressMs(result.getAgeProgressMs());
+        state.setAgeProgressMs(result.ageProgressMs());
     }
 
     /** Existing juvenile deadlines are converted once; new aging-enabled offspring use real durations. */
@@ -140,7 +140,7 @@ public final class AnimalProgressionService {
     public static double slaughterMultiplier(Ref<EntityStore> ref, Store<EntityStore> store, String role) {
         if (!CompanionLifeStageService.isAdult(ref, store, role)) return 0;
         AnimalAgingPolicy.Progress value = aging(ref, store, role);
-        return value == null ? 1 : value.isDead() ? 0 : value.getYieldMultiplier();
+        return value == null ? 1 : value.dead() ? 0 : value.yieldMultiplier();
     }
 
     /** Freeze a detached capture snapshot; never mutate a component still owned by ECS. */
@@ -181,19 +181,19 @@ public final class AnimalProgressionService {
                 ? Math.max(0, state.getAdultAtMs() - state.getLifecycleNowMs()) : 0;
         AnimalAgingPolicy.Progress age = AnimalAgingPolicy.advance(settings, state.getAgeProgressMs(),
                 Math.max(0, elapsed - (long) Math.ceil(juvenileRemaining / growthRate)), loaded, hunger, thirst);
-        boolean prime = age.getStage() == AnimalAgingPolicy.Stage.PRIME;
+        boolean prime = age.stage() == AnimalAgingPolicy.Stage.PRIME;
         boolean frozen = captured || settings.getMode() == AnimalAgingSettings.LifecycleMode.OFF
                 || prime && settings.getMode() == AnimalAgingSettings.LifecycleMode.FREEZE_AT_PRIME;
-        boolean death = age.getStage() == AnimalAgingPolicy.Stage.SENIOR && settings.isOldAgeDeathEnabled();
-        String stage = switch (age.getStage()) {
+        boolean death = age.stage() == AnimalAgingPolicy.Stage.SENIOR && settings.isOldAgeDeathEnabled();
+        String stage = switch (age.stage()) {
             case ADULT -> "Adult"; case PRIME -> "Prime"; case SENIOR -> "Senior";
         };
-        long remaining = age.getRemainingStageMs();
+        long remaining = age.remainingStageMs();
         if (remaining != Long.MAX_VALUE && loaded) {
             remaining = (long) Math.ceil(remaining / AnimalAgingPolicy.agingRate(
-                    settings, age.getAgeProgressMs(), true, hunger, thirst));
+                    settings, age.ageProgressMs(), true, hunger, thirst));
         }
-        return new Presentation(stage, prime, frozen, death, remaining, age.getYieldMultiplier());
+        return new Presentation(stage, prime, frozen, death, remaining, age.yieldMultiplier());
     }
 
     /** True when loaded-world actions must wait for ordinary natural-death resolution. */

@@ -360,7 +360,7 @@ public final class CompanionLifeStageService {
         }
         AnimalAgingPolicy.Progress age = AnimalProgressionService.aging(npcRef, store,
                 CompanionRoleIdResolver.resolveRoleId(npcRef, store));
-        if (age != null && age.isDead()) {
+        if (age != null && age.dead()) {
             com.hypixel.hytale.server.core.modules.entity.damage.DamageCause cause =
                     com.hypixel.hytale.server.core.modules.entity.damage.DamageCause.ENVIRONMENT;
             if (cause != null) {
@@ -412,7 +412,7 @@ public final class CompanionLifeStageService {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
                     AnimalAgingPolicy.Progress aging = AnimalProgressionService.aging(npcRef, store, roleIdFallback);
-                    return (aging == null || !aging.isDead())
+                    return (aging == null || !aging.dead())
                             && STAGE_ADULT.equals(resolveStageId(stage, AnimalProgressionService.lifeTime(stage, store)));
                 }
             }

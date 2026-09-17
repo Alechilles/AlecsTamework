@@ -207,16 +207,15 @@ durations are real minutes of eligible progression and do not use the server's
 day-length scale.
 
 - `Enabled`: turns adult aging on for this breeding profile.
-- `Mode`: `Off`, `FreezeAtPrime`, or `Full`. The server-wide Animal Aging
-  setting supplies the final lifecycle mode.
 - `AdultToPrimeMinutes`: real eligible minutes from adult to prime.
 - `PrimeMinutes`: real eligible minutes in prime before senior age in a full
   lifecycle.
 - `SeniorMinutes`: real eligible minutes in senior age before optional old-age
   death.
-- `OldAgeDeathEnabled`: permits old-age death in a full lifecycle when the
-  server-wide old-age-death setting is also enabled.
 - `NonPrimeYieldMultiplier`: domestic slaughter yield outside the prime stage.
+
+Lifecycle mode and old-age death are controlled only by the server-wide Animal
+Progression settings in `/tw settings`, not by breeding assets or role overrides.
 
 The shared Animal Progression policy decides which time is eligible. Unloaded
 farms are never force-loaded: needs and resource consumption pause, while aging

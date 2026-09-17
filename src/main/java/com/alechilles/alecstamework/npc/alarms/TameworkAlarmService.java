@@ -5,9 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.time.Instant;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -98,17 +96,6 @@ public final class TameworkAlarmService {
         return active
                 ? Snapshot.active(alarmName, nowMs, alarm.getUntilMs(), alarm.getStartedAtMs(), alarm.getDurationMs())
                 : Snapshot.ready(alarmName, nowMs, alarm.getUntilMs(), alarm.getStartedAtMs(), alarm.getDurationMs(), true);
-    }
-
-    private static long resolveTimeMs(@Nullable Store<EntityStore> store) {
-        if (store != null) {
-            WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
-            Instant gameTime = time != null ? time.getGameTime() : null;
-            if (gameTime != null) {
-                return gameTime.toEpochMilli();
-            }
-        }
-        return System.currentTimeMillis();
     }
 
     private static long secondsToMillis(double seconds) {

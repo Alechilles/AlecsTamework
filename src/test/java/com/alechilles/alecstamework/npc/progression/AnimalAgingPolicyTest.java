@@ -14,24 +14,25 @@ class AnimalAgingPolicyTest {
     @Test
     void disabledAgingPreservesAgeAndGivesFullAdultYield() {
         AnimalAgingSettings settings = AnimalAgingSettings.CODEC.decode(org.bson.BsonDocument.parse(
-                "{\"Enabled\":true,\"Mode\":\"Off\"}"));
+                "{\"Enabled\":true}"))
+                .withRuntimePolicy(AnimalAgingSettings.LifecycleMode.OFF, false);
         AnimalAgingPolicy.Progress progress = AnimalAgingPolicy.advance(
                 settings, 10 * MINUTE_MS, 500 * MINUTE_MS, true, 0, 0);
-        assertEquals(10 * MINUTE_MS, progress.getAgeProgressMs());
-        assertEquals(1.0, progress.getYieldMultiplier());
-        assertFalse(progress.isDead());
+        assertEquals(10 * MINUTE_MS, progress.ageProgressMs());
+        assertEquals(1.0, progress.yieldMultiplier());
+        assertFalse(progress.dead());
     }
 
     @Test
     void carePenaltyStartsBelowHalfAndUsesOnlyTheLowerNeed() throws Exception {
         AnimalAgingSettings settings = fullLifecycle();
         assertEquals(10 * MINUTE_MS, AnimalAgingPolicy.advance(
-                settings, 0, 10 * MINUTE_MS, true, 50, 50).getAgeProgressMs());
+                settings, 0, 10 * MINUTE_MS, true, 50, 50).ageProgressMs());
         double oneLowNeed = AnimalAgingPolicy.advance(
-                settings, 0, 10 * MINUTE_MS, true, 25, 100).getAgeProgressMs();
+                settings, 0, 10 * MINUTE_MS, true, 25, 100).ageProgressMs();
         assertEquals(5 * MINUTE_MS, oneLowNeed);
         assertEquals(oneLowNeed, AnimalAgingPolicy.advance(
-                settings, 0, 10 * MINUTE_MS, true, 25, 25).getAgeProgressMs());
+                settings, 0, 10 * MINUTE_MS, true, 25, 25).ageProgressMs());
     }
 
     @Test
@@ -49,8 +50,8 @@ class AnimalAgingPolicyTest {
 
         // Four real minutes complete the last pre-prime minute at 25%; the
         // remaining six advance at 175% because prime/senior poor care ages faster.
-        assertEquals(70.5 * MINUTE_MS, progress.getAgeProgressMs(), 0.001);
-        assertEquals(AnimalAgingPolicy.Stage.PRIME, progress.getStage());
+        assertEquals(70.5 * MINUTE_MS, progress.ageProgressMs(), 0.001);
+        assertEquals(AnimalAgingPolicy.Stage.PRIME, progress.stage());
     }
 
     @Test
@@ -66,7 +67,7 @@ class AnimalAgingPolicyTest {
                 0.0
         );
 
-        assertEquals(10.0 * MINUTE_MS, progress.getAgeProgressMs(), 0.001);
+        assertEquals(10.0 * MINUTE_MS, progress.ageProgressMs(), 0.001);
     }
 
     @Test
@@ -78,9 +79,9 @@ class AnimalAgingPolicyTest {
                 frozen, 59.0 * MINUTE_MS, 2L * MINUTE_MS, true, 100.0, 100.0
         );
 
-        assertEquals(60.0 * MINUTE_MS, atPrime.getAgeProgressMs(), 0.001);
-        assertEquals(AnimalAgingPolicy.Stage.PRIME, atPrime.getStage());
-        assertFalse(atPrime.isDead());
+        assertEquals(60.0 * MINUTE_MS, atPrime.ageProgressMs(), 0.001);
+        assertEquals(AnimalAgingPolicy.Stage.PRIME, atPrime.stage());
+        assertFalse(atPrime.dead());
 
         AnimalAgingSettings full = fullLifecycle();
         setField(full, "adultToPrimeMinutes", 1);
@@ -91,9 +92,9 @@ class AnimalAgingPolicyTest {
                 full, 0.0, 3L * MINUTE_MS, true, 100.0, 100.0
         );
 
-        assertEquals(AnimalAgingPolicy.Stage.SENIOR, dead.getStage());
-        assertTrue(dead.isDead());
-        assertEquals(0L, dead.getRemainingStageMs());
+        assertEquals(AnimalAgingPolicy.Stage.SENIOR, dead.stage());
+        assertTrue(dead.dead());
+        assertEquals(0L, dead.remainingStageMs());
     }
 
     private static AnimalAgingSettings fullLifecycle() throws Exception {

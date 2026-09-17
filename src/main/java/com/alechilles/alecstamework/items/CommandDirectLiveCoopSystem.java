@@ -54,8 +54,6 @@ public final class CommandDirectLiveCoopSystem
             frozenCaptures = new ConcurrentHashMap<>();
     private final Map<String, CompanionSpawnPlacement> frozenReleases =
             new ConcurrentHashMap<>();
-    private final Map<String, Boolean> previousRoaming =
-            new ConcurrentHashMap<>();
 
     /** Creates the world system from its author and projection-only boundary. */
     public CommandDirectLiveCoopSystem(
@@ -104,10 +102,6 @@ public final class CommandDirectLiveCoopSystem
         for (HytaleDirectLiveCoopScanner.LoadedCoop coop : scan.coops()) {
             loadedPhysical.add(coop.physicalKey());
             boolean roaming = roaming(scan.worldTime(), coop.config());
-            boolean wasRoaming = previousRoaming.getOrDefault(
-                    coop.physicalKey(), false
-            );
-            previousRoaming.put(coop.physicalKey(), roaming);
             if (roaming) {
                 boolean readyForRelease = produce.produceWhileRoaming(
                         coop, occupancies, profiles, projections.productionState(),
@@ -130,7 +124,6 @@ public final class CommandDirectLiveCoopSystem
             }
             produce.syncInteractionState(scan.world(), coop);
         }
-        previousRoaming.keySet().retainAll(loadedPhysical);
         releaseRemovedResidents(
                 scan, loadedPhysical, occupancies, profiles
         );

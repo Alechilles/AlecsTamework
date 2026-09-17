@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.config.assets;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -31,13 +30,6 @@ public final class AnimalAgingSettings {
         )
         .documentation("Enables adult aging for this breeding profile. Defaults to false so existing profiles retain adult-only behavior. Inheritance: missing nested key inherits parent value.")
         .add()
-        .<String>append(
-            new KeyedCodec<>("Mode", Codec.STRING),
-            (settings, value) -> settings.mode = LifecycleMode.fromConfigValue(value),
-            settings -> settings.getMode().toConfigValue()
-        )
-        .documentation("Adult aging mode: Off, FreezeAtPrime, or Full. Inheritance: missing nested key inherits parent value.")
-        .add()
         .<Integer>append(
             new KeyedCodec<>("AdultToPrimeMinutes", Codec.INTEGER),
             (settings, value) -> settings.adultToPrimeMinutes = positiveOrDefault(
@@ -61,13 +53,6 @@ public final class AnimalAgingSettings {
             settings -> settings.seniorMinutes
         )
         .documentation("Eligible real minutes in senior age before optional old-age death. Inheritance: missing nested key inherits parent value.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("OldAgeDeathEnabled", Codec.BOOLEAN),
-            (settings, value) -> settings.oldAgeDeathEnabled = value != null && value,
-            settings -> settings.oldAgeDeathEnabled
-        )
-        .documentation("Whether a Full lifecycle ends in old-age death after SeniorMinutes. Inheritance: missing nested key inherits parent value.")
         .add()
         .<Double>append(
             new KeyedCodec<>("NonPrimeYieldMultiplier", Codec.DOUBLE),
@@ -93,13 +78,6 @@ public final class AnimalAgingSettings {
         )
         .documentation("Whether adult aging is enabled for this role.")
         .add()
-        .<String>append(
-            new KeyedCodec<>("Mode", Codec.STRING),
-            (settings, value) -> settings.mode = value == null ? null : LifecycleMode.fromConfigValue(value),
-            settings -> settings.mode == null ? null : settings.mode.toConfigValue()
-        )
-        .documentation("Adult aging mode for this role: Off, FreezeAtPrime, or Full.")
-        .add()
         .<Integer>append(
             new KeyedCodec<>("AdultToPrimeMinutes", Codec.INTEGER),
             (settings, value) -> settings.adultToPrimeMinutes = value,
@@ -120,13 +98,6 @@ public final class AnimalAgingSettings {
             settings -> settings.seniorMinutes
         )
         .documentation("Eligible real minutes spent in senior age for this role.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("OldAgeDeathEnabled", Codec.BOOLEAN),
-            (settings, value) -> settings.oldAgeDeathEnabled = value,
-            settings -> settings.oldAgeDeathEnabled
-        )
-        .documentation("Whether this role can die of old age in a Full lifecycle.")
         .add()
         .<Double>append(
             new KeyedCodec<>("NonPrimeYieldMultiplier", Codec.DOUBLE),
@@ -150,11 +121,9 @@ public final class AnimalAgingSettings {
             return;
         }
         if (!explicitKeys.contains("Enabled")) enabled = parent.enabled;
-        if (!explicitKeys.contains("Mode")) mode = parent.mode;
         if (!explicitKeys.contains("AdultToPrimeMinutes")) adultToPrimeMinutes = parent.adultToPrimeMinutes;
         if (!explicitKeys.contains("PrimeMinutes")) primeMinutes = parent.primeMinutes;
         if (!explicitKeys.contains("SeniorMinutes")) seniorMinutes = parent.seniorMinutes;
-        if (!explicitKeys.contains("OldAgeDeathEnabled")) oldAgeDeathEnabled = parent.oldAgeDeathEnabled;
         if (!explicitKeys.contains("NonPrimeYieldMultiplier")) {
             nonPrimeYieldMultiplier = parent.nonPrimeYieldMultiplier;
         }
@@ -237,52 +206,22 @@ public final class AnimalAgingSettings {
     }
 
     public enum LifecycleMode {
-        OFF("Off"),
-        FREEZE_AT_PRIME("FreezeAtPrime"),
-        FULL("Full");
-
-        private final String configValue;
-
-        LifecycleMode(String configValue) {
-            this.configValue = configValue;
-        }
-
-        public static LifecycleMode fromConfigValue(@Nullable String value) {
-            if (value == null || value.isBlank()) {
-                return FREEZE_AT_PRIME;
-            }
-            String normalized = value.trim();
-            for (LifecycleMode candidate : values()) {
-                if (candidate.configValue.equalsIgnoreCase(normalized)
-                        || candidate.name().equalsIgnoreCase(normalized)) {
-                    return candidate;
-                }
-            }
-            return FREEZE_AT_PRIME;
-        }
-
-        public String toConfigValue() {
-            return configValue;
-        }
+        OFF, FREEZE_AT_PRIME, FULL
     }
 
     /** Nullable values preserve which role override keys were actually authored. */
     public static final class Override {
         private Boolean enabled;
-        private LifecycleMode mode;
         private Integer adultToPrimeMinutes;
         private Integer primeMinutes;
         private Integer seniorMinutes;
-        private Boolean oldAgeDeathEnabled;
         private Double nonPrimeYieldMultiplier;
 
         void applyTo(@Nonnull AnimalAgingSettings target) {
             if (enabled != null) target.enabled = enabled;
-            if (mode != null) target.mode = mode;
             if (adultToPrimeMinutes != null) target.adultToPrimeMinutes = adultToPrimeMinutes;
             if (primeMinutes != null) target.primeMinutes = primeMinutes;
             if (seniorMinutes != null) target.seniorMinutes = seniorMinutes;
-            if (oldAgeDeathEnabled != null) target.oldAgeDeathEnabled = oldAgeDeathEnabled;
             if (nonPrimeYieldMultiplier != null) target.nonPrimeYieldMultiplier = nonPrimeYieldMultiplier;
         }
     }

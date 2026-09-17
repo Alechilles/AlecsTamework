@@ -29,18 +29,7 @@ public final class CompanionRuntimeClock {
             return;
         }
         synchronized (LOCK) {
-            double deltaMs = (dtSeconds * MILLIS_PER_SECOND) + fractionalCarryMs;
-            if (!Double.isFinite(deltaMs) || deltaMs <= 0.0) {
-                return;
-            }
-            long wholeMs = (long) Math.floor(deltaMs);
-            if (wholeMs > 0L) {
-                activeRuntimeMs = saturatingAdd(activeRuntimeMs, wholeMs);
-            }
-            fractionalCarryMs = deltaMs - wholeMs;
-            if (!Double.isFinite(fractionalCarryMs) || fractionalCarryMs < 0.0 || fractionalCarryMs >= 1.0) {
-                fractionalCarryMs = 0.0;
-            }
+            advanceMillis(dtSeconds * MILLIS_PER_SECOND);
         }
     }
 

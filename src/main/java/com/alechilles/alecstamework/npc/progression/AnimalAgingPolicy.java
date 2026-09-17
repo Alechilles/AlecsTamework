@@ -34,19 +34,18 @@ public final class AnimalAgingPolicy {
                                    double thirstPercent) {
         double current = sanitizeProgress(ageProgressMs);
         if (!isActive(settings)) {
-            return progress(settings, current, 0.0);
+            return progress(settings, current);
         }
         AnimalAgingSettings safeSettings = settings;
         if (safeSettings.getMode() == AnimalAgingSettings.LifecycleMode.OFF) {
-            return progress(safeSettings, current, 0.0);
+            return progress(safeSettings, current);
         }
         long safeElapsed = Math.max(0L, eligibleElapsedMs);
         if (safeElapsed == 0L) {
-            return progress(safeSettings, current, 0.0);
+            return progress(safeSettings, current);
         }
 
         double remainingElapsed = safeElapsed;
-        double applied = 0.0;
         while (remainingElapsed > 0.0) {
             Stage stage = resolveStage(safeSettings, current);
             if (stage == Stage.PRIME
@@ -67,7 +66,6 @@ public final class AnimalAgingPolicy {
             if (Double.isInfinite(boundary) || progressUntilBoundary == 0.0) {
                 double gained = safeMultiply(remainingElapsed, rate);
                 current = safeAdd(current, gained);
-                applied = safeAdd(applied, gained);
                 break;
             }
 
@@ -75,14 +73,12 @@ public final class AnimalAgingPolicy {
             if (remainingElapsed < elapsedUntilBoundary) {
                 double gained = safeMultiply(remainingElapsed, rate);
                 current = safeAdd(current, gained);
-                applied = safeAdd(applied, gained);
                 break;
             }
             current = boundary;
-            applied = safeAdd(applied, progressUntilBoundary);
             remainingElapsed -= elapsedUntilBoundary;
         }
-        return progress(safeSettings, current, applied);
+        return progress(safeSettings, current);
     }
 
     /** Returns the juvenile/pre-prime multiplier for the supplied care values. */
@@ -140,8 +136,7 @@ public final class AnimalAgingPolicy {
     }
 
     private static Progress progress(@Nullable AnimalAgingSettings settings,
-                                     double ageProgressMs,
-                                     double appliedElapsedMs) {
+                                     double ageProgressMs) {
         Stage stage = resolveStage(settings, ageProgressMs);
         boolean dead = isDead(settings, ageProgressMs);
         return new Progress(
@@ -149,8 +144,7 @@ public final class AnimalAgingPolicy {
                 stage,
                 dead,
                 remainingStageMs(settings, ageProgressMs, stage, dead),
-                yieldMultiplier(settings, ageProgressMs),
-                appliedElapsedMs
+                yieldMultiplier(settings, ageProgressMs)
         );
     }
 
@@ -255,76 +249,6 @@ public final class AnimalAgingPolicy {
     }
 
     /** Result of one age calculation, ready for the caller to persist. */
-    public static final class Progress {
-        private final double ageProgressMs;
-        private final Stage stage;
-        private final boolean dead;
-        private final long remainingStageMs;
-        private final double yieldMultiplier;
-        private final double appliedElapsedMs;
-
-        private Progress(double ageProgressMs,
-                         @Nonnull Stage stage,
-                         boolean dead,
-                         long remainingStageMs,
-                         double yieldMultiplier,
-                         double appliedElapsedMs) {
-            this.ageProgressMs = ageProgressMs;
-            this.stage = stage;
-            this.dead = dead;
-            this.remainingStageMs = remainingStageMs;
-            this.yieldMultiplier = yieldMultiplier;
-            this.appliedElapsedMs = appliedElapsedMs;
-        }
-
-        public double getAgeProgressMs() {
-            return ageProgressMs;
-        }
-
-        public double ageProgressMs() {
-            return getAgeProgressMs();
-        }
-
-        @Nonnull
-        public Stage getStage() {
-            return stage;
-        }
-
-        @Nonnull
-        public Stage stage() {
-            return getStage();
-        }
-
-        public boolean isDead() {
-            return dead;
-        }
-
-        public boolean dead() {
-            return isDead();
-        }
-
-        public long getRemainingStageMs() {
-            return remainingStageMs;
-        }
-
-        public long remainingStageMs() {
-            return getRemainingStageMs();
-        }
-
-        public double getYieldMultiplier() {
-            return yieldMultiplier;
-        }
-
-        public double yieldMultiplier() {
-            return getYieldMultiplier();
-        }
-
-        public double getAppliedElapsedMs() {
-            return appliedElapsedMs;
-        }
-
-        public double appliedElapsedMs() {
-            return getAppliedElapsedMs();
-        }
-    }
+    public record Progress(double ageProgressMs, @Nonnull Stage stage, boolean dead,
+                           long remainingStageMs, double yieldMultiplier) { }
 }
