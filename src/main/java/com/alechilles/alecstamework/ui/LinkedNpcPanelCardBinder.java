@@ -415,15 +415,15 @@ final class LinkedNpcPanelCardBinder {
                 fixedAnchor(locationRow, 0, inlineLocationWidth, 14));
         locationRow += showInlineWorld ? 14 : 0;
         commandBuilder.setObject(inlineLocationCoordinatesSelector + ".Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth - 24, 18));
+                fixedAnchor(locationRow, 24, inlineLocationWidth - 24, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CoordinateLabel.Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth - 24, 18));
+                fixedAnchor(locationRow, 24, inlineLocationWidth - 24, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CopyButton.Anchor",
-                fixedAnchor(locationRow, inlineLocationWidth - 20, 20, 18));
+                fixedAnchor(locationRow, 0, 20, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CopyGlyph.Anchor",
-                fixedAnchor(locationRow + 2, inlineLocationWidth - 17, 14, 14));
+                fixedAnchor(locationRow + 2, 3, 14, 14));
         commandBuilder.setObject(inlineLocationSelector + " #CopyHint.Anchor",
-                fixedAnchor(locationRow + 27, 0, inlineLocationWidth - 34, 13));
+                fixedAnchor(locationRow + 18, 24, inlineLocationWidth - 24, 14));
         commandBuilder.setObject(inlineLocationSelector + " #RelativeDistance.Anchor",
                 fixedAnchor(locationRow + 18, 0, inlineLocationWidth, 14));
         if (showInlineCoordinates) {
