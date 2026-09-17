@@ -32,6 +32,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 ```json
 {
   "Enabled": true,
+  "HotswapHudEnabled": true,
   "ItemIds": [],
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
@@ -62,6 +63,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 
 ## Top-Level Field Reference
 - `Enabled`: disables the config when `false`.
+- `HotswapHudEnabled`: defaults to `true`. Set to `false` to hide the command-control strip while retaining the animal target HUD. Omitted values inherit from the parent; explicit values override it. This changes presentation only; the item's interactions still determine what its controls do.
 - `ItemIds`: item ids that resolve this config.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.

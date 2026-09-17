@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Command-item configs can hide the command-control strip with
+  `HotswapHudEnabled: false` while keeping the animal information HUD visible.
+
 - Added shared Animal Progression settings for needs, aging, harvest readiness,
   and breeding readiness. Server upgrades preserve each existing owner-offline
   policy while migrating it into the version 2 settings document.

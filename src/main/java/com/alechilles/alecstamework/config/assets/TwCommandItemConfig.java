@@ -276,6 +276,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .documentation("Ordered hotswap HUD contributor requirements. An omitted list inherits from the parent; an "
                 + "explicit list replaces it, including an explicit empty list.")
         .add()
+        .<Boolean>append(
+            new KeyedCodec<>("HotswapHudEnabled", Codec.BOOLEAN),
+            (asset, value) -> asset.hotswapHudEnabled = value == null || value,
+            asset -> asset.hotswapHudEnabled
+        )
+        .documentation("Controls whether the equipped command item shows its hotswap HUD. Omission defaults true; "
+                + "an omitted child value inherits from its parent.")
+        .add()
         .<RosterStorage>append(
             new KeyedCodec<>(
                     "RosterStorage",
@@ -392,6 +400,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private String commandFamilyId;
     private final TwCommandPresentationSelection presentationSelection =
             new TwCommandPresentationSelection();
+    private boolean hotswapHudEnabled = true;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
     private Boolean projectRosterToItemMetadata;
@@ -470,6 +479,9 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                 parent.presentationSelection,
                 explicitTopLevelKeys
         );
+        if (!explicitTopLevelKeys.contains("HotswapHudEnabled")) {
+            hotswapHudEnabled = parent.hotswapHudEnabled;
+        }
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
         if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
@@ -585,6 +597,11 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     @Nonnull
     public List<CommandHudContributorRequirement> getHotswapHudContributors() {
         return presentationSelection.hotswapHudContributors();
+    }
+
+    /** Returns whether this item displays the equipped hotswap HUD. */
+    public boolean isHotswapHudEnabled() {
+        return hotswapHudEnabled;
     }
 
     public RosterStorage getRosterStorage() {

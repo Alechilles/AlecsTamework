@@ -307,6 +307,12 @@ for keys, detached traits, and layout limits.
 
 ### Custom Java command-HUD composition
 
+For an inspection tool that should show the animal target HUD without the
+command-control strip, set `HotswapHudEnabled` to `false` in its command-item
+config. The default is `true`; omitted values inherit from the parent. This
+does not change item interactions. Disable `LinkEnabled` and use an empty
+`CommandList` when the tool should not offer commands.
+
 The target HUD and equipped-tool hotswap strip are independent presentation
 surfaces. A Java plugin can register a renderer for either surface through
 `TameworkApi.commandHud()`. Command-item config selects them independently:

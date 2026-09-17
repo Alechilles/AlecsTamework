@@ -212,6 +212,9 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         }
         ItemStack stack = activeCommand.stack();
         TwCommandItemConfig config = activeCommand.config();
+        if (!config.isHotswapHudEnabled()) {
+            return hiddenModel();
+        }
         return new CommandHotswapHudViewModel(
                 resolvePrimarySlot(player, stack, config, nowMs),
                 OPEN_MENU_SLOT,
