@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.hypixel.hytale.component.ComponentType;
@@ -63,7 +64,7 @@ class BreedingCooldownServiceTest {
     }
 
     @Test
-    void parentCooldownMutationUsesEachOwnerModifierOnceAndLeavesChildLockUnchanged() throws Exception {
+    void parentCooldownMutationUsesEachOwnerModifierOnceAndDoesNotLockJuvenileOffspring() throws Exception {
         try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
                      SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
              TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
@@ -202,11 +203,33 @@ class BreedingCooldownServiceTest {
                 );
                 TameworkBreedingComponent initializedChild = store.getComponent(
                         childRef, breedingType);
-                assertEquals(200_000L, initializedChild.getCooldownDurationMs());
+                assertEquals(0L, initializedChild.getCooldownDurationMs());
                 assertFalse(initializedChild.isReady());
+                assertEquals(0L, initializedChild.getCooldownUntilMs());
+                assertEquals(0L, initializedChild.getCooldownStartedAtMs());
                 assertTrue(initializedChild.getLastPartnerUuid() == null);
                 assertTrue(initializedChild.getManualBreedingPlayerUuid() == null);
                 assertEquals(0L, initializedChild.getManualBreedingUntilMs());
+
+                // Old saves may still contain the pre-aging offspring cooldown.
+                ComponentType<EntityStore, TameworkLifeStageComponent> lifeType = new ComponentType<>();
+                setField(Tamework.getInstance(), "lifeStageComponentType", lifeType);
+                TameworkLifeStageComponent juvenile = new TameworkLifeStageComponent();
+                juvenile.setStage(CompanionLifeStageService.STAGE_BABY);
+                store.put(childRef, lifeType, juvenile);
+                initializedChild.setCooldownUntilMs(400_000L);
+                initializedChild.setCooldownStartedAtMs(200_000L);
+                initializedChild.setCooldownDurationMs(200_000L);
+                CompanionLifeStageService.refreshLifeStage(childRef, null, store);
+                assertEquals(0L, initializedChild.getCooldownUntilMs());
+                assertEquals(0L, initializedChild.getCooldownDurationMs());
+                assertFalse(initializedChild.isReady());
+
+                juvenile.setStage(CompanionLifeStageService.STAGE_ADULT);
+                initializedChild.setCooldownUntilMs(400_000L);
+                initializedChild.setCooldownDurationMs(200_000L);
+                CompanionLifeStageService.refreshLifeStage(childRef, null, store);
+                assertEquals(400_000L, initializedChild.getCooldownUntilMs());
             } finally {
                 clearRuntime(registry);
                 registry.close();

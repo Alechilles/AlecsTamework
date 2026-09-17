@@ -239,7 +239,8 @@ Group {
             Label #CooldownText { Anchor: (Top: 22, Left: 0, Width: 130, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #b9beb8); }
             Group { Anchor: (Top: 14, Left: 0, Width: 130, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 0, Width: 0, Height: 6); Background: #9abc78; }
-            Label #CooldownLabel { Anchor: (Top: 0, Left: 0, Width: 130, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #78bfc1); }
+            Group #AgeIcon { Anchor: (Top: 0, Left: 0, Width: 12, Height: 12); Background: "Tamework/LinkedPanelIcons/LifeStage_Adult.png"; }
+            Label #CooldownLabel { Anchor: (Top: 0, Left: 16, Width: 114, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #78bfc1); }
             TextButton #LifecycleProgressTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #BreedingCooldown { Anchor: (Width: 138, Height: 34); Visible: false;

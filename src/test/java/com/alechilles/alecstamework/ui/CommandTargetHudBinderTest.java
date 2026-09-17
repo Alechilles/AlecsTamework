@@ -35,6 +35,7 @@ class CommandTargetHudBinderTest {
         expected.set("#CooldownRow.Visible", true);
         expected.set("#Root #BreedingCooldown.Visible", true);
         expected.set("#Root #HarvestCooldown.Visible", true);
+        expected.set("#HarvestCooldown #HarvestCooldownIconImage.Visible", true);
         assertCommands(expected, commands);
         Assertions.assertTrue(data(commands, "#Root #HarvestCooldown #CooldownText.Text").toLowerCase().contains("ready"));
         var readyLayout = CommandTargetHudBinder.resolveLayout(model(ready, List.of()));
@@ -47,21 +48,23 @@ class CommandTargetHudBinderTest {
     @Test
     void rendersLifecycleAlongsideCompactCooldownMeters() {
         LinkedNpcEntry animal = cooldownStatus(true).withAnimalLifecycle(
-                new AnimalProgressionService.Presentation("Adult", false, false, false,
-                        60_000L, 0.5, 0.4));
+                new AnimalProgressionService.Presentation("Baby", false, false, false,
+                        60_000L, 0.5, 0.4, "Adult"));
 
+        animal = LinkedNpcEntrySnapshotMapper.build(List.of(animal))[0];
         UICommandBuilder commands = bind(model(animal, List.of()));
 
         UICommandBuilder expected = new UICommandBuilder();
         expected.set("#AgeProgress.Visible", true);
-        expected.set("#AgeStage.Text", "Age · Adult");
-        expected.set("#AgeCountdown.Text", "Prime in 1m");
+        expected.set("#AgeStage.Text", "Age · Baby");
+        expected.set("#AgeIcon.Background", "Tamework/LinkedPanelIcons/LifeStage_Baby.png");
+        expected.set("#AgeCountdown.Text", "Adult in 1m");
         assertCommands(expected, commands);
         Anchor fill = new Anchor();
         fill.setTop(Value.of(16));
         fill.setLeft(Value.of(0));
-        fill.setWidth(Value.of(42));
-        fill.setHeight(Value.of(4));
+        fill.setWidth(Value.of(40));
+        fill.setHeight(Value.of(6));
         Assertions.assertEquals(expectedObject(fill), data(commands, "#AgeMeterFill.Anchor"));
     }
 

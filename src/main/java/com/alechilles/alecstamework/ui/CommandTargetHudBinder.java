@@ -32,8 +32,8 @@ final class CommandTargetHudBinder {
     private static final int STATUS_ROW_WIDTH = 324;
     private static final int STATUS_ROW_HEIGHT = 48;
     private static final int COOLDOWN_ROW_HEIGHT = 40;
-    private static final int COMPACT_METER_WIDTH = 108;
-    private static final int COMPACT_METER_FILL_WIDTH = 104;
+    private static final int COMPACT_METER_WIDTH = 112;
+    private static final int COMPACT_METER_FILL_WIDTH = 100;
     private static final int FOOD_HEADING_HEIGHT = 18;
     private static final int FAVORITE_FOOD_HEIGHT = 36;
     private static final int FOOD_STRIP_HEIGHT = 46;
@@ -212,7 +212,10 @@ final class CommandTargetHudBinder {
         LinkedNpcEntry.AnimalLifecycle lifecycle = status.animalLifecycle();
         commandBuilder.set("#AgeProgress.Visible", display.visible());
         commandBuilder.setObject("#BreedingCooldown.Anchor", compactMeterAnchor());
-        commandBuilder.setObject("#HarvestCooldown.Anchor", compactMeterAnchor());
+        Anchor harvestAnchor = compactMeterAnchor();
+        harvestAnchor.setWidth(Value.of(COMPACT_METER_FILL_WIDTH));
+        commandBuilder.setObject("#HarvestCooldown.Anchor", harvestAnchor);
+        commandBuilder.set("#HarvestCooldown #HarvestCooldownIconImage.Visible", status.harvestCooldownKnown());
         commandBuilder.setObject("#BreedingCooldown #MeterFill.Anchor", compactMeterFill(
                 status.breedingCooldownRemainingMs() < 0L ? 0.0
                         : status.breedingCooldownActive() ? status.breedingCooldownRatio() : 1.0));
@@ -223,6 +226,7 @@ final class CommandTargetHudBinder {
             return;
         }
         commandBuilder.set("#AgeStage.Style.TextColor", LinkedNpcPanelCardBinder.lifecycleColor(lifecycle));
+        commandBuilder.set("#AgeIcon.Background", LinkedNpcPanelCardBinder.lifecycleIcon(lifecycle));
         commandBuilder.set("#AgeStage.Text", LocalizedText.format(
                 language, "tamework.commandmenu.lifecycle.ageStage", display.stageText()));
         commandBuilder.set("#AgeCountdown.Text", display.countdownText());
@@ -552,7 +556,7 @@ final class CommandTargetHudBinder {
         anchor.setTop(Value.of(16));
         anchor.setLeft(Value.of(0));
         anchor.setWidth(Value.of((int) Math.round(clampRatio(ratio) * COMPACT_METER_FILL_WIDTH)));
-        anchor.setHeight(Value.of(4));
+        anchor.setHeight(Value.of(6));
         return anchor;
     }
 

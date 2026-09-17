@@ -8,9 +8,9 @@ import com.hypixel.hytale.server.core.ui.Value;
  * linked-panel cards.
  */
 final class LinkedNpcPanelStatusMeter {
-    private static final int FILL_LEFT = 34;
+    private static final int FILL_LEFT = 28;
     private static final int FILL_TOP = 14;
-    private static final int FILL_MAX_WIDTH = 130;
+    private static final int FILL_MAX_WIDTH = 102;
     private static final int FILL_HEIGHT = 6;
     private static final int THRESHOLD_LEFT = 34;
     private static final int THRESHOLD_TOP = 12;

@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntity
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -134,6 +135,69 @@ class CommandSavedNpcPanelSnapshotTest {
         assertFalse(applied.isTraitsActionEnabled());
         assertFalse(applied.isTalentsActionVisible());
         assertFalse(applied.isTalentsActionEnabled());
+    }
+
+    @Test
+    void hidesBreedingPresentationForJuvenileSavedCompanions() {
+        ProfileId profileId = new ProfileId(UUID.randomUUID());
+        TameworkLifeStageComponent juvenile = new TameworkLifeStageComponent();
+        juvenile.setStage("Baby");
+        BsonDocument components = new BsonDocument()
+                .append("TameworkBreeding", TameworkBreedingComponent.CODEC.encode(
+                        new TameworkBreedingComponent("breed-test", 0.0, 0L, true, true,
+                                60_000L, null),
+                        new ExtraInfo()))
+                .append("TameworkLifeStage", TameworkLifeStageComponent.CODEC.encode(
+                        juvenile, new ExtraInfo()));
+        CompanionEntityCheckpointCodec codec = new CompanionEntityCheckpointCodec();
+        CompanionEntityCheckpoint checkpoint = CompanionEntityCheckpoint.create(
+                profileId, new NpcAlias(UUID.randomUUID()), 0L, new OwnerId(UUID.randomUUID()),
+                LifecycleRevision.INITIAL, ReconciliationGeneration.INITIAL, "world", 1.0, 2.0,
+                3.0, CompanionEntityCheckpoint.CaptureBoundary.UNLOAD, -15L,
+                new BsonDocument().append("Components", components), codec);
+
+        CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.decode(
+                profileWithoutSnapshots(profileId), codec.encode(checkpoint));
+        assertNotNull(saved);
+
+        LinkedNpcEntry applied = saved.apply(baseCard(), null);
+        assertFalse(applied.breedingEnabled());
+        assertFalse(applied.breedingAvailable());
+        assertFalse(applied.breedingCooldownKnown());
+        assertEquals(-1.0, applied.breedingHappinessRatio());
+    }
+
+    @Test
+    void exposesBreedingWhenAStaleSavedJuvenileStageHasReachedAdulthood() {
+        ProfileId profileId = new ProfileId(UUID.randomUUID());
+        TameworkLifeStageComponent staleJuvenile = new TameworkLifeStageComponent();
+        staleJuvenile.setStage("Baby");
+        staleJuvenile.setGrowthScalingEnabled(true);
+        staleJuvenile.setJuvenileClockInitialized(true);
+        staleJuvenile.setAdultAtMs(100L);
+        staleJuvenile.setLifecycleNowMs(100L);
+        BsonDocument components = new BsonDocument()
+                .append("TameworkBreeding", TameworkBreedingComponent.CODEC.encode(
+                        new TameworkBreedingComponent("breed-test", 0.0, 0L, true, true,
+                                0L, null),
+                        new ExtraInfo()))
+                .append("TameworkLifeStage", TameworkLifeStageComponent.CODEC.encode(
+                        staleJuvenile, new ExtraInfo()));
+        CompanionEntityCheckpointCodec codec = new CompanionEntityCheckpointCodec();
+        CompanionEntityCheckpoint checkpoint = CompanionEntityCheckpoint.create(
+                profileId, new NpcAlias(UUID.randomUUID()), 0L, new OwnerId(UUID.randomUUID()),
+                LifecycleRevision.INITIAL, ReconciliationGeneration.INITIAL, "world", 1.0, 2.0,
+                3.0, CompanionEntityCheckpoint.CaptureBoundary.UNLOAD, -15L,
+                new BsonDocument().append("Components", components), codec);
+
+        CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.decode(
+                profileWithoutSnapshots(profileId), codec.encode(checkpoint));
+        assertNotNull(saved);
+
+        LinkedNpcEntry applied = saved.apply(baseCard(), null);
+        assertTrue(applied.breedingEnabled());
+        assertTrue(applied.breedingAvailable());
+        assertTrue(applied.breedingCooldownKnown());
     }
 
     private static CompanionProfileReadModel profile(

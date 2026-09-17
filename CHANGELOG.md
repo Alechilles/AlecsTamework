@@ -20,6 +20,11 @@
 - Command menus and the target HUD show compact age, breeding, and harvest
   meters. Age shows progress within the current life stage; countdowns use
   hours and minutes, switching to seconds below one minute.
+- Fixed cooldown refreshes stretching compact meters. HUD meters now align
+  with the needs bars, and juvenile age countdowns name the next life stage.
+- Added distinct life-stage icons and restored the HUD harvest icon.
+- Juveniles hide breeding controls and timers, and reach adulthood without
+  an extra offspring breeding cooldown. Normal breeding requirements still apply.
 - Unloaded farms are not force-loaded or background-simulated. Needs and trough
   consumption pause while unloaded; aging progresses normally without care
   penalties, and harvest or breeding readiness remains bounded to one ready

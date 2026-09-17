@@ -293,7 +293,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
                 lifecycleDisplay.visible() || !showInlineLocation && entry.hasKnownCooldowns());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
-        bindCompactCooldownFills(commandBuilder, entrySelector, entry);
+
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
                 xpProgressRingSelector,
@@ -672,7 +672,9 @@ final class LinkedNpcPanelCardBinder {
                 countdown = LocalizedText.format(language,
                         "tamework.commandmenu.lifecycle.oldAgeDeath", remaining);
             } else {
-                String nextStage = resolveNextLifecycleStage(lifecycle.stage(), language);
+                String nextStage = lifecycle.nextStage().isBlank() ? resolveNextLifecycleStage(lifecycle.stage(), language)
+                        : LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.stage."
+                                + lifecycle.nextStage().toLowerCase(java.util.Locale.ROOT));
                 countdown = nextStage.isBlank()
                         ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.remaining", remaining)
                         : LocalizedText.format(language, "tamework.commandmenu.lifecycle.nextStage", nextStage, remaining);
@@ -683,6 +685,7 @@ final class LinkedNpcPanelCardBinder {
 
     private static String resolveNextLifecycleStage(String stage, String language) {
         String nextStage = switch (stage.toLowerCase(java.util.Locale.ROOT)) {
+            case "adolescent" -> "adult";
             case "adult" -> "prime";
             case "prime" -> "senior";
             default -> "";
@@ -696,6 +699,7 @@ final class LinkedNpcPanelCardBinder {
                                               LifecycleDisplay display, String language) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
+        commands.set(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
                 : "");
@@ -714,18 +718,17 @@ final class LinkedNpcPanelCardBinder {
         return lifecycle.prime() ? "#d9c878"
                 : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#d9a86f" : "#78bfc1";
     }
-    private static void bindCompactCooldownFills(UICommandBuilder commands, String card,
-                                                 LinkedNpcEntry entry) {
-        double breedingRatio = entry.breedingCooldownRemainingMs() < 0L ? 0.0
-                : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1.0;
-        double harvestRatio = entry.harvestCooldownRemainingMs() < 0L ? 0.0
-                : entry.harvestCooldownActive() ? entry.harvestCooldownRatio() : 1.0;
-        commands.setObject(card + " #BreedingCooldown #MeterFill.Anchor",
-                compactCooldownFill(breedingRatio, 28, 102));
-        commands.setObject(card + " #HarvestCooldown #MeterFill.Anchor",
-                compactCooldownFill(harvestRatio, 28, 102));
-    }
 
+    static String lifecycleIcon(LinkedNpcEntry.AnimalLifecycle lifecycle) {
+        String stage = switch (lifecycle.stage().toLowerCase(java.util.Locale.ROOT)) {
+            case "baby" -> "Baby";
+            case "adolescent" -> "Adolescent";
+            case "prime" -> "Prime";
+            case "senior" -> "Senior";
+            default -> "Adult";
+        };
+        return "Tamework/LinkedPanelIcons/LifeStage_" + stage + ".png";
+    }
     private static Anchor compactCooldownFill(double ratio, int left, int width) {
         return fixedAnchor(14, left, (int) Math.round(Math.clamp(ratio, 0.0, 1.0) * width), 6);
     }

@@ -29,7 +29,9 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -163,10 +165,14 @@ final class CommandSavedNpcPanelSnapshot {
         Meter needs = resolveNeeds(facts.needs, effectiveRole, base);
         Progression progression = resolveProgression(facts.leveling, facts.talents, effectiveRole, language, base);
         LinkedNpcTraitIndicator[] traits = resolveTraits(facts.traits, effectiveRole, language, base.traitIndicators());
-        Cooldown breeding = facts.breeding == null ? Cooldown.from(base.breedingCooldownKnown(), base.breedingCooldownActive(), base.breedingCooldownRemainingMs(), base.breedingCooldownRatio()) : facts.breeding.cooldown();
+        boolean juvenile = isJuvenileLifeStage(facts.lifeStage);
+        Cooldown breeding = juvenile ? new Cooldown(false, false, 0L, 0.0)
+                : facts.breeding == null
+                ? Cooldown.from(base.breedingCooldownKnown(), base.breedingCooldownActive(), base.breedingCooldownRemainingMs(), base.breedingCooldownRatio())
+                : facts.breeding.cooldown();
         Cooldown harvest = resolveHarvest(facts.harvest, effectiveRole, base);
-        boolean breedingEnabled = facts.breeding == null ? base.breedingEnabled() : facts.breeding.enabled;
-        boolean breedingAvailable = facts.breeding == null ? base.breedingAvailable() : true;
+        boolean breedingEnabled = !juvenile && (facts.breeding == null ? base.breedingEnabled() : facts.breeding.enabled);
+        boolean breedingAvailable = !juvenile && (facts.breeding == null ? base.breedingAvailable() : true);
         LinkedNpcEntry applied = new LinkedNpcEntry(
                 base.npcUuid(), base.displayName(), base.gender(), health.current, health.maximum,
                 happiness.current, happiness.maximum, happiness.targetPercent,
@@ -186,7 +192,7 @@ final class CommandSavedNpcPanelSnapshot {
                 base.recallLostRemainingMs());
         applied = applied.withRoleSubtitle(base.roleSubtitle())
                 .withPortraitIcon(resolvePortrait(effectiveRole, base.portraitIcon()))
-                .withBreedingHappinessRatio(base.breedingHappinessRatio())
+                .withBreedingHappinessRatio(juvenile ? -1.0 : base.breedingHappinessRatio())
                 .withFlightToggle(base.flightToggleAvailable(), base.flightToggleAirborne())
                 .withShoulderRide(base.shoulderRideAvailable(), base.shoulderRideMounted())
                 .withTraitValues(traitValues(facts.traits, effectiveRole));
@@ -196,6 +202,25 @@ final class CommandSavedNpcPanelSnapshot {
         applied = applied.withAnimalLifecycle(AnimalProgressionService.presentation(
                 facts.lifeStage, effectiveRole, base.captured() || base.dead()));
         return base.recoveryHeld() ? applied.withRecoveryHold(base.recoveryIncidentId()) : applied;
+    }
+
+    private static boolean isJuvenileLifeStage(@Nullable TameworkLifeStageComponent lifeStage) {
+        if (lifeStage == null || lifeStage.getStage() == null) {
+            return false;
+        }
+        String stage = lifeStage.getStage();
+        boolean juvenile = CompanionLifeStageService.STAGE_BABY.equalsIgnoreCase(stage)
+                || CompanionLifeStageService.STAGE_ADOLESCENT.equalsIgnoreCase(stage);
+        if (!juvenile || !lifeStage.isGrowthScalingEnabled()
+                || !lifeStage.isJuvenileClockInitialized()
+                || lifeStage.getAdultAtMs() == 0L) {
+            return juvenile;
+        }
+        long settled = lifeStage.getActiveProgressMs();
+        long active = AnimalProgressionService.activeTimeMs(lifeStage);
+        long pending = active >= settled ? active - settled : 0L;
+        long lifeNow = BreedingTimeService.saturatingAdd(lifeStage.getLifecycleNowMs(), pending);
+        return lifeNow < lifeStage.getAdultAtMs();
     }
 
     private static CommandSavedNpcPanelSnapshot decodeFullState(CompanionSnapshot snapshot) {

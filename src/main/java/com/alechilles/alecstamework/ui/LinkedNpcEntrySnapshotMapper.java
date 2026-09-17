@@ -101,7 +101,7 @@ final class LinkedNpcEntrySnapshotMapper {
                                     entry.animalLifecycle().stage(), entry.animalLifecycle().prime(),
                                     entry.animalLifecycle().frozen(), entry.animalLifecycle().nextDeath(),
                                     entry.animalLifecycle().remainingMs(), entry.animalLifecycle().yieldMultiplier(),
-                                    entry.animalLifecycle().stageProgress())
+                                    entry.animalLifecycle().stageProgress(), entry.animalLifecycle().nextStage())
                             : null);
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());

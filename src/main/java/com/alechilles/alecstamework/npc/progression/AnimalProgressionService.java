@@ -176,7 +176,8 @@ public final class AnimalProgressionService {
             long until = baby ? state.getAdolescentAtMs() : state.getAdultAtMs();
             return new Presentation(baby ? "Baby" : "Adolescent", false, captured, false,
                     (long) Math.ceil(Math.max(0, until - lifeNow) / growthRate), 0,
-                    stageProgress(lifeNow, baby ? state.getBornAtMs() : state.getAdolescentAtMs(), until));
+                    stageProgress(lifeNow, baby ? state.getBornAtMs() : state.getAdolescentAtMs(), until),
+                    until == state.getAdultAtMs() ? "Adult" : "Adolescent");
         }
         long juvenileRemaining = state.isGrowthScalingEnabled() && state.isJuvenileClockInitialized()
                 ? Math.max(0, state.getAdultAtMs() - state.getLifecycleNowMs()) : 0;
@@ -213,7 +214,11 @@ public final class AnimalProgressionService {
     }
 
     public record Presentation(String stage, boolean prime, boolean frozen, boolean nextDeath,
-                               long remainingMs, double yieldMultiplier, double stageProgress) {
+                               long remainingMs, double yieldMultiplier, double stageProgress, String nextStage) {
+        public Presentation(String stage, boolean prime, boolean frozen, boolean nextDeath,
+                            long remainingMs, double yieldMultiplier, double stageProgress) {
+            this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, stageProgress, "");
+        }
         public Presentation(String stage, boolean prime, boolean frozen, boolean nextDeath,
                             long remainingMs, double yieldMultiplier) {
             this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, 0);

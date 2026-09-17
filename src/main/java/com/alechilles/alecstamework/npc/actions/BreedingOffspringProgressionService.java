@@ -124,7 +124,7 @@ final class BreedingOffspringProgressionService {
         );
         CompanionGenderService.ensureGender(childRef, store, childRoleId, breedingConfig, selectedGender);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
-        applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
+        applyOffspringBreedingLock(childRef, childNpc, childRoleId, childCooldownMs, store);
         boolean familyAssigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
         if (!familyAssigned) {
             familyFlockRetryService.schedule(childRef, parentARef, parentBRef, store);
@@ -414,6 +414,7 @@ final class BreedingOffspringProgressionService {
 
     private void applyOffspringBreedingLock(Ref<EntityStore> childRef,
                                             @Nullable NPCEntity childNpc,
+                                            @Nullable String childRoleId,
                                             long childCooldownMs,
                                             Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
@@ -422,6 +423,16 @@ final class BreedingOffspringProgressionService {
         }
         TameworkBreedingComponent breeding = store.getComponent(childRef, breedingType);
         if (breeding == null) {
+            return;
+        }
+        if (!CompanionLifeStageService.isAdult(childRef, store, childRoleId)) {
+            breeding.setReady(false);
+            breeding.setCooldownUntilMs(0L);
+            breeding.setCooldownStartedAtMs(0L);
+            breeding.setCooldownDurationMs(0L);
+            breeding.setLastPartnerUuid(null);
+            breeding.clearManualBreedingReady();
+            store.putComponent(childRef, breedingType, breeding);
             return;
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);

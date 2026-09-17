@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessPresentationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
@@ -168,17 +169,22 @@ final class CommandLoadedNpcStatusSnapshotService {
         long breedingCooldownRemainingMs = 0L;
         double breedingCooldownRatio = 0.0;
         boolean breedingCooldownKnown = false;
-        CommandLinkedPanelCooldownSnapshotService.CooldownSnapshot breedingSnapshot =
-                cooldownSnapshotService.readBreedingCooldownSnapshot(npcRef, store, speciesId);
-        if (breedingSnapshot != null) {
-            breedingAvailable = breedingSnapshot.available;
-            if (breedingSnapshot.known) {
-                breedingEnabled = breedingSnapshot.enabled;
+        boolean breedingMature = CompanionLifeStageService.isAdult(npcRef, store, speciesId);
+        if (breedingMature) {
+            CommandLinkedPanelCooldownSnapshotService.CooldownSnapshot breedingSnapshot =
+                    cooldownSnapshotService.readBreedingCooldownSnapshot(npcRef, store, speciesId);
+            if (breedingSnapshot != null) {
+                breedingAvailable = breedingSnapshot.available;
+                if (breedingSnapshot.known) {
+                    breedingEnabled = breedingSnapshot.enabled;
+                }
+                breedingCooldownKnown = breedingSnapshot.known;
+                breedingCooldownActive = breedingSnapshot.active;
+                breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
+                breedingCooldownRatio = breedingSnapshot.ratio;
             }
-            breedingCooldownKnown = breedingSnapshot.known;
-            breedingCooldownActive = breedingSnapshot.active;
-            breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
-            breedingCooldownRatio = breedingSnapshot.ratio;
+        } else {
+            breedingEnabled = false;
         }
 
         boolean harvestCooldownActive = false;
@@ -286,8 +292,9 @@ final class CommandLoadedNpcStatusSnapshotService {
                         .getFlightToggle();
         Optional<Boolean> flightMode = new BondedCompanionFlightModeReader()
                 .read(npc, flightToggle);
-        entry = entry.withBreedingHappinessRatio(
-                resolveBreedingHappinessRatio(npcRef, store, resolvedRoleId, maxHappiness));
+        entry = entry.withBreedingHappinessRatio(breedingMature
+                ? resolveBreedingHappinessRatio(npcRef, store, resolvedRoleId, maxHappiness)
+                : -1.0);
         LinkedNpcEntry result = entry.withFlightToggle(flightMode.isPresent(),
                 flightMode.orElse(false));
         TwCompanionShoulderRideSettings shoulderRide =

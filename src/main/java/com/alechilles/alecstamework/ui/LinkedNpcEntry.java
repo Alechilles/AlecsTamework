@@ -1288,7 +1288,11 @@ public final class LinkedNpcEntry {
 
     /** Detached lifecycle display values shared by live, unloaded, captured, and coop cards. */
     public record AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
-                                  long remainingMs, double yieldMultiplier, double stageProgress) {
+                                  long remainingMs, double yieldMultiplier, double stageProgress, String nextStage) {
+        public AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
+                               long remainingMs, double yieldMultiplier, double stageProgress) {
+            this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, stageProgress, "");
+        }
         public AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
                                long remainingMs, double yieldMultiplier) {
             this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, 0);
@@ -1296,7 +1300,7 @@ public final class LinkedNpcEntry {
         static final AnimalLifecycle NONE = new AnimalLifecycle("", false, false, false, -1L, 1.0, 0);
         static AnimalLifecycle from(AnimalProgressionService.Presentation value) {
             return value == null ? NONE : new AnimalLifecycle(value.stage(), value.prime(), value.frozen(),
-                    value.nextDeath(), value.remainingMs(), value.yieldMultiplier(), value.stageProgress());
+                    value.nextDeath(), value.remainingMs(), value.yieldMultiplier(), value.stageProgress(), value.nextStage());
         }
         public boolean active() { return !stage.isBlank(); }
     }

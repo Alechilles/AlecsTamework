@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -38,6 +40,7 @@ public final class CompanionLifeStageService {
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
     private static final Set<UUID> ACTIVE_GROWTH_TICKERS = ConcurrentHashMap.newKeySet();
+    private static final BreedingCooldownResetService BREEDING_COOLDOWN_RESET = new BreedingCooldownResetService();
 
     /** Controls whether offspring initialization may reinterpret a missing planned family. */
     public enum LifecycleFamilyResolution {
@@ -312,6 +315,23 @@ public final class CompanionLifeStageService {
         return created;
     }
 
+    // Older saves can still carry the former offspring cooldown into adulthood.
+    private static void clearJuvenileBreedingCooldown(Ref<EntityStore> npcRef,
+                                                      @Nullable NPCEntity npc,
+                                                      Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
+        if (type == null) return;
+        TameworkBreedingComponent breeding = store.getComponent(npcRef, type);
+        if (breeding == null || breeding.getCooldownUntilMs() == 0L
+                && breeding.getCooldownStartedAtMs() == 0L && breeding.getCooldownDurationMs() == 0L) return;
+        boolean ready = breeding.isReady();
+        if (BREEDING_COOLDOWN_RESET.forceReady(npcRef, npc, breeding, store)) {
+            // Keep readiness under the normal happiness/needs rules.
+            breeding.setReady(ready);
+            store.putComponent(npcRef, type, breeding);
+        }
+    }
+
     public static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
                                         @Nullable NPCEntity npc,
                                         @Nullable Store<EntityStore> store) {
@@ -334,6 +354,9 @@ public final class CompanionLifeStageService {
         changed = true;
         long nowMs = AnimalProgressionService.lifeTime(stage, store);
         String resolvedStage = resolveStageId(stage, nowMs);
+        if (!STAGE_ADULT.equals(previousStage) || !STAGE_ADULT.equals(resolvedStage)) {
+            clearJuvenileBreedingCooldown(npcRef, npc, store);
+        }
         if (!resolvedStage.equals(stage.getStage())) {
             stage.setStage(resolvedStage);
             changed = true;
