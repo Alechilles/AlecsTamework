@@ -235,4 +235,13 @@ class LinkedNpcPanelStatusTextServiceTest {
         assertFalse(clock.startsWith("-"));
         assertFalse(duration.contains("-"));
     }
+
+    @Test
+    void countdownUsesRoundedUpMinutesUntilUnderOneMinute() {
+        assertEquals("2m", LinkedNpcPanelStatusTextService.formatRemainingTime(60_001L, "en-US"));
+        assertEquals("1m", LinkedNpcPanelStatusTextService.formatRemainingTime(60_000L, "en-US"));
+        assertEquals("60s", LinkedNpcPanelStatusTextService.formatRemainingTime(59_999L, "en-US"));
+        assertEquals("45s", LinkedNpcPanelStatusTextService.formatRemainingTime(45_000L, "en-US"));
+        assertEquals("0s", LinkedNpcPanelStatusTextService.formatRemainingTime(0L, "en-US"));
+    }
 }

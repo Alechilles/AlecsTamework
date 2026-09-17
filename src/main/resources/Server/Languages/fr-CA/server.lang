@@ -50,6 +50,7 @@ tamework.ui.shared.button.edit=Modifier
 tamework.ui.shared.button.refresh=Actualiser
 tamework.ui.shared.button.reset=Réinitialiser
 tamework.ui.shared.duration.minutesSeconds={0} min {1} s
+tamework.ui.shared.duration.minutes={0} min
 tamework.ui.shared.duration.seconds={0} s
 tamework.ui.shared.label.group=Groupe
 tamework.ui.shared.placeholder.groupName=Nom du groupe

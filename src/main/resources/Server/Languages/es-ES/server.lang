@@ -998,6 +998,7 @@ tamework.ui.shared.button.random=Aleatorio
 tamework.ui.shared.button.refresh=Actualizar
 tamework.ui.shared.button.reset=Reiniciar
 tamework.ui.shared.duration.minutesSeconds={0}m {1}s
+tamework.ui.shared.duration.minutes={0}m
 tamework.ui.shared.duration.seconds={0}s
 tamework.ui.shared.label.group=Grupo
 tamework.ui.shared.modifier=Modificador

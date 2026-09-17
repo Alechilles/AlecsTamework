@@ -226,13 +226,12 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String formatRemainingTime(long remainingMs, String language) {
-        long totalSeconds = ceilMillisToSeconds(remainingMs);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return LocalizedText.format(language, "tamework.ui.shared.duration.seconds", seconds);
+        if (remainingMs < 60_000L) {
+            return LocalizedText.format(language, "tamework.ui.shared.duration.seconds",
+                    ceilMillisToSeconds(remainingMs));
         }
-        return LocalizedText.format(language, "tamework.ui.shared.duration.minutesSeconds", minutes, seconds);
+        long minutes = 1L + ((remainingMs - 1L) / 60_000L);
+        return LocalizedText.format(language, "tamework.ui.shared.duration.minutes", minutes);
     }
 
     static String formatRemainingClock(long remainingMs) {
