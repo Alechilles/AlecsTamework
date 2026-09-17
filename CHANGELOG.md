@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Captured age meters now gray out consistently, and paused meters show a larger
+  pause symbol centered over the bar.
+
 - Flat UI symbols now use white textures with explicit display tints. Shaded
   artwork and symbols with contrasting internal details retain their original textures.
 - Unloaded and captured animal cards keep the normal card height, with location

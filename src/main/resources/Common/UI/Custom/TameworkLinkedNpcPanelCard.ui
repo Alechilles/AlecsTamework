@@ -238,40 +238,40 @@ Group {
     }
     Group #CooldownRow { Anchor: (Top: 111, Left: 432, Right: 0, Height: 34); LayoutMode: Left;
         Group #LifecycleProgress { Anchor: (Width: 138, Height: 34); Visible: false;
-            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
-                Group #LeftStroke { Anchor: (Left: 0, Width: 2, Height: 6); Background: #78bfc1; }
-                Group #RightStroke { Anchor: (Left: 4, Width: 2, Height: 6); Background: #78bfc1; }
-            }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #b9beb8); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #9abc78; }
             Group #AgeIcon { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/LifeStage_Adult.png", Color: #ffffff); }
             Label #CooldownLabel { Anchor: (Top: 0, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #78bfc1); }
+            Group #Paused { Anchor: (Top: 12, Left: 70, Width: 14, Height: 10); Background: #202723; Visible: false; HitTestVisible: false;
+                Group { Anchor: (Left: 2, Width: 3, Height: 10); Background: #b9beb8; }
+                Group { Anchor: (Left: 9, Width: 3, Height: 10); Background: #b9beb8; }
+            }
             TextButton #LifecycleProgressTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #BreedingCooldown { Anchor: (Width: 138, Height: 34); Visible: false;
-            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
-                Group { Anchor: (Left: 0, Width: 2, Height: 6); Background: #bb959e; }
-                Group { Anchor: (Left: 4, Width: 2, Height: 6); Background: #bb959e; }
-            }
             Group #BreedingCooldownIconMuted { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #777777); Visible: false; }
         Group #BreedingCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #ffffff); }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #bb959e; }
             Label #CooldownLabel { Anchor: (Top: 0, Left: 24, Width: 106, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: (FontSize: 9, TextColor: #b9beb8); }
+            Group #Paused { Anchor: (Top: 12, Left: 70, Width: 14, Height: 10); Background: #202723; Visible: false; HitTestVisible: false;
+                Group { Anchor: (Left: 2, Width: 3, Height: 10); Background: #b9beb8; }
+                Group { Anchor: (Left: 9, Width: 3, Height: 10); Background: #b9beb8; }
+            }
             TextButton #BreedingCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #HarvestCooldown { Anchor: (Width: 138, Height: 34); Visible: false;
-            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
-                Group { Anchor: (Left: 0, Width: 2, Height: 6); Background: #cbbb88; }
-                Group { Anchor: (Left: 4, Width: 2, Height: 6); Background: #cbbb88; }
-            }
             Group #HarvestCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png", Color: #ffffff); }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #cbbb88; }
             Label #CooldownLabel { Anchor: (Top: 0, Left: 24, Width: 106, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: (FontSize: 9, TextColor: #b9beb8); }
+            Group #Paused { Anchor: (Top: 12, Left: 70, Width: 14, Height: 10); Background: #202723; Visible: false; HitTestVisible: false;
+                Group { Anchor: (Left: 2, Width: 3, Height: 10); Background: #b9beb8; }
+                Group { Anchor: (Left: 9, Width: 3, Height: 10); Background: #b9beb8; }
+            }
             TextButton #HarvestCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
     }
