@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.0.1 - Database Growth Hotfix - 2026-09-16
 
 - Reduced database growth from repeated entity checkpoints by compacting old,
   consumed checkpoint history while preserving current saves and retry safety.
