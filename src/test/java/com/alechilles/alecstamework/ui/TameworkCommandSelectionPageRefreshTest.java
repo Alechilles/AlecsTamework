@@ -37,6 +37,37 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
     @Test
+    void decorationsOnlyTargetRenderedCardsWhileOwnerListRefreshIsPending() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        build(page);
+        // A mode change refreshes the model before the card rebuild reaches the client.
+        LinkedNpcEntry second = new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 10, 10,
+                0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false,
+                0L, new LinkedNpcTraitIndicator[0]);
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> List.of(ENTRY, second));
+        invoke(page, "refreshLinkedNpcEntries");
+        var snapshot = new com.alechilles.alecstamework.api.commandui.CommandUiSnapshot(
+                OWNER, 1L, 1L, null, List.of(), List.of(),
+                new com.alechilles.alecstamework.api.commandui.CommandUiPanelState("owned"));
+        UICommandBuilder commands = new UICommandBuilder();
+        page.updateDefaultDecorations(snapshot, commands);
+        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                "#TameworkLinkedPanelList[0] #ContributorPortraitStars.Visible".equals(command.selector)));
+        assertFalse(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                command.selector.startsWith("#TameworkLinkedPanelList[1]")),
+                "Contributor updates must not target a card before it is appended.");
+        refresh(page, true);
+        commands = new UICommandBuilder();
+        page.updateDefaultDecorations(snapshot, commands);
+        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                "#TameworkLinkedPanelList[1] #ContributorPortraitStars.Visible".equals(command.selector)));
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void modeTabClicksNeedNoClientPropertyLookupAndUpdateTheHeader() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),

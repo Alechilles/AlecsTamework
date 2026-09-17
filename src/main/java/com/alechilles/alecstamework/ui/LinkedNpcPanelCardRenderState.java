@@ -76,6 +76,8 @@ final class LinkedNpcPanelCardRenderState {
 
     LinkedNpcEntry entryAt(int index) { return entries[index]; }
 
+    int entryCount() { return entries.length; }
+
 
     private static boolean pending(LinkedNpcEntry entry, UUID pendingUuid) {
         return entry != null && pendingUuid != null

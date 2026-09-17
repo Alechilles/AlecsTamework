@@ -56,9 +56,11 @@ final class CommandSelectionLinkedPanelRuntime {
     void bindDefaultDecorations(UICommandBuilder commands) {
         CommandUiDefaultDecorationBinder.bindHeader(commands,
                 page.defaultDecorations());
-        for (int index = 0; index < page.linkedNpcEntries.length; index++) {
-            LinkedNpcEntry entry = page.linkedNpcEntries[index];
-            CommandPanelFeaturePresentation presentation = page.featureController
+        // Tab/filter changes can replace the model before its queued rebuild is sent.
+        // Contributor updates must address the cards that are still on the client.
+        for (int index = 0; index < page.cardRenderState.entryCount(); index++) {
+            LinkedNpcEntry entry = page.cardRenderState.entryAt(index);
+            CommandPanelFeaturePresentation presentation = page.cardRenderState
                     .presentation(entry.npcUuid());
             if (presentation != null && presentation.bonded() != null) continue;
             CommandUiDefaultDecorationBinder.bindCard(commands,
