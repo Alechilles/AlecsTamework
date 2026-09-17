@@ -13,7 +13,7 @@ $C.@PageOverlay {
       Background: #252b27;
       Group {
         Anchor: (Left: 16, Top: 12, Width: 30, Height: 30);
-        Background: "Tamework/PanelActions/Locate_Glyph_Default.png";
+        Background: (TexturePath: "Tamework/PanelActions/Locate_Glyph_Default.png", Color: #f8ecd4);
         HitTestVisible: false;
       }
       Label #TameworkLinkedLocationTitle {
@@ -24,7 +24,7 @@ $C.@PageOverlay {
       Group {
         Anchor: (Top: 11, Right: 12, Width: 32, Height: 32);
         TextButton #TameworkLinkedLocationCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
-        Group { Anchor: (Top: 4, Left: 4, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+        Group { Anchor: (Top: 4, Left: 4, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); }
       }
     }
     Group { Anchor: (Top: 57, Left: 3, Right: 3, Height: 1); Background: #4a5a50; }

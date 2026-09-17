@@ -21,7 +21,7 @@ final class LinkedNpcPanelIconStyles {
 
     static void style(UICommandBuilder commands, String selector, String name) {
         commands.set(selector + ".Style", Value.ref("TameworkPanelActionStyles.ui", name));
-        commands.set(selector + "Glyph.Background", "Tamework/PanelActions/" + name + "_Glyph_Default.png");
+        commands.setObject(selector + "Glyph.Background", UiIconStyle.forTexture("Tamework/PanelActions/" + name + "_Glyph_Default.png"));
     }
 
     static void visible(UICommandBuilder commands, String selector, boolean visible) {

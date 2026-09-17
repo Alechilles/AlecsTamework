@@ -18,12 +18,16 @@ import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -200,6 +204,99 @@ class CommandSavedNpcPanelSnapshotTest {
         assertTrue(applied.breedingCooldownKnown());
     }
 
+    @Test
+    void advancesSavedCooldownsWithSignedWorldTimeAndCustomDayLength() {
+        long checkpointWorldMs = -1_000_000L;
+        double gameRate = 3.0;
+        long durationMs = 30_000L;
+        TameworkLifeStageComponent lifeStage = progressionAt(checkpointWorldMs, false);
+        TameworkBreedingComponent breeding = new TameworkBreedingComponent(
+                "breed-test", 0.0, 0L, true, true,
+                checkpointWorldMs + durationMs, null, checkpointWorldMs, durationMs);
+        TameworkAlarmComponent alarms = new TameworkAlarmComponent();
+        alarms.setAlarm("Harvest_Ready", checkpointWorldMs, durationMs, checkpointWorldMs + durationMs);
+
+        long clockAtSnapshot = AnimalProgressionClock.get().current(null);
+        lifeStage.setProgressionClockMs(clockAtSnapshot);
+        CommandSavedNpcPanelSnapshot saved = savedTimers(lifeStage, breeding, alarms);
+        CompanionRuntimeClock.advanceByDeltaSeconds(4.0f);
+
+        LinkedNpcEntry applied = saved.apply(baseCard(), null, gameRate);
+
+        assertTrue(applied.breedingCooldownKnown());
+        assertTrue(applied.breedingCooldownActive());
+        assertEquals(6_000L, applied.breedingCooldownRemainingMs());
+        assertEquals(0.4, applied.breedingCooldownRatio());
+        assertTrue(applied.harvestCooldownKnown());
+        assertTrue(applied.harvestCooldownActive());
+        assertEquals(6_000L, applied.harvestCooldownRemainingMs());
+        assertEquals(0.4, applied.harvestCooldownRatio());
+
+        LinkedNpcEntry otherWorld = saved.apply(baseCard(), null, Double.NaN);
+        assertEquals(-1L, otherWorld.breedingCooldownRemainingMs());
+        assertEquals(-1L, otherWorld.harvestCooldownRemainingMs());
+    }
+
+    @Test
+    void keepsCapturedSavedCooldownsFrozenAtTheirCheckpoint() {
+        long checkpointWorldMs = -1_000_000L;
+        long durationMs = cooldownDurationForTenSeconds();
+        TameworkLifeStageComponent lifeStage = progressionAt(checkpointWorldMs, false);
+        TameworkBreedingComponent breeding = new TameworkBreedingComponent(
+                "breed-test", 0.0, 0L, true, true,
+                checkpointWorldMs + durationMs, null, checkpointWorldMs, durationMs);
+        TameworkAlarmComponent alarms = new TameworkAlarmComponent();
+        alarms.setAlarm("Harvest_Ready", checkpointWorldMs, durationMs, checkpointWorldMs + durationMs);
+
+        CommandSavedNpcPanelSnapshot saved = savedTimers(lifeStage, breeding, alarms);
+        CompanionRuntimeClock.advanceByDeltaSeconds(4.0f);
+
+        LinkedNpcEntry applied = saved.apply(capturedBaseCard(), null);
+
+        assertTrue(applied.breedingCooldownActive());
+        assertEquals(10_000L, applied.breedingCooldownRemainingMs());
+        assertEquals(0.0, applied.breedingCooldownRatio());
+        assertTrue(applied.harvestCooldownActive());
+        assertEquals(10_000L, applied.harvestCooldownRemainingMs());
+        assertEquals(0.0, applied.harvestCooldownRatio());
+    }
+
+    private static TameworkLifeStageComponent progressionAt(long worldMs, boolean paused) {
+        TameworkLifeStageComponent lifeStage = new TameworkLifeStageComponent();
+        lifeStage.setProgressionInitialized(true);
+        lifeStage.setLastProgressionWorldMs(worldMs);
+        lifeStage.setActiveProgressMs(0L);
+        lifeStage.setProgressionClockMs(AnimalProgressionClock.get().current(null));
+        lifeStage.setStoredProgressionPaused(paused);
+        return lifeStage;
+    }
+
+    private static long cooldownDurationForTenSeconds() {
+        return Math.round(BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(null) * 10_000.0);
+    }
+
+    private static CommandSavedNpcPanelSnapshot savedTimers(
+            TameworkLifeStageComponent lifeStage,
+            TameworkBreedingComponent breeding,
+            TameworkAlarmComponent alarms
+    ) {
+        ProfileId profileId = new ProfileId(UUID.randomUUID());
+        BsonDocument components = new BsonDocument()
+                .append("TameworkBreeding", TameworkBreedingComponent.CODEC.encode(breeding, new ExtraInfo()))
+                .append("TameworkAlarm", TameworkAlarmComponent.CODEC.encode(alarms, new ExtraInfo()))
+                .append("TameworkLifeStage", TameworkLifeStageComponent.CODEC.encode(lifeStage, new ExtraInfo()));
+        CompanionEntityCheckpointCodec codec = new CompanionEntityCheckpointCodec();
+        CompanionEntityCheckpoint checkpoint = CompanionEntityCheckpoint.create(
+                profileId, new NpcAlias(UUID.randomUUID()), 0L, new OwnerId(UUID.randomUUID()),
+                LifecycleRevision.INITIAL, ReconciliationGeneration.INITIAL, "world", 1.0, 2.0,
+                3.0, CompanionEntityCheckpoint.CaptureBoundary.UNLOAD, -15L,
+                new BsonDocument().append("Components", components), codec);
+        CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.decode(
+                profileWithoutSnapshots(profileId), codec.encode(checkpoint));
+        assertNotNull(saved);
+        return saved;
+    }
+
     private static CompanionProfileReadModel profile(
             ProfileId profileId,
             CompanionSnapshot snapshot
@@ -250,6 +347,12 @@ class CommandSavedNpcPanelSnapshotTest {
     private static LinkedNpcEntry baseCard() {
         return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 1, 1, 0, 0,
                 null, 0, 0, 0, 0, false, false, false, false, false, false,
+                0L, new com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator[0]);
+    }
+
+    private static LinkedNpcEntry capturedBaseCard() {
+        return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 1, 1, 0, 0,
+                null, 0, 0, 0, 0, false, false, false, true, false, false,
                 0L, new com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator[0]);
     }
 

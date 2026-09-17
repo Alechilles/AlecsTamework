@@ -7,6 +7,24 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LinkedNpcTraitIndicatorBinderTest {
+    @Test
+    void tintsBundledWhiteSymbolsWithoutRecoloringCustomArtwork() {
+        for (String path : new String[] {"Tamework/LinkedPanelIcons/Trait_Size.png", "OtherMod/CustomTrait.png"}) {
+            UICommandBuilder actual = new UICommandBuilder();
+            LinkedNpcTraitIndicatorBinder.bind(actual, "#Card", new LinkedNpcTraitIndicator[] {
+                    new LinkedNpcTraitIndicator("", path, "Size", "Size", 1.0, true, false)
+            });
+            var style = new com.hypixel.hytale.server.core.ui.PatchStyle(Value.of(path));
+            if (path.startsWith("Tamework/")) style.setColor(Value.of("#f7ecd0"));
+            UICommandBuilder expected = new UICommandBuilder();
+            expected.setObject("#Card #TraitSlot0 #TraitIconImage.Background", style);
+            String emitted = java.util.Arrays.stream(actual.getCommands())
+                    .filter(c -> c.selector.equals("#Card #TraitSlot0 #TraitIconImage.Background"))
+                    .findFirst().orElseThrow().data;
+            assertEquals(expected.getCommands()[0].data, emitted);
+        }
+    }
+
     // Catches the old hidden-ring segments making maxed traits appear only partly filled.
     @Test
     void traitBarsShowTheirWholeRangeForPositiveAndNegativeTraits() {

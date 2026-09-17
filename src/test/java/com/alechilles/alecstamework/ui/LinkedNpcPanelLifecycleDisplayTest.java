@@ -26,15 +26,15 @@ class LinkedNpcPanelLifecycleDisplayTest {
     }
 
     @Test
-    void capturedLifecycleUsesPausedStatus() {
+    void capturedLifecycleKeepsItsRemainingTimeVisible() {
         LinkedNpcEntry captured = entry(true).withAnimalLifecycle(
-                new AnimalProgressionService.Presentation("Adult", false, false, false,
+                new AnimalProgressionService.Presentation("Adult", false, true, false,
                         60_000L, 0.5));
 
         LinkedNpcPanelCardBinder.LifecycleDisplay display =
                 LinkedNpcPanelCardBinder.resolveLifecycleDisplay(captured, "en-US");
 
-        assertFalse(display.countdownText().isBlank());
+        assertEquals("Prime in 1m", display.countdownText());
     }
 
     @Test

@@ -249,6 +249,8 @@ final class LinkedNpcPanelCardBinder {
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
+        commandBuilder.set(recallCountdownSelector + ".Style",
+                Value.ref("TameworkLinkedNpcPanelCard.ui", "RecallCountdown"));
         commandBuilder.set(
                 recallCountdownSelector + ".Text",
                 LocalizedText.format(
@@ -292,7 +294,10 @@ final class LinkedNpcPanelCardBinder {
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive, showInlineLocation);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
-                lifecycleDisplay.visible() || !showInlineLocation && entry.hasKnownCooldowns());
+                lifecycleDisplay.visible() || entry.hasKnownCooldowns());
+        commandBuilder.set(entrySelector + " #LifecycleProgress #Paused.Visible", entry.captured() || lifecycle.frozen());
+        commandBuilder.set(entrySelector + " #BreedingCooldown #Paused.Visible", entry.captured());
+        commandBuilder.set(entrySelector + " #HarvestCooldown #Paused.Visible", entry.captured());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
 
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
@@ -365,7 +370,7 @@ final class LinkedNpcPanelCardBinder {
             int emblemSize = lost ? (compact ? 48 : 72) : compact ? 36 : 44;
             int emblemTop = lost ? (compact ? 37 : managedRoster ? 64 : 46) : 36;
             int labelTop = lost ? emblemTop + emblemSize + 4 : compact ? 74 : 82;
-            commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
+            commandBuilder.setObject(entrySelector + " #StatusEmblem.Background", UiIconStyle.forTexture(emblem));
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",
                     fixedAnchor(emblemTop, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
             commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
@@ -402,33 +407,37 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(inlineLocationCoordinatesSelector + ".Value", location.coordinates());
         commandBuilder.set(inlineLocationCoordinatesSelector + ".MaxLength",
                 Math.max(64, location.coordinates().length() + 16));
-        int locationRow = showInlineStatus ? 52 : 18;
+        int locationRow = showInlineStatus ? 28 : 14;
         int inlineLocationWidth = showRecall || showReturnHome || showSetHome ? 296 : 414;
+        commandBuilder.setObject(inlineLocationStatusSelector + ".Anchor",
+                fixedAnchor(14, 0, inlineLocationWidth, 14));
         commandBuilder.setObject(inlineLocationWorldSelector + ".Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth, 18));
-        locationRow += showInlineWorld ? 22 : 0;
+                fixedAnchor(locationRow, 0, inlineLocationWidth, 14));
+        locationRow += showInlineWorld ? 14 : 0;
         commandBuilder.setObject(inlineLocationCoordinatesSelector + ".Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth - 34, 26));
+                fixedAnchor(locationRow, 0, inlineLocationWidth - 24, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CoordinateLabel.Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth - 34, 26));
+                fixedAnchor(locationRow, 0, inlineLocationWidth - 24, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CopyButton.Anchor",
-                fixedAnchor(locationRow, inlineLocationWidth - 28, 28, 26));
+                fixedAnchor(locationRow, inlineLocationWidth - 20, 20, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CopyGlyph.Anchor",
-                fixedAnchor(locationRow + 4, inlineLocationWidth - 23, 18, 18));
+                fixedAnchor(locationRow + 2, inlineLocationWidth - 17, 14, 14));
         commandBuilder.setObject(inlineLocationSelector + " #CopyHint.Anchor",
                 fixedAnchor(locationRow + 27, 0, inlineLocationWidth - 34, 13));
         commandBuilder.setObject(inlineLocationSelector + " #RelativeDistance.Anchor",
-                fixedAnchor(locationRow + 26, 0, inlineLocationWidth, 14));
+                fixedAnchor(locationRow + 18, 0, inlineLocationWidth, 14));
         if (showInlineCoordinates) {
             eventBuilder.addEventBinding(CustomUIEventBindingType.Activating,
                     inlineLocationSelector + " #CopyButton",
                     EventData.of(config.eventCommandId(), LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid()), false);
         }
         if (showInlineLocation) {
-            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 114);
+            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 74);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
-                    fixedAnchor(146, 432, inlineLocationWidth, 14));
+                    fixedAnchor(88, 730, 116, 20));
+            commandBuilder.set(recallCountdownSelector + ".Style",
+                    Value.ref("TameworkLinkedNpcPanelCard.ui", "InlineRecallCountdown"));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -438,8 +447,14 @@ final class LinkedNpcPanelCardBinder {
                 "tamework.ui.linkedPanel.action." + (entry.lost() ? "recover" : "revive")));
         LinkedNpcPanelIconStyles.visible(commandBuilder, locateSelector, showLocate);
         LinkedNpcPanelIconStyles.visible(commandBuilder, recallSelector, showRecall);
+        if (showInlineLocation && showRecallCountdown) {
+            commandBuilder.set(recallSelector + "Caption.Visible", false);
+        }
         LinkedNpcPanelIconStyles.visible(commandBuilder, setHomeSelector, showSetHome);
         LinkedNpcPanelIconStyles.visible(commandBuilder, returnHomeSelector, showReturnHome);
+        if (showInlineLocation && showRecallCountdown) {
+            commandBuilder.set(returnHomeSelector + "Caption.Visible", false);
+        }
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseSelector, showRelease);
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseDisabledSelector, showReleaseDisabled);
         commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language,
@@ -610,15 +625,14 @@ final class LinkedNpcPanelCardBinder {
     static void bindCardLayout(UICommandBuilder commands, String card, LinkedNpcEntry entry,
                                boolean managedRoster, boolean showActiveToggle,
                                boolean showInlineLocation) {
-        boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation;
+        boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation
+                && (entry.dead() || entry.lost());
         Anchor cardAnchor = buildCardAnchor(managedRoster, compact);
-        boolean lifecycleBelowLocation = showInlineLocation && entry.animalLifecycle().active();
-        if (lifecycleBelowLocation) cardAnchor.setHeight(Value.of(210));
         commands.setObject(card + ".Anchor", cardAnchor);
-        Anchor cooldownAnchor = fixedAnchor(lifecycleBelowLocation ? 146 : 111, 432, 414, 34);
+        Anchor cooldownAnchor = fixedAnchor(111, 432, 414, 34);
         commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
         bindPortrait(commands, card, entry, compact);
-        boolean showDetails = !compact && (!showInlineLocation || entry.hasKnownCardDetails());
+        boolean showDetails = !compact && entry.hasKnownCardDetails();
         commands.set(card + " #NeedRingRow.Visible", showDetails);
         commands.set(card + " #TraitStrip.Visible", showDetails);
         commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth() || entry.dead());
@@ -663,9 +677,9 @@ final class LinkedNpcPanelCardBinder {
                 ? "tamework.commandmenu.lifecycle.yield.maximumTooltip"
                 : "tamework.commandmenu.lifecycle.yield.reducedTooltip");
         String countdown = "";
-        if (entry.captured() || lifecycle.frozen() && !lifecycle.prime()) {
+        if (!entry.captured() && lifecycle.frozen() && !lifecycle.prime()) {
             countdown = LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.status.paused");
-        } else if (lifecycle.frozen()) {
+        } else if (lifecycle.frozen() && (!entry.captured() || lifecycle.remainingMs() == Long.MAX_VALUE)) {
             countdown = LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.status.frozen");
         } else if (lifecycle.remainingMs() >= 0L && lifecycle.remainingMs() != Long.MAX_VALUE) {
             String remaining = LinkedNpcPanelStatusTextService.formatRemainingTime(lifecycle.remainingMs(), language);
@@ -711,6 +725,8 @@ final class LinkedNpcPanelCardBinder {
                         ? "LifecycleSeniorLabel" : "LifecycleAdultLabel"));
         commands.set(selector + " #LifecycleProgressTooltip.TooltipText", display.yieldTooltip());
         commands.set(selector + " #MeterFill.Background", lifecycleColor(lifecycle));
+        commands.set(selector + " #Paused #LeftStroke.Background", lifecycleColor(lifecycle));
+        commands.set(selector + " #Paused #RightStroke.Background", lifecycleColor(lifecycle));
         commands.setObject(selector + " #MeterFill.Anchor",
                 LinkedNpcPanelStatusMeter.buildFillAnchor(lifecycle.stageProgress()));
     }

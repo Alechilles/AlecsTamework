@@ -35,13 +35,13 @@ Group {
 
       Group #SectionToggleTopExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretUp.png";
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
         Visible: true;
       }
 
       Group #SectionToggleTopCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretDown.png";
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
         Visible: false;
       }
     }
@@ -151,13 +151,13 @@ Group {
 
       Group #SectionToggleNestedExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretUp.png";
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
         Visible: true;
       }
 
       Group #SectionToggleNestedCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretDown.png";
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
         Visible: false;
       }
     }
@@ -267,13 +267,13 @@ Group {
 
       Group #SectionToggleDeepExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretUp.png";
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
         Visible: true;
       }
 
       Group #SectionToggleDeepCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: "TwConfigCaretDown.png";
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
         Visible: false;
       }
     }

@@ -129,8 +129,34 @@ class LinkedNpcPanelCardRenderStateTest {
             var meter = anchor(commands, "#Card #CooldownRow.Anchor");
             org.junit.jupiter.api.Assertions.assertTrue(card.getNumber("Height").intValue()
                     > meter.getNumber("Top").intValue() + meter.getNumber("Height").intValue());
-            if (location) org.junit.jupiter.api.Assertions.assertTrue(meter.getNumber("Top").intValue() >= 142);
+            assertEquals(176, card.getNumber("Height").intValue());
+            assertEquals(111, meter.getNumber("Top").intValue());
         }
+    }
+
+    @Test
+    void capturedContainerDetailsFitAbovePausedMetersWithoutAnotherLocationPage() {
+        var animal = new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 81, 81,
+                96, 100, "", 86, 100, 99, 100, false, false, false, true, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY)
+                .withAnimalLifecycle(new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
+                        "Adult", false, true, false, 1_200_000, 0.5, 0.5))
+                .withLocation(new LinkedNpcEntry.Location("Capture Crate in Wooden Chest.", "default",
+                        "1054.1, 122.0, 120.4", "220m south, 153m east"));
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, animal, false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        String card = "#TameworkLinkedPanelList[0]";
+        assertEquals(176, anchor(commands, card + ".Anchor").getNumber("Height").intValue());
+        var location = anchor(commands, card + " #InlineLocation.Anchor");
+        var directions = anchor(commands, card + " #InlineLocation #RelativeDistance.Anchor");
+        var meters = anchor(commands, card + " #CooldownRow.Anchor");
+        org.junit.jupiter.api.Assertions.assertTrue(location.getNumber("Top").intValue()
+                + directions.getNumber("Top").intValue() + directions.getNumber("Height").intValue()
+                < meters.getNumber("Top").intValue());
+        assertVisible(commands, card + " #InlineLocation #CopyButton.Visible", true);
+        assertVisible(commands, card + " #LocateButton.Visible", false);
+        assertVisible(commands, card + " #LifecycleProgress #Paused.Visible", true);
     }
 
     private static org.bson.BsonDocument anchor(UICommandBuilder commands, String selector) {

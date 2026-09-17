@@ -22,6 +22,8 @@ $C = "Common.ui";
 @LifecycleAdultLabel = LabelStyle(FontSize: 9, TextColor: #78bfc1);
 @LifecyclePrimeLabel = LabelStyle(FontSize: 9, TextColor: #d9c878);
 @LifecycleSeniorLabel = LabelStyle(FontSize: 9, TextColor: #d9a86f);
+@InlineRecallCountdown = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #ffcf6e, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+@RecallCountdown = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center);
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @PortraitCompactStyle = ItemGridStyle(SlotSize: 48, SlotSpacing: 0, SlotIconSize: 48);
 
@@ -38,26 +40,26 @@ Group {
 
     ItemGrid #Portrait { Anchor: (Top: 28, Left: 28, Width: 92, Height: 92); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
     Group #ContributorPortraitStars { Anchor: (Top: 28, Left: 68, Width: 80, Height: 16); HitTestVisible: false; Visible: false;
-      Group #ContributorStar1 { Anchor: (Top: 0, Right: 0, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png"); HitTestVisible: false; Visible: false; }
-      Group #ContributorStar2 { Anchor: (Top: 0, Right: 16, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png"); HitTestVisible: false; Visible: false; }
-      Group #ContributorStar3 { Anchor: (Top: 0, Right: 32, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png"); HitTestVisible: false; Visible: false; }
-      Group #ContributorStar4 { Anchor: (Top: 0, Right: 48, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png"); HitTestVisible: false; Visible: false; }
-      Group #ContributorStar5 { Anchor: (Top: 0, Right: 64, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png"); HitTestVisible: false; Visible: false; }
+      Group #ContributorStar1 { Anchor: (Top: 0, Right: 0, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #ffd447); HitTestVisible: false; Visible: false; }
+      Group #ContributorStar2 { Anchor: (Top: 0, Right: 16, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #ffd447); HitTestVisible: false; Visible: false; }
+      Group #ContributorStar3 { Anchor: (Top: 0, Right: 32, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #ffd447); HitTestVisible: false; Visible: false; }
+      Group #ContributorStar4 { Anchor: (Top: 0, Right: 48, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #ffd447); HitTestVisible: false; Visible: false; }
+      Group #ContributorStar5 { Anchor: (Top: 0, Right: 64, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #ffd447); HitTestVisible: false; Visible: false; }
     }
     TextButton #ActiveToggleActiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOnButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
     TextButton #ActiveToggleInactiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOffButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png"); Visible: false; }
-    Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
+    Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #50c8ef); Visible: false; }
+    Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #fc7cb4); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 28, Right: 36, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
     Label #RoleSubtitle { Anchor: (Top: 37, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }
     TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
-    Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); Visible: true; HitTestVisible: false; }
+    Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); Visible: true; HitTestVisible: false; }
 
     DropdownBox #GroupSelector { Anchor: (Top: 120, Left: 0, Width: 144, Height: 26); Style: $A.@GroupDropdown; ShowLabel: false; MaxSelection: 1; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
     Label #GroupSelectorLabel { Anchor: (Top: 120, Left: 26, Width: 96, Height: 26); Text: ""; Style: (FontSize: 12, TextColor: #d6d9d0, VerticalAlignment: Center); HitTestVisible: false; Visible: false; }
-    Group #GroupSelectorMarker { Anchor: (Top: 127, Left: 7, Width: 12, Height: 12); Background: "Tamework/PanelControls/GroupDiamondOutline.png"; HitTestVisible: false; Visible: false; }
+    Group #GroupSelectorMarker { Anchor: (Top: 127, Left: 7, Width: 12, Height: 12); Background: (TexturePath: "Tamework/PanelControls/GroupDiamondOutline.png", Color: #ffffff); HitTestVisible: false; Visible: false; }
     Group #TraitStrip {
         // Traits share the progression row immediately above the health bar.
         Anchor: (Top: 36, Left: 172, Width: 128, Height: 30);
@@ -66,7 +68,7 @@ Group {
             Anchor: (Width: 32, Height: 30); Visible: false;
             Group #TraitBarTrack { Anchor: (Top: 1, Left: 6, Width: 22, Height: 3); Background: #3d4840; }
             Group #RingFillBar1 { Anchor: (Top: 1, Left: 6, Width: 0, Height: 3); Background: #6fc576; }
-            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: "Tamework/LinkedPanelIcons/Trait_Disposition.png"; Visible: false; }
+            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png", Color: #f7ecd0); Visible: false; }
             Label #TraitIcon { Anchor: (Top: 4, Left: 5, Width: 24, Height: 24); Text: ""; Style: (FontSize: 18, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
             TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 32, Height: 30); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
@@ -74,7 +76,7 @@ Group {
             Anchor: (Width: 32, Height: 30); Visible: false;
             Group #TraitBarTrack { Anchor: (Top: 1, Left: 6, Width: 22, Height: 3); Background: #3d4840; }
             Group #RingFillBar1 { Anchor: (Top: 1, Left: 6, Width: 0, Height: 3); Background: #6fc576; }
-            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: "Tamework/LinkedPanelIcons/Trait_Disposition.png"; Visible: false; }
+            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png", Color: #f7ecd0); Visible: false; }
             Label #TraitIcon { Anchor: (Top: 4, Left: 5, Width: 24, Height: 24); Text: ""; Style: (FontSize: 18, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
             TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 32, Height: 30); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
@@ -82,7 +84,7 @@ Group {
             Anchor: (Width: 32, Height: 30); Visible: false;
             Group #TraitBarTrack { Anchor: (Top: 1, Left: 6, Width: 22, Height: 3); Background: #3d4840; }
             Group #RingFillBar1 { Anchor: (Top: 1, Left: 6, Width: 0, Height: 3); Background: #6fc576; }
-            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: "Tamework/LinkedPanelIcons/Trait_Disposition.png"; Visible: false; }
+            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png", Color: #f7ecd0); Visible: false; }
             Label #TraitIcon { Anchor: (Top: 4, Left: 5, Width: 24, Height: 24); Text: ""; Style: (FontSize: 18, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
             TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 32, Height: 30); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
@@ -90,7 +92,7 @@ Group {
             Anchor: (Width: 32, Height: 30); Visible: false;
             Group #TraitBarTrack { Anchor: (Top: 1, Left: 6, Width: 22, Height: 3); Background: #3d4840; }
             Group #RingFillBar1 { Anchor: (Top: 1, Left: 6, Width: 0, Height: 3); Background: #6fc576; }
-            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: "Tamework/LinkedPanelIcons/Trait_Disposition.png"; Visible: false; }
+            Group #TraitIconImage { Anchor: (Top: 5, Left: 6, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png", Color: #f7ecd0); Visible: false; }
             Label #TraitIcon { Anchor: (Top: 4, Left: 5, Width: 24, Height: 24); Text: ""; Style: (FontSize: 18, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
             TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 32, Height: 30); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
@@ -98,60 +100,60 @@ Group {
     Label #StatusConfirm { Anchor: (Top: 30, Left: 432, Width: 414, Height: 16); Text: %server.tamework.ui.linkedPanel.card.confirmRemove; Style: (FontSize: 11, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #StatusInactive { Anchor: (Top: 43, Left: 48, Width: 96, Height: 18); Text: %server.tamework.ui.linkedPanel.card.inactive; Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #RecallCountdown { Anchor: (Top: 72, Left: 568, Width: 270, Height: 20); Text: %server.tamework.ui.linkedPanel.card.recallCountdown.default; Style: (FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Group #InlineLocation { Anchor: (Top: 32, Left: 432, Width: 414, Height: 110); Visible: false;
+    Group #InlineLocation { Anchor: (Top: 32, Left: 432, Width: 414, Height: 74); Visible: false;
         Label #Heading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #a9b69f, VerticalAlignment: Center); }
-        Label #Status { Anchor: (Top: 18, Left: 0, Right: 0, Height: 32); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, Wrap: true, VerticalAlignment: Center); Visible: false; }
+        Label #Status { Anchor: (Top: 14, Left: 0, Right: 0, Height: 14); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center); Visible: false; }
         Label #World { Anchor: (Top: 36, Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #a9b69f, VerticalAlignment: Center); Visible: false; }
         TextField #Coordinates { Anchor: (Top: 58, Left: 0, Right: 0, Height: 26); Style: $A.@PanelInputFieldStyle; PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle; Background: #181c1a; OutlineColor: #4a5a50; OutlineSize: 1; Padding: (Horizontal: 8); Value: ""; MaxLength: 96; Visible: false; }
         Label #CoordinateLabel { Anchor: (Top: 74, Left: 0, Width: 380, Height: 26); Text: ""; Style: (FontSize: 12, TextColor: #e8e4da, VerticalAlignment: Center); Visible: false; }
         TextButton #CopyButton { Anchor: (Top: 74, Right: 0, Width: 28, Height: 26); Text: ""; Style: $A.@PanelButton; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-        Group #CopyGlyph { Anchor: (Top: 78, Right: 5, Width: 18, Height: 18); HitTestVisible: false; Visible: false; Background: "Tamework/PanelActions/Copy_Glyph_Default.png"; }
+        Group #CopyGlyph { Anchor: (Top: 78, Right: 5, Width: 18, Height: 18); HitTestVisible: false; Visible: false; Background: (TexturePath: "Tamework/PanelActions/Copy_Glyph_Default.png", Color: #f2e8cd); }
         Label #CopyHint { Anchor: (Top: 101, Left: 0, Right: 34, Height: 13); Text: ""; Style: (FontSize: 9, TextColor: #a9b69f); Visible: false; }
         Label #RelativeDistance { Anchor: (Top: 100, Left: 0, Right: 0, Height: 14); Text: ""; Style: (FontSize: 11, TextColor: #a9b69f, VerticalAlignment: Center); Visible: false; }
     }
     TextButton #LinkButton { Anchor: (Top: 98, Left: 746, Width: 100, Height: 26); Style: $A.@PanelButton; Padding: (Horizontal: 4); Text: %server.tamework.ui.linkedPanel.card.button.link; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.link; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
 
     TextButton #ShoulderRideButton { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Style: $A.@ShoulderOff; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #ShoulderRideButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/ShoulderOff_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #ShoulderRideButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/ShoulderOff_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #ShoulderRideButtonCaption { Anchor: (Top: 80, Right: 413, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.shoulderOff; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #FlightToggleButton { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Style: $A.@FlightGrounded; Text: ""; TooltipText: ""; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #FlightToggleButtonGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/FlightGrounded_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #FlightToggleButtonGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/FlightGrounded_Glyph_Default.png", Color: #f8ecd4); Visible: false; HitTestVisible: false; }
     Label #FlightToggleButtonCaption { Anchor: (Top: 80, Right: 347, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.flightGrounded; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #BreedingToggleEnabledButton { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Style: $A.@BreedingOn; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #BreedingToggleEnabledButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/BreedingOn_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #BreedingToggleEnabledButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/BreedingOn_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #BreedingToggleEnabledButtonCaption { Anchor: (Top: 80, Right: 281, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.breedingOn; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #BreedingToggleDisabledButton { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Style: $A.@BreedingOff; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #BreedingToggleDisabledButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/BreedingOff_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #BreedingToggleDisabledButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/BreedingOff_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #BreedingToggleDisabledButtonCaption { Anchor: (Top: 80, Right: 281, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.breedingOff; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #LocateButton { Anchor: (Top: 36, Right: 226, Width: 42, Height: 42); Style: $A.@Locate; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.locate; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #LocateButtonGlyph { Anchor: (Top: 36, Right: 226, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Locate_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #LocateButtonGlyph { Anchor: (Top: 36, Right: 226, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Locate_Glyph_Default.png", Color: #f8ecd4); Visible: false; HitTestVisible: false; }
     Label #LocateButtonCaption { Anchor: (Top: 80, Right: 215, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.locate; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #RecallButton { Anchor: (Top: 36, Right: 160, Width: 42, Height: 42); Style: $A.@Recall; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.recall; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #RecallButtonGlyph { Anchor: (Top: 36, Right: 160, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Recall_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #RecallButtonGlyph { Anchor: (Top: 36, Right: 160, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Recall_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #RecallButtonCaption { Anchor: (Top: 80, Right: 149, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.recall; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #SetHomeButton { Anchor: (Top: 36, Right: 94, Width: 42, Height: 42); Style: $A.@SetHome; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.setHome; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #SetHomeButtonGlyph { Anchor: (Top: 36, Right: 94, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/SetHome_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #SetHomeButtonGlyph { Anchor: (Top: 36, Right: 94, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/SetHome_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #SetHomeButtonCaption { Anchor: (Top: 80, Right: 83, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.setHome; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #ReturnHomeButton { Anchor: (Top: 36, Right: 28, Width: 42, Height: 42); Style: $A.@ReturnHome; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.returnHome; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #ReturnHomeButtonGlyph { Anchor: (Top: 36, Right: 28, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/ReturnHome_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #ReturnHomeButtonGlyph { Anchor: (Top: 36, Right: 28, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/ReturnHome_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #ReturnHomeButtonCaption { Anchor: (Top: 80, Right: 17, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.returnHome; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #ReleaseButton { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Style: $A.@Release; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #ReleaseButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Release_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #ReleaseButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Release_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #ReleaseButtonCaption { Anchor: (Top: 80, Right: 413, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.release; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #ReleaseButtonDisabled { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Style: $A.@ReleaseDisabled; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #ReleaseButtonDisabledGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Release_Glyph_Default.png", Color: #ffffff(0.4)); Visible: false; HitTestVisible: false; }
+    Group #ReleaseButtonDisabledGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Release_Glyph_Default.png", Color: #f9edd5(0.4)); Visible: false; HitTestVisible: false; }
     Label #ReleaseButtonDisabledCaption { Anchor: (Top: 80, Right: 413, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.release; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #UnlinkButton { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Style: $A.@Unlink; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #UnlinkButtonGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Unlink_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #UnlinkButtonGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Unlink_Glyph_Default.png", Color: #f8ecd4); Visible: false; HitTestVisible: false; }
     Label #UnlinkButtonCaption { Anchor: (Top: 80, Right: 347, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.unlink; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #UnlinkButtonDisabled { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Style: $A.@UnlinkDisabled; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #UnlinkButtonDisabledGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Unlink_Glyph_Default.png", Color: #ffffff(0.4)); Visible: false; HitTestVisible: false; }
+    Group #UnlinkButtonDisabledGlyph { Anchor: (Top: 36, Right: 358, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Unlink_Glyph_Default.png", Color: #f8ecd4(0.4)); Visible: false; HitTestVisible: false; }
     Label #UnlinkButtonDisabledCaption { Anchor: (Top: 80, Right: 347, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.unlink; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #CullButton { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Style: $A.@Cull; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.cull; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #CullButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Cull_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #CullButtonGlyph { Anchor: (Top: 36, Right: 292, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Cull_Glyph_Default.png", Color: #f67762); Visible: false; HitTestVisible: false; }
     Label #CullButtonCaption { Anchor: (Top: 80, Right: 281, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.cull; Style: @ActionCaptionStyle; Visible: false; }
     TextButton #RespawnButton { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Style: $A.@Revive; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    Group #RespawnButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Revive_Glyph_Default.png"); Visible: false; HitTestVisible: false; }
+    Group #RespawnButtonGlyph { Anchor: (Top: 36, Right: 424, Width: 42, Height: 42); Background: (TexturePath: "Tamework/PanelActions/Revive_Glyph_Default.png", Color: #f9edd5); Visible: false; HitTestVisible: false; }
     Label #RespawnButtonCaption { Anchor: (Top: 80, Right: 413, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.revive; Style: @ActionCaptionStyle; Visible: false; }
 
     Group #HealthFrame {
@@ -166,7 +168,7 @@ Group {
         Anchor: (Top: 38, Left: 304, Width: 34, Height: 24);
         Visible: false;
         TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 34, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
-        Group #TalentPointIcon { Anchor: (Top: 5, Left: 3, Width: 14, Height: 14); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
+        Group #TalentPointIcon { Anchor: (Top: 5, Left: 3, Width: 14, Height: 14); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png", Color: #f5e8c9); }
         Label #TalentPointCountShadow { Anchor: (Top: 0, Left: 17, Width: 15, Height: 24); Text: ""; Visible: false; }
         Label #TalentPointCount { Anchor: (Top: 0, Left: 17, Width: 15, Height: 24); Text: "1"; HitTestVisible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f5ebce, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
@@ -195,7 +197,7 @@ Group {
         Anchor: (Top: 92, Left: 172, Width: 234, Height: 66);
         LayoutMode: Top;
         Group #NeedHappiness { Anchor: (Width: 234, Height: 22);
-            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: "Tamework/LinkedPanelIcons/Need_Happiness.png"; }
+            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Happiness.png", Color: #f2c97c); }
             Label #NeedIcon { Anchor: (Width: 1, Height: 1); Text: ""; Visible: false; }
             Label { Anchor: (Top: 0, Left: 22, Width: 68, Height: 22); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: (FontSize: 9, TextColor: #c8ccc5, VerticalAlignment: Center); }
             Group { Anchor: (Top: 8, Left: 92, Width: 92, Height: 6); Background: #3c443e; }
@@ -216,7 +218,7 @@ Group {
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #NeedHunger { Anchor: (Width: 234, Height: 22);
-            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: "Tamework/LinkedPanelIcons/Need_Hunger.png"; }
+            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Hunger.png", Color: #d9a066); }
             Label #NeedIcon { Anchor: (Width: 1, Height: 1); Text: ""; Visible: false; }
             Label { Anchor: (Top: 0, Left: 22, Width: 68, Height: 22); Text: %server.tamework.ui.linkedPanel.meter.hunger; Style: (FontSize: 9, TextColor: #c8ccc5, VerticalAlignment: Center); }
             Group { Anchor: (Top: 8, Left: 92, Width: 92, Height: 6); Background: #3c443e; }
@@ -225,7 +227,7 @@ Group {
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #NeedThirst { Anchor: (Width: 234, Height: 22);
-            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: "Tamework/LinkedPanelIcons/Need_Thirst.png"; }
+            Group #NeedIconImage { Anchor: (Top: 1, Left: 0, Width: 16, Height: 16); Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Thirst.png", Color: #84dbff); }
             Label #NeedIcon { Anchor: (Width: 1, Height: 1); Text: ""; Visible: false; }
             Label { Anchor: (Top: 0, Left: 22, Width: 68, Height: 22); Text: %server.tamework.ui.linkedPanel.meter.thirst; Style: (FontSize: 9, TextColor: #c8ccc5, VerticalAlignment: Center); }
             Group { Anchor: (Top: 8, Left: 92, Width: 92, Height: 6); Background: #3c443e; }
@@ -236,16 +238,24 @@ Group {
     }
     Group #CooldownRow { Anchor: (Top: 111, Left: 432, Right: 0, Height: 34); LayoutMode: Left;
         Group #LifecycleProgress { Anchor: (Width: 138, Height: 34); Visible: false;
+            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
+                Group #LeftStroke { Anchor: (Left: 0, Width: 2, Height: 6); Background: #78bfc1; }
+                Group #RightStroke { Anchor: (Left: 4, Width: 2, Height: 6); Background: #78bfc1; }
+            }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #b9beb8); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #9abc78; }
-            Group #AgeIcon { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/LifeStage_Adult.png"; }
+            Group #AgeIcon { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/LifeStage_Adult.png", Color: #ffffff); }
             Label #CooldownLabel { Anchor: (Top: 0, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #78bfc1); }
             TextButton #LifecycleProgressTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #BreedingCooldown { Anchor: (Width: 138, Height: 34); Visible: false;
+            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
+                Group { Anchor: (Left: 0, Width: 2, Height: 6); Background: #bb959e; }
+                Group { Anchor: (Left: 4, Width: 2, Height: 6); Background: #bb959e; }
+            }
             Group #BreedingCooldownIconMuted { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #777777); Visible: false; }
-        Group #BreedingCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png"; }
+        Group #BreedingCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #ffffff); }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #bb959e; }
@@ -253,7 +263,11 @@ Group {
             TextButton #BreedingCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #HarvestCooldown { Anchor: (Width: 138, Height: 34); Visible: false;
-            Group #HarvestCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png"; }
+            Group #Paused { Anchor: (Top: 14, Left: 132, Width: 6, Height: 6); Visible: false; HitTestVisible: false;
+                Group { Anchor: (Left: 0, Width: 2, Height: 6); Background: #cbbb88; }
+                Group { Anchor: (Left: 4, Width: 2, Height: 6); Background: #cbbb88; }
+            }
+            Group #HarvestCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png", Color: #ffffff); }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #cbbb88; }

@@ -16,6 +16,15 @@ class LinkedNpcPanelRecallFeedbackTest {
             assertValue(commands, "#InlineLocation.Visible", "true");
             assertValue(commands, "#RecallCountdown.Visible", "true");
             assertValue(commands, "#RecallCountdown.Text", "Attempting recall: 10s...");
+            var location = anchor(commands, "#InlineLocation.Anchor");
+            var recall = anchor(commands, "#RecallButton.Anchor");
+            assertTrue(location.getNumber("Left").intValue() + location.getNumber("Width").intValue()
+                    < recall.getNumber("Left").intValue());
+            assertValue(commands, "#RecallButtonCaption.Visible", "false");
+            if (linked) {
+                assertValue(commands, "#ReturnHomeButton.Visible", "true");
+                assertValue(commands, "#ReturnHomeButtonCaption.Visible", "false");
+            }
 
             var update = new UICommandBuilder();
             LinkedNpcPanelCardDynamicPresenter.refresh(update, new UIEventBuilder(),
@@ -27,10 +36,16 @@ class LinkedNpcPanelRecallFeedbackTest {
         }
     }
 
+    private static org.bson.BsonDocument anchor(UICommandBuilder commands, String suffix) {
+        return org.bson.BsonDocument.parse(Arrays.stream(commands.getCommands())
+                .filter(command -> ("#TameworkLinkedPanelList[0] " + suffix).equals(command.selector))
+                .reduce((first, last) -> last).orElseThrow().data).getDocument("0");
+    }
+
     private static LinkedNpcEntry entry(boolean linked, boolean pending, long remaining) {
         return new LinkedNpcEntry(UUID.randomUUID(), "Frost Dragon", null,
                 0, 0, 0, 0, 0, null, 0, 0, 0, 0,
-                false, false, false, false, false, false, 0L,
+                false, true, false, false, false, false, 0L,
                 null, null, null, LinkedNpcTraitIndicator.EMPTY,
                 false, false, false, false, linked, true,
                 "Dragon", "Dragon", null, null, null,

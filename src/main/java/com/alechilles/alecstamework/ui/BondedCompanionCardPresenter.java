@@ -233,8 +233,8 @@ final class BondedCompanionCardPresenter {
                 status.state() == BondedCompanionStateView.DEAD
                         && copy.reviveReady());
         commands.set(entrySelector + " #BondedStateEmblem.Visible", true);
-        commands.set(entrySelector + " #BondedStateEmblem.Background",
-                stateEmblem(status.state()));
+        commands.setObject(entrySelector + " #BondedStateEmblem.Background",
+                UiIconStyle.forTexture(stateEmblem(status.state())));
     }
 
     private static String stateEmblem(BondedCompanionStateView state) {
@@ -470,8 +470,8 @@ final class BondedCompanionCardPresenter {
             case REVIVE -> "Revive";
             case NONE -> "Recall";
         };
-        commands.set(entrySelector + " #BondedActionIcon.Background",
-                "Tamework/PanelActions/" + glyph + "_Glyph_Default.png");
+        commands.setObject(entrySelector + " #BondedActionIcon.Background",
+                UiIconStyle.forTexture("Tamework/PanelActions/" + glyph + "_Glyph_Default.png"));
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
     }

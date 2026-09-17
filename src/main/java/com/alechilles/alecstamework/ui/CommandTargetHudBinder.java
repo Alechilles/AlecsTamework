@@ -283,7 +283,7 @@ final class CommandTargetHudBinder {
             commandBuilder.set(slot + " #TraitIconImage.Visible", trait.hasIconTexturePath());
             commandBuilder.set(slot + " #TraitIcon.Visible", !trait.hasIconTexturePath());
             if (trait.hasIconTexturePath()) {
-                commandBuilder.set(slot + " #TraitIconImage.Background", trait.iconTexturePath());
+                commandBuilder.setObject(slot + " #TraitIconImage.Background", UiIconStyle.forTexture(trait.iconTexturePath()));
                 commandBuilder.setObject(slot + " #TraitIconImage.Anchor", LinkedNpcTraitIndicatorBinder.iconAnchor(trait.iconTexturePath(), 2, 5, 20));
             } else {
                 commandBuilder.set(slot + " #TraitIcon.Text", trait.iconText());

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.ui.TameworkLinkedNpcLocationFormatter;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.Tamework;
@@ -341,7 +342,11 @@ final class CommandLinkedPanelEntryService {
                             speciesRoleId, null));
             CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null : persistenceView.savedPanel(record, player.getUuid());
             if (saved != null) {
-                entry = saved.apply(entry, player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage());
+                // Use the current world's configured clock when this animal belongs to it.
+                // Other-world deadlines remain unknown without fetching stores or loading chunks.
+                double gameRate = world != null && world.getName().equals(record.lastKnownWorldName)
+                        ? BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store) : Double.NaN;
+                entry = saved.apply(entry, player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage(), gameRate);
             }
             if (!entry.loaded() && !entry.dead() && !entry.lost()) {
                 entry = entry.withLocation(location(player, record, entry, saved,
@@ -392,8 +397,7 @@ final class CommandLinkedPanelEntryService {
                         coop.x(), coop.y(), coop.z());
             }
         } else {
-            status = LocalizedText.resolve(player,
-                    "tamework.ui.notifications.command.locate.lastKnown");
+            status = "";
             if (record.lastKnownPosition != null) {
                 world = record.lastKnownWorldName;
                 targetX = record.lastKnownPosition.x;

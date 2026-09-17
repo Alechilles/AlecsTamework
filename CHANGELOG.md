@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Flat UI symbols now use white textures with explicit display tints. Shaded
+  artwork and symbols with contrasting internal details retain their original textures.
+- Unloaded and captured animal cards keep the normal card height, with location
+  details and coordinate copying above the meters. Captured timers retain their
+  remaining times with pause symbols; unloaded timers use saved progression time.
+
 - Moved spawn-marker deletion to `/tw debug delete-spawn-marker`, outside the view menu.
 - Reject invalid debug toggle and NPC marker values, and keep named world options
   out of positional command arguments. Corrected outdated command examples.

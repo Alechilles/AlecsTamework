@@ -41,9 +41,9 @@ final class LinkedNpcTraitIndicatorBinder {
             commandBuilder.set(slotSelector + " #TraitIcon.Visible", false);
             commandBuilder.set(slotSelector + " #TraitIconImage.Visible", true);
             commandBuilder.setObject(slotSelector + " #TraitIconImage.Anchor", iconAnchor(indicator.iconTexturePath(), 6, 5, 22));
-            commandBuilder.set(
+            commandBuilder.setObject(
                     slotSelector + " #TraitIconImage.Background",
-                    indicator.iconTexturePath()
+                    UiIconStyle.forTexture(indicator.iconTexturePath())
             );
         } else {
             commandBuilder.set(slotSelector + " #TraitIconImage.Visible", false);

@@ -333,7 +333,7 @@ final class LinkedNpcPanelVitalsBinder {
         if (icon.hasTexturePath()) {
             commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
             commandBuilder.set(slotSelector + " #NeedIconImage.Visible", true);
-            commandBuilder.set(slotSelector + " #NeedIconImage.Background", icon.texturePath());
+            commandBuilder.setObject(slotSelector + " #NeedIconImage.Background", UiIconStyle.forTexture(icon.texturePath()));
         } else {
             commandBuilder.set(slotSelector + " #NeedIconImage.Visible", false);
             commandBuilder.set(slotSelector + " #NeedIcon.Visible", true);

@@ -155,6 +155,10 @@ final class CommandSavedNpcPanelSnapshot {
 
     /** Applies only known saved fields and leaves unavailable legacy fields as supplied by the base entry. */
     LinkedNpcEntry apply(LinkedNpcEntry base, @Nullable String language) {
+        return apply(base, language, BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(null));
+    }
+
+    LinkedNpcEntry apply(LinkedNpcEntry base, @Nullable String language, double gameRate) {
         if (base == null) {
             return null;
         }
@@ -169,8 +173,8 @@ final class CommandSavedNpcPanelSnapshot {
         Cooldown breeding = juvenile ? new Cooldown(false, false, 0L, 0.0)
                 : facts.breeding == null
                 ? Cooldown.from(base.breedingCooldownKnown(), base.breedingCooldownActive(), base.breedingCooldownRemainingMs(), base.breedingCooldownRatio())
-                : facts.breeding.cooldown();
-        Cooldown harvest = resolveHarvest(facts.harvest, effectiveRole, base);
+                : facts.breeding.cooldown(facts.lifeStage, base.captured(), gameRate);
+        Cooldown harvest = resolveHarvest(facts.harvest, facts.lifeStage, base.captured(), effectiveRole, base, gameRate);
         boolean breedingEnabled = !juvenile && (facts.breeding == null ? base.breedingEnabled() : facts.breeding.enabled);
         boolean breedingAvailable = !juvenile && (facts.breeding == null ? base.breedingAvailable() : true);
         LinkedNpcEntry applied = new LinkedNpcEntry(
@@ -360,7 +364,11 @@ final class CommandSavedNpcPanelSnapshot {
         return Meter.needs(saved.hunger, values.getHungerMax(), saved.thirst, values.getThirstMax());
     }
 
-    private Cooldown resolveHarvest(@Nullable Harvest saved, String role, LinkedNpcEntry base) {
+    private Cooldown resolveHarvest(@Nullable Harvest saved,
+                                    @Nullable TameworkLifeStageComponent lifeStage,
+                                    boolean captured,
+                                    String role,
+                                    LinkedNpcEntry base, double gameRate) {
         if (saved == null) {
             if (!new CommandLinkedPanelCooldownSnapshotService().hasEnabledHarvestCapability(role)) {
                 return Cooldown.from(base.harvestCooldownKnown(), base.harvestCooldownActive(), base.harvestCooldownRemainingMs(), base.harvestCooldownRatio());
@@ -373,9 +381,7 @@ final class CommandSavedNpcPanelSnapshot {
         String alarmName = CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName();
         for (Alarm alarm : saved.alarms) {
             if (alarmName.equals(alarm.name)) {
-                // Snapshot timestamps use a world clock that is unavailable here. Preserve that
-                // there was timer evidence without inventing an elapsed duration from wall time.
-                return new Cooldown(true, false, -1L, 0.0);
+                return cooldown(alarm.untilMs, alarm.startedAtMs, alarm.durationMs, lifeStage, captured, gameRate);
             }
         }
         return new CommandLinkedPanelCooldownSnapshotService().hasEnabledHarvestCapability(role)
@@ -531,7 +537,60 @@ final class CommandSavedNpcPanelSnapshot {
     private record Health(int current, int maximum) { Health(double current, double maximum) { this(round(current), Math.max(1, round(maximum))); } }
     private record Happiness(String configId, double value) { }
     private record Needs(String configId, double hunger, double thirst) { }
-    private record Breeding(boolean enabled, long untilMs, long startedAtMs, long durationMs) { Cooldown cooldown() { return untilMs == 0L ? new Cooldown(true, false, 0L, 1.0) : new Cooldown(true, false, -1L, 0.0); } }
+    private static Cooldown cooldown(long untilMs,
+                                     long startedAtMs,
+                                     long durationMs,
+                                     @Nullable TameworkLifeStageComponent lifeStage,
+                                     boolean captured, double gameRate) {
+        if (untilMs == 0L) {
+            return new Cooldown(true, false, 0L, 1.0);
+        }
+        if (!Double.isFinite(gameRate) || gameRate <= 0.0) {
+            return new Cooldown(true, false, -1L, 0.0);
+        }
+        double rate = gameRate;
+        Long nowMs = savedProgressionTimeMs(lifeStage, captured, rate);
+        if (nowMs == null) {
+            return new Cooldown(true, false, -1L, 0.0);
+        }
+        if (!BreedingTimeService.isDeadlineActive(untilMs, nowMs)) {
+            return new Cooldown(true, false, 0L, 1.0);
+        }
+        long remainingGameMs = BreedingTimeService.remainingDurationMs(untilMs, nowMs);
+        long remainingRealMs = Math.max(0L, Math.round(remainingGameMs / rate));
+        long totalGameMs = Math.max(0L, durationMs);
+        if (totalGameMs <= 0L && startedAtMs != 0L && untilMs > startedAtMs) {
+            totalGameMs = BreedingTimeService.saturatingSubtract(untilMs, startedAtMs);
+        }
+        double ratio = totalGameMs <= 0L ? 0.0
+                : clamp(1.0 - ((double) remainingGameMs / (double) totalGameMs), 0.0, 1.0);
+        return new Cooldown(true, true, remainingRealMs, ratio);
+    }
+
+    /**
+     * Rebuilds the live virtual world clock from persisted progression evidence without reading a world.
+     * Captured snapshots have no pending eligible runtime, while unloaded companions accrue it lazily.
+     */
+    @Nullable
+    private static Long savedProgressionTimeMs(@Nullable TameworkLifeStageComponent lifeStage,
+                                               boolean captured, double rate) {
+        if (lifeStage == null || !lifeStage.isProgressionInitialized()
+                || lifeStage.getLastProgressionWorldMs() == 0L) {
+            return null;
+        }
+        long settled = lifeStage.getActiveProgressMs();
+        long active = captured ? settled : AnimalProgressionService.activeTimeMs(lifeStage);
+        long pending = active >= settled ? active - settled : 0L;
+        long scaled = pending <= 0L || !Double.isFinite(rate) || rate <= 0.0 ? 0L
+                : (long) Math.min(Long.MAX_VALUE, pending * rate);
+        return BreedingTimeService.saturatingAdd(lifeStage.getLastProgressionWorldMs(), scaled);
+    }
+
+    private record Breeding(boolean enabled, long untilMs, long startedAtMs, long durationMs) {
+        Cooldown cooldown(@Nullable TameworkLifeStageComponent lifeStage, boolean captured, double gameRate) {
+            return CommandSavedNpcPanelSnapshot.cooldown(untilMs, startedAtMs, durationMs, lifeStage, captured, gameRate);
+        }
+    }
     private record Leveling(String configId, int level, double currentXp, double totalXp) { }
     private record Talents(String configId, int spentPoints) { }
     private record Trait(String id, double value) { }

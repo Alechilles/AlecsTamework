@@ -35,7 +35,7 @@ $C.@PageOverlay {
             TooltipText: %server.tamework.ui.shared.button.close;
             Style: $A.@Remove;
           }
-          Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+          Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); }
         }
       }
     }

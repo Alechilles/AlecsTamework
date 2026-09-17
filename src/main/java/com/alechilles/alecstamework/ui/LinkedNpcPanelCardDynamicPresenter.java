@@ -32,7 +32,8 @@ final class LinkedNpcPanelCardDynamicPresenter {
             return;
         }
         if (!previous.portraitIcon().equals(current.portraitIcon())) {
-            LinkedNpcPanelCardBinder.bindPortrait(commands, selector, current, !current.hasKnownCardDetails());
+            LinkedNpcPanelCardBinder.bindPortrait(commands, selector, current,
+                    !current.hasKnownCardDetails() && (current.dead() || current.lost()));
         }
         if (vitalsChanged(previous, current)) {
             LinkedNpcPanelVitalsBinder.bind(commands, selector, current, language);
