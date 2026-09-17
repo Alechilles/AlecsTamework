@@ -75,7 +75,7 @@ public final class TameworkAlarmService {
     public static Snapshot snapshot(@Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store,
                                     @Nullable String alarmName) {
-        long nowMs = resolveTimeMs(store);
+        long nowMs = com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(npcRef, store);
         if (alarmName == null || alarmName.isBlank()) {
             return Snapshot.invalidName(nowMs);
         }

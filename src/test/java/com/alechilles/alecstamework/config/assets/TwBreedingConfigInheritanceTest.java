@@ -171,6 +171,42 @@ class TwBreedingConfigInheritanceTest {
     }
 
     @Test
+    void agingSectionInheritsMissingNestedKeys() throws Exception {
+        TwBreedingConfig parent = new TwBreedingConfig();
+        TwBreedingConfig child = new TwBreedingConfig();
+        AnimalAgingSettings parentAging = aging(true, 90, 720);
+        AnimalAgingSettings childAging = aging(false, 60, 120);
+        setField(parent, "aging", parentAging);
+        setField(child, "aging", childAging);
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Aging"), Map.of("Aging", Set.of("PrimeMinutes")));
+
+        assertTrue(child.getAging().isEnabled());
+        assertEquals(90, child.getAging().getAdultToPrimeMinutes());
+        assertEquals(120, child.getAging().getPrimeMinutes());
+    }
+
+    @Test
+    void roleAgingOverridePatchesOnlyAuthoredValues() throws Exception {
+        TwBreedingConfig config = new TwBreedingConfig();
+        AnimalAgingSettings rootAging = aging(true, 90, 720);
+        AnimalAgingSettings.Override roleAging = new AnimalAgingSettings.Override();
+        TwBreedingConfig.RoleOverrideSettings roleOverride = new TwBreedingConfig.RoleOverrideSettings();
+        Map<String, TwBreedingConfig.RoleOverrideSettings> overrides = new HashMap<>();
+        setField(roleAging, "primeMinutes", 120);
+        setField(roleOverride, "aging", roleAging);
+        overrides.put("Tamed_Sheep", roleOverride);
+        setField(config, "aging", rootAging);
+        setField(config, "roleOverrides", overrides);
+
+        AnimalAgingSettings resolved = config.resolveAging("Tamed_Sheep");
+
+        assertTrue(resolved.isEnabled());
+        assertEquals(90, resolved.getAdultToPrimeMinutes());
+        assertEquals(120, resolved.getPrimeMinutes());
+    }
+
+    @Test
     void genderCanBeOverriddenPerRole() throws Exception {
         TwBreedingConfig config = new TwBreedingConfig();
         TwBreedingConfig.GenderSettings gender = new TwBreedingConfig.GenderSettings();
@@ -200,6 +236,15 @@ class TwBreedingConfigInheritanceTest {
         setField(inheritance, "attachmentInheritance", attachments);
         setField(config, "inheritance", inheritance);
         return config;
+    }
+
+    private static AnimalAgingSettings aging(boolean enabled, int adultToPrimeMinutes, int primeMinutes)
+            throws Exception {
+        AnimalAgingSettings settings = new AnimalAgingSettings();
+        setField(settings, "enabled", enabled);
+        setField(settings, "adultToPrimeMinutes", adultToPrimeMinutes);
+        setField(settings, "primeMinutes", primeMinutes);
+        return settings;
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+
 /**
  * Session-local runtime clock that advances only while systems are ticking.
  *
@@ -12,6 +13,7 @@ public final class CompanionRuntimeClock {
 
     private static long activeRuntimeMs;
     private static double fractionalCarryMs;
+    private static long lastWorldTickNanos = Long.MIN_VALUE;
 
     private CompanionRuntimeClock() {
     }
@@ -42,10 +44,36 @@ public final class CompanionRuntimeClock {
         }
     }
 
+    /**
+     * Advances the session clock from one world tick without counting the same
+     * server interval once per loaded world. Monotonic elapsed time is capped
+     * by the reporting tick, so resuming after a pause cannot replay downtime.
+     */
+    public static void advanceForWorld(float dtSeconds) {
+        advanceForWorldTick(dtSeconds, System.nanoTime());
+    }
+
+    /** Package-visible deterministic seam for multi-world clock tests. */
+    static void advanceForWorldTick(float dtSeconds, long monotonicNanos) {
+        if (!Float.isFinite(dtSeconds) || dtSeconds <= 0.0f) {
+            return;
+        }
+        synchronized (LOCK) {
+            double boundedMs = dtSeconds * MILLIS_PER_SECOND;
+            if (lastWorldTickNanos != Long.MIN_VALUE) {
+                if (monotonicNanos <= lastWorldTickNanos) return;
+                boundedMs = Math.min(boundedMs, (monotonicNanos - lastWorldTickNanos) / 1_000_000.0);
+            }
+            lastWorldTickNanos = monotonicNanos;
+            advanceMillis(boundedMs);
+        }
+    }
+
     static void resetForTests() {
         synchronized (LOCK) {
             activeRuntimeMs = 0L;
             fractionalCarryMs = 0.0;
+            lastWorldTickNanos = Long.MIN_VALUE;
         }
     }
 
@@ -57,5 +85,16 @@ public final class CompanionRuntimeClock {
             return Long.MAX_VALUE;
         }
         return left + right;
+    }
+
+    private static void advanceMillis(double deltaMs) {
+        deltaMs += fractionalCarryMs;
+        if (!Double.isFinite(deltaMs) || deltaMs <= 0.0) return;
+        long wholeMs = (long) Math.floor(deltaMs);
+        if (wholeMs > 0L) activeRuntimeMs = saturatingAdd(activeRuntimeMs, wholeMs);
+        fractionalCarryMs = deltaMs - wholeMs;
+        if (!Double.isFinite(fractionalCarryMs) || fractionalCarryMs < 0.0 || fractionalCarryMs >= 1.0) {
+            fractionalCarryMs = 0.0;
+        }
     }
 }

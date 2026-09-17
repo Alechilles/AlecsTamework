@@ -169,15 +169,16 @@ class BreedingCooldownServiceTest {
                 );
 
                 assertFalse(parent.isReady());
-                assertEquals(1_140_000L, parent.getCooldownUntilMs());
-                assertEquals(1_000_000L, parent.getCooldownStartedAtMs());
+                // Without a saved animal clock, the current world time is the timeline origin.
+                assertEquals(340_000L, parent.getCooldownUntilMs());
+                assertEquals(200_000L, parent.getCooldownStartedAtMs());
                 assertEquals(140_000L, parent.getCooldownDurationMs());
                 assertEquals(partnerUuid, parent.getLastPartnerUuid());
                 assertEquals(900_000L, parent.getLastHappinessUpdateMs());
                 assertTrue(parent.getManualBreedingPlayerUuid() == null);
                 assertFalse(otherParent.isReady());
-                assertEquals(1_200_000L, otherParent.getCooldownUntilMs());
-                assertEquals(1_000_000L, otherParent.getCooldownStartedAtMs());
+                assertEquals(400_000L, otherParent.getCooldownUntilMs());
+                assertEquals(200_000L, otherParent.getCooldownStartedAtMs());
                 assertEquals(200_000L, otherParent.getCooldownDurationMs());
                 assertEquals(parentUuid, otherParent.getLastPartnerUuid());
                 assertEquals(900_000L, otherParent.getLastHappinessUpdateMs());

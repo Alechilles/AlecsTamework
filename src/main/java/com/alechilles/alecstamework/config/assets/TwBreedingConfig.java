@@ -1225,6 +1225,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         )
         .documentation("Role and growth settings for spawned offspring.")
         .add()
+        .<AnimalAgingSettings.Override>append(
+            new KeyedCodec<>("Aging", AnimalAgingSettings.OVERRIDE_CODEC),
+            (settings, value) -> settings.aging = value,
+            settings -> settings.aging
+        )
+        .documentation("Partial adult animal aging override for this role.")
+        .add()
         .build();
 
     private static final MapCodec<RoleOverrideSettings, Map<String, RoleOverrideSettings>> ROLE_OVERRIDES_BY_ROLE_CODEC =
@@ -1336,6 +1343,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .documentation("Offspring lifecycle settings. Inheritance: omitted section inherits from parent; when present, "
                 + "only explicitly defined nested fields override parent.")
         .add()
+        .<AnimalAgingSettings>append(
+            new KeyedCodec<>("Aging", AnimalAgingSettings.CODEC),
+            (asset, value) -> asset.aging = value == null ? new AnimalAgingSettings() : value,
+            asset -> asset.aging
+        )
+        .documentation("Optional adult animal aging settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
+        .add()
         .<Map<String, RoleOverrideSettings>>append(
             new KeyedCodec<>("RoleOverrides", ROLE_OVERRIDES_BY_ROLE_CODEC),
             (asset, value) -> asset.roleOverrides = value == null ? EMPTY_ROLE_OVERRIDES : value,
@@ -1365,6 +1380,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private GenderSettings gender = new GenderSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
     private OffspringLifecycleSettings offspringLifecycle = new OffspringLifecycleSettings();
+    private AnimalAgingSettings aging = new AnimalAgingSettings();
     private Map<String, RoleOverrideSettings> roleOverrides = EMPTY_ROLE_OVERRIDES;
 
     public static AssetStore<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> getAssetStore() {
@@ -1564,6 +1580,11 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     parent,
                     nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "OffspringLifecycle")
             );
+        }
+        if (!explicitTopLevelKeys.contains("Aging")) {
+            aging = parent.aging;
+        } else {
+            inheritAgingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Aging"));
         }
         if (roleOverrides == null) {
             roleOverrides = EMPTY_ROLE_OVERRIDES;
@@ -1818,6 +1839,19 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
         if (!nestedExplicitKeys.contains("Families")) {
             offspringLifecycle.families = parent.offspringLifecycle.families;
+        }
+    }
+
+    private void inheritAgingSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (aging == null) {
+            aging = parent.aging;
+            return;
+        }
+        if (parent.aging != null) {
+            aging.inheritMissingFrom(parent.aging, nestedExplicitKeys);
         }
     }
 
@@ -2092,6 +2126,20 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return offspringLifecycle == null ? new OffspringLifecycleSettings() : offspringLifecycle;
     }
 
+    public AnimalAgingSettings getAging() {
+        return aging == null ? new AnimalAgingSettings() : aging;
+    }
+
+    /** Resolves the root aging settings with any local role patch applied. */
+    public AnimalAgingSettings resolveAging(@Nullable String roleId) {
+        AnimalAgingSettings resolved = getAging().copy();
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override != null && override.aging != null) {
+            override.aging.applyTo(resolved);
+        }
+        return resolved;
+    }
+
     public OffspringLifecycleSettings resolveOffspringLifecycle(@Nullable String roleId) {
         RoleOverrideSettings override = resolveOffspringLifecycleOverride(roleId);
         if (override == null || override.offspringLifecycle == null) {
@@ -2303,6 +2351,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private GenderSettingsOverride gender;
         private InheritanceSettingsOverride inheritance;
         private OffspringLifecycleSettingsOverride offspringLifecycle;
+        private AnimalAgingSettings.Override aging;
     }
 
     /** Partial happiness override patch for a single role. */

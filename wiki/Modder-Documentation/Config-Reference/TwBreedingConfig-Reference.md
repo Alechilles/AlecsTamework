@@ -9,7 +9,7 @@ draft: false
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
-`TwBreedingConfig` defines breeding readiness, partner eligibility, pairing rules, cooldowns, passive breeding scans, inheritance behavior, offspring lifecycle defaults, and role-specific breeding overrides.
+`TwBreedingConfig` defines breeding readiness, partner eligibility, pairing rules, cooldowns, passive breeding scans, inheritance behavior, offspring lifecycle defaults, adult aging, and role-specific breeding overrides.
 
 Ordinary animals do not require `TwManagedActivityConfig` to breed. Managed
 offspring still require their configured population admission checks.
@@ -51,6 +51,7 @@ Use it when you want to control:
   "Gender": { "...": "..." },
   "Inheritance": { "...": "..." },
   "OffspringLifecycle": { "...": "..." },
+  "Aging": { "...": "..." },
   "RoleOverrides": {
     "Role_Id": { "...": "..." }
   }
@@ -199,6 +200,33 @@ When `AdultRoles` is present:
 
 Invalid, blank, or non-positive weighted adult entries are ignored for selection.
 
+### `Aging`
+`Aging` is an optional adult lifecycle profile. It is disabled by default so
+existing breeding assets retain their adult-only behavior. When enabled, all
+durations are real minutes of eligible progression and do not use the server's
+day-length scale.
+
+- `Enabled`: turns adult aging on for this breeding profile.
+- `Mode`: `Off`, `FreezeAtPrime`, or `Full`. The server-wide Animal Aging
+  setting supplies the final lifecycle mode.
+- `AdultToPrimeMinutes`: real eligible minutes from adult to prime.
+- `PrimeMinutes`: real eligible minutes in prime before senior age in a full
+  lifecycle.
+- `SeniorMinutes`: real eligible minutes in senior age before optional old-age
+  death.
+- `OldAgeDeathEnabled`: permits old-age death in a full lifecycle when the
+  server-wide old-age-death setting is also enabled.
+- `NonPrimeYieldMultiplier`: domestic slaughter yield outside the prime stage.
+
+The shared Animal Progression policy decides which time is eligible. Unloaded
+farms are never force-loaded: needs and resource consumption pause, while aging
+uses the normal rate without an unloaded care penalty. Stored or captured
+animals pause progression; a traded animal keeps its accumulated age.
+
+`RoleOverrides.<RoleId>.Aging` accepts the same keys as a partial patch. As
+with every `RoleOverrides` entry, it is local to its asset and does not inherit
+from a parent.
+
 ### `RoleOverrides`
 `RoleOverrides` is a map keyed by exact role id. Each value can override only the breeding sections that matter for that role:
 - `Happiness`
@@ -210,6 +238,7 @@ Invalid, blank, or non-positive weighted adult entries are ignored for selection
 - `Gender`
 - `Inheritance`
 - `OffspringLifecycle`
+- `Aging`
 
 Important behavior:
 - `RoleOverrides` is local-only.

@@ -1838,7 +1838,7 @@ public final class TameworkApiImpl
         Boolean eligible = effectiveHappiness != null && threshold != null
                 ? BreedingEligibilityService.isEligible(effectiveHappiness, threshold)
                 : null;
-        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        long nowMs = com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(npcRef, store);
         return ApiMapper.mapBreeding(
                 configId,
                 breedingComponent,

@@ -151,10 +151,20 @@ final class LinkedNpcPanelCardBinder {
         String releaseSelector = entrySelector + " #ReleaseButton";
         String releaseDisabledSelector = entrySelector + " #ReleaseButtonDisabled";
         String cullSelector = entrySelector + " #CullButton";
+        LifecycleDisplay lifecycleDisplay = resolveLifecycleDisplay(entry, language);
+        LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
+        commandBuilder.set(entrySelector + " #LifecycleBadge.Text", lifecycleDisplay.stageText());
+        commandBuilder.set(entrySelector + " #LifecycleBadge.Visible", lifecycleDisplay.visible() && !lifecycle.prime());
+        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.Text", lifecycleDisplay.stageText());
+        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.Visible", lifecycleDisplay.visible() && lifecycle.prime());
+        commandBuilder.set(entrySelector + " #LifecycleBadge.TooltipText", lifecycleDisplay.yieldTooltip());
+        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.TooltipText", lifecycleDisplay.yieldTooltip());
+        commandBuilder.set(entrySelector + " #LifecycleCountdown.Text", lifecycleDisplay.countdownText());
+        commandBuilder.set(entrySelector + " #LifecycleCountdown.Visible", !lifecycleDisplay.countdownText().isBlank());
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
@@ -639,8 +649,35 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
         nameAnchor.setWidth(null);
-        nameAnchor.setRight(Value.of(36));
+        nameAnchor.setRight(Value.of(entry.animalLifecycle().active() ? 300 : 36));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
+    }
+
+    static LifecycleDisplay resolveLifecycleDisplay(LinkedNpcEntry entry, String language) {
+        LinkedNpcEntry.AnimalLifecycle lifecycle = entry == null
+                ? LinkedNpcEntry.AnimalLifecycle.NONE : entry.animalLifecycle();
+        if (!lifecycle.active()) return LifecycleDisplay.NONE;
+        String stage = LocalizedText.resolve(language,
+                "tamework.commandmenu.lifecycle.stage." + lifecycle.stage().toLowerCase(java.util.Locale.ROOT));
+        String yieldTooltip = LocalizedText.resolve(language, lifecycle.yieldMultiplier() >= 1.0
+                ? "tamework.commandmenu.lifecycle.yield.maximumTooltip"
+                : "tamework.commandmenu.lifecycle.yield.reducedTooltip");
+        String countdown = "";
+        if (entry.captured() || lifecycle.frozen() && !lifecycle.prime()) {
+            countdown = LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.status.paused");
+        } else if (lifecycle.frozen()) {
+            countdown = LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.status.frozen");
+        } else if (lifecycle.remainingMs() >= 0L && lifecycle.remainingMs() != Long.MAX_VALUE) {
+            countdown = LocalizedText.format(language, lifecycle.nextDeath()
+                            ? "tamework.commandmenu.lifecycle.oldAgeDeath"
+                            : "tamework.commandmenu.lifecycle.remaining",
+                    LinkedNpcPanelStatusTextService.formatRemainingTime(lifecycle.remainingMs(), language));
+        }
+        return new LifecycleDisplay(true, stage, countdown, yieldTooltip);
+    }
+
+    record LifecycleDisplay(boolean visible, String stageText, String countdownText, String yieldTooltip) {
+        static final LifecycleDisplay NONE = new LifecycleDisplay(false, "", "", "");
     }
 
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {

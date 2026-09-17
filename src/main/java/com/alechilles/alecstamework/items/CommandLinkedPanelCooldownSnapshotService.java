@@ -48,7 +48,7 @@ final class CommandLinkedPanelCooldownSnapshotService {
         if (breeding == null) {
             return new CooldownSnapshot(false, availableByConfig, false, false, 0L, 0.0);
         }
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        long now = com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(npcRef, store);
         long until = breeding.getCooldownUntilMs();
         boolean active = until != 0L && now < until;
         if (!active) {

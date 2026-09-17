@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import javax.annotation.Nonnull;
 
@@ -46,7 +47,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean reviveSystemEnabled,
                                      boolean recallTeleportingEnabled,
                                      boolean telemetryEnabled,
-                                     boolean telemetryBreadcrumbsEnabled) {
+                                     boolean telemetryBreadcrumbsEnabled,
+                                     @Nonnull AnimalAgingMode animalAgingMode,
+                                     boolean animalOldAgeDeathEnabled) {
 
     @Nonnull
     TameworkSettingsStore.GlobalSettingsSnapshot toGlobalSettingsSnapshot() {
@@ -88,7 +91,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
                 telemetryEnabled,
-                telemetryBreadcrumbsEnabled
+                telemetryBreadcrumbsEnabled,
+                animalAgingMode.toConfigValue(),
+                animalOldAgeDeathEnabled
         );
     }
 
@@ -141,7 +146,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
                 telemetryEnabled,
-                telemetryBreadcrumbsEnabled
+                telemetryBreadcrumbsEnabled,
+                animalAgingMode,
+                animalOldAgeDeathEnabled
         );
     }
 
@@ -190,7 +197,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 settings.reviveSystemEnabled(),
                 settings.recallTeleportingEnabled(),
                 settings.telemetryEnabled(),
-                settings.telemetryBreadcrumbsEnabled()
+                settings.telemetryBreadcrumbsEnabled(),
+                AnimalAgingMode.fromConfigValue(settings.animalAgingMode()),
+                settings.animalOldAgeDeathEnabled()
         );
     }
 }

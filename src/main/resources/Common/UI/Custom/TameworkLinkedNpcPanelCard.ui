@@ -46,6 +46,9 @@ Group {
     Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png"); Visible: false; }
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 28, Right: 36, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #LifecycleBadge { Anchor: (Top: 2, Left: 210, Width: 88, Height: 20); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #d9c878, HorizontalAlignment: Center, VerticalAlignment: Center); Background: #35362a; Visible: false; }
+    Label #LifecycleBadgePrime { Anchor: (Top: 2, Left: 210, Width: 88, Height: 20); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #c8e89a, HorizontalAlignment: Center, VerticalAlignment: Center); Background: #25402b; Visible: false; }
+    Label #LifecycleCountdown { Anchor: (Top: 2, Right: 36, Width: 250, Height: 20); Text: ""; Style: (FontSize: 10, TextColor: #c8d7c5, HorizontalAlignment: End, VerticalAlignment: Center); Visible: false; }
     Label #RoleSubtitle { Anchor: (Top: 37, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }

@@ -78,7 +78,7 @@ final class InteractionBreedingEffects {
             owner.logDebug("TameworkInteract: no breeding component found for NPC.");
             return finish(player, BreedingInteractionOutcome.unavailable());
         }
-        long breedingNowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        long breedingNowMs = com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(npcRef, store);
         if (breeding.isCooldownActive(breedingNowMs)) {
             breeding.clearManualBreedingReady();
             store.putComponent(npcRef, breedingType, breeding);

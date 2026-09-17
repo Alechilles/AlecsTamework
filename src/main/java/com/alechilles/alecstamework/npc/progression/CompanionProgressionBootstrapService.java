@@ -211,7 +211,7 @@ public final class CompanionProgressionBootstrapService {
         if (breedingType == null) {
             return;
         }
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        long now = AnimalProgressionService.currentTimeMs(npcRef, store);
         double happinessValue = happiness != null
                 ? happiness.getValue()
                 : resolveInitialHappinessValue(npcRef, store, null);

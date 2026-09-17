@@ -24,9 +24,11 @@ public final class CompanionReturnStateNormalizer {
             @Nonnull CoopResidentStateSnapshot source
     ) {
         Objects.requireNonNull(source, "source");
-        return copy(source, pausedNeeds(source.needs()),
-                source.currentHealth(), source.maximumHealth(),
-                source.healthPercent());
+        CoopResidentStateSnapshot detached = new CoopResidentStateSnapshotCodec().copy(source);
+        com.alechilles.alecstamework.npc.progression.AnimalProgressionService.pauseStored(detached.lifeStage());
+        return copy(detached, pausedNeeds(detached.needs()),
+                detached.currentHealth(), detached.maximumHealth(),
+                detached.healthPercent());
     }
 
     /** Returns a death snapshot at full health with no lethal needs backlog. */

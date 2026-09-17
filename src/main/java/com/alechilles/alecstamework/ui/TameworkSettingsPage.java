@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -75,6 +76,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE = "@NeedsStarvationDamagePerMinute";
     private static final String KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE = "@NeedsDehydrationDamagePerMinute";
     private static final String KEY_NEEDS_DAMAGE_LETHAL = "@NeedsDamageLethal";
+    private static final String KEY_ANIMAL_AGING_MODE = "@AnimalAgingMode";
+    private static final String KEY_ANIMAL_OLD_AGE_DEATH = "@AnimalOldAgeDeath";
     private static final String KEY_HAPPINESS_ENABLED = "@HappinessEnabled";
     private static final String KEY_PASSIVE_BREEDING_ENABLED = "@PassiveBreedingEnabled";
     private static final String KEY_BREEDING_REQUIRES_HAPPINESS = "@BreedingRequiresHappiness";
@@ -227,6 +230,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsStarvationDamagePerMinuteInput.Value")
                 .append(KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value")
                 .append(KEY_NEEDS_DAMAGE_LETHAL, "#TwSettingsNeedsDamageLethalCheck.Value")
+                .append(KEY_ANIMAL_AGING_MODE, "#TwSettingsAnimalAgingModeDropdown.Value")
+                .append(KEY_ANIMAL_OLD_AGE_DEATH, "#TwSettingsAnimalOldAgeDeathCheck.Value")
                 .append(KEY_HAPPINESS_ENABLED, "#TwSettingsHappinessEnabledCheck.Value")
                 .append(KEY_PASSIVE_BREEDING_ENABLED, "#TwSettingsPassiveBreedingEnabledCheck.Value")
                 .append(KEY_BREEDING_REQUIRES_HAPPINESS, "#TwSettingsBreedingRequiresHappinessCheck.Value")
@@ -275,6 +280,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsNeedsStarvationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsStarvationDamagePerMinute()));
         commandBuilder.set("#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsDehydrationDamagePerMinute()));
         commandBuilder.set("#TwSettingsNeedsDamageLethalCheck.Value", currentValues.needsDamageLethal());
+        commandBuilder.set("#TwSettingsAnimalAgingModeDropdown.Entries", animalAgingModeEntries());
+        commandBuilder.set("#TwSettingsAnimalAgingModeDropdown.Value", currentValues.animalAgingMode().toConfigValue());
+        commandBuilder.set("#TwSettingsAnimalOldAgeDeathCheck.Value", currentValues.animalOldAgeDeathEnabled());
         commandBuilder.set("#TwSettingsHappinessEnabledCheck.Value", currentValues.happinessEnabled());
         commandBuilder.set("#TwSettingsPassiveBreedingEnabledCheck.Value", currentValues.passiveBreedingEnabled());
         commandBuilder.set("#TwSettingsBreedingRequiresHappinessCheck.Value", currentValues.breedingRequiresHappiness());
@@ -458,6 +466,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
     }
 
+    private List<DropdownEntryInfo> animalAgingModeEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.animalAgingMode.off")),
+                        AnimalAgingMode.OFF.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.animalAgingMode.freezeAtPrime")),
+                        AnimalAgingMode.FREEZE_AT_PRIME.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.animalAgingMode.full")),
+                        AnimalAgingMode.FULL.toConfigValue()
+                )
+        );
+    }
+
     private List<DropdownEntryInfo> needsDamageModelEntries() {
         return List.of(
                 new DropdownEntryInfo(
@@ -567,6 +592,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE, Codec.STRING), (x, v) -> x.needsStarvationDamagePerMinute = v, x -> x.needsStarvationDamagePerMinute).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE, Codec.STRING), (x, v) -> x.needsDehydrationDamagePerMinute = v, x -> x.needsDehydrationDamagePerMinute).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_DAMAGE_LETHAL, Codec.BOOLEAN), (x, v) -> x.needsDamageLethal = v, x -> x.needsDamageLethal).add()
+                .<String>append(new KeyedCodec<>(KEY_ANIMAL_AGING_MODE, Codec.STRING), (x, v) -> x.animalAgingMode = v, x -> x.animalAgingMode).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_ANIMAL_OLD_AGE_DEATH, Codec.BOOLEAN), (x, v) -> x.animalOldAgeDeathEnabled = v, x -> x.animalOldAgeDeathEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_HAPPINESS_ENABLED, Codec.BOOLEAN), (x, v) -> x.happinessEnabled = v, x -> x.happinessEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_PASSIVE_BREEDING_ENABLED, Codec.BOOLEAN), (x, v) -> x.passiveBreedingEnabled = v, x -> x.passiveBreedingEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_HAPPINESS, Codec.BOOLEAN), (x, v) -> x.breedingRequiresHappiness = v, x -> x.breedingRequiresHappiness).add()
@@ -607,6 +634,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String needsStarvationDamagePerMinute;
         String needsDehydrationDamagePerMinute;
         Boolean needsDamageLethal;
+        String animalAgingMode;
+        Boolean animalOldAgeDeathEnabled;
         Boolean happinessEnabled;
         Boolean passiveBreedingEnabled;
         Boolean breedingRequiresHappiness;

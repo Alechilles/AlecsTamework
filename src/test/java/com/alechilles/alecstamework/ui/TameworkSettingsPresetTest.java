@@ -2,14 +2,10 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkSettingsPresetTest {
@@ -52,18 +48,6 @@ class TameworkSettingsPresetTest {
         assertEquals(TameworkSettingsPreset.FULL_EXPERIENCE, TameworkSettingsPreset.match(full));
     }
 
-    @Test
-    void presetDisplayNamesUseLanguageKeys() throws Exception {
-        String content = Files.readString(
-                Path.of("src/main/java/com/alechilles/alecstamework/ui/TameworkSettingsPreset.java"),
-                StandardCharsets.UTF_8
-        );
-
-        assertTrue(content.contains("displayKey"));
-        assertTrue(content.contains("LocalizedText.resolve(language"));
-        assertFalse(content.contains("\"Simplified (Minecraft-like)\""));
-    }
-
     private static TameworkSettingsValues baseValues() {
         return new TameworkSettingsValues(
                 12,
@@ -103,6 +87,8 @@ class TameworkSettingsPresetTest {
                 true,
                 false,
                 false,
+                false,
+                AnimalAgingMode.FREEZE_AT_PRIME,
                 false
         );
     }

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
@@ -28,7 +30,7 @@ public final class TameworkSettingsStore {
     public static final String SETTINGS_DIRECTORY_NAME = "Settings";
     public static final String GLOBAL_SETTINGS_FILE_NAME = "tamework-settings.json";
 
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object SETTINGS_CACHE_LOCK = new Object();
     private static final Object PATH_CACHE_LOCK = new Object();
@@ -158,6 +160,11 @@ public final class TameworkSettingsStore {
             return false;
         }
         publishSettingsCache(globalSettingsFile, document);
+        AnimalProgressionClock.get().onPolicyChanged(TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.fromConfigValue(snapshot.needsTickPolicyMode()),
+                Math.max(0.0, snapshot.needsOwnerOfflineGraceHours()),
+                Math.max(0.0, snapshot.needsOwnerOfflineDecayMultiplier())
+        ));
         return true;
     }
 
@@ -193,10 +200,6 @@ public final class TameworkSettingsStore {
         document.needs = new NeedsSection();
         document.needs.enabled = snapshot.needsEnabled();
         document.needs.resourceMode = NeedsResourceMode.fromConfigValue(snapshot.needsResourceMode()).toConfigValue();
-        document.needs.tickPolicy = new NeedsTickPolicySection();
-        document.needs.tickPolicy.mode = trimToNull(snapshot.needsTickPolicyMode());
-        document.needs.tickPolicy.ownerOfflineGraceHours = Math.max(0.0, snapshot.needsOwnerOfflineGraceHours());
-        document.needs.tickPolicy.ownerOfflineDecayMultiplier = Math.max(0.0, snapshot.needsOwnerOfflineDecayMultiplier());
         document.needs.damage = new NeedsDamageSection();
         document.needs.damage.enabled = snapshot.needsDamageEnabled();
         document.needs.damage.model = trimToNull(snapshot.needsDamageModel());
@@ -219,6 +222,12 @@ public final class TameworkSettingsStore {
         document.progression = new ProgressionSection();
         document.progression.levelingEnabled = snapshot.levelingEnabled();
         document.progression.talentsEnabled = snapshot.talentsEnabled();
+        document.progression.animal = new AnimalProgressionSection();
+        document.progression.animal.mode = trimToNull(snapshot.needsTickPolicyMode());
+        document.progression.animal.ownerOfflineGraceHours = Math.max(0.0, snapshot.needsOwnerOfflineGraceHours());
+        document.progression.animal.ownerOfflineMultiplier = Math.max(0.0, snapshot.needsOwnerOfflineDecayMultiplier());
+        document.progression.animal.agingMode = trimToNull(snapshot.animalAgingMode());
+        document.progression.animal.oldAgeDeathEnabled = snapshot.animalOldAgeDeathEnabled();
 
         document.revive = new ReviveSection();
         document.revive.enabled = snapshot.reviveSystemEnabled();
@@ -403,10 +412,6 @@ public final class TameworkSettingsStore {
         document.needs = new NeedsSection();
         document.needs.enabled = true;
         document.needs.resourceMode = "Accurate";
-        document.needs.tickPolicy = new NeedsTickPolicySection();
-        document.needs.tickPolicy.mode = "OWNER_ONLINE_GRACE_THEN_DECAY";
-        document.needs.tickPolicy.ownerOfflineGraceHours = 72.0;
-        document.needs.tickPolicy.ownerOfflineDecayMultiplier = 1.0;
         document.needs.damage = new NeedsDamageSection();
         document.needs.damage.enabled = true;
         document.needs.damage.model = "MIN_ONLY_PERCENT";
@@ -429,6 +434,12 @@ public final class TameworkSettingsStore {
         document.progression = new ProgressionSection();
         document.progression.levelingEnabled = true;
         document.progression.talentsEnabled = true;
+        document.progression.animal = new AnimalProgressionSection();
+        document.progression.animal.mode = "OWNER_ONLINE_GRACE_THEN_DECAY";
+        document.progression.animal.ownerOfflineGraceHours = 72.0;
+        document.progression.animal.ownerOfflineMultiplier = 1.0;
+        document.progression.animal.agingMode = "FREEZE_AT_PRIME";
+        document.progression.animal.oldAgeDeathEnabled = false;
 
         document.revive = new ReviveSection();
         document.revive.enabled = true;
@@ -464,6 +475,9 @@ public final class TameworkSettingsStore {
             }
             GlobalSettingsDocument parsed = GSON.fromJson(raw, GlobalSettingsDocument.class);
             if (parsed == null) {
+                return null;
+            }
+            if (migrateToCurrentVersion(parsed) && !writeDocument(globalSettingsFile, parsed, logger)) {
                 return null;
             }
             return parsed;
@@ -558,6 +572,7 @@ public final class TameworkSettingsStore {
         BreedingSection breeding = document.breeding;
         TraitsSection traits = document.traits;
         ProgressionSection progression = document.progression;
+        AnimalProgressionSection animalProgression = progression != null ? progression.animal : null;
         ReviveSection revive = document.revive;
         TravelSection travel = document.travel;
         TelemetrySection telemetry = document.telemetry;
@@ -599,9 +614,12 @@ public final class TameworkSettingsStore {
                         : null,
                 needs != null ? needs.enabled : null,
                 needs != null ? trimToNull(needs.resourceMode) : null,
-                needsTickPolicy != null ? trimToNull(needsTickPolicy.mode) : null,
-                needsTickPolicy != null ? needsTickPolicy.ownerOfflineGraceHours : null,
-                needsTickPolicy != null ? needsTickPolicy.ownerOfflineDecayMultiplier : null,
+                animalProgression != null ? trimToNull(animalProgression.mode)
+                        : needsTickPolicy != null ? trimToNull(needsTickPolicy.mode) : null,
+                animalProgression != null ? animalProgression.ownerOfflineGraceHours
+                        : needsTickPolicy != null ? needsTickPolicy.ownerOfflineGraceHours : null,
+                animalProgression != null ? animalProgression.ownerOfflineMultiplier
+                        : needsTickPolicy != null ? needsTickPolicy.ownerOfflineDecayMultiplier : null,
                 needsDamage != null ? needsDamage.enabled : null,
                 needsDamage != null ? trimToNull(needsDamage.model) : null,
                 needsDamage != null ? trimToNull(needsDamage.dualNeedRule) : null,
@@ -618,7 +636,9 @@ public final class TameworkSettingsStore {
                 revive != null ? revive.enabled : null,
                 travel != null ? travel.recallTeleportingEnabled : null,
                 telemetry != null ? telemetry.enabled : null,
-                telemetry != null ? telemetry.breadcrumbsEnabled : null
+                telemetry != null ? telemetry.breadcrumbsEnabled : null,
+                animalProgression != null ? trimToNull(animalProgression.agingMode) : null,
+                animalProgression != null ? animalProgression.oldAgeDeathEnabled : null
         );
     }
 
@@ -771,7 +791,62 @@ public final class TameworkSettingsStore {
                                           boolean reviveSystemEnabled,
                                           boolean recallTeleportingEnabled,
                                           boolean telemetryEnabled,
-                                          boolean telemetryBreadcrumbsEnabled) {
+                                          boolean telemetryBreadcrumbsEnabled,
+                                          @Nonnull String animalAgingMode,
+                                          boolean animalOldAgeDeathEnabled) {
+        /** Compatibility constructor for callers that do not yet select lifecycle settings. */
+        public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                      @Nonnull String populationPerPlayerLimitScope,
+                                      boolean simpleClaimsEnabled,
+                                      int simpleClaimsLimitPerClaimChunk,
+                                      int simpleClaimsLimitPerClaimTotal,
+                                      boolean simpleClaimsBreedingRequiresClaim,
+                                      boolean simpleClaimsProtectTamedFromNonMembers,
+                                      boolean blockOwnerDamage,
+                                      boolean blockAllPlayerDamageIfOwned,
+                                      boolean invulnerableIfOwned,
+                                      boolean captureClearsOwner,
+                                      boolean spawnSetsOwner,
+                                      boolean captureRequiresOwner,
+                                      boolean spawnRequiresOwner,
+                                      boolean interactionRequiresOwner,
+                                      boolean linkingRequiresOwner,
+                                      boolean needsEnabled,
+                                      @Nonnull String needsResourceMode,
+                                      @Nonnull String needsTickPolicyMode,
+                                      double needsOwnerOfflineGraceHours,
+                                      double needsOwnerOfflineDecayMultiplier,
+                                      boolean needsDamageEnabled,
+                                      @Nonnull String needsDamageModel,
+                                      @Nonnull String needsDamageDualNeedRule,
+                                      double needsStarvationDamagePerMinute,
+                                      double needsDehydrationDamagePerMinute,
+                                      boolean needsDamageLethal,
+                                      boolean happinessEnabled,
+                                      boolean passiveBreedingEnabled,
+                                      boolean breedingRequiresHappiness,
+                                      boolean breedingGenderEnabled,
+                                      boolean traitsEnabled,
+                                      boolean levelingEnabled,
+                                      boolean talentsEnabled,
+                                      boolean reviveSystemEnabled,
+                                      boolean recallTeleportingEnabled,
+                                      boolean telemetryEnabled,
+                                      boolean telemetryBreadcrumbsEnabled) {
+            this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope, simpleClaimsEnabled,
+                    simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
+                    simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
+                    blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned,
+                    captureClearsOwner, spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner,
+                    interactionRequiresOwner, linkingRequiresOwner, needsEnabled, needsResourceMode,
+                    needsTickPolicyMode, needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
+                    needsDamageEnabled, needsDamageModel, needsDamageDualNeedRule,
+                    needsStarvationDamagePerMinute, needsDehydrationDamagePerMinute, needsDamageLethal,
+                    happinessEnabled, passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
+                    traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                    recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
+                    "FREEZE_AT_PRIME", false);
+        }
     }
 
     /**
@@ -814,7 +889,9 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean reviveSystemEnabled,
                                    @Nullable Boolean recallTeleportingEnabled,
                                    @Nullable Boolean telemetryEnabled,
-                                   @Nullable Boolean telemetryBreadcrumbsEnabled) {
+                                   @Nullable Boolean telemetryBreadcrumbsEnabled,
+                                   @Nullable String animalAgingMode,
+                                   @Nullable Boolean animalOldAgeDeathEnabled) {
     }
 
     private record CachedSettings(@Nonnull Path path,
@@ -822,6 +899,38 @@ public final class TameworkSettingsStore {
                                   @Nullable GlobalSettingsDocument document,
                                   @Nullable GlobalOverrides overrides,
                                   @Nonnull ResolvedTameworkSettings settings) {
+    }
+
+    /**
+     * Moves the formerly needs-only offline policy into the shared progression section.
+     * Existing values are copied exactly so an upgrade never changes a server's policy.
+     */
+    private static boolean migrateToCurrentVersion(@Nonnull GlobalSettingsDocument document) {
+        int version = document.version == null ? 1 : document.version;
+        if (version >= CURRENT_VERSION) {
+            return false;
+        }
+        if (document.progression == null) {
+            document.progression = new ProgressionSection();
+        }
+        if (document.progression.animal == null) {
+            document.progression.animal = new AnimalProgressionSection();
+        }
+        NeedsTickPolicySection legacy = document.needs != null ? document.needs.tickPolicy : null;
+        if (legacy != null) {
+            document.progression.animal.mode = legacy.mode;
+            document.progression.animal.ownerOfflineGraceHours = legacy.ownerOfflineGraceHours;
+            document.progression.animal.ownerOfflineMultiplier = legacy.ownerOfflineDecayMultiplier;
+            document.needs.tickPolicy = null;
+        }
+        if (document.progression.animal.agingMode == null) {
+            document.progression.animal.agingMode = "FREEZE_AT_PRIME";
+        }
+        if (document.progression.animal.oldAgeDeathEnabled == null) {
+            document.progression.animal.oldAgeDeathEnabled = false;
+        }
+        document.version = CURRENT_VERSION;
+        return true;
     }
 
     private record CachedResolvedPaths(@Nonnull Tamework plugin,
@@ -903,6 +1012,15 @@ public final class TameworkSettingsStore {
     private static final class ProgressionSection {
         private Boolean levelingEnabled;
         private Boolean talentsEnabled;
+        private AnimalProgressionSection animal;
+    }
+
+    private static final class AnimalProgressionSection {
+        private String mode;
+        private Double ownerOfflineGraceHours;
+        private Double ownerOfflineMultiplier;
+        private String agingMode;
+        private Boolean oldAgeDeathEnabled;
     }
 
     private static final class NeedsTickPolicySection {

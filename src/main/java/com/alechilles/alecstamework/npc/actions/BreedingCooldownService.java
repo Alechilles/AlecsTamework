@@ -141,7 +141,7 @@ final class BreedingCooldownService {
                 null
         );
         CooldownWindow window = resolveWindow(
-                nowMs,
+                com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(npcRef, store),
                 applyParentOutcomeMultiplier(cooldownMs, outcome.breedingCooldownMultiplier())
         );
         breeding.setReady(false);

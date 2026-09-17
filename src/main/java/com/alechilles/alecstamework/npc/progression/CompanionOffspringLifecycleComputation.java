@@ -105,6 +105,10 @@ final class CompanionOffspringLifecycleComputation {
         TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
                 ? breedingConfig.resolveTiming(roleId).getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        if (breedingConfig != null && breedingConfig.resolveAging(roleId).isEnabled()) {
+            return Math.max(1L, Math.round(configuredSeconds * 1000.0
+                    * BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store)));
+        }
         long converted = BreedingTimeService.toGameDurationMs(
                 configuredSeconds, timerBasis, store
         );

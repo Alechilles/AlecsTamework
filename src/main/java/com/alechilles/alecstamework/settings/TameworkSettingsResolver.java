@@ -65,7 +65,11 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.reviveSystemEnabled(), defaults.reviveSystemEnabled()),
                 resolveBoolean(values.recallTeleportingEnabled(), defaults.recallTeleportingEnabled()),
                 resolveBoolean(values.telemetryEnabled(), defaults.telemetryEnabled()),
-                resolveBoolean(values.telemetryBreadcrumbsEnabled(), defaults.telemetryBreadcrumbsEnabled())
+                resolveBoolean(values.telemetryBreadcrumbsEnabled(), defaults.telemetryBreadcrumbsEnabled()),
+                AnimalAgingMode.fromConfigValue(
+                        resolveString(values.animalAgingMode(), defaults.animalAgingMode())
+                ).toConfigValue(),
+                resolveBoolean(values.animalOldAgeDeathEnabled(), defaults.animalOldAgeDeathEnabled())
         );
     }
 

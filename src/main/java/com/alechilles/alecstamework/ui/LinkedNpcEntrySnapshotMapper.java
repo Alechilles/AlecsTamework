@@ -95,7 +95,13 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.flightToggleAirborne())
                     .withShoulderRide(entry.shoulderRideAvailable(),
                             entry.shoulderRideMounted())
-                    .withTraitValues(entry.traitValues());
+                    .withTraitValues(entry.traitValues())
+                    .withAnimalLifecycle(entry.animalLifecycle().active()
+                            ? new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
+                                    entry.animalLifecycle().stage(), entry.animalLifecycle().prime(),
+                                    entry.animalLifecycle().frozen(), entry.animalLifecycle().nextDeath(),
+                                    entry.animalLifecycle().remainingMs(), entry.animalLifecycle().yieldMultiplier())
+                            : null);
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());
             }

@@ -27,6 +27,8 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -191,6 +193,8 @@ final class CommandSavedNpcPanelSnapshot {
         if (base.ownedActions()) {
             applied = applied.withOwnedActions();
         }
+        applied = applied.withAnimalLifecycle(AnimalProgressionService.presentation(
+                facts.lifeStage, effectiveRole, base.captured() || base.dead()));
         return base.recoveryHeld() ? applied.withRecoveryHold(base.recoveryIncidentId()) : applied;
     }
 
@@ -218,7 +222,7 @@ final class CommandSavedNpcPanelSnapshot {
     private static CommandSavedNpcPanelSnapshot fromState(CoopResidentStateSnapshot state, long observedAtMs) {
         return new CommandSavedNpcPanelSnapshot(observedAtMs, state.roleId(), Facts.from(
                 state.currentHealth() == null || state.maximumHealth() == null ? null : new Health(state.currentHealth(), state.maximumHealth()),
-                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms())),
+                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms()), state.lifeStage()),
                 Appearance.from(state.attachments(), null), false);
     }
 
@@ -250,8 +254,9 @@ final class CommandSavedNpcPanelSnapshot {
             TameworkAttachmentsComponent attachments = component(
                     components, "TameworkAttachments", TameworkAttachmentsComponent.CODEC);
             TameworkAlarmComponent alarms = component(components, "TameworkAlarm", TameworkAlarmComponent.CODEC);
+            TameworkLifeStageComponent lifeStage = component(components, "TameworkLifeStage", TameworkLifeStageComponent.CODEC);
             return new CommandSavedNpcPanelSnapshot(checkpoint.capturedAtMs(), profile.identity().roleId(),
-                    Facts.from(health, happiness, needs, breeding, leveling, traits, talents, harvest(alarms)),
+                    Facts.from(health, happiness, needs, breeding, leveling, traits, talents, harvest(alarms), lifeStage),
                     Appearance.from(attachments, component(components, "Model")), true);
         } catch (RuntimeException | LinkageError ignored) {
             return null;
@@ -453,9 +458,9 @@ final class CommandSavedNpcPanelSnapshot {
         }
     }
 
-    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest) {
-        static Facts from(@Nullable Health health, @Nullable TameworkHappinessComponent happiness, @Nullable TameworkNeedsComponent needs, @Nullable TameworkBreedingComponent breeding, @Nullable TameworkLevelingComponent leveling, @Nullable TameworkTraitsComponent traits, @Nullable TameworkTalentsComponent talents, @Nullable Harvest harvest) {
-            return new Facts(health, happiness == null ? null : new Happiness(happiness.getConfigId(), happiness.getValue()), needs == null ? null : new Needs(needs.getConfigId(), needs.getHunger(), needs.getThirst()), breeding == null ? null : new Breeding(breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(), breeding.getCooldownDurationMs()), leveling == null ? null : new Leveling(leveling.getConfigId(), leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp()), traits == null ? null : Traits.from(traits), talents == null ? null : new Talents(talents.getConfigId(), talents.getSpentPoints()), harvest);
+    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) {
+        static Facts from(@Nullable Health health, @Nullable TameworkHappinessComponent happiness, @Nullable TameworkNeedsComponent needs, @Nullable TameworkBreedingComponent breeding, @Nullable TameworkLevelingComponent leveling, @Nullable TameworkTraitsComponent traits, @Nullable TameworkTalentsComponent talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) {
+            return new Facts(health, happiness == null ? null : new Happiness(happiness.getConfigId(), happiness.getValue()), needs == null ? null : new Needs(needs.getConfigId(), needs.getHunger(), needs.getThirst()), breeding == null ? null : new Breeding(breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(), breeding.getCooldownDurationMs()), leveling == null ? null : new Leveling(leveling.getConfigId(), leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp()), traits == null ? null : Traits.from(traits), talents == null ? null : new Talents(talents.getConfigId(), talents.getSpentPoints()), harvest, lifeStage);
         }
     }
     private record Appearance(@Nullable String modelId, Map<String, String> attachments) {

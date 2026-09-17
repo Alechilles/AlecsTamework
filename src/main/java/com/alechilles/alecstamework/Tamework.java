@@ -633,6 +633,7 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();
+        com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
         if (diagnosticRuntime != null) {
             diagnosticRuntime.preparePersistence(runtimeDataDirectory);
         }
@@ -1564,6 +1565,7 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
+        com.alechilles.alecstamework.npc.progression.CompanionLifeStageService.shutdown();
         HusbandryHarvestUseContext.clearPendingUses();
         TameworkNpcCullService.clearPendingItemUses();
         TameworkShutdownSequence.run(
@@ -1599,6 +1601,7 @@ public class Tamework extends JavaPlugin {
             companionProgressionSignalBus = null;
         }
         ownerPopulationLiveIndex.clear();
+        com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().close();
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;

@@ -31,6 +31,9 @@ final class SpawnerCaptureSnapshotMapper {
     SnapshotCodecRegistry.EncodedSnapshot encodeCapture(
             @Nonnull CoopResidentStateSnapshot state
     ) {
+        // Capture state is detached; storage must not accrue eligible owner time.
+        state = new com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec().copy(state);
+        com.alechilles.alecstamework.npc.progression.AnimalProgressionService.pauseStored(state.lifeStage());
         return codecs.encode(
                 CompanionCaptureRequest.SNAPSHOT_KIND,
                 CompanionCaptureRequest.SNAPSHOT_VERSION,

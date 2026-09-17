@@ -534,6 +534,28 @@ $C.@PageOverlay {
               }
             }
 
+            Group { Anchor: (Height: 8); }
+
+            Group {
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
+
+              Label #TwSettingsAnimalProgressionSectionLabel {
+                Anchor: (Left: 0, Right: 0, Height: 28);
+                Text: %server.tamework.ui.settings.label.animalProgression;
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsAnimalProgressionSectionTooltip {
+                Anchor: (Left: 0, Right: 0, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.animalProgression;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+            }
+
             Group {
               Anchor: (Height: 34);
 
@@ -616,6 +638,58 @@ $C.@PageOverlay {
                 Padding: (Horizontal: 8);
                 PlaceholderText: "1";
                 MaxLength: 12;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsAnimalAgingModeLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.animalAgingMode;
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsAnimalAgingModeTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.animalAgingMode;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsAnimalAgingModeDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: %server.tamework.ui.settings.noItems.agingMode;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsAnimalOldAgeDeathLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.animalOldAgeDeath;
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsAnimalOldAgeDeathTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.animalOldAgeDeath;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsAnimalOldAgeDeathCheck {
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
               }
             }
 

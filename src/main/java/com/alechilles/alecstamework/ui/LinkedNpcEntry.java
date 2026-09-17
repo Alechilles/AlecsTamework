@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.ProgressionView;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
@@ -69,6 +70,7 @@ public final class LinkedNpcEntry {
     private final boolean shoulderRideAvailable;
     private final boolean shoulderRideMounted;
     private final Location location;
+    private final AnimalLifecycle animalLifecycle;
 
     public LinkedNpcEntry(UUID npcUuid,
                           String displayName,
@@ -504,6 +506,7 @@ public final class LinkedNpcEntry {
         this.shoulderRideAvailable = false;
         this.shoulderRideMounted = false;
         this.location = Location.EMPTY;
+        this.animalLifecycle = AnimalLifecycle.NONE;
     }
 
     public boolean hasHealth() {
@@ -877,6 +880,17 @@ public final class LinkedNpcEntry {
                         portraitIcon, location, values);
     }
 
+    public AnimalLifecycle animalLifecycle() { return animalLifecycle; }
+
+    public LinkedNpcEntry withAnimalLifecycle(AnimalProgressionService.Presentation presentation) {
+        AnimalLifecycle lifecycle = AnimalLifecycle.from(presentation);
+        return Objects.equals(animalLifecycle, lifecycle) ? this
+                : new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                        flightToggleAvailable, flightToggleAirborne, shoulderRideAvailable,
+                        shoulderRideMounted, breedingHappinessRatio, ownedActions, roleSubtitle,
+                        portraitIcon, location, traitValues, lifecycle);
+    }
+
     public boolean hasAnyFutureAction() {
         return traitsActionVisible || talentsActionVisible;
     }
@@ -1004,6 +1018,17 @@ public final class LinkedNpcEntry {
                           double breedingHappinessRatio, boolean ownedActions,
                           String roleSubtitle, String portraitIcon, Location location,
                           ProgressionView.TraitsView traitValues) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
+                shoulderRideAvailable, shoulderRideMounted, breedingHappinessRatio, ownedActions,
+                roleSubtitle, portraitIcon, location, traitValues, source.animalLifecycle);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean recoveryHeld, String incidentId,
+                          boolean flightToggleAvailable, boolean flightToggleAirborne,
+                          boolean shoulderRideAvailable, boolean shoulderRideMounted,
+                          double breedingHappinessRatio, boolean ownedActions,
+                          String roleSubtitle, String portraitIcon, Location location,
+                          ProgressionView.TraitsView traitValues, AnimalLifecycle animalLifecycle) {
         this.portraitIcon = portraitIcon;
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
@@ -1063,6 +1088,7 @@ public final class LinkedNpcEntry {
         this.recoveryHeld = recoveryHeld;
         this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
         this.location = Location.normalize(location);
+        this.animalLifecycle = animalLifecycle == null ? AnimalLifecycle.NONE : animalLifecycle;
     }
 
     private static String normalizeIncidentId(String incidentId) {
@@ -1152,6 +1178,7 @@ public final class LinkedNpcEntry {
                 && flightToggleAirborne == other.flightToggleAirborne
                 && shoulderRideAvailable == other.shoulderRideAvailable
                 && shoulderRideMounted == other.shoulderRideMounted
+                && Objects.equals(animalLifecycle, other.animalLifecycle)
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
                 && Objects.equals(roleSubtitle, other.roleSubtitle)
@@ -1227,7 +1254,8 @@ public final class LinkedNpcEntry {
                 flightToggleAirborne,
                 shoulderRideAvailable,
                 shoulderRideMounted,
-                location
+                location,
+                animalLifecycle
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
         return result;
@@ -1255,6 +1283,17 @@ public final class LinkedNpcEntry {
         private static String normalizeText(String value) {
             return value == null ? "" : value.trim();
         }
+    }
+
+    /** Detached lifecycle display values shared by live, unloaded, captured, and coop cards. */
+    public record AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
+                                  long remainingMs, double yieldMultiplier) {
+        static final AnimalLifecycle NONE = new AnimalLifecycle("", false, false, false, -1L, 1.0);
+        static AnimalLifecycle from(AnimalProgressionService.Presentation value) {
+            return value == null ? NONE : new AnimalLifecycle(value.stage(), value.prime(), value.frozen(),
+                    value.nextDeath(), value.remainingMs(), value.yieldMultiplier());
+        }
+        public boolean active() { return !stage.isBlank(); }
     }
 
     /**

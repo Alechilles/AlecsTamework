@@ -117,7 +117,7 @@ final class BreedingPartnerService {
                 if (candidateBreeding == null
                         || (requireBreedingEnabled && !candidateBreeding.isEnabled())
                         || !acceptsReadiness(readinessPolicy, candidateBreeding)
-                        || candidateBreeding.isCooldownActive(now)) {
+                        || candidateBreeding.isCooldownActive(com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(candidateRef, store))) {
                     continue;
                 }
                 if (requireTamed && !TamedStateResolver.isTamed(candidateRef, store)) {

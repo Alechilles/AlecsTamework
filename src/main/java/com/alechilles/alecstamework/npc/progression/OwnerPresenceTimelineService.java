@@ -209,6 +209,7 @@ public final class OwnerPresenceTimelineService {
         if (ownerId == null) {
             return;
         }
+        AnimalProgressionClock.get().onOwnerConnected(ownerId);
         presenceByOwner.compute(ownerId, (uuid, existing) -> existing == null
                 ? PresenceState.initial(true, atMs)
                 : existing.transitionTo(true, atMs));
@@ -218,6 +219,7 @@ public final class OwnerPresenceTimelineService {
         if (ownerId == null) {
             return;
         }
+        AnimalProgressionClock.get().onOwnerDisconnected(ownerId);
         presenceByOwner.compute(ownerId, (uuid, existing) -> existing == null
                 ? PresenceState.initial(false, atMs)
                 : existing.transitionTo(false, atMs));

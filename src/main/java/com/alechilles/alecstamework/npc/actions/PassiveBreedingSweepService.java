@@ -129,7 +129,7 @@ public final class PassiveBreedingSweepService {
                     new Vector3d(transform.getPosition()),
                     config
             );
-            boolean cooldownActive = breeding.isCooldownActive(nowMs);
+            boolean cooldownActive = breeding.isCooldownActive(com.alechilles.alecstamework.npc.progression.AnimalProgressionService.currentTimeMs(ref, store));
             boolean shouldBeReady = !cooldownActive && resolveShouldBeReady(candidate, breeding, store);
             if (breeding.isReady() != shouldBeReady) {
                 breeding.setReady(shouldBeReady);

@@ -62,7 +62,9 @@ class TameworkSettingsStoreTest {
                 false,
                 false,
                 true,
-                false
+                false,
+                "FULL",
+                true
         );
 
         assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, snapshot, null));
@@ -107,6 +109,8 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.recallTeleportingEnabled());
         assertEquals(true, overrides.telemetryEnabled());
         assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+        assertEquals("FULL", overrides.animalAgingMode());
+        assertEquals(true, overrides.animalOldAgeDeathEnabled());
 
         String raw = Files.readString(settingsFile);
         assertTrue(raw.contains("\"population\""));
@@ -278,6 +282,35 @@ class TameworkSettingsStoreTest {
     @Test
     void defaultGlobalSettingsUsesAccurateNeedsResourceMode() {
         assertEquals("Accurate", TameworkSettingsStore.defaultGlobalSettings().needsResourceMode());
+    }
+
+    @Test
+    void migratesLegacyNeedsPolicyIntoAnimalProgressionWithoutChangingValues() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        Files.writeString(settingsFile, """
+                {
+                  "version": 1,
+                  "needs": {
+                    "tickPolicy": {
+                      "mode": "ANY_LOADED_PLAYER",
+                      "ownerOfflineGraceHours": 37.5,
+                      "ownerOfflineDecayMultiplier": 0.75
+                    }
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        ResolvedTameworkSettings migrated = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals("ANY_LOADED_PLAYER", migrated.needsTickPolicyMode());
+        assertEquals(37.5, migrated.needsOwnerOfflineGraceHours());
+        assertEquals(0.75, migrated.needsOwnerOfflineDecayMultiplier());
+        assertEquals("FREEZE_AT_PRIME", migrated.animalAgingMode());
+        assertFalse(migrated.animalOldAgeDeathEnabled());
+
+        ResolvedTameworkSettings reloaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(migrated, reloaded);
     }
 
     @Test

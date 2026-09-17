@@ -18,6 +18,7 @@ public final class TameworkRuntimeSettings {
     private final NeedsResourceMode resolvedNeedsResourceMode;
     private final TwNeedsConfig.TickPolicySettings resolvedNeedsTickPolicy;
     private final TwNeedsConfig.DamageSettings resolvedNeedsDamage;
+    private final AnimalAgingMode resolvedAnimalAgingMode;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
         this.values = values;
@@ -35,6 +36,7 @@ public final class TameworkRuntimeSettings {
                 values.needsDehydrationDamagePerMinute(),
                 values.needsDamageLethal()
         );
+        this.resolvedAnimalAgingMode = AnimalAgingMode.fromConfigValue(values.animalAgingMode());
     }
 
     @Nonnull
@@ -175,6 +177,34 @@ public final class TameworkRuntimeSettings {
 
     public double needsOwnerOfflineDecayMultiplier() {
         return values.needsOwnerOfflineDecayMultiplier();
+    }
+
+    /** Shared owner-offline policy used by needs, lifecycle, and cooldown progression. */
+    @Nonnull
+    public TwNeedsConfig.TickPolicySettings resolveAnimalProgressionPolicy() {
+        return resolvedNeedsTickPolicy;
+    }
+
+    @Nonnull
+    public String animalProgressionPolicyMode() {
+        return values.animalProgressionPolicyMode();
+    }
+
+    public double animalProgressionOwnerOfflineGraceHours() {
+        return values.animalProgressionOwnerOfflineGraceHours();
+    }
+
+    public double animalProgressionOwnerOfflineMultiplier() {
+        return values.animalProgressionOwnerOfflineMultiplier();
+    }
+
+    @Nonnull
+    public AnimalAgingMode animalAgingMode() {
+        return resolvedAnimalAgingMode;
+    }
+
+    public boolean animalOldAgeDeathEnabled() {
+        return values.animalOldAgeDeathEnabled();
     }
 
     public boolean needsDamageEnabled() {

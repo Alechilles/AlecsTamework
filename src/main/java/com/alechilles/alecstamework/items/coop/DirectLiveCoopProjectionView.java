@@ -16,6 +16,7 @@ import javax.annotation.Nonnull;
  */
 public final class DirectLiveCoopProjectionView {
     private final PersistenceDomainFacades facades;
+    private final DirectLiveCoopProductionState productionState;
 
     /** Creates the projection-only view over the shared replacement facade bundle. */
     public DirectLiveCoopProjectionView(
@@ -27,6 +28,7 @@ public final class DirectLiveCoopProjectionView {
             );
         }
         this.facades = facades;
+        this.productionState = new DirectLiveCoopProductionState(facades);
     }
 
     /** Returns the current immutable coop occupancy projection. */
@@ -39,5 +41,11 @@ public final class DirectLiveCoopProjectionView {
     @Nonnull
     public Map<ProfileId, CompanionProfileProjectionState> profileSnapshot() {
         return facades.queries().projectedProfileSnapshot();
+    }
+
+    /** Returns the extension-backed managed-coop production watermark boundary. */
+    @Nonnull
+    public DirectLiveCoopProductionState productionState() {
+        return productionState;
     }
 }

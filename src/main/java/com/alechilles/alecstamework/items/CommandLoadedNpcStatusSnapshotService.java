@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
@@ -25,6 +26,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -292,10 +294,15 @@ final class CommandLoadedNpcStatusSnapshotService {
                 TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
                         .getShoulderRide();
         boolean mounted = isShoulderMounted(npcRef, player, store);
+        TameworkLifeStageComponent lifeStage = safeGetComponent(
+                store, npcRef, TameworkLifeStageComponent.getComponentType());
         return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted)
                 .withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                         customName, resolvedRoleId, resolvedContext.cachedNameKey()))
-                .withPortraitIcon(resolvedOptions.includePortrait() ? resolvePortrait(npcRef, store, resolvedRoleId) : null);
+                .withPortraitIcon(resolvedOptions.includePortrait() ? resolvePortrait(npcRef, store, resolvedRoleId) : null)
+                .withAnimalLifecycle(AnimalProgressionService.loadedPresentation(lifeStage, resolvedRoleId,
+                        maxHunger > 0 ? hunger * 100.0 / maxHunger : 100,
+                        maxThirst > 0 ? thirst * 100.0 / maxThirst : 100));
     }
 
     /** Reads appearance only in the existing world-thread card snapshot pass. */

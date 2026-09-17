@@ -315,21 +315,24 @@ public final class CompanionLifeStageService {
     public static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
                                         @Nullable NPCEntity npc,
                                         @Nullable Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return;
-        }
+        refreshLifeStage(npcRef, npc, store, false);
+    }
+
+    private static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
+                                        @Nullable NPCEntity npc,
+                                        @Nullable Store<EntityStore> store,
+                                        boolean loaded) {
+        if (npcRef == null || !npcRef.isValid() || store == null) return;
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
-        if (type == null) {
-            return;
-        }
+        if (type == null) return;
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        if (stage == null) {
-            return;
-        }
+        if (stage == null) return;
 
         String previousStage = normalizeStage(stage.getStage());
         boolean changed = normalizeComponentDefaults(stage, npcRef, store);
-        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        AnimalProgressionService.advance(stage, npcRef, store, loaded);
+        changed = true;
+        long nowMs = AnimalProgressionService.lifeTime(stage, store);
         String resolvedStage = resolveStageId(stage, nowMs);
         if (!resolvedStage.equals(stage.getStage())) {
             stage.setStage(resolvedStage);
@@ -355,6 +358,18 @@ public final class CompanionLifeStageService {
         if (changed) {
             store.putComponent(npcRef, type, stage);
         }
+        AnimalAgingPolicy.Progress age = AnimalProgressionService.aging(npcRef, store,
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        if (age != null && age.isDead()) {
+            com.hypixel.hytale.server.core.modules.entity.damage.DamageCause cause =
+                    com.hypixel.hytale.server.core.modules.entity.damage.DamageCause.ENVIRONMENT;
+            if (cause != null) {
+                com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.tryAddComponent(store, npcRef,
+                        new com.hypixel.hytale.server.core.modules.entity.damage.Damage(
+                                new com.hypixel.hytale.server.core.modules.entity.damage.Damage.EnvironmentSource("tamework.old_age"),
+                                cause, Float.MAX_VALUE));
+            }
+        }
     }
 
     /**
@@ -373,7 +388,7 @@ public final class CompanionLifeStageService {
             return;
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        if (stage == null || !stage.isGrowthScalingEnabled()) {
+        if (stage == null || (!stage.isGrowthScalingEnabled() && !agingEnabled(npcRef, store))) {
             return;
         }
         UUID npcUuid = npc != null ? npc.getUuid() : null;
@@ -396,7 +411,9 @@ public final class CompanionLifeStageService {
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    return STAGE_ADULT.equals(resolveStageId(stage, BreedingTimeService.resolveCurrentTimeMs(store)));
+                    AnimalAgingPolicy.Progress aging = AnimalProgressionService.aging(npcRef, store, roleIdFallback);
+                    return (aging == null || !aging.isDead())
+                            && STAGE_ADULT.equals(resolveStageId(stage, AnimalProgressionService.lifeTime(stage, store)));
                 }
             }
         }
@@ -412,7 +429,7 @@ public final class CompanionLifeStageService {
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    return resolveStageId(stage, BreedingTimeService.resolveCurrentTimeMs(store));
+                    return resolveStageId(stage, AnimalProgressionService.lifeTime(stage, store));
                 }
             }
         }
@@ -452,7 +469,7 @@ public final class CompanionLifeStageService {
             stage.setAdolescentSwitchScale(clampScale(stage.getAdolescentSwitchScale() * ratio));
             stage.setAdultStartScale(clampScale(stage.getAdultStartScale() * ratio));
             stage.setAdultSwitchScale(clampScale(stage.getAdultSwitchScale() * ratio));
-            long now = BreedingTimeService.resolveCurrentTimeMs(store);
+            long now = AnimalProgressionService.lifeTime(stage, store);
             String resolvedStage = resolveStageId(stage, now);
             if (!resolvedStage.equals(stage.getStage())) {
                 stage.setStage(resolvedStage);
@@ -601,7 +618,7 @@ public final class CompanionLifeStageService {
             }
         }
 
-        changed |= migrateLegacyTimelineBasis(component, npcRef, store);
+        if (!component.isJuvenileClockInitialized()) changed |= migrateLegacyTimelineBasis(component, npcRef, store);
 
         if (component.getFullyGrownAtMs() < component.getAdultAtMs()) {
             component.setFullyGrownAtMs(component.getAdultAtMs());
@@ -982,7 +999,7 @@ public final class CompanionLifeStageService {
         boolean targetRoleReady = expectedRoleId == null
                 || expectedRoleId.isBlank()
                 || (currentRoleId != null && expectedRoleId.equalsIgnoreCase(currentRoleId));
-        double targetScale = resolveScale(stage, BreedingTimeService.resolveCurrentTimeMs(store));
+        double targetScale = resolveScale(stage, AnimalProgressionService.lifeTime(stage, store));
         boolean applied = CompanionModelScaleService.applyScale(npcRef, npc, store, targetScale);
         boolean closeEnough = isScaleClose(npcRef, store, targetScale);
         boolean roleSpecificRetry = expectedRoleId != null && !expectedRoleId.isBlank();
@@ -1018,7 +1035,7 @@ public final class CompanionLifeStageService {
     }
 
     private static void onGrowthTick(World world, UUID npcUuid) {
-        if (world == null || npcUuid == null) {
+        if (world == null || npcUuid == null || !ACTIVE_GROWTH_TICKERS.contains(npcUuid)) {
             return;
         }
         Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
@@ -1032,7 +1049,7 @@ public final class CompanionLifeStageService {
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        refreshLifeStage(npcRef, npc, store);
+        refreshLifeStage(npcRef, npc, store, true);
         if (isGrowthInProgress(npcRef, store)) {
             scheduleGrowthTick(npcRef, npc, store);
             return;
@@ -1046,8 +1063,16 @@ public final class CompanionLifeStageService {
             return false;
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        return stage != null && stage.isGrowthScalingEnabled();
+        return stage != null && (stage.isGrowthScalingEnabled() || agingEnabled(npcRef, store));
     }
+
+    private static boolean agingEnabled(Ref<EntityStore> ref, Store<EntityStore> store) {
+        TwBreedingConfig config = TwBreedingConfig.resolveForRole(CompanionRoleIdResolver.resolveRoleId(ref, store));
+        return config != null && config.resolveAging(CompanionRoleIdResolver.resolveRoleId(ref, store)).isEnabled();
+    }
+
+    /** Clears scheduler ownership during plugin shutdown; queued callbacks become inert. */
+    public static void shutdown() { ACTIVE_GROWTH_TICKERS.clear(); }
 
     private static boolean isUninitializedAdultComponent(@Nullable TameworkLifeStageComponent component) {
         if (component == null) {

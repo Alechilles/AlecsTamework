@@ -49,7 +49,7 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        CompanionRuntimeClock.advanceByDeltaSeconds(dt);
+        CompanionRuntimeClock.advanceForWorld(dt);
         long nowMs = System.currentTimeMillis();
         CompanionNeedsRuntimeRegistry.WorldState state = registry.state(store);
         if (CompanionNeedsDispatchPolicy.decide(state, nowMs)

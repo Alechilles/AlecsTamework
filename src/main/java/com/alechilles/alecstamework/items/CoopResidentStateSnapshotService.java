@@ -367,7 +367,7 @@ public final class CoopResidentStateSnapshotService {
                 store.getComponent(reference, TameworkLevelingComponent.getComponentType()),
                 store.getComponent(reference, TameworkTraitsComponent.getComponentType()),
                 store.getComponent(reference, TameworkTalentsComponent.getComponentType()),
-                store.getComponent(reference, TameworkLifeStageComponent.getComponentType()),
+                com.alechilles.alecstamework.npc.progression.AnimalProgressionService.snapshot(reference, store),
                 attachments,
                 health == null ? null : health.currentHealth(),
                 health == null ? null : health.maximumHealth(),

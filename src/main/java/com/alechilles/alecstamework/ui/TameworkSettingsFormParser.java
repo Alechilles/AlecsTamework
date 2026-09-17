@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -107,12 +108,17 @@ final class TameworkSettingsFormParser {
                 payload.needsDamageDualNeedRule,
                 currentValues.needsDamageDualNeedRule().toConfigValue()
         );
+        String agingMode = fallback(
+                payload.animalAgingMode,
+                currentValues.animalAgingMode().toConfigValue()
+        );
         return ChoiceResult.success(new ChoiceValues(
                 TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope),
                 TwNeedsConfig.TickPolicyMode.fromConfigValue(tickPolicy),
                 NeedsResourceMode.fromConfigValue(resourceMode).toConfigValue(),
                 TwNeedsConfig.DamageModel.fromConfigValue(damageModel),
-                TwNeedsConfig.DualNeedRule.fromConfigValue(dualNeedRule)
+                TwNeedsConfig.DualNeedRule.fromConfigValue(dualNeedRule),
+                AnimalAgingMode.fromConfigValue(agingMode)
         ));
     }
 
@@ -159,7 +165,9 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.reviveSystemEnabled, current.reviveSystemEnabled()),
                 boolOrDefault(payload.recallTeleportingEnabled, current.recallTeleportingEnabled()),
                 current.telemetryEnabled(),
-                current.telemetryBreadcrumbsEnabled()
+                current.telemetryBreadcrumbsEnabled(),
+                choices.animalAgingMode(),
+                boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled())
         );
     }
 
@@ -260,7 +268,8 @@ final class TameworkSettingsFormParser {
                                 @Nonnull TwNeedsConfig.TickPolicyMode tickPolicyMode,
                                 @Nonnull String needsResourceMode,
                                 @Nonnull TwNeedsConfig.DamageModel damageModel,
-                                @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule) {
+                                @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule,
+                                @Nonnull AnimalAgingMode animalAgingMode) {
     }
 
     private record ChoiceResult(boolean success, @Nonnull String message, @Nullable ChoiceValues values) {

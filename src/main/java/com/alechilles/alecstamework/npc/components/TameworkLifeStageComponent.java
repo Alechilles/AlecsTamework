@@ -112,7 +112,68 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
             TameworkLifeStageComponent::getGender
         )
         .add()
+        .append(
+            new KeyedCodec<>("AgingInitialized", Codec.BOOLEAN),
+            TameworkLifeStageComponent::setAgingInitialized,
+            TameworkLifeStageComponent::isAgingInitialized
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("AgeProgressMs", Codec.DOUBLE),
+            TameworkLifeStageComponent::setAgeProgressMs,
+            TameworkLifeStageComponent::getAgeProgressMs
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("ProgressionOwnerId", Codec.STRING),
+            TameworkLifeStageComponent::setProgressionOwnerId,
+            TameworkLifeStageComponent::getProgressionOwnerId
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("ProgressionClockMs", Codec.LONG),
+            TameworkLifeStageComponent::setProgressionClockMs,
+            TameworkLifeStageComponent::getProgressionClockMs
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("ProgressionInitialized", Codec.BOOLEAN),
+            TameworkLifeStageComponent::setProgressionInitialized,
+            TameworkLifeStageComponent::isProgressionInitialized
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("LastProgressionWorldMs", Codec.LONG),
+            TameworkLifeStageComponent::setLastProgressionWorldMs,
+            TameworkLifeStageComponent::getLastProgressionWorldMs
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("LifecycleNowMs", Codec.LONG),
+            TameworkLifeStageComponent::setLifecycleNowMs,
+            TameworkLifeStageComponent::getLifecycleNowMs
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("JuvenileClockInitialized", Codec.BOOLEAN),
+            TameworkLifeStageComponent::setJuvenileClockInitialized,
+            TameworkLifeStageComponent::isJuvenileClockInitialized
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("StoredProgressionPaused", Codec.BOOLEAN),
+            TameworkLifeStageComponent::setStoredProgressionPaused,
+            TameworkLifeStageComponent::isStoredProgressionPaused
+        )
+        .add()
+        .append(new KeyedCodec<>("ActiveProgressMs", Codec.LONG),
+            TameworkLifeStageComponent::setActiveProgressMs, TameworkLifeStageComponent::getActiveProgressMs)
+        .add()
         .build();
+
+    private long activeProgressMs;
+    public long getActiveProgressMs() { return activeProgressMs; }
+    public void setActiveProgressMs(long value) { activeProgressMs = Math.max(0, value); }
 
     private String stage = "Adult";
     private long bornAtMs;
@@ -130,6 +191,15 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
     private String babyRoleId;
     private String adolescentRoleId;
     private String gender;
+    private boolean agingInitialized;
+    private double ageProgressMs;
+    private String progressionOwnerId;
+    private long progressionClockMs;
+    private boolean progressionInitialized;
+    private long lastProgressionWorldMs;
+    private long lifecycleNowMs;
+    private boolean juvenileClockInitialized;
+    private boolean storedProgressionPaused;
 
     public TameworkLifeStageComponent() {
     }
@@ -293,6 +363,78 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         this.gender = gender;
     }
 
+    public boolean isAgingInitialized() {
+        return agingInitialized;
+    }
+
+    public void setAgingInitialized(boolean agingInitialized) {
+        this.agingInitialized = agingInitialized;
+    }
+
+    public double getAgeProgressMs() {
+        return Double.isFinite(ageProgressMs) && ageProgressMs >= 0.0 ? ageProgressMs : 0.0;
+    }
+
+    public void setAgeProgressMs(double ageProgressMs) {
+        this.ageProgressMs = Double.isFinite(ageProgressMs) && ageProgressMs >= 0.0 ? ageProgressMs : 0.0;
+    }
+
+    public String getProgressionOwnerId() {
+        return progressionOwnerId;
+    }
+
+    public void setProgressionOwnerId(String progressionOwnerId) {
+        this.progressionOwnerId = progressionOwnerId;
+    }
+
+    public long getProgressionClockMs() {
+        return progressionClockMs;
+    }
+
+    public void setProgressionClockMs(long progressionClockMs) {
+        this.progressionClockMs = progressionClockMs;
+    }
+
+    public boolean isProgressionInitialized() {
+        return progressionInitialized;
+    }
+
+    public void setProgressionInitialized(boolean progressionInitialized) {
+        this.progressionInitialized = progressionInitialized;
+    }
+
+    public long getLastProgressionWorldMs() {
+        return lastProgressionWorldMs;
+    }
+
+    public void setLastProgressionWorldMs(long lastProgressionWorldMs) {
+        this.lastProgressionWorldMs = lastProgressionWorldMs;
+    }
+
+    public long getLifecycleNowMs() {
+        return lifecycleNowMs;
+    }
+
+    public void setLifecycleNowMs(long lifecycleNowMs) {
+        this.lifecycleNowMs = lifecycleNowMs;
+    }
+
+    public boolean isJuvenileClockInitialized() {
+        return juvenileClockInitialized;
+    }
+
+    public void setJuvenileClockInitialized(boolean juvenileClockInitialized) {
+        this.juvenileClockInitialized = juvenileClockInitialized;
+    }
+
+    public boolean isStoredProgressionPaused() {
+        return storedProgressionPaused;
+    }
+
+    public void setStoredProgressionPaused(boolean storedProgressionPaused) {
+        this.storedProgressionPaused = storedProgressionPaused;
+    }
+
     @Override
     public TameworkLifeStageComponent clone() {
         TameworkLifeStageComponent clone = new TameworkLifeStageComponent(
@@ -313,6 +455,16 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         clone.setBabyRoleId(babyRoleId);
         clone.setAdolescentRoleId(adolescentRoleId);
         clone.setGender(gender);
+        clone.setActiveProgressMs(activeProgressMs);
+        clone.setAgingInitialized(agingInitialized);
+        clone.setAgeProgressMs(ageProgressMs);
+        clone.setProgressionOwnerId(progressionOwnerId);
+        clone.setProgressionClockMs(progressionClockMs);
+        clone.setProgressionInitialized(progressionInitialized);
+        clone.setLastProgressionWorldMs(lastProgressionWorldMs);
+        clone.setLifecycleNowMs(lifecycleNowMs);
+        clone.setJuvenileClockInitialized(juvenileClockInitialized);
+        clone.setStoredProgressionPaused(storedProgressionPaused);
         return clone;
     }
 }

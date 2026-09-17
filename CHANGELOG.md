@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Added shared Animal Progression settings for needs, aging, harvest readiness,
+  and breeding readiness. Server upgrades preserve each existing owner-offline
+  policy while migrating it into the version 2 settings document.
+- Added optional role-scoped adult aging through `TwBreedingConfig.Aging`, with
+  real eligible-minute durations, prime freezing by default, configurable full
+  lifecycle and old-age death, and lifecycle status/yield UI text.
+- Unloaded farms are not force-loaded or background-simulated. Needs and trough
+  consumption pause while unloaded; aging progresses normally without care
+  penalties, and harvest or breeding readiness remains bounded to one ready
+  result until a loaded world can complete the physical action.
+- Managed coops catch up production from saved active animal time, with bounded
+  work and container capacity limits. Captured storage pauses these intervals.
+- Fixed shared progression time advancing faster on servers with multiple worlds.
+
 - Reduced database growth from repeated entity checkpoints by compacting old,
   consumed checkpoint history while preserving current saves and retry safety.
 - Added `/tw debug persistence compact` to reclaim database disk space while the

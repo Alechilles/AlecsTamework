@@ -75,7 +75,10 @@ final class CullRewardService {
                         return -1.0;
                     }
                     wearMultiplier[0] = Math.min(wearMultiplier[0], modifiers.toolWearMultiplier());
-                    return HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
+                    double bonus = HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
+                    double age = com.alechilles.alecstamework.npc.progression.AnimalProgressionService
+                            .slaughterMultiplier(npcRef, store, roleId);
+                    return (1.0 + bonus) * age - 1.0;
                 },
                 random::nextDouble);
         output = HusbandryYieldResolver.applyCullConversions(
