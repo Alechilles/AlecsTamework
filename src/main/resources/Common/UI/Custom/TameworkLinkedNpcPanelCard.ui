@@ -244,8 +244,8 @@ Group {
             TextButton #LifecycleProgressTooltip { Anchor: (Top: 0, Left: 0, Width: 138, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #BreedingCooldown { Anchor: (Width: 138, Height: 34); Visible: false;
-            Group #BreedingCooldownIconMuted { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Fertility.png", Color: #777777); Visible: false; }
-        Group #BreedingCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Trait_Fertility.png"; }
+            Group #BreedingCooldownIconMuted { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #777777); Visible: false; }
+        Group #BreedingCooldownIconImage { Anchor: (Top: 7, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png"; }
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 24, Width: 0, Height: 6); Background: #bb959e; }

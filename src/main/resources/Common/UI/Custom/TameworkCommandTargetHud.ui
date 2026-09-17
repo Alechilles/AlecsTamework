@@ -122,8 +122,8 @@ Group #Root {
    TextButton #AgeTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 40); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
   Group #BreedingCooldown { Anchor: (Width: 112, Height: 40); Visible: false;
-   Group #BreedingCooldownIconImage { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Fertility.png"); Visible: false; }
-   Group #BreedingCooldownIconMuted { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Fertility.png", Color: #747b73); Visible: false; }
+   Group #BreedingCooldownIconImage { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png"); Visible: false; }
+   Group #BreedingCooldownIconMuted { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #747b73); Visible: false; }
    Label #CooldownLabel { Anchor: (Top: 0, Left: 18, Width: 82, Height: 14); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: @CooldownLabel; }
    Group { Anchor: (Top: 16, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
    Group #MeterFill { Anchor: (Top: 16, Left: 0, Width: 0, Height: 6); Background: #bb959e; }

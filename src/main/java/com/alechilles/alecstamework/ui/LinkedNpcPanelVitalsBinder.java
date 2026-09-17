@@ -369,10 +369,10 @@ final class LinkedNpcPanelVitalsBinder {
         commands.set(card + " #BreedingCooldownIconImage.Visible", !muted);
         commands.set(card + " #BreedingCooldownIconMuted.Visible", muted);
         commands.setObject(card + " #BreedingCooldownIconImage.Background",
-                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Trait_Fertility.png"))
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Breeding_Cooldown.png"))
                         .setColor(Value.of("#bb959e")));
         commands.setObject(card + " #BreedingCooldownIconMuted.Background",
-                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Trait_Fertility.png"))
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Breeding_Cooldown.png"))
                         .setColor(Value.of(MUTED_FILL_COLOR)));
     }
 
