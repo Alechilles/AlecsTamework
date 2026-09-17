@@ -7,6 +7,8 @@
 - Added `/tw debug persistence compact` to reclaim database disk space while the
   server stays online, temporarily pausing Tamework saves during maintenance.
   New and compacted databases also reclaim space incrementally.
+- Database compaction now builds its temporary copy beside the save database,
+  avoiding failures caused by a hosting provider's separate system temp-storage limit.
 
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 

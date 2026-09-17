@@ -5,9 +5,11 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import org.sqlite.SQLiteConnection;
 
 /** One writer-lane maintenance pass that reclaims obsolete checkpoint history and file space. */
 final class SqliteDatabaseCompaction {
@@ -30,11 +32,13 @@ final class SqliteDatabaseCompaction {
         }
         Path target = databasePath.toAbsolutePath().normalize();
         long bytesBefore = databaseBytes(target);
-        requireVacuumHeadroom(target);
         requireNoOperationsInFlight(connection);
+        checkpointWal(connection);
+        requireVacuumHeadroom(target);
 
         int compactedOperations = compactCheckpointHistory(connection, nowMs);
-        enableIncrementalVacuumAndRebuild(connection);
+        checkpointWal(connection);
+        rebuildBesideDatabase(connection, target);
         checkpointWal(connection);
         requireQuickCheck(connection);
         return new SqliteDatabaseCompactionResult(
@@ -109,10 +113,70 @@ final class SqliteDatabaseCompaction {
         }
     }
 
-    private static void enableIncrementalVacuumAndRebuild(Connection connection) throws SQLException {
+    /**
+     * Keeps the large rebuild image on the checked save volume. The owning writer lane and
+     * maintenance gate must remain held throughout: no canonical writes may occur between
+     * taking this snapshot and copying it back. Existing readers keep SQLite's normal WAL safety.
+     */
+    static void rebuildBesideDatabase(Connection connection, Path databasePath) throws Exception {
+        Path rebuilt = Files.createTempFile(databasePath.getParent(),
+                databasePath.getFileName() + ".compact-", ".sqlite");
+        Exception originalFailure = null;
+        try {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA auto_vacuum=INCREMENTAL");
+            }
+            try (PreparedStatement statement = connection.prepareStatement("VACUUM INTO ?")) {
+                statement.setString(1, rebuilt.toString());
+                statement.execute();
+            }
+            // Validate the candidate before touching the original. Do not rename a database
+            // underneath live readers or manually manipulate its WAL/SHM files.
+            try (Connection source = new SqliteConnectionFactory(rebuilt).openReadConnection()) {
+                requireQuickCheck(source);
+                requireIncrementalVacuum(source);
+                copyRebuiltDatabase(source, databasePath);
+            }
+            requireIncrementalVacuum(connection);
+        } catch (Exception failure) {
+            originalFailure = failure;
+            throw failure;
+        } finally {
+            try {
+                Files.deleteIfExists(rebuilt);
+            } catch (IOException cleanupFailure) {
+                if (originalFailure != null) {
+                    originalFailure.addSuppressed(cleanupFailure);
+                } else {
+                    throw cleanupFailure;
+                }
+            }
+        }
+    }
+
+    private static void copyRebuiltDatabase(Connection source, Path databasePath) throws SQLException {
+        boolean[] completed = {false};
+        // Xerial 3.49.1.0 restore() reads errors from the source, hiding destination failures.
+        // Use backup() from the copy instead. Its busy-exhaustion result can also be zero:
+        // require the synchronous successful final-step callback as positive commit evidence.
+        // The callback must not throw or access either database connection.
+        int result = source.unwrap(SQLiteConnection.class).getDatabase().backup(
+                "main", databasePath.toString(),
+                (remaining, total) -> {
+                    if (remaining == 0) completed[0] = true;
+                },
+                100, 3, 100
+        );
+        if (result != 0) {
+            throw new SQLException("database_compaction_copy_failed", null, result);
+        }
+        if (!completed[0]) {
+            throw new SQLException("database_compaction_copy_busy", null, 5);
+        }
+    }
+
+    private static void requireIncrementalVacuum(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.execute("PRAGMA auto_vacuum=INCREMENTAL");
-            statement.execute("VACUUM");
             if (integerPragma(statement, "PRAGMA auto_vacuum") != AUTO_VACUUM_INCREMENTAL) {
                 throw new SQLException("database_compaction_incremental_vacuum_not_enabled");
             }
