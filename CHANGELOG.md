@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed queued births ignoring growth sizes and durations for animal families without an explicit ID.
+
 - Command-item configs can hide the command-control strip with
   `HotswapHudEnabled: false` while keeping the animal information HUD visible.
 

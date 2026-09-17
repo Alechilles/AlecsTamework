@@ -439,16 +439,26 @@ final class BreedingLitterWorldExecutor {
     private static TwBreedingConfig config(@Nullable String id) {
         return id == null ? null : TwBreedingConfig.resolveById(id);
     }
-    private static TwBreedingConfig.RoleFamily family(
+    static TwBreedingConfig.RoleFamily family(
             @Nullable TwBreedingConfig config,
             BreedingLitterOperation.ChildPlan plan
     ) {
-        if (config == null || plan.lifecycleFamilyId() == null) {
+        if (config == null) {
             return null;
         }
         TwBreedingConfig.RoleFamily family =
                 config.resolveLifecycleFamilyForRole(plan.roleId());
-        if (family == null || family.getId() == null
+        if (plan.lifecycleFamilyId() == null) {
+            // Legacy families have no Id; retain their settings using the frozen role pair.
+            if (family == null || !family.matchesAdultRole(plan.adultRoleId())) {
+                family = config.resolveLifecycleFamilyForRole(plan.adultRoleId());
+            }
+            if (family == null || family.getId() != null
+                    || !family.matchesRole(plan.roleId())
+                    || !family.matchesAdultRole(plan.adultRoleId())) {
+                return null;
+            }
+        } else if (family == null || family.getId() == null
                 || !family.getId().equalsIgnoreCase(
                         plan.lifecycleFamilyId()
                 )) {
