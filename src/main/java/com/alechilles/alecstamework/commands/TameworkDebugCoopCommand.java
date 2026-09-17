@@ -24,6 +24,10 @@ public final class TameworkDebugCoopCommand extends AbstractTameworkServerComman
         }
         String raw = getFirstArg(commandContext);
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? plugin.setDebugCoopEnabled(explicit)
                 : plugin.toggleDebugCoopEnabled();

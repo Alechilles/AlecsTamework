@@ -20,7 +20,7 @@ Use `TwGlobalConfig` for:
 
 Do not use it for role-specific companion policy. That belongs in [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 
-Population caps, ownership requirements/protection, revive enablement, claim-integration enablement/limits, and related high-impact server policy are owned by `/tw settings`. Legacy config keys are still decoded, but new examples and `/tw config` hide them.
+Population caps, ownership requirements/protection, revive enablement, claim-integration enablement/limits, and related high-impact server policy are owned by `/tw settings`. Legacy config keys are still decoded, but new examples and `/tw config open` hide them.
 
 ## Asset Location and Resolution
 - Location: `<ModRoot>/Server/Tamework/Global/*.json`
@@ -33,7 +33,7 @@ Population caps, ownership requirements/protection, revive enablement, claim-int
 - Omitted top-level sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays or maps replace the parent value rather than merging.
-- `TwGlobalConfig` is not part of `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwGlobalConfig` is not part of `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json
@@ -126,14 +126,14 @@ These legacy fields are still decoded but `/tw settings` is authoritative:
 There is no provider selector or QuestLines Claims bridge.
 
 ## Legacy Settings-Owned Fields Accepted
-Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
+Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config open` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Global/TwGlobalConfig_Default.json` is the best reference for shipped baseline values.
 - `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes
   priority when both are authored. A matching role-scoped companion config
   still owns the effective cooldown.
-- Settings-owned legacy sections remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
+- Settings-owned legacy sections remain readable for old packs, but `/tw settings` wins at runtime and `/tw config open` hides those fields.
 
 ## Minimal Example
 ```json

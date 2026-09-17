@@ -1404,7 +1404,7 @@ tamework.commands.debugView.description=Commandes de visualisation de débogage 
 tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not=Le service de débogage des événements d'XP Tamework n'est pas disponible.
 tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen=Journalisation de débogage des événements d'XP des compagnons Tamework : {0} (événements vus cette session : {1})
 tamework.commands.debugXpEvents.description=Activer ou désactiver la journalisation de débogage des événements d'API d'XP des compagnons Tamework.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Utilisation : /tw debug view delete [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Utilisation : /tw debug delete-spawn-marker [range]
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Impossible de résoudre votre position.
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=Aucun marqueur d'apparition chargé trouvé devant vous dans un rayon de {0} blocs.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=Le marqueur d'apparition ciblé n'est plus valide.
@@ -1786,3 +1786,7 @@ tamework.commandmenu.lifecycle.oldAgeDeath=Mort de vieillesse dans {0}
 tamework.commandmenu.lifecycle.yield=Rendement : {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Rendement d'abattage maximal
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Rendement d'abattage réduit
+
+tamework.commands.invalidToggle=État non valide. Utilisez on, off ou toggle ; omettez la valeur pour basculer.
+
+tamework.commands.setOwner.componentUnavailable=Le composant de propriétaire est indisponible.

@@ -25,7 +25,7 @@ Use it when you want:
 - Parent fallback is supported.
 - Omitted top-level keys inherit from parent pools.
 - Explicit arrays replace parent pool arrays for that same key.
-- `TwNamesConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwNamesConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

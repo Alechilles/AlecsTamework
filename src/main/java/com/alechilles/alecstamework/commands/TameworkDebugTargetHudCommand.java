@@ -16,6 +16,10 @@ public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerC
     protected void executeServer(@Nonnull CommandContext commandContext) {
         String raw = getFirstArg(commandContext.getInputString());
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? CommandTargetHudDebugLog.setEnabled(explicit)
                 : CommandTargetHudDebugLog.toggle();

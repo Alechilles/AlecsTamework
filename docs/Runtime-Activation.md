@@ -53,10 +53,10 @@ recovery; an orphan or non-regular sidecar remains read-only.
 
 The startup topology does not change while the server process runs. A config
 reload builds a candidate plan and compares its fingerprint with the startup
-plan. If module states changed, `/tw reloadconfig` reports that a restart is
+plan. If module states changed, `/tw config reload` reports that a restart is
 required. It does not add or remove live systems.
 
-Use `/tw activation` to inspect the startup fingerprint, reload result,
+Use `/tw runtime status` to inspect the startup fingerprint, reload result,
 module states, reasons, and passive counters. Dormant modules report zero
 systems, callbacks, work cycles, workers, subscriptions, and database opens.
 The diagnostics service has no monitor thread.

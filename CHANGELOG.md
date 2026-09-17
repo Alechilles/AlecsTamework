@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Moved spawn-marker deletion to `/tw debug delete-spawn-marker`, outside the view menu.
+- Reject invalid debug toggle and NPC marker values, and keep named world options
+  out of positional command arguments. Corrected outdated command examples.
+
 - Fixed queued births ignoring growth sizes and durations for animal families without an explicit ID.
 
 - Command-item configs can hide the command-control strip with

@@ -26,7 +26,7 @@ revival.
 - Asset key: file name / asset ID
 - Logical roster key: `RosterId`
 - Policy-family key: `FamilyId`
-- Runtime reload: `/tw reloadconfig`
+- Runtime reload: `/tw config reload`
 
 Several assets may share one `RosterId` when they declare different
 `FamilyId` values. This is how one command item can show independently balanced

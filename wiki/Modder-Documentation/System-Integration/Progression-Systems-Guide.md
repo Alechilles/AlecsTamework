@@ -143,14 +143,14 @@ That means incomplete progression configs usually show up as missing or flat UI 
 
 ## Fast Debug Workflow
 Use:
-- `/tw gethappiness`
+- `/tw debug get happiness`
 - `/tw debug set happiness`
-- `/tw getneeds`
-- `/tw setneeds`
-- `/tw gettraits`
+- `/tw debug get needs`
+- `/tw debug set needs`
+- `/tw debug get traits`
 - `/tw debug set traits`
 - `/tw debug set trait`
-- `/tw getlifestage`
+- `/tw debug get lifestage`
 
 For breeding issues, also verify:
 - effective happiness threshold
@@ -159,13 +159,13 @@ For breeding issues, also verify:
 - sleep and combat gates
 
 For needs-damage diagnostics, use:
-- `/tw debugneedsdamage [on|off]`
+- `/tw debug log needs damage [on|off]`
 
 For needs seek/targeting diagnostics, use:
-- `/tw debugneedsseek [on|off]`
+- `/tw debug log needs seek [on|off]`
 
 For telemetry-backed needs failure aggregation, use:
-- `/tw debugneedstelemetry [on|off]`
+- `/tw debug telemetry needs [on|off]`
 
 ## Related Pages
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)

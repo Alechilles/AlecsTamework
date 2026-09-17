@@ -13,7 +13,7 @@ final class TameworkDeleteSpawnMarkerCommandSupportTest {
     @Test
     void parseUsesDefaultRangeWhenNoArgumentProvided() {
         TameworkDeleteSpawnMarkerCommandSupport.ParseResult result =
-                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug view delete");
+                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug delete-spawn-marker");
 
         assertEquals(TameworkDeleteSpawnMarkerCommandSupport.Mode.DELETE, result.mode());
         assertEquals(10.0, result.range());
@@ -22,7 +22,7 @@ final class TameworkDeleteSpawnMarkerCommandSupportTest {
     @Test
     void parseClampsRangeToSupportedLimit() {
         TameworkDeleteSpawnMarkerCommandSupport.ParseResult result =
-                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug view delete 999");
+                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug delete-spawn-marker 999");
 
         assertEquals(TameworkDeleteSpawnMarkerCommandSupport.Mode.DELETE, result.mode());
         assertEquals(64.0, result.range());
@@ -31,7 +31,7 @@ final class TameworkDeleteSpawnMarkerCommandSupportTest {
     @Test
     void parseRejectsInvalidRange() {
         TameworkDeleteSpawnMarkerCommandSupport.ParseResult result =
-                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug view delete near");
+                TameworkDeleteSpawnMarkerCommandSupport.parse("/tw debug delete-spawn-marker near");
 
         assertEquals(TameworkDeleteSpawnMarkerCommandSupport.Mode.INVALID, result.mode());
     }

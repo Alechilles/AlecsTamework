@@ -63,8 +63,8 @@ Good uses:
 ## Troubleshooting
 - Verify projectile id exists and is loadable.
 - Verify target resolution is valid (slot target, owner/user/target, or random radius setup).
-- Use `/tw debugprompt` to ensure interaction gating and prompt behavior are correct.
-- Use `/tw debughook` only if this projectile entry is chained with hook behavior.
+- Use `/tw debug log prompt` to ensure interaction gating and prompt behavior are correct.
+- Use `/tw debug log hook` only if this projectile entry is chained with hook behavior.
 
 ## Related Pages
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)

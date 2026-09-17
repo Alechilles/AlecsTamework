@@ -24,6 +24,10 @@ public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand
         }
         String raw = getFirstArg(commandContext);
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? plugin.setDebugLagEnabled(explicit)
                 : plugin.toggleDebugLagEnabled();

@@ -15,7 +15,7 @@ final class TameworkDeleteSpawnMarkerCommandSupport {
     }
 
     static ParseResult parse(String input) {
-        String arg = TameworkCommandInput.firstArgument(input, "delete");
+        String arg = TameworkCommandInput.firstArgument(input, "delete-spawn-marker");
         if (arg == null || arg.isBlank()) {
             return new ParseResult(Mode.DELETE, DEFAULT_RANGE);
         }

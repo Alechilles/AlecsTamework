@@ -36,7 +36,7 @@ When deterministic selection matters and multiple configs could apply, set `Conf
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
 - `Interactions` is an explicit ordered array and replaces the parent list when authored in a child asset.
-- `TwInteractionConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwInteractionConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

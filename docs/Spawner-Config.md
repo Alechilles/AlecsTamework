@@ -245,7 +245,7 @@ Bonded capture example:
 ```
 
 ## Reloading
-Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
+Use `/tw config reload` to reload spawner, naming, and command item configs into the item feature registries.
 Captured spawner display text is written into base Hytale `ItemDisplay` metadata when the NPC is captured.
 
 Bonded roster policies reload with their dependent command configs as one

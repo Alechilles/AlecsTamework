@@ -27,7 +27,7 @@ This config is especially important when you use:
 - Omitted top-level sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
-- `TwHappinessConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwHappinessConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

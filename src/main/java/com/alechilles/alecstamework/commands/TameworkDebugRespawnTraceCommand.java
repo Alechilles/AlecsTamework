@@ -27,6 +27,10 @@ public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServ
         }
         String raw = getFirstArg(commandContext.getInputString());
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? plugin.setDebugRespawnTraceEnabled(explicit)
                 : plugin.toggleDebugRespawnTraceEnabled();

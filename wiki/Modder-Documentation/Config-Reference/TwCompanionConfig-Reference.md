@@ -38,7 +38,7 @@ Do not put global relocation infrastructure here. Retry windows and linked-panel
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
 - Alias handling matters for `DeadRespawnCooldownMs` and `DeadRespawnCooldownMins`; either key counts as an explicit override.
-- `TwCompanionConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwCompanionConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json
@@ -166,13 +166,13 @@ input aliases; `Revive.GameplayCooldownMs` wins when the nested section is
 present.
 
 ## Legacy Settings-Owned Fields Accepted
-Older packs may still contain ownership protection and revive enablement keys in `TwCompanionConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
+Older packs may still contain ownership protection and revive enablement keys in `TwCompanionConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config open` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Companion/TwCompanionConfig_Default.json` is the shipped baseline.
 - New configs should use `Revive.GameplayCooldownMs`; the older
   `DeadRespawnCooldownMins` and `DeadRespawnCooldownMs` fields remain readable.
-- Settings-owned legacy fields remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
+- Settings-owned legacy fields remain readable for old packs, but `/tw settings` wins at runtime and `/tw config open` hides those fields.
 - `FollowMasterOnWorldChangeStateFilter` is an explicit array. If you author it in a child asset, it replaces the parent list.
 
 ## Minimal Example

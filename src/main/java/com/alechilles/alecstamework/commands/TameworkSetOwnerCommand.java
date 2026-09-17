@@ -58,13 +58,11 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
         }
 
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type != null) {
-            store.putComponent(
-                    candidate.ref,
-                    type,
-                    new TameworkOwnerComponent(newOwner, ownerName)
-            );
+        if (type == null) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.componentUnavailable"));
+            return;
         }
+        store.putComponent(candidate.ref, type, new TameworkOwnerComponent(newOwner, ownerName));
         String ownerText = newOwner == null ? "null" : newOwner.toString();
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.set.owner.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(ownerText)));
     }

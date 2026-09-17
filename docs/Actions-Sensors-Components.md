@@ -313,37 +313,37 @@ specific to each NPC.
 - `TameworkCommand`
 
 ## `/tw` Commands
-- `/tw getowner`
+- `/tw debug get owner`
 - `/tw debug set owner`
-- `/tw gettamed`
+- `/tw debug get tamed`
 - `/tw debug set tamed`
 - `/tw debug get alarm [AlarmName] [NpcUuid]`
-- `/tw reloadconfig`
-- `/tw gethappiness`
+- `/tw config reload`
+- `/tw debug get happiness`
 - `/tw debug set happiness <value>`
 - `/tw debug get needs [--entity=<uuid>|--ray|--cone|--coneAll|--sphere] [--world=<world>] [--angle=<degrees>] [--range=<blocks>] [--roles=<role,...>] [--nearest]`
 - `/tw debug set needs <hunger> <thirst> [NPC selectors]`
 - `/tw debug set hunger <value> [NPC selectors]`
 - `/tw debug set thirst <value> [NPC selectors]`
-- `/tw debug set breeding ready [--mode=true|false|toggle] [NPC selectors]`
-- `/tw spawntamed <role> [--count=<quantity>] [--radius=<blocks>] [--attachment=<slot:value>]`
-- `/tw gettraits`
+- `/tw debug set breedingready [--mode=true|false|toggle] [NPC selectors]`
+- `/tw npc spawn tamed <role> [--count=<quantity>] [--radius=<blocks>] [--attachment=<slot:value>]`
+- `/tw debug get traits`
 - `/tw debug set traits <TraitId> <Value> [TraitId Value ...]`
 - `/tw debug set trait <TraitId> <Value>`
-- `/tw getlifestage`
+- `/tw debug get lifestage`
 - `/tw npc find <uuid> [on|off]`
-- `/tw getflockdebug`
-- `/tw debughook [on|off]`
-- `/tw debugprompt [on|off]`
-- `/tw debugspawner [on|off]`
-- `/tw debugspawnerlocation [on|off]`
-- `/tw debugdespawn [on|off] [RoleName|all|clear]`
+- `/tw debug get flock`
+- `/tw debug log hook [on|off]`
+- `/tw debug log prompt [on|off]`
+- `/tw debug log spawner [on|off]`
+- `/tw debug log spawner-location [on|off]`
+- `/tw debug log despawn [on|off] [RoleName|all|clear]`
 - `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
 - `/tw debug avatar input [on|off|status]`
-- `/tw debuglag [on|off]`
+- `/tw debug log lag [on|off]`
 - `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug view spawn-markers [radius|off]`
-- `/tw debug view delete [range]`
+- `/tw debug delete-spawn-marker [range]`
 
 `NPC selectors` use Hytale's standard NPC debug selection: `--world`, `--entity`, `--angle`,
 `--range`, `--roles`, `--nearest`, `--ray`, `--cone`, `--coneAll`, and `--sphere`.
@@ -353,4 +353,4 @@ specific to each NPC.
 - `TriggerNpcHook` + `TameworkHook` is the primary bridge from optimized interactions into instruction branches.
 - `TameworkAlarm` is the instruction-side reset bridge for durable Tamework alarm state.
 - `TameworkEffectActive` is useful for gating behavior while status effects (for example tranquilizer) are active.
-- `/tw reloadconfig` only reloads item-feature assets (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).
+- `/tw config reload` only reloads item-feature assets (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).

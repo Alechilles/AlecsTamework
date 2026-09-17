@@ -139,7 +139,7 @@ Behavior summary:
 - `TwBondedCompanionRosterConfig` defines bonded roster-family limits, session
   duration, summon cooldown, revive cooldown, revive price, and action gates.
   `ReviveCooldownSeconds: 0` disables the bonded revive cooldown.
-- Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config` hide them so server owners use `/tw settings`.
+- Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config open` hide them so server owners use `/tw settings`.
 
 Persistence machinery does not have feature-specific asset families.
 Population groups are authored through `TwPopulationGroupConfig`; paid revival
@@ -161,7 +161,7 @@ Gate evaluation is OR-based across enabled global configs:
 Recipe visibility reconciliation removes disabled gated tranquilizer recipes from crafting registries and restores them when enabled.
 
 ## Reloading
-`/tw reloadconfig` reloads item-feature registries only:
+`/tw config reload` reloads item-feature registries only:
 - `TwSpawnerConfig`
 - `TwNameItemConfig`
 - `TwCommandItemConfig`

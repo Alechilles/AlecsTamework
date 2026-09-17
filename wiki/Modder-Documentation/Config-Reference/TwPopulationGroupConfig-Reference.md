@@ -21,7 +21,7 @@ group.
 - Scope: logical group with exact role membership
 - `GroupId`: stable, namespaced, and case-sensitive
 - Duplicate `GroupId`: highest `Priority` wins; asset-ID ordering breaks ties
-- Reload: normal asset loaded/removed events, not `/tw reloadconfig`
+- Reload: normal asset loaded/removed events, not `/tw config reload`
 
 ## Fields
 

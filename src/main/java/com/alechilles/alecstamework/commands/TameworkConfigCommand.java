@@ -59,9 +59,9 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
             player.getPageManager().openCustomPage(ref, store, page);
             plugin.getTelemetryEvents().recordUsage(
                     "config_editor_opened",
-                    TameworkTelemetryEvents.commandContext("/tw config", "config_editor", "config_editor")
+                    TameworkTelemetryEvents.commandContext("/tw config open", "config_editor", "config_editor")
                             .operation("open")
-                            .detail("Opened via /tw config.")
+                            .detail("Opened via /tw config open.")
                             .detail("source", "command")
                             .build()
             );

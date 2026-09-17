@@ -1467,7 +1467,7 @@ tamework.commands.deleteSpawnMarker.description=Lösche die loaded spawn marker 
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=Keine loaded spawn marker gefunden in front of you within {0} blocks.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=Target spawn marker ist nicht mehr valid.
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Kann nicht resolve your position.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Verwendung: /tw debug view delete [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Verwendung: /tw debug delete-spawn-marker [range]
 tamework.commands.findNpc.description=Finde an NPC by UUID und print its aktuelle world state.
 tamework.commands.findNpc.entity.exists.but.has.no.npc.component=Entity {0} exists but hat no NPC component.
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} gefunden: Rolle={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
@@ -1786,3 +1786,7 @@ tamework.commandmenu.lifecycle.oldAgeDeath=Tod durch Altersschwäche in {0}
 tamework.commandmenu.lifecycle.yield=Ertrag: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Maximaler Schlachtertrag
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Verringerter Schlachtertrag
+
+tamework.commands.invalidToggle=Ungültiger Zustand. Verwende on, off oder toggle; ohne Wert wird umgeschaltet.
+
+tamework.commands.setOwner.componentUnavailable=Die Besitzerkomponente ist nicht verfügbar.

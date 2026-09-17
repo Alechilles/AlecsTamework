@@ -24,7 +24,12 @@ public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCo
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not"));
             return;
         }
-        Boolean explicit = parseBoolean(getFirstArg(commandContext.getInputString()));
+        String raw = getFirstArg(commandContext.getInputString());
+        Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null ? service.setEnabled(explicit) : service.toggle();
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen").param("0", String.valueOf((enabled ? "enabled" : "disabled"))).param("1", String.valueOf(service.getEventCount())));
     }

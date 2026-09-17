@@ -34,7 +34,7 @@ Use it when you want to control:
 - Explicit arrays and maps replace the parent value.
 - Alias keys are treated as explicit overrides. This matters for cooldown and lifecycle minute-based keys.
 - `RoleOverrides` is the required exception: it is local-only and never inherited from the parent.
-- `TwBreedingConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwBreedingConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json
@@ -245,7 +245,7 @@ Important behavior:
 - This is intentional and part of Tamework’s inheritance contract.
 
 ## Legacy Settings-Owned Fields Accepted
-These legacy fields are still decoded for old packs, but they are hidden from `/tw config` and controlled at runtime by `/tw settings`:
+These legacy fields are still decoded for old packs, but they are hidden from `/tw config open` and controlled at runtime by `/tw settings`:
 - `PassiveBreeding.Enabled`
 - `RoleOverrides.*.PassiveBreeding.Enabled`
 
@@ -409,7 +409,7 @@ This pattern allows two different adult roles to breed together, produce one sha
 - Keep `Timing.Basis` and `PassiveBreeding.Basis` intentional. They solve different timing problems.
 - New content should prefer minute-based keys where they exist, but old second-based keys remain valid.
 - Gender labels appear in linked companion panels and preserved spawner tooltips for companions covered by an enabled gender config.
-- A multi-child litter is not automatically a duplication bug. Check `/tw gethappiness` for the active job's planned, admitted, and outstanding counts before investigating repeated entities.
+- A multi-child litter is not automatically a duplication bug. Check `/tw debug get happiness` for the active job's planned, admitted, and outstanding counts before investigating repeated entities.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)

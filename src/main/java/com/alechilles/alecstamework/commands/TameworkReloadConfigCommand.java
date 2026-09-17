@@ -78,7 +78,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
         }).whenComplete((summary, throwable) -> world.execute(() -> {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
             if (throwable != null || summary == null) {
-                plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Async /tw reloadconfig failed.");
+                plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Async /tw config reload failed.");
                 telemetryEvents.recordLifecycle(
                         "reload_config",
                         durationMs,

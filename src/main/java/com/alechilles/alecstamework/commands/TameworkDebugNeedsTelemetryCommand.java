@@ -24,6 +24,10 @@ public final class TameworkDebugNeedsTelemetryCommand extends AbstractTameworkSe
         }
         String raw = getFirstArg(commandContext.getInputString());
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? plugin.setDebugNeedsTelemetryDiagnosticsEnabled(explicit)
                 : plugin.toggleDebugNeedsTelemetryDiagnosticsEnabled();

@@ -1446,7 +1446,7 @@ tamework.commands.deleteSpawnMarker.description=Delete o loaded spawn marker Voc
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=No loaded spawn marker found em frativadot of Você within {0} blocks.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=alvo spawn marker is no lativadoger valid.
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Não foi possível determinar seu positiativado.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw debug view delete [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw debug delete-spawn-marker [range]
 tamework.commands.findNpc.description=Find an NPC by UUID e print its current mundo estado.
 tamework.commands.findNpc.entity.exists.but.has.no.npc.component=Entity {0} exists but has no NPC compativadoent.
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} encontrado: role={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
@@ -1786,3 +1786,7 @@ tamework.commandmenu.lifecycle.oldAgeDeath=Morte por velhice em {0}
 tamework.commandmenu.lifecycle.yield=Rendimento: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Rendimento máximo de abate
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Rendimento reduzido de abate
+
+tamework.commands.invalidToggle=Estado inválido. Use on, off ou toggle; omita o valor para alternar.
+
+tamework.commands.setOwner.componentUnavailable=O componente de proprietário não está disponível.

@@ -127,4 +127,25 @@ class TameworkDebugToggleInputTest {
                 TameworkCommandInput.argumentsAfter(
                         "/tw debug get alarm alarm 12345678-1234-1234-1234-123456789abc", "alarm"));
     }
+    @Test
+    void namedWorldOptionIsNotAnAlarmName() {
+        String input = "/tw debug get alarm 12345678-1234-1234-1234-123456789abc --world=default";
+        assertEquals("12345678-1234-1234-1234-123456789abc", TameworkGetAlarmCommand.getArg(input, 0));
+        assertNull(TameworkGetAlarmCommand.getArg(input, 1));
+        assertArrayEquals(new String[]{"-25"},
+                TameworkCommandInput.argumentsAfter("/tw debug set happiness -25 --help", "happiness"));
+    }
+    @Test
+    void invalidTamedStateIsRejectedInsteadOfToggling() {
+        assertNull(TameworkSetTamedCommand.resolveRequestedState("flase", true));
+        assertEquals(false, TameworkSetTamedCommand.resolveRequestedState("off", true));
+        assertEquals(false, TameworkSetTamedCommand.resolveRequestedState("toggle", true));
+        assertEquals(true, TameworkSetTamedCommand.resolveRequestedState(null, false));
+    }
+    @Test
+    void invalidMarkerStateIsRejectedInsteadOfEnabled() {
+        assertNull(TameworkFindNpcCommand.parseOptionalMark("of"));
+        assertEquals(false, TameworkFindNpcCommand.parseOptionalMark("off"));
+        assertEquals(true, TameworkFindNpcCommand.parseOptionalMark(null));
+    }
 }

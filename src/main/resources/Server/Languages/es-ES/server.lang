@@ -1320,7 +1320,7 @@ tamework.commands.debugView.description=Comandos de visualización de depuració
 tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not=El servicio de depuración de eventos de Tamework XP no está disponible.
 tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen=Registro de depuración de eventos de Tamework XP: {0} (eventos vistos en esta sesión: {1})
 tamework.commands.debugXpEvents.description=Alternar el registro de depuración de eventos de la API XP de Tamework Companion.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw debug view delete [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw debug delete-spawn-marker [range]
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=No se puede resolver su posición.
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=No se encontró ningún marcador de generación cargado frente a usted dentro de los bloques {0}.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=El marcador de generación de objetivos ya no es válido.
@@ -1742,3 +1742,7 @@ tamework.commandmenu.lifecycle.oldAgeDeath=Muerte por vejez en {0}
 tamework.commandmenu.lifecycle.yield=Rendimiento: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Rendimiento máximo de sacrificio
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Rendimiento reducido de sacrificio
+
+tamework.commands.invalidToggle=Estado no válido. Usa on, off o toggle; omite el valor para alternar.
+
+tamework.commands.setOwner.componentUnavailable=El componente de propietario no está disponible.

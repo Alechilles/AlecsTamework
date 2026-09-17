@@ -40,6 +40,14 @@ public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand
             return;
         }
 
+        if (!arg.isBlank()
+                && !"on".equals(arg) && !"true".equals(arg) && !"1".equals(arg)
+                && !"off".equals(arg) && !"false".equals(arg) && !"0".equals(arg)
+                && !TameworkCommandInput.isToggleRequest(arg)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
+
         boolean enabled;
         if ("on".equals(arg) || "true".equals(arg) || "1".equals(arg)) {
             PlayerInputDebugProbe.enable(playerUuid);

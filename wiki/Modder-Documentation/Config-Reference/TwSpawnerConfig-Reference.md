@@ -15,7 +15,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - Scope: item-scoped
 - Resolution key: `EmptyItemId`
-- Runtime reload: `/tw reloadconfig` reloads spawner assets into the item feature registry
+- Runtime reload: `/tw config reload` reloads spawner assets into the item feature registry
 
 ## Inheritance and Reload
 - Parent fallback is supported.
@@ -231,7 +231,7 @@ Appearance header.
 - Use `/tw settings` for the global capture/spawn owner-transfer defaults.
 - Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
 - Companion icon rules belong to `TwDynamicIconConfig`; update dependent packs together when migrating the removed inline icon maps.
-- `/tw reloadconfig` is required after editing spawner configs during development.
+- `/tw config reload` is required after editing spawner configs during development.
 - Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied
   into every capture item.
 - `BondedRosterId` is valid only with

@@ -15,7 +15,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Location: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
 - Scope: item-scoped
 - Resolution key: `ItemIds`
-- Runtime reload: `/tw reloadconfig` reloads command-item assets into the item feature registry
+- Runtime reload: `/tw config reload` reloads command-item assets into the item feature registry
 
 ## Inheritance and Reload
 - Parent fallback is supported.
@@ -26,7 +26,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `TargetHudContributors` and `HotswapHudContributors` are explicit arrays and
   replace the parent list, including when the child sets an empty array.
 - HUD renderer and contributor fields inherit independently from the parent.
-- `TwCommandItemConfig` is one of the item families refreshed by `/tw reloadconfig`.
+- `TwCommandItemConfig` is one of the item families refreshed by `/tw config reload`.
 
 ## Top-Level Structure
 ```json
@@ -407,7 +407,7 @@ player-facing tool.
 - `CommandList` is ordered and explicit. A child asset that authors it replaces the entire parent list.
 - `MaxActive: 0` means unlimited, not zero active companions.
 - `ModeMapping` is UI-facing metadata. It does not replace the `Steps` that actually perform the command.
-- `/tw reloadconfig` is required after editing command-item configs during development.
+- `/tw config reload` is required after editing command-item configs during development.
 - Bonded roster and dependent command configs reload atomically. An invalid
   bonded reference leaves the prior coherent generation active.
 

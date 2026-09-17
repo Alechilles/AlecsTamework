@@ -9,6 +9,5 @@ public final class TameworkDebugViewCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkShowHitboxesCommand());
         addSubCommand(new TameworkShowSpawnBeaconsCommand(spawnBeaconVisualizationService));
         addSubCommand(new TameworkShowSpawnMarkersCommand());
-        addSubCommand(new TameworkDeleteSpawnMarkerCommand());
     }
 }

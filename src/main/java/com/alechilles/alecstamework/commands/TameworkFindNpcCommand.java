@@ -62,7 +62,11 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         double scale = CompanionModelScaleService.resolveCurrentScale(targetRef, store, 1.0);
         double distance = resolveDistance(targetTransform, playerTransform);
 
-        boolean shouldMark = parseOptionalMark(getArg(commandContext.getInputString(), 1));
+        Boolean shouldMark = parseOptionalMark(getArg(commandContext.getInputString(), 1));
+        if (shouldMark == null) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off"));
+            return;
+        }
         if (shouldMark && targetTransform != null) {
             spawnMarker(targetTransform.getPosition(), store);
         }
@@ -95,7 +99,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         return targetTransform.getPosition().distance(playerTransform.getPosition());
     }
 
-    private static boolean parseOptionalMark(String arg) {
+    static Boolean parseOptionalMark(String arg) {
         if (arg == null || arg.isBlank()) {
             return true;
         }
@@ -106,7 +110,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         if ("on".equals(normalized) || "true".equals(normalized) || "1".equals(normalized)) {
             return true;
         }
-        return true;
+        return null;
     }
 
     static String getArg(String input, int index) {

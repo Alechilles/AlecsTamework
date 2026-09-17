@@ -50,7 +50,7 @@ operation does not play success feedback.
 - Captured-spawner names and detail lines are written into base Hytale item display metadata.
 
 ## Reloading
-Spawner configs participate in `/tw reloadconfig`.
+Spawner configs participate in `/tw config reload`.
 
 ## Related Pages
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)

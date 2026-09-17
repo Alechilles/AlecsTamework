@@ -20,7 +20,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Parent fallback is supported.
 - Omitted top-level object sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
-- `TwDebugConfig` is not part of `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwDebugConfig` is not part of `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

@@ -16,7 +16,7 @@ Parent: [Core Architecture](/mod/alecs-tamework/core-architecture) | [Developer 
 - `NameItemRegistry`
 - `CommandItemRegistry`
 
-These are the registries that `/tw reloadconfig` refreshes directly.
+These are the registries that `/tw config reload` refreshes directly.
 
 ## Inheritance model
 - Asset families implement parent fallback through `TwParentFallbackAsset`

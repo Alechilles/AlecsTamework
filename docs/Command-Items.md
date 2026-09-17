@@ -577,7 +577,7 @@ role-scoped companion config exists.
 Command feedback sounds are delivered as local 2D sound for the using player and in-world 3D sound for nearby others.
 
 ## Reloading
-`/tw reloadconfig` reloads command item assets along with spawner and naming
+`/tw config reload` reloads command item assets along with spawner and naming
 assets. Bonded roster policies and their dependent bonded command configs are
 accepted as one coherent generation. An invalid or missing `BondedRosterId`
 rejects the new generation instead of partially swapping roster or command

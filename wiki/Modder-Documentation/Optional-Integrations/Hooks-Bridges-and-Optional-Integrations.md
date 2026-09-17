@@ -103,8 +103,8 @@ Use `AssetSets` when you want to enable optional bundled assets such as:
 - Put bridge-specific tuning in the family that owns it instead of inventing side-channel params.
 
 ## Debugging Bridges
-- Use `/tw debughook` to inspect hook emit and consume flow.
-- Use `/tw debugprompt` when interaction prompts look wrong before a hook even fires.
+- Use `/tw debug log hook` to inspect hook emit and consume flow.
+- Use `/tw debug log prompt` when interaction prompts look wrong before a hook even fires.
 - Use the linked panel and item feedback to confirm command dispatch before debugging the downstream hook consumer.
 
 ## Related Pages

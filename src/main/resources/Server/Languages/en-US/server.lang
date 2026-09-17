@@ -1373,7 +1373,7 @@ tamework.commands.debugView.description=Tamework debug visualization commands.
 tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not=Tamework XP event debug service is not available.
 tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen=Tamework XP event debug logging: {0} (events seen this session: {1})
 tamework.commands.debugXpEvents.description=Toggle Tamework companion XP API event debug logging.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Usage: /tw debug view delete [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Usage: /tw debug delete-spawn-marker [range]
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Unable to resolve your position.
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=No loaded spawn marker found in front of you within {0} blocks.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=Target spawn marker is no longer valid.
@@ -1798,3 +1798,7 @@ tamework.commandmenu.lifecycle.oldAgeDeath=Old-age death in {0}
 tamework.commandmenu.lifecycle.yield=Yield: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Maximum slaughter yield
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Reduced slaughter yield
+
+tamework.commands.invalidToggle=Invalid state. Use on, off, or toggle; omit the value to toggle.
+
+tamework.commands.setOwner.componentUnavailable=Owner component is not available.

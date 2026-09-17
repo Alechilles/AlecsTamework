@@ -48,7 +48,7 @@ recovery journal, vanilla resident importer, or coop repair command surface.
   `TameworkManagedCoopCaptureCrate` when the vanilla item should participate in
   canonical captured-item intake. Tamework's bundled capture-crate patch is the
   reference wiring.
-- Use `/tw debugcoop` for coop-specific runtime logging and `/tw debug
+- Use `/tw debug log coop` for coop-specific runtime logging and `/tw debug
   persistence status` for bounded replacement-persistence status.
 
 ## Related Pages

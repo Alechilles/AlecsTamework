@@ -79,7 +79,7 @@ Add prompt, item, and UI keys in:
 `Server/Languages/en-US/server.lang`
 
 ## 7. Reload or test
-- `/tw reloadconfig` reloads spawner, naming, and command item registries
+- `/tw config reload` reloads spawner, naming, and command item registries
 - Other config families update through the normal asset registry load and remove flow
 
 ## Notes

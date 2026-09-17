@@ -27,7 +27,7 @@ Use it when you want:
 - Omitted top-level sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
-- `TwTraitConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwTraitConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

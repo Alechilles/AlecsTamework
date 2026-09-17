@@ -39,7 +39,7 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
     private static final int MAX_NPC_SUMMARY_ROWS = 4;
 
     public TameworkDeleteSpawnMarkerCommand() {
-        super("delete", "server.tamework.commands.deleteSpawnMarker.description");
+        super("delete-spawn-marker", "server.tamework.commands.deleteSpawnMarker.description");
         setAllowsExtraArguments(true);
     }
 

@@ -24,6 +24,10 @@ public final class TameworkDebugNeedsDamageCommand extends AbstractTameworkServe
         }
         String raw = getFirstArg(commandContext);
         Boolean explicit = parseBoolean(raw);
+        if (explicit == null && !TameworkCommandInput.isToggleRequest(raw)) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
         boolean enabled = explicit != null
                 ? plugin.setDebugNeedsDamageDiagnosticsEnabled(explicit)
                 : plugin.toggleDebugNeedsDamageDiagnosticsEnabled();

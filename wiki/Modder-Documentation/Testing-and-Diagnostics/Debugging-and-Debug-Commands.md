@@ -26,11 +26,11 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw npc find <uuid>`
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
-- `/tw debug view spawnbeacons [radius|off]`
+- `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug persistence [status|health|detail|export]`
 - `/tw debug persistence reviveready`
 
-`/tw debug view spawnbeacons` tracks loaded natural spawn beacons around the caller
+`/tw debug view spawn-beacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model
 and nameplate used by a manually created beacon. Its presentation-only proxies
 do not participate in spawning and are removed when tracking ends.

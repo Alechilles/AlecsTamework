@@ -34,11 +34,11 @@ closed as read-only.
 
 ## Operations
 
-Runtime topology is fixed until restart. `/tw reloadconfig` compares a new
+Runtime topology is fixed until restart. `/tw config reload` compares a new
 candidate with the startup plan and reports `restart required` when module
 states differ. It does not change live systems.
 
-Use `/tw activation` to view the topology fingerprint, reload result, states,
+Use `/tw runtime status` to view the topology fingerprint, reload result, states,
 reasons, system registrations, callbacks, work cycles, workers,
 subscriptions, and database opens. Dormant modules report exact zeros. No
 background monitor produces these values.

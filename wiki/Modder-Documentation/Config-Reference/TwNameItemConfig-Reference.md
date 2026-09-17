@@ -15,14 +15,14 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Location: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - Scope: item-scoped
 - Resolution key: `ItemId`
-- Runtime reload: `/tw reloadconfig` reloads naming configs into the item feature registry
+- Runtime reload: `/tw config reload` reloads naming configs into the item feature registry
 
 ## Inheritance and Reload
 - Parent fallback is supported.
 - Omitted top-level object sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
-- `TwNameItemConfig` is one of the item families refreshed by `/tw reloadconfig`.
+- `TwNameItemConfig` is one of the item families refreshed by `/tw config reload`.
 
 ## Top-Level Structure
 ```json
@@ -134,7 +134,7 @@ Custom validation is also supported through:
 ## Gotchas
 - `AllowedChars` is server-side policy, not only UI validation.
 - `AllowRename` and `ReplaceExisting` solve different problems: one is about existing Tamework names, the other is about replacing non-Tamework display names.
-- `/tw reloadconfig` is required after editing naming configs during development.
+- `/tw config reload` is required after editing naming configs during development.
 
 ## Related Pages
 - [Naming System Guide](/mod/alecs-tamework/naming-system-guide)

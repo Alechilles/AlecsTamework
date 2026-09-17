@@ -120,7 +120,7 @@ Examples:
 - `TwBreedingConfig.RoleOverrides` is local-only and never inherited.
 
 ## Reload Boundaries
-`/tw reloadconfig` only reloads item-feature families:
+`/tw config reload` only reloads item-feature families:
 - `TwSpawnerConfig`
 - `TwNameItemConfig`
 - `TwCommandItemConfig`
@@ -141,7 +141,7 @@ Everything else refreshes through normal asset loaded and removed events:
 3. Keep priorities sparse and deliberate.
 4. Use parent fallback for shared defaults, but remember arrays and maps replace.
 5. Test the exact role, item, or coop id you expect to resolve.
-6. Use `/tw reloadconfig` only when you edited an item config family.
+6. Use `/tw config reload` only when you edited an item config family.
 
 ## Related Pages
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)

@@ -28,7 +28,7 @@ Use it when you want companions to:
 - Omitted top-level sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays replace the parent value.
-- `TwNeedsConfig` is not reloaded by `/tw reloadconfig`; it refreshes through normal asset load/remove flow.
+- `TwNeedsConfig` is not reloaded by `/tw config reload`; it refreshes through normal asset load/remove flow.
 
 ## Top-Level Structure
 ```json

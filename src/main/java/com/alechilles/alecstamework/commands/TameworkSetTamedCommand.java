@@ -47,11 +47,22 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
         }
 
         String raw = getFirstArg(commandContext.getInputString());
-        Boolean parsed = parseBoolean(raw);
-        boolean next = parsed != null ? parsed : !current;
+        Boolean next = resolveRequestedState(raw, current);
+        if (next == null) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.invalidToggle"));
+            return;
+        }
 
         store.putComponent(candidate.ref, type, new TameworkTamedComponent(next));
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.set.tamed.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(next)));
+    }
+
+    static Boolean resolveRequestedState(String raw, boolean current) {
+        Boolean parsed = parseBoolean(raw);
+        if (parsed != null) {
+            return parsed;
+        }
+        return TameworkCommandInput.isToggleRequest(raw) ? !current : null;
     }
 
     static String getFirstArg(String input) {

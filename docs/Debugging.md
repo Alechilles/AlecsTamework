@@ -30,7 +30,7 @@ synthetic failure through the real automatic diagnostic path and prints a
 unique token. It does not read or change the SQLite database.
 
 Commands that operate on a world but not a player use Hytale's optional world
-argument. Console callers must provide the target world for `/tw reloadconfig`,
+argument. Console callers must provide the target world for `/tw config reload`,
 `/tw npc clean`, `/tw npc find`, and `/tw debug get alarm`. The last
 two require an NPC UUID when no player gaze target exists; player-relative distance
 is reported as `n/a` from the console.
@@ -41,8 +41,8 @@ truthfully report regenerated targets as restart-required until the server is
 restarted.
 
 Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
-player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
-`/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw debug view hitboxes`,
+player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
+`/tw api test prepare|reset|run|status`, `/tw npc spawn tamed`, `/tw debug view hitboxes`,
 `/tw debug view spawn-beacons`, and `/tw debug view spawn-markers` need a live player.
 
 ## Interaction troubleshooting
@@ -57,10 +57,10 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 ## Progression troubleshooting
 - Validate resolved configs for happiness/needs/breeding/traits on the same NPC.
 - Use:
-  - `/tw gethappiness`
+  - `/tw debug get happiness`
   - `/tw debug get needs --ray`
-  - `/tw gettraits`
-  - `/tw getlifestage`
+  - `/tw debug get traits`
+  - `/tw debug get lifestage`
 - For breeding issues, confirm:
   - effective fertility threshold
   - life-stage/adult gates
@@ -254,12 +254,12 @@ When enabled, it also logs `TameworkHarvestDrop` attempts before the public even
 XP can be diagnosed with a reason such as not tamed or owned, disabled harvest XP, or missing drop output.
 
 ## Useful quick checks
-- `/tw getowner`, `/tw debug set owner`
-- `/tw gettamed`, `/tw debug set tamed`
+- `/tw debug get owner`, `/tw debug set owner`
+- `/tw debug get tamed`, `/tw debug set tamed`
 - `/tw debug get alarm [AlarmName] [NpcUuid]`
-- `/tw getflockdebug`
+- `/tw debug get flock`
 - `/tw npc clean <roleId>`
-- `/tw reloadconfig` (item-feature assets only)
+- `/tw config reload` (item-feature assets only)
 
 ## Timestamp note
 World-time based timestamps can be negative and still valid. Treat `0` as unset sentinel; use ordering comparisons, not `> 0` assumptions.
