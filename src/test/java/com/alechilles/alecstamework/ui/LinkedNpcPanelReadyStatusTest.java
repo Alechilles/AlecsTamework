@@ -29,7 +29,7 @@ class LinkedNpcPanelReadyStatusTest {
     void activeCooldownKeepsCountdownAndUnsupportedStatusesStayHidden() {
         UICommandBuilder commands = new UICommandBuilder();
         LinkedNpcPanelVitalsBinder.bind(commands, "#Card", entry(30, true, true), "en-US");
-        assertTrue(value(commands, "#Card #BreedingCooldown #CooldownText.Text").contains("1:00"));
+        assertTrue(value(commands, "#Card #BreedingCooldown #CooldownText.Text").contains("1m"));
         assertFalse(LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry(30, true, true)));
         commands = new UICommandBuilder();
         LinkedNpcPanelVitalsBinder.bind(commands, "#Card", entry(100, false, false), "en-US");

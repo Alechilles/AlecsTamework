@@ -33,6 +33,11 @@ panel without changing its filters or selection.
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
+- Animals with aging enabled show a compact life-stage label and age progress
+  bar beside breeding and harvest meters, both in the menu and target HUD.
+  The age bar fills within the current stage and resets at the next stage;
+  paused aging keeps its position. Timers show hours and minutes, then seconds
+  when less than one minute remains.
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
 - A thin red mark on the happiness meter shows the NPC's configured breeding happiness requirement. Hover over the breeding toggle to see the required happiness on the next line.
 

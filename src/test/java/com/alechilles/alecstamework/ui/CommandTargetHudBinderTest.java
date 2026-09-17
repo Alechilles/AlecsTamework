@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -40,7 +41,28 @@ class CommandTargetHudBinderTest {
         var emptyLayout = CommandTargetHudBinder.resolveLayout(model(unloadedStatus("Duck"), List.of()));
         Assertions.assertTrue(readyLayout.rootHeight() > emptyLayout.rootHeight());
         UICommandBuilder cooling = bind(model(cooldownStatus(true), List.of()));
-        Assertions.assertTrue(data(cooling, "#Root #BreedingCooldown #CooldownText.Text").contains("1:00"));
+        Assertions.assertTrue(data(cooling, "#Root #BreedingCooldown #CooldownText.Text").contains("1m"));
+    }
+
+    @Test
+    void rendersLifecycleAlongsideCompactCooldownMeters() {
+        LinkedNpcEntry animal = cooldownStatus(true).withAnimalLifecycle(
+                new AnimalProgressionService.Presentation("Adult", false, false, false,
+                        60_000L, 0.5, 0.4));
+
+        UICommandBuilder commands = bind(model(animal, List.of()));
+
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#AgeProgress.Visible", true);
+        expected.set("#AgeStage.Text", "Age · Adult");
+        expected.set("#AgeCountdown.Text", "Prime in 1m");
+        assertCommands(expected, commands);
+        Anchor fill = new Anchor();
+        fill.setTop(Value.of(16));
+        fill.setLeft(Value.of(0));
+        fill.setWidth(Value.of(42));
+        fill.setHeight(Value.of(4));
+        Assertions.assertEquals(expectedObject(fill), data(commands, "#AgeMeterFill.Anchor"));
     }
 
     @Test
@@ -122,6 +144,12 @@ class CommandTargetHudBinderTest {
         }
         Assertions.assertNotNull(result, selector);
         return result;
+    }
+
+    private static String expectedObject(Object value) {
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.setObject("#Expected", value);
+        return data(expected, "#Expected");
     }
 
     private static LinkedNpcEntry cooldownStatus(boolean active) {

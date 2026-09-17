@@ -31,6 +31,9 @@ final class CommandTargetHudBinder {
     private static final int FOOD_ATTACHMENT_GAP = 8;
     private static final int STATUS_ROW_WIDTH = 324;
     private static final int STATUS_ROW_HEIGHT = 48;
+    private static final int COOLDOWN_ROW_HEIGHT = 40;
+    private static final int COMPACT_METER_WIDTH = 108;
+    private static final int COMPACT_METER_FILL_WIDTH = 104;
     private static final int FOOD_HEADING_HEIGHT = 18;
     private static final int FAVORITE_FOOD_HEIGHT = 36;
     private static final int FOOD_STRIP_HEIGHT = 46;
@@ -58,6 +61,7 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#RoleSubtitle.Visible", !status.roleSubtitle().isBlank());
         LinkedNpcPanelVitalsBinder.bindHud(commandBuilder, status, language, HEALTH_FILL_MAX_WIDTH);
         bindStatusVisibility(commandBuilder, status);
+        bindLifecycle(commandBuilder, status, language);
         bindProgression(commandBuilder, status, language);
         bindTraits(commandBuilder, status.traitIndicators());
         bindFood(commandBuilder, model.favoriteFood(), model.compatibleFoods(), language);
@@ -74,8 +78,8 @@ final class CommandTargetHudBinder {
         commandBuilder.setObject("#HeaderRow.Anchor", fullWidthAnchor(HEADER_TOP, HEADER_HEIGHT));
         commandBuilder.setObject("#HealthRow.Anchor", fullWidthAnchor(HEALTH_TOP, HEALTH_HEIGHT));
         commandBuilder.setObject("#StatusRingRow.Anchor", leftAnchor(layout.statusTop(), STATUS_ROW_WIDTH, STATUS_ROW_HEIGHT));
-        commandBuilder.set("#CooldownRow.Visible", model.status().breedingCooldownKnown() || model.status().harvestCooldownKnown());
-        commandBuilder.setObject("#CooldownRow.Anchor", fullWidthAnchor(layout.cooldownTop(), 48));
+        commandBuilder.set("#CooldownRow.Visible", hasCooldownRow(model.status()));
+        commandBuilder.setObject("#CooldownRow.Anchor", fullWidthAnchor(layout.cooldownTop(), COOLDOWN_ROW_HEIGHT));
         commandBuilder.set("#AppearanceDivider.Visible", layout.attachmentCount() > 0);
         commandBuilder.setObject("#AppearanceDivider.Anchor", fullWidthAnchor(layout.firstAttachmentTop() - 4, 1));
         commandBuilder.set("#FoodTameRow.Visible", layout.foodTameVisible());
@@ -108,8 +112,8 @@ final class CommandTargetHudBinder {
         }
 
         int cooldownTop = nextTop;
-        if (status.breedingCooldownKnown() || status.harvestCooldownKnown()) {
-            contentBottom = cooldownTop + 48;
+        if (hasCooldownRow(status)) {
+            contentBottom = cooldownTop + COOLDOWN_ROW_HEIGHT;
             nextTop = contentBottom + SECTION_GAP;
         }
 
@@ -175,6 +179,12 @@ final class CommandTargetHudBinder {
                 || LinkedNpcPanelProgressionBinder.availableTalentPoints(status.futureStatB()) > 0;
     }
 
+    private static boolean hasCooldownRow(@Nonnull LinkedNpcEntry status) {
+        return status.animalLifecycle().active()
+                || status.breedingCooldownKnown()
+                || status.harvestCooldownKnown();
+    }
+
     private static boolean hasRenderableFoods(@Nonnull List<CommandTargetHudViewModel.FoodRow> foods) {
         for (CommandTargetHudViewModel.FoodRow food : foods) {
             if (isRenderableFood(food)) {
@@ -193,6 +203,41 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#NeedHunger.Visible", TameworkRuntimeSettings.needsEnabled(true) && status.hasHunger());
         commandBuilder.set("#NeedThirst.Visible", TameworkRuntimeSettings.needsEnabled(true) && status.hasThirst());
         commandBuilder.set("#StatusRingRow.Visible", hasStatusRow(status));
+    }
+
+    private static void bindLifecycle(@Nonnull UICommandBuilder commandBuilder,
+                                      @Nonnull LinkedNpcEntry status,
+                                      @Nullable String language) {
+        LinkedNpcPanelCardBinder.LifecycleDisplay display = LinkedNpcPanelCardBinder.resolveLifecycleDisplay(status, language);
+        LinkedNpcEntry.AnimalLifecycle lifecycle = status.animalLifecycle();
+        commandBuilder.set("#AgeProgress.Visible", display.visible());
+        commandBuilder.setObject("#BreedingCooldown.Anchor", compactMeterAnchor());
+        commandBuilder.setObject("#HarvestCooldown.Anchor", compactMeterAnchor());
+        commandBuilder.setObject("#BreedingCooldown #MeterFill.Anchor", compactMeterFill(
+                status.breedingCooldownRemainingMs() < 0L ? 0.0
+                        : status.breedingCooldownActive() ? status.breedingCooldownRatio() : 1.0));
+        commandBuilder.setObject("#HarvestCooldown #MeterFill.Anchor", compactMeterFill(
+                status.harvestCooldownRemainingMs() < 0L ? 0.0
+                        : status.harvestCooldownActive() ? status.harvestCooldownRatio() : 1.0));
+        if (!display.visible()) {
+            return;
+        }
+        commandBuilder.set("#AgeStage.Style.TextColor", LinkedNpcPanelCardBinder.lifecycleColor(lifecycle));
+        commandBuilder.set("#AgeStage.Text", LocalizedText.format(
+                language, "tamework.commandmenu.lifecycle.ageStage", display.stageText()));
+        commandBuilder.set("#AgeCountdown.Text", display.countdownText());
+        commandBuilder.set("#AgeTooltip.TooltipText", lifecycleTooltip(display));
+        commandBuilder.setObject("#AgeMeterFill.Anchor", compactMeterFill(lifecycle.stageProgress()));
+        commandBuilder.set("#AgeMeterFill.Background", LinkedNpcPanelCardBinder.lifecycleColor(lifecycle));
+        commandBuilder.setObject("#AgeProgress.Anchor", compactMeterAnchor());
+    }
+
+    @Nonnull
+    private static String lifecycleTooltip(@Nonnull LinkedNpcPanelCardBinder.LifecycleDisplay display) {
+        if (display.countdownText().isBlank()) {
+            return display.yieldTooltip();
+        }
+        return display.countdownText() + "\n" + display.yieldTooltip();
     }
 
     private static void bindProgression(UICommandBuilder commandBuilder, LinkedNpcEntry status, @Nullable String language) {
@@ -491,6 +536,31 @@ final class CommandTargetHudBinder {
         anchor.setWidth(Value.of(Math.max(1, width)));
         anchor.setHeight(Value.of(Math.max(1, height)));
         return anchor;
+    }
+
+    @Nonnull
+    private static Anchor compactMeterAnchor() {
+        Anchor anchor = new Anchor();
+        anchor.setWidth(Value.of(COMPACT_METER_WIDTH));
+        anchor.setHeight(Value.of(COOLDOWN_ROW_HEIGHT));
+        return anchor;
+    }
+
+    @Nonnull
+    private static Anchor compactMeterFill(double ratio) {
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(16));
+        anchor.setLeft(Value.of(0));
+        anchor.setWidth(Value.of((int) Math.round(clampRatio(ratio) * COMPACT_METER_FILL_WIDTH)));
+        anchor.setHeight(Value.of(4));
+        return anchor;
+    }
+
+    private static double clampRatio(double ratio) {
+        if (!Double.isFinite(ratio)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, ratio));
     }
 
     record Layout(int rootHeight,

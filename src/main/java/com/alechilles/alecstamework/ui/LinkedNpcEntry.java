@@ -828,7 +828,8 @@ public final class LinkedNpcEntry {
     }
 
     boolean hasKnownCardDetails() {
-        return hasHealth()
+        return animalLifecycle.active()
+                || hasHealth()
                 || hasHappiness()
                 || hasHunger()
                 || hasThirst()
@@ -1287,11 +1288,15 @@ public final class LinkedNpcEntry {
 
     /** Detached lifecycle display values shared by live, unloaded, captured, and coop cards. */
     public record AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
-                                  long remainingMs, double yieldMultiplier) {
-        static final AnimalLifecycle NONE = new AnimalLifecycle("", false, false, false, -1L, 1.0);
+                                  long remainingMs, double yieldMultiplier, double stageProgress) {
+        public AnimalLifecycle(String stage, boolean prime, boolean frozen, boolean nextDeath,
+                               long remainingMs, double yieldMultiplier) {
+            this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, 0);
+        }
+        static final AnimalLifecycle NONE = new AnimalLifecycle("", false, false, false, -1L, 1.0, 0);
         static AnimalLifecycle from(AnimalProgressionService.Presentation value) {
             return value == null ? NONE : new AnimalLifecycle(value.stage(), value.prime(), value.frozen(),
-                    value.nextDeath(), value.remainingMs(), value.yieldMultiplier());
+                    value.nextDeath(), value.remainingMs(), value.yieldMultiplier(), value.stageProgress());
         }
         public boolean active() { return !stage.isBlank(); }
     }

@@ -17,6 +17,9 @@
 - Added optional role-scoped adult aging through `TwBreedingConfig.Aging`, with
   real eligible-minute durations, prime freezing by default, configurable full
   lifecycle and old-age death, and lifecycle status/yield UI text.
+- Command menus and the target HUD show compact age, breeding, and harvest
+  meters. Age shows progress within the current life stage; countdowns use
+  hours and minutes, switching to seconds below one minute.
 - Unloaded farms are not force-loaded or background-simulated. Needs and trough
   consumption pause while unloaded; aging progresses normally without care
   penalties, and harvest or breeding readiness remains bounded to one ready

@@ -1787,6 +1787,11 @@ tamework.commandmenu.lifecycle.yield=Ertrag: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Maximaler Schlachtertrag
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Verringerter Schlachtertrag
 
+tamework.ui.shared.duration.hours={0} Std.
+tamework.ui.shared.duration.hoursMinutes={0} Std. {1} Min.
+tamework.commandmenu.lifecycle.ageStage=Alter · {0}
+tamework.commandmenu.lifecycle.nextStage={0} in {1}
+
 tamework.commands.invalidToggle=Ungültiger Zustand. Verwende on, off oder toggle; ohne Wert wird umgeschaltet.
 
 tamework.commands.setOwner.componentUnavailable=Die Besitzerkomponente ist nicht verfügbar.

@@ -161,7 +161,7 @@ final class LinkedNpcPanelStatusTextService {
             tooltip = LocalizedText.format(
                     language,
                     "tamework.ui.linkedPanel.breedingCooldown.remaining",
-                    formatRemainingClock(entry.breedingCooldownRemainingMs())
+                    formatRemainingTime(entry.breedingCooldownRemainingMs(), language)
             );
         }
         return appendLastKnownTooltip(tooltip, entry, language);
@@ -186,7 +186,7 @@ final class LinkedNpcPanelStatusTextService {
             tooltip = LocalizedText.format(
                     language,
                     "tamework.ui.linkedPanel.harvestCooldown.remaining",
-                    formatRemainingClock(entry.harvestCooldownRemainingMs())
+                    formatRemainingTime(entry.harvestCooldownRemainingMs(), language)
             );
         }
         return appendLastKnownTooltip(tooltip, entry, language);
@@ -210,7 +210,7 @@ final class LinkedNpcPanelStatusTextService {
         if (entry != null && !entry.loaded() && remainingMs <= 0L) {
             return resolveLastKnownLabel(language);
         }
-        return formatRemainingClock(remainingMs);
+        return formatRemainingTime(remainingMs, language);
     }
 
     private static String resolveLastKnownLabel(String language) {
@@ -231,18 +231,12 @@ final class LinkedNpcPanelStatusTextService {
                     ceilMillisToSeconds(remainingMs));
         }
         long minutes = 1L + ((remainingMs - 1L) / 60_000L);
-        return LocalizedText.format(language, "tamework.ui.shared.duration.minutes", minutes);
-    }
-
-    static String formatRemainingClock(long remainingMs) {
-        long totalSeconds = ceilMillisToSeconds(remainingMs);
-        long hours = totalSeconds / 3600L;
-        long minutes = (totalSeconds % 3600L) / 60L;
-        long seconds = totalSeconds % 60L;
-        if (hours > 0L) {
-            return String.format("%d:%02d:%02d", hours, minutes, seconds);
-        }
-        return String.format("%d:%02d", minutes, seconds);
+        long hours = minutes / 60L;
+        long remainder = minutes % 60L;
+        if (hours == 0L) return LocalizedText.format(language, "tamework.ui.shared.duration.minutes", minutes);
+        return remainder == 0L
+                ? LocalizedText.format(language, "tamework.ui.shared.duration.hours", hours)
+                : LocalizedText.format(language, "tamework.ui.shared.duration.hoursMinutes", hours, remainder);
     }
 
     private static long ceilMillisToSeconds(long remainingMs) {

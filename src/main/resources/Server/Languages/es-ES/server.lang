@@ -1743,6 +1743,11 @@ tamework.commandmenu.lifecycle.yield=Rendimiento: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Rendimiento máximo de sacrificio
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Rendimiento reducido de sacrificio
 
+tamework.ui.shared.duration.hours={0} h
+tamework.ui.shared.duration.hoursMinutes={0} h {1} min
+tamework.commandmenu.lifecycle.ageStage=Edad · {0}
+tamework.commandmenu.lifecycle.nextStage={0} en {1}
+
 tamework.commands.invalidToggle=Estado no válido. Usa on, off o toggle; omite el valor para alternar.
 
 tamework.commands.setOwner.componentUnavailable=El componente de propietario no está disponible.

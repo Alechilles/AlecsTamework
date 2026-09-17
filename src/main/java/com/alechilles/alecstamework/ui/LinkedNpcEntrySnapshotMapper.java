@@ -100,7 +100,8 @@ final class LinkedNpcEntrySnapshotMapper {
                             ? new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
                                     entry.animalLifecycle().stage(), entry.animalLifecycle().prime(),
                                     entry.animalLifecycle().frozen(), entry.animalLifecycle().nextDeath(),
-                                    entry.animalLifecycle().remainingMs(), entry.animalLifecycle().yieldMultiplier())
+                                    entry.animalLifecycle().remainingMs(), entry.animalLifecycle().yieldMultiplier(),
+                                    entry.animalLifecycle().stageProgress())
                             : null);
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());

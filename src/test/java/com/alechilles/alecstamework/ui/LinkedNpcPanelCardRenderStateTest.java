@@ -115,6 +115,30 @@ class LinkedNpcPanelCardRenderStateTest {
                         "In Wooden Chest", "world", "1, 2, 3")))), null, Map.of()));
     }
 
+    @Test
+    void ageOnlyCardsKeepTheMeterInsideTheCardWithOrWithoutLocation() {
+        var animal = new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 0, 0,
+                0, 0, "", 0, 0, 0, 0, false, false, false, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY).withAnimalLifecycle(
+                new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
+                        "Adult", false, false, false, 60_000, 0.5, 0.5));
+        for (boolean location : new boolean[] {false, true}) {
+            UICommandBuilder commands = new UICommandBuilder();
+            LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", animal, false, false, location);
+            var card = anchor(commands, "#Card.Anchor");
+            var meter = anchor(commands, "#Card #CooldownRow.Anchor");
+            org.junit.jupiter.api.Assertions.assertTrue(card.getNumber("Height").intValue()
+                    > meter.getNumber("Top").intValue() + meter.getNumber("Height").intValue());
+            if (location) org.junit.jupiter.api.Assertions.assertTrue(meter.getNumber("Top").intValue() >= 142);
+        }
+    }
+
+    private static org.bson.BsonDocument anchor(UICommandBuilder commands, String selector) {
+        return org.bson.BsonDocument.parse(Arrays.stream(commands.getCommands())
+                .filter(command -> selector.equals(command.selector))
+                .reduce((first, last) -> last).orElseThrow().data).getDocument("0");
+    }
+
     private static void assertVisible(UICommandBuilder commands, String selector, boolean visible) {
         UICommandBuilder expected = new UICommandBuilder();
         expected.set(selector, visible);

@@ -175,7 +175,8 @@ public final class AnimalProgressionService {
             boolean baby = lifeNow < state.getAdolescentAtMs();
             long until = baby ? state.getAdolescentAtMs() : state.getAdultAtMs();
             return new Presentation(baby ? "Baby" : "Adolescent", false, captured, false,
-                    (long) Math.ceil(Math.max(0, until - lifeNow) / growthRate), 0);
+                    (long) Math.ceil(Math.max(0, until - lifeNow) / growthRate), 0,
+                    stageProgress(lifeNow, baby ? state.getBornAtMs() : state.getAdolescentAtMs(), until));
         }
         long juvenileRemaining = state.isGrowthScalingEnabled() && state.isJuvenileClockInitialized()
                 ? Math.max(0, state.getAdultAtMs() - state.getLifecycleNowMs()) : 0;
@@ -193,7 +194,16 @@ public final class AnimalProgressionService {
             remaining = (long) Math.ceil(remaining / AnimalAgingPolicy.agingRate(
                     settings, age.ageProgressMs(), true, hunger, thirst));
         }
-        return new Presentation(stage, prime, frozen, death, remaining, age.yieldMultiplier());
+        double stageStart = age.stage() == AnimalAgingPolicy.Stage.ADULT ? 0
+                : age.stage() == AnimalAgingPolicy.Stage.PRIME ? settings.getAdultToPrimeMs()
+                : (double) settings.getAdultToPrimeMs() + settings.getPrimeMs();
+        double stageDuration = switch (age.stage()) {
+            case ADULT -> settings.getAdultToPrimeMs();
+            case PRIME -> settings.getPrimeMs();
+            case SENIOR -> settings.getSeniorMs();
+        };
+        double progress = stageProgress(age.ageProgressMs(), stageStart, stageStart + stageDuration);
+        return new Presentation(stage, prime, frozen, death, remaining, age.yieldMultiplier(), progress);
     }
 
     /** True when loaded-world actions must wait for ordinary natural-death resolution. */
@@ -203,7 +213,16 @@ public final class AnimalProgressionService {
     }
 
     public record Presentation(String stage, boolean prime, boolean frozen, boolean nextDeath,
-                               long remainingMs, double yieldMultiplier) { }
+                               long remainingMs, double yieldMultiplier, double stageProgress) {
+        public Presentation(String stage, boolean prime, boolean frozen, boolean nextDeath,
+                            long remainingMs, double yieldMultiplier) {
+            this(stage, prime, frozen, nextDeath, remainingMs, yieldMultiplier, 0);
+        }
+    }
+
+    private static double stageProgress(double now, double start, double end) {
+        return end <= start ? 1 : Math.clamp((now - start) / (end - start), 0, 1);
+    }
 
     private static AnimalAgingSettings settings(@Nullable TwBreedingConfig config, @Nullable String role) {
         if (config == null) return null;

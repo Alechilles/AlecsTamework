@@ -229,15 +229,16 @@ class LinkedNpcPanelStatusTextServiceTest {
 
     @Test
     void saturatedCooldownFormattingNeverWrapsNegative() {
-        String clock = LinkedNpcPanelStatusTextService.formatRemainingClock(Long.MAX_VALUE);
         String duration = LinkedNpcPanelStatusTextService.formatRemainingTime(Long.MAX_VALUE, null);
 
-        assertFalse(clock.startsWith("-"));
         assertFalse(duration.contains("-"));
     }
 
     @Test
     void countdownUsesRoundedUpMinutesUntilUnderOneMinute() {
+        assertEquals("4h", LinkedNpcPanelStatusTextService.formatRemainingTime(240L * 60_000, "en-US"));
+        assertEquals("1h 28m", LinkedNpcPanelStatusTextService.formatRemainingTime(88L * 60_000, "en-US"));
+        assertEquals("1h", LinkedNpcPanelStatusTextService.formatRemainingTime(3_599_999L, "en-US"));
         assertEquals("2m", LinkedNpcPanelStatusTextService.formatRemainingTime(60_001L, "en-US"));
         assertEquals("1m", LinkedNpcPanelStatusTextService.formatRemainingTime(60_000L, "en-US"));
         assertEquals("60s", LinkedNpcPanelStatusTextService.formatRemainingTime(59_999L, "en-US"));

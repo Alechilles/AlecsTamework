@@ -1799,6 +1799,11 @@ tamework.commandmenu.lifecycle.yield=Yield: {0}
 tamework.commandmenu.lifecycle.yield.maximumTooltip=Maximum slaughter yield
 tamework.commandmenu.lifecycle.yield.reducedTooltip=Reduced slaughter yield
 
+tamework.ui.shared.duration.hours={0}h
+tamework.ui.shared.duration.hoursMinutes={0}h {1}m
+tamework.commandmenu.lifecycle.ageStage=Age · {0}
+tamework.commandmenu.lifecycle.nextStage={0} in {1}
+
 tamework.commands.invalidToggle=Invalid state. Use on, off, or toggle; omit the value to toggle.
 
 tamework.commands.setOwner.componentUnavailable=Owner component is not available.

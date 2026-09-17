@@ -13,7 +13,7 @@ class LinkedNpcPanelLifecycleDisplayTest {
     void preservesLifecycleAcrossPresentationCopiesAndDoesNotFormatFrozenInfinity() {
         LinkedNpcEntry source = entry(false).withAnimalLifecycle(
                 new AnimalProgressionService.Presentation("Prime", true, true, false,
-                        Long.MAX_VALUE, 1.0));
+                        Long.MAX_VALUE, 1.0, 1.0));
 
         LinkedNpcEntry copied = source.withRoleSubtitle("Sheep").withPortraitIcon("portrait");
         LinkedNpcPanelCardBinder.LifecycleDisplay display =
@@ -21,6 +21,7 @@ class LinkedNpcPanelLifecycleDisplayTest {
 
         assertTrue(copied.animalLifecycle().active());
         assertTrue(copied.animalLifecycle().prime());
+        assertEquals(1.0, copied.animalLifecycle().stageProgress());
         assertFalse(display.countdownText().contains("922337"));
     }
 
@@ -34,6 +35,18 @@ class LinkedNpcPanelLifecycleDisplayTest {
                 LinkedNpcPanelCardBinder.resolveLifecycleDisplay(captured, "en-US");
 
         assertFalse(display.countdownText().isBlank());
+    }
+
+    @Test
+    void identifiesTheNextLifecycleStageInTheCompactCountdown() {
+        LinkedNpcEntry adult = entry(false).withAnimalLifecycle(
+                new AnimalProgressionService.Presentation("Adult", false, false, false,
+                        60_000L, 0.5, 0.4));
+
+        LinkedNpcPanelCardBinder.LifecycleDisplay display =
+                LinkedNpcPanelCardBinder.resolveLifecycleDisplay(adult, "en-US");
+
+        assertEquals("Prime in 1m", display.countdownText());
     }
 
     private static LinkedNpcEntry entry(boolean captured) {

@@ -157,14 +157,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
-        commandBuilder.set(entrySelector + " #LifecycleBadge.Text", lifecycleDisplay.stageText());
-        commandBuilder.set(entrySelector + " #LifecycleBadge.Visible", lifecycleDisplay.visible() && !lifecycle.prime());
-        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.Text", lifecycleDisplay.stageText());
-        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.Visible", lifecycleDisplay.visible() && lifecycle.prime());
-        commandBuilder.set(entrySelector + " #LifecycleBadge.TooltipText", lifecycleDisplay.yieldTooltip());
-        commandBuilder.set(entrySelector + " #LifecycleBadgePrime.TooltipText", lifecycleDisplay.yieldTooltip());
-        commandBuilder.set(entrySelector + " #LifecycleCountdown.Text", lifecycleDisplay.countdownText());
-        commandBuilder.set(entrySelector + " #LifecycleCountdown.Visible", !lifecycleDisplay.countdownText().isBlank());
+        bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language);
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
@@ -298,8 +291,9 @@ final class LinkedNpcPanelCardBinder {
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive, showInlineLocation);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
-                !showInlineLocation && entry.hasKnownCooldowns());
+                lifecycleDisplay.visible() || !showInlineLocation && entry.hasKnownCooldowns());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
+        bindCompactCooldownFills(commandBuilder, entrySelector, entry);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
                 xpProgressRingSelector,
@@ -616,7 +610,12 @@ final class LinkedNpcPanelCardBinder {
                                boolean managedRoster, boolean showActiveToggle,
                                boolean showInlineLocation) {
         boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation;
-        commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
+        Anchor cardAnchor = buildCardAnchor(managedRoster, compact);
+        boolean lifecycleBelowLocation = showInlineLocation && entry.animalLifecycle().active();
+        if (lifecycleBelowLocation) cardAnchor.setHeight(Value.of(210));
+        commands.setObject(card + ".Anchor", cardAnchor);
+        Anchor cooldownAnchor = fixedAnchor(lifecycleBelowLocation ? 146 : 111, 432, 414, 34);
+        commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
         bindPortrait(commands, card, entry, compact);
         boolean showDetails = !compact && (!showInlineLocation || entry.hasKnownCardDetails());
         commands.set(card + " #NeedRingRow.Visible", showDetails);
@@ -649,7 +648,7 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
         nameAnchor.setWidth(null);
-        nameAnchor.setRight(Value.of(entry.animalLifecycle().active() ? 300 : 36));
+        nameAnchor.setRight(Value.of(36));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
     }
 
@@ -668,12 +667,67 @@ final class LinkedNpcPanelCardBinder {
         } else if (lifecycle.frozen()) {
             countdown = LocalizedText.resolve(language, "tamework.commandmenu.lifecycle.status.frozen");
         } else if (lifecycle.remainingMs() >= 0L && lifecycle.remainingMs() != Long.MAX_VALUE) {
-            countdown = LocalizedText.format(language, lifecycle.nextDeath()
-                            ? "tamework.commandmenu.lifecycle.oldAgeDeath"
-                            : "tamework.commandmenu.lifecycle.remaining",
-                    LinkedNpcPanelStatusTextService.formatRemainingTime(lifecycle.remainingMs(), language));
+            String remaining = LinkedNpcPanelStatusTextService.formatRemainingTime(lifecycle.remainingMs(), language);
+            if (lifecycle.nextDeath()) {
+                countdown = LocalizedText.format(language,
+                        "tamework.commandmenu.lifecycle.oldAgeDeath", remaining);
+            } else {
+                String nextStage = resolveNextLifecycleStage(lifecycle.stage(), language);
+                countdown = nextStage.isBlank()
+                        ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.remaining", remaining)
+                        : LocalizedText.format(language, "tamework.commandmenu.lifecycle.nextStage", nextStage, remaining);
+            }
         }
         return new LifecycleDisplay(true, stage, countdown, yieldTooltip);
+    }
+
+    private static String resolveNextLifecycleStage(String stage, String language) {
+        String nextStage = switch (stage.toLowerCase(java.util.Locale.ROOT)) {
+            case "adult" -> "prime";
+            case "prime" -> "senior";
+            default -> "";
+        };
+        return nextStage.isEmpty() ? "" : LocalizedText.resolve(language,
+                "tamework.commandmenu.lifecycle.stage." + nextStage);
+    }
+
+    private static void bindLifecycleProgress(UICommandBuilder commands, String card,
+                                              LinkedNpcEntry.AnimalLifecycle lifecycle,
+                                              LifecycleDisplay display, String language) {
+        String selector = card + " #LifecycleProgress";
+        commands.set(selector + ".Visible", display.visible());
+        commands.set(selector + " #CooldownLabel.Text", display.visible()
+                ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
+                : "");
+        commands.set(selector + " #CooldownText.Text", display.countdownText());
+        commands.set(selector + " #CooldownLabel.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
+                lifecycle.prime() ? "LifecyclePrimeLabel"
+                        : "Senior".equalsIgnoreCase(lifecycle.stage())
+                        ? "LifecycleSeniorLabel" : "LifecycleAdultLabel"));
+        commands.set(selector + " #LifecycleProgressTooltip.TooltipText", display.yieldTooltip());
+        commands.set(selector + " #MeterFill.Background", lifecycleColor(lifecycle));
+        commands.setObject(selector + " #MeterFill.Anchor",
+                compactCooldownFill(lifecycle.stageProgress(), 0, 130));
+    }
+
+    static String lifecycleColor(LinkedNpcEntry.AnimalLifecycle lifecycle) {
+        return lifecycle.prime() ? "#d9c878"
+                : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#d9a86f" : "#78bfc1";
+    }
+    private static void bindCompactCooldownFills(UICommandBuilder commands, String card,
+                                                 LinkedNpcEntry entry) {
+        double breedingRatio = entry.breedingCooldownRemainingMs() < 0L ? 0.0
+                : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1.0;
+        double harvestRatio = entry.harvestCooldownRemainingMs() < 0L ? 0.0
+                : entry.harvestCooldownActive() ? entry.harvestCooldownRatio() : 1.0;
+        commands.setObject(card + " #BreedingCooldown #MeterFill.Anchor",
+                compactCooldownFill(breedingRatio, 28, 102));
+        commands.setObject(card + " #HarvestCooldown #MeterFill.Anchor",
+                compactCooldownFill(harvestRatio, 28, 102));
+    }
+
+    private static Anchor compactCooldownFill(double ratio, int left, int width) {
+        return fixedAnchor(14, left, (int) Math.round(Math.clamp(ratio, 0.0, 1.0) * width), 6);
     }
 
     record LifecycleDisplay(boolean visible, String stageText, String countdownText, String yieldTooltip) {
