@@ -81,7 +81,10 @@ still accumulate; this reduces growth rather than imposing a fixed size cap.
 
 ### Checking compaction in game
 
-Use a disposable copy of a world with a backed-up database. After the world has
+Use a disposable copy of a world with a backed-up database. Keep its player
+inventories, world data, and Tamework database from the same save: filled capture
+items require their matching persisted companion records. Do not replace only the
+database with an empty fixture when checking companion behavior. After the world has
 loaded, run `/tw debug persistence compact` and check the completion message's
 before/after MiB. A database with few free pages may shrink very little, and zero
 compacted operations is valid when no checkpoint history is eligible. Afterward,
