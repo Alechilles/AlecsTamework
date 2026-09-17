@@ -10,6 +10,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CommandLinkedPanelProgressionPresentationServiceTest {
     @Test
+    void lowerPreferredAppetiteUsesBeneficialColorAndCorrectDescription() {
+        var config = com.alechilles.alecstamework.config.assets.TwTraitConfig.CODEC.decode(
+                org.bson.BsonDocument.parse("""
+                    {"Traits":[{"Id":"Appetite","DisplayName":"Appetite",
+                    "EffectKey":"NeedsHungerDecayMultiplier","MutationPreference":"LOWER",
+                    "BreedingMin":0.75,"BreedingMax":1.25,"Default":1.0}]}
+                    """), new com.hypixel.hytale.codec.ExtraInfo());
+        var service = new CommandLinkedPanelProgressionPresentationService();
+        var beneficial = service.buildSavedTraitIndicators(config, java.util.Map.of("appetite", 0.95), null, "en-US")[0];
+        assertEquals(false, beneficial.belowDefault());
+        assertEquals("Appetite\nDecreases how quickly hunger falls by 5%.", beneficial.tooltipText());
+        var harmful = service.buildSavedTraitIndicators(config, java.util.Map.of("appetite", 1.05), null, "en-US")[0];
+        assertEquals(true, harmful.belowDefault());
+        assertEquals("Appetite\nIncreases how quickly hunger falls by 5%.", harmful.tooltipText());
+    }
+
+    @Test
     void flatHappinessTooltipUsesPointsInsteadOfLegacyMultipliers() {
         String tooltip = CommandLinkedPanelProgressionPresentationService.buildModifierTooltip(
                 List.of(

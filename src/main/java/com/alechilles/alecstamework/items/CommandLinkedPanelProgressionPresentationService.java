@@ -239,7 +239,8 @@ final class CommandLinkedPanelProgressionPresentationService {
                     traitTooltip,
                     fillRatio,
                     !belowDefault,
-                    belowDefault
+                    definition.getMutationPreference() == TwTraitConfig.MutationPreference.LOWER
+                            ? value > defaultValue : belowDefault
             ));
             if (indicators.size() >= MAX_TRAIT_INDICATORS) {
                 break;

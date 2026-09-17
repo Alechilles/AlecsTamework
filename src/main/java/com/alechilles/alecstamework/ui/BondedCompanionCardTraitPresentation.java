@@ -60,7 +60,9 @@ final class BondedCompanionCardTraitPresentation {
                     traitTooltip,
                     belowDefault ? ratio(baseline - current, baseline - minimum)
                             : ratio(current - baseline, maximum - baseline),
-                    !belowDefault, belowDefault));
+                    !belowDefault,
+                    definition.getMutationPreference() == TwTraitConfig.MutationPreference.LOWER
+                            ? current > baseline : belowDefault));
             if (indicators.size() >= LinkedNpcTraitIndicatorBinder.MAX_VISIBLE_TRAIT_INDICATORS) {
                 break;
             }
