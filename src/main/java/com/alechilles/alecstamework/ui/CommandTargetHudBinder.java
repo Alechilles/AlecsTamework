@@ -226,7 +226,7 @@ final class CommandTargetHudBinder {
             return;
         }
         commandBuilder.set("#AgeStage.Style.TextColor", LinkedNpcPanelCardBinder.lifecycleColor(lifecycle));
-        commandBuilder.set("#AgeIcon.Background", LinkedNpcPanelCardBinder.lifecycleIcon(lifecycle));
+        commandBuilder.setObject("#AgeIcon.Background", LinkedNpcPanelCardBinder.lifecycleIcon(lifecycle));
         commandBuilder.set("#AgeStage.Text", LocalizedText.format(
                 language, "tamework.commandmenu.lifecycle.ageStage", display.stageText()));
         commandBuilder.set("#AgeCountdown.Text", display.countdownText());

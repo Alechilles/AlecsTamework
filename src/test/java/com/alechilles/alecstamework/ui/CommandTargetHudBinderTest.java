@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.List;
 import java.util.UUID;
@@ -57,7 +58,8 @@ class CommandTargetHudBinderTest {
         UICommandBuilder expected = new UICommandBuilder();
         expected.set("#AgeProgress.Visible", true);
         expected.set("#AgeStage.Text", "Age · Baby");
-        expected.set("#AgeIcon.Background", "Tamework/LinkedPanelIcons/LifeStage_Baby.png");
+        expected.setObject("#AgeIcon.Background", new PatchStyle(
+                Value.of("Tamework/LinkedPanelIcons/LifeStage_Baby.png")).setColor(Value.of("#78bfc1")));
         expected.set("#AgeCountdown.Text", "Adult in 1m");
         assertCommands(expected, commands);
         Anchor fill = new Anchor();

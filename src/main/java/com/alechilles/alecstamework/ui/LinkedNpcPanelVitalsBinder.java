@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.awt.Color;
 import java.util.ArrayList;
@@ -367,6 +368,12 @@ final class LinkedNpcPanelVitalsBinder {
                 "#BreedingCooldownTooltip", muted, "#bb959e", language, entry);
         commands.set(card + " #BreedingCooldownIconImage.Visible", !muted);
         commands.set(card + " #BreedingCooldownIconMuted.Visible", muted);
+        commands.setObject(card + " #BreedingCooldownIconImage.Background",
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Trait_Fertility.png"))
+                        .setColor(Value.of("#bb959e")));
+        commands.setObject(card + " #BreedingCooldownIconMuted.Background",
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Trait_Fertility.png"))
+                        .setColor(Value.of(MUTED_FILL_COLOR)));
     }
 
     private static void bindHarvestCooldownMeter(UICommandBuilder commands, String card,
@@ -377,6 +384,9 @@ final class LinkedNpcPanelVitalsBinder {
                 LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready"),
                 LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language),
                 "#HarvestCooldownTooltip", !entry.loaded(), "#cbbb88", language, entry);
+        commands.setObject(card + " #HarvestCooldownIconImage.Background",
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Harvest_Cooldown.png"))
+                        .setColor(Value.of(entry.loaded() ? "#cbbb88" : MUTED_FILL_COLOR)));
     }
 
     private static void bindCooldownMeter(UICommandBuilder commands, String slot, boolean visible,

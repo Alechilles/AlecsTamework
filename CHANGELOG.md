@@ -22,7 +22,9 @@
   hours and minutes, switching to seconds below one minute.
 - Fixed cooldown refreshes stretching compact meters. HUD meters now align
   with the needs bars, and juvenile age countdowns name the next life stage.
-- Added distinct life-stage icons and restored the HUD harvest icon.
+- Added distinct life-stage icons and restored the HUD harvest icon. Command-panel
+  icons sit beside their meters with consistent sizing and tighter gaps. Meter
+  icons match their fill colors in both the panel and HUD.
 - Juveniles hide breeding controls and timers, and reach adulthood without
   an extra offspring breeding cooldown. Normal breeding requirements still apply.
 - Unloaded farms are not force-loaded or background-simulated. Needs and trough

@@ -19,8 +19,8 @@ class LinkedNpcPanelReadyStatusTest {
         // Dynamic refreshes use this binder directly: a ready fill must stay inside its compact track.
         var harvestFill = org.bson.BsonDocument.parse(value(commands,
                 "#Card #HarvestCooldown #MeterFill.Anchor")).getDocument("0");
-        assertEquals(28, harvestFill.getNumber("Left").intValue());
-        assertEquals(102, harvestFill.getNumber("Width").intValue());
+        assertEquals(24, harvestFill.getNumber("Left").intValue());
+        assertEquals(106, harvestFill.getNumber("Width").intValue());
         assertTrue(value(commands, "#Card #BreedingCooldown #BreedingCooldownTooltip.TooltipText").contains("Too unhappy"));
         assertTrue(value(commands, "#Card #BreedingCooldown #MeterFill.Background").contains("#727772"));
 

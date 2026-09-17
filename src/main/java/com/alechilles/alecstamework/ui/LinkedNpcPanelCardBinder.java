@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -699,7 +700,7 @@ final class LinkedNpcPanelCardBinder {
                                               LifecycleDisplay display, String language) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
-        commands.set(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle));
+        commands.setObject(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
                 : "");
@@ -711,7 +712,7 @@ final class LinkedNpcPanelCardBinder {
         commands.set(selector + " #LifecycleProgressTooltip.TooltipText", display.yieldTooltip());
         commands.set(selector + " #MeterFill.Background", lifecycleColor(lifecycle));
         commands.setObject(selector + " #MeterFill.Anchor",
-                compactCooldownFill(lifecycle.stageProgress(), 0, 130));
+                LinkedNpcPanelStatusMeter.buildFillAnchor(lifecycle.stageProgress()));
     }
 
     static String lifecycleColor(LinkedNpcEntry.AnimalLifecycle lifecycle) {
@@ -719,7 +720,7 @@ final class LinkedNpcPanelCardBinder {
                 : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#d9a86f" : "#78bfc1";
     }
 
-    static String lifecycleIcon(LinkedNpcEntry.AnimalLifecycle lifecycle) {
+    static PatchStyle lifecycleIcon(LinkedNpcEntry.AnimalLifecycle lifecycle) {
         String stage = switch (lifecycle.stage().toLowerCase(java.util.Locale.ROOT)) {
             case "baby" -> "Baby";
             case "adolescent" -> "Adolescent";
@@ -727,10 +728,9 @@ final class LinkedNpcPanelCardBinder {
             case "senior" -> "Senior";
             default -> "Adult";
         };
-        return "Tamework/LinkedPanelIcons/LifeStage_" + stage + ".png";
-    }
-    private static Anchor compactCooldownFill(double ratio, int left, int width) {
-        return fixedAnchor(14, left, (int) Math.round(Math.clamp(ratio, 0.0, 1.0) * width), 6);
+        return new PatchStyle(
+                Value.of("Tamework/LinkedPanelIcons/LifeStage_" + stage + ".png"))
+                .setColor(Value.of(lifecycleColor(lifecycle)));
     }
 
     record LifecycleDisplay(boolean visible, String stageText, String countdownText, String yieldTooltip) {
