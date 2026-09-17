@@ -64,9 +64,26 @@ avoid stale revision fences. No new worker or durable queue is introduced. Pendi
 or maintenance failure is reported; ordinary admission resumes unless shutdown
 or a database integrity failure prevents it.
 
-Maintenance compacts eligible history in committed batches, checks temporary disk
-headroom, enables incremental auto-vacuum, rebuilds with `VACUUM`, and truncates
-the WAL. A busy reader can prevent the final checkpoint and cause a retryable
+Maintenance checkpoints the WAL before checking disk headroom, compacts eligible
+history in committed batches, and checkpoints again before rebuilding. It enables
+incremental auto-vacuum and uses `VACUUM INTO` to create the large rebuild image
+beside the canonical database, avoiding a separate system temp-volume limit.
+The checked copy is applied through SQLite's transactional backup API, preserving
+the original file and SQLite's WAL ownership while read connections may exist.
+The writer lane and public maintenance gate remain held across snapshot creation
+and copy-back; no other canonical writer is allowed in that interval. The copy
+is disposable and removed after success or failure. A process termination can
+leave a non-authoritative `.compact-*.sqlite` image beside the database.
+
+The pinned Xerial 3.49.1.0 `restore` wrapper can hide destination errors. Use the
+copy's `backup` direction instead, and require both its zero error code and the
+successful final progress callback with zero pages remaining. The latter catches
+the wrapper's swallowed busy-retry exhaustion. The synchronous callback only
+records completion and never throws or accesses a database. Incomplete backup
+transactions roll back inside SQLite. Verify incremental mode, truncate the WAL,
+and check integrity before reporting success.
+
+A busy reader can prevent a WAL checkpoint and cause a retryable
 command failure. Rebuilding a large database may take several minutes and requires
 up to twice the original database size in additional free space. Tamework saves
 and companion mutations are unavailable during maintenance; the game server keeps

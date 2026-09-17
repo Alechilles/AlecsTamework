@@ -7,6 +7,8 @@
 - Added `/tw debug persistence compact` to reclaim database disk space while the
   server stays online, temporarily pausing Tamework saves during maintenance.
   New and compacted databases also reclaim space incrementally.
+- Database compaction now builds its temporary copy beside the save database,
+  avoiding failures caused by a hosting provider's separate system temp-storage limit.
 
 - Added an optional captured-item display API for plugin-provided tooltip
   prefixes and item rarity. Tamework preserves the quality through capture

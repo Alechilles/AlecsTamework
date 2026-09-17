@@ -1,12 +1,17 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,6 +24,62 @@ class SqliteDatabaseCompactionTest {
 
     @TempDir
     Path tempDir;
+
+    /** Reproduces a host temp directory unavailable to VACUUM while the save drive is writable. */
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void compactsWhenSystemTemporaryStorageIsUnavailable() throws Exception {
+        Path java = Path.of(System.getProperty("java.home"), "bin", "java.exe");
+        String classpath = System.getProperty("surefire.test.class.path",
+                System.getProperty("java.class.path"));
+        Process process = new ProcessBuilder(java.toString(), "-cp", classpath,
+                UnavailableTempChild.class.getName(), tempDir.toString())
+                .redirectErrorStream(true).start();
+        try {
+            assertTrue(process.waitFor(30, TimeUnit.SECONDS), "Compaction child timed out");
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertEquals(0, process.exitValue(), output);
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                process.waitFor(5, TimeUnit.SECONDS);
+            }
+        }
+    }
+
+    /** Isolates the test-only global SQLite setting from every other test connection. */
+    public static final class UnavailableTempChild {
+        public static void main(String[] arguments) throws Exception {
+            Path root = Path.of(arguments[0]);
+            Path database = root.resolve("save with ' quote.sqlite");
+            seedCheckpointHistory(database, 1);
+            try (Connection writer = new SqliteConnectionFactory(database).openWriterConnection();
+                 Statement statement = writer.createStatement()) {
+                statement.execute("CREATE TABLE retained_payload (body BLOB)");
+                statement.execute("INSERT INTO retained_payload VALUES (zeroblob(16777216))");
+                statement.execute("CREATE TABLE discarded_payload (body BLOB)");
+                statement.execute("INSERT INTO discarded_payload VALUES (zeroblob(16777216))");
+                statement.execute("DROP TABLE discarded_payload");
+                Path unavailable = Files.createDirectory(root.resolve("unavailable-temp"));
+                statement.execute("PRAGMA temp_store_directory='"
+                        + unavailable.toString().replace("'", "''") + "'");
+                Files.delete(unavailable);
+                // Windows' pinned SQLite VFS uses this explicit directory without a fallback.
+                // Prove the old algorithm actually fails before exercising the production fix.
+                assertThrows(SQLException.class, () -> statement.execute("VACUUM"));
+
+                SqliteDatabaseCompactionResult result = SqliteDatabaseCompaction.run(
+                        writer, database, COMPACTION_TIME);
+
+                assertTrue(result.bytesAfter() < result.bytesBefore());
+                assertEquals(16777216, intValue(statement, "SELECT length(body) FROM retained_payload"));
+                assertEquals(2, intPragma(statement, "PRAGMA auto_vacuum"));
+                assertEquals("ok", text(statement, "PRAGMA integrity_check"));
+                statement.execute("INSERT INTO retained_payload VALUES (X'1234')");
+                assertEquals(2, intValue(statement, "SELECT COUNT(*) FROM retained_payload"));
+            }
+        }
+    }
 
     /** Catches a new database silently retaining the non-reclaiming auto-vacuum mode. */
     @Test
@@ -128,6 +189,66 @@ class SqliteDatabaseCompactionTest {
                     writer, database, COMPACTION_TIME
             );
             assertTrue(result.bytesAfter() <= result.bytesBefore());
+        }
+    }
+
+    /** Catches Xerial reporting zero after an incomplete backup that exhausted its busy retries. */
+    @Test
+    void blockedCopyReportsFailurePreservesDataAndCanRetry() throws Exception {
+        Path database = tempDir.resolve("blocked-copy.sqlite");
+        seedCheckpointHistory(database, 1);
+        try (Connection writer = new SqliteConnectionFactory(database, 1).openWriterConnection();
+             Connection blocker = new SqliteConnectionFactory(database, 1).openWriterConnection();
+             Statement locked = blocker.createStatement();
+             Statement statement = writer.createStatement()) {
+            locked.execute("BEGIN IMMEDIATE");
+            try {
+                locked.execute("UPDATE profile_extension_data SET json_payload = 'uncommitted'");
+                SQLException failure = assertThrows(SQLException.class,
+                        () -> SqliteDatabaseCompaction.rebuildBesideDatabase(writer, database));
+                assertEquals(5, failure.getErrorCode());
+                assertEquals("{\"current\":true}", text(statement,
+                        "SELECT json_payload FROM profile_extension_data"));
+                assertEquals(0, intPragma(statement, "PRAGMA auto_vacuum"));
+                try (var files = Files.list(tempDir)) {
+                    assertTrue(files.noneMatch(path -> path.getFileName().toString().contains(".compact-")),
+                            "Failed maintenance must release its temporary disk space");
+                }
+            } finally {
+                locked.execute("ROLLBACK");
+            }
+            SqliteDatabaseCompaction.run(writer, database, COMPACTION_TIME);
+            assertEquals(2, intPragma(statement, "PRAGMA auto_vacuum"));
+            assertEquals("{\"current\":true}", text(statement,
+                    "SELECT json_payload FROM profile_extension_data"));
+            assertEquals("ok", text(statement, "PRAGMA integrity_check"));
+        }
+    }
+
+    /** Catches replacing the database file or bypassing WAL safety underneath a live read snapshot. */
+    @Test
+    void readerKeepsItsSnapshotAcrossTransactionalCopyBack() throws Exception {
+        Path database = tempDir.resolve("reader-during-copy.sqlite");
+        seedCheckpointHistory(database, 2);
+        try (Connection writer = new SqliteConnectionFactory(database, 1).openWriterConnection();
+             Statement statement = writer.createStatement()) {
+            try (Connection reader = new SqliteConnectionFactory(database, 1).openReadConnection();
+                 Statement reading = reader.createStatement();
+                 ResultSet rows = reading.executeQuery(
+                         "SELECT operation_id FROM operation_envelope ORDER BY operation_id")) {
+                assertTrue(rows.next());
+                assertEquals("checkpoint-0", rows.getString(1));
+                SqliteDatabaseCompaction.rebuildBesideDatabase(writer, database);
+                assertEquals(2, intPragma(statement, "PRAGMA auto_vacuum"));
+                assertTrue(rows.next());
+                assertEquals("checkpoint-1", rows.getString(1));
+                assertTrue(rows.next());
+                assertEquals("keep", rows.getString(1));
+            }
+            SqliteDatabaseCompaction.run(writer, database, COMPACTION_TIME);
+            assertEquals("ok", text(statement, "PRAGMA integrity_check"));
+            assertEquals("{\"current\":true}", text(statement,
+                    "SELECT json_payload FROM profile_extension_data"));
         }
     }
 

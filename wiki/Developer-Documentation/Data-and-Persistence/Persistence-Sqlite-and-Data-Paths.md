@@ -69,6 +69,13 @@ and resume afterward. Completion
 reports the before/after disk usage. Allow several minutes for large databases and
 up to twice the database size in additional free disk space. Keep a current backup.
 
+The rebuild image is created beside `tamework-state.sqlite`, on the volume whose
+free space is checked. Tamework validates that copy and copies it back through
+SQLite's transactional backup API, then removes the temporary image. It does not
+change the server's global SQLite temporary-directory setting or replace database
+files underneath open connections. The large rebuild image therefore does not
+depend on a hosting container's separate system temporary-storage allowance.
+
 If work cannot drain, unfinished operations remain, or a reader blocks the final
 WAL checkpoint, the command reports failure in the server log; retry after the
 cause clears. Database integrity failures keep mutations blocked. Avoid stopping
