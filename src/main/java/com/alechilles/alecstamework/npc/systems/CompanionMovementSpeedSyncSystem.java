@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedEffectService;
@@ -75,6 +76,9 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         }
         state.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
+        if (!hasRegisteredTamedType()) {
+            return;
+        }
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         if (npcType == null) {
             return;
@@ -117,7 +121,8 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     }
 
     private boolean refreshCompanion(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
-        if (!npcRef.isValid() || store.getComponent(npcRef, NPCEntity.getComponentType()) == null) {
+        if (!hasRegisteredTamedType() || !npcRef.isValid()
+                || store.getComponent(npcRef, NPCEntity.getComponentType()) == null) {
             return false;
         }
         if (shouldSkipManagedMovement(
@@ -256,6 +261,20 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     /** Keeps Tamework glide and avatar-flight sessions outside native mount movement ownership. */
     static boolean shouldSkipManagedMovement(boolean mountedGlideActive, boolean avatarFlightActive) {
         return mountedGlideActive || avatarFlightActive;
+    }
+
+    private static boolean hasRegisteredTamedType() {
+        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
+        if (type == null) {
+            return false;
+        }
+        try {
+            // A removed registration can remain non-null; do not let a movement sweep take down the world.
+            type.validate();
+            return true;
+        } catch (IllegalStateException unregistered) {
+            return false;
+        }
     }
 
     private static <T extends Component<EntityStore>> boolean hasComponent(@Nonnull Ref<EntityStore> ref,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
+
 - Recall no longer restores a dead saved body while its death transition is pending.
 - Captured age meters now gray out consistently, and paused meters show a larger
   transparent pause icon centered over the bar, with equal-width strokes.
