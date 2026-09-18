@@ -204,7 +204,7 @@ Group {
             Group #MeterFill { Anchor: (Top: 8, Left: 92, Width: 0, Height: 6); Background: #d7ba77; }
             Label #NeedValueText { Anchor: (Top: 0, Left: 188, Width: 44, Height: 22); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf, HorizontalAlignment: End, VerticalAlignment: Center); }
             Group #HappinessTargetMarker { Anchor: (Top: 6, Left: 92, Width: 2, Height: 10); Background: #e1be73; Visible: false; HitTestVisible: false; }
-            Group #BreedingThresholdMarker { Anchor: (Top: -3, Left: 85, Width: 14, Height: 12); Background: (TexturePath: "Tamework/PanelActions/BreedingOn_Glyph_Default.png", Color: #ed8eae); Visible: false; HitTestVisible: false; }
+            Group #BreedingThresholdMarker { Anchor: (Top: -3, Left: 85, Width: 14, Height: 12); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Threshold.png", Color: #ed8eae); Visible: false; HitTestVisible: false; }
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #NeedHunger { Anchor: (Width: 234, Height: 22);
