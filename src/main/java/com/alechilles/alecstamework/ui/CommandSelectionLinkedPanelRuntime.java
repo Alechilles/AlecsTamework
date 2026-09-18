@@ -183,6 +183,9 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelModeDropdown.Value",
                 LinkedNpcPanelPresentationSupport.mode(page.panelModeValueSupplier));
         LinkedNpcPanelPresentationSupport.bindModeTabs(commands, page.panelModeValueSupplier, values);
+        if (!page.config.usesBondedCompanionRoster()) {
+            LinkedNpcPanelPresentationSupport.bindFilterWidth(commands, page.panelModeValueSupplier, values);
+        }
         values.set(commands, "#TameworkLinkedPanelAutoLinkCheck.Value",
                 LinkedNpcPanelPresentationSupport.autoLink(
                         page.panelAutoLinkEnabledSupplier));
@@ -303,6 +306,10 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.panelGroupActivationEntriesSupplier,
                 page.panelGroupActivationValueSupplier);
         // The initial roster chrome overrides generic values; seed those final values too.
+        if (!page.config.usesBondedCompanionRoster()) {
+            LinkedNpcPanelPresentationSupport.bindFilterWidth(new UICommandBuilder(),
+                    page.panelModeValueSupplier, page.refreshTransaction.values());
+        }
         BondedCompanionPanelChrome.bindToolbar(new UICommandBuilder(), new UIEventBuilder(),
                 page, page.refreshTransaction.values());
     }

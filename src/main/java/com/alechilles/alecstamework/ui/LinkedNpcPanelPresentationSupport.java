@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -23,6 +24,31 @@ final class LinkedNpcPanelPresentationSupport {
             if (entry != null && matches(entry, mode, needle)) filtered.add(entry);
         }
         return filtered.toArray(new LinkedNpcEntry[0]);
+    }
+
+    static void bindFilterWidth(UICommandBuilder commands, Supplier<String> supplier) {
+        bindFilterWidth(commands, supplier, null);
+    }
+
+    static void bindFilterWidth(UICommandBuilder commands, Supplier<String> supplier,
+                                LinkedNpcPanelRefreshValues values) {
+        // Nearby mode reserves the right edge for radius controls.
+        int width = nearby(supplier) ? 96 : 200;
+        if (values != null && !values.changed("#TameworkLinkedPanelControlsSecondary.Anchor", width)) return;
+        Anchor controls = filterAnchor(264 + width);
+        controls.setLeft(Value.of(444));
+        controls.setTop(Value.of(0));
+        // Anchor is a markup property; its nested Width is not a runtime selector.
+        commands.setObject("#TameworkLinkedPanelControlsSecondary.Anchor", controls);
+        commands.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor", filterAnchor(width));
+        commands.setObject("#TameworkLinkedPanelFilterInput.Anchor", filterAnchor(width));
+    }
+
+    private static Anchor filterAnchor(int width) {
+        Anchor anchor = new Anchor();
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(28));
+        return anchor;
     }
 
     static String mode(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_MODE_LINKED); }
