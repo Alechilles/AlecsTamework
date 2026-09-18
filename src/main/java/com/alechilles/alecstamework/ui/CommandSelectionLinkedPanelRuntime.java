@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -345,7 +346,10 @@ final class CommandSelectionLinkedPanelRuntime {
             if (append) {
                 commands.set(selector + ".MaxSelection", 128);
                 commands.set(selector + ".Entries", entries);
-                commands.set(selector + ".SelectedValues", entry.groupIds());
+                // The builder registers LocalizableString, not String, for array values.
+                // Literal wrappers encode the IDs as plain strings without translating them.
+                commands.set(selector + ".SelectedValues", entry.groupIds().stream()
+                        .map(LocalizableString::fromString).toList());
             }
             bindCompanionGroupLabel(commands, selector, entry);
             if (append) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,

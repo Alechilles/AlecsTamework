@@ -42,12 +42,19 @@ class TameworkCommandSelectionPageRefreshTest {
         CapturedPackets packets = new CapturedPackets();
         var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
         AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(ENTRY.withOwnedActions()
-                .withCompanionGroups("profile", List.of(), true));
+                .withCompanionGroups("profile", List.of(
+                        new LinkedNpcEntry.GroupMembership("Barn", "Barn", "#445566")), true));
         replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> List.of(row.get()));
         page.configureCompanions(new CompanionPanelBinding(() -> "All", ignored -> {}, () -> false, ignored -> {},
                 (id, memberships) -> row.set(row.get().withCompanionGroups("profile", memberships.stream()
                         .map(group -> new LinkedNpcEntry.GroupMembership(group, group, "#445566")).toList(), true))));
-        build(page);
+        UICommandBuilder initial = new UICommandBuilder();
+        page.build(null, initial, new UIEventBuilder(), null);
+        var selected = java.util.Arrays.stream(initial.getCommands())
+                .filter(command -> command.selector != null && command.selector.endsWith("#GroupSelector.SelectedValues"))
+                .findFirst().orElseThrow();
+        assertEquals(List.of("Barn"), BsonDocument.parse(selected.data).getArray("0").stream()
+                .map(value -> value.asString().getValue()).toList());
         CommandSelectionEventData data = new CommandSelectionEventData();
         data.commandId = CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + CARD;
         data.companionGroups = new String[]{"Barn", "Travel"};
