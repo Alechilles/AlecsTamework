@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.1.0 - Animal Progression and Companion UI - 2026-09-18
 
 - Recall no longer restores a dead saved body while its death transition is pending.
 - Captured age meters now gray out consistently, and paused meters show a larger
