@@ -198,6 +198,8 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   removal or world-deletion evidence. It is not inferred solely because the
   companion is off-screen, absent, or took too long to recall.
 
+Captured companions whose ownership was cleared remain visible when carried in your inventory or already tracked by that flute. These cards are read-only until the companion is released from storage and owned again. The header counts all displayed companions, including these stored records.
+
 ## Group tools
 - Groups are shared by the player's ordinary compatible flutes.
 - A companion can belong to multiple groups or none. Use the card's native multi-select

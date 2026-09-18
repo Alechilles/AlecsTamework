@@ -59,6 +59,26 @@ final class CommandOwnedPanelRecordSource {
                 .map(CompanionProfileProjectionState::profileId).findFirst();
     }
 
+    /** Display-only captures: current inventory or a pre-existing tool record, never ownership. */
+    List<LinkedNpcRecord> capturedRecordsFor(List<LinkedNpcRecord> linkedRecords,
+                                             java.util.Set<String> carriedProfiles) {
+        ArrayList<LinkedNpcRecord> result = new ArrayList<>();
+        for (var profile : profiles.get().values()) {
+            if (profile.ownerId() != null || profile.lifecycleState() != LifecycleState.CAPTURED) continue;
+            var linked = linkedRecords.stream().filter(record ->
+                    profile.profileId().toString().equals(record.profileId)
+                    || profile.currentAlias() != null && profile.currentAlias().value().equals(record.npcUuid))
+                    .findFirst().orElse(null);
+            if (linked == null && !carriedProfiles.contains(profile.profileId().toString())) continue;
+            UUID alias = linked != null ? linked.npcUuid : profile.currentAlias() == null
+                    ? CommandRosterPanelRecordSource.presentationUuid(profile.profileId()) : profile.currentAlias().value();
+            result.add(new LinkedNpcRecord(alias, profile.profileId().toString(),
+                    null, null, null, profile.customName() != null ? profile.customName() : profile.displayName(),
+                    null, profile.roleId(), null, false, false, null));
+        }
+        return List.copyOf(result);
+    }
+
     List<LinkedNpcRecord> recordsFor(UUID ownerUuid) {
         return recordsFor(ownerUuid, List.of());
     }

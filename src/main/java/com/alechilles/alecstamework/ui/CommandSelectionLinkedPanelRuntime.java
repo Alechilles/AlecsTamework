@@ -43,8 +43,7 @@ final class CommandSelectionLinkedPanelRuntime {
         commands.clear("#TameworkLinkedPanelList");
         boolean hasEntries = page.linkedNpcEntries.length > 0;
         commands.set("#TameworkLinkedPanelEmptyState.Text",
-                LinkedNpcPanelPresentationSupport.empty(
-                        page.panelEmptyStateKeySupplier, page.resolveLanguage()));
+                emptyText(page.resolveLanguage()));
         commands.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commands.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
         for (int index = 0; index < page.linkedNpcEntries.length; index++) {
@@ -52,6 +51,12 @@ final class CommandSelectionLinkedPanelRuntime {
                     page.featureController.presentation(
                             page.linkedNpcEntries[index].npcUuid()));
         }
+    }
+
+    private String emptyText(String language) {
+        return page.companionBinding != null
+                ? LocalizedText.resolve(language, "tamework.ui.roster.emptyFilter")
+                : LinkedNpcPanelPresentationSupport.empty(page.panelEmptyStateKeySupplier, language);
     }
 
     void bindDefaultDecorations(UICommandBuilder commands) {
@@ -226,8 +231,7 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         boolean hasEntries = page.linkedNpcEntries.length > 0;
         values.set(commands, "#TameworkLinkedPanelEmptyState.Text",
-                LinkedNpcPanelPresentationSupport.empty(
-                        page.panelEmptyStateKeySupplier, language));
+                emptyText(language));
         values.set(commands, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         values.set(commands, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
         Map<UUID, CommandPanelFeaturePresentation> features =
@@ -344,7 +348,9 @@ final class CommandSelectionLinkedPanelRuntime {
             // Reapplying Entries/SelectedValues can reset an open native popup.
             // Group definitions change on the manager page, which rebuilds this page on return.
             if (append) {
-                commands.set(selector + ".MaxSelection", 128);
+                commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
+                        "TameworkPanelActionStyles.ui", "CompanionGroupDropdown"));
+                commands.set(selector + ".MaxSelection", 0);
                 commands.set(selector + ".Entries", entries);
                 // The builder registers LocalizableString, not String, for array values.
                 // Literal wrappers encode the IDs as plain strings without translating them.
@@ -357,6 +363,9 @@ final class CommandSelectionLinkedPanelRuntime {
                             .append("@CompanionGroups", selector + ".SelectedValues"), false);
             return;
         }
+        commands.set(selector + ".MaxSelection", 1);
+        commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
+                "TameworkPanelActionStyles.ui", "GroupDropdown"));
         String selectedGroup = LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId());
         commands.set(selector + ".Entries", entries);
         commands.set(selector + ".Value", selectedGroup);

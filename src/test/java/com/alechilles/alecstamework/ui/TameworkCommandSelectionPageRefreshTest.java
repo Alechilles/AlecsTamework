@@ -55,9 +55,17 @@ class TameworkCommandSelectionPageRefreshTest {
                 .findFirst().orElseThrow();
         assertEquals(List.of("Barn"), BsonDocument.parse(selected.data).getArray("0").stream()
                 .map(value -> value.asString().getValue()).toList());
-        CommandSelectionEventData data = new CommandSelectionEventData();
-        data.commandId = CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + CARD;
-        data.companionGroups = new String[]{"Barn", "Travel"};
+        var maximum = java.util.Arrays.stream(initial.getCommands())
+                .filter(command -> command.selector != null && command.selector.endsWith("#GroupSelector.MaxSelection"))
+                .findFirst().orElseThrow();
+        assertEquals(0, BsonDocument.parse(maximum.data).getInt32("0").getValue(),
+                "The client must allow multiple selections and keep the picker open.");
+        CommandSelectionEventData data = CommandSelectionEventData.CODEC.decode(
+                new BsonDocument(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
+                        new org.bson.BsonString(CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + CARD))
+                        .append("@CompanionGroups", new org.bson.BsonArray(List.of(
+                                new org.bson.BsonString("Barn"), new org.bson.BsonString("Travel")))),
+                new com.hypixel.hytale.codec.ExtraInfo());
         page.handleDataEvent(null, null, data);
         refresh(page, true);
         assertEquals(List.of("Barn", "Travel"), row.get().groupIds());

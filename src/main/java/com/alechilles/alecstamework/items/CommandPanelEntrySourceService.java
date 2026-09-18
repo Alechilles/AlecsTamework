@@ -147,8 +147,17 @@ final class CommandPanelEntrySourceService {
         );
         if (rosterSnapshot == null || featurePresentations == null
                 || player == null || config == null) {
-            return new CommandPanelSnapshot(entries, ownedRecordSource == null || player == null
-                    ? Map.of() : ownedRecordSource.managedFeatures(player.getUuid(), linkedRecordStore.read(stack)));
+            var features = new java.util.HashMap<UUID, CommandPanelFeaturePresentation>();
+            if (ownedRecordSource != null && player != null) {
+                features.putAll(ownedRecordSource.managedFeatures(player.getUuid(), linkedRecordStore.read(stack)));
+                var ownedIds = ownedRecordSource.recordsFor(player.getUuid(), linkedRecordStore.read(stack))
+                        .stream().map(record -> record.npcUuid).collect(java.util.stream.Collectors.toSet());
+                for (var entry : entries) {
+                    if (entry.captured() && !ownedIds.contains(entry.npcUuid()))
+                        features.put(entry.npcUuid(), CommandPanelFeaturePresentation.readOnlyManaged());
+                }
+            }
+            return new CommandPanelSnapshot(entries, features);
         }
         String worldName = player.getWorld() == null
                 ? null
@@ -201,12 +210,16 @@ final class CommandPanelEntrySourceService {
                     ? linkedRecordStore.read(stack) : rosterSnapshot.records();
             List<LinkedNpcRecord> ownedRecords = ownedRecordSource == null || player == null
                     ? List.of() : ownedRecordSource.recordsFor(player.getUuid(), linkedRecords);
+            if (ownedRecordSource != null) {
+                var visibleRecords = new ArrayList<>(ownedRecords);
+                visibleRecords.addAll(ownedRecordSource.capturedRecordsFor(linkedRecords, carriedCaptureProfiles(player, store)));
+                ownedRecords = visibleRecords;
+            }
             List<LinkedNpcEntry> ownedEntries = linkedPanelEntryService.resolveOwnedEntriesFromRecords(
                     player, store, stack, toolId, ownedRecords, linkedById.keySet()).entries();
             linkedEntries = new ArrayList<>(ownedEntries.size());
             for (LinkedNpcEntry entry : ownedEntries) {
-                linkedEntries.add(linkedById.getOrDefault(entry.npcUuid(), entry)
-                        .withOwnedActions());
+                linkedEntries.add(entry.withOwnedActions());
             }
         }
         if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -428,11 +441,32 @@ final class CommandPanelEntrySourceService {
                 owned != null && owned.breedingEnabled, owned == null ? null : owned.groupId);
     }
 
+    /** Called during panel refresh on the viewer's world thread; only this player's bounded inventory is read. */
+    private static Set<String> carriedCaptureProfiles(Player player, Store<EntityStore> store) {
+        Set<String> profiles = new HashSet<>();
+        if (player == null || store == null || player.getReference() == null || !player.getReference().isValid()
+                || com.hypixel.hytale.server.core.inventory.InventoryComponent.EVERYTHING == null) return profiles;
+        for (var type : com.hypixel.hytale.server.core.inventory.InventoryComponent.EVERYTHING) {
+            var inventory = store.getComponent(player.getReference(), type);
+            if (inventory == null) continue;
+            var container = inventory.getInventory();
+            for (short slot = 0; slot < container.getCapacity(); slot++) {
+                var capture = com.alechilles.alecstamework.items.locate.CapturedItemMetadata.read(container.getItemStack(slot));
+                if (capture != null && capture.profileId() != null) profiles.add(capture.profileId());
+            }
+        }
+        return profiles;
+    }
+
     private List<LinkedNpcEntry> decorate(Player player, Store<EntityStore> store, ItemStack stack,
                                          TwCommandItemConfig config, List<LinkedNpcEntry> entries) {
         if (player == null || config == null || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return entries;
         var groups = new CommandGroupService().readGroups(player, stack);
         var profiledKeys = new java.util.HashMap<UUID, String>();
+        var savedRoles = new java.util.HashMap<UUID, String>();
+        var ownedRecords = ownedRecordSource == null ? linkedRecordStore.read(stack)
+                : ownedRecordSource.recordsFor(player.getUuid(), linkedRecordStore.read(stack));
+        for (var record : ownedRecords) savedRoles.put(record.npcUuid, record.cachedRoleId);
         for (var record : linkedRecordStore.read(stack)) {
             if (record.profileId != null) profiledKeys.put(record.npcUuid, CommandCompanionGroups.profileKey(record.profileId));
         }
@@ -454,7 +488,10 @@ final class CommandPanelEntrySourceService {
             var ref = world == null ? null : world.getEntityRef(entry.npcUuid());
             var position = ref == null || !ref.isValid() ? null : store.getComponent(ref, TransformComponent.getComponentType());
             boolean nearby = origin != null && position != null && origin.getPosition().distanceSquared(position.getPosition()) <= radius * radius;
-            decorated.add(entry.withCompanionGroups(key, tags, linkPolicyService.isRoleAllowed(entry.speciesId(), config, true)).withNearby(nearby));
+            var npc = ref == null || !ref.isValid() ? null : store.getComponent(ref, NPCEntity.getComponentType());
+            String roleId = npc == null ? savedRoles.get(entry.npcUuid()) : linkPolicyService.resolveRoleId(npc);
+            decorated.add(entry.withCompanionGroups(key, tags, (!entry.captured() || savedRoles.containsKey(entry.npcUuid()))
+                    && linkPolicyService.isRoleAllowed(roleId, config, true)).withNearby(nearby));
         }
         return decorated;
     }

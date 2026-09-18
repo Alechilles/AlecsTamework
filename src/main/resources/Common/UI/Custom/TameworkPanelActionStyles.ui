@@ -80,3 +80,11 @@ $C = "Common.ui";
  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #f0eee7, RenderUppercase: false),
  DefaultArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", HoveredArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", PressedArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", ArrowWidth: 10, ArrowHeight: 6
 );
+
+// Multi-group membership needs a persistent selected marker, not only a subtle text tint.
+@CompanionGroupDropdown = DropdownBoxStyle(...@GroupDropdown,
+ EntryIconWidth: 12, EntryIconHeight: 12,
+ EntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamondOutline.png", Color: #afb6b0),
+ SelectedEntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #69c87d),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #9ce5ac, RenderBold: true, RenderUppercase: false)
+);

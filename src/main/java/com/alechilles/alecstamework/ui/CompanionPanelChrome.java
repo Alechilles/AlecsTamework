@@ -33,7 +33,11 @@ final class CompanionPanelChrome {
             c.setObject("#TameworkLinkedPanelControlsSecondary.Anchor", anchor(280, 36, 610, 28));
             c.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor", anchor(0, 0, 440, 28));
             c.setObject("#TameworkLinkedPanelFilterInput.Anchor", anchor(0, 0, 430, 28));
-            c.setObject("#TameworkLinkedPanelListViewport.Anchor", anchor(10, 80, 906, 658));
+            // Content already owns the list viewport; move that container, not its scrolling child.
+            var content = new Anchor();
+            content.setLeft(Value.of(10)); content.setRight(Value.of(10));
+            content.setTop(Value.of(80)); content.setBottom(Value.of(10));
+            c.setObject("#TameworkLinkedPanelRoot #Content.Anchor", content);
             c.set("#TameworkLinkedPanelSubtitleRow.Visible", false);
             c.set("#TameworkLinkedPanelSubtitleRadiusSlot.Visible", false);
             e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionNearbyCheck",

@@ -8,6 +8,8 @@
   first. Nearby-only filtering and one name/species/group search keep browsing
   independent from command recipients. Player-owned groups are shared across
   compatible flutes, support multiple memberships, and can be edited inline.
+  Captures already tracked by a flute or carried in your inventory remain visible
+  as read-only stored cards when capture clears ownership.
 
 - Recall no longer restores a dead saved body while its death transition is pending.
 - Captured age meters now gray out consistently, and paused meters show a larger

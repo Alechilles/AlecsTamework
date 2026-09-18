@@ -105,6 +105,27 @@ class CommandOwnedPanelRecordSourceTest {
         assertFalse(features.containsKey(ordinary.currentAlias().value()));
     }
 
+    /** Capture can clear ownership, but carried and previously tracked captures must remain visible without authority. */
+    @Test
+    void showsKnownOwnerlessCapturesWithoutGrantingOwnership() {
+        UUID owner = UUID.randomUUID();
+        var carried = profile(null, LifecycleState.CAPTURED, UUID.randomUUID(), Set.of());
+        var tracked = profile(null, LifecycleState.CAPTURED, UUID.randomUUID(), Set.of());
+        var unrelated = profile(null, LifecycleState.CAPTURED, UUID.randomUUID(), Set.of());
+        var transferred = profile(UUID.randomUUID(), LifecycleState.CAPTURED, UUID.randomUUID(), Set.of());
+        var source = new CommandOwnedPanelRecordSource(() -> Map.of(carried.profileId(), carried,
+                tracked.profileId(), tracked, unrelated.profileId(), unrelated, transferred.profileId(), transferred));
+        var link = new LinkedNpcRecord(tracked.currentAlias().value(), tracked.profileId().toString(),
+                null, null, null, "Tracked", null, "Cow", null, true, false, null);
+        var visible = source.capturedRecordsFor(java.util.List.of(link),
+                Set.of(carried.profileId().toString(), transferred.profileId().toString()));
+        assertEquals(Set.of(carried.profileId().toString(), tracked.profileId().toString()),
+                visible.stream().map(record -> record.profileId).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(visible.stream().noneMatch(record -> record.active));
+        assertTrue(source.recordsFor(owner, java.util.List.of(link)).isEmpty());
+        for (var record : visible) assertTrue(source.profileForRow(owner, record.npcUuid).isEmpty());
+    }
+
     private static CompanionProfileProjectionState profile(UUID owner, LifecycleState state,
             UUID alias, Set<UUID> links) {
         return new CompanionProfileProjectionState(new ProfileId(UUID.randomUUID()),
