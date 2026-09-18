@@ -32,6 +32,7 @@ final class CommandGroupQuickSelectBinder {
             values.remember("#TameworkGroupQuickSelect.Visible", available);
         } else values.set(commands, "#TameworkGroupQuickSelect.Visible", available);
         if (!available) return;
+        entries = entries.stream().filter(entry -> !"__none__".equals(entry.value())).toList();
         boolean entriesChanged = values.changed("groupQuickSelectEntries", entries);
         Map<String, String> groupColors = groupColors(colors);
         boolean rebuild = initial || entriesChanged;

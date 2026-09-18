@@ -76,7 +76,8 @@ public final class TameworkCommandHotswapInteraction extends SimpleInteraction {
         Player player = buffer.getComponent(playerRef, Player.getComponentType());
         if (player == null) return false;
         if (CommandHotswapAction.isCycleGroup(assignments.read(held, slot))) {
-            return persistGroupCycle(context, handler.cycleHotswapGroup(held));
+            buffer.run(store -> handler.cycleHotswapGroup(player, held));
+            return true;
         }
         buffer.run(store -> handler.handleHotswapUse(player, held, context.getTargetEntity(), slot));
         context.setHeldItem(held);

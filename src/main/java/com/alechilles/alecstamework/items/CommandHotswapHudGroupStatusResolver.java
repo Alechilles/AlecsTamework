@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.WeakHashMap;
+import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
@@ -20,69 +20,50 @@ final class CommandHotswapHudGroupStatusResolver {
     private static final CommandHotswapHudViewModel.GroupStatus CUSTOM_STATUS =
             new CommandHotswapHudViewModel.GroupStatus(true, "Custom Selection", CUSTOM_COLOR);
 
-    private final Function<ItemStack, List<LinkedNpcRecord>> linkedNpcReader;
-    private final Function<ItemStack, List<CommandGroupService.GroupRecord>> groupReader;
-    private final CommandGroupActivationService activationService;
-    private final Map<UUID, CachedStatus> statusByPlayer = new WeakHashMap<>();
-
-    CommandHotswapHudGroupStatusResolver(@Nullable CommandLinkedNpcRecordStore linkedNpcRecordStore,
-                                         @Nullable CommandGroupService groupService,
-                                         @Nullable CommandGroupActivationService activationService) {
-        CommandLinkedNpcRecordStore records = linkedNpcRecordStore != null
-                ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
-        CommandGroupService groups = groupService != null ? groupService : new CommandGroupService();
-        this.linkedNpcReader = records::read;
-        this.groupReader = groups::readGroups;
-        this.activationService = activationService != null
-                ? activationService : new CommandGroupActivationService(
-                        records, groups);
+    CommandHotswapHudViewModel.GroupStatus resolve(@Nullable List<LinkedNpcEntry> entries,
+                                                   @Nullable List<CommandGroupService.GroupRecord> groups) {
+        return resolveSelection(resolveSelectionValue(entries, groups), groups);
     }
 
-    private CommandHotswapHudGroupStatusResolver(
-            Function<ItemStack, List<LinkedNpcRecord>> linkedNpcReader,
-            Function<ItemStack, List<CommandGroupService.GroupRecord>> groupReader,
-            @Nullable CommandGroupActivationService activationService) {
-        this.linkedNpcReader = linkedNpcReader;
-        this.groupReader = groupReader;
-        this.activationService = activationService != null
-                ? activationService : new CommandGroupActivationService(null, null);
-    }
-
-    static CommandHotswapHudGroupStatusResolver forReaders(
-            Function<ItemStack, List<LinkedNpcRecord>> linkedNpcReader,
-            Function<ItemStack, List<CommandGroupService.GroupRecord>> groupReader) {
-        return new CommandHotswapHudGroupStatusResolver(linkedNpcReader, groupReader, null);
-    }
-
-    CommandHotswapHudViewModel.GroupStatus resolve(@Nullable UUID playerUuid,
-                                                   @Nullable ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
+    /**
+     * Resolves a status from the bounded selected-record set without constructing panel rows.
+     * An incomplete owned-roster view intentionally reports Custom rather than All Companions.
+     */
+    CommandHotswapHudViewModel.GroupStatus resolveSelectedKeys(
+            @Nullable Set<String> selectedKeys,
+            @Nullable List<CommandGroupService.GroupRecord> groups,
+            @Nullable Function<String, Set<String>> membersForGroup) {
+        if (selectedKeys == null || selectedKeys.isEmpty()) {
             return NONE_STATUS;
         }
-        CachedStatus cached = null;
-        if (playerUuid != null) {
-            synchronized (statusByPlayer) {
-                cached = statusByPlayer.get(playerUuid);
+        if (groups != null && membersForGroup != null) {
+            for (CommandGroupService.GroupRecord group : groups) {
+                if (group == null || group.groupId == null || group.groupId.isBlank()) continue;
+                Set<String> members = membersForGroup.apply(group.groupId);
+                if (members != null && !members.isEmpty() && selectedKeys.equals(members)) {
+                    return resolveSelection(group.groupId, groups);
+                }
             }
         }
-        if (cached != null && cached.stack() == stack) {
-            return cached.status();
-        }
-        CommandHotswapHudViewModel.GroupStatus resolved = resolve(
-                linkedNpcReader.apply(stack),
-                groupReader.apply(stack)
-        );
-        if (playerUuid != null) {
-            synchronized (statusByPlayer) {
-                statusByPlayer.put(playerUuid, new CachedStatus(stack, resolved));
-            }
-        }
-        return resolved;
+        return CUSTOM_STATUS;
     }
 
-    CommandHotswapHudViewModel.GroupStatus resolve(@Nullable List<LinkedNpcRecord> records,
-                                                   @Nullable List<CommandGroupService.GroupRecord> groups) {
-        String selection = activationService.resolveSelectionValue(records, groups);
+    CommandHotswapHudViewModel.GroupStatus customStatus() {
+        return CUSTOM_STATUS;
+    }
+
+    /** Retains legacy per-item group status for owner-family command items. */
+    CommandHotswapHudViewModel.GroupStatus resolveLegacy(@Nullable ItemStack stack) {
+        CommandLinkedNpcRecordStore records = new CommandLinkedNpcRecordStore();
+        CommandGroupService groups = new CommandGroupService();
+        CommandGroupActivationService activation = new CommandGroupActivationService(records, groups);
+        List<CommandGroupService.GroupRecord> definitions = groups.readGroups(stack);
+        return resolveSelection(activation.resolveSelectionValue(records.read(stack), definitions), definitions);
+    }
+
+    private CommandHotswapHudViewModel.GroupStatus resolveSelection(
+            String selection,
+            @Nullable List<CommandGroupService.GroupRecord> groups) {
         if (CommandGroupActivationService.ALL_VALUE.equals(selection)) {
             return ALL_STATUS;
         }
@@ -98,6 +79,54 @@ final class CommandHotswapHudGroupStatusResolver {
         }
         String label = group.name == null || group.name.isBlank() ? group.groupId : group.name.trim();
         return new CommandHotswapHudViewModel.GroupStatus(true, label, safeColor(group.colorHex));
+    }
+
+    private String resolveSelectionValue(@Nullable List<LinkedNpcEntry> entries,
+                                         @Nullable List<CommandGroupService.GroupRecord> groups) {
+        Set<String> selected = selected(entries);
+        if (selected.isEmpty()) return CommandGroupActivationService.NONE_VALUE;
+        Set<String> selectable = selectable(entries);
+        if (!selectable.isEmpty() && selected.equals(selectable)) {
+            return CommandGroupActivationService.ALL_VALUE;
+        }
+        if (groups != null) for (CommandGroupService.GroupRecord group : groups) {
+            if (group != null && group.groupId != null && !group.groupId.isBlank()
+                    && selected.equals(members(entries, group.groupId))
+                    && !selected.isEmpty()) return group.groupId;
+        }
+        return CommandGroupActivationService.CUSTOM_VALUE;
+    }
+
+    private Set<String> selected(@Nullable List<LinkedNpcEntry> entries) {
+        Set<String> result = new HashSet<>();
+        if (entries == null) return result;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported() && entry.active()) result.add(key(entry));
+        }
+        return result;
+    }
+
+    private Set<String> selectable(@Nullable List<LinkedNpcEntry> entries) {
+        Set<String> result = new HashSet<>();
+        if (entries == null) return result;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported()) result.add(key(entry));
+        }
+        return result;
+    }
+
+    private Set<String> members(@Nullable List<LinkedNpcEntry> entries, String groupId) {
+        Set<String> result = new HashSet<>();
+        if (entries == null) return result;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported() && entry.groupIds().contains(groupId)) result.add(key(entry));
+        }
+        return result;
+    }
+
+    private String key(LinkedNpcEntry entry) {
+        return entry.companionKey() == null || entry.companionKey().isBlank()
+                ? CommandCompanionGroups.entityKey(entry.npcUuid()) : entry.companionKey();
     }
 
     @Nullable
@@ -121,9 +150,5 @@ final class CommandHotswapHudGroupStatusResolver {
             return ALL_COLOR;
         }
         return colorHex;
-    }
-
-    private record CachedStatus(ItemStack stack,
-                                CommandHotswapHudViewModel.GroupStatus status) {
     }
 }

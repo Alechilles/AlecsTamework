@@ -31,6 +31,7 @@ class CommandOwnedPanelRecordSourceTest {
         for (var record : records) {
             assertEquals(profiles.get(ProfileId.parse(record.profileId)).currentAlias().value(), record.npcUuid);
             assertEquals("My animal", record.cachedDisplayName);
+            assertFalse(record.active, "Ownership alone must not select a companion on every flute");
         }
     }
 

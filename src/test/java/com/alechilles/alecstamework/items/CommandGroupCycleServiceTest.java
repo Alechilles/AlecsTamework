@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -12,40 +14,43 @@ class CommandGroupCycleServiceTest {
             new CommandGroupService.GroupRecord("red", "Red", "#AA5500", 1)
     );
 
-    private final CommandGroupCycleService cycleService =
-            new CommandGroupCycleService(null, null, null);
+    private final CommandGroupCycleService cycleService = new CommandGroupCycleService();
 
     @Test
     void cycleMovesFromAllThroughDisplayOrderedNamedGroupsAndBackToAll() {
-        assertEquals("blue", cycleService.nextSelectorValue(records(true, true, true), GROUPS));
-        assertEquals("red", cycleService.nextSelectorValue(records(true, false, false), GROUPS));
+        assertEquals("blue", cycleService.nextSelectorValue(entries(true, true, true), GROUPS));
+        assertEquals("red", cycleService.nextSelectorValue(entries(true, false, false), GROUPS));
         assertEquals(CommandGroupActivationService.ALL_VALUE,
-                cycleService.nextSelectorValue(records(false, true, false), GROUPS));
+                cycleService.nextSelectorValue(entries(false, true, false), GROUPS));
     }
 
     @Test
     void customAndNoneSelectionsCycleToAllCompanions() {
         assertEquals(CommandGroupActivationService.ALL_VALUE,
-                cycleService.nextSelectorValue(records(true, true, false), GROUPS));
+                cycleService.nextSelectorValue(entries(true, true, false), GROUPS));
         assertEquals(CommandGroupActivationService.ALL_VALUE,
-                cycleService.nextSelectorValue(records(false, false, false), GROUPS));
+                cycleService.nextSelectorValue(entries(false, false, false), GROUPS));
     }
 
-    private List<LinkedNpcRecord> records(boolean blueActive,
-                                           boolean redActive,
-                                           boolean ungroupedActive) {
+    private List<LinkedNpcEntry> entries(boolean blueActive,
+                                         boolean redActive,
+                                         boolean ungroupedActive) {
         return List.of(
-                record("blue", blueActive),
-                record("red", redActive),
-                record(null, ungroupedActive)
+                entry("blue", blueActive),
+                entry("red", redActive),
+                entry(null, ungroupedActive)
         );
     }
 
-    private LinkedNpcRecord record(String groupId, boolean active) {
+    private LinkedNpcEntry entry(String groupId, boolean active) {
         UUID uuid = UUID.randomUUID();
-        return new LinkedNpcRecord(
-                uuid, null, null, uuid.toString(), null, "test_role", null,
-                active, false, groupId
-        );
+        LinkedNpcEntry entry = new LinkedNpcEntry(uuid, "Companion", 1, 1, 0, 0, 0,
+                "", 0, 0, 0, 0, true, false, false, false, false, false,
+                0L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, active,
+                "test_role", "Test", null, null, null, false, false, 0L, 0.0, false);
+        return entry.withCompanionGroups("e" + uuid,
+                groupId == null ? List.of() : List.of(new LinkedNpcEntry.GroupMembership(groupId, groupId, "#112233")),
+                true);
     }
 }

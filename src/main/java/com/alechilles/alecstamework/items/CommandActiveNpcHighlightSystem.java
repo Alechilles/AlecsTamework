@@ -153,7 +153,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 RECONCILE_INTERVAL_MS,
                 () -> {
                     List<CommandActiveNpcHighlightPlanService.HighlightTarget> desiredTargets =
-                            resolveTargets(activeTool.stack());
+                            resolveTargets(playerCandidate.player(), activeTool.stack());
                     scheduleProxyRemoval(store, displayTracker.reconcile(
                             store, playerUuid, activeTool.toolId(), desiredTargets
                     ));
@@ -211,8 +211,13 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
 
     @Nonnull
     private List<CommandActiveNpcHighlightPlanService.HighlightTarget> resolveTargets(
-            @Nonnull ItemStack stack) {
-        return planService.build(recordStore.read(stack), groupService.readGroups(stack));
+            @Nonnull Player player, @Nonnull ItemStack stack) {
+        return planService.build(recordStore.read(stack), groupService.readGroups(player, stack), record -> {
+            String key = record.profileId == null ? CommandCompanionGroups.entityKey(record.npcUuid)
+                    : CommandCompanionGroups.profileKey(record.profileId);
+            var tags = CommandCompanionGroups.groups(player, key, record.npcUuid);
+            return tags.isEmpty() ? null : tags.getFirst();
+        });
     }
 
     private void emitForLoadedTarget(

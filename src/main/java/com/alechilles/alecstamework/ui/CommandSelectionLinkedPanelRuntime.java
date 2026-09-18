@@ -183,7 +183,7 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelModeDropdown.Value",
                 LinkedNpcPanelPresentationSupport.mode(page.panelModeValueSupplier));
         LinkedNpcPanelPresentationSupport.bindModeTabs(commands, page.panelModeValueSupplier, values);
-        if (!page.config.usesBondedCompanionRoster()) {
+        if (!page.config.usesBondedCompanionRoster() && page.companionBinding == null) {
             LinkedNpcPanelPresentationSupport.bindFilterWidth(commands, page.panelModeValueSupplier, values);
         }
         values.set(commands, "#TameworkLinkedPanelAutoLinkCheck.Value",
@@ -237,6 +237,7 @@ final class CommandSelectionLinkedPanelRuntime {
                         progressionEligible)));
         renderCards(commands, events, hasEntries, features, language);
         BondedCompanionPanelChrome.bindToolbar(commands, events, page, values);
+        CompanionPanelChrome.bind(commands, events, page, values);
         if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
             return LinkedNpcPanelRefreshOutcome.evaluated(
                     progressionEligible, shortestCountdown());
@@ -306,7 +307,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.panelGroupActivationEntriesSupplier,
                 page.panelGroupActivationValueSupplier);
         // The initial roster chrome overrides generic values; seed those final values too.
-        if (!page.config.usesBondedCompanionRoster()) {
+        if (!page.config.usesBondedCompanionRoster() && page.companionBinding == null) {
             LinkedNpcPanelPresentationSupport.bindFilterWidth(new UICommandBuilder(),
                     page.panelModeValueSupplier, page.refreshTransaction.values());
         }
@@ -337,6 +338,26 @@ final class CommandSelectionLinkedPanelRuntime {
         if (!available) return;
         List<DropdownEntryInfo> entries = resolveGroupEntries();
         if (entries.isEmpty()) entries = LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage());
+        if (page.companionBinding != null) {
+            entries = entries.stream().filter(option -> !"None".equalsIgnoreCase(option.value())).toList();
+            // Reapplying Entries/SelectedValues can reset an open native popup.
+            // Group definitions change on the manager page, which rebuilds this page on return.
+            if (append) {
+                commands.set(selector + ".MaxSelection", 128);
+                commands.set(selector + ".Entries", entries);
+                commands.set(selector + ".SelectedValues", entry.groupIds());
+            }
+            String label = entry.groups().isEmpty() ? LocalizedText.resolve(page.resolveLanguage(), "tamework.ui.companions.noGroups")
+                    : entry.groups().size() == 1 ? entry.groups().getFirst().name()
+                    : LocalizedText.format(page.resolveLanguage(), "tamework.ui.companions.groupSummary", entry.groups().getFirst().name(), entry.groups().size() - 1);
+            commands.set(selector + "Label.Text", label);
+            commands.set(selector + ".TooltipText", entry.groupName());
+            LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
+            if (append) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
+                    EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
+                            .append("@CompanionGroups", selector + ".SelectedValues"), false);
+            return;
+        }
         String selectedGroup = LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId());
         commands.set(selector + ".Entries", entries);
         commands.set(selector + ".Value", selectedGroup);
@@ -433,6 +454,19 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     void applyLocalFilter() {
+        if (page.companionBinding != null) {
+            var previous = page.linkedNpcEntries;
+            page.linkedNpcEntries = CompanionPanelChrome.filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries),
+                    page.companionBinding.state().get(), page.companionBinding.nearby().get(),
+                    LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
+            if (page.preserveCompanionOrder && previous != null) {
+                var order = new java.util.HashMap<UUID, Integer>();
+                for (int i = 0; i < previous.length; i++) order.put(previous[i].npcUuid(), i);
+                java.util.Arrays.sort(page.linkedNpcEntries, java.util.Comparator.comparingInt(
+                        entry -> order.getOrDefault(entry.npcUuid(), Integer.MAX_VALUE)));
+            }
+            return;
+        }
         page.linkedNpcEntries = LinkedNpcPanelPresentationSupport.filter(
                 page.pendingRemovals.filter(page.baseLinkedNpcEntries),
                 LinkedNpcPanelPresentationSupport.filterMode(

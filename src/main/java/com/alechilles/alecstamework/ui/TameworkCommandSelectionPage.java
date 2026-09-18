@@ -96,6 +96,10 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelCardRenderState cardRenderState;
     final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
     String rosterStateFilter = "All";
+    CompanionPanelBinding companionBinding;
+    boolean preserveCompanionOrder;
+    /** Configures ordinary owned-companion controls; callbacks run on the current world thread. */
+    public void configureCompanions(CompanionPanelBinding binding) { companionBinding = java.util.Objects.requireNonNull(binding); }
     UUID pendingUnlinkNpcUuid;
     final LinkedNpcPanelPendingRemovals pendingRemovals = new LinkedNpcPanelPendingRemovals();
     final LinkedNpcPanelRemovalConfirmOverlayState removalConfirmOverlay =
@@ -459,7 +463,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
             LinkedNpcPanelPresentationSupport.bindModeTabs(commandBuilder, panelModeValueSupplier);
-            if (!config.usesBondedCompanionRoster()) {
+            if (!config.usesBondedCompanionRoster() && companionBinding == null) {
                 LinkedNpcPanelPresentationSupport.bindFilterWidth(commandBuilder, panelModeValueSupplier);
             }
             commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
@@ -484,6 +488,7 @@ public final class TameworkCommandSelectionPage
             );
             bindRemovalConfirmationEvents(eventBuilder);
             BondedCompanionPanelChrome.bindToolbar(commandBuilder, eventBuilder, this, null);
+            CompanionPanelChrome.bind(commandBuilder, eventBuilder, this, null);
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
             CommandSelectionPageEventBinder.bindHotswapControls(eventBuilder);
             companionGuide.build(commandBuilder, eventBuilder);
@@ -553,6 +558,7 @@ public final class TameworkCommandSelectionPage
         }
         String receivedCommandId = data.commandId == null ? "" : data.commandId.trim();
         String commandId = receivedCommandId;
+        if (data.companionGroups == null) preserveCompanionOrder = false;
         if (handleRemovalConfirmation(commandId)) {
             return;
         }
@@ -658,6 +664,26 @@ public final class TameworkCommandSelectionPage
         if (rosterEventBoundary.blocks(data, commandId)) {
             return;
         }
+        if (companionBinding != null) {
+            if (commandId.startsWith(CompanionPanelChrome.FILTER_PREFIX)) {
+                String state = commandId.substring(CompanionPanelChrome.FILTER_PREFIX.length());
+                if (CompanionPanelChrome.FILTERS.contains(state)) companionBinding.setState().accept(state);
+                refreshLinkedNpcEntries(); sendCardRefreshUpdate(); return;
+            }
+            if (data.companionNearby != null) {
+                companionBinding.setNearby().accept(data.companionNearby);
+                refreshLinkedNpcEntries(); sendCardRefreshUpdate(); return;
+            }
+            if (commandId.startsWith(ASSIGN_GROUP_COMMAND_PREFIX) && data.companionGroups != null) {
+                UUID id = CommandUiIdParser.parseNpcUuid(commandId, ASSIGN_GROUP_COMMAND_PREFIX);
+                if (id != null && linkedPanelRuntime.resolveEntry(id) != null && data.companionGroups.length <= 128) {
+                    companionBinding.assignGroups().accept(id, java.util.List.of(data.companionGroups));
+                    // Keep the current order and native popup while its checkboxes are being edited.
+                    preserveCompanionOrder = true;
+                }
+                return;
+            }
+        }
         if (commandId.startsWith(ASSIGN_GROUP_COMMAND_PREFIX)) {
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, ASSIGN_GROUP_COMMAND_PREFIX);
             if (npcUuid != null && data.panelGroupAssignValue != null) {
@@ -754,7 +780,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (data.panelFilterTextInput != null) {
-            if (rosterEventBoundary.bondedRoster() && panelSetFilterModeCallback != null
+            if ((rosterEventBoundary.bondedRoster() || companionBinding != null) && panelSetFilterModeCallback != null
                     && !"Name".equals(LinkedNpcPanelPresentationSupport.filterMode(panelFilterModeValueSupplier))) {
                 panelSetFilterModeCallback.accept("Name");
             }

@@ -1751,3 +1751,25 @@ tamework.commandmenu.lifecycle.nextStage={0} en {1}
 tamework.commands.invalidToggle=Estado no válido. Usa on, off o toggle; omite el valor para alternar.
 
 tamework.commands.setOwner.componentUnavailable=El componente de propietario no está disponible.
+
+tamework.ui.companions.title=Compañeros
+tamework.ui.companions.inWorld=En el mundo
+tamework.ui.companions.stored=Almacenados
+tamework.ui.companions.lostDead=Perdidos / muertos
+tamework.ui.companions.all=Todos
+tamework.ui.companions.nearby=Solo cercanos
+tamework.ui.companions.highlight=Resaltar seleccionados
+tamework.ui.companions.search=Buscar por nombre, especie o grupo...
+tamework.ui.companions.addGroup=Añadir grupo
+tamework.ui.companions.clearSelection=Borrar selección
+tamework.ui.companions.select=Seleccionar
+tamework.ui.companions.deselect=Quitar selección
+tamework.ui.companions.noGroups=Sin grupos
+tamework.ui.companions.groupSummary={0} +{1}
+tamework.ui.companions.count={0} seleccionados · {1} en total
+tamework.ui.companions.unsupported=Este objeto de comando no admite a este compañero.
+tamework.command.selection.selected=Seleccionado: {0}.
+tamework.command.selection.deselected=Deseleccionado: {0}.
+tamework.command.selection.limit=Límite de selección alcanzado.
+
+tamework.ui.companions.header = Compañeros — {0} seleccionados · {1} en propiedad

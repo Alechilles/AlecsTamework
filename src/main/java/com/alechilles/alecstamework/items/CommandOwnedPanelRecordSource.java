@@ -90,7 +90,7 @@ final class CommandOwnedPanelRecordSource {
             records.add(new LinkedNpcRecord(alias, profile.profileId().toString(),
                     null, null, null,
                     profile.customName() != null ? profile.customName() : profile.displayName(),
-                    null, profile.roleId(), null, true, false, null));
+                    null, profile.roleId(), null, false, false, null));
         }
         records.sort(Comparator.comparing(record -> record.profileId == null
                 ? record.npcUuid.toString() : record.profileId));

@@ -115,7 +115,7 @@ final class CommandGroupManagerPageService {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            List<CommandGroupService.GroupRecord> groups = groupService.readGroups(stack);
+            List<CommandGroupService.GroupRecord> groups = groupService.readGroups(player, stack);
             if (groups.isEmpty()) {
                 return List.of();
             }

@@ -221,7 +221,7 @@ final class CommandSelectionPageService {
         this.panelActionService = panelActionService;
         this.talentPageService = talentPageService;
         this.managedPanelActions = new CommandUiManagedPanelActions(
-                toolInventoryService, panelActionService);
+                toolInventoryService, panelActionService, groupAssignPageService);
         this.managedTalentActions = new CommandUiManagedTalentActions(
                 talentPageService, bondedTalentPages);
         this.featureActions = featureActions;
@@ -596,7 +596,7 @@ final class CommandSelectionPageService {
                 Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null)
                 .withEmptyStateText(localized(
                         player, panelSnapshot.emptyStateKey()));
-        return new InitialUiState(withAssignments(snapshot, working), panelSnapshot);
+        return new InitialUiState(withAssignments(snapshot, CommandCompanionGroups.view(player, working)), panelSnapshot);
     }
 
     private CommandUiSnapshot withAssignments(
@@ -852,7 +852,7 @@ final class CommandSelectionPageService {
         return new CommandUiManagedPanelActions.Context(
                 context.toolId(), context.preferenceAuthority(),
                 context.genericAuthority(),
-                () -> resolveCurrentPlayer(context.ownerUuid()));
+                () -> resolveCurrentPlayer(context.ownerUuid()), context.config());
     }
 
     static CompletionStage<CommandUiActionResult> apply(Runnable action) {
@@ -903,9 +903,9 @@ final class CommandSelectionPageService {
         boolean releasable = !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
-        if (!linked && releasable) addGenericRow(catalog, rowId, "LINK", actionLabel(context, "link"),
+        if (!entry.ownedActions() && !linked && releasable) addGenericRow(catalog, rowId, "LINK", actionLabel(context, "link"),
                 npcId, null, npc.link(), context.genericAuthority(), false);
-        if (linked) addGenericRow(catalog, rowId, "UNLINK", actionLabel(context, "unlink"),
+        if (linked && !entry.ownedActions()) addGenericRow(catalog, rowId, "UNLINK", actionLabel(context, "unlink"),
                 npcId, null, npc.unlink(), context.genericAuthority(),
                 false);
         if (!managed && !entry.captured() && !entry.inCoop()) {
@@ -916,10 +916,10 @@ final class CommandSelectionPageService {
             addGenericRow(catalog, rowId, "CULL", actionLabel(context, "cull"), npcId, null,
                     npc.cull(), context.genericAuthority(), true);
         }
-        if (linked) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
+        if (genericLinkedOrOwned) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
                 actionLabel(context, entry.active() ? "setInactive" : "setActive"), npcId, null,
                 npc.toggleActive(), context.genericAuthority(), false);
-        if (linked && entry.loaded() && entry.breedingAvailable()) {
+        if (genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable()) {
             addGenericRow(catalog, rowId, "TOGGLE_BREEDING",
                     actionLabel(context, entry.breedingEnabled() ? "disableBreeding" : "enableBreeding"),
                     npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
@@ -938,21 +938,21 @@ final class CommandSelectionPageService {
             addGenericRow(catalog, rowId, "RECALL", actionLabel(context, "recall"), npcId, null,
                     npc.recall(), context.genericAuthority(), false);
         }
-        if (linked && entry.loaded() && !entry.dead() && !entry.captured()
+        if (genericLinkedOrOwned && entry.loaded() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "SET_HOME", actionLabel(context, "setHome"), npcId, null,
                     npc.setHome(), context.genericAuthority(), false);
         }
-        if (linked && entry.hasHome() && !entry.dead() && !entry.captured()
+        if (genericLinkedOrOwned && entry.hasHome() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "RETURN_HOME", actionLabel(context, "returnHome"),
                     npcId, null, npc.returnHome(), context.genericAuthority(), false);
         }
-        if (linked && entry.loaded() && entry.flightToggleAvailable()) {
+        if (genericLinkedOrOwned && entry.loaded() && entry.flightToggleAvailable()) {
             addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", actionLabel(context, "toggleFlight"),
                     npcId, features.flightToggle(), context, false);
         }
-        if (linked && entry.loaded() && entry.shoulderRideAvailable()) {
+        if (genericLinkedOrOwned && entry.loaded() && entry.shoulderRideAvailable()) {
             addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
                     actionLabel(context, "toggleShoulderRide"), npcId, shoulderRideCallback(context),
                     context, false);
@@ -1302,7 +1302,7 @@ final class CommandSelectionPageService {
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationValue(
                                 resolveCurrentPlayer(context.ownerUuid()),
-                                context.toolId())
+                                context.toolId(), context.config())
                         : () -> "",
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupDropdownEntries(
@@ -1342,6 +1342,15 @@ final class CommandSelectionPageService {
                         : () -> false,
                 panelCallbacks.setActiveHighlightEnabled()
         ));
+        if (context.genericRosterActions() && !context.config().usesOwnerCommandFamilyRoster()) {
+            page.configureCompanions(new com.alechilles.alecstamework.ui.CompanionPanelBinding(
+                    () -> CommandCompanionPreferences.state(toolInventoryService.findToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId())),
+                    state -> { if (context.genericAuthority().getAsBoolean()) toolInventoryService.mutateToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack -> CommandCompanionPreferences.state(stack, state)); },
+                    () -> CommandCompanionPreferences.nearby(toolInventoryService.findToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId())),
+                    nearby -> { if (context.genericAuthority().getAsBoolean()) toolInventoryService.mutateToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack -> CommandCompanionPreferences.nearby(stack, nearby)); },
+                    (id, groups) -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupAssignments(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), id, groups); }
+            ));
+        }
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(
                 () -> toolInventoryService.findActiveToolStack(
@@ -1431,7 +1440,7 @@ final class CommandSelectionPageService {
             com.alechilles.alecstamework.ui.LinkedNpcEntry entry = context.snapshot()
                     .entry(uuid);
             if (!context.genericRosterActions() || !context.genericAuthority().getAsBoolean()
-                    || entry == null || !entry.linked() || !entry.loaded()
+                    || entry == null || !(entry.linked() || entry.ownedActions()) || !entry.loaded()
                     || !entry.flightToggleAvailable()
                     || linkedFlightToggleActions == null) return;
             linkedFlightToggleActions.toggle(context.ownerUuid(), eventRef, eventStore,
@@ -1868,7 +1877,7 @@ final class CommandSelectionPageService {
                 if (context.genericRosterActions()
                         && context.genericAuthority().getAsBoolean()
                         && linkedShoulderRideActions != null && entry != null
-                        && entry.linked() && entry.loaded()
+                        && (entry.linked() || entry.ownedActions()) && entry.loaded()
                         && entry.shoulderRideAvailable()) {
                     linkedShoulderRideActions.toggle(context.ownerUuid(), eventRef,
                             eventStore, context.toolId(), uuid);

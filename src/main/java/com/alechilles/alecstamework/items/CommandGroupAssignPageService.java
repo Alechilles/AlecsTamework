@@ -35,17 +35,45 @@ final class CommandGroupAssignPageService {
 
     List<DropdownEntryInfo> resolveGroupActivationDropdownEntries(Player player, String toolId) {
         ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
-        return groupActivationService.resolveDropdownEntries(stack, resolveLanguage(player));
+        return groupActivationService.resolveDropdownEntries(CommandCompanionGroups.view(player, stack), resolveLanguage(player));
     }
 
     java.util.Map<String, String> resolveGroupColors(Player player, String toolId) {
         ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
-        return groupActivationService.resolveGroupColors(stack);
+        return groupActivationService.resolveGroupColors(CommandCompanionGroups.view(player, stack));
     }
 
-    String resolveGroupActivationValue(Player player, String toolId) {
+    String resolveGroupActivationValue(Player player, String toolId, TwCommandItemConfig config) {
         ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
-        return groupActivationService.resolveSelectionValue(stack);
+        if (stack == null || config == null
+                || config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
+            return CommandGroupActivationService.NONE_VALUE;
+        }
+        List<LinkedNpcEntry> entries = toolInventoryService.buildLinkedPanelBaseEntriesForTool(
+                player, toolId, config);
+        java.util.Set<String> selected = new java.util.HashSet<>();
+        java.util.Set<String> selectable = new java.util.HashSet<>();
+        for (LinkedNpcEntry entry : entries) {
+            if (entry == null || !entry.selectionSupported()) continue;
+            String key = entry.companionKey() == null || entry.companionKey().isBlank()
+                    ? CommandCompanionGroups.entityKey(entry.npcUuid()) : entry.companionKey();
+            selectable.add(key);
+            if (entry.active()) selected.add(key);
+        }
+        if (selected.isEmpty()) return CommandGroupActivationService.NONE_VALUE;
+        if (!selectable.isEmpty() && selected.equals(selectable)) {
+            return CommandGroupActivationService.ALL_VALUE;
+        }
+        for (var group : new CommandGroupService().readGroups(player, stack)) {
+            java.util.Set<String> members = new java.util.HashSet<>();
+            for (LinkedNpcEntry entry : entries) {
+                if (entry == null || !entry.selectionSupported() || !entry.groupIds().contains(group.groupId)) continue;
+                members.add(entry.companionKey() == null || entry.companionKey().isBlank()
+                        ? CommandCompanionGroups.entityKey(entry.npcUuid()) : entry.companionKey());
+            }
+            if (!members.isEmpty() && selected.equals(members)) return group.groupId;
+        }
+        return CommandGroupActivationService.CUSTOM_VALUE;
     }
 
     void applyGroupActivation(Player player,
@@ -57,11 +85,31 @@ final class CommandGroupAssignPageService {
                 || toolInventoryService == null) {
             return;
         }
-        toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> groupActivationService.applySelection(stack, selectorValue)
-        );
+        List<LinkedNpcEntry> entries = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config);
+        boolean all = CommandGroupActivationService.ALL_VALUE.equals(selectorValue);
+        boolean none = CommandGroupActivationService.NONE_VALUE.equals(selectorValue);
+        if (!all && !none && resolveGroupDropdownEntries(player, toolId).stream().noneMatch(g -> g.value().equals(selectorValue))) return;
+        // Resolve authoritative rows before one item write, with no per-animal notification spam.
+        var candidates = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
+        for (var entry : entries) {
+            if (none || !entry.selectionSupported() || !(all || entry.groupIds().contains(selectorValue))) continue;
+            var record = toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, entry.npcUuid());
+            if (record != null) candidates.put(entry.npcUuid(), record);
+        }
+        var records = new CommandLinkedNpcRecordStore();
+        toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            var next = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
+            records.read(stack).forEach(record -> next.put(record.npcUuid, record.withActive(false)));
+            int limit = config.getMaxActive();
+            int selected = 0;
+            for (var record : candidates.values()) {
+                if (limit > 0 && selected >= limit) break;
+                if (record.profileId != null) next.values().removeIf(previous -> record.profileId.equals(previous.profileId));
+                next.put(record.npcUuid, record.withActive(true));
+                selected++;
+            }
+            return records.write(stack, new java.util.ArrayList<>(next.values()));
+        });
     }
 
     void applyGroupAssignment(Player player,
@@ -77,32 +125,16 @@ final class CommandGroupAssignPageService {
         if (panelActionService == null) {
             return;
         }
-        if (groupId != null && !isNpcLinkedToTool(player, toolId, config, npcUuid)) {
-            panelActionService.applyLink(player, toolId, config, npcUuid);
-        }
-        panelActionService.applySetLinkedNpcGroup(player, toolId, config, npcUuid, groupId);
+        applyGroupAssignments(player, toolId, config, npcUuid, groupId == null ? List.of() : List.of(groupId));
     }
 
-    private boolean isNpcLinkedToTool(Player player,
-                                      String toolId,
-                                      TwCommandItemConfig config,
-                                      UUID npcUuid) {
-        if (toolInventoryService == null || npcUuid == null) {
-            return false;
-        }
-        List<LinkedNpcEntry> entries = toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config);
-        if (entries == null || entries.isEmpty()) {
-            return false;
-        }
-        for (LinkedNpcEntry entry : entries) {
-            if (entry == null || entry.npcUuid() == null) {
-                continue;
-            }
-            if (entry.npcUuid().equals(npcUuid)) {
-                return entry.linked();
-            }
-        }
-        return false;
+    void applyGroupAssignments(Player player, String toolId, TwCommandItemConfig config, UUID npcUuid, List<String> groupIds) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config) || player == null || npcUuid == null || groupIds == null) return;
+        var entry = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config).stream()
+                .filter(e -> npcUuid.equals(e.npcUuid()) && e.ownedActions()).findFirst().orElse(null);
+        if (entry == null || toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid) == null) return;
+        CommandCompanionGroups.assign(player, toolInventoryService.findToolStack(player, toolId),
+                entry.companionKey(), npcUuid, groupIds);
     }
 
     private String resolveLanguage(Player player) {

@@ -94,8 +94,24 @@ $C.@PageOverlay {
       TextButton #TameworkLinkedPanelManageGroupsButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.edit; Style: $A.@GroupRow; }
       Group { Anchor: (Top: 5, Left: 5, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/GroupEdit.png", Color: #e7e3d9); HitTestVisible: false; }
      }
-     Group { Anchor: (Top: 36, Left: 4, Right: 4, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Top: 2, Bottom: 4);
+     Group { Anchor: (Top: 36, Left: 4, Right: 4, Bottom: 72); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Top: 2, Bottom: 4);
       Group #TameworkGroupQuickSelectList { Anchor: (Left: 0, Right: 0); LayoutMode: Top; }
+     }
+     Group #CompanionGroupActions {
+      Anchor: (Left: 4, Right: 4, Bottom: 4, Height: 64);
+      LayoutMode: Top;
+      Visible: false;
+      TextButton #CompanionAddGroup {
+       Anchor: (Height: 28);
+       Text: %server.tamework.ui.companions.addGroup;
+       Style: $A.@PanelButton;
+      }
+      Group { Anchor: (Height: 4); }
+      TextButton #CompanionClearSelection {
+       Anchor: (Height: 28);
+       Text: %server.tamework.ui.companions.clearSelection;
+       Style: $A.@PanelButton;
+      }
      }
     }
    }

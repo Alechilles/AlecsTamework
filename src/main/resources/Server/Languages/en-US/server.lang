@@ -1807,3 +1807,25 @@ tamework.commandmenu.lifecycle.nextStage={0} in {1}
 tamework.commands.invalidToggle=Invalid state. Use on, off, or toggle; omit the value to toggle.
 
 tamework.commands.setOwner.componentUnavailable=Owner component is not available.
+
+tamework.ui.companions.title=Companions
+tamework.ui.companions.inWorld=In World
+tamework.ui.companions.stored=Stored
+tamework.ui.companions.lostDead=Lost / Dead
+tamework.ui.companions.all=All
+tamework.ui.companions.nearby=Nearby only
+tamework.ui.companions.highlight=Highlight selected
+tamework.ui.companions.search=Search name, species, or group...
+tamework.ui.companions.addGroup=Add group
+tamework.ui.companions.clearSelection=Clear selection
+tamework.ui.companions.select=Select
+tamework.ui.companions.deselect=Deselect
+tamework.ui.companions.noGroups=No groups
+tamework.ui.companions.groupSummary={0} +{1}
+tamework.ui.companions.count={0} selected · {1} owned
+tamework.ui.companions.unsupported=This command item does not support this companion.
+tamework.command.selection.selected=Selected {0}.
+tamework.command.selection.deselected=Deselected {0}.
+tamework.command.selection.limit=Selection limit reached.
+
+tamework.ui.companions.header = Companions — {0} selected · {1} owned

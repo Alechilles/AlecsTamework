@@ -94,7 +94,8 @@ final class CommandLinkedFlightToggleActionService {
 
         @Override public boolean linked(Ref<EntityStore> npcRef, UUID ownerUuid,
                                         String itemId, Store<EntityStore> store) {
-            return links.isLinkedToTool(npcRef, ownerUuid, itemId, store);
+            return CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                    && ownerUuid.equals(links.resolveOwnerId(npcRef, store));
         }
 
         @Override public NPCEntity npc(Ref<EntityStore> npcRef, Store<EntityStore> store) {

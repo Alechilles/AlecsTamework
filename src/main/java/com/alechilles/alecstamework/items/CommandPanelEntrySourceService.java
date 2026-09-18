@@ -192,7 +192,8 @@ final class CommandPanelEntrySourceService {
                 );
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
-        boolean ownedMode = panelMode == CommandPanelPreferenceService.PanelMode.OwnedMode;
+        boolean ownedMode = config != null && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster();
+        if (ownedMode) CommandCompanionGroups.importLegacy(player, stack);
         if (ownedMode) {
             Map<UUID, LinkedNpcEntry> linkedById = new java.util.HashMap<>();
             for (LinkedNpcEntry entry : linkedEntries) linkedById.put(entry.npcUuid(), entry);
@@ -209,23 +210,23 @@ final class CommandPanelEntrySourceService {
             }
         }
         if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
-            return applyFiltersAndSort(linkedEntries, stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
         }
         if (player == null || store == null) {
-            return applyFiltersAndSort(linkedEntries, stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
         }
         UUID playerUuid = player.getUuid();
         Ref<EntityStore> playerRef = player.getReference();
         if (playerUuid == null || playerRef == null || !playerRef.isValid()) {
-            return applyFiltersAndSort(linkedEntries, stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
         }
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (!ownedMode && playerTransform == null) {
-            return applyFiltersAndSort(linkedEntries, stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
         }
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         if (!Double.isFinite(radius) || radius <= 0.0) {
-            return applyFiltersAndSort(linkedEntries, stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
         }
         double radiusSq = ownedMode ? Double.POSITIVE_INFINITY : radius * radius;
 
@@ -295,7 +296,7 @@ final class CommandPanelEntrySourceService {
                                 npc.getUuid(),
                                 npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
                                 linkedToTool,
-                                true,
+                                !ownedMode,
                                 false,
                                 false,
                                 null,
@@ -311,7 +312,7 @@ final class CommandPanelEntrySourceService {
                 }
             }
         });
-        return applyFiltersAndSort(out, stack);
+        return applyFiltersAndSort(decorate(player, store, stack, config, out), stack);
     }
 
     @Nullable
@@ -391,6 +392,73 @@ final class CommandPanelEntrySourceService {
         }
     }
 
+    @Nullable
+    LinkedNpcRecord ownedSelectionRecord(Player player, ItemStack stack, UUID rowId) {
+        if (player == null || rowId == null || player.getWorld() == null) return null;
+        List<LinkedNpcRecord> records = linkedRecordStore.read(stack);
+        LinkedNpcRecord owned = null;
+        if (ownedRecordSource != null) {
+            if (ownedRecordSource.managedFeatures(player.getUuid(), records).containsKey(rowId)) return null;
+            String profile = ownedRecordSource.profileForRow(player.getUuid(), rowId).map(Object::toString).orElse(null);
+            owned = ownedRecordSource.recordsFor(player.getUuid(), records).stream()
+                    .filter(record -> rowId.equals(record.npcUuid) || profile != null && profile.equals(record.profileId))
+                    .findFirst().orElse(null);
+            if (owned != null && !rowId.equals(owned.npcUuid)) {
+                owned = new LinkedNpcRecord(rowId, owned.profileId, owned.lastKnownPosition, owned.lastKnownWorldName,
+                        owned.homePosition, owned.cachedDisplayName, owned.cachedNameKey, owned.cachedRoleId,
+                        owned.cachedCommandState, owned.active, owned.breedingEnabled, owned.groupId);
+            }
+        }
+        var world = player.getWorld();
+        var ref = world.getEntityRef(rowId);
+        if (ref == null || !ref.isValid()) return owned;
+        var store = world.getEntityStore().getStore();
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(ref, store)
+                || !player.getUuid().equals(linkPolicyService.resolveOwnerId(ref, store))) return null;
+        var npc = store.getComponent(ref, NPCEntity.getComponentType());
+        if (npc == null) return null;
+        var position = store.getComponent(ref, TransformComponent.getComponentType());
+        var links = store.getComponent(ref, com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent.getComponentType());
+        return new LinkedNpcRecord(rowId, owned == null ? null : owned.profileId,
+                position == null ? null : new Vector3d(position.getPosition()),
+                world.getName(), links == null ? null : links.getHomePosition(),
+                npcNameResolver.resolveNpcDisplayNameFromComponents(ref, store),
+                npcNameResolver.resolveNpcNameKey(npc), linkPolicyService.resolveRoleId(npc),
+                owned == null ? null : owned.cachedCommandState, owned != null && owned.active,
+                owned != null && owned.breedingEnabled, owned == null ? null : owned.groupId);
+    }
+
+    private List<LinkedNpcEntry> decorate(Player player, Store<EntityStore> store, ItemStack stack,
+                                         TwCommandItemConfig config, List<LinkedNpcEntry> entries) {
+        if (player == null || config == null || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return entries;
+        var groups = new CommandGroupService().readGroups(player, stack);
+        var profiledKeys = new java.util.HashMap<UUID, String>();
+        for (var record : linkedRecordStore.read(stack)) {
+            if (record.profileId != null) profiledKeys.put(record.npcUuid, CommandCompanionGroups.profileKey(record.profileId));
+        }
+        var world = player.getWorld();
+        var viewer = world == null ? null : world.getEntityRef(player.getUuid());
+        var origin = viewer == null || !viewer.isValid() ? null : store.getComponent(viewer, TransformComponent.getComponentType());
+        double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
+        List<LinkedNpcEntry> decorated = new ArrayList<>(entries.size());
+        for (var entry : entries) {
+            String key = ownedRecordSource == null ? CommandCompanionGroups.entityKey(entry.npcUuid())
+                    : ownedRecordSource.profileForRow(player.getUuid(), entry.npcUuid())
+                    .map(id -> CommandCompanionGroups.profileKey(id.toString()))
+                    .orElse(CommandCompanionGroups.entityKey(entry.npcUuid()));
+            key = profiledKeys.getOrDefault(entry.npcUuid(), key);
+            CommandCompanionGroups.promoteProfile(player, key, entry.npcUuid());
+            var memberships = CommandCompanionGroups.groups(player, key, entry.npcUuid());
+            var tags = groups.stream().filter(g -> memberships.contains(g.groupId))
+                    .map(g -> new LinkedNpcEntry.GroupMembership(g.groupId, g.name, g.colorHex)).toList();
+            var ref = world == null ? null : world.getEntityRef(entry.npcUuid());
+            var position = ref == null || !ref.isValid() ? null : store.getComponent(ref, TransformComponent.getComponentType());
+            boolean nearby = origin != null && position != null && origin.getPosition().distanceSquared(position.getPosition()) <= radius * radius;
+            decorated.add(entry.withCompanionGroups(key, tags, linkPolicyService.isRoleAllowed(entry.speciesId(), config, true)).withNearby(nearby));
+        }
+        return decorated;
+    }
+
     private boolean resolveLinkingRequireOwner() {
         return resolveLinkingRequireOwner(TwGlobalConfig.resolveActive());
     }
@@ -412,7 +480,10 @@ final class CommandPanelEntrySourceService {
             if (entry == null || entry.npcUuid() == null) {
                 continue;
             }
-            if (!matchesContains(entry.displayName(), nameFilter)) {
+            if (nameFilter != null && !matchesContains(entry.displayName(), nameFilter)
+                    && !matchesContains(entry.speciesLabel(), nameFilter)
+                    && !matchesContains(entry.speciesId(), nameFilter)
+                    && !matchesContains(entry.groupName(), nameFilter)) {
                 continue;
             }
             if (!matchesContains(firstNonBlank(entry.speciesLabel(), entry.speciesId()), speciesFilter)) {
@@ -425,7 +496,10 @@ final class CommandPanelEntrySourceService {
         }
         CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
         if (sort == CommandPanelPreferenceService.PanelSort.Default) {
-            return partitionByActive(filtered);
+            filtered.sort(Comparator.comparingInt((LinkedNpcEntry entry) -> entry.active() ? 0 : 1)
+                    .thenComparingInt(entry -> entry.dead() ? 5 : entry.lost() ? 4
+                            : entry.captured() || entry.inCoop() ? 3 : entry.loaded() ? 0 : 1));
+            return filtered;
         }
         Comparator<LinkedNpcEntry> comparator = buildComparator(sort);
         filtered.sort(comparator);
@@ -441,17 +515,17 @@ final class CommandPanelEntrySourceService {
         if (sort == null) {
             return base.thenComparing(byName);
         }
-        // Care sorts prioritize need even when the animal is inactive.
+        // Selected companions remain first for every sort.
         if (sort == CommandPanelPreferenceService.PanelSort.Happiness) {
-            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+            return base.thenComparingDouble((LinkedNpcEntry value) ->
                     careRatio(value.currentHappiness(), value.maxHappiness())).thenComparing(byName);
         }
         if (sort == CommandPanelPreferenceService.PanelSort.Hunger) {
-            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+            return base.thenComparingDouble((LinkedNpcEntry value) ->
                     careRatio(value.currentHunger(), value.maxHunger())).thenComparing(byName);
         }
         if (sort == CommandPanelPreferenceService.PanelSort.Thirst) {
-            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+            return base.thenComparingDouble((LinkedNpcEntry value) ->
                     careRatio(value.currentThirst(), value.maxThirst())).thenComparing(byName);
         }
         if (sort == CommandPanelPreferenceService.PanelSort.Name) {

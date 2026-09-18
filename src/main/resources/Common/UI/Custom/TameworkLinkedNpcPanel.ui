@@ -62,6 +62,39 @@ Group #TameworkLinkedPanelActiveHighlightControls {
           TextButton #TameworkModeOwned { Anchor: (Left: 132, Width: 64, Height: 28); Text: %server.tamework.ui.linkedPanel.mode.owned; Style: $A.@PanelButton; }
         }
 
+        // Generic companion roster tabs stay hidden for the legacy managed and bonded flows.
+        // The command page positions this group beside the shared toolbar when enabled.
+        Group #CompanionModeTabs {
+          Anchor: (Top: 0, Left: 0, Width: 354, Height: 30);
+          LayoutMode: Left;
+          Visible: false;
+          TextButton #CompanionInWorld { Anchor: (Width: 84, Height: 28); Text: %server.tamework.ui.companions.inWorld; Style: $A.@PanelButton; }
+          Group { Anchor: (Width: 4); }
+          TextButton #CompanionStored { Anchor: (Width: 72, Height: 28); Text: %server.tamework.ui.companions.stored; Style: $A.@PanelButton; }
+          Group { Anchor: (Width: 4); }
+          TextButton #CompanionLostDead { Anchor: (Width: 102, Height: 28); Text: %server.tamework.ui.companions.lostDead; Style: $A.@PanelButton; }
+          Group { Anchor: (Width: 4); }
+          TextButton #CompanionAll { Anchor: (Width: 54, Height: 28); Text: %server.tamework.ui.companions.all; Style: $A.@PanelButton; }
+        }
+
+        Group #CompanionNearbyControls {
+          Anchor: (Top: 0, Left: 0, Width: 128, Height: 28);
+          Visible: false;
+          CheckBox #CompanionNearbyCheck {
+            Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
+            Background: (Color: #252c27);
+            OutlineColor: #4a5a50;
+            OutlineSize: 1;
+            Padding: (Full: 4);
+            Style: $C.@DefaultCheckBoxStyle;
+          }
+          Label #CompanionNearbyLabel {
+            Anchor: (Left: 28, Width: 100, Height: 28);
+            Text: %server.tamework.ui.companions.nearby;
+            Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+        }
+
 Group #BondedRosterModeTabs { Anchor: (Top: 0, Left: 0, Width: 284, Height: 30); Visible: false;
     TextButton #BondedRosterAll { Anchor: (Left: 0, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.all; Style: $A.@PanelButton; }
     TextButton #BondedRosterActive { Anchor: (Left: 72, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.active; Style: $A.@PanelButton; }

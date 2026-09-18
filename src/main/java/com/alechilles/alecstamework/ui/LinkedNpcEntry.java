@@ -40,6 +40,29 @@ public final class LinkedNpcEntry {
     private final String deathCauseHint;
     private final String speciesId;
     private final String speciesLabel;
+    private java.util.List<GroupMembership> groups = java.util.List.of();
+    private String companionKey;
+    private boolean selectionSupported = true;
+    private boolean nearby;
+    public boolean nearby() { return nearby; }
+    public LinkedNpcEntry withNearby(boolean value) {
+        LinkedNpcEntry copy = new LinkedNpcEntry(this, ownedActions);
+        copy.nearby = value;
+        return copy;
+    }
+    public record GroupMembership(String id, String name, String color) { }
+    public java.util.List<GroupMembership> groups() { return groups; }
+    public String companionKey() { return companionKey == null ? "e" + npcUuid : companionKey; }
+    public boolean selectionSupported() { return selectionSupported; }
+    public java.util.List<String> groupIds() { return groups.stream().map(GroupMembership::id).toList(); }
+    public LinkedNpcEntry withCompanionGroups(String key, java.util.List<GroupMembership> memberships, boolean supported) {
+        LinkedNpcEntry copy = new LinkedNpcEntry(this, ownedActions);
+        copy.companionKey = key;
+        copy.groups = java.util.List.copyOf(memberships);
+        copy.selectionSupported = supported;
+        return copy;
+    }
+
     private final String groupId;
     private final String groupName;
     private final String groupColorHex;
@@ -648,15 +671,15 @@ public final class LinkedNpcEntry {
     }
 
     public String groupId() {
-        return groupId;
+        return companionKey == null ? groupId : groups.isEmpty() ? null : groups.getFirst().id();
     }
 
     public String groupName() {
-        return groupName;
+        return companionKey == null ? groupName : groups.stream().map(GroupMembership::name).collect(java.util.stream.Collectors.joining(", "));
     }
 
     public String groupColorHex() {
-        return groupColorHex;
+        return companionKey == null ? groupColorHex : groups.isEmpty() ? null : groups.getFirst().color();
     }
 
     public boolean breedingEnabled() {
@@ -1059,6 +1082,10 @@ public final class LinkedNpcEntry {
         this.deathCauseHint = source.deathCauseHint;
         this.speciesId = source.speciesId;
         this.speciesLabel = source.speciesLabel;
+        this.nearby = source.nearby;
+        this.groups = source.groups;
+        this.companionKey = source.companionKey;
+        this.selectionSupported = source.selectionSupported;
         this.groupId = source.groupId;
         this.groupName = source.groupName;
         this.groupColorHex = source.groupColorHex;
@@ -1189,6 +1216,10 @@ public final class LinkedNpcEntry {
                 && Objects.equals(deathCauseHint, other.deathCauseHint)
                 && Objects.equals(speciesId, other.speciesId)
                 && Objects.equals(speciesLabel, other.speciesLabel)
+                && Objects.equals(groups, other.groups)
+                && Objects.equals(companionKey, other.companionKey)
+                && selectionSupported == other.selectionSupported
+                && nearby == other.nearby
                 && Objects.equals(groupId, other.groupId)
                 && Objects.equals(groupName, other.groupName)
                 && Objects.equals(groupColorHex, other.groupColorHex)
@@ -1259,6 +1290,7 @@ public final class LinkedNpcEntry {
                 animalLifecycle
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
+        result = 31 * result + Objects.hash(groups, companionKey, selectionSupported, nearby);
         return result;
     }
 

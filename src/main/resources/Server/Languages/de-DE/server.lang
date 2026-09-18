@@ -1795,3 +1795,25 @@ tamework.commandmenu.lifecycle.nextStage={0} in {1}
 tamework.commands.invalidToggle=Ungültiger Zustand. Verwende on, off oder toggle; ohne Wert wird umgeschaltet.
 
 tamework.commands.setOwner.componentUnavailable=Die Besitzerkomponente ist nicht verfügbar.
+
+tamework.ui.companions.title=Gefährten
+tamework.ui.companions.inWorld=In der Welt
+tamework.ui.companions.stored=Gelagert
+tamework.ui.companions.lostDead=Verloren / Tot
+tamework.ui.companions.all=Alle
+tamework.ui.companions.nearby=Nur in der Nähe
+tamework.ui.companions.highlight=Ausgewählte hervorheben
+tamework.ui.companions.search=Name, Spezies oder Gruppe suchen...
+tamework.ui.companions.addGroup=Gruppe hinzufügen
+tamework.ui.companions.clearSelection=Auswahl löschen
+tamework.ui.companions.select=Auswählen
+tamework.ui.companions.deselect=Auswahl aufheben
+tamework.ui.companions.noGroups=Keine Gruppen
+tamework.ui.companions.groupSummary={0} +{1}
+tamework.ui.companions.count={0} ausgewählt · {1} insgesamt
+tamework.ui.companions.unsupported=Dieser Befehlsgegenstand unterstützt diesen Gefährten nicht.
+tamework.command.selection.selected=Ausgewählt: {0}.
+tamework.command.selection.deselected=Auswahl aufgehoben: {0}.
+tamework.command.selection.limit=Auswahllimit erreicht.
+
+tamework.ui.companions.header = Begleiter — {0} ausgewählt · {1} im Besitz

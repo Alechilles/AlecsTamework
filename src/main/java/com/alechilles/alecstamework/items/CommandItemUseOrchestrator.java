@@ -212,18 +212,9 @@ final class CommandItemUseOrchestrator {
             use.replaceWorkingItem(link.updatedItem);
         }
         use.flushHeldItem();
-        if (link.linked && !link.active) {
-            feedbackService.showSuccessKey(
-                    use.player, "tamework.ui.notifications.command.link.successInactive", link.npcName);
-            return;
-        }
-        feedbackService.showSuccessKey(
-                use.player,
-                link.linked
-                        ? "tamework.ui.notifications.command.link.success"
-                        : "tamework.ui.notifications.command.link.unlinked",
-                link.npcName
-        );
+        feedbackService.showSuccessKey(use.player, link.active
+                ? "tamework.command.selection.selected"
+                : "tamework.command.selection.deselected", link.npcName);
     }
 
     private boolean executeCommand(CommandPreparedUse use,
@@ -450,7 +441,8 @@ final class CommandItemUseOrchestrator {
     }
 
     private boolean usesGenericLinkedRecords(TwCommandItemConfig config) {
-        return config != null && !config.usesBondedCompanionRoster();
+        return config != null
+                && config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata;
     }
 
     @FunctionalInterface
