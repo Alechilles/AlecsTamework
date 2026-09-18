@@ -6,6 +6,9 @@
   transparent pause icon centered over the bar, with equal-width strokes.
 - Coordinate copy buttons sit immediately left of the coordinates, and opening
   the selectable field keeps its hint directly below it.
+- Startup recovery defers death and ownership-release operations blocked by an
+  unfinished population admission, preserving their records instead of preventing
+  the entire world from starting.
 
 - Flat UI symbols now use white textures with explicit display tints. Shaded
   artwork and symbols with contrasting internal details retain their original textures.

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
+import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -14,7 +16,12 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -62,6 +69,14 @@ class SqlitePublicPersistenceAdapterTest {
             OperationId.parse("40000000-0000-0000-0000-000000000002");
     private static final OperationId BLOCKED_OPERATION =
             OperationId.parse("40000000-0000-0000-0000-000000000005");
+    private static final OperationId DORMANT_OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000006");
+    private static final OperationId OWNER_RELEASE_OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000007");
+    private static final NpcAlias DOMAIN_ALIAS =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000002");
+    private static final OwnerId MISMATCH_OWNER =
+            OwnerId.parse("10000000-0000-0000-0000-000000000003");
     private final java.util.concurrent.atomic.AtomicLong domainClock =
             new java.util.concurrent.atomic.AtomicLong(-100);
 
@@ -333,6 +348,134 @@ class SqlitePublicPersistenceAdapterTest {
     }
 
     @Test
+    void defersPendingPopulationDomainOwnerReleaseWithoutBlockingRecovery()
+            throws Exception {
+        SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
+        seedActiveDomainProfile();
+        preparePendingDomainAdmission(adapter);
+
+        OperationWorkflowResult initial = adapter.ownerPopulationOperations().submit(
+                OWNER_RELEASE_OPERATION,
+                new IdempotencyKey("recover-owner-pending-domain"),
+                new OwnerPopulationTransitionRequest(
+                        DOMAIN_PROFILE,
+                        LifecycleRevision.INITIAL,
+                        DOMAIN_OWNER,
+                        "world",
+                        null,
+                        null,
+                        0,
+                        0,
+                        -200
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED, initial.status());
+        prepareProfile(adapter);
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                boundaries(), "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, recovered.status());
+        assertEquals(OperationPhase.PREPARED, operationPhase(adapter, OWNER_RELEASE_OPERATION));
+        assertInstanceOf(PersistenceReadResult.Found.class, adapter.profileReader()
+                .findByProfile(PROFILE).toCompletableFuture().get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void defersPendingPopulationDomainDormantWithoutBlockingRecovery()
+            throws Exception {
+        SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
+        seedActiveDomainProfile();
+        preparePendingDomainAdmission(adapter);
+
+        String snapshotJson = "{\"health\":0}";
+        OperationWorkflowResult initial = adapter.dormantOperations().submit(
+                DORMANT_OPERATION,
+                new IdempotencyKey("recover-dormant-pending-domain"),
+                new CompanionDormantTransitionRequest(
+                        DOMAIN_PROFILE,
+                        LifecycleRevision.INITIAL,
+                        new CompanionSnapshot(
+                                SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
+                                DOMAIN_PROFILE,
+                                DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind(),
+                                1,
+                                snapshotJson,
+                                Sha256Hash.ofUtf8(snapshotJson),
+                                LifecycleRevision.INITIAL,
+                                true,
+                                -200
+                        ),
+                        new DormantSourceEvidence(
+                                DOMAIN_ALIAS,
+                                "world",
+                                DormantSourceEvidence.Kind.DEATH_COMPONENT,
+                                ReconciliationGeneration.INITIAL,
+                                "recover-dormant-pending-domain",
+                                -200
+                        ),
+                        -200
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED, initial.status());
+        prepareProfile(adapter);
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                boundaries(), "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, recovered.status());
+        assertEquals(OperationPhase.PREPARED, operationPhase(adapter, DORMANT_OPERATION));
+        assertInstanceOf(PersistenceReadResult.Found.class, adapter.profileReader()
+                .findByProfile(PROFILE).toCompletableFuture().get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void doesNotDeferOwnerPopulationSourceMismatch() throws Exception {
+        SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
+        seedActiveDomainProfile();
+        OwnerPopulationTransitionRequest release =
+                new OwnerPopulationTransitionRequest(
+                        DOMAIN_PROFILE,
+                        LifecycleRevision.INITIAL,
+                        MISMATCH_OWNER,
+                        "world",
+                        null,
+                        null,
+                        0,
+                        0,
+                        -200
+                );
+        committed(adapter.publicOperations().engine().prepare(
+                OwnerPopulationTransitionDefinition.INSTANCE,
+                new OperationRequest<>(
+                        OWNER_RELEASE_OPERATION,
+                        new IdempotencyKey("recover-owner-source-mismatch"),
+                        release,
+                        SqliteOwnerPopulationTransitionOperations.FEATURE_SCOPE,
+                        LifecycleRevision.INITIAL,
+                        List.of(
+                                OperationScope.profile(DOMAIN_PROFILE),
+                                OperationScope.owner(MISMATCH_OWNER)
+                        ),
+                        -200
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                boundaries(), "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                SqlitePublicRecoveryResult.Status.DISPATCH_FAILED,
+                recovered.status()
+        );
+        assertEquals("owner_population_source_mismatch", recovered.failure().getMessage());
+        assertEquals(OperationPhase.PREPARED, operationPhase(adapter, OWNER_RELEASE_OPERATION));
+    }
+
+    @Test
     void startupReconciliationUsesSharedProtocolBeforePublicAdmission()
             throws Exception {
         connections = new SqliteConnectionFactory(
@@ -502,6 +645,12 @@ class SqlitePublicPersistenceAdapterTest {
     }
 
     private PopulationDomainAdmissionOperation.Payload domainPayload() {
+        return domainPayload(List.of());
+    }
+
+    private PopulationDomainAdmissionOperation.Payload domainPayload(
+            List<PopulationDomainAdmissionOperation.DomainInput> domains
+    ) {
         return new PopulationDomainAdmissionOperation.Payload(
                 UUID.fromString("40000000-0000-0000-0000-000000000003"),
                 DOMAIN_PROFILE,
@@ -520,10 +669,77 @@ class SqlitePublicPersistenceAdapterTest {
                 1,
                 -50,
                 1,
-                List.of(),
+                domains,
                 List.of(),
                 -100
         );
+    }
+
+    private void preparePendingDomainAdmission(
+            SqlitePublicPersistenceAdapter adapter
+    ) throws Exception {
+        committed(adapter.populationDomainAdmissionOperations().prepare(
+                DOMAIN_OPERATION,
+                new IdempotencyKey("recover-pending-domain"),
+                domainPayload(List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                        "recovery-domain",
+                        PopulationDomainScope.GLOBAL,
+                        null,
+                        1,
+                        1,
+                        1,
+                        12,
+                        6,
+                        1
+                )))
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+        assertEquals(OperationPhase.LIVE_APPLYING,
+                adapter.populationDomainAdmissionOperations().claim(DOMAIN_OPERATION)
+                        .toCompletableFuture().get(10, TimeUnit.SECONDS).phase());
+    }
+
+    private void seedActiveDomainProfile() throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertTrue(transaction.identities().createProfile(identity(DOMAIN_PROFILE)).applied());
+            assertTrue(transaction.lifecycles().create(new CompanionLifecycle(
+                    DOMAIN_PROFILE,
+                    DOMAIN_OWNER,
+                    LifecycleState.ACTIVE,
+                    LifecycleLocation.liveEntity(DOMAIN_ALIAS.toString(), "world"),
+                    LifecycleRevision.INITIAL,
+                    null,
+                    -300,
+                    ReconciliationGeneration.INITIAL,
+                    null,
+                    "world"
+            )).applied());
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO companion_alias(
+                        npc_uuid, profile_id, alias_generation, alias_state,
+                        lease_operation_id, mapped_at_ms, retired_at_ms
+                    ) VALUES (?, ?, 0, 'CURRENT', NULL, ?, NULL)
+                    """)) {
+                statement.setString(1, DOMAIN_ALIAS.toString());
+                statement.setString(2, DOMAIN_PROFILE.toString());
+                statement.setLong(3, -300);
+                statement.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
+    private OperationPhase operationPhase(
+            SqlitePublicPersistenceAdapter adapter,
+            OperationId operationId
+    ) throws Exception {
+        PersistenceReadResult.Found<SqliteOperationReader.OperationReadModel> found =
+                assertInstanceOf(PersistenceReadResult.Found.class,
+                        adapter.operationReader().find(operationId).toCompletableFuture()
+                                .get(10, TimeUnit.SECONDS));
+        return found.value().operation().phase();
     }
 
     private void assertActiveQuarantine(

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -304,6 +306,16 @@ final class SqlitePublicRecoveryDispatcher {
                     claim
             );
         }
+        if (isPopulationDependencyDeferred(claim, result)) {
+            // The canonical mutation rolled back. Leave it PREPARED while recovery
+            // settles the admission that owns the conflicting reservation.
+            return deferClaim(
+                    claims,
+                    index,
+                    context,
+                    claim
+            );
+        }
         if (result.status() != OperationWorkflowResult.Status.PUBLISHED
                 && result.status()
                 != OperationWorkflowResult.Status.COMPENSATED) {
@@ -321,6 +333,23 @@ final class SqlitePublicRecoveryDispatcher {
                 index + 1,
                 context.completedOne()
         );
+    }
+
+    private boolean isPopulationDependencyDeferred(
+            OperationRecoveryClaim claim,
+            OperationWorkflowResult result
+    ) {
+        if (result.status()
+                != OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED) {
+            return false;
+        }
+        String code = result.failure() == null ? null : result.failure().getMessage();
+        return CompanionDormantTransitionDefinition.KIND.equals(
+                claim.operation().kind()
+        ) && "dormant_population_domain_pending_conflict".equals(code)
+                || OwnerPopulationTransitionDefinition.KIND.equals(
+                claim.operation().kind()
+        ) && "owner_population_domain_claim_pending".equals(code);
     }
 
     private CompletionStage<SqlitePublicRecoveryResult> deferClaim(
