@@ -158,7 +158,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
-        bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured());
+        bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
@@ -295,9 +295,9 @@ final class LinkedNpcPanelCardBinder {
                 showActiveToggleActive || showActiveToggleInactive, showInlineLocation);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
                 lifecycleDisplay.visible() || entry.hasKnownCooldowns());
-        commandBuilder.set(entrySelector + " #LifecycleProgress #Paused.Visible", entry.captured() || lifecycle.frozen());
-        commandBuilder.set(entrySelector + " #BreedingCooldown #Paused.Visible", entry.captured());
-        commandBuilder.set(entrySelector + " #HarvestCooldown #Paused.Visible", entry.captured());
+        commandBuilder.set(entrySelector + " #LifecycleProgress #Paused.Visible", entry.captured() || entry.dead() || lifecycle.frozen());
+        commandBuilder.set(entrySelector + " #BreedingCooldown #Paused.Visible", entry.captured() || entry.dead());
+        commandBuilder.set(entrySelector + " #HarvestCooldown #Paused.Visible", entry.captured() || entry.dead());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
 
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
@@ -711,22 +711,22 @@ final class LinkedNpcPanelCardBinder {
 
     private static void bindLifecycleProgress(UICommandBuilder commands, String card,
                                               LinkedNpcEntry.AnimalLifecycle lifecycle,
-                                              LifecycleDisplay display, String language, boolean captured) {
+                                              LifecycleDisplay display, String language, boolean muted) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
-        String color = captured ? "#727772" : lifecycleColor(lifecycle);
+        String color = muted ? "#727772" : lifecycleColor(lifecycle);
         commands.setObject(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle).setColor(Value.of(color)));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
                 : "");
         commands.set(selector + " #CooldownText.Text", display.countdownText());
         commands.set(selector + " #CooldownLabel.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
-                captured ? "CooldownTextMuted" : lifecycle.prime() ? "LifecyclePrimeLabel"
+                muted ? "CooldownTextMuted" : lifecycle.prime() ? "LifecyclePrimeLabel"
                         : "Senior".equalsIgnoreCase(lifecycle.stage())
                         ? "LifecycleSeniorLabel" : "LifecycleAdultLabel"));
         commands.set(selector + " #LifecycleProgressTooltip.TooltipText", display.yieldTooltip());
         commands.set(selector + " #CooldownText.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
-                captured ? "CooldownTextMuted" : "CooldownTextNormal"));
+                muted ? "CooldownTextMuted" : "CooldownTextNormal"));
         commands.set(selector + " #MeterFill.Background", color);
         commands.setObject(selector + " #MeterFill.Anchor",
                 LinkedNpcPanelStatusMeter.buildFillAnchor(lifecycle.stageProgress()));

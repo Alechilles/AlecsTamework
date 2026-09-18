@@ -53,7 +53,7 @@ final class LinkedNpcPanelVitalsBinder {
                 entry.breedingCooldownRemainingMs() < 0 ? 0 : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1, 156));
         commands.setObject("#HarvestCooldown #MeterFill.Anchor", hudFill(
                 entry.harvestCooldownRemainingMs() < 0 ? 0 : entry.harvestCooldownActive() ? entry.harvestCooldownRatio() : 1, 156));
-        boolean breedingMuted = !entry.loaded() || !entry.breedingEnabled()
+        boolean breedingMuted = entry.captured() || entry.dead() || !entry.breedingEnabled()
                 || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
         commands.set("#BreedingCooldown #CooldownText.Style", Value.ref("TameworkCommandTargetHud.ui",
                 breedingMuted ? "CooldownMuted" : "CooldownValue"));
@@ -356,7 +356,7 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static void bindBreedingCooldownMeter(UICommandBuilder commands, String card,
                                                   LinkedNpcEntry entry, String language) {
-        boolean muted = !entry.loaded() || !entry.breedingEnabled()
+        boolean muted = entry.captured() || entry.dead() || !entry.breedingEnabled()
                 || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
         bindCooldownMeter(commands, card + " #BreedingCooldown",
                 !entry.lost() && entry.breedingCooldownKnown(), (entry.loaded() || entry.breedingEnabled()) && entry.breedingCooldownActive(),
@@ -383,10 +383,10 @@ final class LinkedNpcPanelVitalsBinder {
                 entry.harvestCooldownRatio(), entry.harvestCooldownRemainingMs(),
                 LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready"),
                 LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language),
-                "#HarvestCooldownTooltip", !entry.loaded(), "#cbbb88", language, entry);
+                "#HarvestCooldownTooltip", entry.captured() || entry.dead(), "#cbbb88", language, entry);
         commands.setObject(card + " #HarvestCooldownIconImage.Background",
                 new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Harvest_Cooldown.png"))
-                        .setColor(Value.of(entry.loaded() ? "#cbbb88" : MUTED_FILL_COLOR)));
+                        .setColor(Value.of(entry.captured() || entry.dead() ? MUTED_FILL_COLOR : "#cbbb88")));
     }
 
     private static void bindCooldownMeter(UICommandBuilder commands, String slot, boolean visible,
