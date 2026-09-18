@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.items.ImportedRecallRecoverySink;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonValue;
 
 /** Applies canonical and source-location fences to full-state Recall. */
 public final class ExactCheckpointRecallRecoveryAuthor {
@@ -45,7 +46,11 @@ public final class ExactCheckpointRecallRecoveryAuthor {
             ImportedRecallRecoverySink.RecallFailure failure
     ) {
         LifecycleState state = profile.lifecycle().state();
-        return alias != null
+        BsonValue components = checkpoint.holder().get("Components");
+        // A pending death transition must not let Recall reinsert a dead body.
+        return (components == null || (components.isDocument()
+                && !components.asDocument().containsKey("Death")))
+                && alias != null
                 && alias.state() == CompanionAlias.State.CURRENT
                 && alias.alias().value().equals(failure.npcUuid())
                 && alias.profileId().equals(checkpoint.profileId())

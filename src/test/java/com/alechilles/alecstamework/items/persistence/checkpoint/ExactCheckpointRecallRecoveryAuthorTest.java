@@ -75,6 +75,17 @@ class ExactCheckpointRecallRecoveryAuthorTest {
         ));
     }
 
+    @Test
+    void rejectsSavedDeathEvenWhenCanonicalLifecycleIsStillActive() {
+        assertNull(author.author(
+                profile(new LifecycleRevision(9)),
+                checkpoint(new LifecycleRevision(9), BsonDocument.parse(
+                        "{\"Components\":{\"Death\":{\"DeathCause\":\"Physical\"}}}"
+                )),
+                failure(Set.of())
+        ));
+    }
+
     private CompanionProfileReadModel profile(LifecycleRevision revision) {
         CompanionIdentity identity = new CompanionIdentity(
                 PROFILE, "Cat", "Cat_Pet", null, null,
@@ -106,6 +117,12 @@ class ExactCheckpointRecallRecoveryAuthorTest {
     private CompanionEntityCheckpoint checkpoint(
             LifecycleRevision revision
     ) {
+        return checkpoint(revision, BsonDocument.parse("{\"Model\":{\"Scale\":0.8}}"));
+    }
+
+    private CompanionEntityCheckpoint checkpoint(
+            LifecycleRevision revision, BsonDocument holder
+    ) {
         return CompanionEntityCheckpoint.create(
                 PROFILE,
                 ALIAS,
@@ -119,7 +136,7 @@ class ExactCheckpointRecallRecoveryAuthorTest {
                 64,
                 CompanionEntityCheckpoint.CaptureBoundary.UNLOAD,
                 -7_000,
-                BsonDocument.parse("{\"Model\":{\"Scale\":0.8}}"),
+                holder,
                 CODEC
         );
     }
