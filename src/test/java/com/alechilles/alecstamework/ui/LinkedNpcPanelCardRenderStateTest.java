@@ -157,6 +157,17 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(commands, card + " #InlineLocation #CopyButton.Visible", true);
         assertVisible(commands, card + " #LocateButton.Visible", false);
         assertVisible(commands, card + " #LifecycleProgress #Paused.Visible", true);
+
+        // Capture may clear ownership; restricting actions must not replace the ordinary card layout.
+        UICommandBuilder readOnly = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(readOnly, new UIEventBuilder(), 0, animal.withOwnedActions(), false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US",
+                CommandPanelFeaturePresentation.readOnlyManaged());
+        assertEquals(anchor(commands, card + ".Anchor"), anchor(readOnly, card + ".Anchor"));
+        assertVisible(readOnly, card + " #InlineLocation.Visible", true);
+        assertVisible(readOnly, card + " #InlineLocation #CopyButton.Visible", true);
+        assertVisible(readOnly, card + " #RemoveButton.Visible", false);
+        assertVisible(readOnly, card + " #ActiveToggleInactiveButton.Visible", false);
     }
 
     private static org.bson.BsonDocument anchor(UICommandBuilder commands, String selector) {
