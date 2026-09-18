@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Reworked ordinary command flutes around one owned-companion panel. Owned animals
+  appear automatically, each flute keeps its own selected set, and the
+  panel separates In World, Stored, Lost / Dead, and All views with selected rows
+  first. Nearby-only filtering and one name/species/group search keep browsing
+  independent from command recipients. Player-owned groups are shared across
+  compatible flutes, support multiple memberships, and can be edited inline.
+
 - Recall no longer restores a dead saved body while its death transition is pending.
 - Captured age meters now gray out consistently, and paused meters show a larger
   transparent pause icon centered over the bar, with equal-width strokes.

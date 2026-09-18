@@ -8,7 +8,10 @@ draft: false
 
 Parent: [Companion Controls](/mod/alecs-tamework/companion-controls) | [Player Guides](/mod/alecs-tamework/player-guides)
 
-The linked panel is the side panel that appears with Tamework command tools. It is the main place for inspecting and managing individual companions.
+The linked panel is the side panel that appears with Tamework command tools. For
+ordinary flutes it is an owned-companion panel: every owned companion appears
+automatically, while each flute remembers which companions are selected for commands.
+The page keeps the historic name because existing links and guides use **Linked Panel**.
 
 ![Tamework UI Showcase](https://wiki.hytalemodding.dev/storage/mods/019d3092-1857-713f-86a6-60f15c4e0a9e/files/9d39db03-a1d0-4805-8ded-d1a84d8278e8.jpg)
 
@@ -17,7 +20,7 @@ Use **? Help** at the top of the command menu to open the **Companion Guide**.
 Choose a topic on the left to learn about cards, commands and groups, care,
 breeding, traits and talents, capture and coops, finding and recovery, bonded
 companions, travel and flight, or world utilities. The guide also covers taming,
-ownership, linking, and naming for new players.
+ownership, selection, and naming for new players.
 
 Example cards use the same controls as your animals' cards, with made-up names
 and numbers. Hover over their bars and icons for help. Use the example's
@@ -26,8 +29,9 @@ commands or change your companions. Features and controls depend on the animal p
 server settings. Use the guide's Back or close button to return to the existing
 panel without changing its filters or selection.
 
-- Linked companions for the current tool
-- Active and inactive status
+- Every owned companion in the current panel, including animals not yet selected on
+  that flute. Unsupported roles remain visible with their restriction explained.
+- Selected and unselected status, with selected companions listed first
 - Loaded, unloaded, captured, housed in a coop, roster-stored,
   provisioned-dormant, dead, or `LOST` state
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
@@ -87,21 +91,28 @@ link is not required. Normal talent requirements still apply.
 Ordinary unloaded companions must load before you can spend their points. Older
 records without a complete saved talent snapshot cannot use offline spending.
 
-## Panel modes
-- `LinkedMode` shows companions linked to the current tool.
-- `NearbyMode` shows nearby eligible companions, usually for quick local management.
-- `OwnedMode` shows all your owned animals, including saved animals in unloaded chunks
-  and other worlds, regardless of item links or the current tool's species filter.
-  It has no radius limit. Unlinked animals that are off-screen show their saved
-  status. Use their removal controls and choose **Release** to permanently clear
-  ownership and free ownership-limit slots, even in another world or unloaded chunk.
-  Captured animals and coop occupants must be released from storage first.
-  Managed roster companions use their roster's removal controls.
-  Animals awaiting recovery stay protected, but do not prevent releasing your other animals.
-  Linking and culling require the animal to be loaded in your world. Recall,
-  Locate, and Revive/Recover do not require an item link in Owned mode; the animal's
-  state, cooldowns, and recovery rules still apply. Home and link settings require a link.
-  Bonded-companion tools keep their separate roster controls.
+## Companion tabs and selection
+
+Ordinary flutes show one owned-companion list with these status tabs:
+
+- **In World**: living companions that are not captured or housed in a coop
+- **Stored**: captured or cooped companions
+- **Lost / Dead**: companions in either recovery state
+- **All**: every owned companion
+
+Selected companions appear before unselected companions in every tab. The selected
+state belongs to the physical flute, so two flutes can keep different working sets.
+Left-clicking an owned NPC while holding the flute toggles its selection, and the
+selection button on its card does the same. Role, tame, ownership, and per-item
+selection limits still apply. A specialized flute can show an owned companion while
+explaining that its command set does not support that companion.
+
+Use **Nearby only** to narrow the current tab without changing selection. The search
+field matches the companion name, species, or group as one literal search. Tabs,
+nearby filtering, search, and sorting only change what is visible; they never change
+which companions receive commands.
+
+The separate bonded-companion panel keeps its own roster states and controls.
 
 ## Finding captured animals
 
@@ -138,18 +149,22 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
 
 ## Sorting and filtering
 - Sort modes include default order, name, species, group, happiness, hunger, and thirst.
-- Care sorts show the lowest percentage first, including inactive companions. Unknown
+  Selected companions remain first for every sort.
+- Care sorts show the lowest percentage first within the selected and unselected sections. Unknown
   values sort last. Unloaded companions use their last-known saved values.
-- Filter modes can include none, name, species, or group.
-- Some tools let you type filter text while the panel is open.
+- The ordinary companion panel has a single literal search field for name, species,
+  and group. Some legacy tools still expose separate filter modes.
 
-## Active vs inactive
-- Active companions stay part of normal bulk command dispatch.
-- Inactive companions remain linked to the tool but are excluded from bulk commands.
-- Inactive rows can still appear in the panel so you can manage them individually.
-- The group selector can quickly set all linked companions active, set all inactive, or activate one group while deactivating the rest.
-- Generic linked panels include a `Highlight Active` setting. It starts off.
-  When enabled, loaded active companions show an indicator above their heads
+## Selected vs unselected
+- Selected companions stay part of normal bulk command dispatch.
+- Unselected companions remain owned and visible but are excluded from bulk commands
+  on that flute.
+- Unselected rows can still appear in the panel so you can manage them individually.
+- The group sidebar can quickly select all companions, clear the current flute's
+  selection, or select one group's members. Group selection is a one-time operation;
+  individual toggles can adjust it afterward.
+- Generic companion panels include a `Highlight selected` setting. It starts off.
+  When enabled, loaded selected companions show an indicator above their heads
   while you hold that command tool. Only you see the indicator. Its color matches
   each companion's group; ungrouped companions use neutral gold. The indicator
   is hidden while someone rides the companion and returns after dismount.
@@ -158,12 +173,11 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
 - `Recall`
 - `Set Home`
 - `Return Home`
-- `Unlink`
 - `Revive`, a restoration action for dead or `LOST` companions when the
   companion policy and death cooldown allow it. Roster-backed companions can
   show a confirmation with exact item costs; legacy item-linked flows may be
   free.
-- The red X opens `Release` and `Unlink` in Linked, Nearby, and Owned modes. `Cull` also appears for loaded, living animals. Unlink is dimmed when the animal has no item link.
+- The red X opens `Release` in the generic companion tabs. `Cull` also appears for loaded, living animals. Use the selection toggle to leave an animal out of commands without releasing it.
 - `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Loaded animals are removed immediately. Captured animals and coop occupants must leave storage first.
 - Action buttons share normal and hovered frames. Flight, shoulder, and breeding icons show the current mode.
 
@@ -185,11 +199,14 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   companion is off-screen, absent, or took too long to recall.
 
 ## Group tools
-- Some tools support assigning a companion to a group.
-- Group tabs and a group manager let you create, rename, recolor, or delete groups.
-- Group sorting and filtering are especially useful when one tool manages many companions.
-- These groups organize the command UI. They do not change companion storage
-  or owner limits.
+- Groups are shared by the player's ordinary compatible flutes.
+- A companion can belong to multiple groups or none. Use the card's native multi-select
+  group dropdown to toggle memberships inline; it does not open another page.
+- The group manager lets you create, rename, recolor, or delete groups. **Add group**
+  opens creation, and **Clear selection** affects only the current flute's recipients.
+- Clicking a group selects its members for the current flute without removing any
+  other group memberships.
+- Groups organize the command UI. They do not change companion storage or owner limits.
 
 ## Practical tips
 - If a companion is dead or `LOST`, use `Revive` when it becomes available
@@ -199,7 +216,7 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   trying again. An expired countdown is not proof that the companion is lost.
 - If a row says `Captured` or `In Coop`, use the matching filled-item or coop
   release interaction.
-- If the row stays inactive, check whether you intentionally toggled it off for bulk commands.
+- If the row stays unselected, check whether you intentionally toggled it off for bulk commands.
 - If nearby actions appear only sometimes, move closer and confirm the creature is loaded and owned by you.
 
 ## Related Pages

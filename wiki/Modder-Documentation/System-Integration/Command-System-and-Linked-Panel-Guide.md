@@ -14,8 +14,8 @@ This guide covers how to ship a command tool successfully. Use it for wiring and
 1. Create a `TwCommandItemConfig` in `Server/Tamework/Items/Commands/`.
 2. Bind your item with `TameworkCommand`.
 3. Decide how recipients are selected:
-   - link-based only
-   - owner-scope
+   - ordinary `ItemMetadata` owned-companion selection (the default flute UX)
+   - owner-scope for a command-family roster
    - master-target only
    - linked plus master-target
 4. Author the command list and its steps.
@@ -46,9 +46,12 @@ Practical rule:
 - keep secondary for radial selection unless your item’s UX demands something else
 
 ## Recipient Strategy
-Choose `MembershipMode` based on how much persistence you want:
-- `LinkedOnly`: best for curated companion rosters
-- `OwnerScope`: best for “command all my nearby pets” tools
+Choose `RosterStorage` and `MembershipMode` together:
+- ordinary `ItemMetadata` flutes discover all owned companions and use
+  per-item active records as the command selection; their panel selection is
+  independent of shared player groups
+- `LinkedOnly`: best for legacy curated companion rosters
+- `OwnerScope`: best for “command all my nearby pets” tools or a durable command family
 - `MasterTarget`: best for one-target tactical tools
 - `LinkedOrMasterTarget`: best when you want a persistent roster plus a one-off targeted override
 
@@ -59,7 +62,7 @@ Then tighten the target set with:
 - `Radius`
 - `RequireLineOfSight`
 
-If `RequireOwner` is omitted, command linking/recipient ownership checks fall back to `TwGlobalConfig.OwnershipRequirements.LinkingRequiresOwner`.
+If `RequireOwner` is omitted, recipient ownership checks fall back to `TwGlobalConfig.OwnershipRequirements.LinkingRequiresOwner`.
 
 ## Authoring Commands
 Keep each command focused on one gameplay intent:
@@ -92,13 +95,17 @@ Config-driven:
 - item cooldown and selection rules
 
 Runtime-driven:
-- linked row status such as active, unloaded, captured, cooped, roster-stored,
+- owned row status such as selected, unselected, unloaded, captured, cooped, roster-stored,
   provisioned-dormant, dead, or Lost
 - per-row actions such as recall, set home, return home, unlink, revive, release, or cull
-- group assignment and sorting/filter state
+- group membership, selection state, status tabs, nearby filter, and search/sort state
 - current health, cooldown, breeding, and trait indicators
 
-This boundary matters because not every linked-panel action is authored inside `TwCommandItemConfig`. Some actions depend on runtime state plus effective companion policy.
+This boundary matters because not every companion-panel action is authored inside
+`TwCommandItemConfig`. Ordinary `ItemMetadata` ownership discovery, per-item selection,
+shared player groups, multi-membership edits, and status/search presentation are runtime
+concerns. The held item's role and command options still decide whether a selected row
+can receive a particular command.
 
 ## Role and Runtime Prerequisites
 Confirm the target role or template includes the pieces needed by your commands:
@@ -127,12 +134,18 @@ Put shared infrastructure in [TwGlobalConfig Reference](/mod/alecs-tamework/twgl
 - unlink confirm in the linked panel
 
 ## Testing Checklist
-1. Link and unlink a companion.
-2. Open the radial and verify default command selection.
-3. Run each authored command while the NPC is loaded.
-4. Test recall or return-home with the NPC unloaded.
-5. Test dead or lost states if revive or recovery matters for the species.
-6. Confirm role filters and target caps behave as expected.
+1. For an ordinary `ItemMetadata` flute, confirm a newly owned compatible companion
+   appears without a link operation.
+2. Toggle one NPC's selection with the held flute and from its panel card; confirm
+   another flute keeps its own selection.
+3. Create a player group, assign one companion to several groups through the inline
+   multi-select dropdown, and confirm clicking a group selects its members without
+   removing other memberships.
+4. Open the radial and verify default command selection.
+5. Run each authored command while the NPC is loaded.
+6. Test recall or return-home with the NPC unloaded.
+7. Test dead or lost states if revive or recovery matters for the species.
+8. Confirm role filters, unsupported-command messaging, and target caps behave as expected.
 
 ## Related Pages
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
