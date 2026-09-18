@@ -36,6 +36,37 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final UUID CARD = UUID.fromString("a2000000-0000-0000-0000-000000000001");
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
+    /** Multi-group checks save immediately without rebuilding the mounted native popup. */
+    @Test
+    void companionGroupEditsUpdateCaptionWithoutResettingTheDropdown() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(ENTRY.withOwnedActions()
+                .withCompanionGroups("profile", List.of(), true));
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> List.of(row.get()));
+        page.configureCompanions(new CompanionPanelBinding(() -> "All", ignored -> {}, () -> false, ignored -> {},
+                (id, memberships) -> row.set(row.get().withCompanionGroups("profile", memberships.stream()
+                        .map(group -> new LinkedNpcEntry.GroupMembership(group, group, "#445566")).toList(), true))));
+        build(page);
+        CommandSelectionEventData data = new CommandSelectionEventData();
+        data.commandId = CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + CARD;
+        data.companionGroups = new String[]{"Barn", "Travel"};
+        page.handleDataEvent(null, null, data);
+        refresh(page, true);
+        assertEquals(List.of("Barn", "Travel"), row.get().groupIds());
+        assertTrue(packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                .anyMatch(command -> command.selector.endsWith("#GroupSelectorLabel.Text") && command.data.contains("Barn +1")),
+                () -> packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                        .filter(command -> command.selector.endsWith("#GroupSelectorLabel.Text"))
+                        .map(command -> command.selector + "=" + command.data).toList().toString());
+        assertFalse(packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                .anyMatch(command -> command.selector.endsWith("#GroupSelector.SelectedValues")
+                        || command.selector.endsWith("#GroupSelector.Entries")
+                        || command.selector.equals("#TameworkLinkedPanelList")),
+                "Saving a check must leave the mounted dropdown and its selections untouched.");
+        page.onDismiss(null, null);
+    }
+
     @Test
     void decorationsOnlyTargetRenderedCardsWhileOwnerListRefreshIsPending() throws Exception {
         CapturedPackets packets = new CapturedPackets();

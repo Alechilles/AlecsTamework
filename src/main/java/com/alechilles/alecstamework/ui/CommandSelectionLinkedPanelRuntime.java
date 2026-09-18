@@ -347,12 +347,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 commands.set(selector + ".Entries", entries);
                 commands.set(selector + ".SelectedValues", entry.groupIds());
             }
-            String label = entry.groups().isEmpty() ? LocalizedText.resolve(page.resolveLanguage(), "tamework.ui.companions.noGroups")
-                    : entry.groups().size() == 1 ? entry.groups().getFirst().name()
-                    : LocalizedText.format(page.resolveLanguage(), "tamework.ui.companions.groupSummary", entry.groups().getFirst().name(), entry.groups().size() - 1);
-            commands.set(selector + "Label.Text", label);
-            commands.set(selector + ".TooltipText", entry.groupName());
-            LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
+            bindCompanionGroupLabel(commands, selector, entry);
             if (append) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
                     EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
                             .append("@CompanionGroups", selector + ".SelectedValues"), false);
@@ -369,6 +364,30 @@ final class CommandSelectionLinkedPanelRuntime {
                 EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
                         CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
                         .append(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ASSIGN_VALUE, selector + ".Value"), false);
+    }
+
+    private void bindCompanionGroupLabel(UICommandBuilder commands, String selector, LinkedNpcEntry entry) {
+        String label = entry.groups().isEmpty() ? LocalizedText.resolve(page.resolveLanguage(), "tamework.ui.companions.noGroups")
+                : entry.groups().size() == 1 ? entry.groups().getFirst().name()
+                : LocalizedText.format(page.resolveLanguage(), "tamework.ui.companions.groupSummary", entry.groups().getFirst().name(), entry.groups().size() - 1);
+        commands.set(selector + "Label.Text", label);
+        commands.set(selector + ".TooltipText", entry.groupName());
+        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
+    }
+
+    void companionGroupsChanged(UUID id) {
+        page.preserveCompanionOrder = true;
+        refreshEntries();
+        LinkedNpcEntry current = resolveEntry(id);
+        if (current == null) return;
+        for (int index = 0; index < page.cardRenderState.entryCount(); index++) {
+            if (!id.equals(page.cardRenderState.entryAt(index).npcUuid())) continue;
+            UICommandBuilder commands = new UICommandBuilder();
+            // Only the adjacent caption/swatch changes; never reset the native checkbox popup.
+            bindCompanionGroupLabel(commands, "#TameworkLinkedPanelList[" + index + "] #GroupSelector", current);
+            page.packetSender.send(commands, new UIEventBuilder());
+            return;
+        }
     }
 
     private void bindGroupShortcuts(UICommandBuilder commands, UIEventBuilder events,
@@ -460,10 +479,10 @@ final class CommandSelectionLinkedPanelRuntime {
                     page.companionBinding.state().get(), page.companionBinding.nearby().get(),
                     LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
             if (page.preserveCompanionOrder && previous != null) {
-                var order = new java.util.HashMap<UUID, Integer>();
-                for (int i = 0; i < previous.length; i++) order.put(previous[i].npcUuid(), i);
-                java.util.Arrays.sort(page.linkedNpcEntries, java.util.Comparator.comparingInt(
-                        entry -> order.getOrDefault(entry.npcUuid(), Integer.MAX_VALUE)));
+                var current = new java.util.HashMap<UUID, LinkedNpcEntry>();
+                for (var entry : page.baseLinkedNpcEntries) current.put(entry.npcUuid(), entry);
+                page.linkedNpcEntries = java.util.Arrays.stream(previous).map(entry -> current.get(entry.npcUuid()))
+                        .filter(java.util.Objects::nonNull).toArray(LinkedNpcEntry[]::new);
             }
             return;
         }

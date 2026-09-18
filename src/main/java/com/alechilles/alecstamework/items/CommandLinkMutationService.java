@@ -120,7 +120,7 @@ final class CommandLinkMutationService {
                 linkedNpcRecordStore.read(workingItem), npcUuid);
         boolean active = existing == null || !existing.active;
         if (active && !canActivateLinkedNpc(workingItem, npcUuid, config)) {
-            return LinkToggleResult.notToggled();
+            return LinkToggleResult.selectionLimitReached();
         }
         ItemStack updatedItem;
         if (existing != null) {

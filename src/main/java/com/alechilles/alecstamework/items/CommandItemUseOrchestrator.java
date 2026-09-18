@@ -201,6 +201,11 @@ final class CommandItemUseOrchestrator {
             return Interception.handled(true);
         }
         if (!link.toggled) {
+            if ("tamework.command.selection.limit".equals(link.failureMessageKey)) {
+                use.flushHeldItem();
+                feedbackService.showWarningKey(use.player, link.failureMessageKey);
+                return Interception.handled(true);
+            }
             return Interception.unhandled();
         }
         applyLinkResult(use, link);

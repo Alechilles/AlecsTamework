@@ -515,6 +515,22 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void selectingPastTheLimitReturnsASelectionWarningInsteadOfAnOrdinaryClick() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            var records = new CommandLinkedNpcRecordStore();
+            var config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"MaxActive\":1}"), new ExtraInfo());
+            var stack = records.write(metadataStack("test:generic-whistle"), List.of(
+                    new LinkedNpcRecord(UUID.randomUUID(), null, null, null, "Other", null, "Sheep", null, true, false, null)));
+            var result = new CommandLinkMutationService(records, new CommandLinkPolicyService(), null, null)
+                    .tryToggleLink(target.player, scope.store, target.reference, "generic-tool", config, stack);
+            assertFalse(result.toggled);
+            assertEquals("tamework.command.selection.limit", result.failureMessageKey);
+            assertEquals(1, records.read(stack).size());
+        }
+    }
+
+    @Test
     void genericRecipientQueryExcludesBondedProjectionButKeepsOrdinaryNpc()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {

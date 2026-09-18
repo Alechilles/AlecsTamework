@@ -96,6 +96,8 @@ final class LinkedNpcEntrySnapshotMapper {
                     .withShoulderRide(entry.shoulderRideAvailable(),
                             entry.shoulderRideMounted())
                     .withTraitValues(entry.traitValues())
+                    .withCompanionGroups(entry.companionKey(), entry.groups(), entry.selectionSupported())
+                    .withNearby(entry.nearby())
                     .withAnimalLifecycle(entry.animalLifecycle().active()
                             ? new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
                                     entry.animalLifecycle().stage(), entry.animalLifecycle().prime(),

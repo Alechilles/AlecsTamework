@@ -679,7 +679,7 @@ public final class TameworkCommandSelectionPage
                 if (id != null && linkedPanelRuntime.resolveEntry(id) != null && data.companionGroups.length <= 128) {
                     companionBinding.assignGroups().accept(id, java.util.List.of(data.companionGroups));
                     // Keep the current order and native popup while its checkboxes are being edited.
-                    preserveCompanionOrder = true;
+                    linkedPanelRuntime.companionGroupsChanged(id);
                 }
                 return;
             }
