@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed a companion-panel disconnect when portrait-star updates overtook a
+  queued card-list refresh.
+
 - Fixed companions being marked lost and refusing capture when Hytale removes a duplicate entity while the original remains alive.
 
 - Captured companions keep their linked-panel cards until a different player

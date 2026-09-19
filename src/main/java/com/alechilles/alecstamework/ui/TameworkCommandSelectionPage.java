@@ -404,12 +404,13 @@ public final class TameworkCommandSelectionPage
         defaultDecorations = CommandUiDefaultDecorationBinder.from(snapshot);
     }
 
-    /** Updates the retained default decoration state and every currently rendered card. */
+    /** Queues decorations with the card refresh so they cannot overtake queued card appends. */
     @Override
     public void updateDefaultDecorations(@Nonnull CommandUiSnapshot snapshot,
                                          @Nonnull UICommandBuilder commands) {
+        CommandUiDefaultDecorationBinder.State previous = defaultDecorations;
         configureDefaultDecorations(snapshot);
-        linkedPanelRuntime.bindDefaultDecorations(commands);
+        if (!previous.equals(defaultDecorations)) linkedPanelRuntime.requestRefresh();
     }
 
     CommandUiDefaultDecorationBinder.State defaultDecorations() {

@@ -28,6 +28,8 @@ final class CommandSelectionLinkedPanelRuntime {
     }
     private final TameworkCommandSelectionPage page;
     private long removalConfirmOverlayRevision = -1L;
+    private CommandUiDefaultDecorationBinder.State renderedDecorations =
+            CommandUiDefaultDecorationBinder.State.EMPTY;
 
     CommandSelectionLinkedPanelRuntime(TameworkCommandSelectionPage page) {
         this.page = page;
@@ -51,16 +53,17 @@ final class CommandSelectionLinkedPanelRuntime {
                     page.featureController.presentation(
                             page.linkedNpcEntries[index].npcUuid()));
         }
+        renderedDecorations = page.defaultDecorations();
     }
 
-    void bindDefaultDecorations(UICommandBuilder commands) {
+    private void bindDefaultDecorations(UICommandBuilder commands) {
         CommandUiDefaultDecorationBinder.bindHeader(commands,
                 page.defaultDecorations());
-        // Tab/filter changes can replace the model before its queued rebuild is sent.
-        // Contributor updates must address the cards that are still on the client.
-        for (int index = 0; index < page.cardRenderState.entryCount(); index++) {
-            LinkedNpcEntry entry = page.cardRenderState.entryAt(index);
-            CommandPanelFeaturePresentation presentation = page.cardRenderState
+        // These commands follow any card appends in the same packet. A separate
+        // contributor dispatch could arrive before a previously queued rebuild.
+        for (int index = 0; index < page.linkedNpcEntries.length; index++) {
+            LinkedNpcEntry entry = page.linkedNpcEntries[index];
+            CommandPanelFeaturePresentation presentation = page.featureController
                     .presentation(entry.npcUuid());
             if (presentation != null && presentation.bonded() != null) continue;
             CommandUiDefaultDecorationBinder.bindCard(commands,
@@ -236,12 +239,16 @@ final class CommandSelectionLinkedPanelRuntime {
                         page.cardRenderState.presentation(id), presentation,
                         progressionEligible)));
         renderCards(commands, events, hasEntries, features, language);
+        if (!renderedDecorations.equals(page.defaultDecorations())) {
+            bindDefaultDecorations(commands);
+        }
         BondedCompanionPanelChrome.bindToolbar(commands, events, page, values);
         if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
             return LinkedNpcPanelRefreshOutcome.evaluated(
                     progressionEligible, shortestCountdown());
         }
         page.packetSender.send(commands, events);
+        renderedDecorations = page.defaultDecorations();
         page.refreshTransaction.commit(values, groupRevision, reviveRevision);
         removalConfirmOverlayRevision = removalConfirmRevision;
         page.cardRenderState.markRendered(page.linkedNpcEntries,

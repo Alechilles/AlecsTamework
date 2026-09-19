@@ -37,7 +37,7 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
     @Test
-    void decorationsOnlyTargetRenderedCardsWhileOwnerListRefreshIsPending() throws Exception {
+    void decorationsShareCardRefreshPacketsWhenTheListGrowsOrShrinks() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
                 new NavigationFixture(), legacyConfig());
@@ -54,16 +54,51 @@ class TameworkCommandSelectionPageRefreshTest {
                 new com.alechilles.alecstamework.api.commandui.CommandUiPanelState("owned"));
         UICommandBuilder commands = new UICommandBuilder();
         page.updateDefaultDecorations(snapshot, commands);
-        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                "#TameworkLinkedPanelList[0] #ContributorPortraitStars.Visible".equals(command.selector)));
-        assertFalse(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                command.selector.startsWith("#TameworkLinkedPanelList[1]")),
-                "Contributor updates must not target a card before it is appended.");
+        assertEquals(0, commands.getCommands().length,
+                "A separately dispatched contributor packet can overtake the queued card rebuild.");
         refresh(page, true);
-        commands = new UICommandBuilder();
+        assertCommand(packets.updates.getLast(),
+                "#TameworkLinkedPanelList[1] #ContributorPortraitStars.Visible");
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> List.of(ENTRY));
+        invoke(page, "refreshLinkedNpcEntries");
         page.updateDefaultDecorations(snapshot, commands);
-        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                "#TameworkLinkedPanelList[1] #ContributorPortraitStars.Visible".equals(command.selector)));
+        assertEquals(0, commands.getCommands().length);
+        refresh(page, true);
+        assertFalse(java.util.Arrays.stream(packets.updates.getLast().commands.getCommands())
+                .anyMatch(command -> command.selector != null
+                        && command.selector.startsWith("#TameworkLinkedPanelList[1]")));
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void decorationOnlyChangesRefreshExistingCardsOnce() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        build(page);
+        var contribution = new com.alechilles.alecstamework.api.commandui.CommandUiContribution(
+                com.alechilles.alecstamework.api.commandui.CommandUiContributorId.of("example:stars"),
+                Map.of(), Map.of(CARD, Map.of("portrait.stars",
+                        com.alechilles.alecstamework.api.commandui.CommandUiValue.of(3L))));
+        var snapshot = new com.alechilles.alecstamework.api.commandui.CommandUiSnapshot(
+                OWNER, 1L, 1L, null, List.of(), List.of(),
+                new com.alechilles.alecstamework.api.commandui.CommandUiPanelState("linked"))
+                .withContributions(Map.of(contribution.contributorId(), contribution));
+        UICommandBuilder separate = new UICommandBuilder();
+        page.updateDefaultDecorations(snapshot, separate);
+        assertEquals(0, separate.getCommands().length);
+        packets.fail = true;
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> refresh(page, true));
+        packets.fail = false;
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(),
+                "#TameworkLinkedPanelList[0] #ContributorStar3.Visible");
+        packets.updates.clear();
+        page.updateDefaultDecorations(snapshot, separate);
+        refresh(page, true);
+        assertTrue(packets.updates.isEmpty(), "Unchanged decorations must not emit another packet.");
         page.onDismiss(null, null);
     }
 
