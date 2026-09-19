@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -107,6 +108,12 @@ public final class HytaleDormantCompanionObservationFactory
                 managedCaptureSource(store.getComponent(
                         reference, projectionType
                 ))
+        )) {
+            return null;
+        }
+        UUIDComponent uuid = store.getComponent(reference, UUIDComponent.getComponentType());
+        if (uuid != null && hasRemovalSurvivor(
+                reference, uuid.getUuid(), store.getExternalData()
         )) {
             return null;
         }
@@ -322,6 +329,17 @@ public final class HytaleDormantCompanionObservationFactory
         World world = entityStore == null ? null : entityStore.getWorld();
         String name = world == null ? null : world.getName();
         return name == null || name.isBlank() ? null : name.trim();
+    }
+
+    /** Duplicate cleanup removes one ref while another still owns its UUID. */
+    static boolean hasRemovalSurvivor(
+            Ref<EntityStore> removed,
+            @Nullable UUID uuid,
+            EntityStore entityStore
+    ) {
+        Ref<EntityStore> current = uuid == null
+                ? null : entityStore.getRefFromUUID(uuid);
+        return current != null && current.isValid() && !current.equals(removed);
     }
 
     static boolean authoritativeRemoval(

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed companions being marked lost and refusing capture when Hytale removes a duplicate entity while the original remains alive.
+
 - Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
 
 - Recall no longer restores a dead saved body while its death transition is pending.
