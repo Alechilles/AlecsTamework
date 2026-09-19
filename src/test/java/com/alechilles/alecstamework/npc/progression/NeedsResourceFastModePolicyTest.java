@@ -58,11 +58,11 @@ class NeedsResourceFastModePolicyTest {
     }
 
     @Test
-    void nullModeRemainsAccurate() {
+    void missingModeUsesAutoFastUnderHotPressure() {
         TameworkRuntimePressureService service = TameworkRuntimePressureService.getInstance();
         recordHotPressure(service, RuntimePressureDomain.NEEDS_RESOURCE_SEARCH);
 
-        assertFalse(NeedsResourceFastModePolicy.isFastModeActive(null, service, 1_000L));
+        assertTrue(NeedsResourceFastModePolicy.isFastModeActive(null, service, 1_000L));
     }
 
     private static void recordHotPressure(

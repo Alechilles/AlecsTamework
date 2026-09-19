@@ -72,6 +72,9 @@ final class PublishedDormantEventPublisher {
     private LifecycleState targetState(
             DormantCompanionObservation observation
     ) {
+        if (observation.evidence() == DormantCompanionObservation.Evidence.OLD_AGE_DEATH) {
+            return LifecycleState.RELEASED;
+        }
         return observation.evidence()
                 == DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
                 ? LifecycleState.DEAD_REVIVABLE

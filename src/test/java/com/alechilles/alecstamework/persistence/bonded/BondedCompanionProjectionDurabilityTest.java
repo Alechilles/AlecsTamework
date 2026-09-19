@@ -636,35 +636,7 @@ class BondedCompanionProjectionDurabilityTest {
         ActiveFixture fixture = liveFixture("planned-death.sqlite");
         var planner = new BondedCompanionStorePlanner(
                 fixture.store(), rosterRegistry("role:wolf", 5L));
-        var service = new BondedCompanionProjectionService(
-                planner,
-                fixture.durability(),
-                new com.alechilles.alecstamework.companion.bonded
-                        .BondedCompanionProjectionWorld() {
-                    @Override
-                    public BondedCompanionProjectionService.SpawnResult spawn(
-                            BondedCompanionProjectionService.SpawnPlan plan
-                    ) {
-                        return BondedCompanionProjectionService.SpawnResult
-                                .failed();
-                    }
-
-                    @Override
-                    public BondedCompanionProjectionValidator.Projection
-                            readExact(
-                            BondedCompanionProjectionValidator.LeaseExpectation
-                                    lease
-                    ) {
-                        return null;
-                    }
-                },
-                new BondedCompanionProjectionCleanupService(
-                        ignored -> BondedCompanionProjectionCleanupService
-                                .Outcome.ALREADY_MISSING),
-                () -> "unused-lease",
-                () -> UUID.fromString(
-                        "20000000-0000-0000-0000-000000000099")
-        );
+        var service = deathService(fixture, planner);
         var projection = new BondedCompanionProjectionValidator.Projection(
                 NPC,
                 "world-a",
@@ -719,6 +691,30 @@ class BondedCompanionProjectionDurabilityTest {
                         1L, snapshot(), 0L),
                 -60L
         ));
+    }
+
+    @Test
+    void oldAgeDeathPermanentlyDeletesTheProfileAndExactLease()
+            throws Exception {
+        ActiveFixture fixture = liveFixture("old-age-death.sqlite");
+        var service = deathService(fixture, new BondedCompanionStorePlanner(
+                fixture.store(), rosterRegistry("role:wolf", 5L)));
+        var projection = new BondedCompanionProjectionValidator.Projection(
+                NPC,
+                "world-a",
+                TameworkProjectionIdentityComponent.bondedCompanion(
+                        "profile-a", "lease-a"),
+                snapshot()
+        );
+
+        assertEquals(BondedCompanionProjectionService.ReconcileStatus.DEAD,
+                service.confirmDeath(fixture.lease(), projection, -70L, true)
+                        .status());
+        assertTrue(fixture.store().findProfile(
+                OWNER, POLICY_ROSTER, "profile-a").isEmpty());
+        assertTrue(fixture.store().findActiveLeases(
+                OWNER, POLICY_ROSTER).isEmpty());
+        assertFalse(begin(fixture.durability(), "profile-a", POLICY_FAMILY, 99));
     }
 
     @Test
@@ -881,6 +877,41 @@ class BondedCompanionProjectionDurabilityTest {
                         "spawn-recovery", -90L
                 );
         return durability.beginSummon(request, lease, cleanup);
+    }
+
+    private BondedCompanionProjectionService deathService(
+            ActiveFixture fixture,
+            BondedCompanionStorePlanner planner
+    ) {
+        return new BondedCompanionProjectionService(
+                planner,
+                fixture.durability(),
+                new com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionProjectionWorld() {
+                    @Override
+                    public BondedCompanionProjectionService.SpawnResult spawn(
+                            BondedCompanionProjectionService.SpawnPlan plan
+                    ) {
+                        return BondedCompanionProjectionService.SpawnResult
+                                .failed();
+                    }
+
+                    @Override
+                    public BondedCompanionProjectionValidator.Projection
+                            readExact(
+                            BondedCompanionProjectionValidator.LeaseExpectation
+                                    lease
+                    ) {
+                        return null;
+                    }
+                },
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService
+                                .Outcome.ALREADY_MISSING),
+                () -> "unused-lease",
+                () -> UUID.fromString(
+                        "20000000-0000-0000-0000-000000000099")
+        );
     }
 
     private BondedCompanionRecord.Profile profile() {

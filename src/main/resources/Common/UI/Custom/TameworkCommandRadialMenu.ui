@@ -17,7 +17,8 @@ $C.@PageOverlay {
     Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
     Background: #252b27;
     Group #TameworkCommandMenuLogo { Anchor: (Top: 4, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
-    Label #TameworkCommandMenuTitle { Anchor: (Left: 56, Right: 286, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
+    Label #TameworkCommandMenuTitle { Anchor: (Left: 56, Right: 478, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
+    Label #TameworkContributorCapacity { Anchor: (Top: 8, Right: 286, Width: 180, Height: 26); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
     TextButton #CommandMenuHelpButton {
       Anchor: (Top: 8, Right: 186, Width: 88, Height: 26);
       Text: %server.tamework.ui.guide.help;

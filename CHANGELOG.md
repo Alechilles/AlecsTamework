@@ -2,6 +2,20 @@
 
 ## 4.1.0 - Animal Progression and Companion UI - 2026-09-18
 
+- Old-age deaths are now permanent, even with revives enabled, including bonded
+  companions. They free owned capacity and cannot be revived later.
+
+- New or unspecified needs resource-search settings now default to Auto Fast.
+  Existing explicit choices stay unchanged.
+
+- Experience presets now set aging, animal progression/offline policy, and the
+  combined needs-damage rule explicitly. Simplified disables adult aging, Easier
+  freezes at prime, and Full Experience/Hardcore use full aging; only Hardcore
+  enables old-age death. Switching presets no longer carries those values over.
+
+- Refreshed the Companion Guide and its example cards for per-flute selection,
+  shared groups, captured-animal trading, and Hardcore server rules in all six languages.
+
 - Companion status tabs show matching animal counts and a clearer selected highlight.
   Right-click a group to add its animals to your current selection; left-click selects
   only that group. Fixed the menu logo tooltip stretching off-screen.
@@ -34,6 +48,7 @@
 - Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
 
 - Recall no longer restores a dead saved body while its death transition is pending.
+- Unloaded NPC cards keep a visible health-bar background even when saved health is zero.
 - Captured age meters now gray out consistently, and paused meters show a larger
   transparent pause icon centered over the bar, with equal-width strokes.
 - Coordinate copy buttons sit immediately left of the coordinates, and opening

@@ -655,7 +655,6 @@ final class LinkedNpcPanelCardBinder {
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background",
                 entry.dead() ? "#151916"
-                        : !entry.loaded() && entry.hasKnownCardDetails() ? "#202423"
                         : compact ? "#202423" : "#151916");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, 232, 20));

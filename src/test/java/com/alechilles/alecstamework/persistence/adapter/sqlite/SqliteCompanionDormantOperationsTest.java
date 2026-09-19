@@ -111,6 +111,32 @@ class SqliteCompanionDormantOperationsTest {
     }
 
     @Test
+    void oldAgePermanentlyReleasesOwnershipAndRetiresAlias() throws Exception {
+        seedManagedDomainClaims();
+        try (Connection connection = connections.openWriterConnection()) {
+            new SqliteCompanionToolLinkStore(connection).link(
+                    new com.alechilles.alecstamework.companion.identity.CompanionToolLink(
+                            PROFILE, java.util.UUID.randomUUID(), "command", -600L, -600L));
+        }
+        var request = request(DormantSourceEvidence.Kind.OLD_AGE_DEATH, 3);
+        var first = submit(30, request);
+        var replay = submit(30, request);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(LifecycleState.RELEASED, lifecycle().state());
+        assertNull(lifecycle().ownerId());
+        assertNull(lifecycle().ownerWorldKey());
+        assertEquals(CompanionAlias.State.RETIRED, alias().state());
+        assertEquals(first.events(), replay.events());
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteCompanionToolLinkStore(connection).findByProfile(PROFILE).isEmpty());
+            var domains = new SqlitePopulationDomainStore(connection);
+            assertEquals(0, domains.counts(domain("husbandry-owned")).committedOwned());
+            assertEquals(0, domains.counts(domain("husbandry-deployed")).committedDeployable());
+        }
+    }
+
+    @Test
     void deathSnapshotAliasRetirementAndLifecycleCommitAtomically()
             throws Exception {
         CompanionDormantTransitionRequest request =

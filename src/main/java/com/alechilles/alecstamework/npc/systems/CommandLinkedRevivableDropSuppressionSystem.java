@@ -62,7 +62,8 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
         TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         boolean deadRespawnEnabled = CompanionRevivePolicy.featureEnabled(roleId);
-        if (!shouldSuppressDrops(links, deadRespawnEnabled)) {
+        if (CompanionRevivePolicy.isOldAgeDeath(component)
+                || !shouldSuppressDrops(links, deadRespawnEnabled)) {
             return;
         }
         component.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);

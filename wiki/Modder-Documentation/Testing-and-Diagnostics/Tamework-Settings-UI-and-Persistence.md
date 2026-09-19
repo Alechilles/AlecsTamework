@@ -6,6 +6,8 @@ draft: false
 ---
 # Tamework Settings UI and Persistence
 
+Parent: [Testing and Diagnostics](/mod/alecs-tamework/testing-and-diagnostics) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
+
 `/tw settings` is the server-facing home for gameplay policy that should not be
 duplicated across content packs.
 
@@ -19,6 +21,18 @@ button row marks unsaved changes, with warning icons flashing on and off every
 second. The warning clears after a successful apply, when all edits are reverted,
 or when **Refresh** reloads the saved settings. Validation or save failures keep
 the draft available so you can correct it and try again.
+
+## Experience presets
+
+Selecting a preset fills the form immediately; **Apply** saves it. **Custom**
+leaves the current form unchanged. There is no separate Load Preset step.
+
+**Hardcore** enables full adult aging and old-age death for configured animals,
+disables revives and recall teleportation, and sets starvation/dehydration damage
+to 10%/15% of maximum health per minute. The other standard presets restore
+revives and recall teleportation, disable old-age death, and restore the 2%/3%
+damage rates. Only Hardcore changes the aging mode. Review the form before applying;
+presets preserve ownership, claims, population limits, and other custom policies.
 
 ## Population limit
 
@@ -86,8 +100,9 @@ natural death after the configured senior duration. Natural death uses ordinary
 non-slaughter drops and does not grant premium slaughter yield or husbandry XP.
 
 Adult lifecycle durations use real minutes of eligible progression. They do not
-scale with the server's day length. Captured or stored animals pause progression;
-traded animals retain their accumulated age.
+scale with the server's day length. Animals in capture items pause progression;
+managed coop residents can continue under the shared progression policy. Traded
+animals retain their accumulated age.
 
 ### Settings-file migration
 

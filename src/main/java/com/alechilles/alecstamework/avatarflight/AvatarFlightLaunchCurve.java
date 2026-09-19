@@ -46,7 +46,7 @@ public final class AvatarFlightLaunchCurve {
                 : settings.getPartialChargeCost();
     }
 
-    private static double interpolate(double min, double max, double amount) {
+    static double interpolate(double min, double max, double amount) {
         return min + (max - min) * clamp01(amount);
     }
 
@@ -54,7 +54,8 @@ public final class AvatarFlightLaunchCurve {
         return Double.isFinite(value) && value > 0.0 ? value : 1.0;
     }
 
-    private static double clamp01(double value) {
+    static double clamp01(double value) {
+        if (!Double.isFinite(value)) return 0.0;
         return Math.max(0.0, Math.min(1.0, value));
     }
 }

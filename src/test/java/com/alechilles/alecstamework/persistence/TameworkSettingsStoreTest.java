@@ -166,7 +166,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
         assertEquals(true, overrides.needsEnabled());
-        assertEquals("Accurate", overrides.needsResourceMode());
+        assertEquals("AutoFast", overrides.needsResourceMode());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
         assertEquals(72.0, overrides.needsOwnerOfflineGraceHours());
         assertEquals(1.0, overrides.needsOwnerOfflineDecayMultiplier());
@@ -209,7 +209,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, settings.interactionRequiresOwner());
         assertEquals(true, settings.linkingRequiresOwner());
         assertEquals(true, settings.needsEnabled());
-        assertEquals("Accurate", settings.needsResourceMode());
+        assertEquals("AutoFast", settings.needsResourceMode());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", settings.needsTickPolicyMode());
         assertEquals(72.0, settings.needsOwnerOfflineGraceHours());
         assertEquals(true, settings.needsDamageEnabled());
@@ -254,7 +254,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
         assertEquals(true, overrides.needsEnabled());
-        assertEquals("Accurate", overrides.needsResourceMode());
+        assertEquals("AutoFast", overrides.needsResourceMode());
         assertEquals(true, overrides.happinessEnabled());
         assertEquals(true, overrides.passiveBreedingEnabled());
         assertEquals(true, overrides.breedingGenderEnabled());
@@ -277,11 +277,6 @@ class TameworkSettingsStoreTest {
         assertNotNull(overrides);
         assertEquals(false, overrides.telemetryEnabled());
         assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
-    }
-
-    @Test
-    void defaultGlobalSettingsUsesAccurateNeedsResourceMode() {
-        assertEquals("Accurate", TameworkSettingsStore.defaultGlobalSettings().needsResourceMode());
     }
 
     @Test

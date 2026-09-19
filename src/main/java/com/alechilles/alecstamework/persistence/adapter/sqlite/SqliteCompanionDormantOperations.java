@@ -131,9 +131,14 @@ public final class SqliteCompanionDormantOperations {
                 ),
                 "dormant_alias_retirement"
         );
+        boolean permanentDeath = dormant.targetState() == LifecycleState.RELEASED;
+        if (permanentDeath) {
+            requireApplied(transaction.toolLinks().replace(dormant.profileId(), List.of()),
+                    "old_age_tool_links");
+        }
         CompanionLifecycle transitioned = new CompanionLifecycle(
                 dormant.profileId(),
-                current.ownerId(),
+                permanentDeath ? null : current.ownerId(),
                 dormant.targetState(),
                 LifecycleLocation.none(),
                 current.revision().next(),
@@ -144,7 +149,7 @@ public final class SqliteCompanionDormantOperations {
                         dormant.source().observedGeneration()
                 ),
                 current.quarantineIncidentId(),
-                current.ownerWorldKey()
+                permanentDeath ? null : current.ownerWorldKey()
         );
         convergePopulationDomains(
                 transaction, operation, current, transitioned

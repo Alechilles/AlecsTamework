@@ -461,14 +461,16 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                     com.hypixel.hytale.server.core.universe.world.storage.EntityStore>
                     reference,
             @Nonnull com.hypixel.hytale.component.Store<
-                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entityStore
+                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entityStore,
+            boolean permanently
     ) {
         if (!operational()) return;
         runStorageGuarded("confirmed_death", () -> {
             var projection = world.readCurrent(
                     reference, entityStore, worldKey, npcUuid, marker);
             if (projection != null) {
-                localLifecycle.onConfirmedDeath(projection, clock.getAsLong());
+                localLifecycle.onConfirmedDeath(
+                        projection, clock.getAsLong(), permanently);
             }
         });
     }
@@ -712,7 +714,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
     }
 
-    private static void publishLifecycleChange(
+    static void publishLifecycleChange(
             com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore store,
             BondedCompanionChangePublisher changes,
             BondedCompanionProjectionValidator.LeaseExpectation lease,
@@ -720,6 +722,15 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     ) {
         if (result.status() != BondedCompanionProjectionService.ReconcileStatus.STORED
                 && result.status() != BondedCompanionProjectionService.ReconcileStatus.DEAD) {
+            return;
+        }
+        if (result.permanentDeathRevision() != null) {
+            // The exact profile was deleted, so publish from the committed result.
+            changes.publishCommitted(new BondedCompanionChangedEvent(
+                    lease.profileId(), lease.ownerUuid(), lease.rosterId(),
+                    BondedCompanionStateView.ACTIVE, BondedCompanionStateView.DEAD,
+                    result.permanentDeathRevision(), "old_age"),
+                    BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED);
             return;
         }
         store.findProfile(lease.ownerUuid(), lease.rosterId(), lease.profileId())

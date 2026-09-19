@@ -21,12 +21,12 @@ public final class AvatarFlightLaunchVfxMath {
 
     public static double chargeProgress(long heldMs, long maxChargeMs) {
         if (maxChargeMs <= 0L) return heldMs > 0L ? 1.0 : 0.0;
-        return clamp01((double) Math.max(0L, heldMs) / maxChargeMs);
+        return AvatarFlightLaunchCurve.clamp01((double) Math.max(0L, heldMs) / maxChargeMs);
     }
 
     public static long pulseIntervalMs(@Nullable AvatarFlightVfxSettings settings, double progress) {
         AvatarFlightVfxSettings resolved = settings == null ? new AvatarFlightVfxSettings() : settings;
-        double interval = interpolate(
+        double interval = AvatarFlightLaunchCurve.interpolate(
                 resolved.getLaunchChargeEarlyIntervalMs(),
                 resolved.getLaunchChargeFullIntervalMs(),
                 progress
@@ -36,7 +36,7 @@ public final class AvatarFlightLaunchVfxMath {
 
     public static double pulseScale(@Nullable AvatarFlightVfxSettings settings, double progress) {
         AvatarFlightVfxSettings resolved = settings == null ? new AvatarFlightVfxSettings() : settings;
-        return interpolate(
+        return AvatarFlightLaunchCurve.interpolate(
                 resolved.getLaunchChargeMinScale(),
                 resolved.getLaunchChargeMaxScale(),
                 progress
@@ -52,14 +52,5 @@ public final class AvatarFlightLaunchVfxMath {
         if (charge >= resolved.getLaunchReleaseFullThreshold()) return ReleaseTier.FULL;
         if (charge >= resolved.getLaunchReleaseMidThreshold()) return ReleaseTier.MID;
         return ReleaseTier.PARTIAL;
-    }
-
-    private static double interpolate(double from, double to, double progress) {
-        return from + (to - from) * clamp01(progress);
-    }
-
-    private static double clamp01(double value) {
-        if (!Double.isFinite(value)) return 0.0;
-        return Math.max(0.0, Math.min(1.0, value));
     }
 }

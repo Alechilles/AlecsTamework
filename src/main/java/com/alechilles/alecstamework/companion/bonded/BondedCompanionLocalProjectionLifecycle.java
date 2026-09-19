@@ -220,6 +220,15 @@ public final class BondedCompanionLocalProjectionLifecycle {
             @Nonnull BondedCompanionProjectionValidator.Projection projection,
             long diedAtMs
     ) {
+        onConfirmedDeath(projection, diedAtMs, false);
+    }
+
+    /** Routes a death from the current world event with its permanent-disposition flag. */
+    public void onConfirmedDeath(
+            @Nonnull BondedCompanionProjectionValidator.Projection projection,
+            long diedAtMs,
+            boolean permanently
+    ) {
         Objects.requireNonNull(projection, "projection");
         var marker = projection.marker();
         if (!marker.isBondedCompanion() || marker.getProfileId() == null
@@ -231,7 +240,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
         exact.filter(lease -> lease.liveNpcUuid().equals(projection.npcUuid())
                         && lease.worldKey().equals(projection.worldKey()))
                 .ifPresent(lease -> observer.onConfirmedDeath(
-                        lease, projection, diedAtMs));
+                        lease, projection, diedAtMs, permanently));
     }
 
     private void submit(

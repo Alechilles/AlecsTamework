@@ -39,6 +39,8 @@ public record DormantSourceEvidence(
     /** Authoritative event or explicit repair classes accepted by the protocol. */
     public enum Kind {
         DEATH_COMPONENT(LifecycleState.DEAD_REVIVABLE, new SnapshotKind("death")),
+        /** Terminal natural death; the saved snapshot is evidence, never a revival source. */
+        OLD_AGE_DEATH(LifecycleState.RELEASED, new SnapshotKind("death")),
         DESTRUCTIVE_REMOVAL(LifecycleState.LOST, new SnapshotKind("lost")),
         WORLD_DELETION(LifecycleState.LOST, new SnapshotKind("lost")),
         EXPLICIT_RECALL_EXHAUSTED(LifecycleState.LOST, new SnapshotKind("lost"));

@@ -389,7 +389,8 @@ public final class CompanionLifeStageService {
             if (cause != null) {
                 com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.tryAddComponent(store, npcRef,
                         new com.hypixel.hytale.server.core.modules.entity.damage.Damage(
-                                new com.hypixel.hytale.server.core.modules.entity.damage.Damage.EnvironmentSource("tamework.old_age"),
+                                new com.hypixel.hytale.server.core.modules.entity.damage.Damage.EnvironmentSource(
+                                        com.alechilles.alecstamework.items.CompanionRevivePolicy.OLD_AGE_SOURCE),
                                 cause, Float.MAX_VALUE));
             }
         }

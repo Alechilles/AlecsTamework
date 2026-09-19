@@ -32,7 +32,8 @@ public record DormantCompanionObservation(
         sourceWorldKey = requireText(sourceWorldKey, "Dormant source world");
         Objects.requireNonNull(evidence, "Dormant evidence is required");
         receiptKey = requireText(receiptKey, "Dormant receipt is required");
-        boolean deathEvidence = evidence == Evidence.SAVED_DEATH_COMPONENT;
+        boolean deathEvidence = evidence == Evidence.SAVED_DEATH_COMPONENT
+                || evidence == Evidence.OLD_AGE_DEATH;
         boolean lostEvidence = evidence == Evidence.DESTRUCTIVE_REMOVAL
                 || evidence == Evidence.WORLD_DELETION;
         if (deathEvidence != (death != null)
@@ -46,7 +47,7 @@ public record DormantCompanionObservation(
     /** Returns whether this observation positively proves a dormant transition. */
     public boolean authoritative() {
         return switch (evidence) {
-            case SAVED_DEATH_COMPONENT, DESTRUCTIVE_REMOVAL, WORLD_DELETION ->
+            case SAVED_DEATH_COMPONENT, OLD_AGE_DEATH, DESTRUCTIVE_REMOVAL, WORLD_DELETION ->
                     true;
             case UNLOAD, ABSENCE, TIMEOUT -> false;
         };
@@ -62,6 +63,7 @@ public record DormantCompanionObservation(
     /** Observations accepted or explicitly rejected by the positive-evidence boundary. */
     public enum Evidence {
         SAVED_DEATH_COMPONENT,
+        OLD_AGE_DEATH,
         DESTRUCTIVE_REMOVAL,
         WORLD_DELETION,
         UNLOAD,

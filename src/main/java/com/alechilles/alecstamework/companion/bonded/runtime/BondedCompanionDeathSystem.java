@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded.runtime;
 
 import com.alechilles.alecstamework.TameworkBondedCompanionComposition;
+import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -52,7 +53,8 @@ public final class BondedCompanionDeathSystem extends DeathSystems.OnDeathSystem
             return;
         }
         composition.onConfirmedDeath(
-                world.getName(), uuid.getUuid(), marker, reference, store);
+                world.getName(), uuid.getUuid(), marker, reference, store,
+                CompanionRevivePolicy.isOldAgeDeath(component));
     }
 
     @Nonnull @Override public Query<EntityStore> getQuery() {
