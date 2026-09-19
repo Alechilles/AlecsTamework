@@ -1,8 +1,19 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
+import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.HytaleModuleScope;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
+import com.hypixel.hytale.component.Component;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.TestEntityComponentStore;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -13,6 +24,56 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for companion movement-speed lifecycle change detection. */
 class CompanionMovementSpeedSyncSystemTest {
+    @Test
+    void unregisteredTamedTypeStopsMovementReadsInsteadOfCrashingTheWorld() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             ValidatingMovementStore store = new ValidatingMovementStore()) {
+            ComponentType<EntityStore, TameworkTamedComponent> tamedType = store.getRegistry()
+                    .registerComponent(TameworkTamedComponent.class, TameworkTamedComponent::new);
+            Field field = Tamework.class.getDeclaredField("tamedComponentType");
+            field.setAccessible(true);
+            field.set(Tamework.getInstance(), tamedType);
+            Ref<EntityStore> ref = store.createReference();
+            NPCEntity npc = new NPCEntity();
+            npc.setLegacyUUID(UUID.randomUUID());
+            npc.setRoleName("Wild_MovementTest");
+            store.put(ref, NPCEntity.getComponentType(), npc);
+            store.put(ref, tamedType, new TameworkTamedComponent(false));
+
+            new CompanionMovementSpeedSyncSystem().tick(0.05f, 0, store);
+            assertEquals(1, store.tamedReads, "Active registrations must still resolve tame state.");
+            int readsBeforeUnregister = store.componentReads;
+            store.getRegistry().unregisterComponent(tamedType);
+
+            CompanionMovementSpeedSyncSystem system = new CompanionMovementSpeedSyncSystem();
+            assertDoesNotThrow(() -> system.tick(0.05f, 0, store));
+            assertDoesNotThrow(() -> system.refreshImmediately(ref, store));
+            assertEquals(readsBeforeUnregister, store.componentReads,
+                    "Movement refreshes must stop before accessing components after unregistration.");
+        }
+    }
+
+    private static final class ValidatingMovementStore extends TestEntityComponentStore {
+        private int componentReads;
+        private int tamedReads;
+
+        private ValidatingMovementStore() {
+            super(new EntityStore(null));
+        }
+
+        @Override
+        public <T extends Component<EntityStore>> T getComponent(
+                Ref<EntityStore> ref, ComponentType<EntityStore, T> type) {
+            componentReads++;
+            if (type == TameworkTamedComponent.getComponentType()) {
+                // Match Store's validation using a real registered/unregistered component type.
+                type.validate();
+                tamedReads++;
+            }
+            return super.getComponent(ref, type);
+        }
+    }
+
     @Test
     void lifecycleCompletionCommitsOnlyWhenNpcAndCurrentMountedRiderRefreshesSucceed() {
         assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(
