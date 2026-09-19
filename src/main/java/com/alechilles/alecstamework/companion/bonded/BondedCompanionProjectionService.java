@@ -218,6 +218,17 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionProjectionValidator.Projection projection,
             long diedAtMs
     ) {
+        return confirmDeath(lease, projection, diedAtMs, false);
+    }
+
+    /** Permanently removes an exact old-age death; ordinary deaths remain revivable. */
+    @Nonnull
+    public ReconcileResult confirmDeath(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+            @Nonnull BondedCompanionProjectionValidator.Projection projection,
+            long diedAtMs,
+            boolean permanently
+    ) {
         var validation = validator.validate(lease, List.of(projection));
         if (validation.status() != BondedCompanionProjectionValidator.Status.VALID) {
             return new ReconcileResult(ReconcileStatus.IDENTITY_MISMATCH, List.of());
@@ -237,11 +248,12 @@ public final class BondedCompanionProjectionService {
                     : ReconcileStatus.DURABILITY_REJECTED;
             return new ReconcileResult(status, List.of());
         }
-        if (!durability.confirmDeath(lease, planned.plan(), diedAtMs)) {
+        if (!durability.confirmDeath(lease, planned.plan(), diedAtMs, permanently)) {
             return new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, List.of());
         }
         leaseLifecycle.ended(lease);
-        return new ReconcileResult(ReconcileStatus.DEAD, List.of());
+        return new ReconcileResult(ReconcileStatus.DEAD, List.of(),
+                permanently ? planned.plan().expectedRevision() + 1L : null);
     }
 
     private SpawnResult safeSpawn(SpawnPlan plan) {
@@ -483,8 +495,14 @@ public final class BondedCompanionProjectionService {
 
     public record ReconcileResult(
             @Nonnull ReconcileStatus status,
-            @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups
+            @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
+            @Nullable Long permanentDeathRevision
     ) {
+        public ReconcileResult(ReconcileStatus status,
+                               List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups) {
+            this(status, cleanups, null);
+        }
+
         public ReconcileResult {
             cleanups = List.copyOf(cleanups);
         }

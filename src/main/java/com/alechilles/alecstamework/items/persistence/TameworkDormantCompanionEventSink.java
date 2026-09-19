@@ -29,7 +29,8 @@ public final class TameworkDormantCompanionEventSink
     public void publish(@Nonnull Published event) {
         Objects.requireNonNull(event, "Published dormant event is required");
         if (event.observation().evidence()
-                == DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT) {
+                == DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
+                || event.observation().evidence() == DormantCompanionObservation.Evidence.OLD_AGE_DEATH) {
             deaths.accept(death(event));
             return;
         }

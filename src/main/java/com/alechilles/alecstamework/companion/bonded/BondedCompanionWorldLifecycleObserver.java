@@ -143,8 +143,18 @@ public final class BondedCompanionWorldLifecycleObserver {
             @Nonnull BondedCompanionProjectionValidator.Projection projection,
             long diedAtMs
     ) {
+        onConfirmedDeath(lease, projection, diedAtMs, false);
+    }
+
+    /** Routes a permanent old-age death only after its exact projection validates. */
+    public void onConfirmedDeath(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+            @Nonnull BondedCompanionProjectionValidator.Projection projection,
+            long diedAtMs,
+            boolean permanently
+    ) {
         BondedCompanionProjectionService.ReconcileResult result =
-                projections.confirmDeath(lease, projection, diedAtMs);
+                projections.confirmDeath(lease, projection, diedAtMs, permanently);
         listener.onReconciled(lease, null, result);
     }
 

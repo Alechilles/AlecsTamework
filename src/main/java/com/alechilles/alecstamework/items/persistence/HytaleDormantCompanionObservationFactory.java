@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -89,7 +90,9 @@ public final class HytaleDormantCompanionObservationFactory
         return observe(
                 reference,
                 store,
-                DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT,
+                CompanionRevivePolicy.isOldAgeDeath(death)
+                        ? DormantCompanionObservation.Evidence.OLD_AGE_DEATH
+                        : DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT,
                 death
         );
     }
@@ -213,6 +216,11 @@ public final class HytaleDormantCompanionObservationFactory
             DeathComponent death,
             long diedAtMs
     ) {
+        if (CompanionRevivePolicy.isOldAgeDeath(death)) {
+            return new DormantCompanionObservation.DeathObservation(
+                    diedAtMs, 0L, DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
+                    CompanionRevivePolicy.OLD_AGE_SOURCE);
+        }
         DamageTargetMemoryService.RecentAttackerSnapshot attacker =
                 DamageTargetMemoryService.getInstance().getRecentAttacker(
                         npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs

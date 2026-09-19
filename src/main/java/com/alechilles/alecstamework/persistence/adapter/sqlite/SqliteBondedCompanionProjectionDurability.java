@@ -174,8 +174,20 @@ public final class SqliteBondedCompanionProjectionDurability implements
             BondedCompanionProjectionStorePlanner.StorePlan plan,
             long diedAtMs
     ) {
+        return confirmDeath(lease, plan, diedAtMs, false);
+    }
+
+    @Override
+    public boolean confirmDeath(
+            BondedCompanionProjectionValidator.LeaseExpectation lease,
+            BondedCompanionProjectionStorePlanner.StorePlan plan,
+            long diedAtMs,
+            boolean permanently
+    ) {
         Objects.requireNonNull(plan, "plan");
         return transaction(connection -> {
+            if (permanently) return deleteAfterConfirmedDeath(
+                    connection, lease, plan.expectedRevision());
             try (PreparedStatement update = connection.prepareStatement("""
                     UPDATE bonded_companion_profile
                     SET state = 'DEAD', revision = revision + 1,
@@ -204,6 +216,37 @@ public final class SqliteBondedCompanionProjectionDurability implements
             }
             return deleteLease(connection, lease) == 1;
         });
+    }
+
+    /**
+     * Deletes only an ACTIVE profile fenced by the same exact live lease that
+     * supplied the positive death evidence. Foreign keys remove that lease and
+     * its dependent durable rows in this transaction.
+     */
+    private boolean deleteAfterConfirmedDeath(
+            Connection connection,
+            BondedCompanionProjectionValidator.LeaseExpectation lease,
+            long expectedRevision
+    ) throws Exception {
+        try (PreparedStatement delete = connection.prepareStatement("""
+                DELETE FROM bonded_companion_profile
+                WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
+                  AND state = 'ACTIVE' AND revision = ?
+                  AND EXISTS (
+                    SELECT 1 FROM bonded_companion_lease l
+                    WHERE l.profile_id = bonded_companion_profile.profile_id
+                      AND l.lease_token = ? AND l.live_npc_uuid = ?
+                      AND l.world_key = ? AND l.projection_state = ?
+                  )
+                """)) {
+            scope(delete, 1, lease);
+            delete.setLong(4, expectedRevision);
+            delete.setString(5, lease.leaseToken());
+            delete.setString(6, lease.liveNpcUuid().toString());
+            delete.setString(7, lease.worldKey());
+            delete.setString(8, lease.phase().name());
+            return delete.executeUpdate() == 1;
+        }
     }
 
     /** Replays due exact cleanups and records their bounded terminal/retry state. */

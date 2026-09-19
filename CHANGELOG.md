@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Old-age deaths are now permanent, even with revives enabled, including bonded
+  companions. They free owned capacity and cannot be revived later.
+
 - New or unspecified needs resource-search settings now default to Auto Fast.
   Existing explicit choices stay unchanged.
 

@@ -202,7 +202,8 @@ public final class PositiveEvidenceDormantAuthor {
             CoopResidentStateSnapshot state
     ) {
         if (observation.evidence()
-                == DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT) {
+                == DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
+                || observation.evidence() == DormantCompanionObservation.Evidence.OLD_AGE_DEATH) {
             DormantCompanionObservation.DeathObservation death =
                     Objects.requireNonNull(observation.death(), "death");
             return codecs.encode(
@@ -390,6 +391,7 @@ public final class PositiveEvidenceDormantAuthor {
                     .ReconciliationGeneration generation
     ) {
         DormantSourceEvidence.Kind kind = switch (observation.evidence()) {
+            case OLD_AGE_DEATH -> DormantSourceEvidence.Kind.OLD_AGE_DEATH;
             case SAVED_DEATH_COMPONENT ->
                     DormantSourceEvidence.Kind.DEATH_COMPONENT;
             case DESTRUCTIVE_REMOVAL ->

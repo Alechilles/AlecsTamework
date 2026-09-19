@@ -57,6 +57,16 @@ class FreeCompanionRestorationAuthorTest {
     private final SnapshotCodecRegistry codecs = TameworkSnapshotCodecs.create();
 
     @Test
+    void terminalOldAgeDeathCannotBeRestoredWithRevivesEnabled() {
+        var persistence = new FakePersistence(profile(
+                modernDeath(-500L, 0L), LifecycleState.RELEASED));
+        var result = author(persistence, 100L, profile -> true, ignoredDispatcher())
+                .restore(intent()).toCompletableFuture().join();
+        assertEquals(CompanionLifecycleAuthorResult.Status.PROFILE_CONFLICT, result.status());
+        assertEquals(0, persistence.submissions);
+    }
+
+    @Test
     void signedCooldownAndZeroSentinelFollowReleasedDeathPolicy() {
         CompanionSnapshot waiting = modernDeath(-500L, -100L);
         FakePersistence waitingPersistence =

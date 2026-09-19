@@ -21,8 +21,9 @@ public record CompanionDormantTransitionOutcome(
             throw new IllegalArgumentException("Complete dormant transition outcome is required");
         }
         if (state != LifecycleState.DEAD_REVIVABLE
-                && state != LifecycleState.LOST) {
-            throw new IllegalArgumentException("Dormant outcome requires death or lost state");
+                && state != LifecycleState.LOST
+                && state != LifecycleState.RELEASED) {
+            throw new IllegalArgumentException("Dormant outcome requires revivable death, permanent release, or lost state");
         }
         if (sourceReceiptKey == null || sourceReceiptKey.isBlank()) {
             throw new IllegalArgumentException("Dormant source receipt is required");

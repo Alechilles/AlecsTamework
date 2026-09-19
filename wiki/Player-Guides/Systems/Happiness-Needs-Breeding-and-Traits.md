@@ -28,6 +28,10 @@ settings and click **Apply** to save them.
   and 15% of maximum health per minute respectively. Aging still depends on
   the creature's mod supplying an aging configuration.
 
+When old-age death is enabled, dying of old age is permanent, even if revives
+are enabled. This also applies to bonded companions. Changing the revive or
+aging settings afterward cannot restore an animal that died of old age.
+
 Every named preset sets animal progression to the owner-online policy with
 72 hours of offline grace and a 1× rate afterward. Needs damage uses only the
 higher of starvation and dehydration damage, rather than adding both together.

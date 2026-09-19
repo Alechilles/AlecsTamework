@@ -55,4 +55,17 @@ public interface BondedCompanionProjectionDurability {
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
             long diedAtMs);
+
+    /**
+     * Resolves a confirmed exact death. Old-age deaths permanently remove the
+     * profile rather than leaving a revivable DEAD record.
+     */
+    default boolean confirmDeath(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+            @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
+            long diedAtMs,
+            boolean permanently
+    ) {
+        return !permanently && confirmDeath(lease, plan, diedAtMs);
+    }
 }

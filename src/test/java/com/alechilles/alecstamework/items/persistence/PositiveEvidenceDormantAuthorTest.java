@@ -52,6 +52,18 @@ class PositiveEvidenceDormantAuthorTest {
             new ReconciliationGeneration(3);
 
     @Test
+    void oldAgeAuthorsTerminalStateInsteadOfRevivableDeath() {
+        FakePersistence persistence = new FakePersistence(profile());
+        var result = author(persistence, reader(), -450L).makeDormant(intent(
+                DormantCompanionObservation.Evidence.OLD_AGE_DEATH
+        )).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(LifecycleState.RELEASED, persistence.request.targetState());
+        assertEquals(TameworkSnapshotCodecs.DEATH, persistence.request.snapshot().kind());
+    }
+
+    @Test
     void deathWaitsForFirstProfilePublicationWithEvidenceAlreadyFrozen() {
         FakePersistence persistence = new FakePersistence(null);
         CompletableFuture<Void> publication = new CompletableFuture<>();
@@ -419,6 +431,7 @@ class PositiveEvidenceDormantAuthorTest {
         DormantCompanionObservation.DeathObservation death =
                 evidence == DormantCompanionObservation.Evidence
                         .SAVED_DEATH_COMPONENT
+                        || evidence == DormantCompanionObservation.Evidence.OLD_AGE_DEATH
                         ? new DormantCompanionObservation.DeathObservation(
                         -490L,
                         -300L,
