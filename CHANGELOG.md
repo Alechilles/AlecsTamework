@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
 
 - Reduced oversized life-stage and trait UI textures to lower client texture-atlas usage.
 
