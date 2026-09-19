@@ -11,8 +11,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -146,6 +144,18 @@ final class CommandPanelActionService {
                            String toolId,
                            TwCommandItemConfig config,
                            UUID npcUuid) {
+        applyToggleActive(player, toolId, config, npcUuid, null);
+    }
+
+    /**
+     * Applies a selection change for a row whose owned record was resolved by
+     * the server from the current companion projection.
+     */
+    void applyToggleActive(Player player,
+                           String toolId,
+                           TwCommandItemConfig config,
+                           UUID npcUuid,
+                           LinkedNpcRecord ownedRecord) {
         if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
                 || player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
@@ -154,8 +164,15 @@ final class CommandPanelActionService {
         CommandLinkMutationService.ActiveToggleResult[] resultHolder =
                 new CommandLinkMutationService.ActiveToggleResult[1];
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            LinkedNpcRecord existing = linkMutationService.findLinkedNpcRecord(
+                    linkMutationService.readLinkedNpcRecords(stack), npcUuid);
+            LinkedNpcRecord resolvedOwnedRecord = toolInventoryService.resolveOwnedSelectionRecord(
+                    player, toolId, config, npcUuid);
+            // Deselecting is always allowed; selecting must still belong to this player.
+            if ((existing == null || !existing.active) && resolvedOwnedRecord == null) return stack;
             CommandLinkMutationService.ActiveToggleResult result =
-                    linkMutationService.toggleLinkedNpcActive(stack, npcUuid, config);
+                    linkMutationService.toggleLinkedNpcActive(
+                            stack, npcUuid, config, resolvedOwnedRecord);
             resultHolder[0] = result;
             return result.updatedItem;
         });
@@ -171,8 +188,8 @@ final class CommandPanelActionService {
         feedbackService.showSuccessKey(
                 player,
                 result.active
-                        ? "tamework.ui.notifications.command.toggleActive.enabled"
-                        : "tamework.ui.notifications.command.toggleActive.disabled",
+                        ? "tamework.command.selection.selected"
+                        : "tamework.command.selection.deselected",
                 resolveFeedbackName(player, result.updatedItem, npcUuid)
         );
     }
@@ -186,9 +203,19 @@ final class CommandPanelActionService {
                 || npcUuid == null) {
             return;
         }
+        LinkedNpcRecord owned = toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid);
+        if (owned == null) return;
+        var entry = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config).stream()
+                .filter(row -> npcUuid.equals(row.npcUuid()) && row.loaded() && row.breedingAvailable()).findFirst().orElse(null);
+        if (entry == null) return;
         CommandLinkMutationService.BreedingToggleResult[] resultHolder =
                 new CommandLinkMutationService.BreedingToggleResult[1];
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            var records = new java.util.ArrayList<>(linkMutationService.readLinkedNpcRecords(stack));
+            var existing = linkMutationService.findLinkedNpcRecord(records, npcUuid);
+            if (existing == null) records.add(owned.withActive(false).withBreedingEnabled(entry.breedingEnabled()));
+            else records.set(records.indexOf(existing), existing.withBreedingEnabled(entry.breedingEnabled()));
+            stack = linkMutationService.writeLinkedNpcRecords(stack, records);
             CommandLinkMutationService.BreedingToggleResult result =
                     linkMutationService.toggleLinkedNpcBreeding(stack, npcUuid);
             resultHolder[0] = result;
@@ -410,6 +437,7 @@ final class CommandPanelActionService {
         if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
             return;
         }
+        if (toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid) == null) return;
         groupActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
     }
 
@@ -426,51 +454,7 @@ final class CommandPanelActionService {
     }
 
     void applyDeleteGroup(Player player, String toolId, String groupId) {
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> {
-                    ItemStack withoutGroup = groupService.deleteGroup(stack, groupId);
-                    return withoutGroup == stack
-                            ? stack
-                            : clearGroupAssignments(withoutGroup, groupId);
-                }
-        );
-        if (player == null) {
-            return;
-        }
-        if (updated) {
-            feedbackService.showSuccessKey(
-                    player,
-                    "tamework.ui.notifications.command.group.deleted"
-            );
-        } else {
-            feedbackService.showWarningKey(
-                    player,
-                    "tamework.ui.notifications.command.group.deleteFailed"
-            );
-        }
-    }
-
-    private ItemStack clearGroupAssignments(ItemStack stack, String groupId) {
-        if (stack == null || stack.isEmpty() || groupId == null || groupId.isBlank()) {
-            return stack;
-        }
-        List<LinkedNpcRecord> records = linkMutationService.readLinkedNpcRecords(stack);
-        ArrayList<LinkedNpcRecord> updated = new ArrayList<>(records.size());
-        boolean changed = false;
-        for (LinkedNpcRecord record : records) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
-                updated.add(record.withGroupId(null));
-                changed = true;
-            } else {
-                updated.add(record);
-            }
-        }
-        return changed ? linkMutationService.writeLinkedNpcRecords(stack, updated) : stack;
+        groupActionService.applyDeleteGroup(player, toolId, groupId);
     }
 
     private void applyLoadedNpcBreedingToggle(Player player,

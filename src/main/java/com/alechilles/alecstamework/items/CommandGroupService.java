@@ -16,7 +16,7 @@ import java.util.Set;
  * Reads and normalizes command-panel group metadata persisted on command tools.
  */
 final class CommandGroupService {
-    private static final int MAX_GROUPS = 24;
+    static final int MAX_GROUPS = 128;
     private static final int MAX_GROUP_ID_LENGTH = 32;
     private static final int MAX_GROUP_NAME_LENGTH = 24;
     private static final int MAX_METADATA_BYTES = 16 * 1024;
@@ -24,6 +24,10 @@ final class CommandGroupService {
     private static final String RECORD_SEPARATOR = "\n";
     private static final String PART_SEPARATOR = "\\|";
     private static final String DEFAULT_COLOR = "#4b657f";
+
+    List<GroupRecord> readGroups(com.hypixel.hytale.server.core.entity.entities.Player player, ItemStack stack) {
+        return readGroups(CommandCompanionGroups.view(player, stack));
+    }
 
     List<GroupRecord> readGroups(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {

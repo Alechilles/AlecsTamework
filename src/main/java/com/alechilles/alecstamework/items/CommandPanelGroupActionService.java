@@ -28,25 +28,20 @@ final class CommandPanelGroupActionService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
-        String normalizedGroupId = normalizeOptionalGroupId(groupId);
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> {
-                    if (normalizedGroupId != null && groupService.findGroup(stack, normalizedGroupId) == null) {
-                        return stack;
-                    }
-                    return linkMutationService.setLinkedNpcGroup(stack, npcUuid, normalizedGroupId);
-                }
-        );
-        if (!updated && normalizedGroupId != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.assignFailed");
-        }
+        ItemStack stack = toolInventoryService.findToolStack(player, toolId);
+        var record = new CommandLinkedNpcRecordStore().find(new CommandLinkedNpcRecordStore().read(stack), npcUuid);
+        if (record == null) return;
+        String key = record.profileId == null ? CommandCompanionGroups.entityKey(npcUuid)
+                : CommandCompanionGroups.profileKey(record.profileId);
+        String normalized = normalizeOptionalGroupId(groupId);
+        // Legacy scalar API replaces this animal's memberships; native UI sends the whole selected set.
+        CommandCompanionGroups.assign(player, stack, key, npcUuid,
+                normalized == null ? List.of() : List.of(normalized));
     }
 
     void applyCreateGroup(Player player, String toolId, String name, String colorHex) {
         String groupName = groupService.normalizeDisplayName(name);
-        boolean updated = toolInventoryService.mutateToolStack(
+        boolean updated = toolInventoryService.mutateGroups(
                 player, toolId, stack -> groupService.createGroup(stack, name, colorHex)
         );
         sendResult(player, updated,
@@ -57,7 +52,7 @@ final class CommandPanelGroupActionService {
 
     void applyRenameGroup(Player player, String toolId, String groupId, String name) {
         String groupName = groupService.normalizeDisplayName(name);
-        boolean updated = toolInventoryService.mutateToolStack(
+        boolean updated = toolInventoryService.mutateGroups(
                 player, toolId, stack -> groupService.renameGroup(stack, groupId, name)
         );
         sendResult(player, updated,
@@ -68,7 +63,7 @@ final class CommandPanelGroupActionService {
 
     void applyRecolorGroup(Player player, String toolId, String groupId, String colorHex) {
         String[] groupName = { groupId };
-        boolean updated = toolInventoryService.mutateToolStack(
+        boolean updated = toolInventoryService.mutateGroups(
                 player,
                 toolId,
                 stack -> {
@@ -86,57 +81,11 @@ final class CommandPanelGroupActionService {
     }
 
     void applyDeleteGroup(Player player, String toolId, String groupId) {
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> {
-                    ItemStack updatedStack = groupService.deleteGroup(stack, groupId);
-                    return updatedStack == stack ? stack : clearGroupAssignments(updatedStack, groupId);
-                }
-        );
+        boolean updated = toolInventoryService.mutateGroups(
+                player, toolId, stack -> groupService.deleteGroup(stack, groupId));
         sendResult(player, updated,
                 "tamework.ui.notifications.command.group.deleteFailed",
                 "tamework.ui.notifications.command.group.deleted");
-    }
-
-    private ItemStack clearGroupAssignments(ItemStack stack, String groupId) {
-        if (stack == null || stack.isEmpty() || groupId == null || groupId.isBlank()) {
-            return stack;
-        }
-        List<LinkedNpcRecord> records = linkMutationService.readLinkedNpcRecords(stack);
-        if (records.isEmpty()) {
-            return stack;
-        }
-        ArrayList<LinkedNpcRecord> updated = new ArrayList<>(records.size());
-        boolean changed = false;
-        for (LinkedNpcRecord record : records) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
-                updated.add(withoutGroup(record));
-                changed = true;
-            } else {
-                updated.add(record);
-            }
-        }
-        return changed ? linkMutationService.writeLinkedNpcRecords(stack, updated) : stack;
-    }
-
-    private static LinkedNpcRecord withoutGroup(LinkedNpcRecord record) {
-        return new LinkedNpcRecord(
-                record.npcUuid,
-                record.lastKnownPosition,
-                record.lastKnownWorldName,
-                record.homePosition,
-                record.cachedDisplayName,
-                record.cachedNameKey,
-                record.cachedRoleId,
-                record.cachedCommandState,
-                record.active,
-                record.breedingEnabled,
-                null
-        );
     }
 
     private void sendResult(Player player,

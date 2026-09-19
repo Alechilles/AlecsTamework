@@ -14,11 +14,14 @@ final class CommandUiManagedPanelActions {
     private final CommandToolInventoryService tools;
     private final CommandPanelActionService panelActions;
     private final CommandUiManagedGroupFlowService groupFlows;
+    private final CommandGroupAssignPageService groupSelection;
 
     CommandUiManagedPanelActions(
             @Nullable CommandToolInventoryService tools,
-            @Nullable CommandPanelActionService panelActions
+            @Nullable CommandPanelActionService panelActions,
+            @Nullable CommandGroupAssignPageService groupSelection
     ) {
+        this.groupSelection = groupSelection;
         this.tools = tools;
         this.panelActions = panelActions;
         this.groupFlows = new CommandUiManagedGroupFlowService();
@@ -74,16 +77,22 @@ final class CommandUiManagedPanelActions {
                 () -> {
                     Player player = context.player();
                     return player == null || tools == null ? null
-                            : tools.findUniqueToolStack(
-                                    player, context.toolId());
+                            : CommandCompanionGroups.view(player, tools.findUniqueToolStack(
+                                    player, context.toolId()));
                 },
                 mutator -> {
                     Player player = context.player();
                     return player != null && tools != null
                             && tools.findUniqueToolStack(
                                     player, context.toolId()) != null
-                            && tools.mutateToolStack(
+                            && tools.mutateGroups(
                                     player, context.toolId(), mutator);
+                },
+                () -> groupSelection.resolveGroupActivationValue(context.player(), context.toolId(), context.config()),
+                value -> {
+                    if (!context.genericAuthority().getAsBoolean() || context.player() == null) return false;
+                    groupSelection.applyGroupActivation(context.player(), context.toolId(), context.config(), value);
+                    return true;
                 });
     }
 
@@ -98,7 +107,8 @@ final class CommandUiManagedPanelActions {
             String toolId,
             BooleanSupplier preferenceAuthority,
             BooleanSupplier genericAuthority,
-            Supplier<Player> playerSupplier
+            Supplier<Player> playerSupplier,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config
     ) {
         Context {
             if (toolId == null || toolId.isBlank()) {

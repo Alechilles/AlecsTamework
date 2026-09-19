@@ -28,12 +28,16 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
   companion. An NPC that is already dead or at zero health cannot be captured.
 
 ## Command items
-- Link specific companions to a tool
-- Legacy tools store command selection, links, and display preferences on the
-  item itself. Owner/command-family tools read durable roster membership from
-  the world instead of treating the item as roster authority.
+- Ordinary `ItemMetadata` flutes show all owned companions automatically.
+  You do not need to link an animal to each flute.
+- Each physical flute stores its own selected companions. Left-click an owned NPC
+  while holding that flute, or use the card selection button, to select or deselect it.
+  Separate flutes can keep separate working sets.
+- Owner/command-family tools read durable roster membership from the world instead
+  of treating the item as roster authority. Bonded tools keep their separate roster
+  and lease controls.
 - Open the radial menu and linked panel for deeper management
-- Can limit how many linked companions stay active at once
+- Can limit how many selected companions stay active at once
 - Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
 - Read captured, coop, roster-stored, provisioned-dormant, dead, and `LOST`
   status from the companion's saved lifecycle rather than deciding those states
@@ -52,7 +56,12 @@ command item and acquisition method.
 ## Player expectations
 - If an item works on one creature but not another, that is usually a role filter from the mod's config.
 - If spawning or naming fails, it is usually because of ownership, tame, cooldown, or allowed-role rules.
-- If a command item looks empty, it may simply have no linked companions yet.
+- If a command item looks empty, check its status tab, `Nearby only` filter, and search
+  text. A newly owned companion appears automatically even when it is not selected.
+- A flute's selected set is independent of the shared player groups. Companions can
+  belong to several groups or none; left-clicking a group selects its members for the
+  current flute without changing memberships. Right-click adds a group while keeping
+  the animals already selected.
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
 - A supported managed-coop interaction can place an eligible canonical filled

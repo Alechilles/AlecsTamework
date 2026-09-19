@@ -166,13 +166,16 @@ final class LinkedNpcPanelCardBinder {
         // identity must never fall through to legacy per-item link actions.
         boolean managedRoster = config.ownerCommandFamilyRoster()
                 || feature != null && feature.managesRosterRow();
+        // Read-only ordinary companions keep the normal card and location layout.
+        boolean rosterLayout = config.ownerCommandFamilyRoster()
+                || feature != null && (feature.roster() != null || feature.bonded() != null);
         boolean legacyLinked = isLinked && !managedRoster;
         boolean genericLinkedOrOwned = !managedRoster
                 && (legacyLinked || entry.ownedActions());
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();
         LinkedNpcEntry.Location location = entry.location();
-        boolean showInlineLocation = !managedRoster
+        boolean showInlineLocation = !rosterLayout
                 && !pendingUnlink
                 && !entry.loaded()
                 && !entry.dead()
@@ -193,7 +196,7 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
-        boolean showSetHome = legacyLinked
+        boolean showSetHome = genericLinkedOrOwned
                 && entry.loaded()
                 && !entry.dead()
                 && !entry.captured()
@@ -201,7 +204,7 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.lost()
                 && !pendingUnlink;
         boolean showReturnHome =
-                legacyLinked
+                genericLinkedOrOwned
                         && !entry.dead()
                         && !entry.captured()
                         && !entry.inCoop()
@@ -211,28 +214,28 @@ final class LinkedNpcPanelCardBinder {
         boolean removalMenuAvailable = !managedRoster;
         boolean canRelease = removalMenuAvailable && !entry.captured() && !entry.inCoop();
         boolean canCull = canRelease && entry.loaded() && !entry.dead() && !entry.lost();
-        boolean showLink = !legacyLinked && !managedRoster && entry.loaded()
+        boolean showLink = !entry.ownedActions() && !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
         boolean showRemovalMenu = removalMenuAvailable && pendingUnlink;
-        boolean showUnlink = showRemovalMenu && legacyLinked;
-        boolean showUnlinkDisabled = showRemovalMenu && !legacyLinked;
+        boolean showUnlink = showRemovalMenu && legacyLinked && !entry.ownedActions();
+        boolean showUnlinkDisabled = showRemovalMenu && !legacyLinked && !entry.ownedActions();
         boolean showRelease = showRemovalMenu && canRelease;
         boolean showReleaseDisabled = showRemovalMenu && !canRelease;
         boolean showCull = showRemovalMenu && canCull;
-        boolean showActiveToggleActive = legacyLinked && entry.active();
-        boolean showActiveToggleInactive = legacyLinked && !entry.active();
+        boolean showActiveToggleActive = genericLinkedOrOwned && entry.active();
+        boolean showActiveToggleInactive = genericLinkedOrOwned && !entry.active();
         boolean showBreedingToggleEnabled =
-                legacyLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
+                genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
-                legacyLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        boolean showFlightToggle = legacyLinked && entry.loaded()
+                genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
+        boolean showFlightToggle = genericLinkedOrOwned && entry.loaded()
                 && entry.flightToggleAvailable() && !pendingUnlink;
-        boolean showShoulderRide = legacyLinked && entry.loaded()
+        boolean showShoulderRide = genericLinkedOrOwned && entry.loaded()
                 && entry.shoulderRideAvailable() && !pendingUnlink;
         boolean showRespawn = paidRevivalManaged
                 ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
                 : showReviveAction;
-        boolean showInactiveBadge = legacyLinked && !entry.active()
+        boolean showInactiveBadge = !entry.ownedActions() && legacyLinked && !entry.active()
                 && !showRespawn && !pendingUnlink;
         boolean showRecallCountdown = genericLinkedOrOwned
                 && entry.recallPending()
@@ -270,6 +273,12 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkDisabledSelector, showUnlinkDisabled);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
+        if (entry.ownedActions()) {
+            commandBuilder.set(activeToggleInactiveSelector + ".Disabled", !entry.selectionSupported());
+            commandBuilder.set(activeToggleActiveSelector + ".TooltipText", LocalizedText.resolve(language, "tamework.ui.companions.deselect"));
+            commandBuilder.set(activeToggleInactiveSelector + ".TooltipText", LocalizedText.resolve(language,
+                    entry.selectionSupported() ? "tamework.ui.companions.select" : "tamework.ui.companions.unsupported"));
+        }
         LinkedNpcPanelIconStyles.visible(commandBuilder, breedingToggleEnabledSelector, showBreedingToggleEnabled);
         LinkedNpcPanelIconStyles.visible(commandBuilder, breedingToggleDisabledSelector, showBreedingToggleDisabled);
         bindBreedingTooltips(commandBuilder, entrySelector, entry, language);
@@ -291,7 +300,7 @@ final class LinkedNpcPanelCardBinder {
                 ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"
                 : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip") : "");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
-        bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
+        bindCardLayout(commandBuilder, entrySelector, entry, rosterLayout,
                 showActiveToggleActive || showActiveToggleInactive, showInlineLocation);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
                 lifecycleDisplay.visible() || entry.hasKnownCooldowns());
@@ -362,13 +371,13 @@ final class LinkedNpcPanelCardBinder {
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
         commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
         if (emblem != null && !showInlineLocation) {
-            boolean compact = !managedRoster && !entry.hasKnownCardDetails();
+            boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
             int statusWidth = 414;
             boolean lost = entry.lost() && !entry.dead() && !entry.inCoop();
             int emblemSize = lost ? (compact ? 48 : 72) : compact ? 36 : 44;
-            int emblemTop = lost ? (compact ? 37 : managedRoster ? 64 : 46) : 36;
+            int emblemTop = lost ? (compact ? 37 : rosterLayout ? 64 : 46) : 36;
             int labelTop = lost ? emblemTop + emblemSize + 4 : compact ? 74 : 82;
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Background", UiIconStyle.forTexture(emblem));
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",

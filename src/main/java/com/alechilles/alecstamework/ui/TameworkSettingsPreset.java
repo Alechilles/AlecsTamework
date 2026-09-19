@@ -14,7 +14,8 @@ public enum TameworkSettingsPreset {
     CUSTOM("Custom", "tamework.ui.settings.preset.custom"),
     SIMPLIFIED("Simplified", "tamework.ui.settings.preset.simplified"),
     EASIER("Easier", "tamework.ui.settings.preset.easier"),
-    FULL_EXPERIENCE("FullExperience", "tamework.ui.settings.preset.fullExperience");
+    FULL_EXPERIENCE("FullExperience", "tamework.ui.settings.preset.fullExperience"),
+    HARDCORE("Hardcore", "tamework.ui.settings.preset.hardcore");
 
     private final String value;
     private final String displayKey;
@@ -52,9 +53,10 @@ public enum TameworkSettingsPreset {
     public TameworkSettingsValues applyTo(@Nonnull TameworkSettingsValues values) {
         return switch (this) {
             case CUSTOM -> values;
-            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false, false);
-            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true, true);
-            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true);
+            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false, false, false);
+            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true, true, false);
+            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, false);
+            case HARDCORE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, true);
         };
     }
 
@@ -73,14 +75,10 @@ public enum TameworkSettingsPreset {
 
     @Nonnull
     public static TameworkSettingsPreset match(@Nonnull TameworkSettingsValues values) {
-        if (matches(values, false, false, false, false, false, false, false, false, false, false)) {
-            return SIMPLIFIED;
-        }
-        if (matches(values, true, false, false, true, true, true, true, true, true, true)) {
-            return EASIER;
-        }
-        if (matches(values, true, true, true, true, true, true, true, true, true, true)) {
-            return FULL_EXPERIENCE;
+        for (TameworkSettingsPreset preset : values()) {
+            if (preset.isLoadable() && preset.applyTo(values).equals(values)) {
+                return preset;
+            }
         }
         return CUSTOM;
     }
@@ -96,30 +94,9 @@ public enum TameworkSettingsPreset {
                 new DropdownEntryInfo(LocalizableString.fromString(SIMPLIFIED.displayName(language)), SIMPLIFIED.value),
                 new DropdownEntryInfo(LocalizableString.fromString(EASIER.displayName(language)), EASIER.value),
                 new DropdownEntryInfo(LocalizableString.fromString(FULL_EXPERIENCE.displayName(language)), FULL_EXPERIENCE.value),
+                new DropdownEntryInfo(LocalizableString.fromString(HARDCORE.displayName(language)), HARDCORE.value),
                 new DropdownEntryInfo(LocalizableString.fromString(CUSTOM.displayName(language)), CUSTOM.value)
         );
     }
 
-    private static boolean matches(@Nonnull TameworkSettingsValues values,
-                                   boolean needsEnabled,
-                                   boolean needsDamageEnabled,
-                                   boolean needsDamageLethal,
-                                   boolean happinessEnabled,
-                                   boolean passiveBreedingEnabled,
-                                   boolean breedingRequiresHappiness,
-                                   boolean breedingGenderEnabled,
-                                   boolean traitsEnabled,
-                                   boolean levelingEnabled,
-                                   boolean talentsEnabled) {
-        return values.needsEnabled() == needsEnabled
-                && values.needsDamageEnabled() == needsDamageEnabled
-                && values.needsDamageLethal() == needsDamageLethal
-                && values.happinessEnabled() == happinessEnabled
-                && values.passiveBreedingEnabled() == passiveBreedingEnabled
-                && values.breedingRequiresHappiness() == breedingRequiresHappiness
-                && values.breedingGenderEnabled() == breedingGenderEnabled
-                && values.traitsEnabled() == traitsEnabled
-                && values.levelingEnabled() == levelingEnabled
-                && values.talentsEnabled() == talentsEnabled;
-    }
 }

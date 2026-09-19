@@ -80,7 +80,7 @@ Group #Root {
    Group #MeterFill { Anchor: (Top: 26, Left: 0, Width: 0, Height: 6); Background: #d7ba77; }
    Label { Anchor: (Top: 34, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: (FontSize: 10, TextColor: #b9beb8); }
    Group #HappinessTargetMarker { Anchor: (Top: 24, Left: 0, Width: 2, Height: 10); Background: #e1be73; Visible: false; HitTestVisible: false; }
-            Group #BreedingThresholdMarker { Anchor: (Top: 15, Left: -7, Width: 14, Height: 12); Background: (TexturePath: "Tamework/PanelActions/BreedingOn_Glyph_Default.png", Color: #ed8eae); Visible: false; HitTestVisible: false; }
+            Group #BreedingThresholdMarker { Anchor: (Top: 15, Left: -7, Width: 14, Height: 12); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Threshold.png", Color: #ed8eae); Visible: false; HitTestVisible: false; }
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
   Group #NeedHunger { Anchor: (Width: 112, Height: 48);

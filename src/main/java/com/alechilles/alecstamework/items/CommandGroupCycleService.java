@@ -1,67 +1,50 @@
 package com.alechilles.alecstamework.items;
 
-import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /** Advances a command flute through its dispatchable active companion groups. */
 final class CommandGroupCycleService {
-    private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
-    private final CommandGroupService groupService;
-    private final CommandGroupActivationService activationService;
-
-    CommandGroupCycleService(@Nullable CommandLinkedNpcRecordStore linkedNpcRecordStore,
-                             @Nullable CommandGroupService groupService,
-                             @Nullable CommandGroupActivationService activationService) {
-        this.linkedNpcRecordStore = linkedNpcRecordStore != null
-                ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
-        this.groupService = groupService != null ? groupService : new CommandGroupService();
-        this.activationService = activationService != null
-                ? activationService : new CommandGroupActivationService(
-                        this.linkedNpcRecordStore, this.groupService);
-    }
-
-    ItemStack applyNext(@Nullable ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return stack;
-        }
-        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
-        String next = nextSelectorValue(records, groupService.readGroups(stack));
-        return activationService.applySelection(stack, next);
-    }
-
-    String nextSelectorValue(@Nullable List<LinkedNpcRecord> records,
+    String nextSelectorValue(@Nullable List<LinkedNpcEntry> entries,
                              @Nullable List<CommandGroupService.GroupRecord> groups) {
-        List<CommandGroupService.GroupRecord> eligibleGroups = eligibleGroups(records, groups);
-        if (eligibleGroups.isEmpty()) {
-            return CommandGroupActivationService.ALL_VALUE;
-        }
-        String current = activationService.resolveSelectionValue(records, groups);
-        if (CommandGroupActivationService.ALL_VALUE.equals(current)) {
-            return eligibleGroups.getFirst().groupId;
-        }
-        for (int index = 0; index < eligibleGroups.size(); index++) {
-            CommandGroupService.GroupRecord group = eligibleGroups.get(index);
-            if (groupIdMatches(group.groupId, current)) {
-                return index + 1 < eligibleGroups.size()
-                        ? eligibleGroups.get(index + 1).groupId
+        List<CommandGroupService.GroupRecord> eligible = eligibleGroups(entries, groups);
+        if (eligible.isEmpty()) return CommandGroupActivationService.ALL_VALUE;
+        String current = resolveSelectionValue(entries, eligible);
+        if (CommandGroupActivationService.ALL_VALUE.equals(current)) return eligible.getFirst().groupId;
+        for (int index = 0; index < eligible.size(); index++) {
+            if (matches(eligible.get(index).groupId, current)) {
+                return index + 1 < eligible.size()
+                        ? eligible.get(index + 1).groupId
                         : CommandGroupActivationService.ALL_VALUE;
             }
         }
         return CommandGroupActivationService.ALL_VALUE;
     }
 
-    private List<CommandGroupService.GroupRecord> eligibleGroups(
-            @Nullable List<LinkedNpcRecord> records,
-            @Nullable List<CommandGroupService.GroupRecord> groups) {
-        if (records == null || records.isEmpty() || groups == null || groups.isEmpty()) {
-            return List.of();
+    private String resolveSelectionValue(@Nullable List<LinkedNpcEntry> entries,
+                                         List<CommandGroupService.GroupRecord> eligible) {
+        Set<String> selected = selected(entries);
+        if (selected.isEmpty()) return CommandGroupActivationService.NONE_VALUE;
+        Set<String> selectable = selectable(entries);
+        if (!selectable.isEmpty() && selected.equals(selectable)) return CommandGroupActivationService.ALL_VALUE;
+        for (CommandGroupService.GroupRecord group : eligible) {
+            if (selected.equals(members(entries, group.groupId))) return group.groupId;
         }
+        return CommandGroupActivationService.CUSTOM_VALUE;
+    }
+
+    private List<CommandGroupService.GroupRecord> eligibleGroups(
+            @Nullable List<LinkedNpcEntry> entries,
+            @Nullable List<CommandGroupService.GroupRecord> groups) {
+        if (entries == null || entries.isEmpty() || groups == null || groups.isEmpty()) return List.of();
         ArrayList<CommandGroupService.GroupRecord> eligible = new ArrayList<>(groups.size());
         for (CommandGroupService.GroupRecord group : groups) {
             if (group == null || group.groupId == null || group.groupId.isBlank()
-                    || !hasMember(records, group.groupId)) {
+                    || members(entries, group.groupId).isEmpty()) {
                 continue;
             }
             eligible.add(group);
@@ -69,17 +52,38 @@ final class CommandGroupCycleService {
         return eligible;
     }
 
-    private boolean hasMember(List<LinkedNpcRecord> records, String groupId) {
-        for (LinkedNpcRecord record : records) {
-            if (record != null && record.groupId != null
-                    && record.groupId.trim().equalsIgnoreCase(groupId.trim())) {
-                return true;
-            }
+    private Set<String> selected(@Nullable List<LinkedNpcEntry> entries) {
+        Set<String> result = new HashSet<>();
+        if (entries == null) return result;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported() && entry.active()) result.add(key(entry));
         }
-        return false;
+        return result;
     }
 
-    private boolean groupIdMatches(@Nullable String left, @Nullable String right) {
+    private Set<String> selectable(@Nullable List<LinkedNpcEntry> entries) {
+        Set<String> result = new HashSet<>();
+        if (entries == null) return result;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported()) result.add(key(entry));
+        }
+        return result;
+    }
+
+    private Set<String> members(List<LinkedNpcEntry> entries, String groupId) {
+        Set<String> result = new HashSet<>();
+        for (LinkedNpcEntry entry : entries) {
+            if (entry != null && entry.selectionSupported() && entry.groupIds().contains(groupId)) result.add(key(entry));
+        }
+        return result;
+    }
+
+    private String key(LinkedNpcEntry entry) {
+        return entry.companionKey() == null || entry.companionKey().isBlank()
+                ? CommandCompanionGroups.entityKey(entry.npcUuid()) : entry.companionKey();
+    }
+
+    private boolean matches(@Nullable String left, @Nullable String right) {
         return left != null && right != null && left.trim().equalsIgnoreCase(right.trim());
     }
 }

@@ -36,8 +36,54 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final UUID CARD = UUID.fromString("a2000000-0000-0000-0000-000000000001");
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
+    /** Multi-group checks save immediately without rebuilding the mounted native popup. */
     @Test
-    void decorationsOnlyTargetRenderedCardsWhileOwnerListRefreshIsPending() throws Exception {
+    void companionGroupEditsUpdateCaptionWithoutResettingTheDropdown() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(ENTRY.withOwnedActions()
+                .withCompanionGroups("profile", List.of(
+                        new LinkedNpcEntry.GroupMembership("Barn", "Barn", "#445566")), true));
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> List.of(row.get()));
+        page.configureCompanions(new CompanionPanelBinding(() -> "All", ignored -> {}, () -> false, ignored -> {},
+                (id, memberships) -> row.set(row.get().withCompanionGroups("profile", memberships.stream()
+                        .map(group -> new LinkedNpcEntry.GroupMembership(group, group, "#445566")).toList(), true))));
+        UICommandBuilder initial = new UICommandBuilder();
+        page.build(null, initial, new UIEventBuilder(), null);
+        var selected = java.util.Arrays.stream(initial.getCommands())
+                .filter(command -> command.selector != null && command.selector.endsWith("#GroupSelector.SelectedValues"))
+                .findFirst().orElseThrow();
+        assertEquals(List.of("Barn"), BsonDocument.parse(selected.data).getArray("0").stream()
+                .map(value -> value.asString().getValue()).toList());
+        var maximum = java.util.Arrays.stream(initial.getCommands())
+                .filter(command -> command.selector != null && command.selector.endsWith("#GroupSelector.MaxSelection"))
+                .findFirst().orElseThrow();
+        assertEquals(0, BsonDocument.parse(maximum.data).getInt32("0").getValue(),
+                "The client must allow multiple selections and keep the picker open.");
+        CommandSelectionEventData data = CommandSelectionEventData.CODEC.decode(
+                new BsonDocument(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
+                        new org.bson.BsonString(CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + CARD))
+                        .append("@CompanionGroups", new org.bson.BsonArray(List.of(
+                                new org.bson.BsonString("Barn"), new org.bson.BsonString("Travel")))),
+                new com.hypixel.hytale.codec.ExtraInfo());
+        page.handleDataEvent(null, null, data);
+        refresh(page, true);
+        assertEquals(List.of("Barn", "Travel"), row.get().groupIds());
+        assertTrue(packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                .anyMatch(command -> command.selector.endsWith("#GroupSelectorLabel.Text") && command.data.contains("Barn +1")),
+                () -> packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                        .filter(command -> command.selector.endsWith("#GroupSelectorLabel.Text"))
+                        .map(command -> command.selector + "=" + command.data).toList().toString());
+        assertFalse(packets.updates.stream().flatMap(packet -> java.util.Arrays.stream(packet.commands.getCommands()))
+                .anyMatch(command -> command.selector.endsWith("#GroupSelector.SelectedValues")
+                        || command.selector.endsWith("#GroupSelector.Entries")
+                        || command.selector.equals("#TameworkLinkedPanelList")),
+                "Saving a check must leave the mounted dropdown and its selections untouched.");
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void decorationsShareCardRefreshPacketsWhenTheListGrowsOrShrinks() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
                 new NavigationFixture(), legacyConfig());
@@ -54,16 +100,51 @@ class TameworkCommandSelectionPageRefreshTest {
                 new com.alechilles.alecstamework.api.commandui.CommandUiPanelState("owned"));
         UICommandBuilder commands = new UICommandBuilder();
         page.updateDefaultDecorations(snapshot, commands);
-        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                "#TameworkLinkedPanelList[0] #ContributorPortraitStars.Visible".equals(command.selector)));
-        assertFalse(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                command.selector.startsWith("#TameworkLinkedPanelList[1]")),
-                "Contributor updates must not target a card before it is appended.");
+        assertEquals(0, commands.getCommands().length,
+                "A separately dispatched contributor packet can overtake the queued card rebuild.");
         refresh(page, true);
-        commands = new UICommandBuilder();
+        assertCommand(packets.updates.getLast(),
+                "#TameworkLinkedPanelList[1] #ContributorPortraitStars.Visible");
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> List.of(ENTRY));
+        invoke(page, "refreshLinkedNpcEntries");
         page.updateDefaultDecorations(snapshot, commands);
-        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                "#TameworkLinkedPanelList[1] #ContributorPortraitStars.Visible".equals(command.selector)));
+        assertEquals(0, commands.getCommands().length);
+        refresh(page, true);
+        assertFalse(java.util.Arrays.stream(packets.updates.getLast().commands.getCommands())
+                .anyMatch(command -> command.selector != null
+                        && command.selector.startsWith("#TameworkLinkedPanelList[1]")));
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void decorationOnlyChangesRefreshExistingCardsOnce() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        build(page);
+        var contribution = new com.alechilles.alecstamework.api.commandui.CommandUiContribution(
+                com.alechilles.alecstamework.api.commandui.CommandUiContributorId.of("example:stars"),
+                Map.of(), Map.of(CARD, Map.of("portrait.stars",
+                        com.alechilles.alecstamework.api.commandui.CommandUiValue.of(3L))));
+        var snapshot = new com.alechilles.alecstamework.api.commandui.CommandUiSnapshot(
+                OWNER, 1L, 1L, null, List.of(), List.of(),
+                new com.alechilles.alecstamework.api.commandui.CommandUiPanelState("linked"))
+                .withContributions(Map.of(contribution.contributorId(), contribution));
+        UICommandBuilder separate = new UICommandBuilder();
+        page.updateDefaultDecorations(snapshot, separate);
+        assertEquals(0, separate.getCommands().length);
+        packets.fail = true;
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> refresh(page, true));
+        packets.fail = false;
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(),
+                "#TameworkLinkedPanelList[0] #ContributorStar3.Visible");
+        packets.updates.clear();
+        page.updateDefaultDecorations(snapshot, separate);
+        refresh(page, true);
+        assertTrue(packets.updates.isEmpty(), "Unchanged decorations must not emit another packet.");
         page.onDismiss(null, null);
     }
 

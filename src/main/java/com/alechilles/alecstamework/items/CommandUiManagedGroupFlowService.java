@@ -80,7 +80,7 @@ final class CommandUiManagedGroupFlowService {
         if (stack == null || stack.isEmpty()) {
             throw new IllegalStateException("Command tool is unavailable.");
         }
-        String activeSelection = activation.resolveSelectionValue(stack);
+        String activeSelection = context.selection() == null ? activation.resolveSelectionValue(stack) : context.selection().get();
         List<CommandUiGroupView> views = new ArrayList<>();
         for (CommandGroupService.GroupRecord group : groups.readGroups(stack)) {
             if (group == null || group.groupId == null
@@ -170,7 +170,8 @@ final class CommandUiManagedGroupFlowService {
         }
         boolean changed;
         try {
-            changed = context.mutate(mutation);
+            changed = action.builtInKind() == CommandUiAction.Kind.SELECT_ACTIVE_GROUP && context.selectGroup() != null
+                    ? Boolean.TRUE.equals(context.selectGroup().apply(action.value())) : context.mutate(mutation);
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
                     "command group action failed"));
@@ -229,8 +230,14 @@ final class CommandUiManagedGroupFlowService {
             String toolId,
             BooleanSupplier authority,
             Supplier<ItemStack> stackSupplier,
-            Function<UnaryOperator<ItemStack>, Boolean> mutator
+            Function<UnaryOperator<ItemStack>, Boolean> mutator,
+            Supplier<String> selection, Function<String, Boolean> selectGroup
     ) {
+        Context(String toolId, BooleanSupplier authority, Supplier<ItemStack> stackSupplier,
+                Function<UnaryOperator<ItemStack>, Boolean> mutator) {
+            this(toolId, authority, stackSupplier, mutator, null, null);
+        }
+
         Context {
             if (toolId == null || toolId.isBlank()) {
                 throw new IllegalArgumentException("toolId is required");

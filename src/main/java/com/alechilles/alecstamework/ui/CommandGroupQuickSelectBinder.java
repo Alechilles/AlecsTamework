@@ -27,11 +27,19 @@ final class CommandGroupQuickSelectBinder {
                      LinkedNpcPanelRefreshValues values, List<DropdownEntryInfo> entries,
                      String selection, boolean available, boolean initial,
                      Map<String, String> colors) {
+        bind(commands, events, values, entries, selection, available, initial, colors, null);
+    }
+
+    static void bind(UICommandBuilder commands, UIEventBuilder events,
+                     LinkedNpcPanelRefreshValues values, List<DropdownEntryInfo> entries,
+                     String selection, boolean available, boolean initial,
+                     Map<String, String> colors, LinkedNpcEntry[] companions) {
         if (initial) {
             commands.set("#TameworkGroupQuickSelect.Visible", available);
             values.remember("#TameworkGroupQuickSelect.Visible", available);
         } else values.set(commands, "#TameworkGroupQuickSelect.Visible", available);
         if (!available) return;
+        entries = entries.stream().filter(entry -> !"__none__".equals(entry.value())).toList();
         boolean entriesChanged = values.changed("groupQuickSelectEntries", entries);
         Map<String, String> groupColors = groupColors(colors);
         boolean rebuild = initial || entriesChanged;
@@ -41,7 +49,9 @@ final class CommandGroupQuickSelectBinder {
             String button = LIST + "[" + i + "] #QuickGroupButton";
             String swatch = LIST + "[" + i + "] #QuickGroupColor";
             String color = colorFor(entry, groupColors);
-            String style = entry.value().equals(selection) ? "GroupRowSelected" : "GroupRow";
+            boolean selected = companions == null ? entry.value().equals(selection)
+                    : groupSelected(companions, entry.value());
+            String style = selected ? "GroupRowSelected" : "GroupRow";
             if (rebuild) {
                 commands.append(LIST, "TameworkCommandGroupQuickSelectRow.ui");
                 commands.setObject(button + ".Text", entry.label());
@@ -54,6 +64,10 @@ final class CommandGroupQuickSelectBinder {
                 events.addEventBinding(CustomUIEventBindingType.Activating, button,
                         EventData.of(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ACTIVE_LITERAL,
                                 entry.value()), false);
+                if (companions != null) {
+                    events.addEventBinding(CustomUIEventBindingType.RightClicking, button,
+                            EventData.of("CompanionAddGroup", entry.value()), false);
+                }
             } else {
                 values.setStyle(commands, button + ".Style", style);
                 if (values.changed(swatch + ".Background", color)) {
@@ -61,6 +75,16 @@ final class CommandGroupQuickSelectBinder {
                 }
             }
         }
+    }
+
+    static boolean groupSelected(LinkedNpcEntry[] companions, String group) {
+        boolean hasMembers = false;
+        for (var entry : companions) {
+            if (!entry.selectionSupported() || !("__all__".equals(group) || entry.groupIds().contains(group))) continue;
+            hasMembers = true;
+            if (!entry.active()) return false;
+        }
+        return hasMembers;
     }
 
     private static Map<String, String> groupColors(Map<String, String> source) {

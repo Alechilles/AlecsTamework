@@ -22,13 +22,23 @@ final class SpawnerFullStateOwnershipNormalizer {
             @Nullable OwnerId ownerId,
             @Nullable String ownerName
     ) {
+        return normalize(source, ownerId, ownerName, false);
+    }
+
+    @Nonnull
+    CoopResidentStateSnapshot normalize(
+            @Nonnull CoopResidentStateSnapshot source,
+            @Nullable OwnerId ownerId,
+            @Nullable String ownerName,
+            boolean clearToolLinks
+    ) {
         Objects.requireNonNull(source, "source");
         TameworkCommandLinksComponent links = source.commandLinks();
         TameworkCommandLinksComponent normalizedLinks = links == null
                 ? null
                 : new TameworkCommandLinksComponent(
                         ownerId == null ? null : ownerId.value(),
-                        links.getToolIds(),
+                        clearToolLinks ? new String[0] : links.getToolIds(),
                         links.getHomePosition()
                 );
         TameworkOwnerComponent normalizedOwner = ownerId == null

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -28,6 +29,8 @@ final class CommandSelectionLinkedPanelRuntime {
     }
     private final TameworkCommandSelectionPage page;
     private long removalConfirmOverlayRevision = -1L;
+    private CommandUiDefaultDecorationBinder.State renderedDecorations =
+            CommandUiDefaultDecorationBinder.State.EMPTY;
 
     CommandSelectionLinkedPanelRuntime(TameworkCommandSelectionPage page) {
         this.page = page;
@@ -42,8 +45,7 @@ final class CommandSelectionLinkedPanelRuntime {
         commands.clear("#TameworkLinkedPanelList");
         boolean hasEntries = page.linkedNpcEntries.length > 0;
         commands.set("#TameworkLinkedPanelEmptyState.Text",
-                LinkedNpcPanelPresentationSupport.empty(
-                        page.panelEmptyStateKeySupplier, page.resolveLanguage()));
+                emptyText(page.resolveLanguage()));
         commands.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commands.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
         for (int index = 0; index < page.linkedNpcEntries.length; index++) {
@@ -51,16 +53,23 @@ final class CommandSelectionLinkedPanelRuntime {
                     page.featureController.presentation(
                             page.linkedNpcEntries[index].npcUuid()));
         }
+        renderedDecorations = page.defaultDecorations();
     }
 
-    void bindDefaultDecorations(UICommandBuilder commands) {
+    private String emptyText(String language) {
+        return page.companionBinding != null
+                ? LocalizedText.resolve(language, "tamework.ui.roster.emptyFilter")
+                : LinkedNpcPanelPresentationSupport.empty(page.panelEmptyStateKeySupplier, language);
+    }
+
+    private void bindDefaultDecorations(UICommandBuilder commands) {
         CommandUiDefaultDecorationBinder.bindHeader(commands,
                 page.defaultDecorations());
-        // Tab/filter changes can replace the model before its queued rebuild is sent.
-        // Contributor updates must address the cards that are still on the client.
-        for (int index = 0; index < page.cardRenderState.entryCount(); index++) {
-            LinkedNpcEntry entry = page.cardRenderState.entryAt(index);
-            CommandPanelFeaturePresentation presentation = page.cardRenderState
+        // These commands follow any card appends in the same packet. A separate
+        // contributor dispatch could arrive before a previously queued rebuild.
+        for (int index = 0; index < page.linkedNpcEntries.length; index++) {
+            LinkedNpcEntry entry = page.linkedNpcEntries[index];
+            CommandPanelFeaturePresentation presentation = page.featureController
                     .presentation(entry.npcUuid());
             if (presentation != null && presentation.bonded() != null) continue;
             CommandUiDefaultDecorationBinder.bindCard(commands,
@@ -183,6 +192,9 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelModeDropdown.Value",
                 LinkedNpcPanelPresentationSupport.mode(page.panelModeValueSupplier));
         LinkedNpcPanelPresentationSupport.bindModeTabs(commands, page.panelModeValueSupplier, values);
+        if (!page.config.usesBondedCompanionRoster() && page.companionBinding == null) {
+            LinkedNpcPanelPresentationSupport.bindFilterWidth(commands, page.panelModeValueSupplier, values);
+        }
         values.set(commands, "#TameworkLinkedPanelAutoLinkCheck.Value",
                 LinkedNpcPanelPresentationSupport.autoLink(
                         page.panelAutoLinkEnabledSupplier));
@@ -222,8 +234,7 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         boolean hasEntries = page.linkedNpcEntries.length > 0;
         values.set(commands, "#TameworkLinkedPanelEmptyState.Text",
-                LinkedNpcPanelPresentationSupport.empty(
-                        page.panelEmptyStateKeySupplier, language));
+                emptyText(language));
         values.set(commands, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         values.set(commands, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
         Map<UUID, CommandPanelFeaturePresentation> features =
@@ -233,12 +244,17 @@ final class CommandSelectionLinkedPanelRuntime {
                         page.cardRenderState.presentation(id), presentation,
                         progressionEligible)));
         renderCards(commands, events, hasEntries, features, language);
+        if (!renderedDecorations.equals(page.defaultDecorations())) {
+            bindDefaultDecorations(commands);
+        }
         BondedCompanionPanelChrome.bindToolbar(commands, events, page, values);
+        CompanionPanelChrome.bind(commands, events, page, values);
         if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
             return LinkedNpcPanelRefreshOutcome.evaluated(
                     progressionEligible, shortestCountdown());
         }
         page.packetSender.send(commands, events);
+        renderedDecorations = page.defaultDecorations();
         page.refreshTransaction.commit(values, groupRevision, reviveRevision);
         removalConfirmOverlayRevision = removalConfirmRevision;
         page.cardRenderState.markRendered(page.linkedNpcEntries,
@@ -303,6 +319,10 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.panelGroupActivationEntriesSupplier,
                 page.panelGroupActivationValueSupplier);
         // The initial roster chrome overrides generic values; seed those final values too.
+        if (!page.config.usesBondedCompanionRoster() && page.companionBinding == null) {
+            LinkedNpcPanelPresentationSupport.bindFilterWidth(new UICommandBuilder(),
+                    page.panelModeValueSupplier, page.refreshTransaction.values());
+        }
         BondedCompanionPanelChrome.bindToolbar(new UICommandBuilder(), new UIEventBuilder(),
                 page, page.refreshTransaction.values());
     }
@@ -330,6 +350,29 @@ final class CommandSelectionLinkedPanelRuntime {
         if (!available) return;
         List<DropdownEntryInfo> entries = resolveGroupEntries();
         if (entries.isEmpty()) entries = LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage());
+        if (page.companionBinding != null) {
+            entries = entries.stream().filter(option -> !"None".equalsIgnoreCase(option.value())).toList();
+            // Reapplying Entries/SelectedValues can reset an open native popup.
+            // Group definitions change on the manager page, which rebuilds this page on return.
+            if (append) {
+                commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
+                        "TameworkPanelActionStyles.ui", "CompanionGroupDropdown"));
+                commands.set(selector + ".MaxSelection", 0);
+                commands.set(selector + ".Entries", entries);
+                // The builder registers LocalizableString, not String, for array values.
+                // Literal wrappers encode the IDs as plain strings without translating them.
+                commands.set(selector + ".SelectedValues", entry.groupIds().stream()
+                        .map(LocalizableString::fromString).toList());
+            }
+            bindCompanionGroupLabel(commands, selector, entry);
+            if (append) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
+                    EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
+                            .append("@CompanionGroups", selector + ".SelectedValues"), false);
+            return;
+        }
+        commands.set(selector + ".MaxSelection", 1);
+        commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
+                "TameworkPanelActionStyles.ui", "GroupDropdown"));
         String selectedGroup = LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId());
         commands.set(selector + ".Entries", entries);
         commands.set(selector + ".Value", selectedGroup);
@@ -343,13 +386,37 @@ final class CommandSelectionLinkedPanelRuntime {
                         .append(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ASSIGN_VALUE, selector + ".Value"), false);
     }
 
+    private void bindCompanionGroupLabel(UICommandBuilder commands, String selector, LinkedNpcEntry entry) {
+        String label = entry.groups().isEmpty() ? LocalizedText.resolve(page.resolveLanguage(), "tamework.ui.companions.noGroups")
+                : entry.groups().size() == 1 ? entry.groups().getFirst().name()
+                : LocalizedText.format(page.resolveLanguage(), "tamework.ui.companions.groupSummary", entry.groups().getFirst().name(), entry.groups().size() - 1);
+        commands.set(selector + "Label.Text", label);
+        commands.set(selector + ".TooltipText", entry.groupName());
+        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
+    }
+
+    void companionGroupsChanged(UUID id) {
+        page.preserveCompanionOrder = true;
+        refreshEntries();
+        LinkedNpcEntry current = resolveEntry(id);
+        if (current == null) return;
+        for (int index = 0; index < page.cardRenderState.entryCount(); index++) {
+            if (!id.equals(page.cardRenderState.entryAt(index).npcUuid())) continue;
+            UICommandBuilder commands = new UICommandBuilder();
+            // Only the adjacent caption/swatch changes; never reset the native checkbox popup.
+            bindCompanionGroupLabel(commands, "#TameworkLinkedPanelList[" + index + "] #GroupSelector", current);
+            page.packetSender.send(commands, new UIEventBuilder());
+            return;
+        }
+    }
+
     private void bindGroupShortcuts(UICommandBuilder commands, UIEventBuilder events,
                                     LinkedNpcPanelRefreshValues values, boolean initial) {
         CommandGroupQuickSelectBinder.bind(commands, events, values,
                 LinkedNpcPanelPresentationSupport.entries(page.panelGroupActivationEntriesSupplier),
                 LinkedNpcPanelPresentationSupport.value(page.panelGroupActivationValueSupplier, ""),
                 !page.config.usesBondedCompanionRoster() && !page.cardBindingConfig.ownerCommandFamilyRoster(), initial,
-                page.panelGroupColorsSupplier.get());
+                page.panelGroupColorsSupplier.get(), page.companionBinding == null ? null : page.baseLinkedNpcEntries);
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
@@ -426,6 +493,19 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     void applyLocalFilter() {
+        if (page.companionBinding != null) {
+            var previous = page.linkedNpcEntries;
+            page.linkedNpcEntries = CompanionPanelChrome.filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries),
+                    page.companionBinding.state().get(), page.companionBinding.nearby().get(),
+                    LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
+            if (page.preserveCompanionOrder && previous != null) {
+                var current = new java.util.HashMap<UUID, LinkedNpcEntry>();
+                for (var entry : page.baseLinkedNpcEntries) current.put(entry.npcUuid(), entry);
+                page.linkedNpcEntries = java.util.Arrays.stream(previous).map(entry -> current.get(entry.npcUuid()))
+                        .filter(java.util.Objects::nonNull).toArray(LinkedNpcEntry[]::new);
+            }
+            return;
+        }
         page.linkedNpcEntries = LinkedNpcPanelPresentationSupport.filter(
                 page.pendingRemovals.filter(page.baseLinkedNpcEntries),
                 LinkedNpcPanelPresentationSupport.filterMode(

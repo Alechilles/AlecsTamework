@@ -16,6 +16,9 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - Link persistence and mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`, `CommandLinkPolicyService`
 - Command execution: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Panel entry assembly and preferences: `CommandLinkedPanelEntryService`, `CommandLinkedPanelUnloadedNameService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
+- Ordinary companion browsing and player-owned grouping: `CompanionPanelChrome`,
+  `CommandCompanionPreferences`, `CommandCompanionGroups`,
+  `TameworkCompanionGroupsComponent`
 - Active-NPC indicators: `CommandActiveNpcHighlightSystem`,
   `CommandActiveNpcHighlightDisplayTracker`, `CommandActiveNpcHighlightEmitter`
 - Group flows: `CommandGroupService`, `CommandGroupAssignPageService`, `CommandGroupManagerPageService`
@@ -25,6 +28,17 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
   `CommandNpcProfileActionResolver`, `CommandCompanionRestorationService`
 
 ## UI layer
+
+Generic item-linked cards resolve membership from the canonical profile's tool
+links; unresolved legacy records remain visible. Owned and command-family
+roster views retain their own membership rules. A captured item that records
+cleared ownership and its former owner revokes those tool links when a
+different player successfully releases it with owner assignment enabled.
+Release clears both the restored NPC's tool IDs and the durable links in the
+existing release transaction. Capture and failed release leave the links
+intact. The normal panel refresh reads the published membership, so stale item
+records cannot restore a card after transfer or a later recapture.
+
 - `TameworkCommandSelectionPage`
 - `TameworkCommandGroupManagerPage`
 - `LinkedNpcPanelCardBinder`
@@ -51,9 +65,18 @@ keys. The guide is translated into all six supported languages. The UI
 document contains no literal guide text.
 
 ## Persistence model
-Legacy command tools persist their link list, group metadata, panel
-preferences, and active or inactive selection on item metadata. A link record
-may also carry the stable profile ID so an old entity UUID can be canonicalized.
+Ordinary `ItemMetadata` command tools persist their per-item selection records and
+panel preferences on the physical item. The owned panel discovers all owned
+companions from the player's profile projection, then uses those records only to
+decide which rows are selected for that flute. A selected row is eligible for
+dispatch only after the held item's owner, tame, role, command, and capacity checks.
+Legacy link records remain readable and preserve their existing active flags during
+migration; a record may also carry the stable profile ID so an old entity UUID can
+be canonicalized.
+Player-owned group definitions and multi-membership assignments live in
+`TameworkCompanionGroupsComponent`, shared by compatible ordinary flutes. Group
+selection is a one-time mutation of the current flute's per-item records; browsing
+the group or changing its memberships does not become a new persistence authority.
 Owner/command-family rosters instead persist membership and summon state in the
 replacement store; command items are interfaces to that durable roster rather
 than its authority.
@@ -72,7 +95,12 @@ world-thread dispatcher. The command feature handler closes the cache and subscr
 at shutdown. Saved card values never authorize a live action or mutate persistence.
 
 ## Important runtime seams
-- Nearby and linked modes are separate entry sources
+- Ordinary `ItemMetadata` panels use one owned entry source, then apply the status
+  tabs (`In World`, `Stored`, `Lost / Dead`, `All`), `Nearby only`, and literal
+  name/species/group search as view-only filters.
+- Selected rows sort before unselected rows for every supported sort.
+- Nearby and legacy linked modes remain separate entry sources where those modes are
+  still exposed.
 - The canonical lifecycle alone determines active, unloaded, captured, cooped,
   roster-stored, provisioned-dormant, dead, Lost, released, or unresolved
   status. Command-item display caches cannot override it.
@@ -91,9 +119,9 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   the source entity. Recovery logs identify that retry; the drop warning alone
   does not mean Recall has finished. Linked and Owned cards retain their recall
   countdown alongside inline location details while relocation is pending.
-- Link execution applies the command tool's role policy, even in Owned mode.
-  A role restriction produces a localized explanation; ownership alone does
-  not make a companion eligible for every command tool.
+- Selection and command execution apply the command tool's role and command policy.
+  A role or command restriction produces a localized explanation; ownership alone
+  does not make a companion eligible for every command tool.
 - Active-NPC indicators are sent only to the controlling player. Each loaded
   target gets one invisible, non-persistent helper entity mounted above its
   model bounds. Its mount component is added after spawning so Hytale registers

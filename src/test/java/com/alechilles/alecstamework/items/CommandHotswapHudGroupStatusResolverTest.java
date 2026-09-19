@@ -1,12 +1,10 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,11 +16,11 @@ class CommandHotswapHudGroupStatusResolverTest {
     );
 
     private final CommandHotswapHudGroupStatusResolver resolver =
-            new CommandHotswapHudGroupStatusResolver(null, null, null);
+            new CommandHotswapHudGroupStatusResolver();
 
     @Test
     void namedGroupUsesItsNameAndConfiguredColor() {
-        var status = resolver.resolve(records(true, false, false), GROUPS);
+        var status = resolver.resolve(entries(true, false, false), GROUPS);
 
         assertEquals("Blue Squad", status.label());
         assertEquals("#112233", status.colorHex());
@@ -30,8 +28,8 @@ class CommandHotswapHudGroupStatusResolverTest {
 
     @Test
     void customAndNoActiveUseDedicatedLabelsAndColors() {
-        var custom = resolver.resolve(records(true, true, false), GROUPS);
-        var none = resolver.resolve(records(false, false, false), GROUPS);
+        var custom = resolver.resolve(entries(true, true, false), GROUPS);
+        var none = resolver.resolve(entries(false, false, false), GROUPS);
 
         assertEquals("Custom Selection", custom.label());
         assertEquals("#c9a653", custom.colorHex());
@@ -40,82 +38,42 @@ class CommandHotswapHudGroupStatusResolverTest {
     }
 
     @Test
-    void unchangedItemStackSkipsRepeatedMetadataReads() {
-        UUID npcUuid = UUID.randomUUID();
-        ItemStack active = metadataStack(npcUuid + "|ac=1");
-        AtomicInteger linkedReads = new AtomicInteger();
-        AtomicInteger groupReads = new AtomicInteger();
-        CommandHotswapHudGroupStatusResolver cachingResolver =
-                CommandHotswapHudGroupStatusResolver.forReaders(
-                        ignored -> {
-                            linkedReads.incrementAndGet();
-                            return records(true, false, false);
-                        },
-                        ignored -> {
-                            groupReads.incrementAndGet();
-                            return GROUPS;
-                        }
-                );
-
-        var first = cachingResolver.resolve(npcUuid, active);
-        var second = cachingResolver.resolve(npcUuid, active);
-        ItemStack inactive = active.withMetadata(
-                TameworkMetadataKeys.COMMAND_LINKED_NPCS,
-                Codec.STRING,
-                npcUuid + "|ac=0"
-        );
-        cachingResolver.resolve(npcUuid, inactive);
-
-        assertEquals("Blue Squad", first.label());
-        assertEquals(first, second);
-        assertEquals(2, linkedReads.get(), "Only a changed item stack may decode linked records again.");
-        assertEquals(2, groupReads.get(), "Only a changed item stack may decode groups again.");
+    void partialMultiMemberGroupRemainsCustom() {
+        var status = resolver.resolve(List.of(entry("blue", true), entry("blue", false)), GROUPS);
+        assertEquals("Custom Selection", status.label());
     }
 
-    private List<LinkedNpcRecord> records(boolean blueActive,
-                                           boolean redActive,
-                                           boolean ungroupedActive) {
+    @Test
+    void selectedKeysUseSharedMembershipWithoutConstructingPanelEntries() {
+        var status = resolver.resolveSelectedKeys(
+                Set.of("pblue-1", "pblue-2"),
+                GROUPS,
+                groupId -> "blue".equals(groupId)
+                        ? Set.of("pblue-1", "pblue-2") : Set.of());
+
+        assertEquals("Blue Squad", status.label());
+        assertEquals("#112233", status.colorHex());
+    }
+
+    private List<LinkedNpcEntry> entries(boolean blueActive,
+                                         boolean redActive,
+                                         boolean ungroupedActive) {
         return List.of(
-                record("blue", blueActive),
-                record("red", redActive),
-                record(null, ungroupedActive)
+                entry("blue", blueActive),
+                entry("red", redActive),
+                entry(null, ungroupedActive)
         );
     }
 
-    private LinkedNpcRecord record(String groupId, boolean active) {
+    private LinkedNpcEntry entry(String groupId, boolean active) {
         UUID uuid = UUID.randomUUID();
-        return new LinkedNpcRecord(
-                uuid, null, null, uuid.toString(), null, "test_role", null,
-                active, false, groupId
-        );
-    }
-
-    private ItemStack metadataStack(String linkedRecords) {
-        return new MetadataItemStack("Tamework:CommandFlute", null).withMetadata(
-                TameworkMetadataKeys.COMMAND_LINKED_NPCS,
-                Codec.STRING,
-                linkedRecords
-        );
-    }
-
-    /** Asset-store-free stack that keeps real BSON metadata semantics. */
-    private static final class MetadataItemStack extends ItemStack {
-        private MetadataItemStack(String itemId, BsonDocument metadata) {
-            super();
-            this.itemId = itemId;
-            this.quantity = 1;
-            this.metadata = metadata;
-        }
-
-        @Override
-        public <T> ItemStack withMetadata(String key, Codec<T> codec, T value) {
-            BsonDocument next = metadata == null ? new BsonDocument() : metadata.clone();
-            if (value == null) {
-                next.remove(key);
-            } else {
-                next.put(key, codec.encode(value));
-            }
-            return new MetadataItemStack(itemId, next.isEmpty() ? null : next);
-        }
+        LinkedNpcEntry entry = new LinkedNpcEntry(uuid, "Companion", 1, 1, 0, 0, 0,
+                "", 0, 0, 0, 0, true, false, false, false, false, false,
+                0L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, active,
+                "test_role", "Test", null, null, null, false, false, 0L, 0.0, false);
+        return entry.withCompanionGroups("e" + uuid,
+                groupId == null ? List.of() : List.of(new LinkedNpcEntry.GroupMembership(groupId, groupId, "#112233")),
+                true);
     }
 }

@@ -205,7 +205,7 @@ public final class CommandAutoLinkService {
                 continue;
             }
             TwCommandItemConfig config = registry != null ? registry.get(stack.getItemId()) : null;
-            if (config == null || config.usesBondedCompanionRoster()) {
+            if (config == null || config.usesBondedCompanionRoster() || config.usesOwnerCommandFamilyRoster()) {
                 continue;
             }
             if (!config.isEnabled()) {
@@ -306,7 +306,7 @@ public final class CommandAutoLinkService {
         }
         String roleId = resolveRoleId(npcRef, store);
         for (TwCommandItemConfig config : registry.snapshot().values()) {
-            if (config == null || config.usesBondedCompanionRoster()
+            if (config == null || config.usesBondedCompanionRoster() || config.usesOwnerCommandFamilyRoster()
                     || !config.isEnabled() || !config.isLinkEnabled()) {
                 continue;
             }

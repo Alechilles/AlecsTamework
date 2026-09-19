@@ -72,6 +72,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                 profile,
                 sourceSnapshot,
                 decoded,
+                sourceArtifact,
                 ownerAssignment,
                 ownerAssignmentName
         );
@@ -117,6 +118,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                 profile,
                 liveSource,
                 decoded,
+                sourceArtifact,
                 ownerAssignment,
                 ownerAssignmentName
         );
@@ -169,6 +171,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                 profile,
                 liveSource,
                 reconstructed,
+                sourceArtifact,
                 ownerAssignment,
                 ownerAssignmentName
         );
@@ -249,6 +252,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
             CompanionProfileReadModel profile,
             CompanionSnapshot sourceSnapshot,
             CoopResidentStateSnapshot decoded,
+            CapturedArtifact sourceArtifact,
             @Nullable OwnerId ownerAssignment,
             @Nullable String ownerAssignmentName
     ) {
@@ -277,7 +281,9 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                                     decoded
                             ),
                             effectiveOwner,
-                            effectiveOwnerName
+                            effectiveOwnerName,
+                            canonicalOwner == null
+                                    && sourceArtifact.transfersClearedOwnershipTo(ownerAssignment)
                     )),
                     new ResolvedIdentity(
                             profile.identity().profileId(),

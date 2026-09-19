@@ -47,14 +47,19 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             new CommandHotswapHudViewModel.Slot(
                     true, "LMB", "Tamework/CommandHotswaps/Link.png", ""
             );
+    private static final CommandHotswapHudViewModel.Slot SELECT_SLOT =
+            new CommandHotswapHudViewModel.Slot(true, "LMB", "", "+");
+    private static final CommandHotswapHudViewModel.Slot DESELECT_SLOT =
+            new CommandHotswapHudViewModel.Slot(true, "LMB", "", "-");
 
     private final CommandItemRegistry registry;
     private final CommandHotswapAssignmentStore assignments = new CommandHotswapAssignmentStore();
+    private final CommandLinkedNpcRecordStore linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
     private final CommandTargetHudActivationTracker activationTracker;
     private final CommandTargetInspector targetInspector;
     private final CommandHotswapHudPresentationCoordinator presentationCoordinator;
     private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
-            new CommandHotswapHudGroupStatusResolver(null, null, null);
+            new CommandHotswapHudGroupStatusResolver();
     private final Object storesLock = new Object();
     private final Map<Store<EntityStore>, StoreState> statesByStore = new IdentityHashMap<>();
 
@@ -221,10 +226,27 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                 resolveSlot(stack, config, Slot.Q, "Q"),
                 resolveSlot(stack, config, Slot.E, "E"),
                 resolveSlot(stack, config, Slot.R, "R"),
-                config.usesBondedCompanionRoster()
-                        ? CommandHotswapHudViewModel.GroupStatus.hidden()
-                        : groupStatusResolver.resolve(player.getUuid(), stack)
+                resolveGroupStatus(player, stack, config)
         );
+    }
+
+    @Nonnull
+    private CommandHotswapHudViewModel.GroupStatus resolveGroupStatus(
+            @Nonnull Player player,
+            @Nonnull ItemStack stack,
+            @Nonnull TwCommandItemConfig config) {
+        if (config.usesBondedCompanionRoster()) {
+            return CommandHotswapHudViewModel.GroupStatus.hidden();
+        }
+        if (config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
+            return groupStatusResolver.resolveLegacy(stack);
+        }
+        Tamework plugin = Tamework.getInstance();
+        CommandItemFeatureHandler handler = plugin != null
+                ? plugin.getCommandItemFeatureHandler() : null;
+        return handler == null
+                ? CommandHotswapHudViewModel.GroupStatus.hidden()
+                : handler.resolveHotswapGroupStatus(player, stack, config);
     }
 
     @Nonnull
@@ -233,9 +255,17 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             @Nonnull ItemStack stack,
             @Nonnull TwCommandItemConfig config,
             long nowMs) {
-        if (targetInspector.isLinkable(player, player.getReference(), config,
-                player.getWorld() != null ? player.getWorld().getEntityStore().getStore() : null,
-                nowMs)) {
+        Store<EntityStore> store = player.getWorld() != null
+                ? player.getWorld().getEntityStore().getStore() : null;
+        if (targetInspector.isLinkable(player, player.getReference(), config, store, nowMs)) {
+            if (config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata) {
+                CommandTargetInspector.Target target = targetInspector.resolveTarget(
+                        player.getUuid(), player.getReference(), store, nowMs);
+                LinkedNpcRecord record = target == null ? null : linkedNpcRecordStore.find(
+                        linkedNpcRecordStore.read(stack), target.npc().getUuid());
+                boolean selected = record != null && record.active;
+                return selected ? DESELECT_SLOT : SELECT_SLOT;
+            }
             return LINK_SLOT;
         }
         String selectedId = stack.getFromMetadataOrNull(

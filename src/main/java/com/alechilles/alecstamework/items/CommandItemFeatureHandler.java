@@ -110,6 +110,7 @@ public final class CommandItemFeatureHandler {
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandGroupActivationService groupActivationService;
     private final CommandGroupCycleService groupCycleService;
+    private final CommandHotswapHudGroupStatusResolver groupStatusResolver;
     private final CommandTalentPageService talentPageService;
     private final BondedCompanionTalentPageService bondedTalentPageService;
     private final CommandSelectionPageService selectionPageService;
@@ -331,7 +332,8 @@ public final class CommandItemFeatureHandler {
                 panelPreferenceService,
                 profileActionResolver,
                 BondedCompanionCommandRecipientSource.production(
-                        bondedCompanions, linkPolicyService)
+                        bondedCompanions, linkPolicyService),
+                persistenceView
         );
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,
@@ -410,16 +412,13 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 this.groupService
         );
-        this.groupCycleService = new CommandGroupCycleService(
-                linkedNpcRecordStore,
-                this.groupService,
-                groupActivationService
-        );
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
                 toolInventoryService,
                 groupActivationService
         );
+        this.groupCycleService = new CommandGroupCycleService();
+        this.groupStatusResolver = new CommandHotswapHudGroupStatusResolver();
         CommandDeferredLinkService deferredLinks =
                 new CommandDeferredLinkService(
                         toolInventoryService,
@@ -520,7 +519,7 @@ public final class CommandItemFeatureHandler {
                                        CommandHotswapAssignmentStore.Slot slot) {
         String commandId = new CommandHotswapAssignmentStore().read(itemStack, slot);
         if (CommandHotswapAction.isCycleGroup(commandId)) {
-            return cycleHotswapGroup(itemStack);
+            return cycleHotswapGroup(player, itemStack);
         }
         if (commandId != null) {
             itemUseOrchestrator.handleUse(
@@ -531,14 +530,66 @@ public final class CommandItemFeatureHandler {
     }
 
     /**
-     * Advances a generic flute's active companion group without dispatching an NPC command.
-     * The interaction persists this returned stack in the held inventory slot immediately.
+     * Advances a generic flute through shared companion selections without dispatching an NPC command.
      */
-    public ItemStack cycleHotswapGroup(ItemStack itemStack) {
+    public ItemStack cycleHotswapGroup(@Nullable Player player, ItemStack itemStack) {
         TwCommandItemConfig config = itemStack == null || itemStack.isEmpty() || registry == null
                 ? null : registry.get(itemStack.getItemId());
-        return config == null || !config.isEnabled() || config.usesBondedCompanionRoster()
-                ? itemStack : groupCycleService.applyNext(itemStack);
+        if (player == null || config == null || !config.isEnabled()
+                || config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
+            return itemStack;
+        }
+        String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+        if (toolId == null || toolId.isBlank()) return itemStack;
+        String next = groupCycleService.nextSelectorValue(
+                toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
+                groupService.readGroups(player, itemStack));
+        groupAssignPageService.applyGroupActivation(player, toolId, config, next);
+        ItemStack updated = toolInventoryService.findToolStack(player, toolId);
+        return updated == null ? itemStack : updated;
+    }
+
+    /** Legacy callers without a live player cannot mutate owner-wide group selection. */
+    public ItemStack cycleHotswapGroup(ItemStack itemStack) {
+        return itemStack;
+    }
+
+    /** Resolves one generic flute's shared-group status from its current selected records. */
+    public CommandHotswapHudViewModel.GroupStatus resolveHotswapGroupStatus(
+            @Nullable Player player,
+            @Nullable ItemStack itemStack,
+            @Nullable TwCommandItemConfig config) {
+        if (player == null || itemStack == null || itemStack.isEmpty() || config == null
+                || config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
+            return CommandHotswapHudViewModel.GroupStatus.hidden();
+        }
+        String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+        if (toolId == null || toolId.isBlank()) return CommandHotswapHudViewModel.GroupStatus.hidden();
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(itemStack);
+        if (records.stream().noneMatch(record -> record != null && record.active)) {
+            return groupStatusResolver.resolveSelectedKeys(Set.of(), List.of(), null);
+        }
+        // This tick path reads only the selected records. It never builds a panel projection,
+        // scans world NPCs, imports legacy groups, or writes a player component.
+        if (persistenceView == null) {
+            return groupStatusResolver.customStatus();
+        }
+        UUID ownerUuid = player.getUuid();
+        if (ownerUuid == null) return groupStatusResolver.customStatus();
+        Set<String> selectedKeys = new java.util.HashSet<>();
+        for (LinkedNpcRecord record : records) {
+            if (record == null || !record.active) continue;
+            CommandPersistenceView.ProfileSnapshot profile = persistenceView.find(record).orElse(null);
+            if (profile == null || !ownerUuid.equals(profile.ownerUuid())
+                    || !linkPolicyService.isRoleAllowed(profile.roleId(), config, true)) {
+                return groupStatusResolver.customStatus();
+            }
+            selectedKeys.add(CommandCompanionGroups.profileKey(profile.profileId().toString()));
+        }
+        return groupStatusResolver.resolveSelectedKeys(
+                selectedKeys,
+                groupService.readGroups(player, itemStack),
+                groupId -> CommandCompanionGroups.members(player, groupId));
     }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
@@ -889,10 +940,8 @@ public final class CommandItemFeatureHandler {
                 continue;
             }
             LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
-            if (record == null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
-                return;
-            }
+            if (record == null) record = toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid);
+            if (record == null) return;
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             if (npcRef == null || !npcRef.isValid()) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.mustBeLoaded");
@@ -904,12 +953,9 @@ public final class CommandItemFeatureHandler {
                 return;
             }
             TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-            if (links == null || !links.containsToolId(toolId)) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
-                return;
-            }
-            UUID ownerId = links.getOwnerId();
-            if (ownerId != null && !ownerId.equals(player.getUuid())) {
+            UUID ownerId = linkPolicyService.resolveOwnerId(npcRef, store);
+            if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                    || !player.getUuid().equals(ownerId)) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.notAllowed");
                 return;
             }
@@ -917,6 +963,14 @@ public final class CommandItemFeatureHandler {
             if (transform == null) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.positionUnavailable");
                 return;
+            }
+            if (links == null) links = new TameworkCommandLinksComponent(ownerId, new String[0]);
+            else links = links.clone();
+            // Creating home metadata does not select this animal.
+            if (linkedNpcRecordStore.find(linkedNpcRecordStore.read(stack), npcUuid) == null) {
+                var records = new java.util.ArrayList<>(linkedNpcRecordStore.read(stack));
+                records.add(record.withActive(false));
+                stack = linkedNpcRecordStore.write(stack, records);
             }
             Vector3d home = new Vector3d(transform.getPosition());
             if (links.getOwnerId() == null && player.getUuid() != null) {
@@ -962,9 +1016,7 @@ public final class CommandItemFeatureHandler {
         if (!ownedActions.requestLocate(player, toolId, npcUuid,
                 current -> callbackAuthority.allowsGeneric(current, toolId, config),
                 (current, record) -> locateService.locate(current, toolId, record.npcUuid, record,
-                        viewer -> callbackAuthority.allowsGeneric(viewer, toolId, config)
-                                && panelPreferenceService.readPanelModeOverride(toolInventoryService.findToolStack(viewer, toolId))
-                                == CommandPanelPreferenceService.PanelMode.OwnedMode))) {
+                        viewer -> callbackAuthority.allowsGeneric(viewer, toolId, config)))) {
             locateService.locate(player, toolId, npcUuid, null,
                     viewer -> callbackAuthority.allowsGeneric(viewer, toolId, config));
         }
@@ -985,7 +1037,15 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        if (!returnHome && ownedActions.request(player, toolId, npcUuid,
+        if (returnHome) {
+            var owned = toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid);
+            if (owned != null) {
+                menuMoveService.applyMenuMoveCommand(player, toolId, owned.npcUuid, true,
+                        command -> resolveCommandLabel(player, command), owned);
+            }
+            return;
+        }
+        if (ownedActions.request(player, toolId, npcUuid,
                 current -> callbackAuthority.allowsGeneric(current, toolId, config),
                 (current, record) -> menuMoveService.applyMenuMoveCommand(
                         current, toolId, record.npcUuid, false,

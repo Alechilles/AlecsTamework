@@ -49,6 +49,15 @@ final class CommandToolInventoryService {
         this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
+    @javax.annotation.Nullable
+    LinkedNpcRecord resolveOwnedSelectionRecord(Player player, String toolId,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config, UUID rowId) {
+        ItemStack stack = findToolStack(player, toolId);
+        if (stack == null || panelEntrySourceService == null || config == null
+                || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return null;
+        return panelEntrySourceService.ownedSelectionRecord(player, stack, rowId);
+    }
+
     ToolResolution ensureToolId(ItemStack itemStack) {
         String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
         if (toolId != null && !toolId.isBlank()) {
@@ -141,7 +150,7 @@ final class CommandToolInventoryService {
             if (panelEntrySourceService != null) {
                 return panelEntrySourceService.buildEntries(player, store, stack, config, toolId);
             }
-            return panelEntryService.buildEntries(player, store, stack, toolId);
+            return panelEntryService == null ? List.of() : panelEntryService.buildEntries(player, store, stack, toolId);
         }
         return List.of();
     }
@@ -179,7 +188,7 @@ final class CommandToolInventoryService {
             if (panelEntrySourceService != null) {
                 return panelEntrySourceService.buildEntries(player, store, unfilteredStack, config, toolId);
             }
-            return panelEntryService.buildEntries(player, store, unfilteredStack, toolId);
+            return panelEntryService == null ? List.of() : panelEntryService.buildEntries(player, store, unfilteredStack, toolId);
         }
         return List.of();
     }
@@ -230,6 +239,10 @@ final class CommandToolInventoryService {
         return new CommandPanelEntrySourceService.CommandPanelSnapshot(
                 List.of(), java.util.Map.of()
         );
+    }
+
+    boolean mutateGroups(Player player, String toolId, UnaryOperator<ItemStack> mutation) {
+        return CommandCompanionGroups.mutate(player, findToolStack(player, toolId), mutation);
     }
 
     boolean mutateToolStack(Player player, String toolId, UnaryOperator<ItemStack> mutator) {
@@ -360,7 +373,7 @@ final class CommandToolInventoryService {
         if (stack == null || stack.isEmpty()) {
             return entries;
         }
-        List<CommandGroupService.GroupRecord> groups = groupService.readGroups(stack);
+        List<CommandGroupService.GroupRecord> groups = groupService.readGroups(player, stack);
         if (groups == null || groups.isEmpty()) {
             return entries;
         }

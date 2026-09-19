@@ -482,6 +482,54 @@ class CommandGenericTargetAuthorityTest {
         }
     }
 
+    /** A generic item keeps command selection in its metadata without mutating NPC link membership. */
+    @Test
+    void genericItemClickTogglesSelectionWithoutRemovingOwnedRosterVisibility() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            CommandLinkedNpcRecordStore records = new CommandLinkedNpcRecordStore();
+            CommandLinkMutationService selections = new CommandLinkMutationService(
+                    records, new CommandLinkPolicyService(), null, null);
+            ItemStack item = metadataStack("test:generic-whistle");
+
+            LinkToggleResult selected = selections.tryToggleLink(
+                    target.player, scope.store, target.reference,
+                    "generic-tool", genericConfig(), item);
+
+            assertTrue(selected.toggled);
+            assertTrue(selected.active);
+            assertFalse(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+            assertTrue(records.read(selected.updatedItem).getFirst().active);
+
+            LinkToggleResult deselected = selections.tryToggleLink(
+                    target.player, scope.store, target.reference,
+                    "generic-tool", genericConfig(), selected.updatedItem);
+
+            assertTrue(deselected.toggled);
+            assertFalse(deselected.active);
+            assertFalse(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+            assertFalse(records.read(deselected.updatedItem).getFirst().active);
+        }
+    }
+
+    @Test
+    void selectingPastTheLimitReturnsASelectionWarningInsteadOfAnOrdinaryClick() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            var records = new CommandLinkedNpcRecordStore();
+            var config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"MaxActive\":1}"), new ExtraInfo());
+            var stack = records.write(metadataStack("test:generic-whistle"), List.of(
+                    new LinkedNpcRecord(UUID.randomUUID(), null, null, null, "Other", null, "Sheep", null, true, false, null)));
+            var result = new CommandLinkMutationService(records, new CommandLinkPolicyService(), null, null)
+                    .tryToggleLink(target.player, scope.store, target.reference, "generic-tool", config, stack);
+            assertFalse(result.toggled);
+            assertEquals("tamework.command.selection.limit", result.failureMessageKey);
+            assertEquals(1, records.read(stack).size());
+        }
+    }
+
     @Test
     void genericRecipientQueryExcludesBondedProjectionButKeepsOrdinaryNpc()
             throws Exception {
@@ -491,21 +539,25 @@ class CommandGenericTargetAuthorityTest {
             Ref<EntityStore> playerRef = scope.store.createReference();
             scope.store.put(playerRef, scope.transformType,
                     new TransformComponent());
+            CommandLinkedNpcRecordStore records = new CommandLinkedNpcRecordStore();
+            ItemStack selected = records.upsert(
+                    metadataStack("test:generic-whistle"), ordinary.uuid,
+                    null, null, null, null, null, null, true, null);
             Context context = new Context(
                     bonded.player, playerRef, scope.store, genericConfig(),
                     null, "test:generic-whistle", "generic-tool", null,
-                    null, metadataStack("test:generic-whistle"), false,
+                    null, selected, false,
                     false, 0D, 0D, 0L, 0D, 0D);
 
             List<Candidate> recipients = new CommandRecipientService(
-                    null, null, null).queryRecipients(context);
+                    null, records, null).queryRecipients(context);
 
             assertEquals(List.of(ordinary.uuid), recipients.stream()
                     .map(candidate -> candidate.npc.getUuid()).toList());
         }
     }
 
-    /** Owned commands reach unlinked animals outside Nearby's radius but never another owner or bonded lease. */
+    /** Item-local selection remains authoritative when the panel is browsing owned companions. */
     @Test
     void ownedRecipientsIgnoreLinksAndRadiusWhileRecheckingOwner() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
@@ -516,12 +568,16 @@ class CommandGenericTargetAuthorityTest {
             Ref<EntityStore> playerRef = scope.store.createReference();
             scope.store.put(playerRef, scope.transformType, new TransformComponent());
             CommandPanelPreferenceService preferences = new CommandPanelPreferenceService();
-            ItemStack stack = preferences.setPanelMode(metadataStack("test:generic-whistle"),
+            CommandLinkedNpcRecordStore records = new CommandLinkedNpcRecordStore();
+            ItemStack selected = records.upsert(
+                    metadataStack("test:generic-whistle"), ordinary.uuid,
+                    null, null, null, null, null, null, true, null);
+            ItemStack stack = preferences.setPanelMode(selected,
                     CommandPanelPreferenceService.PanelMode.OwnedMode);
             Context context = new Context(ordinary.player, playerRef, scope.store, genericConfig(),
                     null, "test:generic-whistle", "generic-tool", null, null, stack, false,
                     false, 0D, 0D, 0L, 0D, 0D);
-            CommandRecipientService service = new CommandRecipientService(null, null, preferences);
+            CommandRecipientService service = new CommandRecipientService(null, records, preferences);
             assertEquals(List.of(ordinary.uuid), service.queryRecipients(context).stream()
                     .map(candidate -> candidate.npc.getUuid()).toList());
             scope.store.getComponent(ordinary.reference, scope.ownerType).setOwnerId(UUID.randomUUID());

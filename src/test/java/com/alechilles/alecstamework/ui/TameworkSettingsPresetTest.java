@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkSettingsPresetTest {
 
@@ -48,7 +47,48 @@ class TameworkSettingsPresetTest {
         assertEquals(TameworkSettingsPreset.FULL_EXPERIENCE, TameworkSettingsPreset.match(full));
     }
 
+    @Test
+    void hardcoreEnablesPermanentLossAndHigherPercentageNeedsDamage() {
+        TameworkSettingsValues base = baseValues(TwNeedsConfig.DamageModel.MIN_ONLY_FLAT);
+        TameworkSettingsValues hardcore = TameworkSettingsPreset.HARDCORE.applyTo(base);
+
+        assertEquals(AnimalAgingMode.FULL, hardcore.animalAgingMode());
+        assertEquals(true, hardcore.animalOldAgeDeathEnabled());
+        assertEquals(false, hardcore.reviveSystemEnabled());
+        assertEquals(true, hardcore.needsDamageEnabled());
+        assertEquals(true, hardcore.needsDamageLethal());
+        assertEquals(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT, hardcore.needsDamageModel());
+        assertEquals(10.0, hardcore.needsStarvationDamagePerMinute());
+        assertEquals(15.0, hardcore.needsDehydrationDamagePerMinute());
+        assertEquals(TameworkSettingsPreset.HARDCORE, TameworkSettingsPreset.match(hardcore));
+        assertEquals(base.populationLimitPerPlayerOwnedTotal(), hardcore.populationLimitPerPlayerOwnedTotal());
+        assertEquals(base.blockOwnerDamage(), hardcore.blockOwnerDamage());
+        assertEquals(base.simpleClaimsEnabled(), hardcore.simpleClaimsEnabled());
+        assertEquals(base.recallTeleportingEnabled(), hardcore.recallTeleportingEnabled());
+    }
+
+    @Test
+    void leavingHardcoreRestoresRevivesAndNormalNeedsDamageWithoutOldAgeDeath() {
+        TameworkSettingsValues hardcore = TameworkSettingsPreset.HARDCORE.applyTo(baseValues());
+
+        for (TameworkSettingsPreset preset : new TameworkSettingsPreset[] {
+                TameworkSettingsPreset.SIMPLIFIED, TameworkSettingsPreset.EASIER,
+                TameworkSettingsPreset.FULL_EXPERIENCE}) {
+            TameworkSettingsValues restored = preset.applyTo(hardcore);
+            assertEquals(true, restored.reviveSystemEnabled());
+            assertEquals(false, restored.animalOldAgeDeathEnabled());
+            assertEquals(2.0, restored.needsStarvationDamagePerMinute());
+            assertEquals(3.0, restored.needsDehydrationDamagePerMinute());
+            assertEquals(preset, TameworkSettingsPreset.match(restored));
+        }
+        assertEquals(hardcore, TameworkSettingsPreset.CUSTOM.applyTo(hardcore));
+    }
+
     private static TameworkSettingsValues baseValues() {
+        return baseValues(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT);
+    }
+
+    private static TameworkSettingsValues baseValues(TwNeedsConfig.DamageModel damageModel) {
         return new TameworkSettingsValues(
                 12,
                 TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
@@ -72,7 +112,7 @@ class TameworkSettingsPresetTest {
                 TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY,
                 72.0,
                 1.0,
-                TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT,
+                damageModel,
                 TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY,
                 2.0,
                 3.0,

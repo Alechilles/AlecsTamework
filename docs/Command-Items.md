@@ -1,7 +1,10 @@
 # Command Items (TwCommandItemConfig)
 
 ## Overview
-Command items let players link companion NPCs to a tool and dispatch commands at runtime.
+Command items let players manage owned companion NPCs through a tool and dispatch commands at runtime.
+Ordinary `ItemMetadata` flutes show all of the owner's companions automatically;
+the item keeps only that flute's selected command recipients. Legacy link records remain
+readable and are migrated as players use the item.
 The system is asset-driven around:
 - `TwCommandItemConfig`
 - `TameworkCommand` item interaction
@@ -83,7 +86,24 @@ when it needs custom HUD artwork. Standard command IDs use Tamework's bundled
 command glyphs when `Icon` is omitted.
 
 The standard menu presents LMB, Q, E, and R assignments in a compact sidebar beside
-the companion list. Linked, Nearby, and Owned tabs switch the list source.
+the companion list. Ordinary `ItemMetadata` flutes open an owned-companion panel;
+all owned companions appear automatically, so a player does not need to link each
+animal to every flute. The selected command recipients remain specific to the
+physical flute, which lets players keep separate working sets on separate items.
+Clicking an owned NPC with the flute toggles that NPC's selection for the current
+flute. The same selection button is available on the card. A selected companion
+appears before unselected companions, and browsing, searching, or changing status
+tabs never changes the command recipients.
+
+The panel has `In World`, `Stored`, `Lost / Dead`, and `All` status tabs, each showing
+the number of companions matching the current search and nearby filter. The selected
+tab uses a green highlight. `Nearby only`
+is an additional view filter. The search field matches the companion name, species,
+or group as one literal text search. Sort choices still keep selected companions first.
+The held item's role and command support are checked separately, so an owned companion
+can remain selected while being unavailable to a specialized flute; the panel explains
+that restriction instead of changing the selection.
+
 Changing LMB updates the selected primary command and keeps the menu open.
 The original primary-command eligibility rules still apply.
 
@@ -91,10 +111,16 @@ Group shortcuts below the command assignments activate all companions, none,
 or a named group. The selected shortcut is highlighted, and the list scrolls
 when needed. The menu title includes the current mode and visible NPC count.
 
-For legacy command items, the group dropdown on each card assigns or clears
-its group immediately. Selecting a group also links an eligible unlinked NPC.
-The dropdown border shows the group's color. Group assignment remains tied to
-the current command item's links.
+For ordinary command items, groups belong to the player and are shared by compatible
+flutes. A companion may belong to several groups or none. The group dropdown on each
+card is a native multi-select control: toggle memberships inline and close it without
+opening another page. The dropdown border shows the group's color. Left-clicking a group
+shortcut replaces the current flute's selection with that group. Right-clicking adds
+its members while keeping existing selections, including individually selected animals.
+Groups whose eligible members are all selected are highlighted. Neither action changes
+group memberships. `Add group` opens group creation and `Clear selection` removes all
+selected recipients from that flute. Legacy single-group item metadata remains readable
+and is imported into the owner group state.
 
 Set `ShowInRadial: false` on a command entry to offer it through the hotswap
 selectors without consuming one of the primary selector's eight slots.
@@ -126,7 +152,8 @@ player-ready Tamework reward or silently depend on players finding it.
 
 `RosterStorage` selects the authority behind the panel:
 
-- `ItemMetadata`: legacy/default links stored on the particular item;
+- `ItemMetadata`: per-item selection records, with the owned companion list resolved
+  from the player's profiles;
 - `OwnerCommandFamily`: the owner's durable generic command-family roster; or
 - `BondedCompanions`: the separate bonded profile-and-lease authority.
 
@@ -154,8 +181,10 @@ Bonded commands never create generic NPC links, reconcile or project linked rows
 onto the item, or queue generic unloaded/cross-world relocation. Summon, dismiss,
 and revive remain profile-keyed panel actions. Normal commands still operate on
 an exact loaded projection, and live command state such as a stored home position
-travels with the bonded full snapshot. These rules do not change recipient or
-link behavior for `ItemMetadata` and `OwnerCommandFamily` command items.
+travels with the bonded full snapshot. These rules do not change recipient behavior
+for `OwnerCommandFamily` command items. For ordinary `ItemMetadata` flutes, ownership
+discovers the panel rows and the item's active records determine which rows receive
+a command.
 
 Bonded profiles expose exactly three panel states:
 
@@ -193,40 +222,52 @@ Link metadata includes:
 - optional home position
 - fallback display/name key/role stored on the item
 - active/inactive flag
-- optional `groupId`
+- legacy optional `groupId`; current ordinary groups are player-owned and may contain
+  multiple memberships per companion
 
-Inactive linked rows stay visible in the panel, can still use per-row actions, and are excluded from bulk dispatch.
+Inactive linked rows stay visible in the panel, can still use per-row actions, and are
+excluded from bulk dispatch. For an ordinary `ItemMetadata` flute, an inactive row is
+the same companion still owned by the player but deselected on that flute.
 
 Entity UUIDs are projection aliases, not the companion's durable identity. When a stable profile is known, command records and recovery flows resolve historical UUIDs through that profile and deduplicate by profile. Unresolved legacy records continue to fall back to UUID until they can be bound safely; ambiguous bindings fail closed instead of spawning a replacement.
 
 For online players, command-item copies in the hotbar, storage, and backpack are lazily canonicalized when the player enters a world and whenever a linked command item moves through those inventory compartments. Offline inventories are not rewritten directly; their records remain safe through profile-first resolution and are normalized on the next load or use.
 
-When a player tames a supported NPC, Tamework attempts to auto-link the new companion to a matching command item in that player's inventory. Players now receive explicit feedback for both outcomes:
-- linked: the notification names the animal and command item that was linked.
-- not linked: the notification names the animal, applicable command item, and crafting bench type.
+When a player tames a supported NPC, ordinary `ItemMetadata` flutes discover it through
+the owned roster and do not need a separate link. Left-click selection adds the NPC to
+that flute's per-item recipients after the normal owner, tame, role, and capacity checks.
+Owner/command-family and bonded rosters retain their own membership and lease rules.
 
 When a linked companion is placed in a compatible handheld capture item, its
 linked-panel row remains available and reports `CAPTURED` as soon as capture
-commits, including when capture clears live ownership. Releasing the companion
-restores its command links and remaps the panel record to the new live entity
-UUID without changing the stable profile.
+commits, including when capture clears live ownership. Releasing it as the
+same owner restores its command links and remaps the panel record to the new
+live entity UUID without changing the stable profile. If another player
+releases the item and acquires ownership, the successful release removes the
+former owner's command links. Their card disappears on the next panel refresh
+and stays removed if the new owner captures the companion again. Trading the
+item alone, or a failed release, does not remove the captured card. Items
+without saved evidence of the cleared owner retain their existing links.
 
 ### Owned panel mode
 
-The selector offers Linked, Nearby, and Owned for generic command items.
-Owned reads the existing profile projection by owner and supplements it with
-loaded owned NPCs, including animals with no item links. It does not apply the
-tool's species filter or a radius limit. Saved unloaded and other-world animals
-remain visible. This view creates no command links and does not change bonded
-roster authority. Bulk live commands use owner scope in the current world;
-existing target limits and inactive-link choices still apply. Recall, Locate, and
-Revive/Recover also work for unlinked generic profiles after a fresh ownership
-read, with the existing lifecycle and recovery rules. Home and item-link settings
-still require a link. Unlinked off-screen
-rows offer Release through the existing permanent owner-population
-transition. This clears saved ownership, domain reservations, and command links;
-loaded source-world cleanup also clears the live owner-cap entry on its world
-thread. Captured and cooped animals must leave their storage lifecycle first.
+The generic panel now uses one owned-companion list. It reads the existing profile
+projection by owner and supplements it with loaded owned NPCs, including animals with
+no item records. It does not apply the flute's role filter or a radius limit when
+building the list; compatibility is shown on each card and checked when a selection
+or command is applied. Saved unloaded and other-world animals remain visible.
+`In World`, `Stored`, `Lost / Dead`, and `All` tabs filter that list, with selected
+companions first in every tab. `Nearby only` and the unified name/species/group search
+only change what is shown. None of these browsing controls changes the flute's
+recipients.
+
+Each physical `ItemMetadata` flute has its own selected set. Selection is independent
+of the shared player groups, so an animal can be selected without a group, in several
+groups, or in no group. Recall, Locate, and Revive/Recover also work for unlinked
+generic profiles after a fresh ownership read, with the existing lifecycle and
+recovery rules. Home and permanent ownership-release actions retain their existing
+link/storage requirements. Captured and cooped animals must leave their storage
+lifecycle first.
 Managed command-roster companions remain read-only through generic command items;
 their roster controls own removal.
 Terminal removal checks the target profile's authority and pending claims rather
@@ -355,12 +396,14 @@ See [Command HUD Renderer and Contributor API Reference](/mod/alecs-tamework/com
 for lifecycle, fallback, and registration details.
 
 Linked panel supports:
-- Mode toggle: `LinkedMode` / `NearbyMode`
-- Nearby radius controls in nearby mode
-- Sort: `Default`, `Name`, `Species`, `Group`
-- Filter: `None`, `Name`, `Species`, `Group`
-- Filter text input for active filter mode
-- Active/inactive row toggles
+- Owned companion tabs: `In World`, `Stored`, `Lost / Dead`, and `All`
+- Selected companions first in every tab; selected state is per physical
+  `ItemMetadata` flute
+- `Nearby only` view filter and one literal search field matching name, species,
+  or group
+- Sort: `Default`, `Name`, `Species`, `Group` (selected companions stay first)
+- Active/inactive row toggles, with LMB on an owned NPC toggling the current flute's
+  selection
 - Optional per-tool active highlights. While the command tool is equipped,
   loaded active NPCs show a continuous controller-only indicator above their
   heads in their group color. Ungrouped NPCs use neutral gold. The indicator
@@ -371,7 +414,10 @@ Linked panel supports:
   This setting starts disabled and applies only to generic item-metadata
   rosters on Update 6. Update 5 does not run the indicator system because it
   lacks the required model-particle cleanup support.
-- Group shortcuts in the sidebar: `All`, `None`, or one configured group
+- Group shortcuts in the sidebar: `All`, `None`, or one configured group. A group
+  shortcut selects its members for the current flute.
+- Shared player groups with multi-membership, native inline multi-select card dropdowns,
+  and bottom `Add group` / `Clear selection` actions
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment dropdown per row, with a group-colored border
 - Group manager flow (create/rename/recolor/delete)
@@ -381,7 +427,7 @@ Linked panel supports:
   including across restart. Saved health, needs, traits, progression, and applicable
   breeding/harvest indicators remain visible with muted last-known values.
   Missing saved timing is marked unknown; live-only actions remain unavailable.
-- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In Linked, Nearby, and Owned modes, the red X opens compact `Release` and `Unlink` buttons, plus `Cull` for a loaded, living animal. Unlink is disabled when no item link exists. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
+- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In the generic companion tabs, the red X opens `Release`, plus `Cull` for a loaded, living animal. The selection toggle leaves an animal out of commands without releasing it. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
 - Action icons reuse two normal/hover frame textures and sixteen separate glyphs. Flight, shoulder, and breeding toggles show their current state. Larger cards keep passive traits separate and display needs plus applicable cooldowns as horizontal meters.
 - Loaded normal linked rows whose role enables `FlightToggle` show the same
   ground/flight icon button as bonded roster cards. The action is available

@@ -311,6 +311,11 @@ public final class SqliteCompanionCaptureReleaseOperations {
                 )),
                 "capture_release_lifecycle"
         );
+        if (fenced.ownerId() == null && release.source().sourceArtifact()
+                .transfersClearedOwnershipTo(release.ownerAssignment())) {
+            requireApplied(transaction.toolLinks().replace(release.profileId(), List.of()),
+                    "capture_release_transferred_tool_links");
+        }
         CompanionProfileProjectionState after =
                 SqliteCompanionProfileProjectionComposer.compose(
                         transaction,

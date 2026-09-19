@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -32,11 +34,13 @@ final class CommandRecipientService {
     private final BondedCompanionCommandRecipientSource bondedRecipients;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
+    @Nullable
+    private final CommandPersistenceView persistenceView;
 
     CommandRecipientService(CommandLinkPolicyService linkPolicyService,
                             CommandLinkedNpcRecordStore linkedNpcRecordStore,
                             CommandPanelPreferenceService panelPreferenceService) {
-        this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService, null);
+        this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService, null, null, null);
     }
 
     CommandRecipientService(CommandLinkPolicyService linkPolicyService,
@@ -44,7 +48,7 @@ final class CommandRecipientService {
                             CommandPanelPreferenceService panelPreferenceService,
                             @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService,
-                profileActionResolver, null);
+                profileActionResolver, null, null);
     }
 
     CommandRecipientService(CommandLinkPolicyService linkPolicyService,
@@ -52,12 +56,23 @@ final class CommandRecipientService {
                             CommandPanelPreferenceService panelPreferenceService,
                             @Nullable CommandNpcProfileActionResolver profileActionResolver,
                             @Nullable BondedCompanionCommandRecipientSource bondedRecipients) {
+        this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService,
+                profileActionResolver, bondedRecipients, null);
+    }
+
+    CommandRecipientService(CommandLinkPolicyService linkPolicyService,
+                            CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                            CommandPanelPreferenceService panelPreferenceService,
+                            @Nullable CommandNpcProfileActionResolver profileActionResolver,
+                            @Nullable BondedCompanionCommandRecipientSource bondedRecipients,
+                            @Nullable CommandPersistenceView persistenceView) {
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
                 : new CommandPanelPreferenceService();
         this.profileActionResolver = profileActionResolver;
+        this.persistenceView = persistenceView;
         this.bondedRecipients = bondedRecipients != null
                 ? bondedRecipients
                 : BondedCompanionCommandRecipientSource.production(
@@ -71,12 +86,15 @@ final class CommandRecipientService {
         ArrayList<Candidate> out = new ArrayList<>();
         TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
         Vector3d playerPos = playerTransform != null ? new Vector3d(playerTransform.getPosition()) : null;
-        CommandPanelPreferenceService.PanelMode panelModeOverride =
-                panelPreferenceService.readPanelModeOverride(context.workingItem);
         MembershipMode recipientMembershipMode = panelPreferenceService.resolveRecipientMembershipMode(
                 context.workingItem,
                 context.config
         );
+        boolean itemMetadataSelection = usesItemMetadataSelection(context.config);
+        boolean preservesMasterTargetMembership = recipientMembershipMode == MembershipMode.MasterTarget
+                || recipientMembershipMode == MembershipMode.LinkedOrMasterTarget;
+        CommandPanelPreferenceService.PanelMode panelModeOverride = itemMetadataSelection
+                ? null : panelPreferenceService.readPanelModeOverride(context.workingItem);
         boolean ownedMode = panelModeOverride == CommandPanelPreferenceService.PanelMode.OwnedMode;
         double effectiveRadius = ownedMode ? -1 : context.config.getRadius();
         if (panelModeOverride == CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -86,7 +104,7 @@ final class CommandRecipientService {
         int maxTargets = Math.max(1, context.config.getMaxTargets());
         int maxActive = Math.max(0, context.config.getMaxActive());
         UUID playerUuid = context.player.getUuid();
-        boolean requireOwner = ownedMode || resolveLinkingRequireOwner();
+        boolean requireOwner = itemMetadataSelection || ownedMode || resolveLinkingRequireOwner();
         List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
         Map<UUID, LinkedNpcRecord> linkedRecordByUuid = mapLinkedRecordsByUuid(linkedRecords);
         Set<UUID> cappedActiveLinkedNpcUuids = resolveCappedActiveLinkedNpcUuids(linkedRecords, maxActive);
@@ -106,7 +124,12 @@ final class CommandRecipientService {
                     continue;
                 }
                 UUID npcUuid = npc.getUuid();
-                if (!linkPolicyService.matchesMembership(
+                LinkedNpcRecord linkedRecord = linkedRecordByUuid.get(npcUuid);
+                if (itemMetadataSelection && !preservesMasterTargetMembership) {
+                    if (linkedRecord == null || !linkedRecord.active) {
+                        continue;
+                    }
+                } else if (!linkPolicyService.matchesMembership(
                         recipientMembershipMode,
                         requireOwner,
                         npcRef,
@@ -120,20 +143,21 @@ final class CommandRecipientService {
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
                         requireOwner,
-                        !ownedMode && context.config.isRequireTamed(),
+                        context.config.isRequireTamed(),
                         npcRef,
                         playerUuid,
                         context.store
                 )) {
                     continue;
                 }
-                if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
+                if (!linkPolicyService.isRoleAllowed(
+                        linkPolicyService.resolveRoleId(npc), context.config,
+                        TamedStateResolver.isTamed(npcRef, context.store))) {
                     continue;
                 }
-                if (isInactiveLinkedRecord(linkedRecordByUuid, npcUuid)) {
-                    continue;
-                }
-                if (isCappedOutLinkedRecord(linkedRecordByUuid, cappedActiveLinkedNpcUuids, maxActive, npcUuid)) {
+                if (itemMetadataSelection && !preservesMasterTargetMembership
+                        && isCappedOutLinkedRecord(
+                                linkedRecordByUuid, cappedActiveLinkedNpcUuids, maxActive, npcUuid)) {
                     continue;
                 }
                 TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
@@ -150,7 +174,6 @@ final class CommandRecipientService {
                 } else if (radiusSq >= 0) {
                     continue;
                 }
-                LinkedNpcRecord linkedRecord = linkedRecordByUuid.get(npcUuid);
                 out.add(new Candidate(
                         npcRef, npc, distSq, linkedRecord != null ? linkedRecord.profileId : null));
             }
@@ -166,10 +189,11 @@ final class CommandRecipientService {
         if (context.config.usesBondedCompanionRoster()) {
             return List.of();
         }
-        CommandPanelPreferenceService.PanelMode panelModeOverride =
-                panelPreferenceService.readPanelModeOverride(context.workingItem);
         MembershipMode mode = panelPreferenceService.resolveRecipientMembershipMode(context.workingItem, context.config);
-        if (panelModeOverride == null
+        boolean itemMetadataSelection = usesItemMetadataSelection(context.config);
+        CommandPanelPreferenceService.PanelMode panelModeOverride = itemMetadataSelection
+                ? null : panelPreferenceService.readPanelModeOverride(context.workingItem);
+        if (!itemMetadataSelection && panelModeOverride == null
                 && mode != MembershipMode.LinkedOnly
                 && mode != MembershipMode.LinkedOrMasterTarget) {
             return List.of();
@@ -216,6 +240,14 @@ final class CommandRecipientService {
                 continue;
             }
             if (!record.active) {
+                continue;
+            }
+            if (itemMetadataSelection
+                    && !hasUnloadedSelectionAuthority(context.player.getUuid(), record, context.config)) {
+                continue;
+            }
+            if (!itemMetadataSelection
+                    && !linkPolicyService.isRoleAllowed(record.cachedRoleId, context.config)) {
                 continue;
             }
             Ref<EntityStore> ref = world.getEntityRef(record.npcUuid);
@@ -282,14 +314,6 @@ final class CommandRecipientService {
         return byUuid;
     }
 
-    private boolean isInactiveLinkedRecord(Map<UUID, LinkedNpcRecord> linkedRecordByUuid, UUID npcUuid) {
-        if (linkedRecordByUuid == null || linkedRecordByUuid.isEmpty() || npcUuid == null) {
-            return false;
-        }
-        LinkedNpcRecord record = linkedRecordByUuid.get(npcUuid);
-        return record != null && !record.active;
-    }
-
     private boolean isCappedOutLinkedRecord(Map<UUID, LinkedNpcRecord> linkedRecordByUuid,
                                             Set<UUID> cappedActiveLinkedNpcUuids,
                                             int maxActive,
@@ -346,5 +370,26 @@ final class CommandRecipientService {
     static boolean resolveLinkingRequireOwner(TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
         return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
+    }
+
+    private boolean usesItemMetadataSelection(TwCommandItemConfig config) {
+        return config != null
+                && config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata;
+    }
+
+    /**
+     * Offline records are advisory item metadata; the canonical profile still
+     * decides whether this player owns the companion and this item supports it.
+     */
+    private boolean hasUnloadedSelectionAuthority(UUID playerUuid,
+                                                   LinkedNpcRecord record,
+                                                   TwCommandItemConfig config) {
+        if (playerUuid == null || persistenceView == null) {
+            return false;
+        }
+        return persistenceView.find(record)
+                .filter(profile -> playerUuid.equals(profile.ownerUuid()))
+                .filter(profile -> linkPolicyService.isRoleAllowed(profile.roleId(), config, true))
+                .isPresent();
     }
 }

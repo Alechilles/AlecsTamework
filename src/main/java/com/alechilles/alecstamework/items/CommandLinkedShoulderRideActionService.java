@@ -22,7 +22,8 @@ final class CommandLinkedShoulderRideActionService {
         if (player == null || player.getWorld() == null || npcUuid == null) return false;
         Ref<EntityStore> npcRef = player.getWorld().getEntityRef(npcUuid);
         if (npcRef == null || !npcRef.isValid() || npcRef.getStore() != store
-                || !links.isLinkedToTool(npcRef, ownerUuid, itemId, store)) return false;
+                || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                || !ownerUuid.equals(links.resolveOwnerId(npcRef, store))) return false;
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwCompanionShoulderRideSettings settings = roleId == null ? null
                 : TwCompanionConfig.resolveEffectiveForRole(roleId).getShoulderRide();

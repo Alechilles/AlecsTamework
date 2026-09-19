@@ -47,6 +47,11 @@ final class LinkToggleResult {
         return new LinkToggleResult(false, false, false, true, null, null);
     }
 
+    static LinkToggleResult selectionLimitReached() {
+        return new LinkToggleResult(false, false, false, false, null, null,
+                "tamework.command.selection.limit");
+    }
+
     static LinkToggleResult roleNotAllowed() {
         return new LinkToggleResult(false, false, false, false, null, null,
                 "tamework.ui.notifications.command.link.roleNotAllowed");

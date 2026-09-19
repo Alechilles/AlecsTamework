@@ -16,6 +16,13 @@ final class CommandActiveNpcHighlightPlanService {
     @Nonnull
     List<HighlightTarget> build(@Nullable List<LinkedNpcRecord> records,
                                 @Nullable List<CommandGroupService.GroupRecord> groups) {
+        return build(records, groups, record -> record.groupId);
+    }
+
+    @Nonnull
+    List<HighlightTarget> build(@Nullable List<LinkedNpcRecord> records,
+            @Nullable List<CommandGroupService.GroupRecord> groups,
+            java.util.function.Function<LinkedNpcRecord, String> groupForRecord) {
         if (records == null || records.isEmpty()) {
             return List.of();
         }
@@ -28,7 +35,7 @@ final class CommandActiveNpcHighlightPlanService {
             targets.add(new HighlightTarget(
                     record.npcUuid,
                     record.profileId,
-                    colorsByGroup.getOrDefault(normalize(record.groupId), UNGROUPED_COLOR)
+                    colorsByGroup.getOrDefault(normalize(groupForRecord.apply(record)), UNGROUPED_COLOR)
             ));
         }
         return List.copyOf(targets);

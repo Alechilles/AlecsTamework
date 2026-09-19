@@ -91,6 +91,29 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
             new SpawnerCaptureSnapshotMapper();
 
     @Test
+    void tradedCaptureDropsFormerCommandLinksButSameOwnerReleaseKeepsThem() {
+        for (OwnerId receiver : List.of(CANONICAL_OWNER, ASSIGNED_OWNER)) {
+            FakePersistence persistence = new FakePersistence(profile(null, "{}"));
+            var original = intent(receiver, "Receiver");
+            var metadata = original.sourceArtifactStack().getMetadata().clone()
+                    .append(TameworkMetadataKeys.CAPTURE_OWNER_CLEARED, BsonBoolean.TRUE)
+                    .append(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                            new BsonString(CANONICAL_OWNER.toString()));
+            var traded = new SpawnerCapturedArtifactReleaseIntent(
+                    original.intentKey(), original.actorUuid(), original.worldKey(), original.sourceSlot(),
+                    stack("capture-device-filled", metadata), original.receiptArtifactStack(),
+                    receiver, "Receiver", null);
+
+            assertTrue(author(persistence).release(traded, ignored -> placement())
+                    .toCompletableFuture().join().published());
+            var restored = projection(persistence.request);
+            assertEquals(receiver.value(), restored.owner().getOwnerId());
+            assertArrayEquals(receiver.equals(CANONICAL_OWNER) ? new String[]{"tool-a"} : new String[0],
+                    restored.commandLinks().getToolIds());
+        }
+    }
+
+    @Test
     void newAssignmentReplacesStaleOwnerAndCommandLinkProjection() {
         FakePersistence persistence = new FakePersistence(profile(
                 null,

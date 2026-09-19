@@ -13,7 +13,8 @@ Tamework command tools usually use a two-part control scheme: one input for usin
 ## Default input pattern
 - Left-click or primary input uses the currently selected command.
 - Right-click or secondary input opens the command menu.
-- Some mods also let the same tool link or unlink companions with its primary input.
+- For ordinary owned-companion flutes, the same tool can select or deselect the
+  targeted NPC with its primary input. This changes only that flute's command set.
 
 The standard menu now uses one compact LMB/Q/E/R assignment bar above the larger
 companion panel. Choose the command for each input from its dropdown. Changing
@@ -41,6 +42,16 @@ The exact list depends on the command item config and on the mod using Tamework.
 - Move the NPC to a targeted position
 - Trigger a custom hook that hands off to other NPC behavior
 
+## Companion panel selection
+
+The panel lists owned companions automatically for ordinary `ItemMetadata` flutes.
+Selected companions appear first, and each physical flute remembers its own selected
+set. The status tabs are **In World**, **Stored**, **Lost / Dead**, and **All**. Use
+**Nearby only** or the unified name/species/group search to narrow what is shown;
+these browsing controls never change command recipients. Click a group to select its
+members, or toggle individual animals afterward. Shared player groups support multiple
+memberships and are edited inline through the card's native multi-select control.
+
 ## Nearby vs off-screen behavior
 - If the companion is already loaded, commands often apply immediately.
 - If it is far away or unloaded, Tamework can queue relocation and retry it over time.
@@ -49,12 +60,12 @@ The exact list depends on the command item config and on the mod using Tamework.
   mark the companion `LOST`.
 
 ## Why a command might fail
-- The NPC is not linked.
-- The NPC is inactive on that tool.
+- The NPC is not selected on that flute.
+- The NPC is unsupported by the held item's role or command set.
 - Ownership or tame checks fail.
 - The relevant movement or hook wiring is missing in the mod.
 - The companion is dead, `LOST`, captured in a filled item, or housed in a
-  configured coop. The linked panel shows which saved state currently blocks
+  configured coop. The companion panel shows which saved state currently blocks
   live commands.
 
 ## Related Pages

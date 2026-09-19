@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -64,7 +65,7 @@ final class CommandLinkMutationService {
                                    TwCommandItemConfig config,
                                    ItemStack workingItem,
                                    @Nullable DeferredLinkHandler deferredHandler) {
-        if (config == null || config.usesBondedCompanionRoster()) {
+        if (!usesItemMetadataSelection(config)) {
             return LinkToggleResult.notToggled();
         }
         if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
@@ -79,7 +80,7 @@ final class CommandLinkMutationService {
         if (playerId == null) {
             return LinkToggleResult.notToggled();
         }
-        boolean requireOwner = resolveLinkingRequireOwner();
+        boolean requireOwner = true;
         LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
                 requireOwner && deferredHandler != null
                         ? LegacyTamedOwnershipBridge.claimForPlayerIfEligible(
@@ -111,56 +112,47 @@ final class CommandLinkMutationService {
         if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config, tamed)) {
             return LinkToggleResult.roleNotAllowed();
         }
-        TameworkCommandLinksComponent current = store.getComponent(targetRef, TameworkCommandLinksComponent.getComponentType());
-        if (current == null) {
-            current = new TameworkCommandLinksComponent(playerId, new String[0]);
-        }
-        UUID linksOwner = current.getOwnerId();
-        if (requireOwner && linksOwner != null && !linksOwner.equals(playerId)) {
+        UUID npcUuid = npc.getUuid();
+        if (npcUuid == null || workingItem == null || workingItem.isEmpty()) {
             return LinkToggleResult.notToggled();
         }
-        current.setOwnerId(playerId);
-        boolean linked;
-        boolean active = false;
-        TameworkCommandLinksComponent updated;
-        if (current.containsToolId(toolId)) {
-            updated = current.withToolIdRemoved(toolId);
-            linked = false;
-        } else {
-            updated = current.withToolIdAdded(toolId);
-            linked = true;
-            active = shouldActivateOnLink(config, workingItem);
+        LinkedNpcRecord existing = linkedNpcRecordStore.find(
+                linkedNpcRecordStore.read(workingItem), npcUuid);
+        boolean active = existing == null || !existing.active;
+        if (active && !canActivateLinkedNpc(workingItem, npcUuid, config)) {
+            return LinkToggleResult.selectionLimitReached();
         }
-        store.putComponent(targetRef, TameworkCommandLinksComponent.getComponentType(), updated);
+        ItemStack updatedItem;
+        if (existing != null) {
+            updatedItem = linkedNpcRecordStore.setActive(workingItem, npcUuid, active);
+        } else {
+            TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
+            Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
+            TameworkCommandLinksComponent links = store.getComponent(
+                    targetRef, TameworkCommandLinksComponent.getComponentType());
+            Vector3d homePosition = links != null && links.hasHome()
+                    ? links.getHomePosition() : null;
+            updatedItem = linkedNpcRecordStore.upsert(
+                    workingItem,
+                    npcUuid,
+                    lastKnown,
+                    resolveWorldName(store, player.getWorld()),
+                    homePosition,
+                    npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
+                    npcNameResolver.resolveNpcNameKey(npc),
+                    resolveCachedRoleId(npc),
+                    true,
+                    resolveCachedCommandState(targetRef, npc, store)
+            );
+        }
+        if (updatedItem == workingItem) {
+            return LinkToggleResult.notToggled();
+        }
         if (stateSnapshotService != null) {
             stateSnapshotService.refreshFromEntity(targetRef, store);
         }
-        ItemStack updatedItem = workingItem;
-        UUID npcUuid = npc.getUuid();
-        if (npcUuid != null && updatedItem != null && !updatedItem.isEmpty()) {
-            if (linked) {
-                TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-                Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
-                String worldName = resolveWorldName(store, player.getWorld());
-                Vector3d homePosition = updated.hasHome() ? updated.getHomePosition() : null;
-                updatedItem = linkedNpcRecordStore.upsert(
-                        updatedItem,
-                        npcUuid,
-                        lastKnown,
-                        worldName,
-                        homePosition,
-                        npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
-                        npcNameResolver.resolveNpcNameKey(npc),
-                        resolveCachedRoleId(npc),
-                        active,
-                        resolveCachedCommandState(targetRef, npc, store)
-                );
-            } else {
-                updatedItem = linkedNpcRecordStore.remove(updatedItem, npcUuid);
-            }
-        }
         String name = npcNameResolver.resolveNpcDisplayName(targetRef, store, npc);
-        return new LinkToggleResult(true, linked, active, name, updatedItem);
+        return new LinkToggleResult(true, active, active, name, updatedItem);
     }
 
     boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
@@ -314,15 +306,57 @@ final class CommandLinkMutationService {
     ActiveToggleResult toggleLinkedNpcActive(ItemStack stack,
                                              UUID npcUuid,
                                              TwCommandItemConfig config) {
+        return toggleLinkedNpcActive(stack, npcUuid, config, null);
+    }
+
+    /**
+     * Toggles an item-local selection, creating a record from a server-resolved
+     * owned row when the companion has never been selected by this item.
+     */
+    ActiveToggleResult toggleLinkedNpcActive(ItemStack stack,
+                                             UUID npcUuid,
+                                             TwCommandItemConfig config,
+                                             @Nullable LinkedNpcRecord ownedRecord) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return ActiveToggleResult.notToggled(stack);
         }
         List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
         LinkedNpcRecord record = linkedNpcRecordStore.find(records, npcUuid);
+        if (record == null && ownedRecord != null && ownedRecord.profileId != null) {
+            for (int index = 0; index < records.size(); index++) {
+                var previous = records.get(index);
+                if (!ownedRecord.profileId.equals(previous.profileId)) continue;
+                var repaired = new ArrayList<>(records);
+                record = ownedRecord.withActive(previous.active).withBreedingEnabled(previous.breedingEnabled);
+                repaired.set(index, record);
+                stack = linkedNpcRecordStore.write(stack, repaired);
+                records = repaired;
+                break;
+            }
+        }
         if (record == null) {
-            return ActiveToggleResult.notToggled(stack);
+            if (ownedRecord == null || ownedRecord.npcUuid == null
+                    || !npcUuid.equals(ownedRecord.npcUuid)) {
+                return ActiveToggleResult.notToggled(stack);
+            }
+            if (!linkPolicyService.isRoleAllowed(ownedRecord.cachedRoleId, config, true)) {
+                return ActiveToggleResult.notToggled(stack);
+            }
+            if (!canActivateLinkedNpc(stack, npcUuid, config)) {
+                return ActiveToggleResult.maxActiveReached(stack);
+            }
+            ArrayList<LinkedNpcRecord> updatedRecords = new ArrayList<>(records);
+            updatedRecords.add(ownedRecord.withActive(true));
+            ItemStack updated = linkedNpcRecordStore.write(stack, updatedRecords);
+            return updated == stack
+                    ? ActiveToggleResult.notToggled(stack)
+                    : new ActiveToggleResult(updated, true, true);
         }
         boolean nextActive = !record.active;
+        if (nextActive && !linkPolicyService.isRoleAllowed(
+                ownedRecord == null ? record.cachedRoleId : ownedRecord.cachedRoleId, config, true)) {
+            return ActiveToggleResult.notToggled(stack);
+        }
         if (nextActive && !canActivateLinkedNpc(stack, npcUuid, config)) {
             return ActiveToggleResult.maxActiveReached(stack);
         }
@@ -367,14 +401,6 @@ final class CommandLinkMutationService {
         return linkedNpcRecordStore.write(stack, records);
     }
 
-    private boolean shouldActivateOnLink(TwCommandItemConfig config, ItemStack stack) {
-        int maxActive = config != null ? Math.max(0, config.getMaxActive()) : 0;
-        if (maxActive <= 0) {
-            return true;
-        }
-        return countActiveLinkedRecords(stack, null) < maxActive;
-    }
-
     private boolean canActivateLinkedNpc(ItemStack stack,
                                          UUID targetNpcUuid,
                                          TwCommandItemConfig config) {
@@ -401,6 +427,11 @@ final class CommandLinkMutationService {
             count++;
         }
         return count;
+    }
+
+    private boolean usesItemMetadataSelection(@Nullable TwCommandItemConfig config) {
+        return config != null
+                && config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata;
     }
 
     @FunctionalInterface

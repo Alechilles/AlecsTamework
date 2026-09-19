@@ -548,14 +548,12 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
 
             ItemStack sourceTool = metadataCommandStack(
                     "test:horn", "horn-tool").withMetadata(
-                    com.alechilles.alecstamework.config.TameworkMetadataKeys
-                            .COMMAND_PANEL_MODE,
-                    Codec.STRING, "NearbyMode");
+                    "Tamework.Command.CompanionState",
+                    Codec.STRING, "InWorld");
             ItemStack destinationTool = metadataCommandStack(
                     "test:horn", "horn-tool").withMetadata(
-                    com.alechilles.alecstamework.config.TameworkMetadataKeys
-                            .COMMAND_PANEL_MODE,
-                    Codec.STRING, "LinkedMode");
+                    "Tamework.Command.CompanionState",
+                    Codec.STRING, "Stored");
             installInventory(sourcePlayer, sourceTool);
             installInventory(destinationPlayer, destinationTool);
             CommandPanelPreferenceService preferences =
@@ -577,9 +575,9 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             }
 
             assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(
-                    command -> "#TameworkLinkedPanelModeDropdown.Value"
+                    command -> "#CompanionStored.Style"
                             .equals(command.selector)
-                            && command.data.contains("LinkedMode")),
+                            && command.data.contains("CompanionTabButtonSelected")),
                     () -> java.util.Arrays.toString(commands.getCommands()));
         }
     }

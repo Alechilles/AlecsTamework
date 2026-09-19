@@ -2,6 +2,37 @@
 
 ## 4.1.0 - Animal Progression and Companion UI - 2026-09-18
 
+- Companion status tabs show matching animal counts and a clearer selected highlight.
+  Right-click a group to add its animals to your current selection; left-click selects
+  only that group. Fixed the menu logo tooltip stretching off-screen.
+
+- Reworked ordinary command flutes around one owned-companion panel. Owned animals
+  appear automatically, each flute keeps its own selected set, and the
+  panel separates In World, Stored, Lost / Dead, and All views with selected rows
+  first. Nearby-only filtering and one name/species/group search keep browsing
+  independent from command recipients. Player-owned groups are shared across
+  compatible flutes, support multiple memberships, and can be edited inline.
+  Captures already tracked by a flute or carried in your inventory remain visible
+  as read-only stored cards when capture clears ownership.
+
+- Added a Hardcore settings preset with old-age death, disabled revives, and
+  starvation/dehydration damage of 10%/15% of maximum health per minute.
+  Standard presets restore revives and disable old-age death.
+- Selecting an experience preset now fills the settings form immediately; Apply
+  still saves changes. Removed Load Preset and widened the dropdown so the
+  Simplified (Minecraft-like) label has room.
+
+- Fixed a companion-panel disconnect when portrait-star updates overtook a
+  queued card-list refresh.
+
+- Fixed companions being marked lost and refusing capture when Hytale removes a duplicate entity while the original remains alive.
+
+- Captured companions keep their linked-panel cards until a different player
+  successfully releases and acquires them. The former owner's links are then
+  removed, including after later recapture; failed releases preserve the cards.
+
+- Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
+
 - Recall no longer restores a dead saved body while its death transition is pending.
 - Captured age meters now gray out consistently, and paused meters show a larger
   transparent pause icon centered over the bar, with equal-width strokes.

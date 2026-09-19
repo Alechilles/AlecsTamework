@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CommandPanelCareSortTest {
     @Test
-    void lowestPercentageComesFirstRegardlessOfActiveStateAndUnknownComesLast() {
+    void selectedAnimalsComeFirstThenLowestPercentageWithinEachSelectionState() {
         for (var sort : List.of(CommandPanelPreferenceService.PanelSort.Happiness,
                 CommandPanelPreferenceService.PanelSort.Hunger, CommandPanelPreferenceService.PanelSort.Thirst)) {
             assertCareOrder(sort);
@@ -24,7 +24,7 @@ class CommandPanelCareSortTest {
                 entry("Needs care", 40, 200, false, sort),
                 entry("Empty", 0, 100, true, sort)));
         rows.sort(CommandPanelEntrySourceService.buildComparator(sort));
-        assertEquals(List.of("Empty", "Needs care", "Content", "Unknown"),
+        assertEquals(List.of("Empty", "Content", "Unknown", "Needs care"),
                 rows.stream().map(LinkedNpcEntry::displayName).toList());
     }
 

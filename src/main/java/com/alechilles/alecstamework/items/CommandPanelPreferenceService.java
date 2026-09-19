@@ -16,7 +16,7 @@ final class CommandPanelPreferenceService {
     private static final double MIN_NEARBY_RADIUS = 8.0;
     private static final double MAX_NEARBY_RADIUS = 96.0;
     private static final double NEARBY_RADIUS_STEP = 4.0;
-    static final int MAX_FILTER_TEXT_LENGTH = 40;
+    static final int MAX_FILTER_TEXT_LENGTH = 120;
 
     enum PanelMode {
         LinkedMode,
@@ -90,6 +90,7 @@ final class CommandPanelPreferenceService {
     }
 
     PanelMode resolveEffectivePanelMode(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
+        if (config != null && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster()) return PanelMode.OwnedMode;
         PanelMode override = readPanelModeOverride(stack);
         if (override != null) {
             return override;
@@ -104,13 +105,6 @@ final class CommandPanelPreferenceService {
     }
 
     MembershipMode resolveRecipientMembershipMode(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
-        PanelMode override = readPanelModeOverride(stack);
-        if (override == PanelMode.NearbyMode || override == PanelMode.OwnedMode) {
-            return MembershipMode.OwnerScope;
-        }
-        if (override == PanelMode.LinkedMode) {
-            return MembershipMode.LinkedOnly;
-        }
         return config != null && config.getMembershipMode() != null
                 ? config.getMembershipMode()
                 : MembershipMode.LinkedOnly;

@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.bson.BsonDocument;
 
 /**
  * Exact engine-neutral item value written by one successful companion capture.
@@ -81,6 +86,25 @@ public record CapturedArtifact(
                         canonicalMetadata
                 )
         );
+    }
+
+    /**
+     * Identifies an acquisition by someone other than the owner before capture.
+     * Missing legacy evidence does not revoke links. Call only for an unowned
+     * captured profile; existing canonical ownership still takes precedence.
+     */
+    public boolean transfersClearedOwnershipTo(@Nullable OwnerId assignedOwner) {
+        if (assignedOwner == null) return false;
+        BsonDocument metadata = BsonDocument.parse(metadataExtendedJson);
+        var cleared = metadata.get(TameworkMetadataKeys.CAPTURE_OWNER_CLEARED);
+        var previous = metadata.get(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID);
+        if (cleared == null || !cleared.isBoolean() || !cleared.asBoolean().getValue()
+                || previous == null || !previous.isString()) return false;
+        try {
+            return !assignedOwner.value().equals(UUID.fromString(previous.asString().getValue()));
+        } catch (IllegalArgumentException invalidLegacyOwner) {
+            return false;
+        }
     }
 
     private static String requireItemId(String value) {

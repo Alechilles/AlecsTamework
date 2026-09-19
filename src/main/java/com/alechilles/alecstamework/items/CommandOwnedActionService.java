@@ -44,8 +44,6 @@ final class CommandOwnedActionService {
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action,
             boolean locate) {
         if (!ownedMode(player, toolId)) return false;
-        if (links.findLinkedNpcRecord(links.readLinkedNpcRecords(
-                inventory.findToolStack(player, toolId)), rowId) != null) return false;
         UUID owner = player.getUuid();
         if (persistence == null || owner == null || rowId == null) {
             warn(player);
@@ -85,8 +83,7 @@ final class CommandOwnedActionService {
     }
 
     private boolean ownedMode(Player player, String toolId) {
-        return player != null && preferences.readPanelModeOverride(
-                inventory.findToolStack(player, toolId)) == CommandPanelPreferenceService.PanelMode.OwnedMode;
+        return player != null && inventory.findToolStack(player, toolId) != null;
     }
 
     static boolean allows(UUID owner, CompanionProfileReadModel profile,

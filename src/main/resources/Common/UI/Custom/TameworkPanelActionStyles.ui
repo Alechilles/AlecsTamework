@@ -57,6 +57,21 @@ $C = "Common.ui";
 );
 
 @PanelButtonSelected = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Sounds: $C.@ButtonSounds);
+
+// Companion status tabs use a green-tinted fill and brighter label so the active
+// status remains obvious while counts are shown in the same control.
+@CompanionTabButton = TextButtonStyle(
+ Default: (Background: (Color: #252c27), LabelStyle: @PanelButtonLabel),
+ Hovered: (Background: (Color: #35423a), LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: (Color: #2d3831), LabelStyle: @PanelButtonLabel),
+ Sounds: $C.@ButtonSounds
+);
+@CompanionTabButtonSelected = TextButtonStyle(
+ Default: (Background: (Color: #38543f), LabelStyle: (...@PanelButtonLabel, TextColor: #f0eee7)),
+ Hovered: (Background: (Color: #466d4f), LabelStyle: (...@PanelButtonLabel, TextColor: #ffffff)),
+ Pressed: (Background: (Color: #2f4936), LabelStyle: (...@PanelButtonLabel, TextColor: #f0eee7)),
+ Sounds: $C.@ButtonSounds
+);
 @Back = @Action;
 
 // Text entry fields in this panel share the same quiet charcoal treatment as dropdowns.
@@ -79,4 +94,12 @@ $C = "Common.ui";
  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #d6d9d0, RenderUppercase: false),
  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #f0eee7, RenderUppercase: false),
  DefaultArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", HoveredArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", PressedArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", ArrowWidth: 10, ArrowHeight: 6
+);
+
+// Multi-group membership needs a persistent selected marker, not only a subtle text tint.
+@CompanionGroupDropdown = DropdownBoxStyle(...@GroupDropdown,
+ EntryIconWidth: 12, EntryIconHeight: 12,
+ EntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamondOutline.png", Color: #afb6b0),
+ SelectedEntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #69c87d),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #9ce5ac, RenderBold: true, RenderUppercase: false)
 );
