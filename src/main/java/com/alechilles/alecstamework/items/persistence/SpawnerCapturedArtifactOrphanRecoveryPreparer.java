@@ -149,6 +149,7 @@ final class SpawnerCapturedArtifactOrphanRecoveryPreparer {
                 profile,
                 source,
                 state,
+                artifact,
                 ownerAssignment,
                 ownerAssignmentName
         );

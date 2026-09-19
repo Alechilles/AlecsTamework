@@ -4,6 +4,10 @@
 
 - Fixed companions being marked lost and refusing capture when Hytale removes a duplicate entity while the original remains alive.
 
+- Captured companions keep their linked-panel cards until a different player
+  successfully releases and acquires them. The former owner's links are then
+  removed, including after later recapture; failed releases preserve the cards.
+
 - Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
 
 - Recall no longer restores a dead saved body while its death transition is pending.

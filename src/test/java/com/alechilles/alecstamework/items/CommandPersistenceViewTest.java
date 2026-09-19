@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,27 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandPersistenceViewTest {
+    @Test
+    void capturedRowsFollowDurableLinksAcrossTradeAndRecapture() {
+        UUID profile = UUID.randomUUID();
+        UUID alias = UUID.randomUUID();
+        UUID tool = UUID.randomUUID();
+        LinkedNpcRecord cached = record(alias, profile.toString());
+        LinkedNpcRecord unresolved = record(UUID.randomUUID(), null);
+        for (LifecycleState state : List.of(LifecycleState.CAPTURED, LifecycleState.ACTIVE)) {
+            for (boolean linked : List.of(true, false)) {
+                var projection = new CompanionProfileProjectionState(new ProfileId(profile),
+                        new NpcAlias(UUID.randomUUID()), state,
+                        state == LifecycleState.CAPTURED ? null : new OwnerId(UUID.randomUUID()),
+                        null, "Tamed_Chicken", "Chicken", null, true, null, null,
+                        linked ? Set.of(tool) : Set.of(), Set.of(), 100L);
+                var view = new CommandPersistenceView(lookup(projection));
+                assertEquals(linked ? List.of(cached, unresolved) : List.of(unresolved),
+                        view.linkedRecordsForTool(List.of(cached, unresolved), tool.toString()));
+            }
+        }
+    }
+
     @Test
     void exposesOnlyCanonicalCommandFacingProfileFacts() {
         UUID profileUuid = UUID.randomUUID();
