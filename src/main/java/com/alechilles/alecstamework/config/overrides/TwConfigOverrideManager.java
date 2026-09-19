@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1073,7 +1074,7 @@ public final class TwConfigOverrideManager {
                 appendDigest(digest, hashFile(resolveGeneratedPatchPath(resolveGeneratedPatchCacheRoot(), descriptor)));
                 appendDigest(digest, hashFile(resolveOverridePath(world, descriptor)));
             }
-            return toHex(digest.digest());
+            return HexFormat.of().formatHex(digest.digest());
         } catch (Exception ex) {
             return UUID.randomUUID().toString();
         }
@@ -1096,15 +1097,6 @@ public final class TwConfigOverrideManager {
     private void appendDigest(@Nonnull MessageDigest digest, @Nonnull String value) {
         digest.update(value.getBytes(StandardCharsets.UTF_8));
         digest.update((byte) '\n');
-    }
-
-    @Nonnull
-    private String toHex(@Nonnull byte[] bytes) {
-        StringBuilder builder = new StringBuilder(bytes.length * 2);
-        for (byte current : bytes) {
-            builder.append(String.format("%02x", current));
-        }
-        return builder.toString();
     }
 
     private void writeDraftToDisk(@Nonnull World world,
