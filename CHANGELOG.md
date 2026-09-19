@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reduced oversized life-stage and trait UI textures to lower client texture-atlas usage.
+
 - Old-age deaths are now permanent, even with revives enabled, including bonded
   companions. They free owned capacity and cannot be revived later.
 
