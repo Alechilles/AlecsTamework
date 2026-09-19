@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Companion status tabs show matching animal counts and a clearer selected highlight.
+  Right-click a group to add its animals to your current selection; left-click selects
+  only that group. Fixed the menu logo tooltip stretching off-screen.
+
 - Reworked ordinary command flutes around one owned-companion panel. Owned animals
   appear automatically, each flute keeps its own selected set, and the
   panel separates In World, Stored, Lost / Dead, and All views with selected rows

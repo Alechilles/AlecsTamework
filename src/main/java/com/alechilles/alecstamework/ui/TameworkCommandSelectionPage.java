@@ -722,6 +722,15 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
+        if (data.companionAddGroup != null) {
+            if (companionBinding == null) return;
+            cancelPendingFilterTextApply();
+            companionBinding.addGroup().accept(data.companionAddGroup);
+            pendingUnlinkNpcUuid = null;
+            refreshLinkedNpcEntries();
+            sendCardRefreshUpdate();
+            return;
+        }
         if (data.panelGroupActiveValue != null) {
             cancelPendingFilterTextApply();
             if (panelSetGroupActivationCallback != null) {

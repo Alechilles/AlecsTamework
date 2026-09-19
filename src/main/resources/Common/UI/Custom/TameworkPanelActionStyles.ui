@@ -57,6 +57,21 @@ $C = "Common.ui";
 );
 
 @PanelButtonSelected = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Sounds: $C.@ButtonSounds);
+
+// Companion status tabs use a green-tinted fill and brighter label so the active
+// status remains obvious while counts are shown in the same control.
+@CompanionTabButton = TextButtonStyle(
+ Default: (Background: (Color: #252c27), LabelStyle: @PanelButtonLabel),
+ Hovered: (Background: (Color: #35423a), LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: (Color: #2d3831), LabelStyle: @PanelButtonLabel),
+ Sounds: $C.@ButtonSounds
+);
+@CompanionTabButtonSelected = TextButtonStyle(
+ Default: (Background: (Color: #38543f), LabelStyle: (...@PanelButtonLabel, TextColor: #f0eee7)),
+ Hovered: (Background: (Color: #466d4f), LabelStyle: (...@PanelButtonLabel, TextColor: #ffffff)),
+ Pressed: (Background: (Color: #2f4936), LabelStyle: (...@PanelButtonLabel, TextColor: #f0eee7)),
+ Sounds: $C.@ButtonSounds
+);
 @Back = @Action;
 
 // Text entry fields in this panel share the same quiet charcoal treatment as dropdowns.

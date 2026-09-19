@@ -11,6 +11,8 @@ import java.util.*;
 final class CompanionPanelChrome {
     static final String FILTER_PREFIX = "__companion_filter__:";
     static final List<String> FILTERS = List.of("InWorld", "Stored", "LostDead", "All");
+    private static final String TAB_DEFAULT_OUTLINE = "#4a5a50";
+    private static final String TAB_SELECTED_OUTLINE = "#7acb88";
 
     static void bind(UICommandBuilder c, UIEventBuilder e, TameworkCommandSelectionPage page,
                      LinkedNpcPanelRefreshValues values) {
@@ -50,12 +52,20 @@ final class CompanionPanelChrome {
         }
         set(c, values, "#TameworkLinkedPanelInlineFilterTextControls.Visible", true);
         set(c, values, "#CompanionNearbyCheck.Value", page.companionBinding.nearby().get());
+        LinkedNpcEntry[] applicable = page.pendingRemovals.filter(page.baseLinkedNpcEntries);
+        TabCounts counts = tabCounts(applicable, page.companionBinding.nearby().get(),
+                LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
         long count = Arrays.stream(page.baseLinkedNpcEntries).filter(LinkedNpcEntry::active).count();
         set(c, values, "#TameworkCommandMenuTitle.Text", text(language, "title") + " — "
                 + LocalizedText.format(language, "tamework.ui.companions.count", count, page.baseLinkedNpcEntries.length));
         for (String filter : FILTERS) {
             String selector = "#Companion" + filter;
-            String style = filter.equals(page.companionBinding.state().get()) ? "PanelButtonSelected" : "PanelButton";
+            boolean selected = filter.equals(page.companionBinding.state().get());
+            String style = selected ? "CompanionTabButtonSelected" : "CompanionTabButton";
+            int tabCount = counts.forFilter(filter);
+            set(c, values, selector + ".Text", LocalizedText.format(language,
+                    "tamework.ui.companions.tabCount", text(language, filterKey(filter)), tabCount));
+            setTabOutline(c, values, selector, selected ? TAB_SELECTED_OUTLINE : TAB_DEFAULT_OUTLINE);
             if (values == null) {
                 c.set(selector + ".Style", Value.ref("TameworkPanelActionStyles.ui", style));
                 e.addEventBinding(CustomUIEventBindingType.Activating, selector,
@@ -82,6 +92,49 @@ final class CompanionPanelChrome {
             case "InWorld" -> !stored && !missing;
             default -> true;
         };
+    }
+
+    static TabCounts tabCounts(LinkedNpcEntry[] entries, boolean nearby, String search) {
+        LinkedNpcEntry[] applicable = filter(entries == null ? new LinkedNpcEntry[0] : entries,
+                "All", nearby, search);
+        int inWorld = 0;
+        int stored = 0;
+        int lostDead = 0;
+        for (LinkedNpcEntry entry : applicable) {
+            if (matchesState(entry, "InWorld")) inWorld++;
+            if (matchesState(entry, "Stored")) stored++;
+            if (matchesState(entry, "LostDead")) lostDead++;
+        }
+        return new TabCounts(inWorld, stored, lostDead, applicable.length);
+    }
+
+    private static String filterKey(String filter) {
+        return switch (filter) {
+            case "InWorld" -> "inWorld";
+            case "LostDead" -> "lostDead";
+            default -> filter.toLowerCase(Locale.ROOT);
+        };
+    }
+
+    private static void setTabOutline(UICommandBuilder c, LinkedNpcPanelRefreshValues values,
+                                      String selector, String color) {
+        if (values == null || values.changed(selector + ".OutlineColor", color)) {
+            c.set(selector + ".OutlineColor", color);
+        }
+        if (values == null || values.changed(selector + ".OutlineSize", 1)) {
+            c.set(selector + ".OutlineSize", 1);
+        }
+    }
+
+    record TabCounts(int inWorld, int stored, int lostDead, int all) {
+        int forFilter(String filter) {
+            return switch (filter) {
+                case "InWorld" -> inWorld;
+                case "Stored" -> stored;
+                case "LostDead" -> lostDead;
+                default -> all;
+            };
+        }
     }
 
     private static boolean contains(String value, String needle) {

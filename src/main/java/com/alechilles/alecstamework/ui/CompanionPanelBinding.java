@@ -9,4 +9,11 @@ import java.util.function.Supplier;
 /** World-thread callbacks for ordinary owned-companion browsing and player-owned group preferences. */
 public record CompanionPanelBinding(Supplier<String> state, Consumer<String> setState,
                                     Supplier<Boolean> nearby, Consumer<Boolean> setNearby,
-                                    BiConsumer<UUID, List<String>> assignGroups) { }
+                                    BiConsumer<UUID, List<String>> assignGroups,
+                                    Consumer<String> addGroup) {
+    public CompanionPanelBinding(Supplier<String> state, Consumer<String> setState,
+                                 Supplier<Boolean> nearby, Consumer<Boolean> setNearby,
+                                 BiConsumer<UUID, List<String>> assignGroups) {
+        this(state, setState, nearby, setNearby, assignGroups, ignored -> { });
+    }
+}

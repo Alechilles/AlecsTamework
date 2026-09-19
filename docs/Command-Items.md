@@ -95,7 +95,9 @@ flute. The same selection button is available on the card. A selected companion
 appears before unselected companions, and browsing, searching, or changing status
 tabs never changes the command recipients.
 
-The panel has `In World`, `Stored`, `Lost / Dead`, and `All` status tabs. `Nearby only`
+The panel has `In World`, `Stored`, `Lost / Dead`, and `All` status tabs, each showing
+the number of companions matching the current search and nearby filter. The selected
+tab uses a green highlight. `Nearby only`
 is an additional view filter. The search field matches the companion name, species,
 or group as one literal text search. Sort choices still keep selected companions first.
 The held item's role and command support are checked separately, so an owned companion
@@ -112,9 +114,11 @@ when needed. The menu title includes the current mode and visible NPC count.
 For ordinary command items, groups belong to the player and are shared by compatible
 flutes. A companion may belong to several groups or none. The group dropdown on each
 card is a native multi-select control: toggle memberships inline and close it without
-opening another page. The dropdown border shows the group's color. Clicking a group
-shortcut selects its members for the current flute; it does not remove their other
-memberships. `Add group` opens group creation and `Clear selection` removes all
+opening another page. The dropdown border shows the group's color. Left-clicking a group
+shortcut replaces the current flute's selection with that group. Right-clicking adds
+its members while keeping existing selections, including individually selected animals.
+Groups whose eligible members are all selected are highlighted. Neither action changes
+group memberships. `Add group` opens group creation and `Clear selection` removes all
 selected recipients from that flute. Legacy single-group item metadata remains readable
 and is imported into the owner group state.
 

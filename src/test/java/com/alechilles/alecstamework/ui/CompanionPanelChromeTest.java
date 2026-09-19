@@ -34,6 +34,22 @@ class CompanionPanelChromeTest {
         assertTrue(far.active());
     }
 
+    // Tab totals use the current search/nearby scope, while each status count remains independent of the selected tab.
+    @Test void tabCountsRespectSearchAndNearbyScope() {
+        var inWorld = entry(true, false, false, false, false).withNearby(true);
+        var stored = entry(false, false, true, false, false).withNearby(true);
+        var lost = entry(false, false, false, false, true).withNearby(true);
+        var farDead = entry(false, true, false, false, false).withNearby(false);
+
+        var counts = CompanionPanelChrome.tabCounts(
+                new LinkedNpcEntry[]{inWorld, stored, lost, farDead}, true, "companion");
+
+        assertEquals(1, counts.inWorld());
+        assertEquals(1, counts.stored());
+        assertEquals(1, counts.lostDead());
+        assertEquals(3, counts.all());
+    }
+
     private LinkedNpcEntry entry(boolean loaded, boolean dead, boolean captured, boolean cooped, boolean lost) {
         return new LinkedNpcEntry(UUID.randomUUID(), "Companion", 10, 10, 0, 0, null,
                 0, 0, 0, 0, loaded, false, dead, captured, cooped, lost,

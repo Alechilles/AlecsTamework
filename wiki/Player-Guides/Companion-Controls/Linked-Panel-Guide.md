@@ -93,7 +93,9 @@ records without a complete saved talent snapshot cannot use offline spending.
 
 ## Companion tabs and selection
 
-Ordinary flutes show one owned-companion list with these status tabs:
+Ordinary flutes show one owned-companion list with these status tabs. Each tab shows
+the number of animals matching your current search and nearby filter; the current
+tab has a green highlight:
 
 - **In World**: living companions that are not captured or housed in a coop
 - **Stored**: captured or cooped companions
@@ -206,8 +208,12 @@ Captured companions whose ownership was cleared remain visible when carried in y
   group dropdown to toggle memberships inline; it does not open another page.
 - The group manager lets you create, rename, recolor, or delete groups. **Add group**
   opens creation, and **Clear selection** affects only the current flute's recipients.
-- Clicking a group selects its members for the current flute without removing any
-  other group memberships.
+- Left-click a group to select only its members for the current flute. Right-click
+  another group to add its members without clearing your current selection, including
+  individually selected animals. Right-clicking from an empty selection selects that
+  group. Both actions respect the flute's supported animals and selection limit.
+- Groups are highlighted when all their eligible animals are selected. Selecting
+  groups does not change group memberships.
 - Groups organize the command UI. They do not change companion storage or owner limits.
 
 ## Practical tips

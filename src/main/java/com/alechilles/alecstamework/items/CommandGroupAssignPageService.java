@@ -80,6 +80,11 @@ final class CommandGroupAssignPageService {
                               String toolId,
                               TwCommandItemConfig config,
                               String selectorValue) {
+        applyGroupActivation(player, toolId, config, selectorValue, false);
+    }
+
+    void applyGroupActivation(Player player, String toolId, TwCommandItemConfig config,
+                              String selectorValue, boolean additive) {
         if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
                 || player == null || toolId == null || toolId.isBlank()
                 || toolInventoryService == null) {
@@ -89,20 +94,16 @@ final class CommandGroupAssignPageService {
         boolean all = CommandGroupActivationService.ALL_VALUE.equals(selectorValue);
         boolean none = CommandGroupActivationService.NONE_VALUE.equals(selectorValue);
         if (!all && !none && resolveGroupDropdownEntries(player, toolId).stream().noneMatch(g -> g.value().equals(selectorValue))) return;
-        // Resolve authoritative rows before one item write, with no per-animal notification spam.
-        var candidates = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
-        for (var entry : entries) {
-            if (none || !entry.selectionSupported() || !(all || entry.groupIds().contains(selectorValue))) continue;
-            var record = toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, entry.npcUuid());
-            if (record != null) candidates.put(entry.npcUuid(), record);
-        }
+        // Existing selections get capacity priority when adding a group. Every candidate is revalidated.
+        var candidates = selectionCandidates(entries, selectorValue, additive,
+                id -> toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, id));
         var records = new CommandLinkedNpcRecordStore();
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
             var next = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
             records.read(stack).forEach(record -> next.put(record.npcUuid, record.withActive(false)));
             int limit = config.getMaxActive();
             int selected = 0;
-            for (var record : candidates.values()) {
+            for (var record : candidates) {
                 if (limit > 0 && selected >= limit) break;
                 if (record.profileId != null) next.values().removeIf(previous -> record.profileId.equals(previous.profileId));
                 next.put(record.npcUuid, record.withActive(true));
@@ -110,6 +111,27 @@ final class CommandGroupAssignPageService {
             }
             return records.write(stack, new java.util.ArrayList<>(next.values()));
         });
+    }
+
+    static List<LinkedNpcRecord> selectionCandidates(List<LinkedNpcEntry> entries, String group,
+            boolean additive, java.util.function.Function<UUID, LinkedNpcRecord> resolve) {
+        var candidates = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
+        if (CommandGroupActivationService.NONE_VALUE.equals(group)) return List.of();
+        if (additive) {
+            for (var entry : entries) {
+                if (entry.active() && entry.selectionSupported()) {
+                    var record = resolve.apply(entry.npcUuid());
+                    if (record != null) candidates.put(record.npcUuid, record);
+                }
+            }
+        }
+        for (var entry : entries) {
+            if (!entry.selectionSupported() || candidates.containsKey(entry.npcUuid())
+                    || !(CommandGroupActivationService.ALL_VALUE.equals(group) || entry.groupIds().contains(group))) continue;
+            var record = resolve.apply(entry.npcUuid());
+            if (record != null) candidates.put(record.npcUuid, record);
+        }
+        return List.copyOf(candidates.values());
     }
 
     void applyGroupAssignment(Player player,

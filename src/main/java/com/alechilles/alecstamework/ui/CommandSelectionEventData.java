@@ -83,8 +83,11 @@ public final class CommandSelectionEventData {
                     (event, value) -> event.hotswapRValue = value, event -> event.hotswapRValue).add()
             .append(new KeyedCodec<>("@CompanionNearby", Codec.BOOLEAN), (e,v) -> e.companionNearby=v, e -> e.companionNearby).add()
             .append(new KeyedCodec<>("@CompanionGroups", Codec.STRING_ARRAY), (e,v) -> e.companionGroups=v, e -> e.companionGroups).add()
+            .append(new KeyedCodec<>("CompanionAddGroup", Codec.STRING),
+                    (e, v) -> e.companionAddGroup = v, e -> e.companionAddGroup).add()
             .build();
 
+    String companionAddGroup;
     Boolean companionNearby;
     String[] companionGroups;
     String commandId;

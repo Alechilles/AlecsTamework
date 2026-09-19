@@ -59,8 +59,9 @@ command item and acquisition method.
 - If a command item looks empty, check its status tab, `Nearby only` filter, and search
   text. A newly owned companion appears automatically even when it is not selected.
 - A flute's selected set is independent of the shared player groups. Companions can
-  belong to several groups or none; clicking a group selects its members for the
-  current flute without changing memberships.
+  belong to several groups or none; left-clicking a group selects its members for the
+  current flute without changing memberships. Right-click adds a group while keeping
+  the animals already selected.
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
 - A supported managed-coop interaction can place an eligible canonical filled

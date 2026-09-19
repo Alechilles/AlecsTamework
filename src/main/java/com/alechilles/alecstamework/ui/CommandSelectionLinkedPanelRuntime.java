@@ -409,7 +409,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 LinkedNpcPanelPresentationSupport.entries(page.panelGroupActivationEntriesSupplier),
                 LinkedNpcPanelPresentationSupport.value(page.panelGroupActivationValueSupplier, ""),
                 !page.config.usesBondedCompanionRoster() && !page.cardBindingConfig.ownerCommandFamilyRoster(), initial,
-                page.panelGroupColorsSupplier.get());
+                page.panelGroupColorsSupplier.get(), page.companionBinding == null ? null : page.baseLinkedNpcEntries);
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {

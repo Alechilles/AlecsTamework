@@ -1348,7 +1348,8 @@ final class CommandSelectionPageService {
                     state -> { if (context.genericAuthority().getAsBoolean()) toolInventoryService.mutateToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack -> CommandCompanionPreferences.state(stack, state)); },
                     () -> CommandCompanionPreferences.nearby(toolInventoryService.findToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId())),
                     nearby -> { if (context.genericAuthority().getAsBoolean()) toolInventoryService.mutateToolStack(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack -> CommandCompanionPreferences.nearby(stack, nearby)); },
-                    (id, groups) -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupAssignments(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), id, groups); }
+                    (id, groups) -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupAssignments(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), id, groups); },
+                    group -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupActivation(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), group, true); }
             ));
         }
         page.configureShoulderRideCallback(shoulderRideCallback(context));

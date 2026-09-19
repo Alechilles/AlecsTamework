@@ -26,6 +26,7 @@ final class CommandSelectionRosterEventBoundary {
         if (data.panelAutoLinkEnabled != null
                 || data.panelActiveHighlightEnabled != null
                 || data.panelGroupActiveValue != null
+                || data.companionAddGroup != null
                 || data.panelGroupAssignValue != null) {
             return true;
         }
