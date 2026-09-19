@@ -71,7 +71,8 @@ final class TameworkCompanionGuideCardRenderer {
             commands.set(group + "Label.Visible", true);
             commands.set(group + ".Entries", List.of(new DropdownEntryInfo(
                     LocalizableString.fromString(entry.groupName()), entry.groupId())));
-            commands.set(group + ".Value", entry.groupId());
+            commands.set(group + ".MaxSelection", 0);
+            commands.set(group + ".SelectedValues", List.of(LocalizableString.fromString(entry.groupId())));
             commands.set(group + "Label.Text", entry.groupName());
             LinkedNpcPanelGroupTabBinder.bind(commands, group, entry);
         }
@@ -112,7 +113,7 @@ final class TameworkCompanionGuideCardRenderer {
                 78, 100, happiness, 100, happiness, "", hunger, 100, thirst, 100,
                 !unloaded, topicIndex == 9, dead, captured, false, false, 0L, null,
                 level, points, traits, false, false, topicIndex == 5, topicIndex == 5,
-                true, active, null, null, groupId, groupName, exampleIndex == 2 ? "#d5b15c" : "#85b99a",
+                !captured, active, null, null, groupId, groupName, exampleIndex == 2 ? "#d5b15c" : "#85b99a",
                 topicIndex == 4 || topicIndex == 3, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, false, false, 0L
@@ -120,7 +121,7 @@ final class TameworkCompanionGuideCardRenderer {
                 .withBreedingHappinessRatio(topicIndex == 4 || topicIndex == 3 ? .60 : -1.0)
                 .withFlightToggle(topicIndex == 9, exampleIndex == 1)
                 .withShoulderRide(topicIndex == 9, exampleIndex == 2);
-        return entry;
+        return captured ? entry : entry.withOwnedActions();
     }
 
     private static void renderBonded(UICommandBuilder commands,

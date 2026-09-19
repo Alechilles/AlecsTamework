@@ -58,10 +58,16 @@ command item and acquisition method.
 - If spawning or naming fails, it is usually because of ownership, tame, cooldown, or allowed-role rules.
 - If a command item looks empty, check its status tab, `Nearby only` filter, and search
   text. A newly owned companion appears automatically even when it is not selected.
+- The title reports this flute's selected and displayed totals. Status-tab counts
+  follow the active `Nearby only` setting and search text.
 - A flute's selected set is independent of the shared player groups. Companions can
   belong to several groups or none; left-clicking a group selects its members for the
   current flute without changing memberships. Right-click adds a group while keeping
   the animals already selected.
+- When a capture item clears ownership, its old owner's flute can keep a read-only
+  stored card while the item is carried or already tracked. If another player
+  releases that traded companion with owner reassignment, the former owner's old
+  flute link and card are removed.
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
 - A supported managed-coop interaction can place an eligible canonical filled

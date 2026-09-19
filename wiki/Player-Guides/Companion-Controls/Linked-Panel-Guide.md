@@ -37,6 +37,7 @@ panel without changing its filters or selection.
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
+- An optional mod-provided capacity summary in the command-menu header
 - Animals with aging enabled show a compact life-stage label and age progress
   bar beside breeding and harvest meters, both in the menu and target HUD.
   The age bar fills within the current stage and resets at the next stage;
@@ -101,6 +102,10 @@ tab has a green highlight:
 - **Stored**: captured or cooped companions
 - **Lost / Dead**: companions in either recovery state
 - **All**: every owned companion
+
+The panel title shows this flute's selected count and its total displayed records.
+The tab counts follow the current **Nearby only** setting and search text, so they
+can be lower than your full roster.
 
 Selected companions appear before unselected companions in every tab. The selected
 state belongs to the physical flute, so two flutes can keep different working sets.
@@ -200,7 +205,12 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   removal or world-deletion evidence. It is not inferred solely because the
   companion is off-screen, absent, or took too long to recall.
 
-Captured companions whose ownership was cleared remain visible when carried in your inventory or already tracked by that flute. These cards are read-only until the companion is released from storage and owned again. The header counts all displayed companions, including these stored records.
+Captured companions whose ownership was cleared remain visible when carried in your
+inventory or already tracked by that flute. These cards are read-only until the
+companion is released from storage and owned again. If another player releases a
+traded captured companion with ownership reassignment, the former owner's command
+links are retired and its old card disappears. The title total includes these
+read-only stored records while they are still displayed.
 
 ## Group tools
 - Groups are shared by the player's ordinary compatible flutes.

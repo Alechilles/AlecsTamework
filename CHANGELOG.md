@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Refreshed the Companion Guide and its example cards for per-flute selection,
+  shared groups, captured-animal trading, and Hardcore server rules in all six languages.
+
 - Companion status tabs show matching animal counts and a clearer selected highlight.
   Right-click a group to add its animals to your current selection; left-click selects
   only that group. Fixed the menu logo tooltip stretching off-screen.

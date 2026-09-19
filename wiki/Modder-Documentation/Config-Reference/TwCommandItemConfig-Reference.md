@@ -67,9 +67,11 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `ItemIds`: item ids that resolve this config.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.
-- `RosterStorage`: `ItemMetadata` for the legacy/default per-item authority or
-  `OwnerCommandFamily` for a durable owner/family roster, or
-  `BondedCompanions` for the separate bonded profile-and-lease authority.
+- `RosterStorage`: `ItemMetadata` for the standard ordinary-flute flow. Its panel
+  automatically discovers owned companions; per-item metadata retains
+  only that physical flute's selected recipients and panel preferences.
+  `OwnerCommandFamily` uses a durable owner/family roster, and
+  `BondedCompanions` uses the separate bonded profile-and-lease authority.
 - `CommandFamilyId`: stable namespaced family shared by equivalent access
   items; required for `OwnerCommandFamily`.
 - `UiRendererId`: optional namespaced Java command-menu renderer ID. Omit it or
@@ -119,7 +121,9 @@ Accepted `MembershipMode` values:
 - `LinkedOrMasterTarget`: linked companions plus the current master target.
 
 With `RosterStorage: ItemMetadata`, linked membership remains on that command
-item. With `OwnerCommandFamily`, membership and stable slots are durable for
+item as the flute's active-recipient selection; it is not the ordinary panel's
+browsing source. The standard panel discovers owned companions even
+without an existing item record. With `OwnerCommandFamily`, membership and stable slots are durable for
 the owner/family and equivalent access items see the same roster. Optional item
 metadata is only a disposable projection. Both modes resolve canonical profile
 IDs and read lifecycle status from replacement persistence; neither item cache
@@ -240,6 +244,10 @@ Fields:
 - The item interaction is `TameworkCommand`.
 - Left-click typically runs the current command; right-click commonly uses `CommandId: OpenSelectionMenu` to open the radial.
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
+- For an ordinary `ItemMetadata` flute, `LinkEnabled` does not control which
+  owned companions appear in the standard panel. The per-item active records
+  control command recipients; the owned projection controls browsing. Keep this
+  distinction when replacing the standard UI or handling card events.
 - `UiRendererId` changes only the menu controller and layout.
   `UiContributors` adds isolated presentation, server actions, and custom
   flows that the renderer declares it can display. Tamework still owns
