@@ -33,4 +33,3 @@ class TameworkBondedPermanentDeathEventTest {
         assertEquals(3L, events.getFirst().revision());
     }
 }
-
