@@ -13,7 +13,6 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsTitle", "tamework.ui.settings.title"},
             {"#TwSettingsRefreshButton", "tamework.ui.shared.button.refresh"},
             {"#TwSettingsCloseButton", "tamework.ui.shared.button.close"},
-            {"#TwSettingsLoadPresetButton", "tamework.ui.settings.button.loadPreset"},
             {"#TwSettingsExperiencePresetsLabel", "tamework.ui.settings.label.experiencePresets"},
             {"#TwSettingsLoadPresetLabel", "tamework.ui.settings.label.loadPreset"},
             {"#TwSettingsPresetNoteLabel", "tamework.ui.settings.note.presetScope"},

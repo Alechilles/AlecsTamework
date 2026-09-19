@@ -107,7 +107,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                                   boolean breedingGenderEnabled,
                                                   boolean traitsEnabled,
                                                   boolean levelingEnabled,
-                                                  boolean talentsEnabled) {
+                                                  boolean talentsEnabled,
+                                                  boolean hardcore) {
         return new TameworkSettingsValues(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope,
@@ -131,10 +132,10 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 needsTickPolicyMode,
                 needsOwnerOfflineGraceHours,
                 needsOwnerOfflineDecayMultiplier,
-                needsDamageModel,
+                TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT,
                 needsDamageDualNeedRule,
-                needsStarvationDamagePerMinute,
-                needsDehydrationDamagePerMinute,
+                hardcore ? 10.0 : 2.0,
+                hardcore ? 15.0 : 3.0,
                 needsDamageLethal,
                 happinessEnabled,
                 passiveBreedingEnabled,
@@ -143,12 +144,12 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 traitsEnabled,
                 levelingEnabled,
                 talentsEnabled,
-                reviveSystemEnabled,
+                !hardcore,
                 recallTeleportingEnabled,
                 telemetryEnabled,
                 telemetryBreadcrumbsEnabled,
-                animalAgingMode,
-                animalOldAgeDeathEnabled
+                hardcore ? AnimalAgingMode.FULL : animalAgingMode,
+                hardcore
         );
     }
 

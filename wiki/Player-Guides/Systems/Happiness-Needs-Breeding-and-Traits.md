@@ -10,6 +10,27 @@ Parent: [Systems](/mod/alecs-tamework/systems) | [Player Guides](/mod/alecs-tame
 
 Many Tamework-powered mods share a cluster of long-term progression systems. The mod decides the exact numbers and compatible creatures, but the framework supplies the common behavior.
 
+## Experience presets
+
+In `/tw settings`, selecting a preset immediately fills the form. Review the
+settings and click **Apply** to save them.
+
+- **Simplified (Minecraft-like)** disables needs, happiness, passive breeding,
+  breeding requirements for happiness and gender, traits, leveling, and talents.
+- **Easier** enables those systems but disables needs damage.
+- **Full Experience** also enables lethal needs damage, with starvation at 2%
+  and dehydration at 3% of maximum health per minute. Revives stay enabled and
+  old-age death stays disabled.
+- **Hardcore** enables the Full Experience systems, full adult aging, and
+  old-age death, disables revives, and raises starvation and dehydration damage
+  to 10% and 15% of maximum health per minute respectively. Aging still depends
+  on the creature's mod supplying an aging configuration.
+
+Switching from Hardcore to another preset restores revives, disables old-age
+death, and restores the 2%/3% damage rates. Only Hardcore changes the aging mode.
+Presets preserve ownership, claims, population limits, travel, and the rule for
+combining starvation and dehydration damage. **Custom** leaves the form unchanged.
+
 ## Happiness
 - A shared wellbeing value used by other systems
 - Often improved by feeding, care, or positive interactions

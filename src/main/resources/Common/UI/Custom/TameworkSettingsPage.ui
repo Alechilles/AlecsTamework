@@ -142,17 +142,12 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsPresetDropdown {
-                Anchor: (Left: 126, Width: 220, Height: 28);
+                Anchor: (Left: 126, Right: 12, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: %server.tamework.ui.settings.noItems.preset;
               }
 
-              TextButton #TwSettingsLoadPresetButton {
-                Anchor: (Left: 354, Width: 110, Height: 28);
-                Text: %server.tamework.ui.settings.button.loadPreset;
-                Style: $A.@PanelButton;
-              }
             }
 
             Group {
