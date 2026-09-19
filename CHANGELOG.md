@@ -15,9 +15,9 @@
   Captures already tracked by a flute or carried in your inventory remain visible
   as read-only stored cards when capture clears ownership.
 
-- Added a Hardcore settings preset with old-age death, disabled revives, and
+- Added a Hardcore settings preset with old-age death, disabled revives and recall teleportation, and
   starvation/dehydration damage of 10%/15% of maximum health per minute.
-  Standard presets restore revives and disable old-age death.
+  Standard presets restore revives and recall teleportation and disable old-age death.
 - Selecting an experience preset now fills the settings form immediately; Apply
   still saves changes. Removed Load Preset and widened the dropdown so the
   Simplified (Minecraft-like) label has room.

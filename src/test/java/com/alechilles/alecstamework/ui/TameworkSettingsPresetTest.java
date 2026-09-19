@@ -64,7 +64,7 @@ class TameworkSettingsPresetTest {
         assertEquals(base.populationLimitPerPlayerOwnedTotal(), hardcore.populationLimitPerPlayerOwnedTotal());
         assertEquals(base.blockOwnerDamage(), hardcore.blockOwnerDamage());
         assertEquals(base.simpleClaimsEnabled(), hardcore.simpleClaimsEnabled());
-        assertEquals(base.recallTeleportingEnabled(), hardcore.recallTeleportingEnabled());
+        assertEquals(false, hardcore.recallTeleportingEnabled());
     }
 
     @Test
@@ -76,6 +76,7 @@ class TameworkSettingsPresetTest {
                 TameworkSettingsPreset.FULL_EXPERIENCE}) {
             TameworkSettingsValues restored = preset.applyTo(hardcore);
             assertEquals(true, restored.reviveSystemEnabled());
+            assertEquals(true, restored.recallTeleportingEnabled());
             assertEquals(false, restored.animalOldAgeDeathEnabled());
             assertEquals(2.0, restored.needsStarvationDamagePerMinute());
             assertEquals(3.0, restored.needsDehydrationDamagePerMinute());
@@ -125,7 +126,7 @@ class TameworkSettingsPresetTest {
                 true,
                 true,
                 true,
-                false,
+                true,
                 false,
                 false,
                 AnimalAgingMode.FREEZE_AT_PRIME,
