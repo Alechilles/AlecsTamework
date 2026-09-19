@@ -31,8 +31,10 @@ final class CompanionPanelChrome {
             c.set("#TameworkLinkedPanelFilterInput.MaxLength", 120);
             c.set("#TameworkLinkedPanelActiveHighlightLabel.Text", text(language, "highlight"));
             c.setObject("#TameworkLinkedPanelActiveHighlightControls.Anchor", anchor(0, 36, 146, 28));
+            c.setObject("#TameworkLinkedPanelActiveHighlightLabel.Anchor", anchor(28, 0, 118, 28));
             c.setObject("#CompanionNearbyControls.Anchor", anchor(155, 36, 115, 28));
             c.setObject("#TameworkLinkedPanelControlsSecondary.Anchor", anchor(280, 36, 610, 28));
+            c.setObject("#TameworkLinkedPanelSortDropdown.Anchor", anchor(0, 0, 124, 28));
             c.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor", anchor(0, 0, 440, 28));
             c.setObject("#TameworkLinkedPanelFilterInput.Anchor", anchor(0, 0, 430, 28));
             // Content already owns the list viewport; move that container, not its scrolling child.
