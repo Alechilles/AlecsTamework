@@ -94,7 +94,11 @@ final class CommandLinkedPanelEntryService {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return List.of();
         }
-        return buildEntriesFromRecords(player, store, stack, toolId, linkedNpcRecordStore.read(stack));
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        if (persistenceView != null) {
+            records = persistenceView.linkedRecordsForTool(records, toolId);
+        }
+        return buildEntriesFromRecords(player, store, stack, toolId, records);
     }
 
     /** Builds from canonical records when item metadata is merely a disposable projection. */

@@ -167,7 +167,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void bindStaticEvents(@Nonnull UIEventBuilder eventBuilder) {
         EventData editEvent = appendFormEventData(EventData.of(ACTION, ACTION_EDIT));
         for (var binding : editEvent.events().entrySet()) {
-            // Selecting a preset alone does not change settings; Load Preset does.
             if (ACTION.equals(binding.getKey()) || KEY_PRESET.equals(binding.getKey())) continue;
             String valueSelector = binding.getValue();
             String selector = valueSelector.substring(0, valueSelector.length() - ".Value".length());
@@ -186,8 +185,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 false
         );
         eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TwSettingsLoadPresetButton",
+                CustomUIEventBindingType.ValueChanged,
+                "#TwSettingsPresetDropdown",
                 appendFormEventData(EventData.of(ACTION, ACTION_LOAD_PRESET)),
                 false
         );
@@ -318,6 +317,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void refreshFeedback() {
         UICommandBuilder commandBuilder = new UICommandBuilder();
         renderFeedback(commandBuilder);
+        if (draftPayload != null) {
+            TameworkSettingsFormParser.ParseResult draft = parseValues(draftPayload);
+            TameworkSettingsPreset preset = draft.success() && draft.values() != null
+                    ? TameworkSettingsPreset.match(draft.values())
+                    : TameworkSettingsPreset.CUSTOM;
+            // A changed form must allow selecting the previous preset again.
+            commandBuilder.set("#TwSettingsPresetDropdown.Value", preset.value());
+        }
         sendUpdate(commandBuilder, null, false);
     }
 

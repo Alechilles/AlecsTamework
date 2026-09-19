@@ -15,6 +15,22 @@
   Captures already tracked by a flute or carried in your inventory remain visible
   as read-only stored cards when capture clears ownership.
 
+- Added a Hardcore settings preset with old-age death, disabled revives, and
+  starvation/dehydration damage of 10%/15% of maximum health per minute.
+  Standard presets restore revives and disable old-age death.
+- Selecting an experience preset now fills the settings form immediately; Apply
+  still saves changes. Removed Load Preset and widened the dropdown so the
+  Simplified (Minecraft-like) label has room.
+
+- Fixed a companion-panel disconnect when portrait-star updates overtook a
+  queued card-list refresh.
+
+- Fixed companions being marked lost and refusing capture when Hytale removes a duplicate entity while the original remains alive.
+
+- Captured companions keep their linked-panel cards until a different player
+  successfully releases and acquires them. The former owner's links are then
+  removed, including after later recapture; failed releases preserve the cards.
+
 - Movement-speed refreshes now stop safely if the tame component registration becomes invalid.
 
 - Recall no longer restores a dead saved body while its death transition is pending.

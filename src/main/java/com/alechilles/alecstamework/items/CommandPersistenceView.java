@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementComp
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import java.util.Comparator;
+import java.util.List;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -80,6 +81,18 @@ final class CommandPersistenceView {
     }
 
     void close() { if (savedPanels != null) savedPanels.close(); }
+
+    /** Item records are caches; a known profile's durable links decide panel membership. */
+    List<LinkedNpcRecord> linkedRecordsForTool(List<LinkedNpcRecord> records, @Nullable String toolId) {
+        final UUID tool;
+        try {
+            tool = UUID.fromString(toolId);
+        } catch (IllegalArgumentException | NullPointerException invalidTool) {
+            return records;
+        }
+        return records.stream().filter(record -> find(record)
+                .map(profile -> profile.toolIds().contains(tool)).orElse(true)).toList();
+    }
 
     /**
      * Resolves one command record by stable profile first and known alias second.

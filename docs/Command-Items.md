@@ -240,9 +240,14 @@ Owner/command-family and bonded rosters retain their own membership and lease ru
 
 When a linked companion is placed in a compatible handheld capture item, its
 linked-panel row remains available and reports `CAPTURED` as soon as capture
-commits, including when capture clears live ownership. Releasing the companion
-restores its command links and remaps the panel record to the new live entity
-UUID without changing the stable profile.
+commits, including when capture clears live ownership. Releasing it as the
+same owner restores its command links and remaps the panel record to the new
+live entity UUID without changing the stable profile. If another player
+releases the item and acquires ownership, the successful release removes the
+former owner's command links. Their card disappears on the next panel refresh
+and stays removed if the new owner captures the companion again. Trading the
+item alone, or a failed release, does not remove the captured card. Items
+without saved evidence of the cleared owner retain their existing links.
 
 ### Owned panel mode
 

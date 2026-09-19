@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseReq
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -814,6 +815,45 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertTrue(result.operation().participants().contains(
                 OperationScope.owner(ASSIGNED_OWNER)
         ));
+    }
+
+    @Test
+    void tradeRevokesDurableLinksOnlyAfterReleaseSucceeds() throws Exception {
+        setCapturedOwner(null);
+        UUID tool = UUID.randomUUID();
+        try (Connection connection = connections.openWriterConnection()) {
+            new SqliteCompanionToolLinkStore(connection).replace(PROFILE,
+                    List.of(new CompanionToolLink(PROFILE, tool, "command", -1000, -1000)));
+        }
+        var original = request(new LifecycleRevision(1), ASSIGNED_OWNER);
+        var metadata = org.bson.BsonDocument.parse(original.source().sourceArtifact().metadataExtendedJson())
+                .append(TameworkMetadataKeys.CAPTURE_OWNER_CLEARED, org.bson.BsonBoolean.TRUE)
+                .append(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                        new org.bson.BsonString(OWNER.toString()));
+        var traded = new CompanionCaptureReleaseRequest(PROFILE, original.expectedLifecycleRevision(),
+                original.sourceSnapshot(), original.sourceAlias(), original.projection(),
+                new CaptureReleaseSourceEvidence(ACTOR, "world-two", 2,
+                        CapturedArtifact.create("capture-device-filled", 1, 0, 0, metadata.toJson()),
+                        receiptArtifact()), TARGET_ALIAS, ASSIGNED_OWNER, original.placement(),
+                original.inventoryReceiptKey(), original.spawnReceiptKey(), original.requestedAtMs());
+
+        var pending = submit(31, traded, (request, operation) ->
+                LiveOperationResult.retryable("actor_unavailable", null).completed());
+        assertEquals(OperationWorkflowResult.Status.LIVE_RETRYABLE, pending.status());
+        try (Connection connection = connections.openReadConnection()) {
+            assertEquals(tool, new SqliteCompanionToolLinkStore(connection)
+                    .findByProfile(PROFILE).getFirst().toolId());
+        }
+        assertEquals(LifecycleState.CAPTURED, lifecycle().state());
+
+        var released = submit(31, traded, (request, operation) ->
+                LiveOperationResult.confirmed("both_receipts_confirmed").completed());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, released.status(),
+                String.valueOf(released.failure()));
+        assertEquals(ASSIGNED_OWNER, lifecycle().ownerId());
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteCompanionToolLinkStore(connection).findByProfile(PROFILE).isEmpty());
+        }
     }
 
     @Test

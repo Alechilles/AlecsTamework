@@ -28,6 +28,17 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
   `CommandNpcProfileActionResolver`, `CommandCompanionRestorationService`
 
 ## UI layer
+
+Generic item-linked cards resolve membership from the canonical profile's tool
+links; unresolved legacy records remain visible. Owned and command-family
+roster views retain their own membership rules. A captured item that records
+cleared ownership and its former owner revokes those tool links when a
+different player successfully releases it with owner assignment enabled.
+Release clears both the restored NPC's tool IDs and the durable links in the
+existing release transaction. Capture and failed release leave the links
+intact. The normal panel refresh reads the published membership, so stale item
+records cannot restore a card after transfer or a later recapture.
+
 - `TameworkCommandSelectionPage`
 - `TameworkCommandGroupManagerPage`
 - `LinkedNpcPanelCardBinder`
