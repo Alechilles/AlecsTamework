@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.api.commandhud;
 
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -57,7 +56,7 @@ public final class CommandHotswapHudChangeSet {
         this.changedSlots = fullRefresh
                 ? allSlots() : copySlots(changedSlots);
         this.groupStatusChanged = fullRefresh || groupStatusChanged;
-        ContributorPathCopy copied = copyContributorPaths(contributorPaths);
+        ContributorPathCopy copied = ContributorPathCopy.copyOf(contributorPaths);
         LinkedHashSet<CommandHudContributorId> fullRefreshIds =
                 new LinkedHashSet<>(copied.fullRefreshes());
         if (fullRefreshContributors != null) {
@@ -167,49 +166,5 @@ public final class CommandHotswapHudChangeSet {
     private static Set<Slot> copySlots(@Nullable Set<Slot> source) {
         if (source == null || source.isEmpty()) return Set.of();
         return Collections.unmodifiableSet(EnumSet.copyOf(source));
-    }
-
-    @Nonnull
-    private static ContributorPathCopy copyContributorPaths(
-            @Nullable Map<CommandHudContributorId, Set<String>> source
-    ) {
-        if (source == null || source.isEmpty()) {
-            return new ContributorPathCopy(Map.of(), Set.of());
-        }
-        LinkedHashMap<CommandHudContributorId, Set<String>> copy = new LinkedHashMap<>();
-        LinkedHashSet<CommandHudContributorId> fullRefreshes = new LinkedHashSet<>();
-        source.forEach((id, paths) -> {
-            if (id == null) return;
-            PathCopy pathCopy = copyPaths(paths);
-            copy.put(id, pathCopy.paths());
-            if (pathCopy.fullRefresh()) fullRefreshes.add(id);
-        });
-        return new ContributorPathCopy(Map.copyOf(copy), Set.copyOf(fullRefreshes));
-    }
-
-    @Nonnull
-    private static PathCopy copyPaths(@Nullable Set<String> source) {
-        if (source == null || source.isEmpty()) return new PathCopy(Set.of(), false);
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        for (String path : source) {
-            String value = CommandHudDirtyScope.normalizePath(path);
-            if (value == null) continue;
-            normalized.add(value);
-            if (normalized.size() > CommandHudDirtyScope.MAX_PATHS) {
-                return new PathCopy(Set.of(), true);
-            }
-        }
-        Set<String> immutable = normalized.isEmpty()
-                ? Set.of() : Collections.unmodifiableSet(normalized);
-        return new PathCopy(immutable, false);
-    }
-
-    private record PathCopy(@Nonnull Set<String> paths, boolean fullRefresh) {
-    }
-
-    private record ContributorPathCopy(
-            @Nonnull Map<CommandHudContributorId, Set<String>> paths,
-            @Nonnull Set<CommandHudContributorId> fullRefreshes
-    ) {
     }
 }
