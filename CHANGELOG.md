@@ -1,8 +1,11 @@
 # Changelog
 
-## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
+## 4.1.1 - UI Texture Optimization - 2026-09-19
 
-- Reduced oversized life-stage and trait UI textures to lower client texture-atlas usage.
+- Reduced nine life-stage and trait UI textures from 1254x1254 to 32x32,
+  lowering their client texture-atlas usage by over 99.9% while preserving transparency.
+
+## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
 
 - Old-age deaths are now permanent, even with revives enabled, including bonded
   companions. They free owned capacity and cannot be revived later.
