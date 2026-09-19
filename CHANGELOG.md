@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- New or unspecified needs resource-search settings now default to Auto Fast.
+  Existing explicit choices stay unchanged.
+
+- Experience presets now set aging, animal progression/offline policy, and the
+  combined needs-damage rule explicitly. Simplified disables adult aging, Easier
+  freezes at prime, and Full Experience/Hardcore use full aging; only Hardcore
+  enables old-age death. Switching presets no longer carries those values over.
+
 - Refreshed the Companion Guide and its example cards for per-flute selection,
   shared groups, captured-animal trading, and Hardcore server rules in all six languages.
 

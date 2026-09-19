@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test;
 
 class NeedsResourceModeTest {
     @Test
-    void blankAndUnknownValuesResolveToAccurate() {
-        assertEquals(NeedsResourceMode.ACCURATE, NeedsResourceMode.fromConfigValue(null));
-        assertEquals(NeedsResourceMode.ACCURATE, NeedsResourceMode.fromConfigValue(""));
-        assertEquals(NeedsResourceMode.ACCURATE, NeedsResourceMode.fromConfigValue("Direct"));
+    void blankAndUnknownValuesResolveToAutoFast() {
+        assertEquals(NeedsResourceMode.AUTO_FAST, NeedsResourceMode.fromConfigValue(null));
+        assertEquals(NeedsResourceMode.AUTO_FAST, NeedsResourceMode.fromConfigValue(""));
+        assertEquals(NeedsResourceMode.AUTO_FAST, NeedsResourceMode.fromConfigValue("Direct"));
     }
 
     @Test

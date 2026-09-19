@@ -15,21 +15,30 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 In `/tw settings`, selecting a preset immediately fills the form. Review the
 settings and click **Apply** to save them.
 
-- **Simplified (Minecraft-like)** disables needs, happiness, passive breeding,
-  breeding requirements for happiness and gender, traits, leveling, and talents.
-- **Easier** enables those systems but disables needs damage.
-- **Full Experience** also enables lethal needs damage, with starvation at 2%
-  and dehydration at 3% of maximum health per minute. Revives stay enabled and
-  old-age death stays disabled.
-- **Hardcore** enables the Full Experience systems, full adult aging, and
-  old-age death, disables revives and recall teleportation, and raises starvation
-  and dehydration damage to 10% and 15% of maximum health per minute respectively. Aging still depends
-  on the creature's mod supplying an aging configuration.
+- **Simplified (Minecraft-like)** disables adult aging, needs, happiness, passive
+  breeding, breeding requirements for happiness and gender, traits, leveling,
+  and talents.
+- **Easier** enables those systems but freezes adult aging at prime and disables
+  needs damage.
+- **Full Experience** enables full adult aging and lethal needs damage, with
+  starvation at 2% and dehydration at 3% of maximum health per minute. Revives
+  and recall teleportation stay enabled; old-age death stays disabled.
+- **Hardcore** enables full adult aging and old-age death, disables revives and
+  recall teleportation, and raises starvation and dehydration damage to 10%
+  and 15% of maximum health per minute respectively. Aging still depends on
+  the creature's mod supplying an aging configuration.
 
-Switching from Hardcore to another preset restores revives and recall
-teleportation, disables old-age death, and restores the 2%/3% damage rates. Only Hardcore changes the aging mode.
-Presets preserve ownership, claims, population limits, and the rule for
-combining starvation and dehydration damage. **Custom** leaves the form unchanged.
+Every named preset sets animal progression to the owner-online policy with
+72 hours of offline grace and a 1× rate afterward. Needs damage uses only the
+higher of starvation and dehydration damage, rather than adding both together.
+Selecting another preset replaces these settings, including the aging mode,
+so values from the previous preset do not linger.
+
+Presets preserve ownership, claims, population limits, telemetry consent, and
+resource-search performance settings. New settings default to **Auto Fast**,
+which uses normal movement until high resource-search or pathing pressure
+triggers direct consumption from valid nearby sources. Explicit saved resource
+modes stay unchanged. **Custom** leaves the form unchanged.
 
 ## Happiness
 - A shared wellbeing value used by other systems

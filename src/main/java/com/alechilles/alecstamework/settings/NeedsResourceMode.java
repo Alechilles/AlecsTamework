@@ -20,7 +20,7 @@ public enum NeedsResourceMode {
     @Nonnull
     public static NeedsResourceMode fromConfigValue(@Nullable String value) {
         if (value == null || value.isBlank()) {
-            return ACCURATE;
+            return AUTO_FAST;
         }
         String normalized = value.trim();
         for (NeedsResourceMode mode : values()) {
@@ -29,7 +29,7 @@ public enum NeedsResourceMode {
                 return mode;
             }
         }
-        return ACCURATE;
+        return AUTO_FAST;
     }
 
     @Nonnull

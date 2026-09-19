@@ -17,7 +17,7 @@ public final class NeedsResourceFastModePolicy {
 
     public static boolean isFastModeActive(long nowMs) {
         return isFastModeActive(
-                TameworkRuntimeSettings.needsResourceMode(NeedsResourceMode.ACCURATE.toConfigValue()),
+                TameworkRuntimeSettings.needsResourceMode(NeedsResourceMode.AUTO_FAST.toConfigValue()),
                 TameworkRuntimePressureService.getInstance(),
                 nowMs);
     }
@@ -26,7 +26,7 @@ public final class NeedsResourceFastModePolicy {
             @Nullable NeedsResourceMode mode,
             @Nonnull TameworkRuntimePressureService pressureService,
             long nowMs) {
-        NeedsResourceMode resolvedMode = mode != null ? mode : NeedsResourceMode.ACCURATE;
+        NeedsResourceMode resolvedMode = mode != null ? mode : NeedsResourceMode.AUTO_FAST;
         return switch (resolvedMode) {
             case ACCURATE -> false;
             case ALWAYS_FAST -> true;

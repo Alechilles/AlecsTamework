@@ -25,6 +25,7 @@ class TameworkSettingsPresetTest {
         assertEquals(false, presetValues.traitsEnabled());
         assertEquals(false, presetValues.levelingEnabled());
         assertEquals(false, presetValues.talentsEnabled());
+        assertEquals(AnimalAgingMode.OFF, presetValues.animalAgingMode());
         assertEquals(TameworkSettingsPreset.SIMPLIFIED, TameworkSettingsPreset.match(presetValues));
         assertEquals(values.simpleClaimsEnabled(), presetValues.simpleClaimsEnabled());
         assertEquals(values.needsResourceMode(), presetValues.needsResourceMode());
@@ -36,6 +37,7 @@ class TameworkSettingsPresetTest {
         assertEquals(false, easier.needsDamageEnabled());
         assertEquals(false, easier.needsDamageLethal());
         assertEquals(true, easier.breedingGenderEnabled());
+        assertEquals(AnimalAgingMode.FREEZE_AT_PRIME, easier.animalAgingMode());
         assertEquals(TameworkSettingsPreset.EASIER, TameworkSettingsPreset.match(easier));
 
         TameworkSettingsValues full = TameworkSettingsPreset.FULL_EXPERIENCE.applyTo(baseValues());
@@ -44,6 +46,7 @@ class TameworkSettingsPresetTest {
         assertEquals(true, full.breedingGenderEnabled());
         assertEquals(true, full.levelingEnabled());
         assertEquals(true, full.talentsEnabled());
+        assertEquals(AnimalAgingMode.FULL, full.animalAgingMode());
         assertEquals(TameworkSettingsPreset.FULL_EXPERIENCE, TameworkSettingsPreset.match(full));
     }
 
@@ -89,6 +92,27 @@ class TameworkSettingsPresetTest {
         return baseValues(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT);
     }
 
+    @Test
+    void switchingPresetsResetsProgressionAndDamageRulesRegardlessOfPreviousProfile() {
+        TameworkSettingsValues base = baseValues();
+        for (TameworkSettingsPreset target : TameworkSettingsPreset.values()) {
+            if (!target.isLoadable()) continue;
+            TameworkSettingsValues expected = target.applyTo(base);
+            assertEquals(TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY,
+                    expected.needsTickPolicyMode());
+            assertEquals(72.0, expected.needsOwnerOfflineGraceHours());
+            assertEquals(1.0, expected.needsOwnerOfflineDecayMultiplier());
+            assertEquals(TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY, expected.needsDamageDualNeedRule());
+            assertEquals(base.needsResourceMode(), expected.needsResourceMode());
+            assertEquals(base.telemetryEnabled(), expected.telemetryEnabled());
+            assertEquals(base.telemetryBreadcrumbsEnabled(), expected.telemetryBreadcrumbsEnabled());
+            for (TameworkSettingsPreset previous : TameworkSettingsPreset.values()) {
+                assertEquals(expected, target.applyTo(previous.applyTo(base)),
+                        previous + " -> " + target);
+            }
+        }
+    }
+
     private static TameworkSettingsValues baseValues(TwNeedsConfig.DamageModel damageModel) {
         return new TameworkSettingsValues(
                 12,
@@ -108,13 +132,13 @@ class TameworkSettingsPresetTest {
                 true,
                 true,
                 true,
-                "Accurate",
+                "AlwaysFast",
                 true,
-                TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY,
-                72.0,
-                1.0,
+                TwNeedsConfig.TickPolicyMode.ANY_LOADED_PLAYER,
+                6.0,
+                0.25,
                 damageModel,
-                TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY,
+                TwNeedsConfig.DualNeedRule.SUM_BOTH,
                 2.0,
                 3.0,
                 true,

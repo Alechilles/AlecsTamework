@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
 import java.util.List;
@@ -53,10 +54,10 @@ public enum TameworkSettingsPreset {
     public TameworkSettingsValues applyTo(@Nonnull TameworkSettingsValues values) {
         return switch (this) {
             case CUSTOM -> values;
-            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false, false, false);
-            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true, true, false);
-            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, false);
-            case HARDCORE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, true);
+            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false, false, false, AnimalAgingMode.OFF);
+            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true, true, false, AnimalAgingMode.FREEZE_AT_PRIME);
+            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, false, AnimalAgingMode.FULL);
+            case HARDCORE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true, true, AnimalAgingMode.FULL);
         };
     }
 

@@ -411,7 +411,7 @@ public final class TameworkSettingsStore {
 
         document.needs = new NeedsSection();
         document.needs.enabled = true;
-        document.needs.resourceMode = "Accurate";
+        document.needs.resourceMode = "AutoFast";
         document.needs.damage = new NeedsDamageSection();
         document.needs.damage.enabled = true;
         document.needs.damage.model = "MIN_ONLY_PERCENT";
