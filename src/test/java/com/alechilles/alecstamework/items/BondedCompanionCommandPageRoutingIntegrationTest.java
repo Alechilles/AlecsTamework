@@ -577,7 +577,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(
                     command -> "#CompanionStored.Style"
                             .equals(command.selector)
-                            && command.data.contains("PanelButtonSelected")),
+                            && command.data.contains("CompanionTabButtonSelected")),
                     () -> java.util.Arrays.toString(commands.getCommands()));
         }
     }
