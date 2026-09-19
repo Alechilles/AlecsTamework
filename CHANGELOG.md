@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.1.0 - Animal Progression and Companion UI - 2026-09-18
+## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
 
 - Old-age deaths are now permanent, even with revives enabled, including bonded
   companions. They free owned capacity and cannot be revived later.
