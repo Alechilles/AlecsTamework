@@ -9,6 +9,7 @@
   for an animal with a quarantined persistence operation. Unfinished coop operations
   now block production, and rejected saves suspend the affected animal's production.
 - Fixed freshly tamed animals appearing unselected in the companion panel after selection.
+- Fixed newly tamed animals disappearing from the companion panel when unloaded before being linked to a flute.
 - Fixed managed animals spawned with `/tw npc spawn tamed` being excluded from the companion panel.
 - Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
   standard NPC selectors. The existing life-stage query now reports adult aging stages.

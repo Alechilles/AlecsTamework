@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,7 +41,7 @@ import org.junit.jupiter.api.Test;
 /** Regression coverage for required profile capture after an admitted admin spawn. */
 class AdminSpawnProfileSnapshotTest {
     @Test
-    void ownedUnlinkedAdminSpawnPublishesWhileOrdinaryRefreshSkipsIt()
+    void ownedUnlinkedAdminSpawnPublishesProfileAndCheckpoint()
             throws Exception {
         UUID npcUuid = UUID.fromString("93000000-0000-0000-0000-000000000001");
         UUID ownerUuid = UUID.fromString("93000000-0000-0000-0000-000000000002");
@@ -70,12 +69,6 @@ class AdminSpawnProfileSnapshotTest {
                                 return java.util.concurrent.CompletableFuture.completedFuture(null);
                             }
                     );
-
-            service.refreshFromEntity(npcRef, scope.store);
-
-            assertNull(service.getSnapshot(npcUuid));
-            assertEquals(List.of(), published);
-            assertEquals(List.of(), checkpoints);
 
             service.publishAdminSpawnProfile(npcRef, scope.store)
                     .toCompletableFuture().join();

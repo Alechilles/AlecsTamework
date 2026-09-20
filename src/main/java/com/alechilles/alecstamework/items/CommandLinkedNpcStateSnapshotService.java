@@ -345,7 +345,8 @@ public final class CommandLinkedNpcStateSnapshotService {
 
     /**
      * A routine checkpoint belongs only to the snapshot captured by this exact
-     * refresh. Unlinked NPCs intentionally leave no snapshot and no checkpoint.
+     * refresh. Unlinked NPCs without an owned tame state leave no snapshot
+     * and no checkpoint.
      */
     private boolean hasCurrentSnapshot(
             @Nonnull Ref<EntityStore> reference,

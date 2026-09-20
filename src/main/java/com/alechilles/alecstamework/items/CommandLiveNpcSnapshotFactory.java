@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -40,9 +41,8 @@ final class CommandLiveNpcSnapshotFactory {
     /**
      * Captures the required profile observation for an admitted admin spawn.
      *
-     * <p>Admin-owned companions do not need a command-item link. Ordinary
-     * command refreshes still require one or more links so they do not begin
-     * publishing unrelated NPCs.</p>
+     * <p>Admin-owned companions do not need a command-item link or a completed
+     * tame-state transition.</p>
      */
     @Nullable
     CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot captureAdminSpawn(
@@ -71,16 +71,26 @@ final class CommandLiveNpcSnapshotFactory {
         );
         String[] toolIds = links == null
                 ? new String[0] : sanitizeToolIds(links.getToolIds());
-        if (!allowUnlinked && toolIds.length == 0) {
-            return null;
-        }
-
         TameworkOwnerComponent owner = component(
                 npcRef, store, TameworkOwnerComponent.getComponentType()
         );
         UUID ownerId = owner != null && owner.getOwnerId() != null
                 ? owner.getOwnerId() : links == null ? null : links.getOwnerId();
         String ownerName = owner == null ? null : owner.getOwnerName();
+        boolean tamed = TamedStateResolver.isTamed(npcRef, store);
+        // Owned animals must remain discoverable after unload even before the
+        // player links a command item. Unrelated wild NPCs need no profile.
+        if (!allowUnlinked && toolIds.length == 0) {
+            if (owner == null || owner.getOwnerId() == null || !tamed) {
+                return null;
+            }
+            // Managed projections already have an operation or bonded lease
+            // owning their durable identity; do not adopt their disposable UUID.
+            if (component(npcRef, store,
+                    TameworkProjectionIdentityComponent.getComponentType()) != null) {
+                return null;
+            }
+        }
 
         MountedNpcSnapshotRoleResolver.Resolution roleResolution =
                 MountedNpcSnapshotRoleResolver.resolve(
@@ -98,7 +108,7 @@ final class CommandLiveNpcSnapshotFactory {
                         ownerName,
                         toolIds,
                         roleId,
-                        TamedStateResolver.isTamed(npcRef, store),
+                        tamed,
                         customName,
                         resolveDisplayName(
                                 npcRef, store, npc, roleId, customName
