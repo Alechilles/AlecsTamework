@@ -14,7 +14,8 @@
     "projectId": "1447962",
     "releaseType": "release",
     "changelogType": "html",
-    "gameVersionTypeIds": [65437],
+    "gameVersion": "0.6",
+    "gameVersionTypeIds": [65438],
     "requiredProjects": [
       {
         "id": 1560961,
