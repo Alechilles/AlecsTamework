@@ -65,7 +65,7 @@ public final class AnimalProgressionService {
 
         String role = CompanionRoleIdResolver.resolveRoleId(ref, store);
         TwBreedingConfig config = TwBreedingConfig.resolveForRole(role);
-        AnimalAgingSettings aging = settings(config, role);
+        AnimalAgingSettings aging = resolveAgingSettings(config, role);
         if (aging == null || !aging.isEnabled()) return;
         boolean tamed = com.alechilles.alecstamework.npc.TamedStateResolver.isTamed(ref, store);
         initializeJuvenileClock(state, worldNow, store);
@@ -133,7 +133,7 @@ public final class AnimalProgressionService {
         TameworkLifeStageComponent state = state(ref, store);
         TwBreedingConfig config = TwBreedingConfig.resolveForRole(role);
         if (state == null || config == null || !config.resolveAging(role).isEnabled()) return null;
-        return AnimalAgingPolicy.advance(settings(config, role), state.getAgeProgressMs(), 0, false, 100, 100);
+        return AnimalAgingPolicy.advance(resolveAgingSettings(config, role), state.getAgeProgressMs(), 0, false, 100, 100);
     }
 
     /** Lifecycle yield modifies expected output, preserving unbiased fractional item rounding. */
@@ -165,7 +165,7 @@ public final class AnimalProgressionService {
     private static Presentation presentation(TameworkLifeStageComponent state, String role,
                                              boolean captured, boolean loaded, double hunger, double thirst) {
         TwBreedingConfig config = TwBreedingConfig.resolveForRole(role);
-        AnimalAgingSettings settings = settings(config, role);
+        AnimalAgingSettings settings = resolveAgingSettings(config, role);
         if (state == null || settings == null || !settings.isEnabled()) return null;
         long elapsed = captured ? 0 : pendingElapsed(state);
         double growthRate = loaded ? AnimalAgingPolicy.growthRate(hunger, thirst) : 1;
@@ -229,7 +229,7 @@ public final class AnimalProgressionService {
         return end <= start ? 1 : Math.clamp((now - start) / (end - start), 0, 1);
     }
 
-    private static AnimalAgingSettings settings(@Nullable TwBreedingConfig config, @Nullable String role) {
+    static AnimalAgingSettings resolveAgingSettings(@Nullable TwBreedingConfig config, @Nullable String role) {
         if (config == null) return null;
         TameworkRuntimeSettings runtime = TameworkRuntimeSettings.current();
         return config.resolveAging(role).withRuntimePolicy(

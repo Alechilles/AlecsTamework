@@ -151,6 +151,12 @@ Use:
 - `/tw debug set traits`
 - `/tw debug set trait`
 - `/tw debug get lifestage`
+- `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
+
+The setter changes the complete progression state, including juvenile timing,
+role, and scale. Juvenile stages require an enabled offspring lifecycle. Prime
+and senior stages require the matching adult-aging policy; senior is available
+only in Full aging mode.
 
 For breeding issues, also verify:
 - effective happiness threshold

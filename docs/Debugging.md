@@ -61,6 +61,10 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
   - `/tw debug get needs --ray`
   - `/tw debug get traits`
   - `/tw debug get lifestage`
+  - `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
+- Setting `baby` or `adolescent` requires an enabled offspring lifecycle for the
+  selected NPC. Setting `prime` requires enabled adult aging, and `senior` also
+  requires the Full aging mode.
 - For breeding issues, confirm:
   - effective fertility threshold
   - life-stage/adult gates

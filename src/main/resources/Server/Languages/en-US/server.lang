@@ -1396,8 +1396,16 @@ tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=NPC {0} has no
 tamework.commands.getHappiness.description=Get happiness of the NPC you are looking at.
 tamework.commands.getLifeStage.no.npc.found.in.view=No NPC found in view.
 tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Life stage for NPC {0}: {1} (fallback role gate, no component).
-tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Life stage for NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Life stage for NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}, ageProgressMs={6}).
 tamework.commands.getLifeStage.description=Get life stage of the NPC you are looking at.
+tamework.commands.setLifeStage.description=Set the life stage of selected NPCs.
+tamework.commands.setLifeStage.argument.stage=Life stage: baby, adolescent, adult, prime, or senior.
+tamework.commands.setLifeStage.invalid.stage=Unknown life stage "{0}". Use baby, adolescent, adult, prime, or senior.
+tamework.commands.setLifeStage.component.unavailable=Life-stage state is unavailable for NPC {0}.
+tamework.commands.setLifeStage.juvenile.unavailable=NPC {0} has no enabled juvenile lifecycle.
+tamework.commands.setLifeStage.aging.unavailable=NPC {0} has no enabled adult-aging configuration.
+tamework.commands.setLifeStage.stage.unavailable=NPC {0} cannot use life stage {1} with the current animal-aging settings.
+tamework.commands.setLifeStage.result=Set life stage for NPC {0}: {1} -> {2}.
 tamework.commands.getNeeds.needs.component.type.is.not.registered=Needs component type is not registered.
 tamework.commands.getNeeds.npc.has.no.tracked.needs.state=NPC {0} has no tracked needs state.
 tamework.commands.getNeeds.description=Get hunger and thirst for selected NPCs.

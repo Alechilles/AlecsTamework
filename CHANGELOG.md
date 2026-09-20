@@ -4,6 +4,8 @@
 
 - Reduced nine life-stage and trait UI textures from 1254x1254 to 32x32,
   lowering their client texture-atlas usage by over 99.9% while preserving transparency.
+- Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
+  standard NPC selectors. The existing life-stage query now reports adult aging stages.
 
 ## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
 

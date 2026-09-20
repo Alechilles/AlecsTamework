@@ -14,6 +14,7 @@ public final class TameworkDebugSetCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkSetBreedingReadyCommand());
         addSubCommand(new TameworkSetHappinessCommand());
         addSubCommand(new TameworkSetLevelCommand());
+        addSubCommand(new TameworkSetLifeStageCommand());
         addSubCommand(new TameworkSetTraitsCommand());
         addSubCommand(new TameworkAddTraitCommand());
         addSubCommand(new TameworkSetTamedCommand());

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.config.assets.AnimalAgingSettings;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -30,6 +31,8 @@ public final class CompanionLifeStageService {
     public static final String STAGE_BABY = "Baby";
     public static final String STAGE_ADOLESCENT = "Adolescent";
     public static final String STAGE_ADULT = "Adult";
+    public static final String STAGE_PRIME = "Prime";
+    public static final String STAGE_SENIOR = "Senior";
 
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
     private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 10L;
@@ -336,6 +339,238 @@ public final class CompanionLifeStageService {
                                         @Nullable NPCEntity npc,
                                         @Nullable Store<EntityStore> store) {
         refreshLifeStage(npcRef, npc, store, false);
+    }
+
+    /** Applies an explicit life stage for in-game debug commands. */
+    @Nonnull
+    public static DebugSetResult setLifeStageForDebug(@Nullable Ref<EntityStore> npcRef,
+                                                      @Nullable NPCEntity npc,
+                                                      @Nullable Store<EntityStore> store,
+                                                      @Nullable String requestedStage) {
+        String targetStage = normalizeDebugStage(requestedStage);
+        if (targetStage == null) {
+            return DebugSetResult.failed(DebugSetStatus.INVALID_STAGE);
+        }
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return DebugSetResult.failed(DebugSetStatus.COMPONENT_UNAVAILABLE);
+        }
+        ComponentType<EntityStore, TameworkLifeStageComponent> type =
+                TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return DebugSetResult.failed(DebugSetStatus.COMPONENT_UNAVAILABLE);
+        }
+
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
+        TameworkLifeStageComponent component = existing != null
+                ? existing.clone() : createInitialLifeStageComponent(npcRef, store, roleId);
+        String configRoleId = roleId;
+        TwBreedingConfig config = configRoleId == null ? null : TwBreedingConfig.resolveForRole(configRoleId);
+        if (config == null && component.getAdultRoleId() != null && !component.getAdultRoleId().isBlank()) {
+            configRoleId = component.getAdultRoleId();
+            config = TwBreedingConfig.resolveForRole(configRoleId);
+        }
+        String previousStage = resolveDebugDisplayStage(component, configRoleId, store);
+        AnimalProgressionService.advance(component, npcRef, store, true);
+        long nowMs = AnimalProgressionService.lifeTime(component, store);
+        CompanionOffspringLifecycleComputation.Result lifecycle = null;
+        AnimalAgingSettings agingSettings = null;
+
+        if (STAGE_BABY.equals(targetStage) || STAGE_ADOLESCENT.equals(targetStage)) {
+            if (config == null || !config.isEnabled()) {
+                return DebugSetResult.failed(DebugSetStatus.JUVENILE_LIFECYCLE_UNAVAILABLE);
+            }
+            TwBreedingConfig.OffspringLifecycleSettings lifecycleSettings =
+                    config.resolveOffspringLifecycle(configRoleId);
+            if (lifecycleSettings == null || !lifecycleSettings.isEnabled()) {
+                return DebugSetResult.failed(DebugSetStatus.JUVENILE_LIFECYCLE_UNAVAILABLE);
+            }
+            TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForProgression(config, configRoleId);
+            String adultRoleId = family != null && family.getAdultRoleId() != null
+                    && !family.getAdultRoleId().isBlank()
+                    ? family.getAdultRoleId() : configRoleId;
+            double adultScale = resolveAdultScale(npcRef, store, adultRoleId);
+            lifecycle = CompanionOffspringLifecycleComputation.compute(
+                    nowMs, adultScale, config, family, configRoleId, store
+            );
+            if (STAGE_ADOLESCENT.equals(targetStage)
+                    && lifecycle.adultAtMs() <= lifecycle.adolescentAtMs()) {
+                return DebugSetResult.failed(DebugSetStatus.STAGE_UNAVAILABLE);
+            }
+            component.setAdultRoleId(adultRoleId);
+            component.setBabyRoleId(family != null ? family.getBabyRoleId() : null);
+            component.setAdolescentRoleId(family != null ? family.getAdolescentRoleId() : null);
+        } else if (STAGE_PRIME.equals(targetStage) || STAGE_SENIOR.equals(targetStage)) {
+            agingSettings = AnimalProgressionService.resolveAgingSettings(config, configRoleId);
+            if (agingSettings == null || !agingSettings.isEnabled()
+                    || agingSettings.getMode() == AnimalAgingSettings.LifecycleMode.OFF) {
+                return DebugSetResult.failed(DebugSetStatus.ADULT_AGING_UNAVAILABLE);
+            }
+            if (STAGE_SENIOR.equals(targetStage)
+                    && agingSettings.getMode() != AnimalAgingSettings.LifecycleMode.FULL) {
+                return DebugSetResult.failed(DebugSetStatus.STAGE_UNAVAILABLE);
+            }
+        }
+
+        if (!applyDebugStageState(component, targetStage, nowMs, lifecycle, agingSettings)) {
+            return DebugSetResult.failed(DebugSetStatus.STAGE_UNAVAILABLE);
+        }
+        store.putComponent(npcRef, type, component);
+
+        NPCEntity resolvedNpc = npc != null ? npc : store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (!STAGE_BABY.equals(targetStage) && !STAGE_ADOLESCENT.equals(targetStage)) {
+            clearJuvenileBreedingCooldown(npcRef, resolvedNpc, store);
+        }
+        refreshLifeStage(npcRef, resolvedNpc, store, true);
+        TameworkLifeStageComponent updated = store.getComponent(npcRef, type);
+        if (updated != null) {
+            double targetScale = resolveScale(updated, AnimalProgressionService.lifeTime(updated, store));
+            CompanionModelScaleService.applyScale(npcRef, resolvedNpc, store, targetScale);
+        }
+        ensureGrowthTickScheduled(npcRef, resolvedNpc, store);
+        String currentStage = updated == null
+                ? targetStage : resolveDebugDisplayStage(updated, configRoleId, store);
+        return new DebugSetResult(DebugSetStatus.APPLIED, previousStage, currentStage);
+    }
+
+    static boolean applyDebugStageState(
+            @Nonnull TameworkLifeStageComponent component,
+            @Nullable String requestedStage,
+            long nowMs,
+            @Nullable CompanionOffspringLifecycleComputation.Result lifecycle,
+            @Nullable AnimalAgingSettings agingSettings) {
+        String targetStage = normalizeDebugStage(requestedStage);
+        if (targetStage == null) {
+            return false;
+        }
+        boolean juvenile = STAGE_BABY.equals(targetStage) || STAGE_ADOLESCENT.equals(targetStage);
+        if (juvenile && lifecycle == null) {
+            return false;
+        }
+        if (STAGE_ADOLESCENT.equals(targetStage)
+                && lifecycle.adultAtMs() <= lifecycle.adolescentAtMs()) {
+            return false;
+        }
+        if ((STAGE_PRIME.equals(targetStage) || STAGE_SENIOR.equals(targetStage))
+                && (agingSettings == null || !agingSettings.isEnabled()
+                || agingSettings.getMode() == AnimalAgingSettings.LifecycleMode.OFF)) {
+            return false;
+        }
+        if (STAGE_SENIOR.equals(targetStage)
+                && agingSettings.getMode() != AnimalAgingSettings.LifecycleMode.FULL) {
+            return false;
+        }
+
+        component.setLifecycleNowMs(nowMs);
+        component.setJuvenileClockInitialized(true);
+        if (juvenile) {
+            applyDebugLifecycle(component, targetStage, nowMs, lifecycle);
+            component.setAgeProgressMs(0.0);
+            component.setAgingInitialized(false);
+            return true;
+        }
+
+        component.setStage(STAGE_ADULT);
+        component.setGrowthScalingEnabled(false);
+        component.setAgingInitialized(true);
+        if (STAGE_PRIME.equals(targetStage)) {
+            component.setAgeProgressMs(agingSettings.getAdultToPrimeMs());
+        } else if (STAGE_SENIOR.equals(targetStage)) {
+            component.setAgeProgressMs((double) agingSettings.getAdultToPrimeMs() + agingSettings.getPrimeMs());
+        } else {
+            component.setAgeProgressMs(0.0);
+        }
+        return true;
+    }
+
+    private static void applyDebugLifecycle(
+            @Nonnull TameworkLifeStageComponent component,
+            @Nonnull String targetStage,
+            long nowMs,
+            @Nonnull CompanionOffspringLifecycleComputation.Result lifecycle) {
+        long adolescentAtMs = lifecycle.adolescentAtMs();
+        long adultAtMs = lifecycle.adultAtMs();
+        long fullyGrownAtMs = lifecycle.fullyGrownAtMs();
+        long bornAtMs = nonZeroTimelineTimestamp(nowMs);
+        if (STAGE_ADOLESCENT.equals(targetStage)) {
+            long babyDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                    adolescentAtMs, nowMs
+            ));
+            long adolescentDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                    adultAtMs, adolescentAtMs
+            ));
+            long adultDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                    fullyGrownAtMs, adultAtMs
+            ));
+            bornAtMs = nonZeroTimelineTimestamp(BreedingTimeService.saturatingSubtract(nowMs, babyDurationMs));
+            adolescentAtMs = nonZeroTimelineTimestamp(nowMs);
+            adultAtMs = BreedingTimeService.saturatingAdd(nowMs, adolescentDurationMs);
+            fullyGrownAtMs = BreedingTimeService.saturatingAdd(adultAtMs, adultDurationMs);
+        }
+        component.setStage(targetStage);
+        component.setBornAtMs(bornAtMs);
+        component.setAdolescentAtMs(adolescentAtMs);
+        component.setAdultAtMs(adultAtMs);
+        component.setFullyGrownAtMs(fullyGrownAtMs);
+        component.setBabyScale(lifecycle.babyStartScale());
+        component.setAdolescentScale(lifecycle.adolescentStartScale());
+        component.setAdolescentSwitchScale(lifecycle.adolescentSwitchScale());
+        component.setAdultStartScale(lifecycle.adultStartScale());
+        component.setAdultSwitchScale(lifecycle.adultSwitchScale());
+        component.setAdultScale(lifecycle.adultFinalScale());
+        component.setGrowthScalingEnabled(true);
+    }
+
+    @Nonnull
+    private static String resolveDebugDisplayStage(@Nonnull TameworkLifeStageComponent component,
+                                                   @Nullable String roleId,
+                                                   @Nonnull Store<EntityStore> store) {
+        AnimalProgressionService.Presentation presentation =
+                AnimalProgressionService.presentation(component, roleId, false);
+        return presentation != null
+                ? presentation.stage()
+                : resolveStageId(component, AnimalProgressionService.lifeTime(component, store));
+    }
+
+    private static long nonZeroTimelineTimestamp(long value) {
+        return value == 0L ? -1L : value;
+    }
+
+    @Nullable
+    private static String normalizeDebugStage(@Nullable String stage) {
+        if (stage == null || stage.isBlank()) {
+            return null;
+        }
+        return switch (stage.trim().toLowerCase(Locale.ROOT)) {
+            case "baby" -> STAGE_BABY;
+            case "adolescent", "juvenile" -> STAGE_ADOLESCENT;
+            case "adult" -> STAGE_ADULT;
+            case "prime" -> STAGE_PRIME;
+            case "senior" -> STAGE_SENIOR;
+            default -> null;
+        };
+    }
+
+    public enum DebugSetStatus {
+        APPLIED,
+        INVALID_STAGE,
+        COMPONENT_UNAVAILABLE,
+        JUVENILE_LIFECYCLE_UNAVAILABLE,
+        ADULT_AGING_UNAVAILABLE,
+        STAGE_UNAVAILABLE
+    }
+
+    public record DebugSetResult(@Nonnull DebugSetStatus status,
+                                 @Nullable String previousStage,
+                                 @Nullable String currentStage) {
+        @Nonnull
+        private static DebugSetResult failed(@Nonnull DebugSetStatus status) {
+            return new DebugSetResult(status, null, null);
+        }
+
+        public boolean applied() {
+            return status == DebugSetStatus.APPLIED;
+        }
     }
 
     private static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
@@ -35,13 +36,18 @@ public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
             return;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-        String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
         TameworkLifeStageComponent component = type != null ? store.getComponent(candidate.ref, type) : null;
+        String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
         if (component == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)));
             return;
         }
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)).param("2", String.valueOf(component.getBornAtMs())).param("3", String.valueOf(component.getAdolescentAtMs())).param("4", String.valueOf(component.getAdultAtMs())).param("5", String.valueOf(component.isGrowthScalingEnabled())));
+        AnimalProgressionService.Presentation presentation =
+                AnimalProgressionService.presentation(component, roleId, false);
+        if (presentation != null) {
+            stage = presentation.stage();
+        }
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)).param("2", String.valueOf(component.getBornAtMs())).param("3", String.valueOf(component.getAdolescentAtMs())).param("4", String.valueOf(component.getAdultAtMs())).param("5", String.valueOf(component.isGrowthScalingEnabled())).param("6", String.valueOf(component.getAgeProgressMs())));
     }
 }

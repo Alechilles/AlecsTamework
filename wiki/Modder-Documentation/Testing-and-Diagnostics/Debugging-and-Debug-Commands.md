@@ -23,12 +23,18 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw config open`, `/tw settings`
 - `/tw config reload`
 - `/tw debug get happiness`, `/tw debug get traits`, `/tw debug get lifestage`
+- `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
 - `/tw npc find <uuid>`
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
 - `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug persistence [status|health|detail|export]`
 - `/tw debug persistence reviveready`
+
+The life-stage setter updates juvenile growth timing, role, and scale together.
+`baby` and `adolescent` require an enabled offspring lifecycle. `prime` requires
+enabled adult aging, while `senior` also requires the Full aging mode. The
+`juvenile` input is accepted as an alias for `adolescent`.
 
 `/tw debug view spawn-beacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model

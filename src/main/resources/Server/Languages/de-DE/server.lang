@@ -1486,9 +1486,17 @@ tamework.commands.getHappiness.description=Zeige Zufriedenheit of die NPC you si
 tamework.commands.getHappiness.no.npc.found.in.view=Kein NPC im Blickfeld gefunden.
 tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=NPC {0} hat no tracked Zufriedenheit state.
 tamework.commands.getLifeStage.description=Zeige life stage of die NPC you sind looking at.
-tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Life stage für NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Lebensphase für NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}, ageProgressMs={6}).
 tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Life stage für NPC {0}: {1} (fallback Rolle gate, no component).
 tamework.commands.getLifeStage.no.npc.found.in.view=Kein NPC im Blickfeld gefunden.
+tamework.commands.setLifeStage.description=Legt die Lebensphase der ausgewählten NPCs fest.
+tamework.commands.setLifeStage.argument.stage=Lebensphase: baby, adolescent, adult, prime oder senior.
+tamework.commands.setLifeStage.invalid.stage=Unbekannte Lebensphase „{0}“. Verwende baby, adolescent, adult, prime oder senior.
+tamework.commands.setLifeStage.component.unavailable=Der Lebensphasenstatus für NPC {0} ist nicht verfügbar.
+tamework.commands.setLifeStage.juvenile.unavailable=NPC {0} hat keinen aktivierten Lebenszyklus für Jungtiere.
+tamework.commands.setLifeStage.aging.unavailable=NPC {0} hat keine aktivierte Konfiguration für das Altern erwachsener Tiere.
+tamework.commands.setLifeStage.stage.unavailable=NPC {0} kann mit den aktuellen Einstellungen nicht auf die Lebensphase {1} gesetzt werden.
+tamework.commands.setLifeStage.result=Lebensphase für NPC {0} festgelegt: {1} -> {2}.
 tamework.commands.getNeeds.description=Zeige hunger und thirst für selected NPCs.
 tamework.commands.getNeeds.needs.component.type.is.not.registered=Needs component type ist not registered.
 tamework.commands.getNeeds.npc.has.no.tracked.needs.state=NPC {0} hat no tracked needs state.

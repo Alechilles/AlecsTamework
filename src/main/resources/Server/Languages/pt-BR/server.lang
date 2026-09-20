@@ -1465,9 +1465,17 @@ tamework.commands.getHappiness.description=Get felicidade of o NPC Você are loo
 tamework.commands.getHappiness.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
 tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=NPC {0} has no tracked felicidade estado.
 tamework.commands.getLifeStage.description=Get life stage of o NPC Você are looking at.
-tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Life stage para NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Estágio de vida do NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}, ageProgressMs={6}).
 tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Life stage para NPC {0}: {1} (fallback função gate, no compativadoent).
 tamework.commands.getLifeStage.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
+tamework.commands.setLifeStage.description=Define o estágio de vida dos NPCs selecionados.
+tamework.commands.setLifeStage.argument.stage=Estágio de vida: baby, adolescent, adult, prime ou senior.
+tamework.commands.setLifeStage.invalid.stage=Estágio de vida desconhecido: “{0}”. Use baby, adolescent, adult, prime ou senior.
+tamework.commands.setLifeStage.component.unavailable=O estado de estágio de vida não está disponível para o NPC {0}.
+tamework.commands.setLifeStage.juvenile.unavailable=O NPC {0} não tem um ciclo de vida juvenil habilitado.
+tamework.commands.setLifeStage.aging.unavailable=O NPC {0} não tem uma configuração de envelhecimento adulto habilitada.
+tamework.commands.setLifeStage.stage.unavailable=O NPC {0} não pode usar o estágio de vida {1} com as configurações atuais de envelhecimento.
+tamework.commands.setLifeStage.result=Estágio de vida definido para o NPC {0}: {1} -> {2}.
 tamework.commands.getNeeds.description=Get fome e sede para selected NPCs.
 tamework.commands.getNeeds.needs.component.type.is.not.registered=Needs compativadoent type is não registered.
 tamework.commands.getNeeds.npc.has.no.tracked.needs.state=NPC {0} has no tracked needs estado.

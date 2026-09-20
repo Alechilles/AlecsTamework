@@ -1427,8 +1427,16 @@ tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=Le PNJ {0} n'a
 tamework.commands.getHappiness.description=Obtenir le bonheur du PNJ que vous regardez.
 tamework.commands.getLifeStage.no.npc.found.in.view=Aucun PNJ trouvé dans le champ de vision.
 tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Étape de vie du PNJ {0} : {1} (barrière de rôle de repli, aucun composant).
-tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Étape de vie du PNJ {0} : {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Étape de vie du PNJ {0} : {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}, ageProgressMs={6}).
 tamework.commands.getLifeStage.description=Obtenir l'étape de vie du PNJ que vous regardez.
+tamework.commands.setLifeStage.description=Définir l'étape de vie des PNJ sélectionnés.
+tamework.commands.setLifeStage.argument.stage=Étape de vie : baby, adolescent, adult, prime ou senior.
+tamework.commands.setLifeStage.invalid.stage=Étape de vie « {0} » inconnue. Utilisez baby, adolescent, adult, prime ou senior.
+tamework.commands.setLifeStage.component.unavailable=L'état de l'étape de vie n'est pas disponible pour le PNJ {0}.
+tamework.commands.setLifeStage.juvenile.unavailable=Le PNJ {0} n'a aucun cycle de vie juvénile activé.
+tamework.commands.setLifeStage.aging.unavailable=Le PNJ {0} n'a aucune configuration de vieillissement adulte activée.
+tamework.commands.setLifeStage.stage.unavailable=Le PNJ {0} ne peut pas utiliser l'étape de vie {1} avec les réglages de vieillissement actuels.
+tamework.commands.setLifeStage.result=Étape de vie définie pour le PNJ {0} : {1} -> {2}.
 tamework.commands.getNeeds.needs.component.type.is.not.registered=Le type de composant de besoins n'est pas enregistré.
 tamework.commands.getNeeds.npc.has.no.tracked.needs.state=Le PNJ {0} n'a aucun état de besoins suivi.
 tamework.commands.getNeeds.description=Obtenir la faim et la soif des PNJ sélectionnés.

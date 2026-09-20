@@ -1343,8 +1343,16 @@ tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=El NPC {0} no 
 tamework.commands.getHappiness.description=Obtén la felicidad del NPC que estás mirando.
 tamework.commands.getLifeStage.no.npc.found.in.view=No se encontró ningún NPC a la vista.
 tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Etapa de vida del NPC {0}: {1} (puerta de función alternativa, sin componente).
-tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Etapa de vida del NPC {0}: {1} (bornAtMs={2}, adolescenteAtMs={3}, adultoAtMs={4}, crecimientoScaling={5}).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Etapa de vida del NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}, ageProgressMs={6}).
 tamework.commands.getLifeStage.description=Obtén la etapa de vida del NPC que estás mirando.
+tamework.commands.setLifeStage.description=Establece la etapa de vida de los NPC seleccionados.
+tamework.commands.setLifeStage.argument.stage=Etapa de vida: baby, adolescent, adult, prime o senior.
+tamework.commands.setLifeStage.invalid.stage=Etapa de vida desconocida: «{0}». Usa baby, adolescent, adult, prime o senior.
+tamework.commands.setLifeStage.component.unavailable=El estado de etapa de vida no está disponible para el NPC {0}.
+tamework.commands.setLifeStage.juvenile.unavailable=El NPC {0} no tiene habilitado un ciclo de vida juvenil.
+tamework.commands.setLifeStage.aging.unavailable=El NPC {0} no tiene habilitada una configuración de envejecimiento adulto.
+tamework.commands.setLifeStage.stage.unavailable=El NPC {0} no puede usar la etapa de vida {1} con la configuración actual de envejecimiento.
+tamework.commands.setLifeStage.result=Etapa de vida establecida para el NPC {0}: {1} -> {2}.
 tamework.commands.getNeeds.needs.component.type.is.not.registered=El tipo de componente de necesidades no está registrado.
 tamework.commands.getNeeds.npc.has.no.tracked.needs.state=NPC {0} no tiene ningún estado de necesidades rastreado.
 tamework.commands.getNeeds.description=Obtén hambre y sed de NPC seleccionados.
