@@ -65,8 +65,22 @@ There is no claim-provider dropdown or QuestLines Claims fallback.
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,
-capture-owner, spawn-owner, needs-resource, and announcement settings. Apply
+capture-owner, spawn-owner, and needs-resource settings. Apply
 changes through the UI so validation and settings-file writes use one path.
+
+## Welcome and announcements
+
+In `/tw settings`, turn off **Welcome and announcements** and click **Apply**
+to disable all automatic welcome and update popups. **Refresh** reloads the saved
+value, and experience presets leave it unchanged.
+
+You can also set
+`"enabled": false` in
+`universe/Tamework/Settings/tamework-settings-announcement.json`.
+This applies to everyone, including first-time players and future update notices.
+Tamework reads the file on each announcement attempt, so no restart is needed.
+The setting does not close an already open popup. `/tw news` can still open the
+announcement manually.
 
 ## Animal progression
 

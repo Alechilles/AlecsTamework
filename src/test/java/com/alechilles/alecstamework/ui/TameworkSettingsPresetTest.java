@@ -104,6 +104,7 @@ class TameworkSettingsPresetTest {
             assertEquals(1.0, expected.needsOwnerOfflineDecayMultiplier());
             assertEquals(TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY, expected.needsDamageDualNeedRule());
             assertEquals(base.needsResourceMode(), expected.needsResourceMode());
+            assertEquals(base.announcementsEnabled(), expected.announcementsEnabled());
             assertEquals(base.telemetryEnabled(), expected.telemetryEnabled());
             assertEquals(base.telemetryBreadcrumbsEnabled(), expected.telemetryBreadcrumbsEnabled());
             for (TameworkSettingsPreset previous : TameworkSettingsPreset.values()) {
@@ -154,6 +155,7 @@ class TameworkSettingsPresetTest {
                 false,
                 false,
                 AnimalAgingMode.FREEZE_AT_PRIME,
+                false,
                 false
         );
     }

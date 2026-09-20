@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -48,6 +49,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_CLOSE = "Close";
     private static final String ACTION_EDIT = "Edit";
 
+    private static final String KEY_ANNOUNCEMENTS_ENABLED = "@AnnouncementsEnabled";
     private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
     private static final String KEY_POP_SCOPE = "@PopulationScope";
@@ -239,7 +241,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_LEVELING_ENABLED, "#TwSettingsLevelingEnabledCheck.Value")
                 .append(KEY_TALENTS_ENABLED, "#TwSettingsTalentsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
-                .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value");
+                .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
+                .append(KEY_ANNOUNCEMENTS_ENABLED, "#TwSettingsAnnouncementsEnabledCheck.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
@@ -291,6 +294,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsTalentsEnabledCheck.Value", currentValues.talentsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
+        commandBuilder.set("#TwSettingsAnnouncementsEnabledCheck.Value", currentValues.announcementsEnabled());
     }
 
     private void updateUnsavedChanges() {
@@ -368,13 +372,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                     } else if (outcome.partial()) {
-                        savedValues = TameworkSettingsValues.fromRuntime();
+                        savedValues = loadSettingsValues();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = outcome.warning();
                     } else if (outcome.success()) {
-                        savedValues = TameworkSettingsValues.fromRuntime();
+                        savedValues = loadSettingsValues();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -417,6 +421,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
         plugin.onRuntimeSettingsChanged();
+        if (!TameworkSettingsAnnouncementStore.saveEnabled(
+                TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin),
+                values.announcementsEnabled(), plugin.getLogger())) {
+            return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.applied"),
+                    resolveText("tamework.ui.settings.warning.announcementSaveFailed"));
+        }
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
     }
@@ -452,8 +462,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
     }
 
+    private TameworkSettingsValues loadSettingsValues() {
+        boolean enabled = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
+                TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin), plugin.getLogger()).enabled();
+        return TameworkSettingsValues.fromRuntime(enabled);
+    }
+
     private void loadCurrentValues() {
-        currentValues = TameworkSettingsValues.fromRuntime();
+        currentValues = loadSettingsValues();
         savedValues = currentValues;
         draftPayload = null;
         unsavedChanges = false;
@@ -610,6 +626,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_TALENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.talentsEnabled = v, x -> x.talentsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_ANNOUNCEMENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.announcementsEnabled = v, x -> x.announcementsEnabled).add()
                 .build();
 
         String action;
@@ -652,5 +669,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean talentsEnabled;
         Boolean reviveSystemEnabled;
         Boolean recallTeleportingEnabled;
+        Boolean announcementsEnabled;
     }
 }

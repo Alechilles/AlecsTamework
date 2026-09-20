@@ -49,7 +49,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean telemetryEnabled,
                                      boolean telemetryBreadcrumbsEnabled,
                                      @Nonnull AnimalAgingMode animalAgingMode,
-                                     boolean animalOldAgeDeathEnabled) {
+                                     boolean animalOldAgeDeathEnabled,
+                                     boolean announcementsEnabled) {
 
     @Nonnull
     TameworkSettingsStore.GlobalSettingsSnapshot toGlobalSettingsSnapshot() {
@@ -150,17 +151,23 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 telemetryEnabled,
                 telemetryBreadcrumbsEnabled,
                 agingMode,
-                hardcore
+                hardcore,
+                announcementsEnabled
         );
     }
 
     @Nonnull
     static TameworkSettingsValues fromRuntime() {
-        return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
+        return fromRuntime(true);
     }
 
     @Nonnull
-    private static TameworkSettingsValues fromResolvedSettings(@Nonnull ResolvedTameworkSettings settings) {
+    static TameworkSettingsValues fromRuntime(boolean announcementsEnabled) {
+        return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings(), announcementsEnabled);
+    }
+
+    @Nonnull
+    private static TameworkSettingsValues fromResolvedSettings(@Nonnull ResolvedTameworkSettings settings, boolean announcementsEnabled) {
         return new TameworkSettingsValues(
                 settings.populationLimitPerPlayerOwnedTotal(),
                 TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope()),
@@ -201,7 +208,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 settings.telemetryEnabled(),
                 settings.telemetryBreadcrumbsEnabled(),
                 AnimalAgingMode.fromConfigValue(settings.animalAgingMode()),
-                settings.animalOldAgeDeathEnabled()
+                settings.animalOldAgeDeathEnabled(),
+                announcementsEnabled
         );
     }
 }

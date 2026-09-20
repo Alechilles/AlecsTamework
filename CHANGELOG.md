@@ -2,6 +2,9 @@
 
 ## 4.1.2 - Companion Panel Fixes - 2026-09-19
 
+- Added a Welcome and announcements toggle in `/tw settings` to disable all
+  automatic welcome and update popups. `/tw news` remains available.
+
 - Fixed a world crash introduced in 4.1 when coop production tried to save progress
   for an animal with a quarantined persistence operation. Unfinished coop operations
   now block production, and rejected saves suspend the affected animal's production.

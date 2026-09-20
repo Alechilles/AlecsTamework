@@ -97,6 +97,21 @@ public final class TameworkSettingsAnnouncementStore {
                 .normalize();
     }
 
+    /** Saves the automatic-popup switch without changing custom announcement content.
+     * Returns false if existing configuration cannot be read or the write fails.
+     */
+    public static boolean saveEnabled(@Nonnull Path announcementFile, boolean enabled,
+                                      @Nullable HytaleLogger logger) {
+        AnnouncementDocument document = Files.exists(announcementFile)
+                ? readAnnouncementDocument(announcementFile, logger)
+                : createDefaultAnnouncementDocument();
+        if (document == null) {
+            return false;
+        }
+        document.enabled = enabled;
+        return writeDocument(announcementFile, document, logger, "save Tamework settings announcement file ");
+    }
+
     @Nonnull
     public static ResolvedAnnouncement loadResolvedAnnouncement(@Nonnull Path announcementFile,
                                                                 @Nullable HytaleLogger logger) {

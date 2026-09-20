@@ -106,6 +106,33 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
+
+              Label #TwSettingsAnnouncementsLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.announcements;
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsAnnouncementsTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.announcements;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsAnnouncementsEnabledCheck {
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
               Background: #252c27;
               Padding: (Left: 8, Right: 8);
 

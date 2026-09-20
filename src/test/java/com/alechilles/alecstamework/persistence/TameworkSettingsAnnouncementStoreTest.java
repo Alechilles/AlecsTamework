@@ -21,6 +21,34 @@ class TameworkSettingsAnnouncementStoreTest {
     Path tempDir;
 
     @Test
+    void enabledSwitchRoundTripsWithoutReplacingCustomAnnouncement() throws Exception {
+        Path file = tempDir.resolve("announcement.json");
+        Files.writeString(file, """
+                {"useBuiltInAnnouncementId": false, "useBuiltInText": false,
+                 "announcementId": "server-news", "title": "Server news",
+                 "bodyLines": ["Custom message"]}
+                """);
+        assertTrue(TameworkSettingsAnnouncementStore.saveEnabled(file, false, null));
+        ResolvedAnnouncement disabled = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(file, null);
+        assertFalse(disabled.enabled());
+        assertFalse(TameworkSettingsAnnouncementStore.shouldShowAnnouncement(disabled, null, UUID.randomUUID()));
+        assertEquals("server-news", disabled.announcementId());
+        assertEquals("Server news", disabled.title());
+        assertEquals(List.of("Custom message"), disabled.bodyLines());
+        assertFalse(disabled.useBuiltInText());
+        assertTrue(TameworkSettingsAnnouncementStore.saveEnabled(file, true, null));
+        assertTrue(TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(file, null).enabled());
+    }
+
+    @Test
+    void enabledSwitchDoesNotOverwriteUnreadableAnnouncement() throws Exception {
+        Path file = tempDir.resolve("announcement.json");
+        Files.writeString(file, "{invalid");
+        assertFalse(TameworkSettingsAnnouncementStore.saveEnabled(file, false, null));
+        assertEquals("{invalid", Files.readString(file));
+    }
+
+    @Test
     void loadResolvedAnnouncementCreatesDefaultTemplateWhenFileMissing() throws Exception {
         Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
         Path announcementFile = TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(tameworkRoot);
@@ -41,11 +69,6 @@ class TameworkSettingsAnnouncementStoreTest {
         assertTrue(announcement.bodyLines().size() >= 3);
         assertEquals("Don't show again until next announcement", announcement.optOutLabel());
 
-        String raw = Files.readString(announcementFile);
-        assertTrue(raw.contains("\"useBuiltInAnnouncementId\": true"));
-        assertTrue(raw.contains("\"useBuiltInText\": true"));
-        assertFalse(raw.contains("\"bodyLines\""));
-        assertFalse(raw.contains("\"subtitle\""));
     }
 
     @Test

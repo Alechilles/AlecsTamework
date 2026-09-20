@@ -1789,3 +1789,7 @@ tamework.command.selection.deselected=Deseleccionado: {0}.
 tamework.command.selection.limit=Límite de selección alcanzado.
 
 tamework.ui.companions.header = Compañeros — {0} seleccionados · {1} en propiedad
+
+tamework.ui.settings.label.announcements=Bienvenida y anuncios
+tamework.ui.settings.tooltip.announcements=Mostrar mensajes automáticos de bienvenida y actualización para todos. Desactiva esta opción para ocultar todas las ventanas emergentes automáticas. /tw news seguirá disponible.
+tamework.ui.settings.warning.announcementSaveFailed=Se guardaron los ajustes de juego, pero no se pudo guardar el ajuste de anuncios. Revisa el archivo de anuncios e inténtalo de nuevo.

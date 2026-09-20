@@ -167,7 +167,8 @@ final class TameworkSettingsFormParser {
                 current.telemetryEnabled(),
                 current.telemetryBreadcrumbsEnabled(),
                 choices.animalAgingMode(),
-                boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled())
+                boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled()),
+                boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled())
         );
     }
 

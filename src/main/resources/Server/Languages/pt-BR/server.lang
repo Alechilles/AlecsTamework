@@ -1833,3 +1833,7 @@ tamework.command.selection.deselected=Desmarcado: {0}.
 tamework.command.selection.limit=Limite de seleção atingido.
 
 tamework.ui.companions.header = Companheiros — {0} selecionados · {1} sob sua posse
+
+tamework.ui.settings.label.announcements=Boas-vindas e anúncios
+tamework.ui.settings.tooltip.announcements=Mostrar anúncios automáticos de boas-vindas e atualizações para todos. Desative para ocultar todas as janelas automáticas. /tw news continua disponível.
+tamework.ui.settings.warning.announcementSaveFailed=As configurações de jogo foram salvas, mas não foi possível salvar a configuração de anúncios. Confira o arquivo de anúncios e tente novamente.

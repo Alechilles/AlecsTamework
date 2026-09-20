@@ -1833,3 +1833,7 @@ tamework.command.selection.deselected=Auswahl aufgehoben: {0}.
 tamework.command.selection.limit=Auswahllimit erreicht.
 
 tamework.ui.companions.header = Begleiter — {0} ausgewählt · {1} im Besitz
+
+tamework.ui.settings.label.announcements=Willkommen und Ankündigungen
+tamework.ui.settings.tooltip.announcements=Automatische Willkommens- und Update-Ankündigungen für alle anzeigen. Deaktivieren, um alle automatischen Popups auszublenden. /tw news bleibt verfügbar.
+tamework.ui.settings.warning.announcementSaveFailed=Die Spieleinstellungen wurden gespeichert, aber die Ankündigungseinstellung konnte nicht gespeichert werden. Prüfe die Ankündigungsdatei und versuche es erneut.

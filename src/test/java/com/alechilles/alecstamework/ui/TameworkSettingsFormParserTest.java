@@ -11,6 +11,19 @@ class TameworkSettingsFormParserTest {
             new TameworkSettingsFormParser(null, HytaleLogger.getLogger());
 
     @Test
+    void announcementToggleTracksPendingChangesAndReverts() {
+        TameworkSettingsValues saved = TameworkSettingsValues.fromRuntime(true);
+        TameworkSettingsPage.EventPayload form = form(saved);
+        form.announcementsEnabled = false;
+        assertTrue(parser.hasChanges(form, saved, saved));
+        TameworkSettingsValues applied = parser.parse(form, saved).values();
+        assertFalse(applied.announcementsEnabled());
+        assertFalse(parser.hasChanges(form, saved, applied));
+        form.announcementsEnabled = true;
+        assertFalse(parser.hasChanges(form, saved, saved));
+    }
+
+    @Test
     void unsavedWarningTracksEditsRevertsAndTheLastSuccessfulSave() {
         TameworkSettingsValues saved = TameworkSettingsValues.fromRuntime();
         TameworkSettingsPage.EventPayload form = form(saved);

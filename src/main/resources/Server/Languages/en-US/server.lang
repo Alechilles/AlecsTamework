@@ -1845,3 +1845,7 @@ tamework.command.selection.deselected=Deselected {0}.
 tamework.command.selection.limit=Selection limit reached.
 
 tamework.ui.companions.header = Companions — {0} selected · {1} owned
+
+tamework.ui.settings.label.announcements=Welcome and announcements
+tamework.ui.settings.tooltip.announcements=Show automatic welcome and update announcements for everyone. Disable to hide all automatic popups. /tw news remains available.
+tamework.ui.settings.warning.announcementSaveFailed=Gameplay settings were saved, but the announcement setting could not be saved. Check the announcement file and try again.

@@ -12,9 +12,8 @@ class TameworkSettingsRenderingTest {
         Field singleton = Unsafe.class.getDeclaredField("theUnsafe");
         singleton.setAccessible(true);
         Unsafe unsafe = (Unsafe) singleton.get(null);
-        TameworkSettingsPage page = new TameworkSettingsPage(null,
-                (com.alechilles.alecstamework.Tamework) unsafe.allocateInstance(com.alechilles.alecstamework.Tamework.class),
-                (com.hypixel.hytale.server.core.universe.world.World) unsafe.allocateInstance(com.hypixel.hytale.server.core.universe.world.World.class));
+        // Render a prepared form without initializing plugin storage or a live world.
+        TameworkSettingsPage page = (TameworkSettingsPage) unsafe.allocateInstance(TameworkSettingsPage.class);
         for (String fieldName : new String[] {"statusLine", "warningLine"}) {
             Field field = TameworkSettingsPage.class.getDeclaredField(fieldName);
             field.setAccessible(true);
