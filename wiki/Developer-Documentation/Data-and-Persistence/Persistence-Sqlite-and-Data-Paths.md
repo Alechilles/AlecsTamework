@@ -199,6 +199,13 @@ directly.
 
 ## Operator diagnostics
 
+Managed-coop production waits while a resident's slot has an unfinished capture
+or release operation. If persistence rejects a production checkpoint before
+submission, production for that animal pauses until the Tamework runtime restarts;
+the rejection is logged once for that animal. Restarting does not clear durable
+quarantine. An uncertain coop release still needs exact entity/receipt evidence
+before it can be resolved safely.
+
 An uncertain new single-animal population admission keeps its capacity reserved
 and blocks its exact operation and profile. It does not block unrelated animals
 owned by the same player. At startup, matching older owner-wide admission locks

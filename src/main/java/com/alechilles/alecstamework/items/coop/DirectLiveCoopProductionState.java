@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -32,7 +33,9 @@ public final class DirectLiveCoopProductionState {
             DirectLiveCoopProductionState.class.getName()
     );
     private final PersistenceDomainFacades facades;
-    private final ConcurrentHashMap<ProfileId, Boolean> pending = new ConcurrentHashMap<>();
+    private final ExtensionMutationSubmitter mutations;
+    private final ConcurrentHashMap<ProfileId, CheckpointState> checkpointStates =
+            new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ProfileId, CachedLifeStage> stageByProfile = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ProfileId, Boolean> activeTimeReads = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ProfileId, Watermark> optimisticWatermarks = new ConcurrentHashMap<>();
@@ -41,7 +44,15 @@ public final class DirectLiveCoopProductionState {
     private final CoopResidentStateSnapshotCodec snapshots = new CoopResidentStateSnapshotCodec();
 
     DirectLiveCoopProductionState(@Nonnull PersistenceDomainFacades facades) {
+        this(facades, facades.operations()::mutateExtension);
+    }
+
+    DirectLiveCoopProductionState(
+            @Nonnull PersistenceDomainFacades facades,
+            @Nonnull ExtensionMutationSubmitter mutations
+    ) {
         this.facades = facades;
+        this.mutations = mutations;
     }
 
     /** Returns no watermark for older residents; callers must initialize it at the current clock. */
@@ -68,9 +79,13 @@ public final class DirectLiveCoopProductionState {
         return malformed;
     }
 
-    /** Submits a best-effort durable advance after produce was added to the loaded container. */
+    /**
+     * Returns whether production is awaiting a checkpoint or was suspended after its checkpoint
+     * admission failed. Suspension lasts until runtime restart so a quarantined profile cannot
+     * keep adding produce without a durable watermark.
+     */
     public boolean pending(@Nonnull ProfileId profileId) {
-        return pending.containsKey(profileId);
+        return checkpointStates.containsKey(profileId);
     }
 
     public void record(@Nonnull ProfileId profileId, long eligibleMs, long expectedRevision) {
@@ -83,7 +98,7 @@ public final class DirectLiveCoopProductionState {
             long expectedRevision,
             boolean retry
     ) {
-        if (pending.putIfAbsent(profileId, Boolean.TRUE) != null) return;
+        if (checkpointStates.putIfAbsent(profileId, CheckpointState.PENDING) != null) return;
         submitPending(profileId, eligibleMs, expectedRevision, retry);
     }
 
@@ -107,30 +122,44 @@ public final class DirectLiveCoopProductionState {
         // Keep the advanced local value until the durable projection catches up. Its revision is
         // deliberately the last known durable revision, never a guessed next revision.
         optimisticWatermarks.put(profileId, new Watermark(eligibleMs, expectedRevision));
-        facades.operations().mutateExtension(OperationId.create(), idempotency, mutation)
-                .completion().whenComplete((result, failure) -> {
-                    Watermark settled = settle(profileId, eligibleMs);
-                    boolean persisted = projectedWatermark(profileId)
-                            .map(value -> value.eligibleMs() >= eligibleMs)
-                            .orElse(false);
-                    boolean published = failure == null && result != null
-                            && result.status() == com.alechilles.alecstamework.persistence.operation
-                                    .OperationWorkflowResult.Status.PUBLISHED;
-                    if (!retry && (!published || !persisted)) {
-                        // Keep the profile pending while retrying so no sweep can write over this
-                        // local watermark between completion and the replacement checkpoint.
-                        submitPending(profileId, eligibleMs, settled.revision(), true);
-                        return;
-                    }
-                    if (retry && (!published || !persisted)
-                            && checkpointWarnings.putIfAbsent(profileId, Boolean.TRUE) == null) {
-                        String message = "Managed-coop production watermark remains undurable: profile="
-                                + profileId;
-                        if (failure == null) LOGGER.warning(message);
-                        else LOGGER.log(Level.WARNING, message, failure);
-                    }
-                    pending.remove(profileId);
-                });
+        try {
+            mutations.submit(OperationId.create(), idempotency, mutation)
+                    .completion().whenComplete((result, failure) -> {
+                        Watermark settled = settle(profileId, eligibleMs);
+                        boolean persisted = projectedWatermark(profileId)
+                                .map(value -> value.eligibleMs() >= eligibleMs)
+                                .orElse(false);
+                        boolean published = failure == null && result != null
+                                && result.status() == com.alechilles.alecstamework.persistence.operation
+                                        .OperationWorkflowResult.Status.PUBLISHED;
+                        if (!retry && (!published || !persisted)) {
+                            // Keep the profile pending while retrying so no sweep can write over this
+                            // local watermark between completion and the replacement checkpoint.
+                            submitPending(profileId, eligibleMs, settled.revision(), true);
+                            return;
+                        }
+                        if (retry && (!published || !persisted)
+                                && checkpointWarnings.putIfAbsent(profileId, Boolean.TRUE) == null) {
+                            String message = "Managed-coop production watermark remains undurable: profile="
+                                    + profileId;
+                            if (failure == null) LOGGER.warning(message);
+                            else LOGGER.log(Level.WARNING, message, failure);
+                        }
+                        checkpointStates.remove(profileId, CheckpointState.PENDING);
+                    });
+        } catch (RuntimeException failure) {
+            suspend(profileId, failure);
+        }
+    }
+
+    private void suspend(@Nonnull ProfileId profileId, @Nonnull RuntimeException failure) {
+        if (checkpointStates.replace(profileId, CheckpointState.PENDING, CheckpointState.SUSPENDED)
+                && checkpointWarnings.putIfAbsent(profileId, Boolean.TRUE) == null) {
+            LOGGER.log(Level.WARNING,
+                    "Managed-coop production suspended after checkpoint admission failure: profile="
+                            + profileId,
+                    failure);
+        }
     }
 
     @Nonnull
@@ -216,5 +245,18 @@ public final class DirectLiveCoopProductionState {
     }
 
     public record Watermark(long eligibleMs, long revision) { }
+    @FunctionalInterface
+    interface ExtensionMutationSubmitter {
+        @Nonnull PublicOperationSubmission submit(
+                @Nonnull OperationId operationId,
+                @Nonnull IdempotencyKey idempotencyKey,
+                @Nonnull ProfileExtensionMutation mutation
+        );
+    }
+
+    private enum CheckpointState {
+        PENDING,
+        SUSPENDED
+    }
     private record CachedLifeStage(SnapshotId snapshotId, TameworkLifeStageComponent lifeStage) { }
 }

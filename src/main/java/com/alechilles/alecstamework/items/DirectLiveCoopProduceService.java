@@ -58,13 +58,16 @@ final class DirectLiveCoopProduceService {
         ));
         int itemsPerTick = rules.getItemsPerTick();
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        DefaultAssetMap<String, ItemDropList> dropLists =
-                ItemDropList.getAssetMap();
 
         boolean readyForRelease = true;
         for (CoopSlotKey slot : coop.slots()) {
             CoopOccupancy occupancy = occupancies.get(slot);
             if (occupancy == null) {
+                continue;
+            }
+            // An unfinished capture/release owns this resident, including quarantined releases.
+            if (occupancy.slot().reserved()) {
+                readyForRelease = false;
                 continue;
             }
             CompanionProfileProjectionState profile =
@@ -98,7 +101,7 @@ final class DirectLiveCoopProduceService {
             }
             int cycles = cyclesDue(now, watermark.eligibleMs(), intervalMs);
             if (cycles <= 0) continue;
-            ItemDropList dropList = resolveDropList(dropLists, dropId);
+            ItemDropList dropList = resolveDropList(ItemDropList.getAssetMap(), dropId);
             int completed = 0;
             boolean saturated = false;
             boolean partialCycle = false;

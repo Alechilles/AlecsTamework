@@ -2,6 +2,9 @@
 
 ## 4.1.2 - Companion Panel Fixes - 2026-09-19
 
+- Fixed a world crash introduced in 4.1 when coop production tried to save progress
+  for an animal with a quarantined persistence operation. Unfinished coop operations
+  now block production, and rejected saves suspend the affected animal's production.
 - Fixed freshly tamed animals appearing unselected in the companion panel after selection.
 - Fixed managed animals spawned with `/tw npc spawn tamed` being excluded from the companion panel.
 - Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
