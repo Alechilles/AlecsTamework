@@ -73,6 +73,10 @@ dispatch only after the held item's owner, tame, role, command, and capacity che
 Legacy link records remain readable and preserve their existing active flags during
 migration; a record may also carry the stable profile ID so an old entity UUID can
 be canonicalized.
+Live owned companions awaiting profile discovery also read their selected state
+from the current flute's records, so newly tamed animals show selection immediately.
+Managed admin-spawned companions use the ordinary command path; their admin-spawn
+projection marker does not exclude them from owned panels or generic commands.
 Player-owned group definitions and multi-membership assignments live in
 `TameworkCompanionGroupsComponent`, shared by compatible ordinary flutes. Group
 selection is a one-time mutation of the current flute's per-item records; browsing

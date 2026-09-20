@@ -55,6 +55,22 @@ import sun.misc.Unsafe;
 /** Behavioral contract for rejecting bonded projections at generic boundaries. */
 class CommandGenericTargetAuthorityTest {
     @Test
+    void adminSpawnedCompanionCanAppearAndReceiveGenericCommands() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            scope.store.put(target.reference, scope.markerType,
+                    new TameworkProjectionIdentityComponent("profile", "operation",
+                            TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE,
+                            null, null, 0L));
+
+            assertTrue(CommandGenericTargetAuthority.allowsNearbyPresentation(
+                    target.reference, scope.store));
+            assertTrue(CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                    target.reference, scope.store));
+        }
+    }
+
+    @Test
     void hookDispatchRejectsMissingInvalidAndWrongStoreReferences()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install();

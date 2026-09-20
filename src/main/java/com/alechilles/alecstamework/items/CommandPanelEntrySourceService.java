@@ -255,6 +255,7 @@ final class CommandPanelEntrySourceService {
 
         Vector3d playerPos = playerTransform == null ? new Vector3d() : new Vector3d(playerTransform.getPosition());
         boolean requireOwner = ownedMode || resolveLinkingRequireOwner();
+        List<LinkedNpcRecord> selectionRecords = ownedMode ? linkedRecordStore.read(stack) : List.of();
         store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             for (int i = 0; i < chunk.size(); i++) {
                 NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
@@ -295,7 +296,9 @@ final class CommandPanelEntrySourceService {
                     continue;
                 }
                 String roleId = normalize(linkPolicyService.resolveRoleId(npc));
-                boolean linkedToTool = linkPolicyService.isLinkedToTool(
+                // Newly tamed companions may not have an owned profile projection yet.
+                LinkedNpcRecord selection = linkedRecordStore.find(selectionRecords, npc.getUuid());
+                boolean linkedToTool = ownedMode ? selection != null : linkPolicyService.isLinkedToTool(
                         npcRef,
                         playerUuid,
                         toolId,
@@ -309,7 +312,7 @@ final class CommandPanelEntrySourceService {
                                 npc.getUuid(),
                                 npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
                                 linkedToTool,
-                                !ownedMode,
+                                !ownedMode || selection != null && selection.active,
                                 false,
                                 false,
                                 null,

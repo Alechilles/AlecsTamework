@@ -206,6 +206,7 @@ final class CommandGenericTargetAuthority {
     ) {
         return switch (marker.getProjectionKind()) {
             case TameworkProjectionIdentityComponent.KIND_RECOVERY,
+                    TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE,
                     TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE,
                     TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
                     TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE,

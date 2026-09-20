@@ -2,6 +2,8 @@
 
 ## 4.1.1 - UI Texture Optimization - 2026-09-19
 
+- Fixed freshly tamed animals appearing unselected in the companion panel after selection.
+- Fixed managed animals spawned with `/tw npc spawn tamed` being excluded from the companion panel.
 - Reduced nine life-stage and trait UI textures from 1254x1254 to 32x32,
   lowering their client texture-atlas usage by over 99.9% while preserving transparency.
 - Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
