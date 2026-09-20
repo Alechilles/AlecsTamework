@@ -33,6 +33,12 @@ class TameworkCommandDispatchTest {
     }
 
     @Test
+    void incompleteSetCommandListsHarvestReadySetter() throws Exception {
+        RecordingSender sender = dispatch("tw debug set", true);
+        assertTrue(sender.messages.stream().anyMatch(message -> plainText(message).contains("harvestready")));
+    }
+
+    @Test
     void spawnMarkerDeletionIsDispatchedOutsideView() throws Exception {
         RecordingSender sender = dispatch("tw debug delete-spawn-marker 12", true);
         assertEquals("server.commands.errors.playerOrArg", sender.messages.getFirst().getMessageId());

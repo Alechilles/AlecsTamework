@@ -20,6 +20,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw debug get owner`, `/tw debug set owner`
 - `/tw debug get tamed`, `/tw debug set tamed`
 - `/tw debug get alarm [AlarmName] [NpcUuid]`
+- `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]`
 - `/tw config open`, `/tw settings`
 - `/tw config reload`
 - `/tw debug get happiness`, `/tw debug get traits`, `/tw debug get lifestage`
@@ -35,6 +36,12 @@ The life-stage setter updates juvenile growth timing, role, and scale together.
 `baby` and `adolescent` require an enabled offspring lifecycle. `prime` requires
 enabled adult aging, while `senior` also requires the Full aging mode. The
 `juvenile` input is accepted as an alias for `adolescent`.
+
+The harvest-readiness setter uses the alarm name from
+`TwGlobalConfig.InteractionDefaults.HarvestAlarmName`. The default or `true` mode
+clears that alarm so harvesting is ready immediately. `false` restarts the role's
+normal `HarvestTimeout`, including configured progression modifiers. `toggle`
+switches between those states.
 
 `/tw debug view spawn-beacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model

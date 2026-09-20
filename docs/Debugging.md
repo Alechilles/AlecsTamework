@@ -49,7 +49,9 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
 - If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.
 - Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist and have expected values.
-- Use `/tw debug get alarm` for harvest/cooldown alarm state.
+- Use `/tw debug get alarm` for harvest/cooldown alarm state. Use
+  `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]` to clear
+  the configured harvest alarm or restart the role's normal `HarvestTimeout`.
 - If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debug log prompt`.
 - If custom item checks fail unexpectedly, verify `ItemsInHand.Operator` (`AnyOf` vs `NoneOf`) and quantity requirements.
 - For `NpcHealthPercent` requirements, confirm health scaling assumptions (`0-100`).
@@ -62,6 +64,7 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
   - `/tw debug get traits`
   - `/tw debug get lifestage`
   - `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
+  - `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]`
 - Setting `baby` or `adolescent` requires an enabled offspring lifecycle for the
   selected NPC. Setting `prime` requires enabled adult aging, and `senior` also
   requires the Full aging mode.

@@ -28,13 +28,35 @@ public final class TameworkAlarmService {
                                      @Nullable String alarmName,
                                      double durationSeconds) {
         Snapshot before = snapshot(npcRef, store, alarmName);
-        if (!before.valid || !before.ready || durationSeconds <= 0.0) {
+        if (!before.valid || !before.ready || !Double.isFinite(durationSeconds) || durationSeconds <= 0.0) {
             log("apply-blocked", before, before, durationSeconds, false);
             return false;
         }
+        return writeAlarm(npcRef, store, alarmName, durationSeconds, before, "apply");
+    }
+
+    /** Replaces an existing alarm window, including one that is still active. */
+    public static boolean replaceAlarm(@Nullable Ref<EntityStore> npcRef,
+                                       @Nullable Store<EntityStore> store,
+                                       @Nullable String alarmName,
+                                       double durationSeconds) {
+        Snapshot before = snapshot(npcRef, store, alarmName);
+        if (!before.valid || !Double.isFinite(durationSeconds) || durationSeconds <= 0.0) {
+            log("replace-blocked", before, before, durationSeconds, false);
+            return false;
+        }
+        return writeAlarm(npcRef, store, alarmName, durationSeconds, before, "replace");
+    }
+
+    private static boolean writeAlarm(@Nullable Ref<EntityStore> npcRef,
+                                      @Nullable Store<EntityStore> store,
+                                      @Nullable String alarmName,
+                                      double durationSeconds,
+                                      @Nonnull Snapshot before,
+                                      @Nonnull String stage) {
         ComponentType<EntityStore, TameworkAlarmComponent> type = TameworkAlarmComponent.getComponentType();
         if (type == null || npcRef == null || !npcRef.isValid() || store == null) {
-            log("apply-missing-type", before, before, durationSeconds, false);
+            log(stage + "-missing-type", before, before, durationSeconds, false);
             return false;
         }
         TameworkAlarmComponent component = store.getComponent(npcRef, type);
@@ -46,7 +68,7 @@ public final class TameworkAlarmService {
         store.putComponent(npcRef, type, component);
 
         Snapshot after = snapshot(npcRef, store, alarmName);
-        log("apply", before, after, durationSeconds, true);
+        log(stage, before, after, durationSeconds, true);
         return true;
     }
 

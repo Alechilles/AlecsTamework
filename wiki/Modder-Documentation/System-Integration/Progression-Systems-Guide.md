@@ -152,6 +152,7 @@ Use:
 - `/tw debug set trait`
 - `/tw debug get lifestage`
 - `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
+- `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]`
 
 The setter changes the complete progression state, including juvenile timing,
 role, and scale. Juvenile stages require an enabled offspring lifecycle. Prime

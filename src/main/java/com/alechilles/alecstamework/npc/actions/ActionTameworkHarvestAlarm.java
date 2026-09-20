@@ -213,6 +213,19 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return applied;
     }
 
+    static double resolveHarvestCooldownSeconds(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable Role role,
+                                                @Nullable Store<EntityStore> store) {
+        HarvestCooldownContext context = resolveHarvestCooldownContext(
+                npcRef,
+                role,
+                store,
+                0.0,
+                "debug-set"
+        );
+        return context == null ? 0.0 : context.cooldownSeconds;
+    }
+
     private static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
                                                 @Nullable Store<EntityStore> store,
                                                 @Nonnull String alarmName,
@@ -418,7 +431,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return name != null && !name.isBlank() ? name : "<null>";
     }
 
-    private static String resolveHarvestAlarmName() {
+    static String resolveHarvestAlarmName() {
         TwGlobalConfig config = TwGlobalConfig.resolveActive();
         String configured = config != null ? config.getHarvestAlarmName() : null;
         return configured != null && !configured.isBlank() ? configured : HARVEST_ALARM_NAME;
