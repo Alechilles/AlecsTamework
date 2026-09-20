@@ -1,16 +1,19 @@
 # Changelog
 
-## 4.1.1 - UI Texture Optimization - 2026-09-19
+## 4.1.2 - Companion Panel Fixes - 2026-09-19
 
 - Fixed freshly tamed animals appearing unselected in the companion panel after selection.
 - Fixed managed animals spawned with `/tw npc spawn tamed` being excluded from the companion panel.
-- Reduced nine life-stage and trait UI textures from 1254x1254 to 32x32,
-  lowering their client texture-atlas usage by over 99.9% while preserving transparency.
 - Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
   standard NPC selectors. The existing life-stage query now reports adult aging stages.
 - Added `/tw debug set harvestready [--mode=true|false|toggle]` with standard NPC
   selectors. Ready mode clears the configured harvest alarm; false restarts the
   role's normal harvest cooldown.
+
+## 4.1.1 - UI Texture Optimization - 2026-09-19
+
+- Reduced nine life-stage and trait UI textures from 1254x1254 to 32x32,
+  lowering their client texture-atlas usage by over 99.9% while preserving transparency.
 
 ## 4.1.0 - Animal Progression and Companion UI - 2026-09-19
 
