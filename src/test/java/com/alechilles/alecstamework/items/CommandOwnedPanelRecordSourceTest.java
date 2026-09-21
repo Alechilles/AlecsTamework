@@ -121,7 +121,10 @@ class CommandOwnedPanelRecordSourceTest {
                 Set.of(carried.profileId().toString(), transferred.profileId().toString()));
         assertEquals(Set.of(carried.profileId().toString(), tracked.profileId().toString()),
                 visible.stream().map(record -> record.profileId).collect(java.util.stream.Collectors.toSet()));
-        assertTrue(visible.stream().noneMatch(record -> record.active));
+        assertTrue(visible.stream().filter(record -> tracked.profileId().toString().equals(record.profileId))
+                .findFirst().orElseThrow().active, "Capture remembers this flute's selection without granting ownership.");
+        assertFalse(visible.stream().filter(record -> carried.profileId().toString().equals(record.profileId))
+                .findFirst().orElseThrow().active, "Carrying a new capture does not select it automatically.");
         assertTrue(source.recordsFor(owner, java.util.List.of(link)).isEmpty());
         for (var record : visible) assertTrue(source.profileForRow(owner, record.npcUuid).isEmpty());
     }

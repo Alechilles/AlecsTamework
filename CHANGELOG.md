@@ -2,6 +2,9 @@
 
 ## 4.1.2 - Companion Panel Fixes - 2026-09-19
 
+- Cooped companions now retain saved health for their cards. Captured companions
+  show editable groups and retain their flute's remembered selection while stored.
+
 - Added a Welcome and announcements toggle in `/tw settings` to disable all
   automatic welcome and update popups. `/tw news` remains available.
 

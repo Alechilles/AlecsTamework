@@ -154,7 +154,10 @@ final class CommandGroupAssignPageService {
         if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config) || player == null || npcUuid == null || groupIds == null) return;
         var entry = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config).stream()
                 .filter(e -> npcUuid.equals(e.npcUuid()) && e.ownedActions()).findFirst().orElse(null);
-        if (entry == null || toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid) == null) return;
+        // Group tags belong to the viewer. A freshly resolved captured card may be
+        // organized even when capture cleared ownership and command selection is unavailable.
+        if (entry == null || !entry.captured()
+                && toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid) == null) return;
         CommandCompanionGroups.assign(player, toolInventoryService.findToolStack(player, toolId),
                 entry.companionKey(), npcUuid, groupIds);
     }

@@ -74,7 +74,7 @@ final class CommandOwnedPanelRecordSource {
                     ? CommandRosterPanelRecordSource.presentationUuid(profile.profileId()) : profile.currentAlias().value();
             result.add(new LinkedNpcRecord(alias, profile.profileId().toString(),
                     null, null, null, profile.customName() != null ? profile.customName() : profile.displayName(),
-                    null, profile.roleId(), null, false, false, null));
+                    null, profile.roleId(), null, linked != null && linked.active, false, null));
         }
         return List.copyOf(result);
     }

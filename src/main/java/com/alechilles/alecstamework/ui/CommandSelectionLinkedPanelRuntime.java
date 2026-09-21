@@ -421,7 +421,9 @@ final class CommandSelectionLinkedPanelRuntime {
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
         return entry != null && !page.cardBindingConfig.ownerCommandFamilyRoster()
-                && (presentation == null || presentation.bonded() == null && !presentation.managesRosterRow());
+                && (presentation == null || presentation.bonded() == null
+                && (!presentation.managesRosterRow()
+                || page.companionBinding != null && entry.captured() && entry.ownedActions()));
     }
 
     void assignGroup(UUID npcUuid, String value) {

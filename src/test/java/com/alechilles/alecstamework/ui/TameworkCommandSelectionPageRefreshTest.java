@@ -39,9 +39,18 @@ class TameworkCommandSelectionPageRefreshTest {
     /** Multi-group checks save immediately without rebuilding the mounted native popup. */
     @Test
     void companionGroupEditsUpdateCaptionWithoutResettingTheDropdown() throws Exception {
+        verifyCompanionGroupEdits(false);
+        verifyCompanionGroupEdits(true);
+    }
+
+    private void verifyCompanionGroupEdits(boolean captured) throws Exception {
         CapturedPackets packets = new CapturedPackets();
-        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
-        AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(ENTRY.withOwnedActions()
+        var page = page(packets, new AtomicReference<>(captured
+                ? CommandPanelFeaturePresentation.readOnlyManaged() : null), new NavigationFixture(), legacyConfig());
+        var entry = captured ? new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null,
+                0, 0, 0, 0, false, false, false, true, false, false,
+                0L, new LinkedNpcTraitIndicator[0]) : ENTRY;
+        AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(entry.withOwnedActions()
                 .withCompanionGroups("profile", List.of(
                         new LinkedNpcEntry.GroupMembership("Barn", "Barn", "#445566")), true));
         replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> List.of(row.get()));

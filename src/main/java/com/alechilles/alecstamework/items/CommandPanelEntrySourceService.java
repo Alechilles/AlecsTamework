@@ -217,9 +217,16 @@ final class CommandPanelEntrySourceService {
             }
             List<LinkedNpcEntry> ownedEntries = linkedPanelEntryService.resolveOwnedEntriesFromRecords(
                     player, store, stack, toolId, ownedRecords, linkedById.keySet()).entries();
+            Map<UUID, String> profileKeys = new java.util.HashMap<>();
+            for (var record : ownedRecords) {
+                if (record.profileId != null) profileKeys.put(record.npcUuid,
+                        CommandCompanionGroups.profileKey(record.profileId));
+            }
             linkedEntries = new ArrayList<>(ownedEntries.size());
             for (LinkedNpcEntry entry : ownedEntries) {
-                linkedEntries.add(entry.withOwnedActions());
+                linkedEntries.add(entry.withOwnedActions().withCompanionGroups(
+                        profileKeys.getOrDefault(entry.npcUuid(), CommandCompanionGroups.entityKey(entry.npcUuid())),
+                        entry.groups(), entry.selectionSupported()));
             }
         }
         if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -482,7 +489,7 @@ final class CommandPanelEntrySourceService {
             String key = ownedRecordSource == null ? CommandCompanionGroups.entityKey(entry.npcUuid())
                     : ownedRecordSource.profileForRow(player.getUuid(), entry.npcUuid())
                     .map(id -> CommandCompanionGroups.profileKey(id.toString()))
-                    .orElse(CommandCompanionGroups.entityKey(entry.npcUuid()));
+                    .orElse(entry.companionKey());
             key = profiledKeys.getOrDefault(entry.npcUuid(), key);
             CommandCompanionGroups.promoteProfile(player, key, entry.npcUuid());
             var memberships = CommandCompanionGroups.groups(player, key, entry.npcUuid());

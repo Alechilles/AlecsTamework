@@ -121,6 +121,17 @@ which companions receive commands.
 
 The separate bonded-companion panel keeps its own roster states and controls.
 
+Capture and cooping preserve the flute's selection. Stored companions do not
+receive commands; selection resumes when they return to the world under your
+ownership. Carrying a new captured animal does not automatically select it.
+Captured cards still let you view and edit your groups, even when capture has
+temporarily cleared the animal's ownership. These groups belong to you and do
+not grant command control over another player's animal.
+
+Captured and cooped cards show saved health when current and maximum health are
+available. Older coop records that saved only a percentage show the storage
+label until the animal returns to the world and enters a coop again.
+
 ## Finding captured animals
 
 In Linked and Owned modes, captured, cooped, and unloaded animals show location

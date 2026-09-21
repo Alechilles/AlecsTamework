@@ -80,7 +80,10 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             var captured = entries.stream().filter(row -> storedId.equals(row.npcUuid())).findFirst().orElseThrow();
             assertTrue(captured.captured(), "A capture whose owner was cleared must reach the Stored filter.");
             assertFalse(captured.selectionSupported());
-            assertFalse(captured.active());
+            assertTrue(captured.active(), "The captured card retains its flute selection while command control is unavailable.");
+            org.junit.jupiter.api.Assertions.assertEquals(
+                    CommandCompanionGroups.profileKey(storedProfile.profileId().toString()), captured.companionKey(),
+                    "Captured group edits must use the same stable profile key after release.");
             assertTrue(snapshot.featurePresentations().get(storedId).managesRosterRow(),
                     "The informational captured card must suppress generic mutation actions.");
 

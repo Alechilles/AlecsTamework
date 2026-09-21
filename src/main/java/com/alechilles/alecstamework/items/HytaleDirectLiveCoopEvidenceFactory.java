@@ -102,7 +102,7 @@ final class HytaleDirectLiveCoopEvidenceFactory {
         );
     }
 
-    private CoopResidentStateSnapshot withSlot(
+    static CoopResidentStateSnapshot withSlot(
             CoopResidentStateSnapshot source,
             String coopId,
             int residentSlot
@@ -124,7 +124,7 @@ final class HytaleDirectLiveCoopEvidenceFactory {
                 source.talents(),
                 source.lifeStage(),
                 source.attachments(),
-                null, null, source.healthPercent(),
+                source.currentHealth(), source.maximumHealth(), source.healthPercent(),
                 source.capturedAtMs(), source.alarms()
         );
     }
