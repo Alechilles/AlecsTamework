@@ -44,13 +44,23 @@ final class CommandGroupAssignPageService {
     }
 
     String resolveGroupActivationValue(Player player, String toolId, TwCommandItemConfig config) {
+        return resolveGroupActivationValue(player, toolId, config,
+                () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config));
+    }
+
+    /** Uses the page's current unfiltered rows instead of rebuilding the roster for each control. */
+    String resolveGroupActivationValue(Player player, String toolId, TwCommandItemConfig config,
+                                       java.util.function.Supplier<List<LinkedNpcEntry>> entries) {
         ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
         if (stack == null || config == null
                 || config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
             return CommandGroupActivationService.NONE_VALUE;
         }
-        List<LinkedNpcEntry> entries = toolInventoryService.buildLinkedPanelBaseEntriesForTool(
-                player, toolId, config);
+        return resolveGroupActivationValue(entries.get(), new CommandGroupService().readGroups(player, stack));
+    }
+
+    static String resolveGroupActivationValue(List<LinkedNpcEntry> entries,
+                                              List<CommandGroupService.GroupRecord> groups) {
         java.util.Set<String> selected = new java.util.HashSet<>();
         java.util.Set<String> selectable = new java.util.HashSet<>();
         for (LinkedNpcEntry entry : entries) {
@@ -64,7 +74,7 @@ final class CommandGroupAssignPageService {
         if (!selectable.isEmpty() && selected.equals(selectable)) {
             return CommandGroupActivationService.ALL_VALUE;
         }
-        for (var group : new CommandGroupService().readGroups(player, stack)) {
+        for (var group : groups) {
             java.util.Set<String> members = new java.util.HashSet<>();
             for (LinkedNpcEntry entry : entries) {
                 if (entry == null || !entry.selectionSupported() || !entry.groupIds().contains(group.groupId)) continue;

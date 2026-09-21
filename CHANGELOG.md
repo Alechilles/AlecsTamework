@@ -2,6 +2,8 @@
 
 ## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
+- Reduced companion-menu refresh cost on large servers by avoiding repeated profile-map copies and redundant roster builds.
+
 - Cooped companions now retain saved health for their cards. Captured companions
   show editable groups and retain their flute's remembered selection while stored.
 

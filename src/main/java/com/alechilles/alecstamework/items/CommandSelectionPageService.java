@@ -1302,7 +1302,8 @@ final class CommandSelectionPageService {
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationValue(
                                 resolveCurrentPlayer(context.ownerUuid()),
-                                context.toolId(), context.config())
+                                context.toolId(), context.config(),
+                                () -> context.snapshot().snapshot().selectionEntries())
                         : () -> "",
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupDropdownEntries(

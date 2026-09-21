@@ -99,6 +99,12 @@ world-thread dispatcher. The command feature handler closes the cache and subscr
 at shutdown. Saved card values never authorize a live action or mutate persistence.
 
 ## Important runtime seams
+- Standard panel refreshes reuse their entry snapshot for group-selection controls.
+  Text-filtered cards and unfiltered selection rows come from one entry build, so
+  searching the list does not change the group-selection summary. Row decoration
+  resolves owned profile identities in one batch per build instead of copying and
+  scanning the server's profile map for every card. This lookup is display-only;
+  action handlers still resolve current ownership at execution time.
 - Ordinary `ItemMetadata` panels use one owned entry source, then apply the status
   tabs (`In World`, `Stored`, `Lost / Dead`, `All`), `Nearby only`, and literal
   name/species/group search as view-only filters.

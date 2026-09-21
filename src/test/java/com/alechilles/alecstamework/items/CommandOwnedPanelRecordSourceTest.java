@@ -13,6 +13,36 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandOwnedPanelRecordSourceTest {
+    /** Large menus must resolve owned rows from one read, without retaining stale ownership. */
+    @Test
+    void resolvesBatchRowIdentitiesFromOneFreshProfileRead() {
+        UUID owner = UUID.randomUUID();
+        var active = profile(owner, LifecycleState.ACTIVE, UUID.randomUUID(), Set.of());
+        var stored = profile(owner, LifecycleState.CAPTURED, null, Set.of());
+        var released = profile(owner, LifecycleState.RELEASED, UUID.randomUUID(), Set.of());
+        Map<ProfileId, CompanionProfileProjectionState> profiles = new HashMap<>();
+        for (int i = 0; i < 10_000; i++) {
+            var other = profile(UUID.randomUUID(), LifecycleState.ACTIVE, UUID.randomUUID(), Set.of());
+            profiles.put(other.profileId(), other);
+        }
+        for (var owned : new CompanionProfileProjectionState[]{active, stored, released}) {
+            profiles.put(owned.profileId(), owned);
+        }
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        var source = new CommandOwnedPanelRecordSource(() -> {
+            reads.incrementAndGet();
+            return Map.copyOf(profiles);
+        });
+        var rows = source.profilesByRow(owner);
+        assertEquals(Map.of(active.currentAlias().value(), active.profileId(),
+                CommandRosterPanelRecordSource.presentationUuid(active.profileId()), active.profileId(),
+                CommandRosterPanelRecordSource.presentationUuid(stored.profileId()), stored.profileId()), rows);
+        assertEquals(1, reads.get(), "Menu size must not multiply full profile snapshots");
+        profiles.remove(active.profileId());
+        assertFalse(source.profilesByRow(owner).containsKey(active.currentAlias().value()));
+        assertEquals(2, reads.get());
+    }
+
     /** Owned animals must remain discoverable without any link to the current tool. */
     @Test
     void includesOwnedProfilesAcrossLoadedAndStoredStatesRegardlessOfToolLinks() {

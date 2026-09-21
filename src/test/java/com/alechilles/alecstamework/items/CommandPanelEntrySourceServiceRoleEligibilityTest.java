@@ -91,6 +91,16 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
                     .findFirst().orElseThrow().selectionSupported());
             assertFalse(entries.stream().filter(row -> UNSUPPORTED.equals(row.npcUuid()))
                     .findFirst().orElseThrow().selectionSupported());
+
+            // A text filter must not change the group-selection summary of the full roster.
+            var filtered = source.buildSnapshot(player, store,
+                    new CommandPanelPreferenceService().setSpeciesFilter(stack, "Chicken"), config, "flute");
+            org.junit.jupiter.api.Assertions.assertEquals(List.of(UNSUPPORTED),
+                    filtered.entries().stream().map(LinkedNpcEntry::npcUuid).toList());
+            org.junit.jupiter.api.Assertions.assertEquals(
+                    CommandGroupAssignPageService.resolveGroupActivationValue(snapshot.selectionEntries(), List.of()),
+                    CommandGroupAssignPageService.resolveGroupActivationValue(filtered.selectionEntries(), List.of()));
+            assertTrue(filtered.selectionEntries().stream().anyMatch(row -> ALLOWED.equals(row.npcUuid())));
         }
     }
 

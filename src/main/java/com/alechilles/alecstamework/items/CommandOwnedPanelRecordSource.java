@@ -47,6 +47,21 @@ final class CommandOwnedPanelRecordSource {
         return Map.copyOf(result);
     }
 
+    /** Display-only row lookup for one entry build; never retained as action authority. */
+    Map<UUID, ProfileId> profilesByRow(UUID ownerUuid) {
+        if (ownerUuid == null) return Map.of();
+        Map<UUID, ProfileId> rows = new HashMap<>();
+        for (var profile : profiles.get().values()) {
+            if (profile.ownerId() == null || !ownerUuid.equals(profile.ownerId().value())
+                    || profile.lifecycleState() == LifecycleState.RELEASED) continue;
+            rows.putIfAbsent(CommandRosterPanelRecordSource.presentationUuid(profile.profileId()), profile.profileId());
+            if (profile.currentAlias() != null) {
+                rows.putIfAbsent(profile.currentAlias().value(), profile.profileId());
+            }
+        }
+        return rows;
+    }
+
     /** Resolves a server-generated Owned row without treating its UUID as ownership authority. */
     java.util.Optional<ProfileId> profileForRow(UUID ownerUuid, UUID rowUuid) {
         if (ownerUuid == null || rowUuid == null) return java.util.Optional.empty();

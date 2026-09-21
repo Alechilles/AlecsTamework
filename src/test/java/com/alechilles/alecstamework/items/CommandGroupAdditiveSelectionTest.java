@@ -8,6 +8,24 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandGroupAdditiveSelectionTest {
+    /** Reusing menu entries must preserve None, All, named and partial selections. */
+    @Test void resolvesGroupSelectionFromSelectableSnapshotRows() {
+        var selected = entry(true, true, "barn", "travel");
+        var unselected = entry(false, true, "travel");
+        var unsupported = entry(true, false, "barn");
+        var groups = List.of(new CommandGroupService.GroupRecord("barn", "Barn", "#445566", 0),
+                new CommandGroupService.GroupRecord("travel", "Travel", "#445566", 1));
+        assertEquals("barn", CommandGroupAssignPageService.resolveGroupActivationValue(
+                List.of(selected, unselected, unsupported), groups));
+        assertEquals(CommandGroupActivationService.ALL_VALUE,
+                CommandGroupAssignPageService.resolveGroupActivationValue(List.of(selected, unsupported), groups));
+        assertEquals(CommandGroupActivationService.NONE_VALUE,
+                CommandGroupAssignPageService.resolveGroupActivationValue(List.of(unselected, unsupported), groups));
+        assertEquals(CommandGroupActivationService.CUSTOM_VALUE,
+                CommandGroupAssignPageService.resolveGroupActivationValue(
+                        List.of(selected, unselected, entry(false, true, "barn")), groups));
+    }
+
     @Test void addingGroupPreservesIndividualSelectionsAndPrioritizesThemWithoutDuplicates() {
         var individual = entry(true, true);
         var overlap = entry(true, true, "barn", "travel");

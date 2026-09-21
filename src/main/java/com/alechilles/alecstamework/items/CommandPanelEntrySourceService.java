@@ -141,10 +141,16 @@ final class CommandPanelEntrySourceService {
                 resolveRosterEntries(
                         player, store, stack, config, toolId, rosterSnapshot
                 );
-        List<LinkedNpcEntry> entries = buildEntries(
-                player, store, stack, config, toolId, rosterSnapshot,
+        // Group selection describes the full roster even while the cards are text-filtered.
+        ItemStack selectionStack = config != null
+                && config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata
+                ? panelPreferenceService.applySelectedFilterText(stack, "") : stack;
+        List<LinkedNpcEntry> selectionEntries = buildEntries(
+                player, store, selectionStack, config, toolId, rosterSnapshot,
                 rosterEntries
         );
+        List<LinkedNpcEntry> entries = selectionStack == stack ? selectionEntries
+                : applyFiltersAndSort(selectionEntries, stack);
         if (rosterSnapshot == null || featurePresentations == null
                 || player == null || config == null) {
             var features = new java.util.HashMap<UUID, CommandPanelFeaturePresentation>();
@@ -157,7 +163,7 @@ final class CommandPanelEntrySourceService {
                         features.put(entry.npcUuid(), CommandPanelFeaturePresentation.readOnlyManaged());
                 }
             }
-            return new CommandPanelSnapshot(entries, features);
+            return new CommandPanelSnapshot(entries, features, null, selectionEntries);
         }
         String worldName = player.getWorld() == null
                 ? null
@@ -400,11 +406,19 @@ final class CommandPanelEntrySourceService {
     record CommandPanelSnapshot(
             List<LinkedNpcEntry> entries,
             Map<UUID, CommandPanelFeaturePresentation> featurePresentations,
-            @Nullable String emptyStateKey
+            @Nullable String emptyStateKey,
+            List<LinkedNpcEntry> selectionEntries
     ) {
         CommandPanelSnapshot {
             entries = List.copyOf(entries);
             featurePresentations = Map.copyOf(featurePresentations);
+            selectionEntries = List.copyOf(selectionEntries);
+        }
+
+        CommandPanelSnapshot(List<LinkedNpcEntry> entries,
+                             Map<UUID, CommandPanelFeaturePresentation> featurePresentations,
+                             @Nullable String emptyStateKey) {
+            this(entries, featurePresentations, emptyStateKey, entries);
         }
 
         CommandPanelSnapshot(
@@ -485,11 +499,14 @@ final class CommandPanelEntrySourceService {
         var origin = viewer == null || !viewer.isValid() ? null : store.getComponent(viewer, TransformComponent.getComponentType());
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         List<LinkedNpcEntry> decorated = new ArrayList<>(entries.size());
+        var profilesByRow = ownedRecordSource == null || entries.isEmpty()
+                ? Map.<UUID, com.alechilles.alecstamework.companion.identity.ProfileId>of()
+                : ownedRecordSource.profilesByRow(player.getUuid());
         for (var entry : entries) {
+            var profileId = profilesByRow.get(entry.npcUuid());
             String key = ownedRecordSource == null ? CommandCompanionGroups.entityKey(entry.npcUuid())
-                    : ownedRecordSource.profileForRow(player.getUuid(), entry.npcUuid())
-                    .map(id -> CommandCompanionGroups.profileKey(id.toString()))
-                    .orElse(entry.companionKey());
+                    : profileId == null ? entry.companionKey()
+                    : CommandCompanionGroups.profileKey(profileId.toString());
             key = profiledKeys.getOrDefault(entry.npcUuid(), key);
             CommandCompanionGroups.promoteProfile(player, key, entry.npcUuid());
             var memberships = CommandCompanionGroups.groups(player, key, entry.npcUuid());
