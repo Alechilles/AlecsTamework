@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.1.2 - Companion Panel Fixes - 2026-09-19
+## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
 - Cooped companions now retain saved health for their cards. Captured companions
   show editable groups and retain their flute's remembered selection while stored.
@@ -11,8 +11,11 @@
 - Fixed a world crash introduced in 4.1 when coop production tried to save progress
   for an animal with a quarantined persistence operation. Unfinished coop operations
   now block production, and rejected saves suspend the affected animal's production.
-- Fixed freshly tamed animals appearing unselected in the companion panel after selection.
 - Fixed newly tamed animals disappearing from the companion panel when unloaded before being linked to a flute.
+
+## 4.1.2 - Companion Panel Fixes - 2026-09-19
+
+- Fixed freshly tamed animals appearing unselected in the companion panel after selection.
 - Fixed managed animals spawned with `/tw npc spawn tamed` being excluded from the companion panel.
 - Added `/tw debug set lifestage <baby|adolescent|adult|prime|senior>` with
   standard NPC selectors. The existing life-stage query now reports adult aging stages.
