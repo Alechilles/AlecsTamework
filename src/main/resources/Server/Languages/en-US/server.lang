@@ -1849,3 +1849,12 @@ tamework.ui.companions.header = Companions — {0} selected · {1} owned
 tamework.ui.settings.label.announcements=Welcome and announcements
 tamework.ui.settings.tooltip.announcements=Show automatic welcome and update announcements for everyone. Disable to hide all automatic popups. /tw news remains available.
 tamework.ui.settings.warning.announcementSaveFailed=Gameplay settings were saved, but the announcement setting could not be saved. Check the announcement file and try again.
+
+tamework.commands.clearOwned.description = Permanently clear ordinary companions owned by a player.
+tamework.commands.clearOwned.usage = Usage: /tw debug clear-owned [self|player|UUID] [confirm]
+tamework.commands.clearOwned.unknownPlayer = Player not found. Use self, an online player name, or a UUID.
+tamework.commands.clearOwned.unavailable = Companion cleanup is unavailable or failed. Check the server log.
+tamework.commands.clearOwned.preview = Owner {owner}: {count} ordinary companions can be cleared; {skipped} protected profiles will be skipped. Captured, cooped, managed-roster, and bonded companions are not deleted. This permanently removes live animals and clears dead/lost entries. Run /tw debug clear-owned {owner} confirm to proceed.
+tamework.commands.clearOwned.busy = Another companion cleanup is running. Wait for it to finish.
+tamework.commands.clearOwned.started = Clearing {count} ordinary companions for {owner}. Close the companion menu while cleanup runs.
+tamework.commands.clearOwned.completed = Cleanup for {owner}: {cleared} cleared, {skipped} skipped, {failed} failed. Unloaded animals are removed when they next load. Protected storage and bonded companions are unchanged.

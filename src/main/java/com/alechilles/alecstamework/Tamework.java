@@ -866,7 +866,9 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-npc-relocation-on-load", () -> new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
-                        commandLinkedNpcStateSnapshotService
+                        commandLinkedNpcStateSnapshotService,
+                        new com.alechilles.alecstamework.items.ReleasedCompanionCleanup(
+                                persistenceComposition.facades().queries())
                 )
         );
         deferChunkSystem(TameworkRuntimeModule.COOPS,

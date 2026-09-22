@@ -1837,3 +1837,12 @@ tamework.ui.companions.header = Begleiter — {0} ausgewählt · {1} im Besitz
 tamework.ui.settings.label.announcements=Willkommen und Ankündigungen
 tamework.ui.settings.tooltip.announcements=Automatische Willkommens- und Update-Ankündigungen für alle anzeigen. Deaktivieren, um alle automatischen Popups auszublenden. /tw news bleibt verfügbar.
 tamework.ui.settings.warning.announcementSaveFailed=Die Spieleinstellungen wurden gespeichert, aber die Ankündigungseinstellung konnte nicht gespeichert werden. Prüfe die Ankündigungsdatei und versuche es erneut.
+
+tamework.commands.clearOwned.description = Gewöhnliche Begleiter eines Spielers dauerhaft entfernen.
+tamework.commands.clearOwned.usage = Verwendung: /tw debug clear-owned [self|Spieler|UUID] [confirm]
+tamework.commands.clearOwned.unknownPlayer = Spieler nicht gefunden. Verwende self, den Namen eines Spielers, der online ist, oder eine UUID.
+tamework.commands.clearOwned.unavailable = Die Begleiterbereinigung ist nicht verfügbar oder fehlgeschlagen. Prüfe das Serverprotokoll.
+tamework.commands.clearOwned.preview = Besitzer {owner}: {count} gewöhnliche Begleiter können entfernt werden; {skipped} geschützte Profile werden übersprungen. Eingefangene Begleiter, Stallbewohner sowie verwaltete und gebundene Begleiter werden nicht gelöscht. Lebende Tiere und Einträge für tote oder verlorene Tiere werden dauerhaft entfernt. Führe /tw debug clear-owned {owner} confirm aus, um fortzufahren.
+tamework.commands.clearOwned.busy = Eine Begleiterbereinigung läuft bereits. Warte, bis sie abgeschlossen ist.
+tamework.commands.clearOwned.started = {count} gewöhnliche Begleiter von {owner} werden entfernt. Schließe währenddessen das Begleitermenü.
+tamework.commands.clearOwned.completed = Bereinigung für {owner}: {cleared} entfernt, {skipped} übersprungen, {failed} fehlgeschlagen. Nicht geladene Tiere werden beim nächsten Laden entfernt. Geschützte Unterbringung und gebundene Begleiter bleiben unverändert.

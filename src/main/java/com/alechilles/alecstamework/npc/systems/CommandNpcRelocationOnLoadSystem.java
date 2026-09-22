@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.ReleasedCompanionCleanup;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -36,6 +37,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     private static final Field STATE_CONTEXTUAL_INTERACTIONS_FIELD = resolveStateSupportField("contextualInteractions");
 
     private final CommandNpcRelocationService relocationService;
+    private final ReleasedCompanionCleanup releasedCompanionCleanup;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final ComponentType<EntityStore, NPCEntity> npcType;
 
@@ -43,6 +45,13 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService
     ) {
+        this(relocationService, stateSnapshotService, null);
+    }
+
+    public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService,
+            @Nullable ReleasedCompanionCleanup releasedCompanionCleanup) {
+        this.releasedCompanionCleanup = releasedCompanionCleanup;
         this.relocationService = relocationService;
         this.stateSnapshotService = stateSnapshotService;
         this.npcType = NPCEntity.getComponentType();
@@ -53,6 +62,11 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        NPCEntity added = store.getComponent(reference, npcType);
+        if (releasedCompanionCleanup != null && added != null && added.getUuid() != null) {
+            // The command buffer cannot cross a durable read. Cleanup re-resolves on the world thread.
+            releasedCompanionCleanup.onNpcAdded(store.getExternalData().getWorld().getName(), added.getUuid());
+        }
         sanitizeRoleReferencesOnAdd(reference, store);
         if (stateSnapshotService != null) {
             stateSnapshotService.onNpcAdded(reference, store);

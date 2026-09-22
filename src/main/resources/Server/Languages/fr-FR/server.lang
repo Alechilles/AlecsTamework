@@ -1837,3 +1837,12 @@ tamework.ui.companions.header = Compagnons — {0} sélectionnés · {1} posséd
 tamework.ui.settings.label.announcements=Bienvenue et annonces
 tamework.ui.settings.tooltip.announcements=Afficher les annonces automatiques de bienvenue et de mise à jour pour tout le monde. Désactivez cette option pour masquer toutes les fenêtres automatiques. /tw news reste disponible.
 tamework.ui.settings.warning.announcementSaveFailed=Les paramètres de jeu ont été enregistrés, mais le paramètre des annonces n’a pas pu être enregistré. Vérifiez le fichier des annonces et réessayez.
+
+tamework.commands.clearOwned.description = Supprimer définitivement les compagnons ordinaires appartenant à un joueur.
+tamework.commands.clearOwned.usage = Utilisation : /tw debug clear-owned [self|joueur|UUID] [confirm]
+tamework.commands.clearOwned.unknownPlayer = Joueur introuvable. Utilisez self, le nom d’un joueur connecté ou un UUID.
+tamework.commands.clearOwned.unavailable = Le nettoyage des compagnons est indisponible ou a échoué. Consultez le journal du serveur.
+tamework.commands.clearOwned.preview = Propriétaire {owner} : {count} compagnons ordinaires peuvent être supprimés ; {skipped} profils protégés seront ignorés. Les compagnons capturés, en enclos, dans un groupe géré ou liés ne sont pas supprimés. Cette action supprime définitivement les animaux vivants et les entrées des animaux morts ou perdus. Exécutez /tw debug clear-owned {owner} confirm pour continuer.
+tamework.commands.clearOwned.busy = Un nettoyage des compagnons est déjà en cours. Attendez sa fin.
+tamework.commands.clearOwned.started = Suppression de {count} compagnons ordinaires de {owner}. Fermez le menu des compagnons pendant le nettoyage.
+tamework.commands.clearOwned.completed = Nettoyage pour {owner} : {cleared} supprimés, {skipped} ignorés, {failed} échecs. Les animaux non chargés seront supprimés à leur prochain chargement. Le stockage protégé et les compagnons liés restent inchangés.

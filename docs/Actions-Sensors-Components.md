@@ -344,6 +344,7 @@ specific to each NPC.
 - `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug view spawn-markers [radius|off]`
 - `/tw debug delete-spawn-marker [range]`
+- `/tw debug clear-owned [self|player|UUID] [confirm]`
 
 `NPC selectors` use Hytale's standard NPC debug selection: `--world`, `--entity`, `--angle`,
 `--range`, `--roles`, `--nearest`, `--ray`, `--cone`, `--coneAll`, and `--sphere`.

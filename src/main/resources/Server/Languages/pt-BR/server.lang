@@ -1837,3 +1837,12 @@ tamework.ui.companions.header = Companheiros — {0} selecionados · {1} sob sua
 tamework.ui.settings.label.announcements=Boas-vindas e anúncios
 tamework.ui.settings.tooltip.announcements=Mostrar anúncios automáticos de boas-vindas e atualizações para todos. Desative para ocultar todas as janelas automáticas. /tw news continua disponível.
 tamework.ui.settings.warning.announcementSaveFailed=As configurações de jogo foram salvas, mas não foi possível salvar a configuração de anúncios. Confira o arquivo de anúncios e tente novamente.
+
+tamework.commands.clearOwned.description = Remover permanentemente os companheiros comuns de um jogador.
+tamework.commands.clearOwned.usage = Uso: /tw debug clear-owned [self|jogador|UUID] [confirm]
+tamework.commands.clearOwned.unknownPlayer = Jogador não encontrado. Use self, o nome de um jogador conectado ou um UUID.
+tamework.commands.clearOwned.unavailable = A limpeza de companheiros está indisponível ou falhou. Consulte o registro do servidor.
+tamework.commands.clearOwned.preview = Proprietário {owner}: {count} companheiros comuns podem ser removidos; {skipped} perfis protegidos serão ignorados. Companheiros capturados, em currais, de listas gerenciadas e vinculados não são excluídos. Isso remove permanentemente os animais vivos e as entradas de animais mortos ou perdidos. Execute /tw debug clear-owned {owner} confirm para continuar.
+tamework.commands.clearOwned.busy = Já existe uma limpeza de companheiros em andamento. Aguarde a conclusão.
+tamework.commands.clearOwned.started = Removendo {count} companheiros comuns de {owner}. Feche o menu de companheiros durante a limpeza.
+tamework.commands.clearOwned.completed = Limpeza de {owner}: {cleared} removidos, {skipped} ignorados, {failed} falhas. Animais não carregados serão removidos quando forem carregados novamente. O armazenamento protegido e os companheiros vinculados permanecem inalterados.

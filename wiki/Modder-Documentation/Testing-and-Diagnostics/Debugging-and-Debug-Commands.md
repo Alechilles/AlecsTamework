@@ -48,6 +48,24 @@ and reveals them to nearby Creative-mode players with the same configured model
 and nameplate used by a manually created beacon. Its presentation-only proxies
 do not participate in spawning and are removed when tracking ends.
 
+## Clearing test animals
+
+Run `/tw debug clear-owned self` to preview ordinary animals owned by your player,
+then `/tw debug clear-owned self confirm` to permanently clear them. Administrators
+can replace `self` with an online player name or any player UUID. The command uses
+the `tamework.command.tw` permission and also works from the console with a target.
+
+Cleanup includes live, unloaded, dead, and lost ordinary animals. It removes their
+ownership and command links through durable lifecycle operations, then removes
+loaded entities. Unloaded entities are removed when they next load. Terminal
+history remains in the database, but these animals are no longer owned or revivable.
+Operations run one at a time; keep the companion menu closed until cleanup finishes.
+
+Captured, cooped, and managed roster companions are skipped and reported. Bonded
+companions are also preserved and are not included in the ordinary-profile counts.
+Inventory items are untouched. Completion reports cleared, skipped, and failed
+counts; busy or changed profiles are not forcibly deleted.
+
 ## Debug toggles
 
 All toggles below accept `on` or `off`; omit the argument to toggle the current

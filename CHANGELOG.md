@@ -2,6 +2,8 @@
 
 ## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
+- Added `/tw debug clear-owned` to preview and permanently clear a player's ordinary animals, including unloaded, dead, and lost entries. Protected stored and bonded companions are preserved.
+
 - Reduced companion-menu refresh cost on large servers by avoiding repeated profile-map copies and redundant roster builds.
 
 - Cooped companions now retain saved health for their cards. Captured companions
