@@ -246,3 +246,8 @@ icon assets during core-owned asset callbacks. Asset changes invalidate role
 lookup and register new icon paths; existing display aliases remain until
 shutdown. Panel binding reuses the item renderer and existing PNGs. No entity
 access, periodic scan, or new executor is added by dynamic icon resolution.
+
+Portrait binding uses an immutable icon-to-item index shared across pages. Item
+load and removal callbacks refresh the index, and shutdown clears it. The index
+stores only icon paths and item IDs, preserves the first registered match, and
+avoids scanning the entire item registry for every card on a page change.

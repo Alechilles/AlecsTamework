@@ -6,6 +6,8 @@
 
 - Added companion-menu pagination with 50 cards per page by default. Server owners can choose 1–100 in `/tw settings`. Ordinary flute menus build detailed cards only for the selected page, while search, status tabs, sorting, and group selection cover the full roster.
 
+- Reduced companion-menu page-change work by indexing registered portrait icons instead of scanning every item for each card.
+
 - Reduced companion-menu refresh cost by sharing profile and flute data within each refresh, building owned cards once, and using indexed discovery instead of scanning every loaded entity. Happiness meters and tooltips share one calculation, population checks resolve families only for nearby roles, and saved-card extension lookups stay within the requested companion. Countdown-only updates reuse existing card data until expiration.
 
 - Cooped companions now retain saved health for their cards. Captured companions

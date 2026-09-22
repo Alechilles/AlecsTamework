@@ -209,6 +209,7 @@ import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
+import com.alechilles.alecstamework.ui.LinkedNpcPanelPortraitItemIndex;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSystems;
@@ -550,6 +551,13 @@ public class Tamework extends JavaPlugin {
                 "item-assets-loaded",
                 () -> getEventRegistry().register(
                         LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded
+                )
+        );
+        deferAssetSubscription(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "item-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class, Item.class, this::onItemAssetsRemoved
                 )
         );
         deferAssetSubscription(
@@ -1603,6 +1611,7 @@ public class Tamework extends JavaPlugin {
             companionProgressionSignalBus = null;
         }
         ownerPopulationLiveIndex.clear();
+        LinkedNpcPanelPortraitItemIndex.clear();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().close();
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
@@ -2817,6 +2826,11 @@ public class Tamework extends JavaPlugin {
         reconcileNpcPortraitAssets();
     }
 
+    private void onItemAssetsRemoved(
+            RemovedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
+        LinkedNpcPanelPortraitItemIndex.refresh();
+    }
+
     private void reconcileNpcPortraitAssets() {
         try {
             int registered = commandNpcPortraitAssets.reconcile();
@@ -2827,6 +2841,8 @@ public class Tamework extends JavaPlugin {
         } catch (RuntimeException failure) {
             getLogger().at(Level.WARNING).withCause(failure).log(
                     "Could not register companion portrait icons; affected images will remain hidden.");
+        } finally {
+            LinkedNpcPanelPortraitItemIndex.refresh();
         }
     }
 
