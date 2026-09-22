@@ -152,17 +152,33 @@ public final class SqliteReadExecutor implements AutoCloseable {
                 0, executionStarted - acceptedAtNanos
         );
         try (Connection connection = connections.openReadConnection()) {
-            connection.setAutoCommit(false);
-            PersistenceReadResult<T> returned =
-                    command.work().execute(connection);
-            connection.commit();
-            PersistenceReadResult<T> result = returned == null
-                    ? failure(command, "read_contract_returned_null",
-                    StorageFailureKind.DECODE, false, null)
-                    : returned;
-            recordCompletion(command, result);
-            completion.complete(result);
+            try {
+                connection.setAutoCommit(false);
+                PersistenceReadResult<T> returned =
+                        command.work().execute(connection);
+                if (returned instanceof PersistenceReadResult.Failed<T> failed
+                        && failed.failure().cause() != null) {
+                    SqliteFailureRecordCapture.attach(
+                            connection, null, failed.failure().cause(), command.kind().value()
+                    );
+                }
+                connection.commit();
+                PersistenceReadResult<T> result = returned == null
+                        ? failure(command, "read_contract_returned_null",
+                        StorageFailureKind.DECODE, false, null)
+                        : returned;
+                recordCompletion(command, result);
+                completion.complete(result);
+            } catch (Throwable failure) {
+                SqliteFailureRecordCapture.attach(connection, null, failure, command.kind().value());
+                PersistenceReadResult<T> result = PersistenceReadResult.failed(
+                        SqliteFailureClassifier.classify(failure, command.kind().value())
+                );
+                recordCompletion(command, result);
+                completion.complete(result);
+            }
         } catch (Throwable failure) {
+            SqliteFailureRecordCapture.attach(null, null, failure, command.kind().value());
             PersistenceReadResult<T> result = PersistenceReadResult.failed(
                     SqliteFailureClassifier.classify(failure, command.kind().value())
             );

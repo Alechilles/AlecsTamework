@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.diagnostics;
 import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
 import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
 import com.alechilles.beacon.api.TelemetryDiagnosticDisposition;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceFailureEvidence;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistenceAutomaticDiagnosticReporterTest {
+
+    @Test
+    void distinctUnderlyingFailuresAreSubmittedButRepeatsRemainDeduplicated() {
+        List<TelemetryDiagnosticBundle> submitted = new ArrayList<>();
+        var reporter = new PersistenceAutomaticDiagnosticReporter(
+                ignored -> new PersistenceDiagnosticExporter.FailurePackage("support", new byte[]{1}, 2),
+                bundle -> {
+                    submitted.add(bundle);
+                    return new TelemetryDiagnosticBundleResult(TelemetryDiagnosticBundleResult.Status.QUEUED, null);
+                }, Runnable::run, null);
+        for (String code : List.of("operation_prepared_detail_missing", "operation_phase_or_lease_mismatch",
+                "operation_prepared_detail_missing")) {
+            reporter.accept(new PersistenceFailureSignal("persistence_write_failed", "write-1",
+                    "dormant", "write", "sqlite_unknown", new IllegalStateException(code)));
+        }
+        assertEquals(2, submitted.size());
+        assertEquals("operation_prepared_detail_missing", submitted.getFirst().attributes().get("failureCode"));
+        reporter.close();
+    }
 
     @Test
     void submitsOneBoundedBundleForRepeatedFailureSignal() {
@@ -136,6 +156,36 @@ class PersistenceAutomaticDiagnosticReporterTest {
 
         assertEquals(2, submissions.get());
         reporter.close();
+    }
+
+    @Test
+    void capturedRecordsUpgradeOnePriorUnavailableReportWithoutChangingItsIssueFingerprint() {
+        List<TelemetryDiagnosticBundle> submitted = new ArrayList<>();
+        var reporter = new PersistenceAutomaticDiagnosticReporter(
+                ignored -> new PersistenceDiagnosticExporter.FailurePackage("support", new byte[]{1}, 2),
+                bundle -> {
+                    submitted.add(bundle);
+                    return new TelemetryDiagnosticBundleResult(TelemetryDiagnosticBundleResult.Status.QUEUED, null);
+                }, Runnable::run, null);
+        var unavailable = new IllegalStateException("operation_prepared_detail_missing");
+        var captured = new IllegalStateException("operation_prepared_detail_missing");
+        captured.addSuppressed(new PersistenceFailureEvidence("""
+                {"version":1,"status":"complete","view":"transaction_local_not_commit_evidence",
+                 "tables":{"companion_lifecycle":[{"revision":14}]},"issues":[],"truncated":false,"elapsedMs":1}
+                """));
+
+        reporter.accept(signal(unavailable));
+        reporter.accept(signal(captured));
+        reporter.accept(signal(captured));
+
+        assertEquals(2, submitted.size());
+        assertEquals(submitted.get(0).disposition().fingerprint(), submitted.get(1).disposition().fingerprint());
+        reporter.close();
+    }
+
+    private static PersistenceFailureSignal signal(Throwable cause) {
+        return new PersistenceFailureSignal("persistence_write_failed", "write-1", "dormant", "write",
+                "sqlite_unknown", cause);
     }
 
     @Test

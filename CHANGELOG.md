@@ -2,6 +2,8 @@
 
 ## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
+- Expanded automatic persistence failure reports with nested error codes and bounded, anonymized operation and related-record evidence, including failures during startup. Reports preserve collection limits and unavailable evidence so support can diagnose more failures without requesting a save.
+
 - Added `/tw debug clear-owned` to preview and permanently clear a player's ordinary animals, including unloaded, dead, and lost entries. Protected stored and bonded companions are preserved.
 
 - Added companion-menu pagination with 50 cards per page by default. Server owners can choose 1–100 in `/tw settings`. Ordinary flute menus build detailed cards only for the selected page, while search, status tabs, sorting, and group selection cover the full roster.

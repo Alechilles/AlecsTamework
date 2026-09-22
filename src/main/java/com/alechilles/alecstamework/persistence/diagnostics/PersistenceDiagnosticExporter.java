@@ -34,11 +34,11 @@ import javax.annotation.Nullable;
  * Writes bounded, redacted replacement-persistence support bundles.
  *
  * <p>The export contains only the public diagnostics seam. It never copies the
- * SQLite database, a save, player names, stable identifiers, coordinates,
+ * SQLite database file, a save, player names, raw stable identifiers, coordinates,
  * inventory payloads, or unrestricted logs.</p>
  */
 public final class PersistenceDiagnosticExporter {
-    static final int BUNDLE_SCHEMA = 1;
+    static final int BUNDLE_SCHEMA = 2;
     static final int MAX_UNCOMPRESSED_BYTES = 4 * 1024 * 1024;
     private static final long MAX_COLLECTION_SECONDS = 10L;
     private static final Gson JSON = new GsonBuilder()
@@ -310,8 +310,13 @@ public final class PersistenceDiagnosticExporter {
         Instant createdAt = Instant.now();
         LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
         members.put("failure.json", failureJson(failure));
+        members.put("failure-records.json", json(
+                PersistenceFailureDetails.collect(failure.cause()).get("records")
+        ));
         evidence.forEach((name, content) -> {
-            if (content != null && !"failure.json".equals(name)) members.put(name, content);
+            if (content != null && !Set.of("failure.json", "failure-records.json").contains(name)) {
+                members.put(name, content);
+            }
         });
 
         byte[] bundle = boundedFailureBundle(supportId, createdAt, members, maxBytes);
@@ -325,22 +330,29 @@ public final class PersistenceDiagnosticExporter {
             @Nonnull LinkedHashMap<String, byte[]> members,
             int maxBytes
     ) {
-        byte[] bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
-        if (bundle.length <= maxBytes) return bundle;
-
-        members.remove("diagnostic-detail.json");
-        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
-        if (bundle.length <= maxBytes) return bundle;
-
-        members.remove("bonded-companions.json");
-        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
-        if (bundle.length <= maxBytes) return bundle;
-
-        members.keySet().removeIf(name -> !Set.of(
-                "failure.json", "operational-status.json", "metrics.json"
-        ).contains(name));
-        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
-        if (bundle.length <= maxBytes) return bundle;
+        JsonArray dropped = new JsonArray();
+        java.util.ArrayList<String> dropOrder = new java.util.ArrayList<>(members.keySet());
+        dropOrder.removeAll(Set.of("failure.json", "failure-records.json"));
+        // Keep records ahead of aggregate status and metrics under size pressure.
+        for (String name : java.util.List.of("diagnostic-detail.json", "bonded-companions.json")) {
+            if (dropOrder.remove(name)) dropOrder.addFirst(name);
+        }
+        dropOrder.add("failure-records.json");
+        for (int index = 0; index <= dropOrder.size(); index++) {
+            long size = members.values().stream().mapToLong(value -> value.length).sum();
+            if (size <= MAX_UNCOMPRESSED_BYTES) {
+                byte[] bundle = bundleBytes(supportId, createdAt, members, size);
+                if (bundle.length <= maxBytes) return bundle;
+            }
+            if (index == dropOrder.size()) break;
+            String name = dropOrder.get(index);
+            members.remove(name);
+            dropped.add(name);
+            JsonObject omission = new JsonObject();
+            omission.addProperty("reason", "bundle_size_limit");
+            omission.add("droppedMembers", dropped);
+            members.put("collection-limits.json", json(omission));
+        }
 
         throw new IllegalArgumentException("Minimal diagnostic failure package exceeds its limit");
     }
@@ -401,6 +413,9 @@ public final class PersistenceDiagnosticExporter {
             }
             json.add("stackFrames", frames);
         }
+        JsonObject detail = PersistenceFailureDetails.collect(cause);
+        json.add("exceptions", detail.get("exceptions"));
+        json.add("exceptionsTruncated", detail.get("exceptionsTruncated"));
         return json(json);
     }
 
@@ -480,7 +495,7 @@ public final class PersistenceDiagnosticExporter {
         );
         manifest.addProperty(
                 "excluded",
-                "SQLite database, save data, player identity, coordinates, "
+                "SQLite database files, raw save payloads, player identity, coordinates, "
                         + "inventory payloads, secrets, and unrestricted logs"
         );
         JsonArray files = new JsonArray();

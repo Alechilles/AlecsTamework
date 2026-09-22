@@ -258,6 +258,8 @@ public final class SqliteSingleWriter implements AutoCloseable {
         try {
             connection = connections.openWriterConnection();
         } catch (Exception openFailure) {
+            SqliteFailureRecordCapture.attach(null, command.operationId(), openFailure,
+                    command.kind().value());
             return rolledBack(command, openFailure);
         }
         try {
@@ -270,6 +272,8 @@ public final class SqliteSingleWriter implements AutoCloseable {
                     connection.commit();
                     checkpoints.hit(PersistenceCheckpoint.COMMIT_RETURNED, command.operationId());
                 } catch (Exception commitFailure) {
+                    SqliteFailureRecordCapture.attach(connection, command.operationId(), commitFailure,
+                            command.kind().value());
                     return unknown(command, commitFailure);
                 }
                 try {
@@ -282,6 +286,8 @@ public final class SqliteSingleWriter implements AutoCloseable {
                 return rollback(connection, command, beforeCommitFailure);
             }
         } catch (Exception beginFailure) {
+            SqliteFailureRecordCapture.attach(connection, command.operationId(), beginFailure,
+                    command.kind().value());
             return rolledBack(command, beginFailure);
         } finally {
             closeConnection(connection);
@@ -291,6 +297,8 @@ public final class SqliteSingleWriter implements AutoCloseable {
     private <T> PersistenceTransactionResult<T> rollback(Connection connection,
                                                          SqliteTransactionCommand<T> command,
                                                          Exception originalFailure) {
+        SqliteFailureRecordCapture.attach(connection, command.operationId(), originalFailure,
+                command.kind().value());
         try {
             connection.rollback();
             return rolledBack(command, originalFailure);

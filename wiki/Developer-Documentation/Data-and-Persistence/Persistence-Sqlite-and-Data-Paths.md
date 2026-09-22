@@ -228,3 +228,42 @@ metrics, and durable detail exposed by the diagnostic reader. It excludes the
 SQLite database, saves, player identities, coordinates, inventory payloads,
 secrets, and unrestricted logs. All persistence diagnostic response lines also go to the
 server log so operators can collect them after command chat closes.
+
+### Automatic failure evidence
+
+Starting with 4.1.3, automatic failure bundles also include `failure-records.json`.
+The shared SQLite writer and reader collect a bounded diagnostic snapshot at the
+failure boundary, before rollback or connection close. The reporter receives
+immutable evidence, so startup shutdown cannot make it disappear before upload.
+Submission still follows the existing Beacon reporting settings.
+
+Write evidence targets the failing operation. Read failures can include a bounded
+sample of unfinished operations; the sample is context, not proof that those
+operations caused the read failure. Recovery failures outside a database callback
+can still include the claimed operation's saved metadata. Reports include safe
+operation, participant, lifecycle, alias, snapshot, and related-record metadata
+when available. They preserve revisions and relationships needed to compare
+expected state with saved state.
+
+Record identifiers use consistent pseudonyms within each capture. Automatic
+evidence excludes raw identities, names, coordinates, full snapshot and inventory
+payloads, arbitrary extension data, and unrestricted exception messages. Nested
+causes include exception classes, source frame line numbers, recognized machine
+error codes, and SQLite numeric error codes. Different underlying failures are
+grouped separately even when their outer classification is `sqlite_unknown`.
+
+Collection has row, byte, and execution bounds. Partial, unavailable, skipped,
+and truncated evidence is marked explicitly; a missing section does not prove
+that the database contained no records. Transaction-local evidence may include
+uncommitted changes and is not proof of a successful commit. Capture does not
+repair records, retry operations, or change persistence failure handling. If
+the connection cannot open, a minimal report still includes the failure evidence
+available without database access. Bonded-companion diagnostics retain their
+separate aggregate view and authority.
+
+Each database capture uses at most three sampled operations, four related
+profiles, and twelve rows per section, with a 150 ms SQLite work budget and a
+96 KiB serialized evidence limit. Busy, timeout, and corrupt-database failures
+skip further database queries. A bundle can retain up to four captures and is
+limited to 512 KiB compressed. `collection-limits.json` identifies members
+dropped to fit; record evidence takes priority over aggregate detail.

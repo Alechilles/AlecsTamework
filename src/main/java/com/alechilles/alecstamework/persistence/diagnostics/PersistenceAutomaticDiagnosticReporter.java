@@ -54,7 +54,7 @@ public final class PersistenceAutomaticDiagnosticReporter
     private final AtomicLong lastWarningAt = new AtomicLong(0L);
     private final ThreadLocal<Boolean> reporting =
             ThreadLocal.withInitial(() -> false);
-    private final LinkedHashMap<String, Boolean> recentIncidents =
+    private final LinkedHashMap<String, Integer> recentIncidents =
             new LinkedHashMap<>();
 
     public PersistenceAutomaticDiagnosticReporter(
@@ -121,27 +121,30 @@ public final class PersistenceAutomaticDiagnosticReporter
     @Override
     public void accept(@Nonnull PersistenceFailureSignal signal) {
         Objects.requireNonNull(signal, "signal");
-        String reportKey = fingerprint(signal);
-        if (closed.get() || reporting.get() || !reserve(reportKey)) {
+        if (closed.get() || reporting.get()) return;
+        String fingerprint = fingerprint(signal);
+        Reservation reservation = reserve(fingerprint,
+                PersistenceFailureDetails.hasCapturedRecords(signal.cause()) ? 1 : 0);
+        if (reservation == null) {
             return;
         }
         try {
-            executor.execute(() -> submit(signal, reportKey));
+            executor.execute(() -> submit(signal, reservation));
         } catch (RejectedExecutionException rejected) {
-            release(reportKey);
+            release(reservation);
             warn("Automatic persistence diagnostic queue is full.", rejected);
         } catch (RuntimeException failure) {
-            release(reportKey);
+            release(reservation);
             warn("Could not schedule an automatic persistence diagnostic.", failure);
         }
     }
 
     private void submit(
             @Nonnull PersistenceFailureSignal signal,
-            @Nonnull String reportKey
+            @Nonnull Reservation reservation
     ) {
         if (reporting.get()) {
-            release(reportKey);
+            release(reservation);
             return;
         }
         reporting.set(true);
@@ -178,9 +181,9 @@ public final class PersistenceAutomaticDiagnosticReporter
                             List.of(attachment)
                     )
             );
-            handleResult(result, reportKey, diagnosticId);
+            handleResult(result, reservation, diagnosticId);
         } catch (RuntimeException failure) {
-            release(reportKey);
+            release(reservation);
             warn("Could not build or submit an automatic persistence diagnostic.", failure);
         } finally {
             reporting.remove();
@@ -189,11 +192,11 @@ public final class PersistenceAutomaticDiagnosticReporter
 
     private void handleResult(
             @Nullable TelemetryDiagnosticBundleResult result,
-            @Nonnull String reportKey,
+            @Nonnull Reservation reservation,
             @Nonnull String diagnosticId
     ) {
         if (result == null || !result.accepted()) {
-            release(reportKey);
+            release(reservation);
             if (logger != null) {
                 String detail = result == null
                         ? "no result"
@@ -224,6 +227,8 @@ public final class PersistenceAutomaticDiagnosticReporter
         Throwable cause = signal.cause();
         if (cause != null) {
             attributes.put("exceptionClass", cause.getClass().getName());
+            String rootCode = PersistenceFailureDetails.rootCode(cause);
+            if (rootCode != null) attributes.put("failureCode", rootCode);
         }
         return Map.copyOf(attributes);
     }
@@ -235,7 +240,7 @@ public final class PersistenceAutomaticDiagnosticReporter
                 + safeToken(signal.operation()) + '|'
                 + safeToken(signal.phase()) + '|'
                 + safeToken(signal.reason()) + '|'
-                + (cause == null ? "none" : cause.getClass().getName());
+                + PersistenceFailureDetails.signature(cause);
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(
                     classification.getBytes(StandardCharsets.UTF_8)
@@ -256,11 +261,13 @@ public final class PersistenceAutomaticDiagnosticReporter
         return normalized.substring(0, Math.min(normalized.length(), 80));
     }
 
-    private synchronized boolean reserve(@Nonnull String incidentKey) {
-        if (recentIncidents.containsKey(incidentKey)) {
-            return false;
-        }
-        recentIncidents.put(incidentKey, Boolean.TRUE);
+    private synchronized @Nullable Reservation reserve(
+            @Nonnull String incidentKey,
+            int quality
+    ) {
+        Integer existing = recentIncidents.get(incidentKey);
+        if (existing != null && existing >= quality) return null;
+        recentIncidents.put(incidentKey, quality);
         if (recentIncidents.size() > MAX_RECENT_INCIDENTS) {
             Iterator<String> iterator = recentIncidents.keySet().iterator();
             if (iterator.hasNext()) {
@@ -268,11 +275,14 @@ public final class PersistenceAutomaticDiagnosticReporter
                 iterator.remove();
             }
         }
-        return true;
+        return new Reservation(incidentKey, quality);
     }
 
-    private synchronized void release(@Nonnull String incidentKey) {
-        recentIncidents.remove(incidentKey);
+    private synchronized void release(@Nonnull Reservation reservation) {
+        if (Integer.valueOf(reservation.quality()).equals(
+                recentIncidents.get(reservation.incidentKey()))) {
+            recentIncidents.remove(reservation.incidentKey());
+        }
     }
 
     private void warn(@Nonnull String message, @Nonnull Throwable failure) {
@@ -325,4 +335,6 @@ public final class PersistenceAutomaticDiagnosticReporter
                 new ThreadPoolExecutor.AbortPolicy()
         );
     }
+
+    private record Reservation(@Nonnull String incidentKey, int quality) { }
 }

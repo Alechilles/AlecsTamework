@@ -251,6 +251,7 @@ final class SqlitePublicRecoveryDispatcher {
         try {
             dispatched = routes.dispatch(claim);
         } catch (Throwable failure) {
+            SqliteFailureRecordCapture.attachOperation(failure, claim.operation());
             return completed(
                     SqlitePublicRecoveryResult.Status.DISPATCH_FAILED,
                     context.passCount(),
@@ -290,6 +291,7 @@ final class SqlitePublicRecoveryDispatcher {
                         ? new IllegalStateException("recovery_containment_read_failed",
                         failed.failure().cause())
                         : new IllegalStateException("recovery_containment_incomplete", result.failure());
+                SqliteFailureRecordCapture.attachOperation(failure, claim.operation());
                 return completed(SqlitePublicRecoveryResult.Status.DISPATCH_FAILED,
                         context.passCount(), context.completedCount(), context.deferred().size(),
                         context.quarantined(), failure);
@@ -319,13 +321,15 @@ final class SqlitePublicRecoveryDispatcher {
         if (result.status() != OperationWorkflowResult.Status.PUBLISHED
                 && result.status()
                 != OperationWorkflowResult.Status.COMPENSATED) {
+            Throwable failure = result.failure();
+            SqliteFailureRecordCapture.attachOperation(failure, claim.operation());
             return completed(
                     unresolvedStatus(result),
                     context.passCount(),
                     context.completedCount(),
                     context.deferred().size(),
                     context.quarantined(),
-                    result.failure()
+                    failure
             );
         }
         return dispatchClaims(
