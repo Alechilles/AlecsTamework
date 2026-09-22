@@ -123,6 +123,40 @@ final class CommandGroupAssignPageService {
         });
     }
 
+    /** Replaces recipients with all eligible matches, across every page, up to the tool's capacity. */
+    void applyMatchingSelection(Player player, String toolId, TwCommandItemConfig config) {
+        if (player == null || config == null
+                || config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) return;
+        var entries = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config);
+        var records = new CommandLinkedNpcRecordStore();
+        toolInventoryService.mutateToolStack(player, toolId, stack -> records.write(stack,
+                matchingSelection(records.read(stack), entries, CommandCompanionViewStore.read(stack).current(),
+                        config.getMaxActive(), id -> toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, id))));
+    }
+
+    static List<LinkedNpcRecord> matchingSelection(List<LinkedNpcRecord> previous, List<LinkedNpcEntry> entries,
+            com.alechilles.alecstamework.ui.CompanionViewSettings settings, int limit,
+            java.util.function.Function<UUID, LinkedNpcRecord> resolve) {
+        var matching = settings.filter(entries.toArray(LinkedNpcEntry[]::new));
+        var candidates = selectionCandidates(java.util.Arrays.asList(matching),
+                CommandGroupActivationService.ALL_VALUE, false, resolve);
+        // A stale or entirely read-only view must not clear unrelated selections.
+        if (candidates.isEmpty()) return previous;
+        var next = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
+        previous.forEach(record -> next.put(record.npcUuid, record.withActive(false)));
+        var unique = new java.util.LinkedHashMap<String, LinkedNpcRecord>();
+        for (var record : candidates) unique.put(record.profileId == null
+                ? "e:" + record.npcUuid : "p:" + record.profileId, record);
+        int selected = 0;
+        for (var record : unique.values()) {
+            if (limit > 0 && selected >= limit) break;
+            if (record.profileId != null) next.values().removeIf(old -> record.profileId.equals(old.profileId));
+            next.put(record.npcUuid, record.withActive(true));
+            selected++;
+        }
+        return new java.util.ArrayList<>(next.values());
+    }
+
     static List<LinkedNpcRecord> selectionCandidates(List<LinkedNpcEntry> entries, String group,
             boolean additive, java.util.function.Function<UUID, LinkedNpcRecord> resolve) {
         var candidates = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();

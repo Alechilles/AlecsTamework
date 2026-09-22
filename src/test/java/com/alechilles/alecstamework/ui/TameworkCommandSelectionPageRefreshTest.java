@@ -33,6 +33,48 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Observable page refresh coverage through the package-scoped packet boundary. */
 class TameworkCommandSelectionPageRefreshTest {
     @Test
+    void choosingSavedViewResetsPagingWithoutChangingRecipientsAndFiltersRemainEditable() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        var settings = new AtomicReference<>(CompanionViewSettings.defaults().withState("All"));
+        var stored = settings.get().withExtraFilters(true, List.of(), List.of());
+        var id = new AtomicReference<>("__all__");
+        var selects = new java.util.concurrent.atomic.AtomicInteger();
+        page.configureCompanions(new CompanionPanelBinding(() -> settings.get().state(),
+                state -> settings.set(settings.get().withState(state)), () -> false, ignored -> {}, (npc, groups) -> {}));
+        page.configureViews(new CompanionViewBinding(settings::get,
+                () -> List.of(new CompanionViewBinding.View("saved", "Travel", stored)), id::get,
+                settings::set, chosen -> { id.set(chosen); settings.set(stored); },
+                (name, update) -> {}, name -> {}, () -> {}, selects::incrementAndGet));
+        var pagination = new LinkedNpcPanelPageState();
+        pagination.setEnabled(false);
+        pagination.setPageSize(1);
+        page.configurePagination(pagination);
+        var initial = new UICommandBuilder();
+        page.build(null, initial, new UIEventBuilder(), null);
+        pagination.setTotalEntries(8);
+        pagination.move(1);
+        var choose = new CommandSelectionEventData();
+        choose.viewId = "saved";
+        page.handleDataEvent(null, null, choose);
+        assertEquals(0, pagination.pageIndex());
+        assertEquals(stored, settings.get());
+        assertEquals(0, selects.get(), "Browsing a preset must not change command recipients.");
+        event(page, "__view__:open");
+        event(page, "__view__:select");
+        assertEquals(0, selects.get(), "An event from behind the editor must be ignored.");
+        var draft = new CommandSelectionEventData();
+        draft.viewSelected = false;
+        page.handleDataEvent(null, null, draft);
+        assertTrue(settings.get().selectedOnly(), "Editor changes wait for Apply.");
+        event(page, "__view__:apply");
+        assertFalse(settings.get().selectedOnly());
+        event(page, "__view__:select");
+        assertEquals(1, selects.get());
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void ordinaryPageTurnsReuseControlsAndRejectOldCardTargets() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());

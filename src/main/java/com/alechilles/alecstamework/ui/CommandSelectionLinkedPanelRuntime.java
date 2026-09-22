@@ -49,7 +49,7 @@ final class CommandSelectionLinkedPanelRuntime {
         commands.set("#TameworkLinkedPanelEmptyState.Text",
                 emptyText(page.resolveLanguage()));
         commands.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
-        commands.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
+        commands.set("#TameworkLinkedPanelListViewport.Visible", true);
         for (int index = 0; index < page.linkedNpcEntries.length; index++) {
             bindCard(commands, events, index, page.linkedNpcEntries[index], true,
                     page.featureController.presentation(
@@ -140,7 +140,9 @@ final class CommandSelectionLinkedPanelRuntime {
                 || version != page.pendingFilterTextApplyVersion) return;
         if (page.panelSetFilterTextCallback != null) {
             page.resetPagination();
-            page.panelSetFilterTextCallback.accept(page.pendingFilterTextInput);
+            if (page.viewBinding != null) {
+                page.viewBinding.edit().accept(page.viewBinding.current().get().withSearch(page.pendingFilterTextInput));
+            } else page.panelSetFilterTextCallback.accept(page.pendingFilterTextInput);
         }
         page.pendingFilterTextInput = null;
         page.pendingUnlinkNpcUuid = null;
@@ -286,7 +288,7 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelEmptyState.Text",
                 emptyText(language));
         values.set(commands, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
-        values.set(commands, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
+        values.set(commands, "#TameworkLinkedPanelListViewport.Visible", true);
         Map<UUID, CommandPanelFeaturePresentation> features =
                 new java.util.HashMap<>();
         page.featureController.presentations().forEach((id, presentation) ->
@@ -598,14 +600,16 @@ final class CommandSelectionLinkedPanelRuntime {
     void applyLocalFilter() {
         if (page.companionBinding != null) {
             var previous = page.linkedNpcEntries;
-            page.linkedNpcEntries = page.pagination != null && page.pagination.hasRosterEntries()
+            page.linkedNpcEntries = page.pagination != null && page.pagination.enabled() && page.pagination.hasRosterEntries()
                     ? page.pendingRemovals.filter(page.baseLinkedNpcEntries)
+                    : page.viewBinding != null
+                    ? page.viewBinding.current().get().filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries))
                     : CompanionPanelChrome.filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries),
                     page.companionBinding.state().get(), page.companionBinding.nearby().get(),
                     LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
             if (page.preserveCompanionOrder && previous != null) {
                 var current = new java.util.HashMap<UUID, LinkedNpcEntry>();
-                for (var entry : page.baseLinkedNpcEntries) current.put(entry.npcUuid(), entry);
+                for (var entry : page.linkedNpcEntries) current.put(entry.npcUuid(), entry);
                 page.linkedNpcEntries = java.util.Arrays.stream(previous).map(entry -> current.get(entry.npcUuid()))
                         .filter(java.util.Objects::nonNull).toArray(LinkedNpcEntry[]::new);
             }

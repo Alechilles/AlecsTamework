@@ -185,6 +185,25 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             org.junit.jupiter.api.Assertions.assertEquals(10, stored.entries().size(),
                     "The stored-state filter must apply before the clamped page window.");
             org.junit.jupiter.api.Assertions.assertEquals(120, stored.selectionEntries().size());
+            ItemStack viewStack = CommandCompanionViewStore.writeCurrent(stack,
+                    new com.alechilles.alecstamework.ui.CompanionViewSettings(
+                            "Stored", false, "", "Species", false, List.of("chicken"), List.of()));
+            viewStack = CommandCompanionViewStore.save(viewStack, "Stored chickens", false);
+            String viewId = CommandCompanionViewStore.read(viewStack).selectedId();
+            viewStack = CommandCompanionViewStore.choose(viewStack, viewId);
+            page.setPageSize(10);
+            var viewPage = source.buildSnapshot(player, store, viewStack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(30, page.totalEntries());
+            org.junit.jupiter.api.Assertions.assertEquals(10, viewPage.entries().size());
+            org.junit.jupiter.api.Assertions.assertTrue(viewPage.entries().stream()
+                    .allMatch(entry -> entry.captured() && "chicken".equals(entry.speciesId())));
+            org.junit.jupiter.api.Assertions.assertEquals(120, page.rosterEntries().size(),
+                    "View options and selection counts must still include animals outside the saved view.");
+            assertTrue(page.move(1));
+            assertTrue(page.move(1));
+            var lastViewPage = source.buildSnapshot(player, store, viewStack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(10, lastViewPage.entries().size());
+            org.junit.jupiter.api.Assertions.assertFalse(page.move(1));
         }
     }
 
@@ -219,6 +238,11 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             this.itemId = itemId;
             this.quantity = 1;
             this.metadata = metadata;
+        }
+
+        @Override
+        public ItemStack withMetadata(BsonDocument metadata) {
+            return new MetadataStack(itemId, metadata);
         }
 
         @Override

@@ -1,10 +1,10 @@
 $A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 Group #TameworkLinkedPanelRoot {
- Anchor: (Top: 54, Left: 176, Width: 928, Height: 750);
+  Anchor: (Top: 54, Left: 176, Width: 928, Height: 790);
  Visible: false;
  Group #TameworkLinkedPanelContainer {
- Anchor: (Top: 0, Left: 0, Width: 928, Height: 750);
+  Anchor: (Top: 0, Left: 0, Width: 928, Height: 790);
  Background: #181c1a;
 Group #Title {
             Anchor: (Top: 10, Left: 10, Right: 10, Height: 30);
@@ -236,26 +236,6 @@ DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
 
 
 }
-Group #TameworkLinkedPanelPagination {
-    Anchor: (Height: 32);
-    LayoutMode: Left;
-    Visible: false;
-    TextButton #TameworkLinkedPanelPagePrevious {
-        Anchor: (Width: 110, Height: 28);
-        Style: $A.@PanelButton;
-        Text: %server.tamework.ui.linkedPanel.pagination.previous;
-    }
-    Label #TameworkLinkedPanelPageStatus {
-        FlexWeight: 1;
-        Anchor: (Height: 28);
-        Style: (FontSize: 13, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
-    }
-    TextButton #TameworkLinkedPanelPageNext {
-        Anchor: (Width: 110, Height: 28);
-        Style: $A.@PanelButton;
-        Text: %server.tamework.ui.linkedPanel.pagination.next;
-    }
-}
 Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);
                 Text: %server.tamework.ui.linkedPanel.emptyState;
@@ -275,6 +255,45 @@ Group #TameworkLinkedPanelListViewport {
                     Anchor: (Bottom: 6);
                 }
             }
+Group #TameworkLinkedPanelPagination {
+    Anchor: (Height: 34);
+    LayoutMode: Left;
+    Visible: false;
+    Background: #202723;
+    Padding: (Left: 7, Right: 2);
+    Label #TameworkLinkedPanelPageRange {
+        Anchor: (Width: 330, Height: 28);
+        Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+    TextButton #CompanionSelectMatching {
+        Anchor: (Width: 170, Height: 28);
+        Visible: false;
+        Text: %server.tamework.ui.views.selectMatching;
+        TooltipText: %server.tamework.ui.views.selectMatchingHint;
+        TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+        Style: $A.@PanelButton;
+    }
+    Group {
+        FlexWeight: 1;
+        Anchor: (Height: 28);
+    }
+    TextButton #TameworkLinkedPanelPagePrevious {
+        Anchor: (Width: 96, Height: 28);
+        Style: $A.@PanelButton;
+        Text: %server.tamework.ui.linkedPanel.pagination.previous;
+    }
+    Label #TameworkLinkedPanelPageStatus {
+        Anchor: (Width: 124, Height: 28);
+        Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+    TextButton #TameworkLinkedPanelPageNext {
+        OutlineColor: #7acb88;
+        OutlineSize: 1;
+        Anchor: (Width: 96, Height: 28);
+        Style: $A.@PanelButton;
+        Text: %server.tamework.ui.linkedPanel.pagination.next;
+    }
+}
 }
         Group #TameworkLinkedPanelGroupAssignOverlay {
             Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);

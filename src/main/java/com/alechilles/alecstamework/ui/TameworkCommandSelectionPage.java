@@ -97,6 +97,22 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
     String rosterStateFilter = "All";
     CompanionPanelBinding companionBinding;
+    CompanionViewBinding viewBinding;
+    final CompanionViewControls viewControls = new CompanionViewControls(this);
+    /** Installs per-flute view callbacks; all reads and writes run on the owning world thread. */
+    public void configureViews(CompanionViewBinding binding) { viewBinding = Objects.requireNonNull(binding); }
+    void refreshView() {
+        resetPagination();
+        pendingUnlinkNpcUuid = null;
+        refreshLinkedNpcEntries();
+        sendCardRefreshUpdate();
+    }
+    void flushViewSearch() {
+        if (viewBinding != null && pendingFilterTextInput != null) {
+            viewBinding.edit().accept(viewBinding.current().get().withSearch(pendingFilterTextInput));
+        }
+        cancelPendingFilterTextApply();
+    }
     boolean preserveCompanionOrder;
     /** Configures ordinary owned-companion controls; callbacks run on the current world thread. */
     public void configureCompanions(CompanionPanelBinding binding) { companionBinding = java.util.Objects.requireNonNull(binding); }
@@ -463,6 +479,7 @@ public final class TameworkCommandSelectionPage
                     LocalizedText.format(resolveLanguage(), "tamework.ui.shared.brandTooltip", runningVersion));
             commandBuilder.set("#CommandMenuSettings.Visible", canOpenSettings(ref, store));
             commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
+            if (viewBinding != null) commandBuilder.append("#TameworkLinkedPanelContainer", "TameworkCompanionViews.ui");
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
             commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
             commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
@@ -562,6 +579,7 @@ public final class TameworkCommandSelectionPage
                 || data.hotswapEValue != null || data.hotswapRValue != null)) {
             return;
         }
+        if (viewBinding != null && viewControls.blocksWhileEditing(data)) return;
         if (data.primaryCommandValue != null) {
             if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(options, data.primaryCommandValue)) {
                 selectionCallback.accept(data.primaryCommandValue);
@@ -690,6 +708,7 @@ public final class TameworkCommandSelectionPage
         if (rosterEventBoundary.blocks(data, commandId)) {
             return;
         }
+        if (viewBinding != null && viewControls.handle(data, commandId)) return;
         if (companionBinding != null) {
             if (commandId.startsWith(CompanionPanelChrome.FILTER_PREFIX)) {
                 String state = commandId.substring(CompanionPanelChrome.FILTER_PREFIX.length());

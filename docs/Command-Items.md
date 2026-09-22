@@ -104,6 +104,31 @@ The held item's role and command support are checked separately, so an owned com
 can remain selected while being unavailable to a specialized flute; the panel explains
 that restriction instead of changing the selection.
 
+
+### Saved views on each flute
+
+The view picker sits beside the status tabs. **All companions** clears the filters;
+**Selected on this flute** shows that flute's current recipients. **+ Filter** opens
+an editor for species, groups, and selected-only filtering. Multiple choices within
+species or groups match any chosen value; different filters narrow the list together.
+The filter-chip row appears only while these extra filters are applied.
+
+Use **Save as new** to name the current status, nearby setting, search, sort, and
+extra filters. Each flute holds up to 16 views and reopens to its selected saved
+view. Temporary edits show a modified view; use **Update view** to keep them.
+**Edit** also offers Rename and Delete view. Deleting the current view returns to
+All companions. Filters remain rules, so newly owned animals that match appear
+automatically. An unavailable species or group stays in the filter until removed.
+
+Changing a view does not change command recipients. **Select all matching** replaces
+that flute's selection with eligible matches across every page, up to the flute's
+command limit. The chip row reports selected animals outside the current view.
+
+The fixed footer shows the visible range, matching total, page number, and Previous
+and Next buttons. The footer stays inside the extended menu frame, including when
+there are no results. Filters and sorting apply before pagination. Page navigation
+is temporary; opening the flute or changing its view starts at the first page.
+
 Changing LMB updates the selected primary command and keeps the menu open.
 The original primary-command eligibility rules still apply.
 

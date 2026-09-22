@@ -1237,6 +1237,14 @@ final class CommandSelectionPageService {
             BondedLifecycleAuthority bondedLifecycleAuthority,
             LinkedNpcPanelPageState pagination
     ) {
+        if (config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata
+                && genericCallbackAuthority.getAsBoolean()) {
+            toolInventoryService.mutateToolStack(player, toolId, stack -> {
+                var saved = CommandCompanionViewStore.read(stack);
+                return saved.selectedId().isBlank() ? stack
+                        : CommandCompanionViewStore.choose(stack, saved.selectedId());
+            });
+        }
         UUID ownerUuid = player.getUuid();
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);
@@ -1244,9 +1252,13 @@ final class CommandSelectionPageService {
                 () -> {
                     pagination.setPageSize(com.alechilles.alecstamework.settings.TameworkRuntimeSettings
                             .current().commandPanelCardsPerPage());
-                    return toolInventoryService.buildLinkedPanelSnapshotForTool(
+                    var snapshot = toolInventoryService.buildLinkedPanelSnapshotForTool(
                             resolveCurrentPlayer(ownerUuid), toolId, config,
                             pagination.enabled() ? pagination : null);
+                    if (!pagination.enabled() && config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata) {
+                        pagination.setRosterEntries(snapshot.selectionEntries());
+                    }
+                    return snapshot;
                 }
         );
         LinkedPanelRefreshSignalSource pageSignals = pageSignals(ownerUuid, config);
@@ -1377,6 +1389,11 @@ final class CommandSelectionPageService {
                     (id, groups) -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupAssignments(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), id, groups); },
                     group -> { if (context.genericAuthority().getAsBoolean()) groupAssignPageService.applyGroupActivation(resolveCurrentPlayer(context.ownerUuid()), context.toolId(), context.config(), group, true); }
             ));
+        }
+        if (context.genericRosterActions() && !context.config().usesOwnerCommandFamilyRoster()) {
+            page.configureViews(CommandCompanionViewService.bind(toolInventoryService, groupAssignPageService,
+                    () -> resolveCurrentPlayer(context.ownerUuid()), context.genericAuthority(),
+                    context.toolId(), context.config()));
         }
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(

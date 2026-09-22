@@ -16,7 +16,7 @@ Tamework command tools usually use a two-part control scheme: one input for usin
 - For ordinary owned-companion flutes, the same tool can select or deselect the
   targeted NPC with its primary input. This changes only that flute's command set.
 
-The standard menu now uses one compact LMB/Q/E/R assignment bar above the larger
+The standard menu uses a compact LMB/Q/E/R assignment sidebar beside the
 companion panel. Choose the command for each input from its dropdown. Changing
 the left-click assignment keeps the menu open; it does not issue the command.
 
@@ -51,6 +51,31 @@ set. The status tabs are **In World**, **Stored**, **Lost / Dead**, and **All**.
 these browsing controls never change command recipients. Click a group to select its
 members, or toggle individual animals afterward. Shared player groups support multiple
 memberships and are edited inline through the card's native multi-select control.
+
+
+### Saved views on each flute
+
+The view picker sits beside the status tabs. **All companions** clears the filters;
+**Selected on this flute** shows that flute's current recipients. **+ Filter** opens
+an editor for species, groups, and selected-only filtering. Multiple choices within
+species or groups match any chosen value; different filters narrow the list together.
+The filter-chip row appears only while these extra filters are applied.
+
+Use **Save as new** to name the current status, nearby setting, search, sort, and
+extra filters. Each flute holds up to 16 views and reopens to its selected saved
+view. Temporary edits show a modified view; use **Update view** to keep them.
+**Edit** also offers Rename and Delete view. Deleting the current view returns to
+All companions. Filters remain rules, so newly owned animals that match appear
+automatically. An unavailable species or group stays in the filter until removed.
+
+Changing a view does not change command recipients. **Select all matching** replaces
+that flute's selection with eligible matches across every page, up to the flute's
+command limit. The chip row reports selected animals outside the current view.
+
+The fixed footer shows the visible range, matching total, page number, and Previous
+and Next buttons. The footer stays inside the extended menu frame, including when
+there are no results. Filters and sorting apply before pagination. Page navigation
+is temporary; opening the flute or changing its view starts at the first page.
 
 ## Nearby vs off-screen behavior
 - If the companion is already loaded, commands often apply immediately.

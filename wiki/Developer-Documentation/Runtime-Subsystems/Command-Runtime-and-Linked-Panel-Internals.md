@@ -70,6 +70,14 @@ panel preferences on the physical item. The owned panel discovers all owned
 companions from the player's profile projection, then uses those records only to
 decide which rows are selected for that flute. A selected row is eligible for
 dispatch only after the held item's owner, tame, role, command, and capacity checks.
+Saved views and their current draft live in the flute's `Tamework.Command.CompanionViews`
+item metadata. They contain presentation settings only. Opening the ordinary menu restores
+the selected preset; legacy items without view metadata keep their previous preferences.
+The paged source retains unfiltered summaries for options/counts, evaluates all view criteria
+before slicing, and hydrates details only for the selected page. Select all matching resolves
+fresh owned entries, revalidates each candidate, and applies the flute's existing capacity.
+No generic or bonded lifecycle storage is added.
+
 Legacy link records remain readable and preserve their existing active flags during
 migration; a record may also carry the stable profile ID so an old entity UUID can
 be canonicalized.

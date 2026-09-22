@@ -248,10 +248,9 @@ final class CommandPanelEntrySourceService {
         summaryEntries = withOwnedGroups(summaryEntries, profileKeys);
         List<LinkedNpcEntry> selectionEntries = decorate(player, store, stack, config, summaryEntries, inputs);
         List<LinkedNpcEntry> legacyFiltered = applyFiltersAndSort(selectionEntries, stack);
-        pagination.setRosterEntries(legacyFiltered);
-        List<LinkedNpcEntry> filtered = pagination.filterRoster(
-                legacyFiltered,
-                CommandCompanionPreferences.state(stack), CommandCompanionPreferences.nearby(stack), "");
+        pagination.setRosterEntries(selectionEntries);
+        List<LinkedNpcEntry> filtered = java.util.Arrays.asList(CommandCompanionViewStore.read(stack).current()
+                .filter(legacyFiltered.toArray(LinkedNpcEntry[]::new)));
         pagination.setTotalEntries(filtered.size());
         List<LinkedNpcEntry> window = filtered.subList(pagination.startIndex(), pagination.endIndex());
         Set<UUID> pageIds = new HashSet<>(window.size());

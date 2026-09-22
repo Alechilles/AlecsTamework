@@ -49,6 +49,44 @@ class CommandGroupAdditiveSelectionTest {
         assertEquals(List.of(eligible.npcUuid()), result.stream().map(r -> r.npcUuid).toList());
     }
 
+    @Test void matchingSelectionIncludesEveryPageAndRevalidatesBeforeApplyingCapacity() {
+        var hidden = entry(true, true, "travel");
+        var stale = entry(false, true, "barn");
+        var unsupported = entry(false, false, "barn");
+        var first = entry(false, true, "barn");
+        var second = entry(false, true, "barn");
+        var last = entry(false, true, "barn");
+        var entries = List.of(hidden, stale, unsupported, first, second, last);
+        var settings = new com.alechilles.alecstamework.ui.CompanionViewSettings(
+                "All", false, "", "Default", false, List.of("Sheep"), List.of("barn"));
+        var previous = List.of(record(hidden.npcUuid()).withActive(true));
+        java.util.function.Function<UUID, LinkedNpcRecord> authority =
+                id -> id.equals(stale.npcUuid()) ? null : record(id);
+        var result = CommandGroupAssignPageService.matchingSelection(previous, entries, settings, 0, authority);
+        assertEquals(List.of(first.npcUuid(), second.npcUuid(), last.npcUuid()),
+                result.stream().filter(r -> r.active).map(r -> r.npcUuid).toList());
+        assertFalse(result.stream().filter(r -> r.npcUuid.equals(hidden.npcUuid())).findFirst().orElseThrow().active);
+        assertEquals(previous, CommandGroupAssignPageService.matchingSelection(previous,
+                List.of(stale, unsupported), settings, 2, authority),
+                "Unavailable matches must not clear existing recipients.");
+        var limited = CommandGroupAssignPageService.matchingSelection(previous, entries, settings, 2, authority);
+        assertEquals(List.of(first.npcUuid(), second.npcUuid()),
+                limited.stream().filter(r -> r.active).map(r -> r.npcUuid).toList());
+    }
+
+    @Test void duplicateAliasesConsumeOnlyOneMatchingSelectionSlot() {
+        var oldAlias = entry(false, true);
+        var newAlias = entry(false, true);
+        var other = entry(false, true);
+        var result = CommandGroupAssignPageService.matchingSelection(List.of(),
+                List.of(oldAlias, newAlias, other),
+                com.alechilles.alecstamework.ui.CompanionViewSettings.defaults().withState("All"), 2,
+                id -> new LinkedNpcRecord(id, id.equals(other.npcUuid()) ? "other" : "shared",
+                        null, null, null, "Sheep", null, "Sheep", null, false, false, null));
+        assertEquals(List.of(newAlias.npcUuid(), other.npcUuid()),
+                result.stream().filter(r -> r.active).map(r -> r.npcUuid).toList());
+    }
+
     private LinkedNpcRecord record(UUID id) {
         return new LinkedNpcRecord(id, null, null, "Sheep", null, "Sheep");
     }

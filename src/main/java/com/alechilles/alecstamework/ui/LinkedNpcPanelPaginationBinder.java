@@ -24,13 +24,19 @@ final class LinkedNpcPanelPaginationBinder {
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     "#TameworkLinkedPanelPageNext", EventData.of("CommandId", NEXT), false);
         }
+        int totalEntries = state.totalEntries();
+        int rangeStart = totalEntries == 0 ? 0 : state.startIndex() + 1;
+        String range = LocalizedText.format(language, "tamework.ui.linkedPanel.pagination.range",
+                rangeStart, state.endIndex(), totalEntries);
         String status = LocalizedText.format(language, "tamework.ui.linkedPanel.pagination.status",
-                state.pageIndex() + 1, state.pageCount(), state.totalEntries());
+                state.pageIndex() + 1, state.pageCount());
         if (values == null) {
+            commands.set("#TameworkLinkedPanelPageRange.Text", range);
             commands.set("#TameworkLinkedPanelPageStatus.Text", status);
             commands.set("#TameworkLinkedPanelPagePrevious.Disabled", state.pageIndex() == 0);
             commands.set("#TameworkLinkedPanelPageNext.Disabled", state.pageIndex() + 1 >= state.pageCount());
         } else {
+            values.set(commands, "#TameworkLinkedPanelPageRange.Text", range);
             values.set(commands, "#TameworkLinkedPanelPageStatus.Text", status);
             values.set(commands, "#TameworkLinkedPanelPagePrevious.Disabled", state.pageIndex() == 0);
             values.set(commands, "#TameworkLinkedPanelPageNext.Disabled", state.pageIndex() + 1 >= state.pageCount());

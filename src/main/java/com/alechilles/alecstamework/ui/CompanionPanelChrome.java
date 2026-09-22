@@ -56,6 +56,9 @@ final class CompanionPanelChrome {
         set(c, values, "#CompanionNearbyCheck.Value", page.companionBinding.nearby().get());
         LinkedNpcEntry[] roster = page.rosterSummaries();
         LinkedNpcEntry[] applicable = page.pendingRemovals.filter(roster);
+        if (page.viewBinding != null) {
+            applicable = page.viewBinding.current().get().withState("All").filter(applicable);
+        }
         TabCounts counts = tabCounts(applicable, page.companionBinding.nearby().get(),
                 LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
         long count = Arrays.stream(roster).filter(LinkedNpcEntry::active).count();
@@ -75,6 +78,7 @@ final class CompanionPanelChrome {
                         EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, FILTER_PREFIX + filter), false);
             } else values.setStyle(c, selector + ".Style", style);
         }
+        if (page.viewBinding != null) page.viewControls.bind(c, e, values);
     }
 
     static LinkedNpcEntry[] filter(LinkedNpcEntry[] entries, String state, boolean nearby, String search) {

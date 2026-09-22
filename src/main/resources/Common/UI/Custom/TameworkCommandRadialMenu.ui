@@ -5,7 +5,7 @@ $C = "Common.ui";
 $C.@PageOverlay {
  LayoutMode: Middle;
  Group #TameworkCommandMenuWheel {
-  Anchor: (Width: 1120, Height: 820);
+  Anchor: (Width: 1120, Height: 860);
   Visible: false;
   Group #TameworkCommandMenuSurface {
    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
