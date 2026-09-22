@@ -450,19 +450,28 @@ final class CommandLoadedNpcStatusSnapshotService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
+        if (includeModifierBreakdown) {
+            // The explanation already resolves happiness, including the population query.
+            // Use that same result for the meter instead of calculating it a second time.
+            var presentation = CompanionHappinessPresentationService.resolve(npcRef, store, roleId);
+            return presentation == null ? null : happinessSnapshot(
+                    presentation.current(), presentation.min(), presentation.max(),
+                    presentation.target(), buildHappinessPresentation(presentation, language));
+        }
         CompanionHappinessService.HappinessSnapshot snapshot = CompanionHappinessService.resolveSnapshot(npcRef, store);
         if (snapshot == null) {
             return null;
         }
-        double value = clamp(snapshot.value(), snapshot.min(), snapshot.max());
-        double max = Math.max(1.0, snapshot.max());
+        return happinessSnapshot(snapshot.value(), snapshot.min(), snapshot.max(), snapshot.target(), null);
+    }
+
+    private HappinessSnapshot happinessSnapshot(double current, double minimum, double maximum,
+                                                double target, @Nullable String modifierBreakdown) {
+        double value = clamp(current, minimum, maximum);
+        double max = Math.max(1.0, maximum);
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
-        int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
-        String modifierBreakdown = includeModifierBreakdown
-                ? buildHappinessPresentation(
-                        CompanionHappinessPresentationService.resolve(npcRef, store, roleId), language)
-                : null;
+        int targetPercent = computePercent(target, minimum, maximum);
         return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
     }
 

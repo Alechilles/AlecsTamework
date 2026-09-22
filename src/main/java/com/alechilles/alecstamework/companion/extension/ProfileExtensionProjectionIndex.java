@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nonnull;
 
 /** Rebuildable synchronous lookup derived from canonical extension rows. */
@@ -24,8 +25,9 @@ public final class ProfileExtensionProjectionIndex
 
     private final Map<ProfileExtensionKey, Long> revisions =
             new HashMap<>();
-    private final Map<ProfileExtensionKey, ProfileExtensionProjectionValue>
-            active = new HashMap<>();
+    private final Map<ProfileId, Map<String, Map<String,
+            ProfileExtensionProjectionValue>>> activeByProfile =
+            new HashMap<>();
 
     @Override
     @Nonnull
@@ -84,7 +86,7 @@ public final class ProfileExtensionProjectionIndex
             );
         }
         revisions.clear();
-        active.clear();
+        activeByProfile.clear();
         for (ProfileExtensionData row : List.copyOf(rows)) {
             if (row == null || revisions.putIfAbsent(
                     row.key(), row.revision()
@@ -94,10 +96,7 @@ public final class ProfileExtensionProjectionIndex
                 );
             }
             if (!row.deleted()) {
-                active.put(
-                        row.key(),
-                        ProfileExtensionProjectionValue.from(row)
-                );
+                putActive(ProfileExtensionProjectionValue.from(row));
             }
         }
     }
@@ -111,7 +110,11 @@ public final class ProfileExtensionProjectionIndex
                     "Extension projection key is required"
             );
         }
-        return Optional.ofNullable(active.get(key));
+        Map<String, ProfileExtensionProjectionValue> values =
+                namespaceValues(key.profileId(), key.namespace());
+        return values == null
+                ? Optional.empty()
+                : Optional.ofNullable(values.get(key.dataKey()));
     }
 
     /** Returns deterministic active values for one profile namespace. */
@@ -124,26 +127,17 @@ public final class ProfileExtensionProjectionIndex
             );
         }
         String normalized = namespace.trim();
-        LinkedHashMap<String, ProfileExtensionProjectionValue> values =
-                new LinkedHashMap<>();
-        active.entrySet().stream()
-                .filter(entry -> entry.getKey().profileId().equals(profileId)
-                        && entry.getKey().namespace().equals(normalized))
-                .sorted(Map.Entry.comparingByKey(
-                        java.util.Comparator.comparing(
-                                ProfileExtensionKey::dataKey
-                        )
-                ))
-                .forEach(entry -> values.put(
-                        entry.getKey().dataKey(), entry.getValue()
-                ));
-        return Collections.unmodifiableMap(values);
+        Map<String, ProfileExtensionProjectionValue> values =
+                namespaceValues(profileId, normalized);
+        if (values == null || values.isEmpty()) {
+            return Map.of();
+        }
+        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
     private void apply(ProfileExtensionMutationOutcome outcome) {
         switch (outcome.status()) {
-            case APPLIED -> active.put(
-                    outcome.key(),
+            case APPLIED -> putActive(
                     new ProfileExtensionProjectionValue(
                             outcome.key(),
                             outcome.revision(),
@@ -151,9 +145,43 @@ public final class ProfileExtensionProjectionIndex
                             outcome.updatedAtMs()
                     )
             );
-            case DELETED -> active.remove(outcome.key());
+            case DELETED -> removeActive(outcome.key());
             case UNCHANGED, REVISION_MISMATCH, PROFILE_NOT_FOUND -> {
             }
         }
+    }
+
+    private void putActive(ProfileExtensionProjectionValue value) {
+        ProfileExtensionKey key = value.key();
+        activeByProfile.computeIfAbsent(key.profileId(), ignored ->
+                new HashMap<>()).computeIfAbsent(key.namespace(), ignored ->
+                new TreeMap<>()).put(key.dataKey(), value);
+    }
+
+    private void removeActive(ProfileExtensionKey key) {
+        Map<String, ProfileExtensionProjectionValue> values =
+                namespaceValues(key.profileId(), key.namespace());
+        if (values == null) {
+            return;
+        }
+        values.remove(key.dataKey());
+        if (!values.isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, ProfileExtensionProjectionValue>>
+                namespaces = activeByProfile.get(key.profileId());
+        namespaces.remove(key.namespace());
+        if (namespaces.isEmpty()) {
+            activeByProfile.remove(key.profileId());
+        }
+    }
+
+    private Map<String, ProfileExtensionProjectionValue> namespaceValues(
+            ProfileId profileId,
+            String namespace
+    ) {
+        Map<String, Map<String, ProfileExtensionProjectionValue>> namespaces =
+                activeByProfile.get(profileId);
+        return namespaces == null ? null : namespaces.get(namespace);
     }
 }

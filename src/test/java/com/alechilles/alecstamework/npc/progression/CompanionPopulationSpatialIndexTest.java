@@ -77,7 +77,7 @@ class CompanionPopulationSpatialIndexTest {
     }
 
     @Test
-    void resolvesPopulationFamilyOncePerRoleForDenseHerd() throws Exception {
+    void resolvesPopulationFamilyOncePerInRadiusRoleForDenseHerd() throws Exception {
         try (HytaleModuleScope ignored = HytaleModuleScope.install();
              TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
             AtomicInteger familyResolutions = new AtomicInteger();
@@ -97,6 +97,9 @@ class CompanionPopulationSpatialIndexTest {
             }
             for (int i = 0; i < 200; i++) {
                 addNpc(store, UUID.randomUUID(), "Dog_Adult", 1.0, 0.0, 0.0);
+            }
+            for (int i = 0; i < 300; i++) {
+                addNpc(store, UUID.randomUUID(), "Distant_Role_" + i, 100.0, 0.0, 0.0);
             }
 
             assertEquals(400, index.countNearby(

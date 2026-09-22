@@ -111,9 +111,13 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   every loaded world entity on each menu refresh. Entity/owner events maintain the owner
   index, remove empty buckets, and plugin shutdown clears it.
 - Happiness population queries reuse the existing five-second spatial snapshot and
-  resolve species-family membership once per distinct role per query. Exact nearby
-  distance checks and the querying animal's breeding config still determine the count;
-  config reload invalidation and snapshot lifetime are unchanged.
+  resolve species-family membership once per distinct role inside the exact query radius.
+  Distant roles do not invoke family resolution. Each card shares its happiness result
+  between the meter and explanation. The querying animal's breeding config, config
+  reload invalidation, and snapshot lifetime are unchanged.
+- Saved-card extension queries select the companion and namespace directly in the
+  existing synchronous projection. They do not scan other companions' extensions;
+  revision checks, deletion, and canonical rebuilds still own projection updates.
 - Countdown-only wakes update timer presentation from the current page snapshot. State
   mutations, progression polling, safety wakes, and timer expiration still request fresh
   data. Countdown presentation never enables an action or changes canonical lifecycle.

@@ -4,7 +4,7 @@
 
 - Added `/tw debug clear-owned` to preview and permanently clear a player's ordinary animals, including unloaded, dead, and lost entries. Protected stored and bonded companions are preserved.
 
-- Reduced companion-menu refresh cost by sharing profile and flute data within each refresh, building owned cards once, and using indexed discovery instead of scanning every loaded entity. Nearby population checks resolve species families once per role, and countdown-only updates reuse existing card data until expiration.
+- Reduced companion-menu refresh cost by sharing profile and flute data within each refresh, building owned cards once, and using indexed discovery instead of scanning every loaded entity. Happiness meters and tooltips share one calculation, population checks resolve families only for nearby roles, and saved-card extension lookups stay within the requested companion. Countdown-only updates reuse existing card data until expiration.
 
 - Cooped companions now retain saved health for their cards. Captured companions
   show editable groups and retain their flute's remembered selection while stored.

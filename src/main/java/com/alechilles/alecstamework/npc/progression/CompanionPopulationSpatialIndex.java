@@ -13,11 +13,9 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -310,7 +308,6 @@ public final class CompanionPopulationSpatialIndex {
     }
 
     private record Snapshot(Map<CellKey, List<Entry>> buckets,
-                            Set<String> roleIds,
                             long expiresAtMs,
                             long generation) {
         private static Snapshot build(@Nonnull Store<EntityStore> store,
@@ -319,15 +316,14 @@ public final class CompanionPopulationSpatialIndex {
                                        @Nullable ComponentType<EntityStore, NPCEntity> npcType,
                                        @Nullable ComponentType<EntityStore, TransformComponent> transformType) {
             if (npcType == null || transformType == null) {
-                return new Snapshot(Map.of(), Set.of(), expiresAtMs, generation);
+                return new Snapshot(Map.of(), expiresAtMs, generation);
             }
             Map<CellKey, List<Entry>> mutableBuckets = new HashMap<>();
-            Set<String> mutableRoleIds = new HashSet<>();
             store.forEachChunk(
                     Query.and(npcType, transformType),
                     (ArchetypeChunk<EntityStore> chunk,
                      CommandBuffer<EntityStore> commandBuffer) -> collectChunk(
-                            chunk, npcType, transformType, mutableBuckets, mutableRoleIds)
+                            chunk, npcType, transformType, mutableBuckets)
             );
             Map<CellKey, List<Entry>> immutableBuckets = new HashMap<>(mutableBuckets.size());
             for (Map.Entry<CellKey, List<Entry>> bucket : mutableBuckets.entrySet()) {
@@ -335,7 +331,6 @@ public final class CompanionPopulationSpatialIndex {
             }
             return new Snapshot(
                     Map.copyOf(immutableBuckets),
-                    Set.copyOf(mutableRoleIds),
                     expiresAtMs,
                     generation
             );
@@ -344,8 +339,7 @@ public final class CompanionPopulationSpatialIndex {
         private static void collectChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
                                          @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
                                          @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
-                                         @Nonnull Map<CellKey, List<Entry>> buckets,
-                                         @Nonnull Set<String> roleIds) {
+                                         @Nonnull Map<CellKey, List<Entry>> buckets) {
             int size = chunk.size();
             for (int i = 0; i < size; i++) {
                 NPCEntity npc = chunk.getComponent(i, npcType);
@@ -363,7 +357,6 @@ public final class CompanionPopulationSpatialIndex {
                         new CellKey(cellCoordinate(position.x), cellCoordinate(position.y), cellCoordinate(position.z)),
                         ignored -> new ArrayList<>()
                 ).add(entry);
-                roleIds.add(roleId);
             }
         }
 
@@ -375,11 +368,7 @@ public final class CompanionPopulationSpatialIndex {
                                 @Nonnull PopulationTypeResolver populationTypeResolver) {
             double radiusSquared = radius * radius;
             QueryPlan plan = planForQuery(sourcePosition, radius);
-            Set<String> matchingRoles = matchingRoles(
-                    sourceTypeKey, sourceBreedingConfig, populationTypeResolver);
-            if (matchingRoles.isEmpty()) {
-                return 0;
-            }
+            Map<String, Boolean> matchingRoleCache = new HashMap<>();
             int count = 0;
             for (long x = plan.minX(); ; x++) {
                 for (long y = plan.minY(); ; y++) {
@@ -394,7 +383,7 @@ public final class CompanionPopulationSpatialIndex {
                         if (entries != null) {
                             count += countEntries(
                                     entries, sourceUuid, sourcePosition, radiusSquared,
-                                    matchingRoles
+                                    sourceTypeKey, sourceBreedingConfig, populationTypeResolver, matchingRoleCache
                             );
                         }
                         if (z == plan.maxZ()) {
@@ -410,20 +399,6 @@ public final class CompanionPopulationSpatialIndex {
                 }
             }
             return count;
-        }
-
-        @Nonnull
-        private Set<String> matchingRoles(@Nonnull String sourceTypeKey,
-                                          @Nullable TwBreedingConfig sourceBreedingConfig,
-                                          @Nonnull PopulationTypeResolver populationTypeResolver) {
-            Set<String> matchingRoles = new HashSet<>();
-            for (String roleId : roleIds) {
-                String candidateType = populationTypeResolver.resolve(roleId, sourceBreedingConfig);
-                if (sourceTypeKey.equals(candidateType)) {
-                    matchingRoles.add(roleId);
-                }
-            }
-            return matchingRoles;
         }
 
         private static boolean cellIntersectsSphere(long cellX,
@@ -457,20 +432,28 @@ public final class CompanionPopulationSpatialIndex {
                                         @Nullable UUID sourceUuid,
                                         @Nonnull Vector3d sourcePosition,
                                         double radiusSquared,
-                                        @Nonnull Set<String> matchingRoles) {
+                                        @Nonnull String sourceTypeKey,
+                                        @Nullable TwBreedingConfig sourceBreedingConfig,
+                                        @Nonnull PopulationTypeResolver populationTypeResolver,
+                                        @Nonnull Map<String, Boolean> matchingRoleCache) {
             int count = 0;
             for (Entry entry : entries) {
                 if (sourceUuid != null && sourceUuid.equals(entry.uuid())) {
-                    continue;
-                }
-                if (!matchingRoles.contains(entry.roleId())) {
                     continue;
                 }
                 double dx = entry.x() - sourcePosition.x;
                 double dy = entry.y() - sourcePosition.y;
                 double dz = entry.z() - sourcePosition.z;
                 double distanceSquared = dx * dx + dy * dy + dz * dz;
-                if (Double.isFinite(distanceSquared) && distanceSquared <= radiusSquared) {
+                if (!Double.isFinite(distanceSquared) || distanceSquared > radiusSquared) {
+                    continue;
+                }
+                boolean matches = matchingRoleCache.computeIfAbsent(
+                        entry.roleId(),
+                        roleId -> sourceTypeKey.equals(
+                                populationTypeResolver.resolve(roleId, sourceBreedingConfig))
+                );
+                if (matches) {
                     count++;
                 }
             }
