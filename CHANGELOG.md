@@ -8,6 +8,8 @@
 
 - Reduced companion-menu page-change work by indexing registered portrait icons instead of scanning every item for each card.
 
+- Ordinary companion pages now reuse their card controls across page changes, including shorter last pages. Removed unused XP-ring widgets and hidden location updates, and shared trait reads within each card build to reduce work on first loads as well.
+
 - Reduced companion-menu refresh cost by sharing profile and flute data within each refresh, building owned cards once, and using indexed discovery instead of scanning every loaded entity. Happiness meters and tooltips share one calculation, population checks resolve families only for nearby roles, and saved-card extension lookups stay within the requested companion. Countdown-only updates reuse existing card data until expiration.
 
 - Cooped companions now retain saved health for their cards. Captured companions

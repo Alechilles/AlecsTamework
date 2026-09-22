@@ -33,6 +33,80 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Observable page refresh coverage through the package-scoped packet boundary. */
 class TameworkCommandSelectionPageRefreshTest {
     @Test
+    void ordinaryPageTurnsReuseControlsAndRejectOldCardTargets() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        var pagination = new LinkedNpcPanelPageState();
+        pagination.setPageSize(2);
+        page.configurePagination(pagination);
+        AtomicReference<UUID> assigned = new AtomicReference<>();
+        page.configureCompanions(new CompanionPanelBinding(() -> "All", ignored -> {},
+                () -> false, ignored -> {}, (id, groups) -> assigned.set(id)));
+        List<LinkedNpcEntry> rows = new ArrayList<>();
+        for (int i = 0; i < 5; i++) rows.add(new LinkedNpcEntry(UUID.randomUUID(), "Animal " + i,
+                10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false,
+                0L, LinkedNpcTraitIndicator.EMPTY).withOwnedActions());
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> {
+            pagination.setTotalEntries(rows.size());
+            return rows.subList(pagination.startIndex(), pagination.endIndex());
+        });
+        var initial = new UICommandBuilder();
+        var initialEvents = new UIEventBuilder();
+        page.build(null, initial, initialEvents, null);
+        var groupEvent = java.util.Arrays.stream(initialEvents.getEvents())
+                .filter(binding -> "#TameworkLinkedPanelList[0] #GroupSelector".equals(binding.selector))
+                .findFirst().orElseThrow();
+        assertTrue(groupEvent.data.contains("#TameworkLinkedPanelList[0] #CardTarget.Value"));
+
+        for (String direction : List.of(LinkedNpcPanelPaginationBinder.NEXT,
+                LinkedNpcPanelPaginationBinder.NEXT, LinkedNpcPanelPaginationBinder.PREVIOUS)) {
+            event(page, direction);
+            refresh(page, true);
+            var update = packets.updates.getLast();
+            assertFalse(java.util.Arrays.stream(update.commands.getCommands()).anyMatch(command ->
+                    command.type == com.hypixel.hytale.protocol.packets.interface_.CustomUICommandType.Clear
+                    || command.type == com.hypixel.hytale.protocol.packets.interface_.CustomUICommandType.Append));
+            assertEquals(0, update.events.getEvents().length, "Page turns must not accumulate card handlers.");
+        }
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[1].Visible", "true");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #CardTarget.Value", rows.get(2).npcUuid().toString());
+
+        var data = new CommandSelectionEventData();
+        data.commandId = LinkedNpcPanelSlotActions.PREFIX + "#GroupSelector";
+        data.cardTarget = rows.get(0).npcUuid().toString();
+        data.companionGroups = new String[] {"Barn"};
+        page.handleDataEvent(null, null, data);
+        assertNull(assigned.get(), "A click from the previous page must not act on its old animal or the replacement.");
+        data.commandId = LinkedNpcPanelSlotActions.PREFIX + "#GroupSelector";
+        data.cardTarget = rows.get(2).npcUuid().toString();
+        page.handleDataEvent(null, null, data);
+        assertEquals(rows.get(2).npcUuid(), assigned.get());
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void hiddenLocationDetailsAreSkippedAndRestoredWhenAnimalUnloads() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        AtomicReference<LinkedNpcEntry> row = new AtomicReference<>(ENTRY.withOwnedActions());
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> List.of(row.get()));
+        var initial = new UICommandBuilder();
+        page.build(null, initial, new UIEventBuilder(), null);
+        assertFalse(java.util.Arrays.stream(initial.getCommands()).anyMatch(command ->
+                command.selector != null && command.selector.contains(" #InlineLocation #")));
+        row.set(new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0,
+                false, true, false, false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY)
+                .withOwnedActions().withLocation(new LinkedNpcEntry.Location("Unloaded", "default", "1, 2, 3", "")));
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #InlineLocation.Visible", "true");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #InlineLocation #Coordinates.Value", "1, 2, 3");
+        row.set(ENTRY.withOwnedActions());
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #InlineLocation.Visible", "false");
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void fullPublicSnapshotStillRendersOnlyTheSelectedPage() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),

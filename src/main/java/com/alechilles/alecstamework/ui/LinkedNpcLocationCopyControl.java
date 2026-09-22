@@ -22,6 +22,7 @@ final class LinkedNpcLocationCopyControl {
     }
 
     void bind(UICommandBuilder commands, int index, LinkedNpcEntry entry) {
+        if (entry.loaded() || entry.dead() || entry.lost()) return;
         String selector = "#TameworkLinkedPanelList[" + index + "] #InlineLocation";
         boolean hasCoordinates = !entry.location().coordinates().isBlank();
         boolean editing = hasCoordinates && entry.npcUuid().equals(copying);

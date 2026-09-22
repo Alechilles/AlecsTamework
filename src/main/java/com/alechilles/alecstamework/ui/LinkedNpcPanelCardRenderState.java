@@ -40,6 +40,7 @@ final class LinkedNpcPanelCardRenderState {
     ) {
         LinkedNpcEntry previousEntry = entries[index];
         LinkedNpcEntry currentEntry = currentEntries[index];
+        if (!Objects.equals(previousEntry.npcUuid(), currentEntry.npcUuid())) return Update.FULL;
         if (pending(previousEntry, pendingUnlinkNpcUuid)
                 != pending(currentEntry, currentPendingUnlinkNpcUuid)) {
             return Update.FULL;

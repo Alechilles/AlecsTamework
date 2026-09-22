@@ -233,8 +233,14 @@ final class CommandLoadedNpcStatusSnapshotService {
             talentsActionVisible = true;
             talentsActionEnabled = true;
         }
-        LinkedNpcTraitIndicator[] traitIndicators =
-                progressionPresentationService.readLoadedTraitIndicators(npcRef, store, language);
+        CommandLinkedPanelProgressionPresentationService.LoadedTraitPresentation traitPresentation =
+                progressionPresentationService.readLoadedTraitPresentation(
+                        npcRef,
+                        store,
+                        resolvedRoleId,
+                        language
+                );
+        LinkedNpcTraitIndicator[] traitIndicators = traitPresentation.indicators();
 
         LinkedNpcEntry entry = new LinkedNpcEntry(
                 npcUuid,
@@ -285,8 +291,7 @@ final class CommandLoadedNpcStatusSnapshotService {
                 false,
                 0L
         );
-        entry = entry.withTraitValues(
-                progressionPresentationService.readLoadedTraitValues(npcRef, store));
+        entry = entry.withTraitValues(traitPresentation.traitValues());
         TwCompanionFlightToggleSettings flightToggle =
                 TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
                         .getFlightToggle();

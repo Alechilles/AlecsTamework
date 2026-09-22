@@ -29,6 +29,8 @@ final class CommandSelectionLinkedPanelRuntime {
     }
     private final TameworkCommandSelectionPage page;
     private long removalConfirmOverlayRevision = -1L;
+    private boolean renderedStableSlots;
+    private int mountedCardCount;
     private CommandUiDefaultDecorationBinder.State renderedDecorations =
             CommandUiDefaultDecorationBinder.State.EMPTY;
 
@@ -54,6 +56,21 @@ final class CommandSelectionLinkedPanelRuntime {
                             page.linkedNpcEntries[index].npcUuid()));
         }
         renderedDecorations = page.defaultDecorations();
+        renderedStableSlots = canUseStableSlots(page.featureController.presentations());
+        mountedCardCount = page.linkedNpcEntries.length;
+    }
+
+    boolean usesStableSlotActions() { return renderedStableSlots; }
+
+    private boolean canUseStableSlots(Map<UUID, CommandPanelFeaturePresentation> features) {
+        boolean ordinary = page.pagination != null && page.pagination.enabled()
+                && page.companionBinding != null && !page.cardBindingConfig.ownerCommandFamilyRoster()
+                && !page.config.usesBondedCompanionRoster();
+        if (!ordinary) return false;
+        for (LinkedNpcEntry entry : page.linkedNpcEntries) {
+            if (features.get(entry.npcUuid()) != null) return false;
+        }
+        return true;
     }
 
     private String emptyText(String language) {
@@ -289,6 +306,9 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         page.packetSender.send(commands, events);
         renderedDecorations = page.defaultDecorations();
+        mountedCardCount = renderedStableSlots && canUseStableSlots(features)
+                ? Math.max(mountedCardCount, page.linkedNpcEntries.length) : page.linkedNpcEntries.length;
+        renderedStableSlots = canUseStableSlots(features);
         page.refreshTransaction.commit(values, groupRevision, reviveRevision);
         removalConfirmOverlayRevision = removalConfirmRevision;
         page.cardRenderState.markRendered(page.linkedNpcEntries,
@@ -301,8 +321,14 @@ final class CommandSelectionLinkedPanelRuntime {
                              boolean hasEntries,
                              Map<UUID, CommandPanelFeaturePresentation> features,
                              String language) {
-        boolean structureChanged = page.cardRenderState.requiresRebuild(
-                page.linkedNpcEntries, features);
+        boolean stableSlots = canUseStableSlots(features);
+        if (stableSlots && renderedStableSlots) {
+            renderReusedCards(commands, events, features, language);
+            return;
+        }
+        boolean structureChanged = stableSlots != renderedStableSlots
+                || (stableSlots ? page.cardRenderState.entryCount() != page.linkedNpcEntries.length
+                : page.cardRenderState.requiresRebuild(page.linkedNpcEntries, features));
         if (structureChanged) {
             commands.clear("#TameworkLinkedPanelList");
             for (int index = 0; index < page.linkedNpcEntries.length; index++) {
@@ -327,6 +353,36 @@ final class CommandSelectionLinkedPanelRuntime {
                         id, page.cardRenderState.entryAt(index), entry,
                         page.cardRenderState.presentation(id), features.get(id),
                         page.isPendingUnlink(id), page.cardBindingConfig, language);
+            }
+        }
+    }
+
+    private void renderReusedCards(UICommandBuilder commands, UIEventBuilder events,
+                                  Map<UUID, CommandPanelFeaturePresentation> features, String language) {
+        int previousCount = page.cardRenderState.entryCount();
+        for (int index = page.linkedNpcEntries.length; index < previousCount; index++) {
+            commands.set("#TameworkLinkedPanelList[" + index + "].Visible", false);
+        }
+        for (int index = 0; index < page.linkedNpcEntries.length; index++) {
+            LinkedNpcEntry entry = page.linkedNpcEntries[index];
+            if (index >= mountedCardCount) {
+                bindCard(commands, events, index, entry, true, null);
+                continue;
+            }
+            if (index >= previousCount) {
+                commands.set("#TameworkLinkedPanelList[" + index + "].Visible", true);
+                bindCard(commands, events, index, entry, false, null);
+                continue;
+            }
+            var update = page.cardRenderState.updateAt(index, page.linkedNpcEntries,
+                    page.pendingUnlinkNpcUuid, features);
+            if (update == LinkedNpcPanelCardRenderState.Update.FULL) {
+                bindCard(commands, events, index, entry, false, null);
+            } else if (update == LinkedNpcPanelCardRenderState.Update.DYNAMIC) {
+                LinkedNpcPanelCardDynamicPresenter.refresh(commands, events,
+                        "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
+                        page.cardRenderState.entryAt(index), entry, null, null,
+                        page.isPendingUnlink(entry.npcUuid()), page.cardBindingConfig, language);
             }
         }
     }
@@ -368,9 +424,18 @@ final class CommandSelectionLinkedPanelRuntime {
     void bindCard(UICommandBuilder commands, UIEventBuilder events, int index,
                   LinkedNpcEntry entry, boolean append,
                   CommandPanelFeaturePresentation presentation) {
-        LinkedNpcPanelCardBinder.bind(commands, events, index, entry, append,
+        boolean stableSlots = canUseStableSlots(page.featureController.presentations());
+        boolean targetChanged = append || index >= page.cardRenderState.entryCount()
+                || !entry.npcUuid().equals(page.cardRenderState.entryAt(index).npcUuid());
+        String card = "#TameworkLinkedPanelList[" + index + "]";
+        LinkedNpcPanelCardBinder.bind(commands, stableSlots ? LinkedNpcPanelSlotActions.IGNORE_EVENTS : events,
+                index, entry, append,
                 page.isPendingUnlink(entry.npcUuid()), page.cardBindingConfig,
                 page.resolveLanguage(), presentation);
+        if (stableSlots) {
+            commands.set(card + " #CardTarget.Value", entry.npcUuid().toString());
+            if (append) LinkedNpcPanelSlotActions.bind(events, card);
+        }
         if (presentation != null && presentation.bonded() != null) return;
         CommandUiDefaultDecorationBinder.bindCard(commands,
                 "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
@@ -393,13 +458,15 @@ final class CommandSelectionLinkedPanelRuntime {
                         "TameworkPanelActionStyles.ui", "CompanionGroupDropdown"));
                 commands.set(selector + ".MaxSelection", 0);
                 commands.set(selector + ".Entries", entries);
+            }
+            if (append || stableSlots && targetChanged) {
                 // The builder registers LocalizableString, not String, for array values.
                 // Literal wrappers encode the IDs as plain strings without translating them.
                 commands.set(selector + ".SelectedValues", entry.groupIds().stream()
                         .map(LocalizableString::fromString).toList());
             }
             bindCompanionGroupLabel(commands, selector, entry);
-            if (append) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
+            if (append && !stableSlots) events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
                     EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
                             .append("@CompanionGroups", selector + ".SelectedValues"), false);
             return;

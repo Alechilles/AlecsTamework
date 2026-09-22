@@ -111,6 +111,19 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
 - Bonded and owner-family standard panels paginate their existing read models after
   view filtering. The pre-detail hydration limit described above applies to ordinary
   owned-companion menus.
+- Ordinary paged cards without managed features keep their controls mounted across
+  page changes. The page holds at most the largest page size used during that open
+  menu (bounded to 100), hides surplus slots on shorter pages, and releases the UI
+  when the menu closes. Each slot binds its actions once and reads the displayed
+  companion UUID from `CardTarget.Value` at click time. The server rejects off-page
+  targets before invoking the existing action handler, which still checks current
+  authority. It does not remap an old click to the new occupant of a slot. Managed,
+  bonded, and public-contributor pages retain their existing binding behavior.
+- Loaded card assembly reads trait components and configuration once to derive both
+  trait indicators and the public trait view. This reuse lasts only for the current
+  card build, so later component or configuration changes are read normally. Hidden
+  location controls receive no child updates until visible, and ordinary level
+  buttons no longer create or update unused ring widgets.
 - Each ordinary panel refresh shares one profile projection snapshot, one managed-profile
   snapshot, and one decoded flute-record list across owned/captured records, row identities,
   and protected controls. Canonical tool membership determines selection without building

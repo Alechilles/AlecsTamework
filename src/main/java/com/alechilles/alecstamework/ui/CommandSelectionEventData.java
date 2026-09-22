@@ -28,6 +28,8 @@ public final class CommandSelectionEventData {
                     (event, value) -> event.commandId = value,
                     event -> event.commandId)
             .add()
+            .append(new KeyedCodec<>(LinkedNpcPanelSlotActions.TARGET_KEY, Codec.STRING),
+                    (event, value) -> event.cardTarget = value, event -> event.cardTarget).add()
             .append(
                     new KeyedCodec<>(KEY_PANEL_MODE_VALUE, Codec.STRING),
                     (event, value) -> event.panelModeValue = value,
@@ -91,6 +93,7 @@ public final class CommandSelectionEventData {
     Boolean companionNearby;
     String[] companionGroups;
     String commandId;
+    String cardTarget;
     String primaryCommandValue;
     String panelModeValue;
     Boolean panelAutoLinkEnabled;

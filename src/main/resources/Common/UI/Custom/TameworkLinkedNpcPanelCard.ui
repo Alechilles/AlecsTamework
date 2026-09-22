@@ -34,6 +34,8 @@ Group {
     OutlineSize: 1;
     Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
+    TextField #CardTarget { Visible: false; MaxLength: 36; }
+
     Group { Anchor: (Top: 36, Left: 156, Bottom: 0, Width: 1); Background: #414845; }
 
     Group { Anchor: (Top: 26, Left: 0, Right: 36, Height: 1); Background: #343c37; HitTestVisible: false; }
@@ -177,17 +179,6 @@ Group {
         Visible: false;
         TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 48, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: ""; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
         Label { Anchor: (Top: 2, Left: 7, Width: 23, Height: 20); HitTestVisible: false; Text: %server.tamework.ui.shared.levelAbbreviation; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
-        Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #353c36; Visible: false; }
-        Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #353c36; Visible: false; }
-        Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 20); Background: #353c36; Visible: false; }
-        Group #RingTrackBottom { Anchor: (Top: 17, Left: 0, Width: 24, Height: 3); Background: #353c36; Visible: false; }
-        Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 20); Background: #353c36; Visible: false; }
-        Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #7cc6f2; Visible: false; }
-        Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 20); Background: #7cc6f2; Visible: false; }
-        Group #RingFillBar3 { Anchor: (Top: 17, Left: 0, Width: 24, Height: 3); Background: #7cc6f2; Visible: false; }
-        Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 20); Background: #7cc6f2; Visible: false; }
-        Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #7cc6f2; Visible: false; }
-        Group #CornerMaskOverlay { Anchor: (Top: 0, Left: 0, Width: 24, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png"); Visible: false; }
         Label #TalentsArrow { Anchor: (Top: 2, Right: 4, Width: 1, Height: 1); Text: ""; HitTestVisible: false; Style: (FontSize: 12, RenderBold: true, TextColor: #c6d9c9, Alignment: Center); }
         Label #XpLevelText { Anchor: (Top: 2, Left: 30, Width: 14, Height: 20); HitTestVisible: false; Text: "1"; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
 

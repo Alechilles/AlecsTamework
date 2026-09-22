@@ -2,13 +2,88 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierBreakdownService;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import java.util.List;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class CommandLinkedPanelProgressionPresentationServiceTest {
+    @Test
+    void loadedTraitPresentationKeepsApiValuesWhenConfigurationIsMissing() {
+        CommandLinkedPanelProgressionPresentationService service =
+                new CommandLinkedPanelProgressionPresentationService();
+        TameworkTraitsComponent traits = new TameworkTraitsComponent(
+                "Traits_Missing",
+                19L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Strength", 1.2),
+                        new TameworkTraitsComponent.TraitValue("Broken", Double.NaN)
+                }
+        );
+
+        var presentation = service.buildLoadedTraitPresentation(traits, null, null, "en-US");
+
+        assertEquals(0, presentation.indicators().length);
+        assertEquals("Traits_Missing", presentation.traitValues().configId());
+        assertEquals(19L, presentation.traitValues().rollSeed());
+        assertEquals(1, presentation.traitValues().values().size());
+        assertEquals("Strength", presentation.traitValues().values().get(0).id());
+        assertEquals(1.2, presentation.traitValues().values().get(0).value());
+        assertNull(presentation.traitValues().values().get(0).effectKey());
+    }
+
+    @Test
+    void loadedTraitPresentationUsesOneConfigForIndicatorsAndApiValues() {
+        CommandLinkedPanelProgressionPresentationService service =
+                new CommandLinkedPanelProgressionPresentationService();
+        TameworkTraitsComponent traits = new TameworkTraitsComponent(
+                "Traits_Strength",
+                23L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Strength", 1.2)
+                }
+        );
+
+        var first = service.buildLoadedTraitPresentation(
+                traits, traitConfig("Strength", "Strength", "MaxHealthMultiplier"), null, "en-US");
+        var edited = service.buildLoadedTraitPresentation(
+                traits, traitConfig("Strength", "Vitality", "DamageDealtMultiplier"), null, "en-US");
+
+        assertEquals("Strength", first.indicators()[0].label());
+        assertEquals("MaxHealthMultiplier", first.traitValues().values().get(0).effectKey());
+        assertEquals("Vitality", edited.indicators()[0].label());
+        assertEquals("DamageDealtMultiplier", edited.traitValues().values().get(0).effectKey());
+    }
+
+    @Test
+    void loadedTraitPresentationKeepsFlatHappinessTooltipsInPoints() {
+        CommandLinkedPanelProgressionPresentationService service =
+                new CommandLinkedPanelProgressionPresentationService();
+        TameworkTraitsComponent traits = new TameworkTraitsComponent(
+                "Traits_Disposition",
+                29L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Disposition", 1.15)
+                }
+        );
+        var happiness = com.alechilles.alecstamework.config.assets.TwHappinessConfig.CODEC.decode(
+                BsonDocument.parse("""
+                    {"Disposition":{"Mode":"FLAT","TraitMin":0.75,"TraitNeutral":1.0,
+                    "TraitMax":1.25,"MinOffset":-10.0,"MaxOffset":10.0}}
+                    """), new com.hypixel.hytale.codec.ExtraInfo());
+
+        var presentation = service.buildLoadedTraitPresentation(
+                traits, traitConfig("Disposition", "Disposition", "HappinessGainMultiplier"), happiness, "en-US");
+
+        assertEquals("Disposition\nIncreases happiness by 6 points.",
+                presentation.indicators()[0].tooltipText());
+        assertEquals("HappinessGainMultiplier", presentation.traitValues().values().get(0).effectKey());
+    }
+
     @Test
     void lowerPreferredAppetiteUsesBeneficialColorAndCorrectDescription() {
         var config = com.alechilles.alecstamework.config.assets.TwTraitConfig.CODEC.decode(
@@ -120,5 +195,15 @@ class CommandLinkedPanelProgressionPresentationServiceTest {
                 ),
                 tooltip
         );
+    }
+
+    private static com.alechilles.alecstamework.config.assets.TwTraitConfig traitConfig(
+            String id, String displayName, String effectKey) {
+        return com.alechilles.alecstamework.config.assets.TwTraitConfig.CODEC.decode(
+                BsonDocument.parse("""
+                    {"Traits":[{"Id":"%s","DisplayName":"%s","EffectKey":"%s",
+                    "BreedingMin":0.75,"BreedingMax":1.25,"Default":1.0}]}
+                    """.formatted(id, displayName, effectKey)),
+                new com.hypixel.hytale.codec.ExtraInfo());
     }
 }

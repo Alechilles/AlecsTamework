@@ -543,6 +543,11 @@ public final class TameworkCommandSelectionPage
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
         if (dismissed || navigationPending || !isCurrentLinkedPanelOwner()) return;
+        if (data.commandId != null && data.commandId.startsWith(LinkedNpcPanelSlotActions.PREFIX)) {
+            if (!linkedPanelRuntime.usesStableSlotActions()) return;
+            data.commandId = LinkedNpcPanelSlotActions.resolve(data.commandId, data.cardTarget, linkedNpcEntries);
+            if (data.commandId == null) return;
+        }
         String guideAction = data.commandId == null ? "" : data.commandId.trim();
         if (guideAction.startsWith("guide:")) {
             UICommandBuilder commands = new UICommandBuilder();

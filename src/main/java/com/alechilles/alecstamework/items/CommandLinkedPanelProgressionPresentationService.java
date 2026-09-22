@@ -22,7 +22,9 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -160,49 +162,95 @@ final class CommandLinkedPanelProgressionPresentationService {
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
                                                         Store<EntityStore> store,
                                                         @Nullable String language) {
-        return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType(), language);
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return LinkedNpcTraitIndicator.EMPTY;
+        }
+        return readLoadedTraitPresentation(
+                npcRef,
+                store,
+                null,
+                language
+        ).indicators();
     }
 
     /** Reads immutable trait values during the existing world-thread card pass. */
     @Nullable
     ProgressionView.TraitsView readLoadedTraitValues(Ref<EntityStore> npcRef,
                                                       Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) return null;
-        TameworkTraitsComponent traits = safeGetComponent(store, npcRef,
-                TameworkTraitsComponent.getComponentType());
-        if (traits == null) return null;
-        return TraitPresentationViewMapper.map(traits,
-                resolveTraitConfig(npcRef, store, traits));
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        return readLoadedTraitPresentation(
+                npcRef,
+                store,
+                null,
+                null
+        ).traitValues();
     }
 
-    private LinkedNpcTraitIndicator[] readTraitIndicators(Ref<EntityStore> npcRef,
-                                                          Store<EntityStore> store,
-                                                          ComponentType<EntityStore, TameworkTraitsComponent> traitType,
-                                                          @Nullable String language) {
-        if (npcRef == null || !npcRef.isValid() || store == null || traitType == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
+    /**
+     * Captures loaded trait state once for a card, then derives both its visual indicators and API view.
+     * The caller must stay on the current world thread while this reads the component.
+     */
+    @Nonnull
+    LoadedTraitPresentation readLoadedTraitPresentation(@Nullable Ref<EntityStore> npcRef,
+                                                        @Nullable Store<EntityStore> store,
+                                                        @Nullable String resolvedRoleId,
+                                                        @Nullable String language) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return LoadedTraitPresentation.EMPTY;
         }
-        TameworkTraitsComponent traits = safeGetComponent(store, npcRef, traitType);
+        TameworkTraitsComponent traits = safeGetComponent(
+                store,
+                npcRef,
+                TameworkTraitsComponent.getComponentType()
+        );
         if (traits == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
+            return LoadedTraitPresentation.EMPTY;
         }
-        TwTraitConfig config = resolveTraitConfig(npcRef, store, traits);
-        if (config == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
+        String roleId = resolvedRoleId != null && !resolvedRoleId.isBlank()
+                ? resolvedRoleId
+                : CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TwTraitConfig traitConfig = resolveTraitConfig(traits, roleId);
+        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(roleId);
+        return buildLoadedTraitPresentation(traits, traitConfig, happinessConfig, language);
+    }
+
+    @Nonnull
+    LoadedTraitPresentation buildLoadedTraitPresentation(@Nullable TameworkTraitsComponent traits,
+                                                         @Nullable TwTraitConfig traitConfig,
+                                                         @Nullable TwHappinessConfig happinessConfig,
+                                                         @Nullable String language) {
+        if (traits == null) {
+            return LoadedTraitPresentation.EMPTY;
         }
-        Map<String, Double> rolledValues = buildRolledValueMap(traits);
-        return buildSavedTraitIndicators(config, rolledValues,
-                CompanionRoleIdResolver.resolveRoleId(npcRef, store), language);
+        CapturedTraitValues values = captureTraitValues(traits);
+        ProgressionView.TraitsView traitValues = TraitPresentationViewMapper.map(
+                values.configId(),
+                values.rollSeed(),
+                values.apiValues(),
+                traitConfig
+        );
+        LinkedNpcTraitIndicator[] indicators = traitConfig == null
+                ? LinkedNpcTraitIndicator.EMPTY
+                : buildTraitIndicators(traitConfig, values.indicatorValues(), happinessConfig, language);
+        return new LoadedTraitPresentation(indicators, traitValues);
     }
 
     /** Uses the same trait icons and tooltips for immutable saved values and live values. */
     LinkedNpcTraitIndicator[] buildSavedTraitIndicators(TwTraitConfig config,
             Map<String, Double> rolledValues, String roleId, String language) {
+        return buildTraitIndicators(config, rolledValues, TwHappinessConfig.resolveForRole(roleId), language);
+    }
+
+    private LinkedNpcTraitIndicator[] buildTraitIndicators(@Nullable TwTraitConfig config,
+                                                           @Nonnull Map<String, Double> rolledValues,
+                                                           @Nullable TwHappinessConfig happinessConfig,
+                                                           @Nullable String language) {
         if (config == null || rolledValues.isEmpty()) {
             return LinkedNpcTraitIndicator.EMPTY;
         }
         ArrayList<LinkedNpcTraitIndicator> indicators = new ArrayList<>(MAX_TRAIT_INDICATORS);
-        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(roleId);
         boolean flatDisposition = happinessConfig != null
                 && happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT;
         for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
@@ -390,9 +438,8 @@ final class CommandLinkedPanelProgressionPresentationService {
     }
 
     @Nullable
-    private TwTraitConfig resolveTraitConfig(Ref<EntityStore> npcRef,
-                                             Store<EntityStore> store,
-                                             TameworkTraitsComponent traits) {
+    private TwTraitConfig resolveTraitConfig(TameworkTraitsComponent traits,
+                                             @Nullable String resolvedRoleId) {
         String configId = traits.getConfigId();
         if (configId != null && !configId.isBlank()) {
             TwTraitConfig config = TwTraitConfig.resolveById(configId);
@@ -400,30 +447,52 @@ final class CommandLinkedPanelProgressionPresentationService {
                 return config;
             }
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        if (roleId == null || roleId.isBlank()) {
+        if (resolvedRoleId == null || resolvedRoleId.isBlank()) {
             return null;
         }
-        return TwTraitConfig.resolveForRole(roleId);
+        return TwTraitConfig.resolveForRole(resolvedRoleId);
     }
 
-    private Map<String, Double> buildRolledValueMap(TameworkTraitsComponent traits) {
-        HashMap<String, Double> values = new HashMap<>();
+    private CapturedTraitValues captureTraitValues(TameworkTraitsComponent traits) {
+        LinkedHashMap<String, Double> apiValues = new LinkedHashMap<>();
+        HashMap<String, Double> indicatorValues = new HashMap<>();
         for (TameworkTraitsComponent.TraitValue traitValue : traits.getTraitValues()) {
             if (traitValue == null) {
-                continue;
-            }
-            String traitId = normalize(traitValue.getId());
-            if (traitId == null || values.containsKey(traitId)) {
                 continue;
             }
             double value = traitValue.getValue();
             if (!Double.isFinite(value)) {
                 continue;
             }
-            values.put(traitId, value);
+            String rawTraitId = traitValue.getId();
+            if (rawTraitId == null || rawTraitId.isBlank()) {
+                continue;
+            }
+            String apiTraitId = rawTraitId.trim();
+            apiValues.putIfAbsent(apiTraitId, value);
+            String indicatorTraitId = normalize(apiTraitId);
+            if (indicatorTraitId != null) {
+                indicatorValues.putIfAbsent(indicatorTraitId, value);
+            }
         }
-        return values;
+        return new CapturedTraitValues(
+                traits.getConfigId(),
+                traits.getRollSeed(),
+                Collections.unmodifiableMap(apiValues),
+                Collections.unmodifiableMap(indicatorValues)
+        );
+    }
+
+    record LoadedTraitPresentation(@Nonnull LinkedNpcTraitIndicator[] indicators,
+                                   @Nullable ProgressionView.TraitsView traitValues) {
+        private static final LoadedTraitPresentation EMPTY =
+                new LoadedTraitPresentation(LinkedNpcTraitIndicator.EMPTY, null);
+    }
+
+    private record CapturedTraitValues(@Nullable String configId,
+                                       long rollSeed,
+                                       @Nonnull Map<String, Double> apiValues,
+                                       @Nonnull Map<String, Double> indicatorValues) {
     }
 
     private String resolveIconGlyph(String label) {

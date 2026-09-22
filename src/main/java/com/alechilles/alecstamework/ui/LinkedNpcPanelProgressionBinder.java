@@ -57,21 +57,12 @@ final class LinkedNpcPanelProgressionBinder {
         String levelText = resolveLevelText(stat.label());
         commandBuilder.set(levelTextSelector + ".Text", levelText);
         commandBuilder.set(tooltipSelector + ".TooltipText", resolveXpTooltip(stat));
-        if (ringSelector.startsWith("#TameworkLinkedPanelList[")) {
-            bindCardLevelGeometry(commandBuilder, ringSelector, levelText);
-        }
-        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(progressRatio(stat.current(), stat.max()));
-        commandBuilder.setObject(ringSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
-        commandBuilder.setObject(ringSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
-        commandBuilder.setObject(ringSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
-        commandBuilder.setObject(ringSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
-        commandBuilder.setObject(ringSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
+        bindCardLevelGeometry(commandBuilder, ringSelector, levelText);
     }
 
     /**
      * The linked-card level button follows the talent-point button and sizes to
-     * the rendered level. The target HUD has its own compact ring layout, so it
-     * intentionally keeps its authored geometry.
+     * the rendered level. Guide cards use the same level button under their own selector.
      */
     private static void bindCardLevelGeometry(UICommandBuilder commandBuilder,
                                               String ringSelector,
