@@ -358,6 +358,14 @@ final class CommandSelectionPageService {
                 ? genericCallbackAuthority : () -> false;
         BondedLifecycleAuthority bondedAuthority = bondedLifecycleAuthority != null
                 ? bondedLifecycleAuthority : ignored -> false;
+        if (config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata
+                && genericAuthority.getAsBoolean()) {
+            toolInventoryService.mutateToolStack(player, toolId, stack -> {
+                var saved = CommandCompanionViewStore.read(stack);
+                return saved.selectedId().isBlank() ? stack
+                        : CommandCompanionViewStore.choose(stack, saved.selectedId());
+            });
+        }
         CommandUiPageCoordinator coordinator = commandUiCoordinator;
         if (coordinator == null) {
             TameworkCommandSelectionPage page = createPage(
@@ -1237,14 +1245,6 @@ final class CommandSelectionPageService {
             BondedLifecycleAuthority bondedLifecycleAuthority,
             LinkedNpcPanelPageState pagination
     ) {
-        if (config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata
-                && genericCallbackAuthority.getAsBoolean()) {
-            toolInventoryService.mutateToolStack(player, toolId, stack -> {
-                var saved = CommandCompanionViewStore.read(stack);
-                return saved.selectedId().isBlank() ? stack
-                        : CommandCompanionViewStore.choose(stack, saved.selectedId());
-            });
-        }
         UUID ownerUuid = player.getUuid();
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);

@@ -4,11 +4,8 @@ $C = "Common.ui";
 Group #CompanionViewToolbar {
   Anchor: (Top: 10, Right: 10, Width: 460, Height: 28);
   TextTooltipStyle: $C.@DefaultTextTooltipStyle;
-  DropdownBox #CompanionViewPicker { Anchor: (Left: 0, Width: 270, Height: 28); Style: $A.@PanelDropdown; MaxSelection: 1; }
-  Group #CompanionViewUnsaved { Anchor: (Left: 278, Width: 110, Height: 28); Visible: false; Background: #4b3e20; OutlineColor: #bc9445; OutlineSize: 1;
-    Label { Anchor: (Left: 2, Right: 2, Height: 28); Text: %server.tamework.ui.views.unsaved; Style: (FontSize: 11, RenderBold: true, TextColor: #f1c66a, HorizontalAlignment: Center, VerticalAlignment: Center); }
-  }
-  TextButton #CompanionViewSaveNew { Anchor: (Left: 396, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.saveButton; Style: $A.@PanelButton; }
+  DropdownBox #CompanionViewPicker { Anchor: (Left: 0, Width: 388, Height: 28); Style: $A.@PanelDropdown; MaxSelection: 1; }
+  TextButton #CompanionViewSaveNew { Anchor: (Left: 396, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.saveButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
   Group #CompanionViewSaveGlyph { Anchor: (Left: 401, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewSave_Glyph_Default.png", Color: #e8e4da); HitTestVisible: false; }
   Group #CompanionViewSaveGlyphUnsaved { Anchor: (Left: 401, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewSave_Glyph_Default.png", Color: #f1c66a); HitTestVisible: false; Visible: false; }
   TextButton #CompanionViewManage { Anchor: (Left: 432, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.manageButton; Style: $A.@PanelButton; }

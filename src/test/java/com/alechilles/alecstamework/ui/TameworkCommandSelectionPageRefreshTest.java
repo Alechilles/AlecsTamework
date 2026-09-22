@@ -69,6 +69,11 @@ class TameworkCommandSelectionPageRefreshTest {
         assertEquals(List.of("Chicken"), settings.get().speciesIds(), "Editor changes wait for Save filter.");
         event(page, "__view__:filterSave");
         assertTrue(settings.get().speciesIds().isEmpty());
+        event(page, CompanionPanelChrome.FILTER_PREFIX + "InWorld");
+        assertEquals("InWorld", settings.get().state());
+        var unsaved = settings.get();
+        page.handleDataEvent(null, null, choose);
+        assertEquals(unsaved, settings.get(), "A repeated picker event must keep unsaved view changes.");
         event(page, "__view__:select");
         assertEquals(1, selects.get());
         page.onDismiss(null, null);

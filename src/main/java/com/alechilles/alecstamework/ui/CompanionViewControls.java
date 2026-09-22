@@ -45,12 +45,13 @@ final class CompanionViewControls {
         var entries = new ArrayList<DropdownEntryInfo>();
         entries.add(option(text("all"), "__all__"));
         entries.add(option(text("selected"), "__selected__"));
-        for (var view : saved) entries.add(option(view.name() + (modified && view.id().equals(id) ? " *" : ""), view.id()));
+        for (var view : saved) entries.add(option(view.name(), view.id()));
         if (customDraft) entries.add(option(text("custom"), "__custom__"));
         set(c, values, "#CompanionViewPicker.Entries", entries);
         set(c, values, "#CompanionViewPicker.Value", customDraft ? "__custom__" : id);
-        set(c, values, "#CompanionViewToolbar.TooltipText", text(unsaved ? "modifiedHint" : "openHint"));
-        set(c, values, "#CompanionViewUnsaved.Visible", unsaved);
+        set(c, values, "#CompanionViewSaveNew.TooltipText", text(unsaved ? "modifiedHint" : "saveButton"));
+        set(c, values, "#CompanionViewSaveNew.OutlineColor", unsaved ? "#f1c66a" : "#4a5a50");
+        set(c, values, "#CompanionViewSaveNew.OutlineSize", 1);
         set(c, values, "#CompanionViewSaveGlyph.Visible", !unsaved);
         set(c, values, "#CompanionViewSaveGlyphUnsaved.Visible", unsaved);
 
@@ -119,6 +120,7 @@ final class CompanionViewControls {
     boolean handle(CommandSelectionEventData data, String command) {
         var b = page.viewBinding;
         if (data.viewId != null) {
+            if (Objects.equals(data.viewId, b.selectedId().get())) return true;
             page.flushViewSearch();
             b.choose().accept(data.viewId);
             page.refreshView();

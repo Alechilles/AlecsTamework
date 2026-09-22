@@ -64,8 +64,9 @@ choices within one filter match any chosen value; different filters narrow the
 list together. The filter-chip row appears only while extra filters are applied.
 Click a chip to edit it or its red X to remove it.
 
-The amber **Unsaved view** label shows when the current view differs from its
-saved version. The toolbar save icon saves those changes to the selected view.
+The toolbar save icon turns amber with a gold outline when the current view
+differs from its saved version. Hover over it to see the unsaved-changes hint.
+The icon saves those changes to the selected view.
 For a new view, it asks for a name and saves the current status, nearby setting,
 search, sort, and extra filters together. The edit icon opens the name field and
 Delete view action. Each flute holds up to 16 views and reopens to its selected
