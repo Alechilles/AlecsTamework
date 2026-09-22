@@ -16,6 +16,11 @@ The page keeps the historic name because existing links and guides use **Linked 
 ![Tamework UI Showcase](https://wiki.hytalemodding.dev/storage/mods/019d3092-1857-713f-86a6-60f15c4e0a9e/files/9d39db03-a1d0-4805-8ded-d1a84d8278e8.jpg)
 
 ## What the panel shows
+The menu shows **50 cards per page** by default. Use **Previous** and **Next** to
+browse the rest. Server owners can set **Command panel cards per page** to 1–100
+in `/tw settings`. Search, status tabs, sorting, and group selection still apply
+to all your companions. Changing pages does not change which animals receive commands.
+
 Use **? Help** at the top of the command menu to open the **Companion Guide**.
 Choose a topic on the left to learn about cards, commands and groups, care,
 breeding, traits and talents, capture and coops, finding and recovery, bonded

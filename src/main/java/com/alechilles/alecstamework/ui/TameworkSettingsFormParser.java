@@ -52,6 +52,15 @@ final class TameworkSettingsFormParser {
         if (!populationLimit.success()) {
             return NumericResult.failure(populationLimit.message());
         }
+        ValueResult<Integer> commandPanelCardsPerPage = parseIntInRange(
+                payload.commandPanelCardsPerPage,
+                "tamework.ui.settings.field.commandPanelCardsPerPage",
+                1,
+                100
+        );
+        if (!commandPanelCardsPerPage.success()) {
+            return NumericResult.failure(commandPanelCardsPerPage.message());
+        }
         ValueResult<Integer> claimLimitChunk = parseNonNegativeInt(
                 payload.claimLimitChunk, "tamework.ui.settings.field.simpleClaimsClaimChunkLimit");
         if (!claimLimitChunk.success()) {
@@ -86,7 +95,8 @@ final class TameworkSettingsFormParser {
             return NumericResult.failure(dehydrationDamage.message());
         }
         return NumericResult.success(new NumericValues(
-                populationLimit.value(), claimLimitChunk.value(), claimLimitTotal.value(),
+                populationLimit.value(), commandPanelCardsPerPage.value(),
+                claimLimitChunk.value(), claimLimitTotal.value(),
                 offlineGraceHours.value(), offlineDecayMultiplier.value(),
                 starvationDamage.value(), dehydrationDamage.value()
         ));
@@ -168,7 +178,8 @@ final class TameworkSettingsFormParser {
                 current.telemetryBreadcrumbsEnabled(),
                 choices.animalAgingMode(),
                 boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled()),
-                boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled())
+                boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled()),
+                numbers.commandPanelCardsPerPage()
         );
     }
 
@@ -185,6 +196,25 @@ final class TameworkSettingsFormParser {
             logger.at(Level.FINE).log("Invalid integer input for " + label + ": " + value);
             return ValueResult.failure(validationMessage("nonNegativeInteger", label));
         }
+    }
+
+    @Nonnull
+    private ValueResult<Integer> parseIntInRange(@Nullable String raw,
+                                                  @Nonnull String labelKey,
+                                                  int minimum,
+                                                  int maximum) {
+        String label = resolve(labelKey);
+        String value = trim(raw);
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed >= minimum && parsed <= maximum) {
+                return ValueResult.success(parsed);
+            }
+        } catch (NumberFormatException ignored) {
+            // The shared validation response below covers malformed values and out-of-range integers.
+        }
+        logger.at(Level.FINE).log("Invalid integer input for " + label + ": " + value);
+        return ValueResult.failure(validationMessage("integerRange", label, minimum, maximum));
     }
 
     @Nonnull
@@ -207,8 +237,8 @@ final class TameworkSettingsFormParser {
     }
 
     @Nonnull
-    private String validationMessage(@Nonnull String validationKey, @Nonnull String label) {
-        return format("tamework.ui.settings.validation." + validationKey, label);
+    private String validationMessage(@Nonnull String validationKey, Object... args) {
+        return format("tamework.ui.settings.validation." + validationKey, args);
     }
 
     @Nonnull
@@ -247,6 +277,7 @@ final class TameworkSettingsFormParser {
     }
 
     private record NumericValues(int populationLimit,
+                                 int commandPanelCardsPerPage,
                                  int claimLimitChunk,
                                  int claimLimitTotal,
                                  double needsOwnerOfflineGraceHours,

@@ -6,10 +6,16 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.ui.TameworkLinkedNpcLocationFormatter;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Component;
@@ -141,6 +147,119 @@ final class CommandLinkedPanelEntryService {
             ItemStack stack, String toolId, List<LinkedNpcRecord> records,
             java.util.Set<UUID> linkedIds) {
         return resolveEntriesFromRecords(player, store, stack, toolId, records, linkedIds);
+    }
+
+    /**
+     * Produces only the fields needed to filter, sort, and page an owned roster.
+     * It deliberately avoids saved-card application and live progression, cooldown,
+     * trait, portrait, and happiness presentation work.  The selected records are
+     * subsequently resolved through {@link #resolveOwnedEntriesFromRecords}.
+     */
+    List<LinkedNpcEntry> resolveOwnedEntrySummariesFromRecords(
+            Player player, Store<EntityStore> store, ItemStack stack,
+            List<LinkedNpcRecord> records, java.util.Set<UUID> linkedIds,
+            boolean includeCareValues
+    ) {
+        if (player == null || store == null || stack == null || stack.isEmpty() || records.isEmpty()) {
+            return List.of();
+        }
+        Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
+        World world = player.getWorld();
+        ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) continue;
+            Ref<EntityStore> liveRef = world == null ? null : world.getEntityRef(record.npcUuid);
+            if (liveRef != null && liveRef.isValid()
+                    && (!CommandGenericTargetAuthority.allowsNearbyPresentation(liveRef, store)
+                    || !linkPolicyService.passesOwnerAndTamed(true, false, liveRef, player.getUuid(), store))) {
+                continue;
+            }
+            CommandPersistenceView.ProfileSnapshot profile = persistenceView == null
+                    ? null : persistenceView.find(record).orElse(null);
+            boolean dead = profile != null && profile.dead();
+            boolean captured = profile != null && profile.captured();
+            boolean inCoop = profile != null && profile.inCoop();
+            boolean lost = profile != null && profile.lost();
+            NPCEntity liveNpc = liveRef == null || !liveRef.isValid() ? null
+                    : safeGetComponent(store, liveRef, NPCEntity.getComponentType());
+            String role = firstNonBlank(liveNpc == null ? null : linkPolicyService.resolveRoleId(liveNpc),
+                    profile == null ? null : profile.roleId(), firstNonBlank(record.cachedRoleId,
+                            RoleNameResolver.extractRoleIdFromNameKey(record.cachedNameKey), null));
+            String displayName = firstNonBlank(liveNpc == null ? null : npcNameResolver.resolveNpcDisplayName(liveRef, store, liveNpc),
+                    profile == null ? null : profile.customName(), firstNonBlank(
+                            profile == null ? null : npcNameResolver.resolveSnapshotDisplayName(
+                                    profile.displayName(), record.cachedNameKey, profile.roleId()),
+                            unloadedNameService.resolve(record), null));
+            String groupId = normalizeOptional(record.groupId);
+            CommandGroupService.GroupRecord group = resolveGroup(groupById, groupId);
+            String groupName = group == null ? groupId : group.name;
+            String groupColor = group == null ? null : group.colorHex;
+            boolean loaded = liveNpc != null
+                    && !dead && !captured && !inCoop;
+            CareValues care = !includeCareValues ? CareValues.EMPTY
+                    : loaded ? rawCareValues(liveRef, store) : savedCareValues(record, player, role);
+            long deadRemaining = dead && profile != null ? remainingUntil(profile.restorationAvailableAtMs(), System.currentTimeMillis()) : 0L;
+            if (dead && !TameworkRuntimeSettings.reviveSystemEnabled(
+                    TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId).isDeadRespawnEnabled())) deadRemaining = -1L;
+            entries.add(new LinkedNpcEntry(record.npcUuid, displayName,
+                    0, 0, care.happiness, care.maxHappiness, 0, null,
+                    care.hunger, care.maxHunger, care.thirst, care.maxThirst,
+                    loaded, record.homePosition != null, dead, captured, inCoop, lost, deadRemaining,
+                    null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                    false, false, false, false, linkedIds.contains(record.npcUuid), record.active,
+                    normalize(role), npcNameResolver.resolveRoleDisplayName(role, record.cachedNameKey),
+                    groupId, groupName, groupColor, record.breedingEnabled,
+                    false, 0L, 0.0, false));
+        }
+        return entries;
+    }
+
+    /** Reads scalar care state for sort ordering without resolving modifiers or nearby populations. */
+    private CareValues rawCareValues(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        TameworkHappinessComponent happiness = safeGetComponent(store, npcRef,
+                TameworkHappinessComponent.getComponentType());
+        TameworkNeedsComponent needs = safeGetComponent(store, npcRef,
+                TameworkNeedsComponent.getComponentType());
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
+        boolean happinessEnabled = HappinessConfigResolver.isRuntimeEnabled(happinessConfig);
+        boolean needsEnabled = needs != null && NeedsConfigResolver.isRuntimeEnabled(needsConfig);
+        double happinessMin = happinessEnabled ? Math.min(happinessConfig.getValues().getMin(), happinessConfig.getValues().getMax()) : 0;
+        double happinessMax = happinessEnabled ? Math.max(happinessConfig.getValues().getMin(), happinessConfig.getValues().getMax()) : 0;
+        double currentHappiness = happiness == null ? Double.NaN : happiness.getValue();
+        if (happinessEnabled && !Double.isFinite(currentHappiness)) {
+            var breeding = safeGetComponent(store, npcRef,
+                    com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.getComponentType());
+            currentHappiness = breeding != null && Double.isFinite(breeding.getHappiness())
+                    ? breeding.getHappiness() : happinessConfig.getValues().getCurrentDefault();
+        }
+        int maxHappiness = happinessEnabled ? Math.max(1, Math.round((float) happinessMax)) : 0;
+        int maxHunger = needsEnabled ? Math.max(1, Math.round((float) needsConfig.getValues().getHungerMax())) : 0;
+        int maxThirst = needsEnabled ? Math.max(1, Math.round((float) needsConfig.getValues().getThirstMax())) : 0;
+        return new CareValues(
+                clampCare(Math.max(happinessMin, Math.min(happinessMax, currentHappiness)), maxHappiness), maxHappiness,
+                clampCare(needsEnabled ? Math.max(needsConfig.getValues().getHungerMin(),
+                        Math.min(needsConfig.getValues().getHungerMax(), needs.getHunger())) : 0, maxHunger), maxHunger,
+                clampCare(needsEnabled ? Math.max(needsConfig.getValues().getThirstMin(),
+                        Math.min(needsConfig.getValues().getThirstMax(), needs.getThirst())) : 0, maxThirst), maxThirst);
+    }
+
+    private CareValues savedCareValues(LinkedNpcRecord record, Player player, @Nullable String role) {
+        CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null
+                : persistenceView.savedPanel(record, player.getUuid());
+        CommandSavedNpcPanelSnapshot.CareSnapshot care = saved == null ? null : saved.careSnapshot(role);
+        return care == null ? CareValues.EMPTY : new CareValues(care.happiness(), care.maxHappiness(),
+                care.hunger(), care.maxHunger(), care.thirst(), care.maxThirst());
+    }
+
+    private static int clampCare(double value, int maximum) {
+        return maximum <= 0 || !Double.isFinite(value) ? 0
+                : Math.max(0, Math.min(maximum, Math.round((float) value)));
+    }
+
+    private record CareValues(int happiness, int maxHappiness, int hunger, int maxHunger,
+                              int thirst, int maxThirst) {
+        private static final CareValues EMPTY = new CareValues(0, 0, 0, 0, 0, 0);
     }
 
     private ResolvedEntries resolveEntriesFromRecords(Player player, Store<EntityStore> store,

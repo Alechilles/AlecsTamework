@@ -287,6 +287,11 @@ public final class TameworkRuntimeSettings {
         return values.recallTeleportingEnabled();
     }
 
+    /** Maximum number of companion cards the linked command panel builds for one page. */
+    public int commandPanelCardsPerPage() {
+        return values.commandPanelCardsPerPage();
+    }
+
     public boolean telemetryEnabled() {
         return values.telemetryEnabled();
     }

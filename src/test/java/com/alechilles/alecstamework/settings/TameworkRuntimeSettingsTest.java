@@ -10,6 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TameworkRuntimeSettingsTest {
 
     @Test
+    void commandPanelCardsPerPageUsesTheDefaultRuntimeBound() {
+        assertEquals(50, TameworkRuntimeSettings.from(
+                TameworkSettingsStore.defaultGlobalSettings()
+        ).commandPanelCardsPerPage());
+    }
+
+    @Test
     void breedingGenderSettingGatesButDoesNotForceConfigGender() {
         TameworkRuntimeSettings enabledSettings =
                 TameworkRuntimeSettings.from(TameworkSettingsStore.defaultGlobalSettings());

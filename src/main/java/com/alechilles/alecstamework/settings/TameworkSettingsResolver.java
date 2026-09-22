@@ -69,7 +69,10 @@ public final class TameworkSettingsResolver {
                 AnimalAgingMode.fromConfigValue(
                         resolveString(values.animalAgingMode(), defaults.animalAgingMode())
                 ).toConfigValue(),
-                resolveBoolean(values.animalOldAgeDeathEnabled(), defaults.animalOldAgeDeathEnabled())
+                resolveBoolean(values.animalOldAgeDeathEnabled(), defaults.animalOldAgeDeathEnabled()),
+                resolveCommandPanelCardsPerPage(
+                        values.commandPanelCardsPerPage(), defaults.commandPanelCardsPerPage()
+                )
         );
     }
 
@@ -85,6 +88,11 @@ public final class TameworkSettingsResolver {
 
     private static int resolveNonNegativeInt(@Nullable Integer value, int fallback) {
         return Math.max(0, value != null ? value : fallback);
+    }
+
+    private static int resolveCommandPanelCardsPerPage(@Nullable Integer value, @Nullable Integer fallback) {
+        int resolved = value != null ? value : fallback != null ? fallback : 50;
+        return Math.max(1, Math.min(100, resolved));
     }
 
     private static double resolveNonNegativeDouble(@Nullable Double value, double fallback) {

@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import javax.annotation.Nullable;
 
 /**
  * Handles command-item hotbar lookups and metadata writes.
@@ -203,6 +204,16 @@ final class CommandToolInventoryService {
             String toolId,
             com.alechilles.alecstamework.config.assets.TwCommandItemConfig config
     ) {
+        return buildLinkedPanelSnapshotForTool(player, toolId, config, null);
+    }
+
+    CommandPanelEntrySourceService.CommandPanelSnapshot
+    buildLinkedPanelSnapshotForTool(
+            Player player,
+            String toolId,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config,
+            @Nullable com.alechilles.alecstamework.ui.LinkedNpcPanelPageState pagination
+    ) {
         if (player == null || toolId == null || toolId.isBlank()
                 || panelEntrySourceService == null) {
             return new CommandPanelEntrySourceService.CommandPanelSnapshot(
@@ -233,7 +244,7 @@ final class CommandToolInventoryService {
             }
             return panelEntrySourceService.buildSnapshot(
                     player, world.getEntityStore().getStore(), stack, config,
-                    toolId
+                    toolId, pagination
             );
         }
         return new CommandPanelEntrySourceService.CommandPanelSnapshot(

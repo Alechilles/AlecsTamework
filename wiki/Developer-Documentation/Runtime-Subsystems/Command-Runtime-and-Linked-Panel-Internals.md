@@ -99,6 +99,18 @@ world-thread dispatcher. The command feature handler closes the cache and subscr
 at shutdown. Saved card values never authorize a live action or mutate persistence.
 
 ## Important runtime seams
+- Standard command pages own a world-thread-local pagination state. The server setting
+  `commandPanel.cardsPerPage` defaults to 50 and is bounded to 1–100. Ordinary flute
+  sources filter and sort detached roster summaries before hydrating only the selected
+  window. Status/nearby tabs and group selection use the complete summary roster.
+  Care sorts read scalar values across that roster; other sorts do not request off-page
+  saved-card snapshots. Background refreshes keep the same page, and shrinking results
+  clamp the page index. External renderers and configured public UI contributors
+  retain their full snapshot contract. A standard menu with such contributors
+  paginates rendering, but still assembles their complete public snapshot.
+- Bonded and owner-family standard panels paginate their existing read models after
+  view filtering. The pre-detail hydration limit described above applies to ordinary
+  owned-companion menus.
 - Each ordinary panel refresh shares one profile projection snapshot, one managed-profile
   snapshot, and one decoded flute-record list across owned/captured records, row identities,
   and protected controls. Canonical tool membership determines selection without building

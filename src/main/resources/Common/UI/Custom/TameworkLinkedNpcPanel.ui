@@ -236,6 +236,26 @@ DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
 
 
 }
+Group #TameworkLinkedPanelPagination {
+    Anchor: (Height: 32);
+    LayoutMode: Left;
+    Visible: false;
+    TextButton #TameworkLinkedPanelPagePrevious {
+        Anchor: (Width: 110, Height: 28);
+        Style: $A.@PanelButton;
+        Text: %server.tamework.ui.linkedPanel.pagination.previous;
+    }
+    Label #TameworkLinkedPanelPageStatus {
+        FlexWeight: 1;
+        Anchor: (Height: 28);
+        Style: (FontSize: 13, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+    TextButton #TameworkLinkedPanelPageNext {
+        Anchor: (Width: 110, Height: 28);
+        Style: $A.@PanelButton;
+        Text: %server.tamework.ui.linkedPanel.pagination.next;
+    }
+}
 Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);
                 Text: %server.tamework.ui.linkedPanel.emptyState;

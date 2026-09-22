@@ -4,6 +4,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkSettingsFormParserTest {
@@ -53,10 +54,27 @@ class TameworkSettingsFormParserTest {
         assertFalse(parser.hasChanges(form, saved, saved));
     }
 
+    @Test
+    void commandPanelCardsPerPageRequiresTheConfiguredBound() {
+        TameworkSettingsValues saved = TameworkSettingsValues.fromRuntime();
+        TameworkSettingsPage.EventPayload form = form(saved);
+
+        form.commandPanelCardsPerPage = "0";
+        assertFalse(parser.parse(form, saved).success());
+        form.commandPanelCardsPerPage = "101";
+        assertFalse(parser.parse(form, saved).success());
+        form.commandPanelCardsPerPage = "25";
+        TameworkSettingsFormParser.ParseResult result = parser.parse(form, saved);
+        assertTrue(result.success());
+        assertTrue(parser.hasChanges(form, saved, saved));
+        assertEquals(25, result.values().commandPanelCardsPerPage());
+    }
+
     private static TameworkSettingsPage.EventPayload form(TameworkSettingsValues values) {
         TameworkSettingsPage.EventPayload form = new TameworkSettingsPage.EventPayload();
         form.populationLimit = Integer.toString(values.populationLimitPerPlayerOwnedTotal());
         form.populationScope = values.populationPerPlayerLimitScope().configValue();
+        form.commandPanelCardsPerPage = Integer.toString(values.commandPanelCardsPerPage());
         form.claimLimitChunk = Integer.toString(values.simpleClaimsLimitPerClaimChunk());
         form.claimLimitTotal = Integer.toString(values.simpleClaimsLimitPerClaimTotal());
         form.needsOwnerOfflineGraceHours = Double.toString(values.needsOwnerOfflineGraceHours());

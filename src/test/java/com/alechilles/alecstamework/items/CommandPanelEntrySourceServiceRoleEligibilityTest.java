@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.LinkedNpcPanelPageState;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
@@ -110,6 +111,83 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
         }
     }
 
+    @Test
+    void ownedPaginationLimitsDetailedCardsWhileFiltersKeepTheFullSelectionRoster() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(world);
+            List<LinkedNpcRecord> records = new java.util.ArrayList<>();
+            java.util.Map<com.alechilles.alecstamework.companion.identity.ProfileId,
+                    com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> profiles =
+                    new java.util.HashMap<>();
+            for (int index = 0; index < 120; index++) {
+                UUID id = new UUID(0L, index + 10L);
+                String role = index % 2 == 0 ? "Cow" : "Chicken";
+                records.add(record(id, role));
+                var value = profile(OWNER, id, role,
+                        index < 60
+                                ? com.alechilles.alecstamework.companion.lifecycle.LifecycleState.UNLOADED
+                                : com.alechilles.alecstamework.companion.lifecycle.LifecycleState.CAPTURED);
+                profiles.put(value.profileId(), value);
+            }
+            ItemStack stack = new CommandLinkedNpcRecordStore().write(
+                    new MetadataStack("test:flute", new BsonDocument()), records);
+            stack = CommandCompanionPreferences.state(stack, "All");
+            var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
+                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
+                        com.alechilles.alecstamework.companion.identity.ProfileId id) {
+                    return java.util.Optional.ofNullable(profiles.get(id));
+                }
+                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
+                        com.alechilles.alecstamework.companion.identity.NpcAlias alias) {
+                    return profiles.values().stream().filter(value -> alias.equals(value.currentAlias())).findFirst();
+                }
+            });
+            var names = new CommandNpcNameResolver();
+            var policy = new CommandLinkPolicyService();
+            var linked = new CommandLinkedPanelEntryService(new CommandLinkedNpcRecordStore(),
+                    null, names, null, persistence, policy, new CommandGroupService(), null);
+            var detailReads = new java.util.concurrent.atomic.AtomicInteger();
+            setField(persistence, "savedPanels", new CommandSavedNpcPanelCache(id -> {
+                detailReads.incrementAndGet();
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
+            }));
+            var source = new CommandPanelEntrySourceService(linked, new CommandPanelPreferenceService(),
+                    policy, names, null, null, null, new CommandOwnedPanelRecordSource(() -> profiles));
+            TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(new BsonDocument(), new ExtraInfo());
+            LinkedNpcPanelPageState page = new LinkedNpcPanelPageState();
+            page.setPageSize(50);
+
+            var first = source.buildSnapshot(player, store, stack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(50, first.entries().size(),
+                    "Only one page may reach detailed card assembly.");
+            org.junit.jupiter.api.Assertions.assertEquals(50, detailReads.get(),
+                    "Default ordering must request saved detail only for the visible page.");
+            org.junit.jupiter.api.Assertions.assertEquals(120, first.selectionEntries().size(),
+                    "Group selection still describes every owned companion.");
+            assertTrue(page.move(1));
+            var second = source.buildSnapshot(player, store, stack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(50, second.entries().size());
+
+            ItemStack filteredStack = new CommandPanelPreferenceService().setSpeciesFilter(stack, "Chicken");
+            var filtered = source.buildSnapshot(player, store, filteredStack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(10, filtered.entries().size(),
+                    "The clamped second page contains only the remaining filtered cards.");
+            org.junit.jupiter.api.Assertions.assertEquals(120, filtered.selectionEntries().size(),
+                    "Filtering cards must not shrink group-selection inputs.");
+
+            ItemStack storedStack = CommandCompanionPreferences.state(stack, "Stored");
+            var stored = source.buildSnapshot(player, store, storedStack, config, "flute", page);
+            org.junit.jupiter.api.Assertions.assertEquals(10, stored.entries().size(),
+                    "The stored-state filter must apply before the clamped page window.");
+            org.junit.jupiter.api.Assertions.assertEquals(120, stored.selectionEntries().size());
+        }
+    }
+
     private static LinkedNpcRecord record(UUID id, String roleId) {
         return new LinkedNpcRecord(id, null, null, "Companion", null, roleId);
     }
@@ -127,6 +205,12 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
         return (Unsafe) field.get(null);
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private static final class MetadataStack extends ItemStack {

@@ -244,6 +244,30 @@ $C.@PageOverlay {
               }
             }
 
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsCommandPanelCardsPerPageLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.commandPanelCardsPerPage;
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsCommandPanelCardsPerPageTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.commandPanelCardsPerPage;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              TextField #TwSettingsCommandPanelCardsPerPageInput {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+              }
+            }
+
             Group { Anchor: (Height: 8); }
 
             Group {

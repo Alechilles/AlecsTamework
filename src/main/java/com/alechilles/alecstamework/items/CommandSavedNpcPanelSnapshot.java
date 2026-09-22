@@ -72,6 +72,41 @@ final class CommandSavedNpcPanelSnapshot {
 
     StoredLocation storedLocation() { return storedLocation; }
 
+    /**
+     * Returns saved scalar care values for roster ordering without constructing
+     * progression, trait, cooldown, location, or tooltip presentation.
+     */
+    @Nullable
+    CareSnapshot careSnapshot(@Nullable String fallbackRole) {
+        if (facts == null) return null;
+        String effectiveRole = firstNonBlank(roleId, fallbackRole);
+        int happiness = 0;
+        int maxHappiness = 0;
+        if (facts.happiness != null) {
+            TwHappinessConfig config = first(TwHappinessConfig.resolveById(facts.happiness.configId),
+                    TwHappinessConfig.resolveForRole(effectiveRole));
+            if (config != null && config.isEnabled()) {
+                maxHappiness = Math.max(1, round(config.getValues().getMax()));
+                happiness = Math.max(0, Math.min(maxHappiness, round(facts.happiness.value)));
+            }
+        }
+        int hunger = 0;
+        int maxHunger = 0;
+        int thirst = 0;
+        int maxThirst = 0;
+        if (facts.needs != null) {
+            TwNeedsConfig config = first(TwNeedsConfig.resolveById(facts.needs.configId),
+                    TwNeedsConfig.resolveForRole(effectiveRole));
+            if (config != null && config.isEnabled()) {
+                maxHunger = Math.max(1, round(config.getValues().getHungerMax()));
+                maxThirst = Math.max(1, round(config.getValues().getThirstMax()));
+                hunger = Math.max(0, Math.min(maxHunger, round(facts.needs.hunger)));
+                thirst = Math.max(0, Math.min(maxThirst, round(facts.needs.thirst)));
+            }
+        }
+        return new CareSnapshot(happiness, maxHappiness, hunger, maxHunger, thirst, maxThirst);
+    }
+
     private CommandSavedNpcPanelSnapshot(CommandSavedNpcPanelSnapshot source, StoredLocation location) {
         this.observedAtMs = source == null ? 0 : source.observedAtMs;
         this.roleId = source == null ? null : source.roleId;
@@ -535,6 +570,8 @@ final class CommandSavedNpcPanelSnapshot {
         }
     }
     private record Health(int current, int maximum) { Health(double current, double maximum) { this(round(current), Math.max(1, round(maximum))); } }
+    record CareSnapshot(int happiness, int maxHappiness, int hunger, int maxHunger,
+                        int thirst, int maxThirst) { }
     private record Happiness(String configId, double value) { }
     private record Needs(String configId, double hunger, double thirst) { }
     private static Cooldown cooldown(long untilMs,

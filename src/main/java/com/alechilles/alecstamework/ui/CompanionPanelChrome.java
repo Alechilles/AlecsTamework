@@ -54,12 +54,13 @@ final class CompanionPanelChrome {
         }
         set(c, values, "#TameworkLinkedPanelInlineFilterTextControls.Visible", true);
         set(c, values, "#CompanionNearbyCheck.Value", page.companionBinding.nearby().get());
-        LinkedNpcEntry[] applicable = page.pendingRemovals.filter(page.baseLinkedNpcEntries);
+        LinkedNpcEntry[] roster = page.rosterSummaries();
+        LinkedNpcEntry[] applicable = page.pendingRemovals.filter(roster);
         TabCounts counts = tabCounts(applicable, page.companionBinding.nearby().get(),
                 LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
-        long count = Arrays.stream(page.baseLinkedNpcEntries).filter(LinkedNpcEntry::active).count();
+        long count = Arrays.stream(roster).filter(LinkedNpcEntry::active).count();
         set(c, values, "#TameworkCommandMenuTitle.Text", text(language, "title") + " — "
-                + LocalizedText.format(language, "tamework.ui.companions.count", count, page.baseLinkedNpcEntries.length));
+                + LocalizedText.format(language, "tamework.ui.companions.count", count, roster.length));
         for (String filter : FILTERS) {
             String selector = "#Companion" + filter;
             boolean selected = filter.equals(page.companionBinding.state().get());

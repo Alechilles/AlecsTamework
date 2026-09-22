@@ -122,6 +122,7 @@ final class CommandSelectionLinkedPanelRuntime {
         if (page.dismissed || !page.isCurrentLinkedPanelOwner()
                 || version != page.pendingFilterTextApplyVersion) return;
         if (page.panelSetFilterTextCallback != null) {
+            page.resetPagination();
             page.panelSetFilterTextCallback.accept(page.pendingFilterTextInput);
         }
         page.pendingFilterTextInput = null;
@@ -212,7 +213,7 @@ final class CommandSelectionLinkedPanelRuntime {
         bindGroupShortcuts(commands, events, values, false);
         if (!page.config.usesBondedCompanionRoster()) values.set(commands, "#TameworkCommandMenuTitle.Text",
                 LinkedNpcPanelPresentationSupport.title(page.panelModeValueSupplier,
-                        page.linkedNpcEntries, language));
+                        page.filteredRosterCount(), language));
         values.set(commands, "#TameworkLinkedPanelGroupSelectorDropdown.Entries",
                 LinkedNpcPanelPresentationSupport.entries(
                         page.panelGroupActivationEntriesSupplier));
@@ -281,6 +282,7 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         BondedCompanionPanelChrome.bindToolbar(commands, events, page, values);
         CompanionPanelChrome.bind(commands, events, page, values);
+        LinkedNpcPanelPaginationBinder.bind(commands, events, page.pagination, language, values);
         if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
             return LinkedNpcPanelRefreshOutcome.evaluated(
                     progressionEligible, shortestCountdown());
@@ -529,7 +531,9 @@ final class CommandSelectionLinkedPanelRuntime {
     void applyLocalFilter() {
         if (page.companionBinding != null) {
             var previous = page.linkedNpcEntries;
-            page.linkedNpcEntries = CompanionPanelChrome.filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries),
+            page.linkedNpcEntries = page.pagination != null && page.pagination.hasRosterEntries()
+                    ? page.pendingRemovals.filter(page.baseLinkedNpcEntries)
+                    : CompanionPanelChrome.filter(page.pendingRemovals.filter(page.baseLinkedNpcEntries),
                     page.companionBinding.state().get(), page.companionBinding.nearby().get(),
                     LinkedNpcPanelPresentationSupport.input(page.panelFilterInputValueSupplier));
             if (page.preserveCompanionOrder && previous != null) {
@@ -537,6 +541,11 @@ final class CommandSelectionLinkedPanelRuntime {
                 for (var entry : page.baseLinkedNpcEntries) current.put(entry.npcUuid(), entry);
                 page.linkedNpcEntries = java.util.Arrays.stream(previous).map(entry -> current.get(entry.npcUuid()))
                         .filter(java.util.Objects::nonNull).toArray(LinkedNpcEntry[]::new);
+            }
+            if (page.pagination != null && !page.pagination.enabled()) {
+                page.pagination.setTotalEntries(page.linkedNpcEntries.length);
+                page.linkedNpcEntries = java.util.Arrays.copyOfRange(page.linkedNpcEntries,
+                        page.pagination.startIndex(), page.pagination.endIndex());
             }
             return;
         }
@@ -549,6 +558,12 @@ final class CommandSelectionLinkedPanelRuntime {
         if (page.config.usesBondedCompanionRoster()) {
             page.linkedNpcEntries = BondedCompanionPanelChrome.filter(page.linkedNpcEntries,
                     page.featureController.presentations(), page.rosterStateFilter);
+        }
+        if (page.pagination != null && (!page.pagination.enabled() || page.config.usesBondedCompanionRoster()
+                || page.config.usesOwnerCommandFamilyRoster())) {
+            page.pagination.setTotalEntries(page.linkedNpcEntries.length);
+            page.linkedNpcEntries = java.util.Arrays.copyOfRange(page.linkedNpcEntries,
+                    page.pagination.startIndex(), page.pagination.endIndex());
         }
     }
 }

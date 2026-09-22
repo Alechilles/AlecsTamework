@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.LinkedNpcPanelPageState;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -144,6 +145,15 @@ final class CommandPanelEntrySourceService {
                                        ItemStack stack,
                                        TwCommandItemConfig config,
                                        String toolId) {
+        return buildSnapshot(player, store, stack, config, toolId, null);
+    }
+
+    CommandPanelSnapshot buildSnapshot(Player player,
+                                       Store<EntityStore> store,
+                                       ItemStack stack,
+                                       TwCommandItemConfig config,
+                                       String toolId,
+                                       @Nullable LinkedNpcPanelPageState pagination) {
         if (player != null && config != null
                 && config.usesBondedCompanionRoster()
                 && bondedEntrySource != null) {
@@ -154,6 +164,10 @@ final class CommandPanelEntrySourceService {
                     durable.featurePresentations(), durable.emptyStateKey());
         }
         RefreshInputs inputs = refreshInputs(player, store, stack, config);
+        if (pagination != null && config != null
+                && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster()) {
+            return buildPagedOwnedSnapshot(player, store, stack, config, toolId, inputs, pagination);
+        }
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);
         CommandLinkedPanelEntryService.ResolvedEntries rosterEntries =
@@ -206,6 +220,116 @@ final class CommandPanelEntrySourceService {
 
     void warmBondedRoster(@Nullable UUID ownerUuid, @Nullable String rosterId) {
         if (bondedEntrySource != null) bondedEntrySource.warm(ownerUuid, rosterId);
+    }
+
+    /** Pages ordinary rosters before the detailed live and saved-card builders run. */
+    private CommandPanelSnapshot buildPagedOwnedSnapshot(
+            Player player, Store<EntityStore> store, ItemStack stack,
+            TwCommandItemConfig config, String toolId, RefreshInputs inputs,
+            LinkedNpcPanelPageState pagination
+    ) {
+        if (player == null || store == null || inputs.owned() == null) {
+            pagination.setTotalEntries(0);
+            return new CommandPanelSnapshot(List.of(), Map.of(), null, List.of());
+        }
+        List<LinkedNpcRecord> records = new ArrayList<>(inputs.owned().ownedRecords().size()
+                + inputs.owned().capturedRecords().size());
+        records.addAll(inputs.owned().ownedRecords());
+        records.addAll(inputs.owned().capturedRecords());
+        appendFreshOwnedRecords(player, store, records, inputs.linkedRecords());
+        Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+        CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
+        boolean includeCareValues = sort == CommandPanelPreferenceService.PanelSort.Happiness
+                || sort == CommandPanelPreferenceService.PanelSort.Hunger
+                || sort == CommandPanelPreferenceService.PanelSort.Thirst;
+        List<LinkedNpcEntry> summaryEntries = linkedPanelEntryService
+                .resolveOwnedEntrySummariesFromRecords(player, store, stack, records, linkedIds, includeCareValues);
+        Map<UUID, String> profileKeys = profileKeys(records);
+        summaryEntries = withOwnedGroups(summaryEntries, profileKeys);
+        List<LinkedNpcEntry> selectionEntries = decorate(player, store, stack, config, summaryEntries, inputs);
+        List<LinkedNpcEntry> legacyFiltered = applyFiltersAndSort(selectionEntries, stack);
+        pagination.setRosterEntries(legacyFiltered);
+        List<LinkedNpcEntry> filtered = pagination.filterRoster(
+                legacyFiltered,
+                CommandCompanionPreferences.state(stack), CommandCompanionPreferences.nearby(stack), "");
+        pagination.setTotalEntries(filtered.size());
+        List<LinkedNpcEntry> window = filtered.subList(pagination.startIndex(), pagination.endIndex());
+        Set<UUID> pageIds = new HashSet<>(window.size());
+        for (LinkedNpcEntry entry : window) pageIds.add(entry.npcUuid());
+        List<LinkedNpcRecord> pageRecords = new ArrayList<>(pageIds.size());
+        for (LinkedNpcRecord record : records) if (record != null && pageIds.contains(record.npcUuid)) pageRecords.add(record);
+        CommandLinkedPanelEntryService.ResolvedEntries resolved = linkedPanelEntryService.resolveOwnedEntriesFromRecords(
+                player, store, stack, toolId, pageRecords, linkedIds);
+        List<LinkedNpcEntry> detailed = resolved.entries();
+        detailed = decorate(player, store, stack, config,
+                withOwnedGroups(detailed, profileKeys), inputs);
+        // Detail resolution can suppress a stale live target after the lightweight pass.
+        detailed = retainPagedOrder(detailed, resolved.renderedIds(), window);
+        var features = new java.util.HashMap<UUID, CommandPanelFeaturePresentation>();
+        features.putAll(inputs.owned().managedFeatures());
+        Set<UUID> ownedIds = inputs.owned().ownedRecords().stream()
+                .map(record -> record.npcUuid).collect(java.util.stream.Collectors.toSet());
+        for (LinkedNpcEntry entry : detailed) {
+            if (entry.captured() && !ownedIds.contains(entry.npcUuid())) {
+                features.put(entry.npcUuid(), CommandPanelFeaturePresentation.readOnlyManaged());
+            }
+        }
+        return new CommandPanelSnapshot(detailed, features, null, selectionEntries);
+    }
+
+    /** Keeps newly tamed indexed NPCs visible before their durable profile is published. */
+    private void appendFreshOwnedRecords(Player player, Store<EntityStore> store,
+                                         List<LinkedNpcRecord> records,
+                                         List<LinkedNpcRecord> selectionRecords) {
+        Set<UUID> known = new HashSet<>();
+        for (LinkedNpcRecord record : records) if (record != null && record.npcUuid != null) known.add(record.npcUuid);
+        for (Ref<EntityStore> ref : liveCandidates(player, store, true, new Vector3d(), 0.0)) {
+            NPCEntity npc = ref == null || !ref.isValid() ? null : store.getComponent(ref, NPCEntity.getComponentType());
+            if (npc == null || npc.getUuid() == null || !known.add(npc.getUuid())
+                    || !CommandGenericTargetAuthority.allowsNearbyPresentation(ref, store)
+                    || !linkPolicyService.passesOwnerAndTamed(true, false, ref, player.getUuid(), store)) continue;
+            LinkedNpcRecord selection = linkedRecordStore.find(selectionRecords, npc.getUuid());
+            records.add(new LinkedNpcRecord(npc.getUuid(), null, null, null, null,
+                    npcNameResolver.resolveNpcDisplayName(ref, store, npc),
+                    npcNameResolver.resolveNpcNameKey(npc), linkPolicyService.resolveRoleId(npc), null,
+                    selection != null && selection.active,
+                    selection != null && selection.breedingEnabled,
+                    selection == null ? null : selection.groupId));
+        }
+    }
+
+    private static Map<UUID, String> profileKeys(List<LinkedNpcRecord> records) {
+        Map<UUID, String> keys = new java.util.HashMap<>();
+        for (LinkedNpcRecord record : records) {
+            if (record != null && record.npcUuid != null && record.profileId != null) {
+                keys.put(record.npcUuid, CommandCompanionGroups.profileKey(record.profileId));
+            }
+        }
+        return keys;
+    }
+
+    private static List<LinkedNpcEntry> withOwnedGroups(List<LinkedNpcEntry> entries,
+                                                          Map<UUID, String> profileKeys) {
+        List<LinkedNpcEntry> result = new ArrayList<>(entries.size());
+        for (LinkedNpcEntry entry : entries) {
+            result.add(entry.withOwnedActions().withCompanionGroups(
+                    profileKeys.getOrDefault(entry.npcUuid(), CommandCompanionGroups.entityKey(entry.npcUuid())),
+                    entry.groups(), entry.selectionSupported()));
+        }
+        return result;
+    }
+
+    private static List<LinkedNpcEntry> retainPagedOrder(List<LinkedNpcEntry> detailed,
+                                                           Map<UUID, UUID> renderedIds,
+                                                           List<LinkedNpcEntry> window) {
+        Map<UUID, LinkedNpcEntry> byId = new java.util.HashMap<>();
+        for (LinkedNpcEntry entry : detailed) byId.put(entry.npcUuid(), entry);
+        List<LinkedNpcEntry> result = new ArrayList<>(window.size());
+        for (LinkedNpcEntry summary : window) {
+            LinkedNpcEntry entry = byId.get(renderedIds.getOrDefault(summary.npcUuid(), summary.npcUuid()));
+            if (entry != null) result.add(entry);
+        }
+        return result;
     }
 
     private List<LinkedNpcEntry> buildEntries(Player player,

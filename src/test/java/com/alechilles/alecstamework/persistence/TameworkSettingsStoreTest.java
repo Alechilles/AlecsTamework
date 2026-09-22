@@ -64,7 +64,8 @@ class TameworkSettingsStoreTest {
                 true,
                 false,
                 "FULL",
-                true
+                true,
+                73
         );
 
         assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, snapshot, null));
@@ -111,6 +112,7 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
         assertEquals("FULL", overrides.animalAgingMode());
         assertEquals(true, overrides.animalOldAgeDeathEnabled());
+        assertEquals(73, overrides.commandPanelCardsPerPage());
 
         String raw = Files.readString(settingsFile);
         assertTrue(raw.contains("\"population\""));
@@ -135,6 +137,8 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"revive\""));
         assertTrue(raw.contains("\"travel\""));
         assertTrue(raw.contains("\"recallTeleportingEnabled\""));
+        assertTrue(raw.contains("\"commandPanel\""));
+        assertTrue(raw.contains("\"cardsPerPage\""));
         assertTrue(raw.contains("\"telemetry\""));
         assertTrue(raw.contains("\"breadcrumbsEnabled\""));
     }
@@ -187,6 +191,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.recallTeleportingEnabled());
         assertEquals(true, overrides.telemetryEnabled());
         assertEquals(true, overrides.telemetryBreadcrumbsEnabled());
+        assertEquals(50, overrides.commandPanelCardsPerPage());
     }
 
     @Test
@@ -224,6 +229,25 @@ class TameworkSettingsStoreTest {
         assertEquals(true, settings.recallTeleportingEnabled());
         assertEquals(true, settings.telemetryEnabled());
         assertEquals(true, settings.telemetryBreadcrumbsEnabled());
+        assertEquals(50, settings.commandPanelCardsPerPage());
+    }
+
+    @Test
+    void commandPanelCardsPerPageDefaultsAndClampsPersistedInput() throws Exception {
+        Path existingFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("existing").resolve("Tamework"));
+        Files.createDirectories(existingFile.getParent());
+        Files.writeString(existingFile, "{\"version\":2}", StandardCharsets.UTF_8);
+        assertEquals(50, TameworkSettingsStore.loadGlobalSettings(existingFile, null).commandPanelCardsPerPage());
+
+        Path zeroFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("zero").resolve("Tamework"));
+        Files.createDirectories(zeroFile.getParent());
+        Files.writeString(zeroFile, "{\"commandPanel\":{\"cardsPerPage\":0}}", StandardCharsets.UTF_8);
+        assertEquals(1, TameworkSettingsStore.loadGlobalSettings(zeroFile, null).commandPanelCardsPerPage());
+
+        Path highFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("high").resolve("Tamework"));
+        Files.createDirectories(highFile.getParent());
+        Files.writeString(highFile, "{\"commandPanel\":{\"cardsPerPage\":101}}", StandardCharsets.UTF_8);
+        assertEquals(100, TameworkSettingsStore.loadGlobalSettings(highFile, null).commandPanelCardsPerPage());
     }
 
     @Test

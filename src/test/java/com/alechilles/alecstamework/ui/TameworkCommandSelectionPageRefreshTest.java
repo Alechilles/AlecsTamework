@@ -32,6 +32,71 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Observable page refresh coverage through the package-scoped packet boundary. */
 class TameworkCommandSelectionPageRefreshTest {
+    @Test
+    void fullPublicSnapshotStillRendersOnlyTheSelectedPage() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        LinkedNpcPanelPageState pagination = new LinkedNpcPanelPageState();
+        pagination.setEnabled(false);
+        page.configurePagination(pagination);
+        List<LinkedNpcEntry> rows = new ArrayList<>();
+        for (int i = 0; i < 60; i++) rows.add(new LinkedNpcEntry(UUID.randomUUID(),
+                "Animal " + i, 10, 10, 0, 0, null, 0, 0, 0, 0,
+                true, true, false, false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY));
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> rows);
+        UICommandBuilder initial = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, initial, events, null);
+        assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPageStatus.Text", "Page 1 of 2");
+        assertFalse(java.util.Arrays.stream(initial.getCommands()).anyMatch(command ->
+                command.selector != null && command.selector.startsWith("#TameworkLinkedPanelList[50]")));
+        event(page, LinkedNpcPanelPaginationBinder.NEXT);
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Name.Text", "Animal 50");
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void paginationNavigatesAndClampsAfterRosterShrinks() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        LinkedNpcPanelPageState pagination = new LinkedNpcPanelPageState();
+        page.configurePagination(pagination);
+        List<LinkedNpcEntry> rows = new ArrayList<>();
+        for (int i = 0; i < 60; i++) rows.add(new LinkedNpcEntry(UUID.randomUUID(),
+                "Animal " + i, 10, 10, 0, 0, null, 0, 0, 0, 0,
+                true, true, false, false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY));
+        AtomicReference<List<LinkedNpcEntry>> roster = new AtomicReference<>(rows);
+        AtomicInteger sourceReads = new AtomicInteger();
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) () -> {
+            sourceReads.incrementAndGet();
+            pagination.setTotalEntries(roster.get().size());
+            return roster.get().subList(pagination.startIndex(), pagination.endIndex());
+        });
+        UICommandBuilder initial = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, initial, events, null);
+        assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPageStatus.Text", "Page 1 of 2");
+
+        event(page, LinkedNpcPanelPaginationBinder.NEXT);
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Name.Text", "Animal 50");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageStatus.Text", "Page 2 of 2");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageNext.Disabled", "true");
+        int reads = sourceReads.get();
+        event(page, LinkedNpcPanelPaginationBinder.NEXT);
+        assertEquals(reads, sourceReads.get(), "Last-page clicks must not reread cards.");
+
+        roster.set(List.of(rows.getFirst()));
+        invoke(page, "refreshLinkedNpcEntries");
+        refresh(page, true);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Name.Text", "Animal 0");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageStatus.Text", "Page 1 of 1");
+        page.onDismiss(null, null);
+    }
+
     private static final UUID OWNER = UUID.fromString("a1000000-0000-0000-0000-000000000001");
     private static final UUID CARD = UUID.fromString("a2000000-0000-0000-0000-000000000001");
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);

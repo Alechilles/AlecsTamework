@@ -109,7 +109,13 @@ The original primary-command eligibility rules still apply.
 
 Group shortcuts below the command assignments activate all companions, none,
 or a named group. The selected shortcut is highlighted, and the list scrolls
-when needed. The menu title includes the current mode and visible NPC count.
+when needed. The menu title includes the current mode and roster count.
+
+The standard menu displays 50 companion cards per page by default. Server owners
+can change **Command panel cards per page** in `/tw settings` to 1–100. Previous
+and Next switch pages without changing command selection. Search, status tabs,
+and sorting apply to the complete roster. Ordinary flute menus calculate detailed
+status and tooltips only for the current page.
 
 For ordinary command items, groups belong to the player and are shared by compatible
 flutes. A companion may belong to several groups or none. The group dropdown on each

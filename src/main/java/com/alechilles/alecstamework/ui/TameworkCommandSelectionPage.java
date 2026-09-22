@@ -138,6 +138,7 @@ public final class TameworkCommandSelectionPage
     private volatile boolean navigationPending;
     volatile long pendingFilterTextApplyVersion;
     String pendingFilterTextInput;
+    LinkedNpcPanelPageState pagination;
     private final CommandSelectionLinkedPanelRuntime linkedPanelRuntime =
             new CommandSelectionLinkedPanelRuntime(this);
 
@@ -421,6 +422,24 @@ public final class TameworkCommandSelectionPage
         return defaultDecorations;
     }
 
+    /** Shares the source's world-thread-owned page window with its navigation controls. */
+    public void configurePagination(@Nonnull LinkedNpcPanelPageState pagination) {
+        this.pagination = java.util.Objects.requireNonNull(pagination);
+    }
+
+    void resetPagination() {
+        if (pagination != null) pagination.reset();
+    }
+
+    int filteredRosterCount() {
+        return pagination == null ? linkedNpcEntries.length : pagination.totalEntries();
+    }
+
+    LinkedNpcEntry[] rosterSummaries() {
+        return pagination != null && pagination.hasRosterEntries()
+                ? pagination.rosterEntries().toArray(LinkedNpcEntry[]::new) : baseLinkedNpcEntries;
+    }
+
     @Override
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder, @Nonnull Store<EntityStore> store) {
@@ -458,7 +477,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.append("#TameworkLinkedPanelRoot",
                     "TameworkLinkedNpcPanelRemovalConfirm.ui");
             removalConfirmOverlay.applyTo(commandBuilder, resolveLanguage());
-            commandBuilder.set("#TameworkCommandMenuTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
+            commandBuilder.set("#TameworkCommandMenuTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, filteredRosterCount(), resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
@@ -655,6 +674,7 @@ public final class TameworkCommandSelectionPage
                 && commandId.startsWith(BondedCompanionPanelChrome.FILTER_COMMAND_PREFIX)) {
             String selected = commandId.substring(BondedCompanionPanelChrome.FILTER_COMMAND_PREFIX.length());
             if (BondedCompanionPanelChrome.FILTERS.contains(selected)) {
+                resetPagination();
                 rosterStateFilter = selected;
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
@@ -668,10 +688,14 @@ public final class TameworkCommandSelectionPage
         if (companionBinding != null) {
             if (commandId.startsWith(CompanionPanelChrome.FILTER_PREFIX)) {
                 String state = commandId.substring(CompanionPanelChrome.FILTER_PREFIX.length());
-                if (CompanionPanelChrome.FILTERS.contains(state)) companionBinding.setState().accept(state);
+                if (CompanionPanelChrome.FILTERS.contains(state)) {
+                    resetPagination();
+                    companionBinding.setState().accept(state);
+                }
                 refreshLinkedNpcEntries(); sendCardRefreshUpdate(); return;
             }
             if (data.companionNearby != null) {
+                resetPagination();
                 companionBinding.setNearby().accept(data.companionNearby);
                 refreshLinkedNpcEntries(); sendCardRefreshUpdate(); return;
             }
@@ -742,6 +766,17 @@ public final class TameworkCommandSelectionPage
             sendCardRefreshUpdate();
             return;
         }
+        if (LinkedNpcPanelPaginationBinder.PREVIOUS.equals(commandId)
+                || LinkedNpcPanelPaginationBinder.NEXT.equals(commandId)) {
+            if (pagination == null) return;
+            cancelPendingFilterTextApply();
+            int direction = LinkedNpcPanelPaginationBinder.NEXT.equals(commandId) ? 1 : -1;
+            if (pagination.move(direction)) {
+                pendingUnlinkNpcUuid = null;
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
         if (data.panelAutoLinkEnabled != null) {
             cancelPendingFilterTextApply();
             if (panelSetAutoLinkEnabledCallback != null) {
@@ -760,6 +795,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (data.panelModeValue != null) {
+            resetPagination();
             cancelPendingFilterTextApply();
             if (panelSetModeCallback != null) {
                 panelSetModeCallback.accept(data.panelModeValue);
@@ -770,6 +806,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (data.panelSortValue != null) {
+            resetPagination();
             cancelPendingFilterTextApply();
             if (panelSetSortCallback != null) {
                 panelSetSortCallback.accept(data.panelSortValue);
@@ -780,6 +817,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (data.panelFilterModeValue != null) {
+            resetPagination();
             cancelPendingFilterTextApply();
             if (panelSetFilterModeCallback != null) {
                 panelSetFilterModeCallback.accept(data.panelFilterModeValue);
@@ -841,6 +879,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (PANEL_FILTER_CLEAR_COMMAND_ID.equals(commandId)) {
+            resetPagination();
             cancelPendingFilterTextApply();
             if (panelClearFiltersCallback != null) {
                 panelClearFiltersCallback.run();
@@ -1232,6 +1271,8 @@ public final class TameworkCommandSelectionPage
     private void buildLinkedNpcPanel(@Nonnull UICommandBuilder commandBuilder,
                                      @Nonnull UIEventBuilder eventBuilder) {
         linkedPanelRuntime.build(commandBuilder, eventBuilder);
+        LinkedNpcPanelPaginationBinder.bind(commandBuilder, eventBuilder, pagination,
+                resolveLanguage(), null);
     }
 
     private void dispatchRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit) { linkedPanelRuntime.dispatch(permit); }

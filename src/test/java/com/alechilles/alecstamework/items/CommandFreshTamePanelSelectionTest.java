@@ -91,6 +91,12 @@ class CommandFreshTamePanelSelectionTest {
             assertTrue(selectedRow.active(),
                     "The selected item record must mark the live owned row as active.");
 
+            var page = new com.alechilles.alecstamework.ui.LinkedNpcPanelPageState();
+            page.setPageSize(1);
+            assertTrue(source.buildSnapshot(player, scope.store, selected.updatedItem, config, "flute", page)
+                            .entries().stream().anyMatch(entry -> NPC.equals(entry.npcUuid())),
+                    "Pagination must retain a newly tamed indexed animal before its profile is published.");
+
             var deselected = mutations.toggleLinkedNpcActive(
                     selected.updatedItem, NPC, config, ownedRecord);
             assertTrue(deselected.toggled);

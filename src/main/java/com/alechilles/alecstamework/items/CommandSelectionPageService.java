@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
+import com.alechilles.alecstamework.ui.LinkedNpcPanelPageState;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.CommandActiveHighlightBinding;
 import com.alechilles.alecstamework.ui.CommandUiHostPage;
@@ -396,6 +397,9 @@ final class CommandSelectionPageService {
         PageContext pageContext = pageContext(
                 player, uiPlayerRef, config, working, toolId, actions,
                 genericAuthority, bondedAuthority);
+        // Public contributors and external renderers consume a complete roster snapshot.
+        // Their existing API has no page-window contract.
+        pageContext.pagination().setEnabled(configuredRenderer == null && config.getUiContributors().isEmpty());
         InitialUiState initial = initialSnapshot(
                 sessionId, configuredRenderer, player, config, working,
                 toolId, selected, rosterMode, pageContext.snapshot());
@@ -406,13 +410,16 @@ final class CommandSelectionPageService {
                 new AtomicReference<>();
         Runnable refreshRequest = () -> refreshHosted(
                 createdRef.get(), uiPlayerRef.getUuid(), config, toolId, actions,
-                genericAuthority, bondedAuthority);
+                genericAuthority, bondedAuthority, pageContext.pagination());
         CommandUiPageCoordinator.Created created = coordinator.create(
                 uiPlayerRef, openContext, snapshot,
-                () -> new StandardCommandUiController(createSelectionPage(
-                        pageContext, buildNpcCallbacks(pageContext),
-                        buildFeatureCallbacks(pageContext),
-                        buildPanelCallbacks(pageContext))),
+                () -> {
+                    pageContext.pagination().setEnabled(config.getUiContributors().isEmpty());
+                    return new StandardCommandUiController(createSelectionPage(
+                            pageContext, buildNpcCallbacks(pageContext),
+                            buildFeatureCallbacks(pageContext),
+                            buildPanelCallbacks(pageContext)));
+                },
                 forceStandard ? List.of() : config.getUiContributors(), actionCatalog.genericBindings(),
                 actionCatalog.bondedBindings(),
                 actionCatalog::attach,
@@ -465,7 +472,8 @@ final class CommandSelectionPageService {
             String toolId,
             Actions actions,
             BooleanSupplier genericAuthority,
-            BondedLifecycleAuthority bondedAuthority
+            BondedLifecycleAuthority bondedAuthority,
+            LinkedNpcPanelPageState pagination
     ) {
         if (created == null || !created.host().isOpen()
                 || !created.session().isOpen()) return;
@@ -492,7 +500,7 @@ final class CommandSelectionPageService {
             String selected = working.getFromMetadataOrNull(
                     TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
             PageContext context = pageContext(player, currentRef, config, working,
-                    toolId, actions, genericAuthority, bondedAuthority);
+                    toolId, actions, genericAuthority, bondedAuthority, pagination);
             CommandUiSnapshot fresh = initialSnapshot(
                     previous.sessionId(), previous.rendererId(), player, config,
                     working, toolId, selected, previous.rosterMode(),
@@ -1218,12 +1226,28 @@ final class CommandSelectionPageService {
             BooleanSupplier genericCallbackAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority
     ) {
+        return pageContext(player, uiPlayerRef, config, working, toolId, actions,
+                genericCallbackAuthority, bondedLifecycleAuthority, new LinkedNpcPanelPageState());
+    }
+
+    private PageContext pageContext(
+            Player player, PlayerRef uiPlayerRef, TwCommandItemConfig config,
+            @Nullable ItemStack working, String toolId, Actions actions,
+            BooleanSupplier genericCallbackAuthority,
+            BondedLifecycleAuthority bondedLifecycleAuthority,
+            LinkedNpcPanelPageState pagination
+    ) {
         UUID ownerUuid = player.getUuid();
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);
         CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
-                () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
-                        resolveCurrentPlayer(ownerUuid), toolId, config)
+                () -> {
+                    pagination.setPageSize(com.alechilles.alecstamework.settings.TameworkRuntimeSettings
+                            .current().commandPanelCardsPerPage());
+                    return toolInventoryService.buildLinkedPanelSnapshotForTool(
+                            resolveCurrentPlayer(ownerUuid), toolId, config,
+                            pagination.enabled() ? pagination : null);
+                }
         );
         LinkedPanelRefreshSignalSource pageSignals = pageSignals(ownerUuid, config);
         BooleanSupplier toolAuthority = config.usesBondedCompanionRoster()
@@ -1238,7 +1262,7 @@ final class CommandSelectionPageService {
                 toolAuthority,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
                 toolAuthority,
-                bondedLifecycleAuthority, panelSnapshot,
+                bondedLifecycleAuthority, panelSnapshot, pagination,
                 pageSignals,
                 working == null ? null : working.getFromMetadataOrNull(
                         TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING),
@@ -1330,6 +1354,7 @@ final class CommandSelectionPageService {
                 panelCallbacks.assignGroup(), npcCallbacks.selectCommand(),
                 context.refreshSignals()
         );
+        page.configurePagination(context.pagination());
         if (context.genericRosterActions()) {
             page.configureGroupColors(() -> groupAssignPageService.resolveGroupColors(
                     resolveCurrentPlayer(context.ownerUuid()), context.toolId()));
@@ -1798,6 +1823,7 @@ final class CommandSelectionPageService {
             BooleanSupplier preferenceAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority,
             CommandPanelSnapshotState snapshot,
+            LinkedNpcPanelPageState pagination,
             LinkedPanelRefreshSignalSource refreshSignals,
             String selectedId,
             boolean requireUnlinkConfirm,
