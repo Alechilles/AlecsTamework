@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
+import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -318,6 +321,16 @@ final class SqlitePublicRecoveryDispatcher {
                     claim
             );
         }
+        if (isInvalidatedDormantPreparation(claim, result)) {
+            // Dormant work is database-only and its preparation stores no reservation or
+            // live-effect evidence, so this invalidated PREPARED operation needs no compensation.
+            return retireInvalidatedDormantPreparation(
+                    claims,
+                    index,
+                    context,
+                    claim
+            );
+        }
         if (result.status() != OperationWorkflowResult.Status.PUBLISHED
                 && result.status()
                 != OperationWorkflowResult.Status.COMPENSATED) {
@@ -337,6 +350,58 @@ final class SqlitePublicRecoveryDispatcher {
                 index + 1,
                 context.completedOne()
         );
+    }
+
+    private boolean isInvalidatedDormantPreparation(
+            OperationRecoveryClaim claim,
+            OperationWorkflowResult result
+    ) {
+        Throwable failure = result.failure();
+        return claim.operation().phase() == OperationPhase.PREPARED
+                && workerId.equals(claim.operation().leaseOwner())
+                && CompanionDormantTransitionDefinition.KIND.equals(
+                claim.operation().kind()
+        ) && result.status() == OperationWorkflowResult.Status.PREPARE_FAILED
+                // Recall's snapshot fence can also reject unreadable evidence, not just stale state.
+                && claim.payload().payload() instanceof CompanionDormantTransitionRequest dormant
+                && dormant.source().kind() != DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED
+                && failure != null
+                && failure.getClass() == IllegalStateException.class
+                && "operation_prepared_detail_missing".equals(
+                failure.getMessage()
+        );
+    }
+
+    private CompletionStage<SqlitePublicRecoveryResult>
+    retireInvalidatedDormantPreparation(
+            List<OperationRecoveryClaim> claims,
+            int index,
+            DispatchContext context,
+            OperationRecoveryClaim claim
+    ) {
+        return operations.engine().transition(
+                claim.operation(),
+                OperationPhase.FAILED,
+                "PREPARATION_INVALIDATED",
+                "operation_prepared_detail_missing",
+                clock.getAsLong()
+        ).completion().thenCompose(transition -> {
+            if (!(transition instanceof PersistenceTransactionResult.Committed<?>)) {
+                return completed(
+                        SqlitePublicRecoveryResult.Status.DISPATCH_FAILED,
+                        context.passCount(),
+                        context.completedCount(),
+                        context.deferred().size(),
+                        context.quarantined(),
+                        transactionFailure(transition)
+                );
+            }
+            return dispatchClaims(
+                    claims,
+                    index + 1,
+                    context.completedOne()
+            );
+        });
     }
 
     private boolean isPopulationDependencyDeferred(

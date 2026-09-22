@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
 import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
@@ -71,6 +72,8 @@ class SqlitePublicPersistenceAdapterTest {
             OperationId.parse("40000000-0000-0000-0000-000000000005");
     private static final OperationId DORMANT_OPERATION =
             OperationId.parse("40000000-0000-0000-0000-000000000006");
+    private static final OperationId SUPERSEDING_DORMANT_OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000008");
     private static final OperationId OWNER_RELEASE_OPERATION =
             OperationId.parse("40000000-0000-0000-0000-000000000007");
     private static final NpcAlias DOMAIN_ALIAS =
@@ -432,6 +435,129 @@ class SqlitePublicPersistenceAdapterTest {
     }
 
     @Test
+    void retiresInvalidatedPreparedDormantTransitionWithoutChangingNewerState()
+            throws Exception {
+        SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
+        seedActiveDomainProfile();
+        CompanionDormantTransitionRequest stale = dormantRequest(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000010"),
+                "stale-dormant-transition",
+                -200
+        );
+        committed(adapter.publicOperations().engine().prepare(
+                CompanionDormantTransitionDefinition.INSTANCE,
+                new OperationRequest<>(
+                        DORMANT_OPERATION,
+                        new IdempotencyKey("stale-dormant-transition"),
+                        stale,
+                        SqliteCompanionDormantOperations.FEATURE_SCOPE,
+                        LifecycleRevision.INITIAL,
+                        List.of(OperationScope.profile(DOMAIN_PROFILE)),
+                        -200
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+
+        CompanionDormantTransitionRequest newer = dormantRequest(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000011"),
+                "newer-dormant-transition",
+                -150
+        );
+        OperationWorkflowResult completed = adapter.dormantOperations().submit(
+                SUPERSEDING_DORMANT_OPERATION,
+                new IdempotencyKey("newer-dormant-transition"),
+                newer
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, completed.status());
+        List<com.alechilles.alecstamework.persistence.projection.ProjectionEvent>
+                newerEvents;
+        try (Connection connection = connections.openReadConnection()) {
+            newerEvents = new SqliteProjectionOutboxStore(connection)
+                    .findByOperation(SUPERSEDING_DORMANT_OPERATION);
+        }
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                boundaries(), "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, recovered.status());
+        assertEquals(OperationPhase.FAILED, operationPhase(adapter, DORMANT_OPERATION));
+        PersistenceReadResult.Found<SqliteOperationReader.OperationReadModel> failed =
+                assertInstanceOf(PersistenceReadResult.Found.class,
+                        adapter.operationReader().find(DORMANT_OPERATION)
+                                .toCompletableFuture().get(10, TimeUnit.SECONDS));
+        assertEquals("PREPARATION_INVALIDATED", failed.value().operation().failureKind());
+        assertEquals("operation_prepared_detail_missing",
+                failed.value().operation().failureCode());
+        assertEquals(OperationPhase.PUBLISHED,
+                operationPhase(adapter, SUPERSEDING_DORMANT_OPERATION));
+        PersistenceReadResult.Found<List<CompanionSnapshot>> snapshots =
+                assertInstanceOf(PersistenceReadResult.Found.class,
+                        adapter.snapshotReader().findHistory(
+                                DOMAIN_PROFILE,
+                                DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind()
+                        ).toCompletableFuture().get(10, TimeUnit.SECONDS)
+                );
+        assertEquals(newer.snapshot(), snapshots.value().getFirst());
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteCompanionSnapshotStore(connection)
+                    .findById(stale.snapshot().snapshotId()).isEmpty());
+            assertTrue(new SqliteProjectionOutboxStore(connection)
+                    .findByOperation(DORMANT_OPERATION).isEmpty());
+            assertEquals(LifecycleState.DEAD_REVIVABLE,
+                    new SqliteCompanionLifecycleStore(connection)
+                            .findByProfile(DOMAIN_PROFILE)
+                            .orElseThrow().state());
+            assertEquals(com.alechilles.alecstamework.companion.identity
+                            .CompanionAlias.State.RETIRED,
+                    new SqliteCompanionIdentityStore(connection)
+                            .resolveAlias(DOMAIN_ALIAS).orElseThrow().state());
+            assertEquals(newerEvents, new SqliteProjectionOutboxStore(connection)
+                    .findByOperation(SUPERSEDING_DORMANT_OPERATION));
+        }
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, adapter.recover(
+                boundaries(), "restart-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS).status());
+    }
+
+    @Test
+    void doesNotRetirePreparedRecallWhenItsSnapshotEvidenceIsInvalid() throws Exception {
+        SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
+        seedActiveDomainProfile();
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_lifecycle
+                     SET lifecycle_state = 'UNLOADED', location_kind = 'NONE',
+                         location_key = NULL, world_key = NULL
+                     WHERE profile_id = ?
+                     """)) {
+            statement.setString(1, DOMAIN_PROFILE.toString());
+            statement.executeUpdate();
+        }
+        // Recall requires a full version-two snapshot. This rejected fixture must stay pending
+        // because the same validation result can also conceal an unreadable tool-link store.
+        CompanionDormantTransitionRequest recall = dormantRequest(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000012"),
+                "invalid-recall-evidence", -200,
+                DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED
+        );
+        committed(adapter.publicOperations().engine().prepare(
+                CompanionDormantTransitionDefinition.INSTANCE,
+                new OperationRequest<>(DORMANT_OPERATION,
+                        new IdempotencyKey("invalid-recall-evidence"), recall,
+                        SqliteCompanionDormantOperations.FEATURE_SCOPE,
+                        LifecycleRevision.INITIAL,
+                        List.of(OperationScope.profile(DOMAIN_PROFILE)), -200)
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(boundaries(), "startup-worker")
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.DISPATCH_FAILED, recovered.status());
+        assertEquals("operation_prepared_detail_missing", recovered.failure().getMessage());
+        assertEquals(OperationPhase.PREPARED, operationPhase(adapter, DORMANT_OPERATION));
+    }
+
+    @Test
     void doesNotDeferOwnerPopulationSourceMismatch() throws Exception {
         SqlitePublicPersistenceAdapter adapter = populationDomainAdapter();
         seedActiveDomainProfile();
@@ -696,6 +822,48 @@ class SqlitePublicPersistenceAdapterTest {
         assertEquals(OperationPhase.LIVE_APPLYING,
                 adapter.populationDomainAdmissionOperations().claim(DOMAIN_OPERATION)
                         .toCompletableFuture().get(10, TimeUnit.SECONDS).phase());
+    }
+
+    private CompanionDormantTransitionRequest dormantRequest(
+            SnapshotId snapshotId,
+            String receiptKey,
+            long observedAtMs
+    ) {
+        return dormantRequest(snapshotId, receiptKey, observedAtMs,
+                DormantSourceEvidence.Kind.DEATH_COMPONENT);
+    }
+
+    private CompanionDormantTransitionRequest dormantRequest(
+            SnapshotId snapshotId,
+            String receiptKey,
+            long observedAtMs,
+            DormantSourceEvidence.Kind sourceKind
+    ) {
+        String snapshotJson = "{\"health\":0}";
+        return new CompanionDormantTransitionRequest(
+                DOMAIN_PROFILE,
+                LifecycleRevision.INITIAL,
+                new CompanionSnapshot(
+                        snapshotId,
+                        DOMAIN_PROFILE,
+                        sourceKind.snapshotKind(),
+                        1,
+                        snapshotJson,
+                        Sha256Hash.ofUtf8(snapshotJson),
+                        LifecycleRevision.INITIAL,
+                        true,
+                        observedAtMs
+                ),
+                new DormantSourceEvidence(
+                        DOMAIN_ALIAS,
+                        "world",
+                        sourceKind,
+                        ReconciliationGeneration.INITIAL,
+                        receiptKey,
+                        observedAtMs
+                ),
+                observedAtMs
+        );
     }
 
     private void seedActiveDomainProfile() throws Exception {

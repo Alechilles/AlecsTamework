@@ -112,6 +112,17 @@ Ordinary unload, temporary absence, and timeout are not death or Lost evidence.
 Tamework does not infer a destructive lifecycle change just because an entity
 is not currently loaded.
 
+Startup recovery retires a `PREPARED` dormant transition as `FAILED` when its
+preparation validation reports `operation_prepared_detail_missing`. Later
+companion changes, such as a coop capture and release, can invalidate that
+operation's frozen source revision or alias. This database-only operation has
+no intermediate live effect or preparation reservation to undo. Recovery keeps
+the current lifecycle, aliases, snapshots, and outbox unchanged and continues
+with unrelated operations. `EXPLICIT_RECALL_EXHAUSTED` retains its existing
+failure handling because its snapshot validation can also reject unreadable
+evidence. Other operation kinds, phases, and failure causes retain their
+existing failure handling.
+
 ## Target and source files
 
 The canonical write target is `tamework-state.sqlite` in Tamework's
