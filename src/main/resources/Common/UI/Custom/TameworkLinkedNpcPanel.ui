@@ -277,21 +277,26 @@ Group #TameworkLinkedPanelPagination {
         FlexWeight: 1;
         Anchor: (Height: 28);
     }
-    TextButton #TameworkLinkedPanelPagePrevious {
-        Anchor: (Width: 96, Height: 28);
-        Style: $A.@PanelButton;
-        Text: %server.tamework.ui.linkedPanel.pagination.previous;
-    }
-    Label #TameworkLinkedPanelPageStatus {
-        Anchor: (Width: 124, Height: 28);
-        Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
-    }
-    TextButton #TameworkLinkedPanelPageNext {
-        OutlineColor: #7acb88;
-        OutlineSize: 1;
-        Anchor: (Width: 96, Height: 28);
-        Style: $A.@PanelButton;
-        Text: %server.tamework.ui.linkedPanel.pagination.next;
+    Group #TameworkLinkedPanelPageNavigation {
+        Anchor: (Width: 316, Height: 28);
+        LayoutMode: Left;
+        Visible: false;
+        TextButton #TameworkLinkedPanelPagePrevious {
+            Anchor: (Width: 96, Height: 28);
+            Style: $A.@PanelButton;
+            Text: %server.tamework.ui.linkedPanel.pagination.previous;
+        }
+        Label #TameworkLinkedPanelPageStatus {
+            Anchor: (Width: 124, Height: 28);
+            Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        TextButton #TameworkLinkedPanelPageNext {
+            OutlineColor: #7acb88;
+            OutlineSize: 1;
+            Anchor: (Width: 96, Height: 28);
+            Style: $A.@PanelButton;
+            Text: %server.tamework.ui.linkedPanel.pagination.next;
+        }
     }
 }
 }

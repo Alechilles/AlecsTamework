@@ -3,22 +3,30 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
-import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
-/** Compact view chrome and page-local editor. Presets change presentation only. */
+/** Saved views change presentation; the flute's command selection remains separate. */
 final class CompanionViewControls {
     private static final String PREFIX = "__view__:";
+    private enum Editor { NONE, FILTER, NAME }
+
     private final TameworkCommandSelectionPage page;
-    private boolean editing;
+    private Editor editor = Editor.NONE;
+    private String filterType = "choose";
     private List<String> species = List.of();
     private List<String> groups = List.of();
-    private boolean selected;
 
     CompanionViewControls(TameworkCommandSelectionPage page) { this.page = page; }
 
@@ -26,24 +34,28 @@ final class CompanionViewControls {
         var binding = page.viewBinding;
         var current = binding.current().get();
         String language = page.resolveLanguage();
-        var entries = new ArrayList<DropdownEntryInfo>();
-        entries.add(option(text("all"), "__all__"));
-        entries.add(option(text("selected"), "__selected__"));
         String id = binding.selectedId().get();
         var saved = binding.views().get();
-        boolean modified = saved.stream().filter(v -> v.id().equals(id))
-                .anyMatch(v -> !v.settings().equals(current));
-        for (var view : saved) entries.add(option(view.name() + (modified && view.id().equals(id) ? " *" : ""), view.id()));
+        var selectedView = saved.stream().filter(v -> v.id().equals(id)).findFirst();
+        boolean modified = selectedView.isPresent() && !selectedView.get().settings().equals(current);
         boolean customDraft = id.isBlank()
                 || "__all__".equals(id) && !current.equals(CompanionViewSettings.defaults().withState("All"))
                 || "__selected__".equals(id) && !current.equals(new CompanionViewSettings("All", false, "", "Default", true, List.of(), List.of()));
+        boolean unsaved = modified || customDraft && (!id.isBlank() || !current.equals(CompanionViewSettings.defaults()));
+        var entries = new ArrayList<DropdownEntryInfo>();
+        entries.add(option(text("all"), "__all__"));
+        entries.add(option(text("selected"), "__selected__"));
+        for (var view : saved) entries.add(option(view.name() + (modified && view.id().equals(id) ? " *" : ""), view.id()));
         if (customDraft) entries.add(option(text("custom"), "__custom__"));
         set(c, values, "#CompanionViewPicker.Entries", entries);
         set(c, values, "#CompanionViewPicker.Value", customDraft ? "__custom__" : id);
-        set(c, values, "#CompanionViewToolbar.TooltipText", text(modified || customDraft ? "modifiedHint" : "openHint"));
+        set(c, values, "#CompanionViewToolbar.TooltipText", text(unsaved ? "modifiedHint" : "openHint"));
+        set(c, values, "#CompanionViewUnsaved.Visible", unsaved);
+        set(c, values, "#CompanionViewSaveGlyph.Visible", !unsaved);
+        set(c, values, "#CompanionViewSaveGlyphUnsaved.Visible", unsaved);
+
         boolean extra = current.hasExtraFilters();
         set(c, values, "#CompanionFilterChips.Visible", extra);
-        // Both anchors move together; the footer remains inside Content's bottom edge.
         if (values == null || values.changed("viewContentTop", extra)) {
             Anchor content = new Anchor();
             content.setLeft(Value.of(10)); content.setRight(Value.of(10));
@@ -51,10 +63,11 @@ final class CompanionViewControls {
             c.setObject("#TameworkLinkedPanelRoot #Content.Anchor", content);
         }
         int left = 0;
-        left = chip(c, values, "Groups", current.groupIds(), groupNames(), left, 175, "groupChip");
-        left = chip(c, values, "Species", current.speciesIds(), speciesNames(), left, 195, "speciesChip");
+        left = chip(c, values, "Groups", current.groupIds(), groupNames(), left, "groupChip");
+        left = chip(c, values, "Species", current.speciesIds(), speciesNames(), left, "speciesChip");
         set(c, values, "#CompanionChipSelected.Visible", current.selectedOnly());
-        if (current.selectedOnly()) c.setObject("#CompanionChipSelected.Anchor", anchor(left, 0, 135, 26));
+        if (current.selectedOnly() && (values == null || values.changed("#CompanionChipSelected.left", left)))
+            c.setObject("#CompanionChipSelected.Anchor", anchor(left, 0, 156, 28));
         var roster = page.rosterSummaries();
         long selectedTotal = Arrays.stream(roster).filter(LinkedNpcEntry::active).count();
         long matchingSelected = Arrays.stream(current.filter(roster)).filter(LinkedNpcEntry::active).count();
@@ -63,41 +76,44 @@ final class CompanionViewControls {
         set(c, values, "#CompanionSelectMatching.Visible", true);
         set(c, values, "#CompanionSelectMatching.Disabled", Arrays.stream(current.filter(roster)).noneMatch(LinkedNpcEntry::selectionSupported));
         if (values != null) return;
-        // Reclaim the original two toolbar rows. Saved views share the status-tab row.
+
         c.setObject("#TameworkLinkedPanelControlsSecondary.Anchor", anchor(280, 36, 520, 28));
         c.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor", anchor(0, 0, 340, 28));
         c.setObject("#TameworkLinkedPanelFilterInput.Anchor", anchor(0, 0, 330, 28));
         e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewPicker",
                 EventData.of("@ViewId", "#CompanionViewPicker.Value"), false);
-        bindButton(e, "#CompanionViewSaveNew", "open");
-        bindButton(e, "#CompanionViewManage", "open");
-        bindButton(e, "#CompanionAddFilter", "open");
-        bindButton(e, "#CompanionChipGroups", "clearGroups");
-        bindButton(e, "#CompanionChipSpecies", "clearSpecies");
-        bindButton(e, "#CompanionChipSelected", "clearSelected");
-        bindButton(e, "#CompanionSelectMatching", "select");
-        for (String action : List.of("apply", "save", "update", "rename", "delete", "cancel")) {
-            e.addEventBinding(CustomUIEventBindingType.Activating, "#CompanionView" + capitalize(action),
-                    EventData.of("CommandId", PREFIX + action).append("@ViewName", "#CompanionViewName.Value"), false);
+        bindButton(e, "#CompanionViewSaveNew", "saveView");
+        bindButton(e, "#CompanionViewManage", "manage");
+        bindButton(e, "#CompanionAddFilter", "addFilter");
+        for (String type : List.of("Groups", "Species", "Selected")) {
+            bindButton(e, "#CompanionChip" + type + "Edit", "edit" + type);
+            bindButton(e, "#CompanionChip" + type + "Remove", "clear" + type);
         }
+        bindButton(e, "#CompanionSelectMatching", "select");
+        bindButton(e, "#CompanionFilterCancel", "cancel");
+        bindButton(e, "#CompanionViewCancel", "cancel");
+        bindButton(e, "#CompanionViewFilterSave", "filterSave");
+        bindButton(e, "#CompanionViewDelete", "delete");
+        e.addEventBinding(CustomUIEventBindingType.Activating, "#CompanionViewSave",
+                EventData.of("CommandId", PREFIX + "save").append("@ViewName", "#CompanionViewName.Value"), false);
+        e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewType",
+                EventData.of("@ViewType", "#CompanionViewType.Value"), false);
         e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewSpecies",
                 EventData.of("@ViewSpecies", "#CompanionViewSpecies.SelectedValues"), false);
         e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewGroups",
                 EventData.of("@ViewGroups", "#CompanionViewGroups.SelectedValues"), false);
-        e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewSelected",
-                EventData.of("@ViewSelected", "#CompanionViewSelected.Value"), false);
     }
 
-    /** A visible editor rejects queued card/assignment events from the covered page. */
+    /** A visible editor rejects queued card and assignment events from the covered page. */
     boolean blocksWhileEditing(CommandSelectionEventData data) {
-        if (!editing) return false;
+        if (editor == Editor.NONE) return false;
         String command = data.commandId == null ? "" : data.commandId;
         if (data.primaryCommandValue != null || data.hotswapQValue != null || data.hotswapEValue != null
                 || data.hotswapRValue != null || data.viewId != null) return true;
         if (CommandSelectionPageEventBinder.CLOSE_COMMAND_ID.equals(command)) return false;
-        if (List.of("apply", "save", "update", "rename", "delete", "cancel")
-                .stream().anyMatch(action -> (PREFIX + action).equals(command))) return false;
-        return !command.isBlank() || data.viewSpecies == null && data.viewGroups == null && data.viewSelected == null;
+        if (command.equals(PREFIX + "cancel") || command.equals(PREFIX + "filterSave")
+                || command.equals(PREFIX + "save") || command.equals(PREFIX + "delete")) return false;
+        return data.viewType == null && data.viewSpecies == null && data.viewGroups == null;
     }
 
     boolean handle(CommandSelectionEventData data, String command) {
@@ -108,43 +124,67 @@ final class CompanionViewControls {
             page.refreshView();
             return true;
         }
-        if (data.viewSpecies != null || data.viewGroups != null || data.viewSelected != null) {
-            if (!editing) return true;
-            if (data.viewSpecies != null && data.viewSpecies.length <= 128)
+        if (data.viewType != null || data.viewSpecies != null || data.viewGroups != null) {
+            if (editor != Editor.FILTER) return true;
+            if (data.viewType != null && List.of("choose", "species", "groups", "selected").contains(data.viewType)) {
+                filterType = data.viewType;
+                showFilterType();
+            }
+            if (data.viewSpecies != null && data.viewSpecies.length <= 128) {
                 species = validChoices(data.viewSpecies, speciesNames(), species);
-            if (data.viewGroups != null && data.viewGroups.length <= 128)
+                updateCaption("Species", species, speciesNames(), "anySpecies");
+            }
+            if (data.viewGroups != null && data.viewGroups.length <= 128) {
                 groups = validChoices(data.viewGroups, groupNames(), groups);
-            if (data.viewSelected != null) selected = data.viewSelected;
+                updateCaption("Groups", groups, groupNames(), "anyGroup");
+            }
             return true;
         }
         if (command.startsWith(PREFIX)) {
-            String action = command.substring(PREFIX.length());
             page.flushViewSearch();
             var current = b.current().get();
+            String action = command.substring(PREFIX.length());
             switch (action) {
-                case "open" -> { open(); return true; }
-                case "clearGroups" -> b.edit().accept(new CompanionViewSettings(current.state(), current.nearby(), current.search(), current.sort(), current.selectedOnly(), current.speciesIds(), List.of()));
-                case "clearSpecies" -> b.edit().accept(new CompanionViewSettings(current.state(), current.nearby(), current.search(), current.sort(), current.selectedOnly(), List.of(), current.groupIds()));
-                case "clearSelected" -> b.edit().accept(new CompanionViewSettings(current.state(), current.nearby(), current.search(), current.sort(), false, current.speciesIds(), current.groupIds()));
+                case "addFilter" -> { openFilter("choose"); return true; }
+                case "editGroups" -> { openFilter("groups"); return true; }
+                case "editSpecies" -> { openFilter("species"); return true; }
+                case "editSelected" -> { openFilter("selected"); return true; }
+                case "manage" -> { openName(); return true; }
+                case "saveView" -> {
+                    if (selectedView() == null) { openName(); return true; }
+                    b.save().accept("", true);
+                }
+                case "clearGroups" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), current.speciesIds(), List.of()));
+                case "clearSpecies" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), List.of(), current.groupIds()));
+                case "clearSelected" -> b.edit().accept(current.withExtraFilters(false, current.speciesIds(), current.groupIds()));
                 case "select" -> b.selectMatching().run();
                 case "cancel" -> { close(); return true; }
-                case "apply", "save", "update", "rename", "delete" -> {
-                    if (!editing) return true;
+                case "filterSave" -> {
+                    if (editor != Editor.FILTER) return true;
+                    switch (filterType) {
+                        case "species" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), species, current.groupIds()));
+                        case "groups" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), current.speciesIds(), groups));
+                        case "selected" -> b.edit().accept(current.withExtraFilters(true, current.speciesIds(), current.groupIds()));
+                        default -> { error("chooseFilterType"); return true; }
+                    }
+                    close();
+                }
+                case "save" -> {
+                    if (editor != Editor.NAME) return true;
                     String name = data.viewName == null ? "" : data.viewName.strip();
-                    if ((action.equals("save") || action.equals("rename")) && name.isEmpty()) {
-                        error("nameRequired"); return true;
+                    if (name.isEmpty()) { error("nameRequired"); return true; }
+                    var saved = selectedView();
+                    if (saved == null && b.views().get().size() >= 16) { error("limit"); return true; }
+                    if (saved == null) b.save().accept(name, false);
+                    else {
+                        b.save().accept("", true);
+                        if (!saved.name().equals(name)) b.rename().accept(name);
                     }
-                    if (action.equals("save") && b.views().get().size() >= 16) {
-                        error("limit"); return true;
-                    }
-                    if (action.equals("apply") || action.equals("save") || action.equals("update")) {
-                        b.edit().accept(new CompanionViewSettings(current.state(), current.nearby(), current.search(),
-                                current.sort(), selected, species, groups));
-                    }
-                    if (action.equals("save")) b.save().accept(name, false);
-                    if (action.equals("update")) b.save().accept(name, true);
-                    if (action.equals("rename")) b.rename().accept(name);
-                    if (action.equals("delete")) b.delete().run();
+                    close();
+                }
+                case "delete" -> {
+                    if (editor != Editor.NAME || selectedView() == null) return true;
+                    b.delete().run();
                     close();
                 }
                 default -> { return true; }
@@ -168,23 +208,57 @@ final class CompanionViewControls {
         return false;
     }
 
-    private void open() {
-        editing = true;
-        var b = page.viewBinding;
-        var current = b.current().get();
-        species = current.speciesIds(); groups = current.groupIds(); selected = current.selectedOnly();
+    private CompanionViewBinding.View selectedView() {
+        String id = page.viewBinding.selectedId().get();
+        return page.viewBinding.views().get().stream().filter(v -> v.id().equals(id)).findFirst().orElse(null);
+    }
+
+    private void openFilter(String type) {
+        editor = Editor.FILTER;
+        filterType = type;
+        var current = page.viewBinding.current().get();
+        species = current.speciesIds(); groups = current.groupIds();
         UICommandBuilder c = new UICommandBuilder();
         c.set("#CompanionViewOverlay.Visible", true);
+        c.set("#CompanionFilterEditor.Visible", true);
+        c.set("#CompanionViewNameEditor.Visible", false);
         c.set("#CompanionViewError.Text", "");
-        var saved = b.views().get().stream().filter(v -> v.id().equals(b.selectedId().get())).findFirst();
-        c.set("#CompanionViewName.Value", saved.map(CompanionViewBinding.View::name).orElse(""));
-        c.set("#CompanionViewUpdate.Disabled", saved.isEmpty());
-        c.set("#CompanionViewRename.Disabled", saved.isEmpty());
-        c.set("#CompanionViewDelete.Disabled", saved.isEmpty());
+        c.set("#CompanionViewType.Entries", List.of(
+                option(text("chooseFilterType"), "choose"), option(text("species"), "species"),
+                option(text("groups"), "groups"), option(text("selectedOnly"), "selected")));
+        c.set("#CompanionViewType.Value", type);
         populate(c, "#CompanionViewSpecies", speciesNames(), species);
         populate(c, "#CompanionViewGroups", groupNames(), groups);
-        c.set("#CompanionViewSelected.Value", selected);
+        caption(c, "Species", species, speciesNames(), "anySpecies");
+        caption(c, "Groups", groups, groupNames(), "anyGroup");
+        filterRows(c);
         page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private void openName() {
+        editor = Editor.NAME;
+        var saved = selectedView();
+        UICommandBuilder c = new UICommandBuilder();
+        c.set("#CompanionViewOverlay.Visible", true);
+        c.set("#CompanionFilterEditor.Visible", false);
+        c.set("#CompanionViewNameEditor.Visible", true);
+        c.set("#CompanionViewNameError.Text", "");
+        c.set("#CompanionViewName.Value", saved == null ? "" : saved.name());
+        c.set("#CompanionViewDelete.Visible", saved != null);
+        page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private void showFilterType() {
+        UICommandBuilder c = new UICommandBuilder();
+        filterRows(c);
+        c.set("#CompanionViewError.Text", "");
+        page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private void filterRows(UICommandBuilder c) {
+        c.set("#CompanionViewSpeciesRow.Visible", "species".equals(filterType));
+        c.set("#CompanionViewGroupsRow.Visible", "groups".equals(filterType));
+        c.set("#CompanionViewSelectedHint.Visible", "selected".equals(filterType));
     }
 
     private void populate(UICommandBuilder c, String selector, Map<String, String> names, List<String> chosen) {
@@ -193,45 +267,66 @@ final class CompanionViewControls {
         c.set(selector + ".Entries", options.entrySet().stream().map(v -> option(v.getValue(), v.getKey())).toList());
         c.set(selector + ".SelectedValues", chosen.stream().map(LocalizableString::fromString).toList());
     }
+
+    private void updateCaption(String suffix, List<String> ids, Map<String, String> names, String emptyKey) {
+        UICommandBuilder c = new UICommandBuilder();
+        caption(c, suffix, ids, names, emptyKey);
+        page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private void caption(UICommandBuilder c, String suffix, List<String> ids, Map<String, String> names, String emptyKey) {
+        String label = ids.isEmpty() ? text(emptyKey) : String.join(", ", ids.stream().map(id -> names.getOrDefault(id, id)).toList());
+        c.set("#CompanionView" + suffix + "Label.Text", label.length() > 42 ? label.substring(0, 41) + "…" : label);
+    }
+
     private void close() {
-        editing = false;
-        UICommandBuilder c = new UICommandBuilder(); c.set("#CompanionViewOverlay.Visible", false);
+        editor = Editor.NONE;
+        UICommandBuilder c = new UICommandBuilder();
+        c.set("#CompanionViewOverlay.Visible", false);
         page.packetSender.send(c, new UIEventBuilder());
     }
+
     private void error(String key) {
-        UICommandBuilder c = new UICommandBuilder(); c.set("#CompanionViewError.Text", text(key));
+        UICommandBuilder c = new UICommandBuilder();
+        c.set(editor == Editor.NAME ? "#CompanionViewNameError.Text" : "#CompanionViewError.Text", text(key));
         page.packetSender.send(c, new UIEventBuilder());
     }
+
     private Map<String, String> speciesNames() {
         var names = new TreeMap<String, String>();
         for (var entry : page.rosterSummaries()) if (entry.speciesId() != null && !entry.speciesId().isBlank())
             names.put(entry.speciesId(), entry.speciesLabel() == null || entry.speciesLabel().isBlank() ? entry.speciesId() : entry.speciesLabel());
         return names;
     }
+
     private Map<String, String> groupNames() {
         var names = new LinkedHashMap<String, String>();
         for (var entry : page.rosterSummaries()) for (var group : entry.groups()) names.put(group.id(), group.name());
         return names;
     }
+
     private int chip(UICommandBuilder c, LinkedNpcPanelRefreshValues values, String suffix, List<String> ids,
-                     Map<String, String> names, int left, int width, String key) {
+                     Map<String, String> names, int left, String key) {
         String selector = "#CompanionChip" + suffix;
         set(c, values, selector + ".Visible", !ids.isEmpty());
         if (ids.isEmpty()) return left;
         String label = String.join(", ", ids.stream().map(id -> names.getOrDefault(id, id)).toList());
         String full = LocalizedText.format(page.resolveLanguage(), "tamework.ui.views." + key, label);
-        set(c, values, selector + ".TooltipText", full);
-        if (label.length() > 18) label = label.substring(0, 17) + "...";
-        set(c, values, selector + ".Text", LocalizedText.format(page.resolveLanguage(), "tamework.ui.views." + key, label));
-        if (values == null || values.changed(selector + ".left", left)) c.setObject(selector + ".Anchor", anchor(left, 0, width, 26));
+        set(c, values, selector + "Edit.TooltipText", full);
+        if (label.length() > 18) label = label.substring(0, 17) + "…";
+        String shown = LocalizedText.format(page.resolveLanguage(), "tamework.ui.views." + key, label);
+        set(c, values, selector + "Edit.Text", shown);
+        int width = Math.clamp(shown.length() * 7 + 56, 132, 224);
+        if (values == null || values.changed(selector + ".layout", left + ":" + width))
+            c.setObject(selector + ".Anchor", anchor(left, 0, width, 28));
         return left + width + 6;
     }
+
     private static List<String> validChoices(String[] values, Map<String, String> available, List<String> existing) {
         return Arrays.stream(values).filter(Objects::nonNull).filter(v -> available.containsKey(v) || existing.contains(v)).distinct().toList();
     }
     private static DropdownEntryInfo option(String label, String id) { return new DropdownEntryInfo(LocalizableString.fromString(label), id); }
     private String text(String key) { return LocalizedText.resolve(page.resolveLanguage(), "tamework.ui.views." + key); }
-    private static String capitalize(String s) { return Character.toUpperCase(s.charAt(0)) + s.substring(1); }
     private static void bindButton(UIEventBuilder e, String selector, String action) {
         e.addEventBinding(CustomUIEventBindingType.Activating, selector, EventData.of("CommandId", PREFIX + action), false);
     }

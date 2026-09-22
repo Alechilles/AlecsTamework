@@ -41,6 +41,16 @@ class CompanionViewSettingsTest {
         assertEquals("All", settings.withState("all").state());
     }
 
+    @Test
+    void speciesFilterSkipsLegacyEntriesWithoutSpecies() {
+        LinkedNpcEntry unknown = entry("Unknown", null, false, false);
+        LinkedNpcEntry chicken = entry("Chicken", "Chicken", false, false);
+        CompanionViewSettings settings = CompanionViewSettings.defaults().withState("All")
+                .withExtraFilters(false, List.of("Chicken"), List.of());
+
+        assertArrayEquals(new LinkedNpcEntry[]{chicken}, settings.filter(new LinkedNpcEntry[]{unknown, chicken}));
+    }
+
     private static LinkedNpcEntry entry(String name, String species, boolean active, boolean nearby, String... groups) {
         UUID id = UUID.randomUUID();
         return new LinkedNpcEntry(id, name, 10, 10, 0, 0, 0, null,

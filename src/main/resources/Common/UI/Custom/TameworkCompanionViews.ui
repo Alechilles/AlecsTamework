@@ -4,13 +4,15 @@ $C = "Common.ui";
 Group #CompanionViewToolbar {
   Anchor: (Top: 10, Right: 10, Width: 460, Height: 28);
   TextTooltipStyle: $C.@DefaultTextTooltipStyle;
-  DropdownBox #CompanionViewPicker {
-    Anchor: (Left: 0, Width: 250, Height: 28);
-    Style: $A.@PanelDropdown;
-    MaxSelection: 1;
+  DropdownBox #CompanionViewPicker { Anchor: (Left: 0, Width: 270, Height: 28); Style: $A.@PanelDropdown; MaxSelection: 1; }
+  Group #CompanionViewUnsaved { Anchor: (Left: 278, Width: 110, Height: 28); Visible: false; Background: #4b3e20; OutlineColor: #bc9445; OutlineSize: 1;
+    Label { Anchor: (Left: 2, Right: 2, Height: 28); Text: %server.tamework.ui.views.unsaved; Style: (FontSize: 11, RenderBold: true, TextColor: #f1c66a, HorizontalAlignment: Center, VerticalAlignment: Center); }
   }
-  TextButton #CompanionViewSaveNew { Anchor: (Left: 256, Width: 94, Height: 28); Text: %server.tamework.ui.views.saveButton; Style: $A.@PanelButton; }
-  TextButton #CompanionViewManage { Anchor: (Right: 0, Width: 104, Height: 28); Text: %server.tamework.ui.views.manageButton; Style: $A.@PanelButton; }
+  TextButton #CompanionViewSaveNew { Anchor: (Left: 396, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.saveButton; Style: $A.@PanelButton; }
+  Group #CompanionViewSaveGlyph { Anchor: (Left: 401, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewSave_Glyph_Default.png", Color: #e8e4da); HitTestVisible: false; }
+  Group #CompanionViewSaveGlyphUnsaved { Anchor: (Left: 401, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewSave_Glyph_Default.png", Color: #f1c66a); HitTestVisible: false; Visible: false; }
+  TextButton #CompanionViewManage { Anchor: (Left: 432, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.manageButton; Style: $A.@PanelButton; }
+  Group { Anchor: (Left: 437, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewEdit_Glyph_Default.png", Color: #e8e4da); HitTestVisible: false; }
 }
 TextButton #CompanionAddFilter {
   Anchor: (Top: 46, Right: 10, Width: 92, Height: 28);
@@ -18,38 +20,70 @@ TextButton #CompanionAddFilter {
   Style: $A.@PanelButton;
 }
 Group #CompanionFilterChips {
-  Anchor: (Top: 82, Left: 10, Right: 10, Height: 26);
+  Anchor: (Top: 82, Left: 10, Right: 10, Height: 28);
   Visible: false;
-  TextButton #CompanionChipGroups { Anchor: (Left: 0, Width: 175, Height: 26); Style: $A.@PanelButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
-  TextButton #CompanionChipSpecies { Anchor: (Left: 181, Width: 195, Height: 26); Style: $A.@PanelButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
-  TextButton #CompanionChipSelected { Anchor: (Left: 382, Width: 135, Height: 26); Text: %server.tamework.ui.views.selectedChip; Style: $A.@PanelButton; }
-  Label #CompanionHiddenSelection { Anchor: (Right: 0, Width: 365, Height: 26); Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: End, VerticalAlignment: Center); }
+  Group #CompanionChipGroups {
+    Anchor: (Left: 0, Width: 180, Height: 28);
+    TextButton #CompanionChipGroupsEdit { Anchor: (Left: 0, Right: 32, Height: 28); Style: $A.@PanelButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    TextButton #CompanionChipGroupsRemove { Anchor: (Right: 0, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.removeFilter; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Right: 3, Top: 3, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+  }
+  Group #CompanionChipSpecies {
+    Anchor: (Left: 186, Width: 180, Height: 28);
+    TextButton #CompanionChipSpeciesEdit { Anchor: (Left: 0, Right: 32, Height: 28); Style: $A.@PanelButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    TextButton #CompanionChipSpeciesRemove { Anchor: (Right: 0, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.removeFilter; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Right: 3, Top: 3, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+  }
+  Group #CompanionChipSelected {
+    Anchor: (Left: 372, Width: 160, Height: 28);
+    TextButton #CompanionChipSelectedEdit { Anchor: (Left: 0, Right: 32, Height: 28); Text: %server.tamework.ui.views.selectedChip; Style: $A.@PanelButton; }
+    TextButton #CompanionChipSelectedRemove { Anchor: (Right: 0, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.removeFilter; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Right: 3, Top: 3, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+  }
+  Label #CompanionHiddenSelection { Anchor: (Right: 0, Width: 280, Height: 28); Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: End, VerticalAlignment: Center); }
 }
 Group #CompanionViewOverlay {
   Anchor: (Top: 0, Bottom: 0, Left: 0, Right: 0);
   Background: #101311(0.85);
   Visible: false;
-  Group #CompanionViewEditor {
-    Anchor: (Top: 150, Left: 114, Width: 700, Height: 366);
+  Group #CompanionFilterEditor {
+    Anchor: (Top: 224, Left: 244, Width: 440, Height: 244);
     Background: #202923;
     OutlineColor: #627969;
     OutlineSize: 1;
-    Label { Anchor: (Top: 14, Left: 20, Right: 20, Height: 28); Text: %server.tamework.ui.views.editorTitle; Style: (FontSize: 20, RenderBold: true, TextColor: #e8e4da); }
-    Label { Anchor: (Top: 48, Left: 20, Right: 20, Height: 24); Text: %server.tamework.ui.views.editorHint; Style: (FontSize: 12, TextColor: #b9beb8); }
-    Label { Anchor: (Top: 82, Left: 20, Width: 310, Height: 22); Text: %server.tamework.ui.views.species; Style: (FontSize: 13, TextColor: #d6d9d0); }
-    Label { Anchor: (Top: 82, Left: 360, Width: 320, Height: 22); Text: %server.tamework.ui.views.groups; Style: (FontSize: 13, TextColor: #d6d9d0); }
-    DropdownBox #CompanionViewSpecies { Anchor: (Top: 108, Left: 20, Width: 310, Height: 30); MaxSelection: 0; Style: $A.@CompanionGroupDropdown; NoItemsText: %server.tamework.ui.views.anySpecies; }
-    DropdownBox #CompanionViewGroups { Anchor: (Top: 108, Left: 360, Width: 320, Height: 30); MaxSelection: 0; Style: $A.@CompanionGroupDropdown; NoItemsText: %server.tamework.ui.views.anyGroup; }
-    CheckBox #CompanionViewSelected { Anchor: (Top: 152, Left: 20, Width: 22, Height: 22); Background: (Color: #252c27); OutlineColor: #4a5a50; OutlineSize: 1; Padding: (Full: 4); Style: $C.@DefaultCheckBoxStyle; }
-    Label { Anchor: (Top: 152, Left: 50, Right: 20, Height: 24); Text: %server.tamework.ui.views.selectedOnly; Style: (FontSize: 13, TextColor: #d6d9d0, VerticalAlignment: Center); }
-    Label { Anchor: (Top: 192, Left: 20, Width: 140, Height: 28); Text: %server.tamework.ui.views.name; Style: (FontSize: 13, TextColor: #d6d9d0, VerticalAlignment: Center); }
-    TextField #CompanionViewName { Anchor: (Top: 192, Left: 166, Right: 20, Height: 28); Style: $A.@PanelInputFieldStyle; PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle; Background: (Color: #252c27); OutlineColor: #4a5a50; OutlineSize: 1; Padding: (Horizontal: 8); MaxLength: 40; PlaceholderText: %server.tamework.ui.views.namePlaceholder; }
-    Label #CompanionViewError { Anchor: (Top: 226, Left: 20, Right: 20, Height: 22); Style: (FontSize: 12, TextColor: #f67661); }
-    TextButton #CompanionViewSave { Anchor: (Top: 258, Left: 20, Width: 155, Height: 30); Text: %server.tamework.ui.views.save; Style: $A.@PanelButton; }
-    TextButton #CompanionViewUpdate { Anchor: (Top: 258, Left: 184, Width: 155, Height: 30); Text: %server.tamework.ui.views.update; Style: $A.@PanelButton; }
-    TextButton #CompanionViewRename { Anchor: (Top: 258, Left: 348, Width: 155, Height: 30); Text: %server.tamework.ui.views.rename; Style: $A.@PanelButton; }
-    TextButton #CompanionViewDelete { Anchor: (Top: 258, Left: 512, Width: 168, Height: 30); Text: %server.tamework.ui.views.delete; TooltipText: %server.tamework.ui.views.deleteHint; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
-    TextButton #CompanionViewApply { Anchor: (Top: 314, Left: 348, Width: 155, Height: 30); Text: %server.tamework.ui.views.apply; Style: $A.@PanelButton; }
-    TextButton #CompanionViewCancel { Anchor: (Top: 314, Left: 512, Width: 168, Height: 30); Text: %server.tamework.ui.views.cancel; Style: $A.@PanelButton; }
+    Label { Anchor: (Top: 14, Left: 20, Right: 60, Height: 28); Text: %server.tamework.ui.views.filterEditorTitle; Style: (FontSize: 20, RenderBold: true, TextColor: #e8e4da); }
+    TextButton #CompanionFilterCancel { Anchor: (Top: 12, Right: 14, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.cancel; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Top: 14, Right: 16, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+    Label { Anchor: (Top: 56, Left: 20, Right: 20, Height: 22); Text: %server.tamework.ui.views.filterType; Style: (FontSize: 13, TextColor: #d6d9d0); }
+    DropdownBox #CompanionViewType { Anchor: (Top: 80, Left: 20, Right: 20, Height: 30); MaxSelection: 1; Style: $A.@PanelDropdown; }
+    Group #CompanionViewSpeciesRow {
+      Anchor: (Top: 120, Left: 20, Right: 20, Height: 55); Visible: false;
+      Label { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Text: %server.tamework.ui.views.species; Style: (FontSize: 13, TextColor: #d6d9d0); }
+      DropdownBox #CompanionViewSpecies { Anchor: (Top: 24, Left: 0, Right: 0, Height: 30); MaxSelection: 0; ShowLabel: false; Style: $A.@CompanionGroupDropdown; NoItemsText: %server.tamework.ui.views.anySpecies; }
+      Label #CompanionViewSpeciesLabel { Anchor: (Top: 24, Left: 10, Right: 30, Height: 30); Style: (FontSize: 12, TextColor: #d6d9d0, VerticalAlignment: Center); HitTestVisible: false; }
+    }
+    Group #CompanionViewGroupsRow {
+      Anchor: (Top: 120, Left: 20, Right: 20, Height: 55); Visible: false;
+      Label { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Text: %server.tamework.ui.views.groups; Style: (FontSize: 13, TextColor: #d6d9d0); }
+      DropdownBox #CompanionViewGroups { Anchor: (Top: 24, Left: 0, Right: 0, Height: 30); MaxSelection: 0; ShowLabel: false; Style: $A.@CompanionGroupDropdown; NoItemsText: %server.tamework.ui.views.anyGroup; }
+      Label #CompanionViewGroupsLabel { Anchor: (Top: 24, Left: 10, Right: 30, Height: 30); Style: (FontSize: 12, TextColor: #d6d9d0, VerticalAlignment: Center); HitTestVisible: false; }
+    }
+    Label #CompanionViewSelectedHint { Anchor: (Top: 129, Left: 20, Right: 20, Height: 30); Text: %server.tamework.ui.views.selectedOnly; Style: (FontSize: 13, TextColor: #d6d9d0); Visible: false; }
+    Label #CompanionViewError { Anchor: (Top: 179, Left: 20, Right: 20, Height: 20); Style: (FontSize: 12, TextColor: #f67661); }
+    TextButton #CompanionViewFilterSave { Anchor: (Top: 202, Right: 20, Width: 125, Height: 28); Text: %server.tamework.ui.views.saveFilter; Style: $A.@PanelButton; }
+  }
+  Group #CompanionViewNameEditor {
+    Anchor: (Top: 245, Left: 244, Width: 440, Height: 202);
+    Background: #202923;
+    OutlineColor: #627969;
+    OutlineSize: 1;
+    Label { Anchor: (Top: 14, Left: 20, Right: 60, Height: 28); Text: %server.tamework.ui.views.editorTitle; Style: (FontSize: 20, RenderBold: true, TextColor: #e8e4da); }
+    TextButton #CompanionViewCancel { Anchor: (Top: 12, Right: 14, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.cancel; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Top: 14, Right: 16, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+    Label { Anchor: (Top: 60, Left: 20, Right: 20, Height: 22); Text: %server.tamework.ui.views.name; Style: (FontSize: 13, TextColor: #d6d9d0); }
+    TextField #CompanionViewName { Anchor: (Top: 84, Left: 20, Right: 20, Height: 30); Style: $A.@PanelInputFieldStyle; PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle; Background: (Color: #252c27); OutlineColor: #4a5a50; OutlineSize: 1; Padding: (Horizontal: 8); MaxLength: 40; PlaceholderText: %server.tamework.ui.views.namePlaceholder; }
+    Label #CompanionViewNameError { Anchor: (Top: 120, Left: 20, Right: 20, Height: 20); Style: (FontSize: 12, TextColor: #f67661); }
+    TextButton #CompanionViewDelete { Anchor: (Top: 156, Left: 20, Width: 125, Height: 28); Text: %server.tamework.ui.views.delete; TooltipText: %server.tamework.ui.views.deleteHint; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+    TextButton #CompanionViewSave { Anchor: (Top: 156, Right: 20, Width: 125, Height: 28); Text: %server.tamework.ui.views.saveView; Style: $A.@PanelButton; }
   }
 }

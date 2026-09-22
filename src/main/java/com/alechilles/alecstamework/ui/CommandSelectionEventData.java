@@ -88,6 +88,7 @@ public final class CommandSelectionEventData {
             .append(new KeyedCodec<>("CompanionAddGroup", Codec.STRING),
                     (e, v) -> e.companionAddGroup = v, e -> e.companionAddGroup).add()
             .append(new KeyedCodec<>("@ViewId", Codec.STRING), (e,v) -> e.viewId=v, e -> e.viewId).add()
+            .append(new KeyedCodec<>("@ViewType", Codec.STRING), (e,v) -> e.viewType=v, e -> e.viewType).add()
             .append(new KeyedCodec<>("@ViewSpecies", Codec.STRING_ARRAY), (e,v) -> e.viewSpecies=v, e -> e.viewSpecies).add()
             .append(new KeyedCodec<>("@ViewGroups", Codec.STRING_ARRAY), (e,v) -> e.viewGroups=v, e -> e.viewGroups).add()
             .append(new KeyedCodec<>("@ViewSelected", Codec.BOOLEAN), (e,v) -> e.viewSelected=v, e -> e.viewSelected).add()
@@ -95,6 +96,7 @@ public final class CommandSelectionEventData {
             .build();
 
     String viewId;
+    String viewType;
     String[] viewSpecies;
     String[] viewGroups;
     Boolean viewSelected;

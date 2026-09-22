@@ -64,9 +64,10 @@ public record CompanionViewSettings(String state,
                 entries == null ? new LinkedNpcEntry[0] : entries, state, nearby, search);
         return Arrays.stream(base)
                 .filter(entry -> !selectedOnly || entry.active())
-                .filter(entry -> speciesIds.isEmpty() || speciesIds.contains(entry.speciesId()))
+                .filter(entry -> speciesIds.isEmpty()
+                        || entry.speciesId() != null && speciesIds.contains(entry.speciesId()))
                 .filter(entry -> groupIds.isEmpty()
-                        || entry.groupIds().stream().anyMatch(groupIds::contains))
+                        || entry.groupIds().stream().anyMatch(id -> id != null && groupIds.contains(id)))
                 .toArray(LinkedNpcEntry[]::new);
     }
 

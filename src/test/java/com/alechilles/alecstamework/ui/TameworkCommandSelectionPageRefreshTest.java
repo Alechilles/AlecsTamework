@@ -37,7 +37,7 @@ class TameworkCommandSelectionPageRefreshTest {
         CapturedPackets packets = new CapturedPackets();
         var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
         var settings = new AtomicReference<>(CompanionViewSettings.defaults().withState("All"));
-        var stored = settings.get().withExtraFilters(true, List.of(), List.of());
+        var stored = settings.get().withExtraFilters(false, List.of("Chicken"), List.of());
         var id = new AtomicReference<>("__all__");
         var selects = new java.util.concurrent.atomic.AtomicInteger();
         page.configureCompanions(new CompanionPanelBinding(() -> settings.get().state(),
@@ -60,15 +60,15 @@ class TameworkCommandSelectionPageRefreshTest {
         assertEquals(0, pagination.pageIndex());
         assertEquals(stored, settings.get());
         assertEquals(0, selects.get(), "Browsing a preset must not change command recipients.");
-        event(page, "__view__:open");
+        event(page, "__view__:editSpecies");
         event(page, "__view__:select");
         assertEquals(0, selects.get(), "An event from behind the editor must be ignored.");
         var draft = new CommandSelectionEventData();
-        draft.viewSelected = false;
+        draft.viewSpecies = new String[0];
         page.handleDataEvent(null, null, draft);
-        assertTrue(settings.get().selectedOnly(), "Editor changes wait for Apply.");
-        event(page, "__view__:apply");
-        assertFalse(settings.get().selectedOnly());
+        assertEquals(List.of("Chicken"), settings.get().speciesIds(), "Editor changes wait for Save filter.");
+        event(page, "__view__:filterSave");
+        assertTrue(settings.get().speciesIds().isEmpty());
         event(page, "__view__:select");
         assertEquals(1, selects.get());
         page.onDismiss(null, null);
@@ -195,12 +195,17 @@ class TameworkCommandSelectionPageRefreshTest {
         UIEventBuilder events = new UIEventBuilder();
         page.build(null, initial, events, null);
         assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPageStatus.Text", "Page 1 of 2");
+        assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPageNavigation.Visible", "true");
+        assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPagePrevious.Visible", "false");
+        assertCommand(new CapturedUpdate(initial, events), "#TameworkLinkedPanelPageNext.Visible", "true");
 
         event(page, LinkedNpcPanelPaginationBinder.NEXT);
         refresh(page, true);
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Name.Text", "Animal 50");
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageStatus.Text", "Page 2 of 2");
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageNext.Disabled", "true");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPagePrevious.Visible", "true");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageNext.Visible", "false");
         int reads = sourceReads.get();
         event(page, LinkedNpcPanelPaginationBinder.NEXT);
         assertEquals(reads, sourceReads.get(), "Last-page clicks must not reread cards.");
@@ -210,6 +215,7 @@ class TameworkCommandSelectionPageRefreshTest {
         refresh(page, true);
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Name.Text", "Animal 0");
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageStatus.Text", "Page 1 of 1");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelPageNavigation.Visible", "false");
         page.onDismiss(null, null);
     }
 
