@@ -265,6 +265,10 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
+                Padding: (Horizontal: 8);
               }
             }
 
