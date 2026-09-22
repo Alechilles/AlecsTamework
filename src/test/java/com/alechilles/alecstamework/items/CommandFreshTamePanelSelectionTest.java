@@ -60,13 +60,17 @@ class CommandFreshTamePanelSelectionTest {
                             com.hypixel.hytale.server.npc.role.support.EntitySupport.class));
             scope.store.put(npcRef, scope.ownerType,
                     new TameworkOwnerComponent(OWNER, "Owner"));
-            scope.store.put(npcRef, scope.transformType, new TransformComponent());
+            var distantPosition = new TransformComponent();
+            distantPosition.getPosition().set(100_000.0, 0.0, 100_000.0);
+            scope.store.put(npcRef, scope.transformType, distantPosition);
             scope.world.references.put(NPC, npcRef);
 
             TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(
                     new BsonDocument(), new ExtraInfo());
             ItemStack stack = new MetadataStack("test:flute", new BsonDocument());
-            CommandPanelEntrySourceService source = entrySource();
+            var liveIndex = new com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex();
+            liveIndex.observe(NPC, OWNER, scope.world.getName());
+            CommandPanelEntrySourceService source = entrySource(liveIndex);
 
             assertFalse(row(source, player, scope.store, stack, config).active(),
                     "A fresh owned animal starts unselected when its item has no record.");
@@ -93,10 +97,15 @@ class CommandFreshTamePanelSelectionTest {
             assertFalse(deselected.active);
             assertFalse(row(source, player, scope.store, deselected.updatedItem, config).active(),
                     "Deselecting the item record must make the live owned row inactive.");
+            scope.store.put(npcRef, scope.ownerType,
+                    new TameworkOwnerComponent(UUID.randomUUID(), "Other owner"));
+            assertTrue(source.buildSnapshot(player, scope.store, stack, config, "flute").entries().isEmpty(),
+                    "A stale owner-index candidate must not expose an animal after its ownership changes.");
         }
     }
 
-    private static CommandPanelEntrySourceService entrySource() {
+    private static CommandPanelEntrySourceService entrySource(
+            com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex liveIndex) {
         var names = new CommandNpcNameResolver();
         var policy = new CommandLinkPolicyService();
         var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
@@ -117,7 +126,7 @@ class CommandFreshTamePanelSelectionTest {
                 persistence, policy, new CommandGroupService(), null);
         return new CommandPanelEntrySourceService(
                 linked, new CommandPanelPreferenceService(), policy, names,
-                null, null, null, new CommandOwnedPanelRecordSource(Map::of));
+                null, null, null, new CommandOwnedPanelRecordSource(Map::of), liveIndex);
     }
 
     private static com.alechilles.alecstamework.ui.LinkedNpcEntry row(

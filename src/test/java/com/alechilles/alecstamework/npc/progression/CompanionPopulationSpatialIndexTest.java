@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import org.joml.Vector3d;
@@ -72,6 +73,41 @@ class CompanionPopulationSpatialIndexTest {
                 assertEquals(1, index.countNearby(
                         store, secondSource, new Vector3d(32.0, 0.0, 0.0), 8.0, "dog_adult", breedingConfig));
             }
+        }
+    }
+
+    @Test
+    void resolvesPopulationFamilyOncePerRoleForDenseHerd() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
+            AtomicInteger familyResolutions = new AtomicInteger();
+            CompanionPopulationSpatialIndex index = new CompanionPopulationSpatialIndex(
+                    () -> 1_000L,
+                    NPC_TYPE,
+                    TRANSFORM_TYPE,
+                    (roleId, ignoredConfig) -> {
+                        familyResolutions.incrementAndGet();
+                        return CompanionPopulationSpatialIndex.normalizePopulationTypeKey(roleId);
+                    }
+            );
+            UUID sourceId = UUID.randomUUID();
+            addNpc(store, sourceId, "Cat_Adult", 0.0, 0.0, 0.0);
+            for (int i = 0; i < 400; i++) {
+                addNpc(store, UUID.randomUUID(), "Cat_Adult", 1.0, 0.0, 0.0);
+            }
+            for (int i = 0; i < 200; i++) {
+                addNpc(store, UUID.randomUUID(), "Dog_Adult", 1.0, 0.0, 0.0);
+            }
+
+            assertEquals(400, index.countNearby(
+                    store,
+                    sourceId,
+                    new Vector3d(0.0, 0.0, 0.0),
+                    4.0,
+                    "cat_adult",
+                    null
+            ));
+            assertEquals(2, familyResolutions.get());
         }
     }
 

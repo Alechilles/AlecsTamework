@@ -72,10 +72,16 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             var policy = new CommandLinkPolicyService();
             var linked = new CommandLinkedPanelEntryService(new CommandLinkedNpcRecordStore(),
                     null, names, null, persistence, policy, new CommandGroupService(), null);
+            var profileReads = new java.util.concurrent.atomic.AtomicInteger();
             CommandPanelEntrySourceService source = new CommandPanelEntrySourceService(linked,
                     new CommandPanelPreferenceService(), policy, names, null, null, null,
-                    new CommandOwnedPanelRecordSource(() -> profiles));
+                    new CommandOwnedPanelRecordSource(() -> {
+                        profileReads.incrementAndGet();
+                        return profiles;
+                    }));
             var snapshot = source.buildSnapshot(player, store, stack, config, "flute");
+            org.junit.jupiter.api.Assertions.assertEquals(1, profileReads.get(),
+                    "Cards, group identities, captures and protected controls must share one profile read");
             List<LinkedNpcEntry> entries = snapshot.entries();
             var captured = entries.stream().filter(row -> storedId.equals(row.npcUuid())).findFirst().orElseThrow();
             assertTrue(captured.captured(), "A capture whose owner was cleared must reach the Stored filter.");

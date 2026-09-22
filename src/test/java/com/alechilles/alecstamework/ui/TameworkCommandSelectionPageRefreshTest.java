@@ -590,6 +590,76 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void countdownWakeUsesTheMountedRowsUntilAnAuthoritativeRefreshIsRequired()
+            throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicInteger reads = new AtomicInteger();
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> {
+                    reads.incrementAndGet();
+                    return List.of(recallEntry(3_500L));
+                });
+        build(page);
+        reads.set(0);
+
+        acceptedRefresh(page, new LinkedPanelRefreshCoordinator.RenderPermit(
+                71L, false, true, 0L));
+
+        assertEquals(0, reads.get(),
+                "A countdown redraw must not reread companion rows.");
+        assertCommand(packets.updates.getFirst(),
+                "#TameworkLinkedPanelList[0] #RecallCountdown.Text");
+
+        acceptedRefresh(page, new LinkedPanelRefreshCoordinator.RenderPermit(72L, false));
+
+        assertEquals(1, reads.get(),
+                "Expiry and mutation permits must rebuild from authoritative rows.");
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void countdownWakeAdvancesTheVisibleDeadRespawnTooltip() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicInteger reads = new AtomicInteger();
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> {
+                    reads.incrementAndGet();
+                    return List.of(deadEntry(3_500L));
+                });
+        build(page);
+        reads.set(0);
+
+        acceptedRefresh(page, new LinkedPanelRefreshCoordinator.RenderPermit(
+                73L, false, true, 0L));
+
+        assertEquals(0, reads.get());
+        assertCommand(packets.updates.getFirst(),
+                "#TameworkLinkedPanelList[0] #HealthTooltip.TooltipText");
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void countdownWakeDoesNotAdvanceCapturedCooldowns() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) () -> List.of(capturedBreedingEntry(3_500L)));
+        build(page);
+
+        acceptedRefresh(page, new LinkedPanelRefreshCoordinator.RenderPermit(
+                74L, false, true, 0L));
+
+        assertCommand(packets.updates.getFirst(),
+                "#TameworkLinkedPanelList[0] #BreedingCooldown #CooldownText.Text", "4");
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void cancelRosterDeletionRestoresActionsAndIgnoresAnotherCardsCancel() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)));
@@ -810,8 +880,12 @@ class TameworkCommandSelectionPageRefreshTest {
         Method method = TameworkCommandSelectionPage.class.getDeclaredMethod(name); method.setAccessible(true); method.invoke(page);
     }
     private static void acceptedRefresh(TameworkCommandSelectionPage page, long id) throws Exception {
+        acceptedRefresh(page, new LinkedPanelRefreshCoordinator.RenderPermit(id, true));
+    }
+    private static void acceptedRefresh(TameworkCommandSelectionPage page,
+                                        LinkedPanelRefreshCoordinator.RenderPermit permit) throws Exception {
         Method method = TameworkCommandSelectionPage.class.getDeclaredMethod("runRefreshOnWorldThread", LinkedPanelRefreshCoordinator.RenderPermit.class);
-        method.setAccessible(true); method.invoke(page, new LinkedPanelRefreshCoordinator.RenderPermit(id, true));
+        method.setAccessible(true); method.invoke(page, permit);
     }
     private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature) throws Exception {
         return page(packets, feature, new NavigationFixture());
@@ -915,6 +989,28 @@ class TameworkCommandSelectionPageRefreshTest {
                 "species", "Species", null, null, null,
                 false, false, false, 0L, 0.0, false,
                 false, 0L, 0.0, false, true, remainingMs
+        );
+    }
+    private static LinkedNpcEntry deadEntry(long remainingMs) {
+        return new LinkedNpcEntry(
+                CARD, "Nimbus", null, 100, 100, 50, 100, 50, "",
+                50, 100, 50, 100, false, false, true, false, false, false,
+                remainingMs, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                "species", "Species", null, null, null,
+                false, false, false, 0L, 0.0, false,
+                false, 0L, 0.0, false, false, 0L
+        );
+    }
+    private static LinkedNpcEntry capturedBreedingEntry(long remainingMs) {
+        return new LinkedNpcEntry(
+                CARD, "Nimbus", null, 100, 100, 50, 100, 50, "",
+                50, 100, 50, 100, false, false, false, true, false, false,
+                -1L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                "species", "Species", null, null, null,
+                true, true, true, remainingMs, 0.5, true,
+                false, 0L, 0.0, false, false, 0L
         );
     }
     private static LinkedNpcEntry talentEntry(int availablePoints) {

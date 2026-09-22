@@ -83,6 +83,13 @@ final class LinkedNpcPanelVitalsBinder {
         bindHarvestCooldownMeter(commandBuilder, entrySelector, entry, language);
     }
 
+    /** Refreshes only time-dependent cooldown controls on an already bound card. */
+    static void bindCooldowns(UICommandBuilder commandBuilder, String entrySelector,
+                              LinkedNpcEntry entry, String language) {
+        bindBreedingCooldownMeter(commandBuilder, entrySelector, entry, language);
+        bindHarvestCooldownMeter(commandBuilder, entrySelector, entry, language);
+    }
+
     private static void bindHealth(UICommandBuilder commandBuilder,
                                    String entrySelector,
                                    LinkedNpcEntry entry,

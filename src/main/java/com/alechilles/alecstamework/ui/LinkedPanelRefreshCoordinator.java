@@ -38,6 +38,9 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private boolean progressionPending;
     private boolean countdownPending;
     private boolean safetyPending;
+    private long countdownBaseRemainingMs = NO_COUNTDOWN_REMAINING_MS;
+    private long countdownBaseRenderedAtMs;
+    private long countdownBaseVersion;
     private long immediateVersion;
     private long interactionFeedbackVersion;
     private long progressionVersion;
@@ -94,7 +97,8 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             progressionRendered = true;
             lastProgressionRenderMs = clock.getAsLong();
         }
-        scheduleCountdown(shortestCountdownRemainingMs);
+        recordCountdownBase(shortestCountdownRemainingMs);
+        scheduleCountdown(currentCountdownRemainingMs());
     }
 
     /**
@@ -149,6 +153,9 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             return;
         }
         Objects.requireNonNull(permit, "permit");
+        if (permit.countdownOnly() && !isCurrentCountdown(permit)) {
+            return;
+        }
         boolean ownsProgressionPermit = permit.progressionEligible()
                 && permit.id() == outstandingProgressionPermitId;
         if (permit.progressionEligible() && !ownsProgressionPermit) {
@@ -169,7 +176,10 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             lastProgressionRenderMs = clock.getAsLong();
             invalidateProgression();
         }
-        scheduleCountdown(shortestCountdownRemainingMs);
+        if (!permit.countdownOnly()) {
+            recordCountdownBase(shortestCountdownRemainingMs);
+        }
+        scheduleCountdown(currentCountdownRemainingMs());
         if (ownsProgressionPermit && progressionDirty) {
             progressionDirty = false;
             scheduleProgression();
@@ -259,7 +269,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             return;
         }
         immediatePending = false;
-        admitRefresh();
+        admitRefresh(false);
     }
 
     private synchronized void runInteractionFeedback(long version,
@@ -271,7 +281,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         if (finalAttempt) {
             interactionFeedbackPending = false;
         }
-        admitRefresh();
+        admitRefresh(false);
     }
 
     private synchronized void runProgression(long version) {
@@ -279,7 +289,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             return;
         }
         progressionPending = false;
-        admitRefresh();
+        admitRefresh(false);
     }
 
     private synchronized void runCountdown(long version) {
@@ -287,7 +297,12 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             return;
         }
         countdownPending = false;
-        admitRefresh();
+        long remainingMs = currentCountdownRemainingMs();
+        // At zero the visible state may change: an action can become enabled,
+        // a row can leave its temporary state, or a pending removal can return.
+        // That requires a normal source refresh. Earlier wakes only redraw
+        // immutable countdown values already held by the page.
+        admitRefresh(remainingMs > 0L);
     }
 
     private synchronized void runSafety(long version) {
@@ -296,17 +311,20 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         }
         safetyPending = false;
         scheduleSafety();
-        admitRefresh();
+        admitRefresh(false);
     }
 
-    private void admitRefresh() {
-        boolean progressionEligible = outstandingProgressionPermitId == 0L && (!progressionRendered
+    private void admitRefresh(boolean countdownOnly) {
+        boolean progressionEligible = !countdownOnly
+                && outstandingProgressionPermitId == 0L && (!progressionRendered
                 || clock.getAsLong() - lastProgressionRenderMs >= PROGRESSION_INTERVAL_MS);
         long permitId = ++nextPermitId;
         if (progressionEligible) {
             outstandingProgressionPermitId = permitId;
         }
-        refreshCallback.accept(new RenderPermit(permitId, progressionEligible));
+        refreshCallback.accept(new RenderPermit(permitId, progressionEligible,
+                countdownOnly,
+                countdownBaseVersion));
     }
 
     private void invalidateImmediate() {
@@ -329,9 +347,39 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         countdownVersion++;
     }
 
+    private void recordCountdownBase(long remainingMs) {
+        countdownBaseRemainingMs = remainingMs;
+        countdownBaseRenderedAtMs = clock.getAsLong();
+        countdownBaseVersion++;
+    }
+
+    private long currentCountdownRemainingMs() {
+        if (countdownBaseRemainingMs == NO_COUNTDOWN_REMAINING_MS) {
+            return NO_COUNTDOWN_REMAINING_MS;
+        }
+        return Math.max(0L, countdownBaseRemainingMs - countdownElapsedMs());
+    }
+
+    private long countdownElapsedMs() {
+        return Math.max(0L, clock.getAsLong() - countdownBaseRenderedAtMs);
+    }
+
     private void invalidateSafety() {
         safetyPending = false;
         safetyVersion++;
+    }
+
+    synchronized CountdownState countdownState(RenderPermit permit) {
+        if (closed || !isCurrentCountdown(Objects.requireNonNull(permit, "permit"))) {
+            return null;
+        }
+        return new CountdownState(countdownElapsedMs(),
+                currentCountdownRemainingMs() == 0L);
+    }
+
+    private boolean isCurrentCountdown(RenderPermit permit) {
+        return !permit.countdownOnly() || permit.countdownBaseVersion() == 0L
+                || permit.countdownBaseVersion() == countdownBaseVersion;
     }
 
     /**
@@ -339,8 +387,23 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
      *
      * @param id coordinator-assigned admission identity
      * @param progressionEligible whether this render may include fresh progression values
+     * @param countdownOnly whether this refresh can reuse its existing row snapshot
+     * @param countdownBaseVersion immutable snapshot generation for countdown-only redraws
      */
-    public record RenderPermit(long id, boolean progressionEligible) {
+    public record RenderPermit(long id, boolean progressionEligible,
+                               boolean countdownOnly, long countdownBaseVersion) {
+        /** Compatibility constructor for callers that require a full refresh. */
+        public RenderPermit(long id, boolean progressionEligible) {
+            this(id, progressionEligible, false, 0L);
+        }
+
+        RenderPermit authoritative() {
+            return countdownOnly ? new RenderPermit(id, progressionEligible,
+                    false, countdownBaseVersion) : this;
+        }
+    }
+
+    record CountdownState(long elapsedMs, boolean expired) {
     }
 
     /**

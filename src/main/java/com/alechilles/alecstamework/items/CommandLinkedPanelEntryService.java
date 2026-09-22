@@ -94,11 +94,24 @@ final class CommandLinkedPanelEntryService {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return List.of();
         }
-        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        return buildEntries(player, store, stack, toolId, linkedNpcRecordStore.read(stack));
+    }
+
+    List<LinkedNpcEntry> buildEntries(Player player, Store<EntityStore> store, ItemStack stack,
+                                     String toolId, List<LinkedNpcRecord> records) {
+        if (player == null || store == null || stack == null || stack.isEmpty()) return List.of();
         if (persistenceView != null) {
             records = persistenceView.linkedRecordsForTool(records, toolId);
         }
         return buildEntriesFromRecords(player, store, stack, toolId, records);
+    }
+
+    /** Selection membership does not require constructing live status cards a second time. */
+    java.util.Set<UUID> linkedRecordIdsForTool(List<LinkedNpcRecord> records, String toolId) {
+        var canonical = persistenceView == null ? records : persistenceView.linkedRecordsForTool(records, toolId);
+        var ids = new java.util.HashSet<UUID>();
+        for (var record : canonical) ids.add(record.npcUuid);
+        return ids;
     }
 
     /** Builds from canonical records when item metadata is merely a disposable projection. */

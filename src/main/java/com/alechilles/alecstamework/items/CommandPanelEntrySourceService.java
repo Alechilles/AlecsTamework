@@ -1,19 +1,20 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
+import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
@@ -43,6 +44,8 @@ final class CommandPanelEntrySourceService {
     private final BondedCompanionPanelEntrySourceService bondedEntrySource;
     @Nullable
     private final CommandOwnedPanelRecordSource ownedRecordSource;
+    @Nullable
+    private final OwnerPopulationLiveIndex liveOwnerIndex;
     private final CommandLinkedNpcRecordStore linkedRecordStore = new CommandLinkedNpcRecordStore();
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
@@ -90,6 +93,21 @@ final class CommandPanelEntrySourceService {
                                    @Nullable CommandPanelFeaturePresentationSource featurePresentations,
                                    @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource,
                                    @Nullable CommandOwnedPanelRecordSource ownedRecordSource) {
+        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService, npcNameResolver,
+                rosterRecordSource, featurePresentations, bondedEntrySource, ownedRecordSource,
+                Tamework.getInstance() == null ? null : Tamework.getInstance().getOwnerPopulationLiveIndex());
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource,
+                                   @Nullable CommandPanelFeaturePresentationSource featurePresentations,
+                                   @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource,
+                                   @Nullable CommandOwnedPanelRecordSource ownedRecordSource,
+                                   @Nullable OwnerPopulationLiveIndex liveOwnerIndex) {
+        this.liveOwnerIndex = liveOwnerIndex;
         this.ownedRecordSource = ownedRecordSource;
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
@@ -114,7 +132,7 @@ final class CommandPanelEntrySourceService {
                                       TwCommandItemConfig config,
                                       String toolId) {
         return buildEntries(
-                player, store, stack, config, toolId, null, null
+                player, store, stack, config, toolId, null, null, refreshInputs(player, store, stack, config)
         );
     }
 
@@ -135,6 +153,7 @@ final class CommandPanelEntrySourceService {
                     applyFiltersAndSort(durable.entries(), stack),
                     durable.featurePresentations(), durable.emptyStateKey());
         }
+        RefreshInputs inputs = refreshInputs(player, store, stack, config);
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);
         CommandLinkedPanelEntryService.ResolvedEntries rosterEntries =
@@ -147,16 +166,16 @@ final class CommandPanelEntrySourceService {
                 ? panelPreferenceService.applySelectedFilterText(stack, "") : stack;
         List<LinkedNpcEntry> selectionEntries = buildEntries(
                 player, store, selectionStack, config, toolId, rosterSnapshot,
-                rosterEntries
+                rosterEntries, inputs
         );
         List<LinkedNpcEntry> entries = selectionStack == stack ? selectionEntries
                 : applyFiltersAndSort(selectionEntries, stack);
         if (rosterSnapshot == null || featurePresentations == null
                 || player == null || config == null) {
             var features = new java.util.HashMap<UUID, CommandPanelFeaturePresentation>();
-            if (ownedRecordSource != null && player != null) {
-                features.putAll(ownedRecordSource.managedFeatures(player.getUuid(), linkedRecordStore.read(stack)));
-                var ownedIds = ownedRecordSource.recordsFor(player.getUuid(), linkedRecordStore.read(stack))
+            if (inputs.owned() != null) {
+                features.putAll(inputs.owned().managedFeatures());
+                var ownedIds = inputs.owned().ownedRecords()
                         .stream().map(record -> record.npcUuid).collect(java.util.stream.Collectors.toSet());
                 for (var entry : entries) {
                     if (entry.captured() && !ownedIds.contains(entry.npcUuid()))
@@ -195,34 +214,30 @@ final class CommandPanelEntrySourceService {
                                                TwCommandItemConfig config,
                                                String toolId,
                                                @Nullable CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot,
-                                               @Nullable CommandLinkedPanelEntryService.ResolvedEntries rosterEntries) {
-        List<LinkedNpcEntry> linkedEntries = config != null
+                                               @Nullable CommandLinkedPanelEntryService.ResolvedEntries rosterEntries,
+                                               RefreshInputs inputs) {
+        boolean ownedMode = config != null && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster();
+        List<LinkedNpcEntry> linkedEntries = ownedMode ? List.of() : config != null
                 && config.usesOwnerCommandFamilyRoster()
                 ? buildRosterEntries(
                         player, store, stack, config, toolId, rosterSnapshot,
                         rosterEntries
                 )
                 : linkedPanelEntryService.buildEntries(
-                        player, store, stack, toolId
+                        player, store, stack, toolId, inputs.linkedRecords()
                 );
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
-        boolean ownedMode = config != null && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster();
         if (ownedMode) CommandCompanionGroups.importLegacy(player, stack);
         if (ownedMode) {
-            Map<UUID, LinkedNpcEntry> linkedById = new java.util.HashMap<>();
-            for (LinkedNpcEntry entry : linkedEntries) linkedById.put(entry.npcUuid(), entry);
-            List<LinkedNpcRecord> linkedRecords = rosterSnapshot == null
-                    ? linkedRecordStore.read(stack) : rosterSnapshot.records();
-            List<LinkedNpcRecord> ownedRecords = ownedRecordSource == null || player == null
-                    ? List.of() : ownedRecordSource.recordsFor(player.getUuid(), linkedRecords);
-            if (ownedRecordSource != null) {
-                var visibleRecords = new ArrayList<>(ownedRecords);
-                visibleRecords.addAll(ownedRecordSource.capturedRecordsFor(linkedRecords, carriedCaptureProfiles(player, store)));
-                ownedRecords = visibleRecords;
+            Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+            List<LinkedNpcRecord> ownedRecords = new ArrayList<>();
+            if (inputs.owned() != null) {
+                ownedRecords.addAll(inputs.owned().ownedRecords());
+                ownedRecords.addAll(inputs.owned().capturedRecords());
             }
             List<LinkedNpcEntry> ownedEntries = linkedPanelEntryService.resolveOwnedEntriesFromRecords(
-                    player, store, stack, toolId, ownedRecords, linkedById.keySet()).entries();
+                    player, store, stack, toolId, ownedRecords, linkedIds).entries();
             Map<UUID, String> profileKeys = new java.util.HashMap<>();
             for (var record : ownedRecords) {
                 if (record.profileId != null) profileKeys.put(record.npcUuid,
@@ -236,23 +251,23 @@ final class CommandPanelEntrySourceService {
             }
         }
         if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
-            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries, inputs), stack);
         }
         if (player == null || store == null) {
-            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries, inputs), stack);
         }
         UUID playerUuid = player.getUuid();
         Ref<EntityStore> playerRef = player.getReference();
         if (playerUuid == null || playerRef == null || !playerRef.isValid()) {
-            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries, inputs), stack);
         }
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (!ownedMode && playerTransform == null) {
-            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries, inputs), stack);
         }
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         if (!Double.isFinite(radius) || radius <= 0.0) {
-            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries), stack);
+            return applyFiltersAndSort(decorate(player, store, stack, config, linkedEntries, inputs), stack);
         }
         double radiusSq = ownedMode ? Double.POSITIVE_INFINITY : radius * radius;
 
@@ -268,80 +283,97 @@ final class CommandPanelEntrySourceService {
 
         Vector3d playerPos = playerTransform == null ? new Vector3d() : new Vector3d(playerTransform.getPosition());
         boolean requireOwner = ownedMode || resolveLinkingRequireOwner();
-        List<LinkedNpcRecord> selectionRecords = ownedMode ? linkedRecordStore.read(stack) : List.of();
-        store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
-            for (int i = 0; i < chunk.size(); i++) {
-                NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
-                if (npc == null || npc.getUuid() == null || seen.contains(npc.getUuid())) {
-                    continue;
-                }
-                Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
-                if (npcRef == null || !npcRef.isValid()) {
-                    continue;
-                }
-                if (!CommandGenericTargetAuthority.allowsNearbyPresentation(
-                        npcRef, store
-                )) {
-                    continue;
-                }
-                if (!linkPolicyService.passesOwnerAndTamed(
-                        requireOwner,
-                        !ownedMode && config != null && config.isRequireTamed(),
-                        npcRef,
-                        playerUuid,
-                        store
-                )) {
-                    continue;
-                }
-                if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
-                    continue;
-                }
-                TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
-                if (npcTransform == null) {
-                    continue;
-                }
-                Vector3d npcPos = npcTransform.getPosition();
-                double dx = npcPos.x - playerPos.x;
-                double dy = npcPos.y - playerPos.y;
-                double dz = npcPos.z - playerPos.z;
-                double distSq = dx * dx + dy * dy + dz * dz;
-                if (distSq > radiusSq) {
-                    continue;
-                }
-                String roleId = normalize(linkPolicyService.resolveRoleId(npc));
-                // Newly tamed companions may not have an owned profile projection yet.
-                LinkedNpcRecord selection = linkedRecordStore.find(selectionRecords, npc.getUuid());
-                boolean linkedToTool = ownedMode ? selection != null : linkPolicyService.isLinkedToTool(
-                        npcRef,
-                        playerUuid,
-                        toolId,
-                        store
-                );
-                LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
-                        player,
-                        npcRef,
-                        store,
-                        new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
-                                npc.getUuid(),
-                                npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
-                                linkedToTool,
-                                !ownedMode || selection != null && selection.active,
-                                false,
-                                false,
-                                null,
-                                null,
-                                null,
-                                roleId,
-                                null
-                        )
-                );
-                if (loadedEntry != null) {
-                    out.add(ownedMode ? loadedEntry.withOwnedActions() : loadedEntry);
-                    seen.add(npc.getUuid());
-                }
+        List<LinkedNpcRecord> selectionRecords = ownedMode ? inputs.linkedRecords() : List.of();
+        for (Ref<EntityStore> npcRef : liveCandidates(player, store, ownedMode, playerPos, radius)) {
+            if (npcRef == null || !npcRef.isValid()) continue;
+            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+            if (npc == null || npc.getUuid() == null || seen.contains(npc.getUuid())) {
+                continue;
             }
-        });
-        return applyFiltersAndSort(decorate(player, store, stack, config, out), stack);
+            if (!CommandGenericTargetAuthority.allowsNearbyPresentation(
+                    npcRef, store
+            )) {
+                continue;
+            }
+            if (!linkPolicyService.passesOwnerAndTamed(
+                    requireOwner,
+                    !ownedMode && config != null && config.isRequireTamed(),
+                    npcRef,
+                    playerUuid,
+                    store
+            )) {
+                continue;
+            }
+            if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
+                continue;
+            }
+            TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
+            if (npcTransform == null) {
+                continue;
+            }
+            Vector3d npcPos = npcTransform.getPosition();
+            double dx = npcPos.x - playerPos.x;
+            double dy = npcPos.y - playerPos.y;
+            double dz = npcPos.z - playerPos.z;
+            double distSq = dx * dx + dy * dy + dz * dz;
+            if (distSq > radiusSq) {
+                continue;
+            }
+            String roleId = normalize(linkPolicyService.resolveRoleId(npc));
+            // Newly tamed companions may not have an owned profile projection yet.
+            LinkedNpcRecord selection = linkedRecordStore.find(selectionRecords, npc.getUuid());
+            boolean linkedToTool = ownedMode ? selection != null : linkPolicyService.isLinkedToTool(
+                    npcRef,
+                    playerUuid,
+                    toolId,
+                    store
+            );
+            LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
+                    player,
+                    npcRef,
+                    store,
+                    new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
+                            npc.getUuid(),
+                            npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
+                            linkedToTool,
+                            !ownedMode || selection != null && selection.active,
+                            false,
+                            false,
+                            null,
+                            null,
+                            null,
+                            roleId,
+                            null
+                    )
+            );
+            if (loadedEntry != null) {
+                out.add(ownedMode ? loadedEntry.withOwnedActions() : loadedEntry);
+                seen.add(npc.getUuid());
+            }
+        }
+        return applyFiltersAndSort(decorate(player, store, stack, config, out, inputs), stack);
+    }
+
+    /** Candidates are resolved and consumed entirely on the viewer's world thread. */
+    private List<Ref<EntityStore>> liveCandidates(Player player, Store<EntityStore> store,
+                                                  boolean ownedMode, Vector3d center, double radius) {
+        var result = new ArrayList<Ref<EntityStore>>();
+        if (ownedMode) {
+            var world = store.getExternalData().getWorld();
+            if (liveOwnerIndex == null || world == null) return result;
+            // The live owner index includes freshly tamed NPCs before durable profile publication.
+            for (UUID id : liveOwnerIndex.ownedNpcIds(player.getUuid(), world.getName())) {
+                var ref = world.getEntityRef(id);
+                if (ref != null && ref.isValid()) result.add(ref);
+            }
+        } else {
+            var spatial = store.getResource(EntityModule.get().getEntitySpatialResourceType());
+            if (spatial != null) {
+                // Own the list: card calculations can perform nested spatial queries on this thread.
+                HytaleSpatialAccess.collect(spatial.getSpatialStructure(), center, radius, result);
+            }
+        }
+        return result;
     }
 
     @Nullable
@@ -482,16 +514,27 @@ final class CommandPanelEntrySourceService {
         return profiles;
     }
 
+    private record RefreshInputs(List<LinkedNpcRecord> linkedRecords,
+                                 @Nullable CommandOwnedPanelRecordSource.Snapshot owned) { }
+
+    private RefreshInputs refreshInputs(Player player, Store<EntityStore> store, ItemStack stack,
+                                        TwCommandItemConfig config) {
+        var records = linkedRecordStore.read(stack);
+        var owned = ownedRecordSource != null && player != null && config != null
+                && !config.usesOwnerCommandFamilyRoster() && !config.usesBondedCompanionRoster()
+                ? ownedRecordSource.snapshot(player.getUuid(), records, carriedCaptureProfiles(player, store)) : null;
+        return new RefreshInputs(records, owned);
+    }
+
     private List<LinkedNpcEntry> decorate(Player player, Store<EntityStore> store, ItemStack stack,
-                                         TwCommandItemConfig config, List<LinkedNpcEntry> entries) {
+                                         TwCommandItemConfig config, List<LinkedNpcEntry> entries, RefreshInputs inputs) {
         if (player == null || config == null || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return entries;
         var groups = new CommandGroupService().readGroups(player, stack);
         var profiledKeys = new java.util.HashMap<UUID, String>();
         var savedRoles = new java.util.HashMap<UUID, String>();
-        var ownedRecords = ownedRecordSource == null ? linkedRecordStore.read(stack)
-                : ownedRecordSource.recordsFor(player.getUuid(), linkedRecordStore.read(stack));
+        var ownedRecords = inputs.owned() == null ? inputs.linkedRecords() : inputs.owned().ownedRecords();
         for (var record : ownedRecords) savedRoles.put(record.npcUuid, record.cachedRoleId);
-        for (var record : linkedRecordStore.read(stack)) {
+        for (var record : inputs.linkedRecords()) {
             if (record.profileId != null) profiledKeys.put(record.npcUuid, CommandCompanionGroups.profileKey(record.profileId));
         }
         var world = player.getWorld();
@@ -499,9 +542,8 @@ final class CommandPanelEntrySourceService {
         var origin = viewer == null || !viewer.isValid() ? null : store.getComponent(viewer, TransformComponent.getComponentType());
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         List<LinkedNpcEntry> decorated = new ArrayList<>(entries.size());
-        var profilesByRow = ownedRecordSource == null || entries.isEmpty()
-                ? Map.<UUID, com.alechilles.alecstamework.companion.identity.ProfileId>of()
-                : ownedRecordSource.profilesByRow(player.getUuid());
+        var profilesByRow = inputs.owned() == null ? Map.<UUID, com.alechilles.alecstamework.companion.identity.ProfileId>of()
+                : inputs.owned().profilesByRow();
         for (var entry : entries) {
             var profileId = profilesByRow.get(entry.npcUuid());
             String key = ownedRecordSource == null ? CommandCompanionGroups.entityKey(entry.npcUuid())

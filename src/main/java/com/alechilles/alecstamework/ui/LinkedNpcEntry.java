@@ -915,6 +915,24 @@ public final class LinkedNpcEntry {
                         portraitIcon, location, traitValues, lifecycle);
     }
 
+    /** Returns a detached card projection with updated timer values only. */
+    LinkedNpcEntry withCountdownProjection(
+            long deadRespawnRemainingMs,
+            long breedingCooldownRemainingMs,
+            double breedingCooldownRatio,
+            long harvestCooldownRemainingMs,
+            double harvestCooldownRatio,
+            AnimalLifecycle lifecycle
+    ) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                flightToggleAvailable, flightToggleAirborne, shoulderRideAvailable,
+                shoulderRideMounted, breedingHappinessRatio, ownedActions,
+                roleSubtitle, portraitIcon, location, traitValues, lifecycle,
+                deadRespawnRemainingMs, breedingCooldownRemainingMs,
+                breedingCooldownRatio, harvestCooldownRemainingMs,
+                harvestCooldownRatio);
+    }
+
     public boolean hasAnyFutureAction() {
         return traitsActionVisible || talentsActionVisible;
     }
@@ -1053,6 +1071,23 @@ public final class LinkedNpcEntry {
                           double breedingHappinessRatio, boolean ownedActions,
                           String roleSubtitle, String portraitIcon, Location location,
                           ProgressionView.TraitsView traitValues, AnimalLifecycle animalLifecycle) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable,
+                flightToggleAirborne, shoulderRideAvailable, shoulderRideMounted,
+                breedingHappinessRatio, ownedActions, roleSubtitle, portraitIcon,
+                location, traitValues, animalLifecycle, source.deadRespawnRemainingMs,
+                source.breedingCooldownRemainingMs, source.breedingCooldownRatio,
+                source.harvestCooldownRemainingMs, source.harvestCooldownRatio);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean recoveryHeld, String incidentId,
+                          boolean flightToggleAvailable, boolean flightToggleAirborne,
+                          boolean shoulderRideAvailable, boolean shoulderRideMounted,
+                          double breedingHappinessRatio, boolean ownedActions,
+                          String roleSubtitle, String portraitIcon, Location location,
+                          ProgressionView.TraitsView traitValues, AnimalLifecycle animalLifecycle,
+                          long deadRespawnRemainingMs, long breedingCooldownRemainingMs,
+                          double breedingCooldownRatio, long harvestCooldownRemainingMs,
+                          double harvestCooldownRatio) {
         this.portraitIcon = portraitIcon;
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
@@ -1078,7 +1113,7 @@ public final class LinkedNpcEntry {
         this.inCoop = source.inCoop;
         this.lost = source.lost;
         this.hasHome = source.hasHome;
-        this.deadRespawnRemainingMs = source.deadRespawnRemainingMs;
+        this.deadRespawnRemainingMs = deadRespawnRemainingMs;
         this.deathCauseHint = source.deathCauseHint;
         this.speciesId = source.speciesId;
         this.speciesLabel = source.speciesLabel;
@@ -1092,12 +1127,12 @@ public final class LinkedNpcEntry {
         this.breedingEnabled = source.breedingEnabled;
         this.breedingAvailable = source.breedingAvailable;
         this.breedingCooldownActive = source.breedingCooldownActive;
-        this.breedingCooldownRemainingMs = source.breedingCooldownRemainingMs;
-        this.breedingCooldownRatio = source.breedingCooldownRatio;
+        this.breedingCooldownRemainingMs = breedingCooldownRemainingMs;
+        this.breedingCooldownRatio = breedingCooldownRatio;
         this.breedingCooldownKnown = source.breedingCooldownKnown;
         this.harvestCooldownActive = source.harvestCooldownActive;
-        this.harvestCooldownRemainingMs = source.harvestCooldownRemainingMs;
-        this.harvestCooldownRatio = source.harvestCooldownRatio;
+        this.harvestCooldownRemainingMs = harvestCooldownRemainingMs;
+        this.harvestCooldownRatio = harvestCooldownRatio;
         this.harvestCooldownKnown = source.harvestCooldownKnown;
         this.recallPending = source.recallPending;
         this.recallLostRemainingMs = source.recallLostRemainingMs;

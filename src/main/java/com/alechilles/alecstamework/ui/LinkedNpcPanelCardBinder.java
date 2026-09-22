@@ -706,6 +706,15 @@ final class LinkedNpcPanelCardBinder {
         return new LifecycleDisplay(true, stage, countdown, yieldTooltip);
     }
 
+    /** Refreshes the existing lifecycle countdown and meter without card event bindings. */
+    static void bindLifecycle(UICommandBuilder commands, String card,
+                              LinkedNpcEntry entry, String language) {
+        LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
+        bindLifecycleProgress(commands, card, lifecycle,
+                resolveLifecycleDisplay(entry, language), language,
+                entry.captured() || entry.dead());
+    }
+
     private static String resolveNextLifecycleStage(String stage, String language) {
         String nextStage = switch (stage.toLowerCase(java.util.Locale.ROOT)) {
             case "adolescent" -> "adult";

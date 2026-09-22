@@ -9,6 +9,27 @@ import org.junit.jupiter.api.Test;
 
 /** Regression tests for the thread-independent loaded-owner population index. */
 class OwnerPopulationLiveIndexTest {
+    @Test
+    void menuCandidatesFollowOwnerAndWorldChangesAndDisappearOnUnload() {
+        var index = new OwnerPopulationLiveIndex();
+        index.observe(FIRST_NPC, OWNER, "alpha");
+        index.observe(SECOND_NPC, OWNER, "beta");
+        for (int i = 0; i < 1000; i++) index.observe(UUID.randomUUID(), OTHER_OWNER, "alpha");
+        var before = index.ownedNpcIds(OWNER, "alpha");
+        assertEquals(Set.of(FIRST_NPC), before);
+        index.observe(FIRST_NPC, OTHER_OWNER, "beta");
+        assertEquals(Set.of(), index.ownedNpcIds(OWNER, "alpha"));
+        assertEquals(Set.of(FIRST_NPC), index.ownedNpcIds(OTHER_OWNER, "beta"));
+        assertEquals(Set.of(FIRST_NPC), before, "An existing presentation snapshot must remain stable");
+        index.remove(FIRST_NPC);
+        index.observe(SECOND_NPC, null, "beta");
+        assertEquals(Set.of(), index.ownedNpcIds(OTHER_OWNER, "beta"));
+        assertEquals(Set.of(), index.ownedNpcIds(OWNER, "beta"));
+        index.observe(FIRST_NPC, OWNER, "alpha");
+        index.clear();
+        assertEquals(Set.of(), index.ownedNpcIds(OWNER, "alpha"));
+    }
+
     private static final UUID OWNER =
             UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID OTHER_OWNER =

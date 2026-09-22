@@ -68,6 +68,12 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
         coordinator.recordRendered(permit, progressionIncluded, shortestCountdownRemainingMs);
     }
 
+    LinkedPanelRefreshCoordinator.CountdownState countdownState(
+            LinkedPanelRefreshCoordinator.RenderPermit permit
+    ) {
+        return coordinator.countdownState(permit);
+    }
+
     private synchronized void onSignal(LinkedPanelRefreshSignal signal) {
         if (closed || signal == null) return;
         if (signal.kind() == LinkedPanelRefreshSignal.Kind.IMMEDIATE) {

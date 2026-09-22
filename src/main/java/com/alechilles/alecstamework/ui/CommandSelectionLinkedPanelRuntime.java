@@ -136,11 +136,21 @@ final class CommandSelectionLinkedPanelRuntime {
             complete(permit, false);
             return;
         }
+        LinkedPanelRefreshCoordinator.CountdownState countdown = permit.countdownOnly()
+                ? page.refreshLifecycle.countdownState(permit) : null;
+        if (permit.countdownOnly() && countdown == null) {
+            complete(permit, false);
+            return;
+        }
         try {
-            refreshEntries();
-            LinkedNpcPanelRefreshOutcome outcome = refresh(
-                    permit.progressionEligible());
-            complete(permit, outcome.progressionIncluded(),
+            boolean reuseCountdownSnapshot = permit.countdownOnly()
+                    && !countdown.expired()
+                    && page.pendingRemovals.remainingMillis() == Long.MAX_VALUE;
+            LinkedNpcPanelRefreshOutcome outcome = reuseCountdownSnapshot
+                    ? refreshCountdowns(countdown.elapsedMs())
+                    : refreshAuthoritative(permit.progressionEligible());
+            complete(reuseCountdownSnapshot ? permit : permit.authoritative(),
+                    outcome.progressionIncluded(),
                     outcome.shortestCountdownRemainingMs());
         } catch (Throwable failure) {
             complete(permit, false);
@@ -150,6 +160,28 @@ final class CommandSelectionLinkedPanelRuntime {
                             "TameworkCommandSelectionPage", "command_item",
                             "refresh", "Failed to refresh linked panel.").build());
         }
+    }
+
+    private LinkedNpcPanelRefreshOutcome refreshAuthoritative(
+            boolean progressionEligible
+    ) {
+        refreshEntries();
+        return refresh(progressionEligible);
+    }
+
+    /** Redraws known countdowns without rereading live companions or durable rows. */
+    private LinkedNpcPanelRefreshOutcome refreshCountdowns(long elapsedMs) {
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        LinkedNpcPanelCountdownPresenter.refresh(commands, events,
+                page.linkedNpcEntries, page.featureController.presentations(),
+                page::isPendingUnlink,
+                elapsedMs, page.resolveLanguage());
+        if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
+            return LinkedNpcPanelRefreshOutcome.evaluated(false, shortestCountdown());
+        }
+        page.packetSender.send(commands, events);
+        return LinkedNpcPanelRefreshOutcome.sent(false, shortestCountdown());
     }
 
     private void complete(LinkedPanelRefreshCoordinator.RenderPermit permit,

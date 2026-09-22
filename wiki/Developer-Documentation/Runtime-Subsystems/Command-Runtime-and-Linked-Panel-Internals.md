@@ -99,6 +99,24 @@ world-thread dispatcher. The command feature handler closes the cache and subscr
 at shutdown. Saved card values never authorize a live action or mutate persistence.
 
 ## Important runtime seams
+- Each ordinary panel refresh shares one profile projection snapshot, one managed-profile
+  snapshot, and one decoded flute-record list across owned/captured records, row identities,
+  and protected controls. Canonical tool membership determines selection without building
+  the linked cards first. These display snapshots live only for the current refresh;
+  command actions still resolve fresh authority.
+- Live owned discovery uses the existing owner/world index, including newly tamed NPCs
+  awaiting profile publication. The menu resolves those UUIDs on the viewer's world thread
+  and rechecks current ownership and generic-target eligibility. Nearby mode uses the
+  engine spatial index with the same exact distance and role checks. Neither path scans
+  every loaded world entity on each menu refresh. Entity/owner events maintain the owner
+  index, remove empty buckets, and plugin shutdown clears it.
+- Happiness population queries reuse the existing five-second spatial snapshot and
+  resolve species-family membership once per distinct role per query. Exact nearby
+  distance checks and the querying animal's breeding config still determine the count;
+  config reload invalidation and snapshot lifetime are unchanged.
+- Countdown-only wakes update timer presentation from the current page snapshot. State
+  mutations, progression polling, safety wakes, and timer expiration still request fresh
+  data. Countdown presentation never enables an action or changes canonical lifecycle.
 - Standard panel refreshes reuse their entry snapshot for group-selection controls.
   Text-filtered cards and unfiltered selection rows come from one entry build, so
   searching the list does not change the group-selection summary. Row decoration

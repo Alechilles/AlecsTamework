@@ -125,6 +125,26 @@ class LinkedNpcPanelVitalsBinderTest {
         Assertions.assertFalse(label.contains("Harvest ready"));
     }
 
+    @Test
+    void countdownProjectionUpdatesCooldownTextTooltipAndMeterFill() {
+        LinkedNpcEntry entry = offlineEntry(125_000L, true);
+        UICommandBuilder commands = new UICommandBuilder();
+
+        LinkedNpcPanelCountdownPresenter.refresh(commands, new com.hypixel.hytale.server.core.ui.builder.UIEventBuilder(),
+                new LinkedNpcEntry[] {entry}, java.util.Map.of(), ignored -> false,
+                5_000L, "en-US");
+
+        Assertions.assertTrue(data(commands, "#TameworkLinkedPanelList[0] #BreedingCooldown #CooldownText.Text")
+                .contains("1m"));
+        Assertions.assertTrue(data(commands,
+                "#TameworkLinkedPanelList[0] #BreedingCooldown #BreedingCooldownTooltip.TooltipText")
+                .contains("1m"));
+        var fill = org.bson.BsonDocument.parse(data(commands,
+                "#TameworkLinkedPanelList[0] #BreedingCooldown #MeterFill.Anchor"))
+                .getDocument("0");
+        Assertions.assertEquals(57, fill.getNumber("Width").intValue());
+    }
+
     private static LinkedNpcEntry offlineEntry(long harvestRemainingMs, boolean harvestActive) {
         return new LinkedNpcEntry(
                 UUID.randomUUID(), "Offline Companion", null,

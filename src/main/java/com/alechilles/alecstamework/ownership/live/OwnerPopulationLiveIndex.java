@@ -17,6 +17,7 @@ import javax.annotation.Nullable;
  */
 public final class OwnerPopulationLiveIndex {
     private final Map<UUID, OwnedNpc> entries = new ConcurrentHashMap<>();
+    private final Map<OwnerWorld, Set<UUID>> byOwnerWorld = new ConcurrentHashMap<>();
 
     public void observe(@Nullable UUID npcId,
                         @Nullable UUID ownerId,
@@ -33,23 +34,52 @@ public final class OwnerPopulationLiveIndex {
         }
         String normalizedWorld = normalizeWorld(worldName);
         if (ownerId == null || normalizedWorld == null) {
-            entries.remove(npcId);
+            remove(npcId);
             return;
         }
-        entries.put(npcId, new OwnedNpc(
-                ownerId, normalizedWorld, normalizeRole(roleId)
-        ));
+        entries.compute(npcId, (id, previous) -> {
+            OwnerWorld key = new OwnerWorld(ownerId, normalizedWorld);
+            if (previous == null || !key.equals(previous.key())) {
+                if (previous != null) removeFromOwner(id, previous.key());
+                byOwnerWorld.compute(key, (ignored, ids) -> {
+                    if (ids == null) ids = ConcurrentHashMap.newKeySet();
+                    ids.add(id);
+                    return ids;
+                });
+            }
+            return new OwnedNpc(ownerId, normalizedWorld, normalizeRole(roleId));
+        });
     }
 
     public void remove(@Nullable UUID npcId) {
         if (npcId != null) {
-            entries.remove(npcId);
+            entries.computeIfPresent(npcId, (id, previous) -> {
+                removeFromOwner(id, previous.key());
+                return null;
+            });
         }
     }
 
     /** Drops all loaded evidence when the plugin runtime is shut down. */
     public void clear() {
         entries.clear();
+        byOwnerWorld.clear();
+    }
+
+    /** Stable candidate IDs only. Callers must recheck live ownership on the owning world thread. */
+    @Nonnull
+    public Set<UUID> ownedNpcIds(@Nonnull UUID ownerId, @Nonnull String worldName) {
+        String normalizedWorld = normalizeWorld(worldName);
+        if (ownerId == null || normalizedWorld == null) return Set.of();
+        var ids = byOwnerWorld.get(new OwnerWorld(ownerId, normalizedWorld));
+        return ids == null ? Set.of() : Set.copyOf(ids);
+    }
+
+    private void removeFromOwner(UUID npcId, OwnerWorld key) {
+        byOwnerWorld.computeIfPresent(key, (ignored, ids) -> {
+            ids.remove(npcId);
+            return ids.isEmpty() ? null : ids;
+        });
     }
 
     public int count(@Nonnull UUID ownerId,
@@ -116,5 +146,8 @@ public final class OwnerPopulationLiveIndex {
 
     private record OwnedNpc(UUID ownerId, String worldName,
                             @Nullable String roleId) {
+        OwnerWorld key() { return new OwnerWorld(ownerId, worldName); }
     }
+
+    private record OwnerWorld(UUID ownerId, String worldName) { }
 }

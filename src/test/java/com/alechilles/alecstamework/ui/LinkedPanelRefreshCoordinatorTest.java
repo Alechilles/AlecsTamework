@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LinkedPanelRefreshCoordinatorTest {
@@ -153,6 +154,60 @@ class LinkedPanelRefreshCoordinatorTest {
         );
 
         assertEquals(List.of(999L), fixture.scheduler.delays());
+    }
+
+    @Test
+    void countdownWakeBeforeExpiryReusesTheExistingSnapshot() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(false, 15_000L);
+
+        fixture.clock.set(10_000L);
+        fixture.scheduler.runDue();
+
+        assertTrue(fixture.latestPermit().countdownOnly());
+        assertEquals(10_000L,
+                fixture.coordinator.countdownState(fixture.latestPermit()).elapsedMs());
+    }
+
+    @Test
+    void countdownExpiryRequiresAnAuthoritativeRefresh() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(false, 1_000L);
+
+        fixture.clock.set(1_000L);
+        fixture.scheduler.runDue();
+
+        assertFalse(fixture.latestPermit().countdownOnly());
+    }
+
+    @Test
+    void staleCountdownPermitCannotPatchANewerSnapshot() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(false, 15_000L);
+        fixture.clock.set(10_000L);
+        fixture.scheduler.runDue();
+        LinkedPanelRefreshCoordinator.RenderPermit stale = fixture.latestPermit();
+
+        fixture.coordinator.recordRendered(
+                new LinkedPanelRefreshCoordinator.RenderPermit(-1L, false), false, 15_000L);
+
+        assertNull(fixture.coordinator.countdownState(stale));
+    }
+
+    @Test
+    void queuedCountdownUsesItsActualWorldThreadDelayAndExpiresAuthoritatively() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(false, 15_000L);
+        fixture.clock.set(10_000L);
+        fixture.scheduler.runDue();
+        LinkedPanelRefreshCoordinator.RenderPermit permit = fixture.latestPermit();
+
+        fixture.clock.set(15_000L);
+        LinkedPanelRefreshCoordinator.CountdownState state =
+                fixture.coordinator.countdownState(permit);
+
+        assertEquals(15_000L, state.elapsedMs());
+        assertTrue(state.expired());
     }
 
     @Test
