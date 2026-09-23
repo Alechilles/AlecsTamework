@@ -44,6 +44,7 @@ final class CommandPanelGroupActionService {
         boolean updated = toolInventoryService.mutateGroups(
                 player, toolId, stack -> groupService.createGroup(stack, name, colorHex)
         );
+        if (updated) refreshViewDisplay(player, toolId);
         sendResult(player, updated,
                 "tamework.ui.notifications.command.group.createFailed",
                 "tamework.ui.notifications.command.group.created",
@@ -55,6 +56,7 @@ final class CommandPanelGroupActionService {
         boolean updated = toolInventoryService.mutateGroups(
                 player, toolId, stack -> groupService.renameGroup(stack, groupId, name)
         );
+        if (updated) refreshViewDisplay(player, toolId);
         sendResult(player, updated,
                 "tamework.ui.notifications.command.group.renameFailed",
                 "tamework.ui.notifications.command.group.renamed",
@@ -83,6 +85,7 @@ final class CommandPanelGroupActionService {
     void applyDeleteGroup(Player player, String toolId, String groupId) {
         boolean updated = toolInventoryService.mutateGroups(
                 player, toolId, stack -> groupService.deleteGroup(stack, groupId));
+        if (updated) refreshViewDisplay(player, toolId);
         sendResult(player, updated,
                 "tamework.ui.notifications.command.group.deleteFailed",
                 "tamework.ui.notifications.command.group.deleted");
@@ -101,6 +104,11 @@ final class CommandPanelGroupActionService {
         } else {
             feedbackService.showWarningKey(player, failureKey);
         }
+    }
+
+    private void refreshViewDisplay(Player player, String toolId) {
+        toolInventoryService.mutateToolStack(player, toolId,
+                stack -> CommandCompanionViewItemDisplay.apply(player, stack));
     }
 
     @Nullable

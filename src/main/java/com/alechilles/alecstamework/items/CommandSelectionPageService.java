@@ -362,8 +362,9 @@ final class CommandSelectionPageService {
                 && genericAuthority.getAsBoolean()) {
             toolInventoryService.mutateToolStack(player, toolId, stack -> {
                 var saved = CommandCompanionViewStore.read(stack);
-                return saved.selectedId().isBlank() ? stack
+                ItemStack selected = saved.selectedId().isBlank() ? stack
                         : CommandCompanionViewStore.choose(stack, saved.selectedId());
+                return CommandCompanionViewItemDisplay.apply(player, selected);
             });
         }
         CommandUiPageCoordinator coordinator = commandUiCoordinator;

@@ -126,6 +126,10 @@ saved view. Deleting the current view returns to All companions. Filters remain
 rules, so newly owned animals that match appear automatically. An unavailable
 species or group stays in the filter until removed.
 
+When a named saved view is selected, the flute's item name adds that view name
+and its tooltip lists the saved filters below the normal description. Unsaved
+changes in the menu do not change the item tooltip until the view is saved.
+
 Changing a view does not change command recipients. **Select all matching** replaces
 that flute's selection with eligible matches across every page, up to the flute's
 command limit. The chip row reports selected animals outside the current view.

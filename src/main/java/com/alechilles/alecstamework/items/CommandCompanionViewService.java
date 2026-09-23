@@ -18,7 +18,11 @@ final class CommandCompanionViewService {
         Supplier<CommandCompanionViewStore.Snapshot> read =
                 () -> CommandCompanionViewStore.read(inventory.findToolStack(player.get(), toolId));
         Consumer<UnaryOperator<ItemStack>> mutate = operation -> {
-            if (authority.getAsBoolean()) inventory.mutateToolStack(player.get(), toolId, operation);
+            if (authority.getAsBoolean()) {
+                Player current = player.get();
+                inventory.mutateToolStack(current, toolId,
+                        stack -> CommandCompanionViewItemDisplay.apply(current, operation.apply(stack)));
+            }
         };
         return new CompanionViewBinding(
                 () -> read.get().current(),
