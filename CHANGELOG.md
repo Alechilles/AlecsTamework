@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
+## 4.2.0 - Companion Views and Stability - 2026-09-23
 
 - Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.
 
@@ -21,6 +21,8 @@
 - Ordinary companion pages now reuse their card controls across page changes, including shorter last pages. Removed unused XP-ring widgets and hidden location updates, and shared trait reads within each card build to reduce work on first loads as well.
 
 - Reduced companion-menu refresh cost by sharing profile and flute data within each refresh, building owned cards once, and using indexed discovery instead of scanning every loaded entity. Happiness meters and tooltips share one calculation, population checks resolve families only for nearby roles, and saved-card extension lookups stay within the requested companion. Countdown-only updates reuse existing card data until expiration.
+
+## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
 - Cooped companions now retain saved health for their cards. Captured companions
   show editable groups and retain their flute's remembered selection while stored.
