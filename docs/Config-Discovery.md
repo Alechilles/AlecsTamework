@@ -83,6 +83,11 @@ Resolved by bound item ids:
 - `TwNameItemConfig` (`ItemId`)
 - `TwCommandItemConfig` (`ItemIds`)
 
+`TwCommandItemConfig.IconOptions` optionally exposes any number of icon-only
+item states for each ordinary command flute. Each state maps to an item asset
+icon and a localized chooser label. The original item icon is always available;
+omitting the list keeps the chooser hidden.
+
 The effective `TwCommandItemConfig` also resolves its command UI composition.
 `UiRendererId` selects one registered Java renderer. `UiContributors` replaces
 the parent list when it is explicitly authored; otherwise it inherits the

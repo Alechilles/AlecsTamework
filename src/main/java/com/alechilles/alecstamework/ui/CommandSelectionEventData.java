@@ -93,6 +93,7 @@ public final class CommandSelectionEventData {
             .append(new KeyedCodec<>("@ViewGroups", Codec.STRING_ARRAY), (e,v) -> e.viewGroups=v, e -> e.viewGroups).add()
             .append(new KeyedCodec<>("@ViewSelected", Codec.BOOLEAN), (e,v) -> e.viewSelected=v, e -> e.viewSelected).add()
             .append(new KeyedCodec<>("@ViewName", Codec.STRING), (e,v) -> e.viewName=v, e -> e.viewName).add()
+            .append(new KeyedCodec<>("@ViewIconItemId", Codec.STRING), (e,v) -> e.viewIconItemId=v, e -> e.viewIconItemId).add()
             .build();
 
     String viewId;
@@ -101,6 +102,7 @@ public final class CommandSelectionEventData {
     String[] viewGroups;
     Boolean viewSelected;
     String viewName;
+    String viewIconItemId;
     String companionAddGroup;
     Boolean companionNearby;
     String[] companionGroups;

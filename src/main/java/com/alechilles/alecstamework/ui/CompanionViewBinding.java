@@ -10,7 +10,12 @@ public record CompanionViewBinding(Supplier<CompanionViewSettings> current,
                                    Supplier<List<View>> views, Supplier<String> selectedId,
                                    Consumer<CompanionViewSettings> edit, Consumer<String> choose,
                                    BiConsumer<String, Boolean> save, Consumer<String> rename,
-                                   Runnable delete, Runnable selectMatching) {
+                                   Runnable delete, Runnable selectMatching,
+                                   Supplier<List<IconOption>> iconOptions, Supplier<String> selectedIconItemId,
+                                   Consumer<String> chooseIcon) {
     /** A named preset; its settings never determine command authority. */
     public record View(String id, String name, CompanionViewSettings settings) { }
+
+    /** An icon-bearing item asset offered as a visual variant of this flute. */
+    public record IconOption(String itemId, String label, String iconPath) { }
 }

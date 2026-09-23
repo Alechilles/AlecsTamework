@@ -123,6 +123,12 @@ For a new view, it asks for a name and saves the current status, nearby setting,
 search, sort, and extra filters together. The edit icon opens the name field and
 Delete view action. A player can save up to 16 views shared by their ordinary
 command flutes. Each flute remembers its own selected view and unsaved draft.
+When `IconOptions` are configured for an ordinary command item, its small icon
+button opens a chooser for that physical flute. The player can select the
+original icon or one of the configured marked icons. This choice is independent
+of the selected view and does not alter command recipients or the held model.
+Each option names an item `State` child with an alternate `Icon`; the item
+keeps its other metadata when switching states.
 Deleting the current view returns that flute to All companions. Filters remain
 rules, so newly owned animals that match appear automatically. An unavailable
 species or group stays in the filter until removed.

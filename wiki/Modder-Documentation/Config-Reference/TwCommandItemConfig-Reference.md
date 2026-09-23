@@ -22,7 +22,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Omitted top-level object sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays and maps replace the parent value.
-- `ItemIds` and `CommandList` are explicit arrays and replace the parent list.
+- `ItemIds`, `IconOptions`, and `CommandList` are explicit arrays and replace the parent list.
 - `TargetHudContributors` and `HotswapHudContributors` are explicit arrays and
   replace the parent list, including when the child sets an empty array.
 - HUD renderer and contributor fields inherit independently from the parent.
@@ -34,6 +34,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "Enabled": true,
   "HotswapHudEnabled": true,
   "ItemIds": [],
+  "IconOptions": [],
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
   "RosterStorage": "ItemMetadata",
@@ -65,6 +66,13 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `Enabled`: disables the config when `false`.
 - `HotswapHudEnabled`: defaults to `true`. Set to `false` to hide the command-control strip while retaining the animal target HUD. Omitted values inherit from the parent; explicit values override it. This changes presentation only; the item's interactions still determine what its controls do.
 - `ItemIds`: item ids that resolve this config.
+- `IconOptions`: optional ordered list of icon choices for ordinary command items.
+  Each entry has `State`, naming a child in the item's `State` map, and
+  `LabelKey`, a translation key for the chooser. The list can contain any
+  number of entries. The unmarked base icon is offered automatically. A state
+  child can override only `Icon`, so the held model and texture remain intact.
+  Missing states are skipped. Omitted lists inherit from the parent config;
+  an explicit list, including `[]`, replaces the inherited list.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.
 - `RosterStorage`: `ItemMetadata` for the standard ordinary-flute flow. Its panel

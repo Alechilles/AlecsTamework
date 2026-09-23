@@ -16,6 +16,7 @@ import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import org.joml.Vector3d;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -148,6 +149,20 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     static final CommandEntry[] EMPTY_COMMAND_LIST = new CommandEntry[0];
     static final CommandStep[] EMPTY_STEPS = new CommandStep[0];
+    private static final IconOption[] EMPTY_ICON_OPTIONS = new IconOption[0];
+    public static final BuilderCodec<IconOption> ICON_OPTION_CODEC = BuilderCodec.builder(
+                    IconOption.class, IconOption::new)
+            .<String>append(new KeyedCodec<>("State", Codec.STRING),
+                    (option, value) -> option.state = normalizeOptional(value), option -> option.state)
+            .documentation("Name of a child entry in the command item's Item.State map.")
+            .add()
+            .<String>append(new KeyedCodec<>("LabelKey", Codec.STRING),
+                    (option, value) -> option.labelKey = normalizeOptional(value), option -> option.labelKey)
+            .documentation("Translation key for this icon choice in the command menu.")
+            .add()
+            .build();
+    public static final ArrayCodec<IconOption> ICON_OPTION_ARRAY_CODEC =
+            new ArrayCodec<>(ICON_OPTION_CODEC, IconOption[]::new);
     public static final StringCodecMapCodec<
             AllowedRoles,
             BuilderCodec<? extends AllowedRoles>> ALLOWED_ROLES_CODEC =
@@ -201,6 +216,16 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .documentation("Command item IDs this config applies to. Inheritance: omitted value inherits from parent; "
                 + "explicit array replaces parent value (no merge).")
+        .add()
+        .<IconOption[]>append(
+            new KeyedCodec<>("IconOptions", ICON_OPTION_ARRAY_CODEC),
+            (asset, value) -> asset.iconOptions = validatedIconOptions(value),
+            asset -> asset.iconOptions
+        )
+        .documentation("Optional, ordered per-flute icon choices. Each State names a child of the item asset's "
+                + "State map and LabelKey names its translated menu label. Any number of options is allowed. "
+                + "The original icon is always available. Omitted children inherit the parent list; an explicit "
+                + "array replaces it, including an empty array.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Radius", Codec.DOUBLE),
@@ -395,6 +420,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private String id;
     private boolean enabled = true;
     private String[] itemIds = ArrayUtil.EMPTY_STRING_ARRAY;
+    private IconOption[] iconOptions = EMPTY_ICON_OPTIONS;
     private double radius = -1.0;
     private MembershipMode membershipMode = MembershipMode.LinkedOnly;
     private String commandFamilyId;
@@ -472,6 +498,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                                            @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("ItemIds")) itemIds = parent.itemIds;
+        if (!explicitTopLevelKeys.contains("IconOptions")) iconOptions = parent.iconOptions;
         if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
         if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
         if (!explicitTopLevelKeys.contains("CommandFamilyId")) commandFamilyId = parent.commandFamilyId;
@@ -542,12 +569,44 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private static IconOption[] validatedIconOptions(@Nullable IconOption[] options) {
+        if (options == null) return EMPTY_ICON_OPTIONS;
+        Set<String> states = new HashSet<>();
+        for (IconOption option : options) {
+            if (option == null || option.state == null || option.labelKey == null) {
+                throw new IllegalArgumentException("IconOptions entries require State and LabelKey");
+            }
+            if (!states.add(option.state)) {
+                throw new IllegalArgumentException("Duplicate IconOptions State: " + option.state);
+            }
+        }
+        return options;
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
 
     public String[] getItemIds() {
         return itemIds;
+    }
+
+    /** Optional icon states offered to each physical item; the list has no fixed size. */
+    public IconOption[] getIconOptions() {
+        return iconOptions;
+    }
+
+    public static final class IconOption {
+        private String state;
+        private String labelKey;
+
+        public String getState() {
+            return state;
+        }
+
+        public String getLabelKey() {
+            return labelKey;
+        }
     }
 
     public double getRadius() {

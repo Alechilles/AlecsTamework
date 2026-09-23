@@ -87,6 +87,18 @@ final class CommandCompanionViewService {
                             stack, CommandCompanionViewStore.ALL_ID, null));
                     inventory.refreshViewDisplays(current);
                 },
-                () -> { if (authority.getAsBoolean()) groups.applyMatchingSelection(player.get(), toolId, config); });
+                () -> { if (authority.getAsBoolean()) groups.applyMatchingSelection(player.get(), toolId, config); },
+                () -> {
+                    Player current = player.get();
+                    return CommandFluteIconService.options(
+                            inventory.findToolStack(current, toolId), config,
+                            current == null || current.getPlayerRef() == null
+                                    ? null : current.getPlayerRef().getLanguage());
+                },
+                () -> {
+                    ItemStack stack = inventory.findToolStack(player.get(), toolId);
+                    return stack == null ? "" : stack.getItemId();
+                },
+                itemId -> mutate.accept(stack -> CommandFluteIconService.choose(stack, config, itemId)));
     }
 }

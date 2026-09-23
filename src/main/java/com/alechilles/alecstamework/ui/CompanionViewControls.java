@@ -5,6 +5,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -20,7 +21,7 @@ import java.util.TreeMap;
 /** Saved views change presentation; the flute's command selection remains separate. */
 final class CompanionViewControls {
     private static final String PREFIX = "__view__:";
-    private enum Editor { NONE, FILTER, NAME }
+    private enum Editor { NONE, FILTER, NAME, ICON }
 
     private final TameworkCommandSelectionPage page;
     private Editor editor = Editor.NONE;
@@ -54,6 +55,9 @@ final class CompanionViewControls {
         set(c, values, "#CompanionViewSaveNew.OutlineSize", 1);
         set(c, values, "#CompanionViewSaveGlyph.Visible", !unsaved);
         set(c, values, "#CompanionViewSaveGlyphUnsaved.Visible", unsaved);
+        boolean hasIconOptions = !binding.iconOptions().get().isEmpty();
+        set(c, values, "#CompanionViewIconButton.Visible", hasIconOptions);
+        set(c, values, "#CompanionViewIconGlyph.Visible", hasIconOptions);
 
         boolean extra = current.hasExtraFilters();
         set(c, values, "#CompanionFilterChips.Visible", extra);
@@ -85,6 +89,7 @@ final class CompanionViewControls {
                 EventData.of("@ViewId", "#CompanionViewPicker.Value"), false);
         bindButton(e, "#CompanionViewSaveNew", "saveView");
         bindButton(e, "#CompanionViewManage", "manage");
+        bindButton(e, "#CompanionViewIconButton", "icon");
         bindButton(e, "#CompanionAddFilter", "addFilter");
         for (String type : List.of("Groups", "Species", "Selected")) {
             bindButton(e, "#CompanionChip" + type + "Edit", "edit" + type);
@@ -93,6 +98,7 @@ final class CompanionViewControls {
         bindButton(e, "#CompanionSelectMatching", "select");
         bindButton(e, "#CompanionFilterCancel", "cancel");
         bindButton(e, "#CompanionViewCancel", "cancel");
+        bindButton(e, "#CompanionViewIconCancel", "cancel");
         bindButton(e, "#CompanionViewFilterSave", "filterSave");
         bindButton(e, "#CompanionViewDelete", "delete");
         e.addEventBinding(CustomUIEventBindingType.Activating, "#CompanionViewSave",
@@ -103,6 +109,8 @@ final class CompanionViewControls {
                 EventData.of("@ViewSpecies", "#CompanionViewSpecies.SelectedValues"), false);
         e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewGroups",
                 EventData.of("@ViewGroups", "#CompanionViewGroups.SelectedValues"), false);
+        e.addEventBinding(CustomUIEventBindingType.ValueChanged, "#CompanionViewIconPicker",
+                EventData.of("@ViewIconItemId", "#CompanionViewIconPicker.Value"), false);
     }
 
     /** A visible editor rejects queued card and assignment events from the covered page. */
@@ -114,7 +122,8 @@ final class CompanionViewControls {
         if (CommandSelectionPageEventBinder.CLOSE_COMMAND_ID.equals(command)) return false;
         if (command.equals(PREFIX + "cancel") || command.equals(PREFIX + "filterSave")
                 || command.equals(PREFIX + "save") || command.equals(PREFIX + "delete")) return false;
-        return data.viewType == null && data.viewSpecies == null && data.viewGroups == null;
+        return data.viewType == null && data.viewSpecies == null && data.viewGroups == null
+                && (editor != Editor.ICON || data.viewIconItemId == null);
     }
 
     boolean handle(CommandSelectionEventData data, String command) {
@@ -124,6 +133,20 @@ final class CompanionViewControls {
             page.flushViewSearch();
             b.choose().accept(data.viewId);
             page.refreshView();
+            return true;
+        }
+        if (data.viewIconItemId != null) {
+            if (editor != Editor.ICON) return true;
+            var chosen = b.iconOptions().get().stream()
+                    .filter(option -> Objects.equals(option.itemId(), data.viewIconItemId))
+                    .findFirst().orElse(null);
+            if (chosen == null) return true;
+            if (!Objects.equals(chosen.itemId(), b.selectedIconItemId().get())) {
+                b.chooseIcon().accept(chosen.itemId());
+            }
+            UICommandBuilder c = new UICommandBuilder();
+            preview(c, chosen);
+            page.packetSender.send(c, new UIEventBuilder());
             return true;
         }
         if (data.viewType != null || data.viewSpecies != null || data.viewGroups != null) {
@@ -152,6 +175,7 @@ final class CompanionViewControls {
                 case "editSpecies" -> { openFilter("species"); return true; }
                 case "editSelected" -> { openFilter("selected"); return true; }
                 case "manage" -> { openName(); return true; }
+                case "icon" -> { if (!b.iconOptions().get().isEmpty()) openIcon(); return true; }
                 case "saveView" -> {
                     if (selectedView() == null) { openName(); return true; }
                     b.save().accept("", true);
@@ -224,6 +248,7 @@ final class CompanionViewControls {
         c.set("#CompanionViewOverlay.Visible", true);
         c.set("#CompanionFilterEditor.Visible", true);
         c.set("#CompanionViewNameEditor.Visible", false);
+        c.set("#CompanionViewIconEditor.Visible", false);
         c.set("#CompanionViewError.Text", "");
         c.set("#CompanionViewType.Entries", List.of(
                 option(text("chooseFilterType"), "choose"), option(text("species"), "species"),
@@ -244,10 +269,38 @@ final class CompanionViewControls {
         c.set("#CompanionViewOverlay.Visible", true);
         c.set("#CompanionFilterEditor.Visible", false);
         c.set("#CompanionViewNameEditor.Visible", true);
+        c.set("#CompanionViewIconEditor.Visible", false);
         c.set("#CompanionViewNameError.Text", "");
         c.set("#CompanionViewName.Value", saved == null ? "" : saved.name());
         c.set("#CompanionViewDelete.Visible", saved != null);
         page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private void openIcon() {
+        var binding = page.viewBinding;
+        List<CompanionViewBinding.IconOption> options = binding.iconOptions().get();
+        if (options.isEmpty()) return;
+        editor = Editor.ICON;
+        UICommandBuilder c = new UICommandBuilder();
+        c.set("#CompanionViewOverlay.Visible", true);
+        c.set("#CompanionFilterEditor.Visible", false);
+        c.set("#CompanionViewNameEditor.Visible", false);
+        c.set("#CompanionViewIconEditor.Visible", true);
+        c.set("#CompanionViewIconPicker.Entries", options.stream()
+                .map(entry -> option(entry.label(), entry.itemId())).toList());
+        String selectedId = binding.selectedIconItemId().get();
+        var selected = options.stream().filter(option -> Objects.equals(option.itemId(), selectedId))
+                .findFirst().orElse(options.getFirst());
+        c.set("#CompanionViewIconPicker.Value", selected.itemId());
+        preview(c, selected);
+        page.packetSender.send(c, new UIEventBuilder());
+    }
+
+    private static void preview(UICommandBuilder c, CompanionViewBinding.IconOption selected) {
+        String path = selected.iconPath();
+        boolean visible = path != null && !path.isBlank();
+        c.set("#CompanionViewIconPreview.Visible", visible);
+        if (visible) c.setObject("#CompanionViewIconPreview.Background", new PatchStyle(Value.of(path)));
     }
 
     private void showFilterType() {

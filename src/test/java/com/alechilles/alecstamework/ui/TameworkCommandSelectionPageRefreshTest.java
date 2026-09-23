@@ -45,7 +45,8 @@ class TameworkCommandSelectionPageRefreshTest {
         page.configureViews(new CompanionViewBinding(settings::get,
                 () -> List.of(new CompanionViewBinding.View("saved", "Travel", stored)), id::get,
                 settings::set, chosen -> { id.set(chosen); settings.set(stored); },
-                (name, update) -> {}, name -> {}, () -> {}, selects::incrementAndGet));
+                (name, update) -> {}, name -> {}, () -> {}, selects::incrementAndGet,
+                List::of, () -> "", ignored -> {}));
         var pagination = new LinkedNpcPanelPageState();
         pagination.setEnabled(false);
         pagination.setPageSize(1);
@@ -76,6 +77,35 @@ class TameworkCommandSelectionPageRefreshTest {
         assertEquals(unsaved, settings.get(), "A repeated picker event must keep unsaved view changes.");
         event(page, "__view__:select");
         assertEquals(1, selects.get());
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void fluteIconPickerAcceptsOnlyConfiguredItemIds() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        var page = page(packets, new AtomicReference<>(), new NavigationFixture(), legacyConfig());
+        var settings = new AtomicReference<>(CompanionViewSettings.defaults());
+        var iconItemId = new AtomicReference<>("Test_Flute");
+        var choices = List.of(
+                new CompanionViewBinding.IconOption("Test_Flute", "Original icon", "Tamework/PanelControls/GroupDiamond.png"),
+                new CompanionViewBinding.IconOption("Test_Flute_Blue", "Blue icon", "Tamework/PanelControls/GroupDiamond.png"));
+        page.configureViews(new CompanionViewBinding(settings::get, List::of, () -> "__all__",
+                settings::set, ignored -> {}, (name, update) -> {}, name -> {}, () -> {}, () -> {},
+                () -> choices, iconItemId::get, iconItemId::set));
+        page.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
+        event(page, "__view__:icon");
+        var forged = new CommandSelectionEventData();
+        forged.viewIconItemId = "Unconfigured_Item";
+        page.handleDataEvent(null, null, forged);
+        assertEquals("Test_Flute", iconItemId.get());
+        var valid = new CommandSelectionEventData();
+        valid.viewIconItemId = "Test_Flute_Blue";
+        page.handleDataEvent(null, null, valid);
+        assertEquals("Test_Flute_Blue", iconItemId.get());
+        event(page, "__view__:cancel");
+        valid.viewIconItemId = "Test_Flute";
+        page.handleDataEvent(null, null, valid);
+        assertEquals("Test_Flute_Blue", iconItemId.get(), "Closed picker must ignore delayed icon events.");
         page.onDismiss(null, null);
     }
 
