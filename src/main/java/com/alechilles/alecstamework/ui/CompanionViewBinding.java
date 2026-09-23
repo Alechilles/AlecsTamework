@@ -17,5 +17,5 @@ public record CompanionViewBinding(Supplier<CompanionViewSettings> current,
     public record View(String id, String name, CompanionViewSettings settings) { }
 
     /** An icon-bearing item asset offered as a visual variant of this flute. */
-    public record IconOption(String itemId, String label, String iconPath) { }
+    public record IconOption(String itemId, String label) { }
 }

@@ -95,7 +95,7 @@ Group #CompanionViewOverlay {
     TextButton #CompanionViewIconCancel { Anchor: (Top: 12, Right: 14, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.cancel; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
     Group { Anchor: (Top: 14, Right: 16, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
     Group #CompanionViewIconPreviewFrame { Anchor: (Top: 58, Left: 20, Width: 76, Height: 76); Background: #252c27; OutlineColor: #4a5a50; OutlineSize: 1; }
-    Group #CompanionViewIconPreview { Anchor: (Top: 64, Left: 26, Width: 64, Height: 64); Visible: false; }
+    ItemIcon #CompanionViewIconPreview { Anchor: (Top: 64, Left: 26, Width: 64, Height: 64); }
     Label { Anchor: (Top: 60, Left: 112, Right: 20, Height: 22); Text: %server.tamework.ui.views.fluteIcon; Style: (FontSize: 13, TextColor: #d6d9d0); }
     DropdownBox #CompanionViewIconPicker { Anchor: (Top: 88, Left: 112, Right: 20, Height: 30); MaxSelection: 1; Style: $A.@PanelDropdown; }
   }

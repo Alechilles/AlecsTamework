@@ -23,13 +23,12 @@ final class CommandFluteIconService {
         if (base == null) return List.of();
         List<CompanionViewBinding.IconOption> choices = new ArrayList<>();
         choices.add(new CompanionViewBinding.IconOption(base.getId(),
-                LocalizedText.resolve(language, "tamework.ui.views.originalIcon"), base.getIcon()));
+                LocalizedText.resolve(language, "tamework.ui.views.originalIcon")));
         for (TwCommandItemConfig.IconOption configured : config.getIconOptions()) {
             Item variant = base.getItemForState(configured.getState());
             if (variant == null || variant.getIcon() == null || variant.getIcon().isBlank()) continue;
             choices.add(new CompanionViewBinding.IconOption(variant.getId(),
-                    LocalizedText.resolveConfigValue(language, configured.getLabelKey(), configured.getState()),
-                    variant.getIcon()));
+                    LocalizedText.resolveConfigValue(language, configured.getLabelKey(), configured.getState())));
         }
         return choices.size() == 1 ? List.of() : List.copyOf(choices);
     }

@@ -5,7 +5,6 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
-import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -297,10 +296,7 @@ final class CompanionViewControls {
     }
 
     private static void preview(UICommandBuilder c, CompanionViewBinding.IconOption selected) {
-        String path = selected.iconPath();
-        boolean visible = path != null && !path.isBlank();
-        c.set("#CompanionViewIconPreview.Visible", visible);
-        if (visible) c.setObject("#CompanionViewIconPreview.Background", new PatchStyle(Value.of(path)));
+        c.set("#CompanionViewIconPreview.ItemId", selected.itemId());
     }
 
     private void showFilterType() {

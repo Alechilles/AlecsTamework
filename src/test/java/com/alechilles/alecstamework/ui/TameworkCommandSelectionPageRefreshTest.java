@@ -87,13 +87,14 @@ class TameworkCommandSelectionPageRefreshTest {
         var settings = new AtomicReference<>(CompanionViewSettings.defaults());
         var iconItemId = new AtomicReference<>("Test_Flute");
         var choices = List.of(
-                new CompanionViewBinding.IconOption("Test_Flute", "Original icon", "Tamework/PanelControls/GroupDiamond.png"),
-                new CompanionViewBinding.IconOption("Test_Flute_Blue", "Blue icon", "Tamework/PanelControls/GroupDiamond.png"));
+                new CompanionViewBinding.IconOption("Test_Flute", "Original icon"),
+                new CompanionViewBinding.IconOption("Test_Flute_Blue", "Blue icon"));
         page.configureViews(new CompanionViewBinding(settings::get, List::of, () -> "__all__",
                 settings::set, ignored -> {}, (name, update) -> {}, name -> {}, () -> {}, () -> {},
                 () -> choices, iconItemId::get, iconItemId::set));
         page.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
         event(page, "__view__:icon");
+        assertCommand(packets.updates.getLast(), "#CompanionViewIconPreview.ItemId", "Test_Flute");
         var forged = new CommandSelectionEventData();
         forged.viewIconItemId = "Unconfigured_Item";
         page.handleDataEvent(null, null, forged);
@@ -102,6 +103,7 @@ class TameworkCommandSelectionPageRefreshTest {
         valid.viewIconItemId = "Test_Flute_Blue";
         page.handleDataEvent(null, null, valid);
         assertEquals("Test_Flute_Blue", iconItemId.get());
+        assertCommand(packets.updates.getLast(), "#CompanionViewIconPreview.ItemId", "Test_Flute_Blue");
         event(page, "__view__:cancel");
         valid.viewIconItemId = "Test_Flute";
         page.handleDataEvent(null, null, valid);
