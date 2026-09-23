@@ -242,7 +242,7 @@ server log so operators can collect them after command chat closes.
 
 ### Automatic failure evidence
 
-Starting with 4.1.3, automatic failure bundles also include `failure-records.json`.
+Starting with 4.2.0, automatic failure bundles also include `failure-records.json`.
 The shared SQLite writer and reader collect a bounded diagnostic snapshot at the
 failure boundary, before rollback or connection close. The reporter receives
 immutable evidence, so startup shutdown cannot make it disappear before upload.
