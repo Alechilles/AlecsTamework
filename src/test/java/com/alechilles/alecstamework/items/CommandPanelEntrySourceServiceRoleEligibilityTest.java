@@ -188,9 +188,6 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             ItemStack viewStack = CommandCompanionViewStore.writeCurrent(stack,
                     new com.alechilles.alecstamework.ui.CompanionViewSettings(
                             "Stored", false, "", "Species", false, List.of("chicken"), List.of()));
-            viewStack = CommandCompanionViewStore.save(viewStack, "Stored chickens", false);
-            String viewId = CommandCompanionViewStore.read(viewStack).selectedId();
-            viewStack = CommandCompanionViewStore.choose(viewStack, viewId);
             page.setPageSize(10);
             var viewPage = source.buildSnapshot(player, store, viewStack, config, "flute", page);
             org.junit.jupiter.api.Assertions.assertEquals(30, page.totalEntries());

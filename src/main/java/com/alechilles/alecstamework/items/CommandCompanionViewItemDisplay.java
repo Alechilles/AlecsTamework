@@ -16,18 +16,25 @@ import javax.annotation.Nullable;
 final class CommandCompanionViewItemDisplay {
     private static final String PREFIX = "server.tamework.ui.commandItem.view.";
     private static final String NAME_KEY = PREFIX + "name";
+    private static final String FILTER_HEADER = "#F6C453";
+    private static final String FILTER_LABEL = "#AFB6B0";
+    private static final String FILTER_VALUE = "#F3E7C9";
 
     private CommandCompanionViewItemDisplay() { }
 
     static ItemStack apply(@Nullable Player player, @Nullable ItemStack stack) {
+        return apply(player, stack, CommandCompanionViews.read(player));
+    }
+
+    static ItemStack apply(@Nullable Player player, @Nullable ItemStack stack,
+                           @Nullable List<CommandCompanionViews.View> views) {
         if (stack == null || stack.isEmpty()) return stack;
         ItemDisplayMetadata existing = stack.getFromMetadataOrNull(ItemDisplayMetadata.KEYED_CODEC);
         if (existing != null && !owned(existing)) return stack;
+        if (views == null) return stack;
 
         var snapshot = CommandCompanionViewStore.read(stack);
-        var selected = snapshot.views().stream()
-                .filter(view -> view.id().equals(snapshot.selectedId()))
-                .findFirst().orElse(null);
+        var selected = CommandCompanionViews.find(views, snapshot.selectedId());
         if (selected == null) {
             return existing == null ? stack : stack.withMetadata(ItemDisplayMetadata.KEYED_CODEC, null);
         }
@@ -35,8 +42,8 @@ final class CommandCompanionViewItemDisplay {
         Message name = Message.translation(NAME_KEY)
                 .param("0", stack.getItem().getTranslationMessage())
                 .param("1", Message.raw(selected.name()));
-        Message description = Message.join(stack.getItem().getDescriptionTranslationMessage(),
-                Message.raw("\n\n"), filters(player, stack, selected.settings()));
+        Message description = Message.join(filters(player, stack, selected.settings()),
+                Message.raw("\n\n"), stack.getItem().getDescriptionTranslationMessage());
         return stack.withMetadata(ItemDisplayMetadata.KEYED_CODEC,
                 new ItemDisplayMetadata(name, description));
     }
@@ -73,18 +80,20 @@ final class CommandCompanionViewItemDisplay {
         if (settings.selectedOnly()) lines.add(Message.translation(PREFIX + "selected"));
         if (!settings.search().isEmpty()) lines.add(line("search", Message.raw(settings.search())));
 
-        if (lines.isEmpty()) return Message.translation(PREFIX + "none");
+        if (lines.isEmpty()) {
+            return Message.translation(PREFIX + "none").color(FILTER_HEADER).bold(true);
+        }
         List<Message> content = new ArrayList<>();
-        content.add(Message.translation(PREFIX + "filters"));
+        content.add(Message.translation(PREFIX + "filters").color(FILTER_HEADER).bold(true));
         for (Message line : lines) {
-            content.add(Message.raw("\n"));
-            content.add(line);
+            content.add(Message.raw("\n").color(FILTER_LABEL));
+            content.add(line.color(FILTER_LABEL));
         }
         return Message.join(content.toArray(Message[]::new));
     }
 
     private static Message line(String key, Message value) {
-        return Message.translation(PREFIX + key).param("0", value);
+        return Message.translation(PREFIX + key).param("0", value.color(FILTER_VALUE));
     }
 
     private static Message join(List<Message> values) {

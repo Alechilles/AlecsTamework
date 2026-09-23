@@ -53,7 +53,7 @@ members, or toggle individual animals afterward. Shared player groups support mu
 memberships and are edited inline through the card's native multi-select control.
 
 
-### Saved views on each flute
+### Saved views across flutes
 
 The view picker sits beside the status tabs. **All companions** clears the filters;
 **Selected on this flute** shows that flute's current recipients. **+ Filter** opens a
@@ -69,13 +69,15 @@ differs from its saved version. Hover over it to see the unsaved-changes hint.
 The icon saves those changes to the selected view.
 For a new view, it asks for a name and saves the current status, nearby setting,
 search, sort, and extra filters together. The edit icon opens the name field and
-Delete view action. Each flute holds up to 16 views and reopens to its selected
-saved view. Deleting the current view returns to All companions. Filters remain
+Delete view action. You can save up to 16 views shared by your ordinary command
+flutes. Each flute remembers its own selected view and unsaved draft. Deleting
+the current view returns that flute to All companions. Filters remain
 rules, so newly owned animals that match appear automatically. An unavailable
 species or group stays in the filter until removed.
 
 When you select a named saved view, the flute's item name includes the view name
-and its tooltip lists the saved filters. Changes you have not saved in the menu
+and its tooltip shows the saved filters in color above the normal description.
+Changes you have not saved in the menu
 do not appear in the item tooltip yet.
 
 Changing a view does not change command recipients. **Select all matching** replaces

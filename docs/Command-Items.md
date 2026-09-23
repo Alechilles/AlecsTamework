@@ -105,7 +105,7 @@ can remain selected while being unavailable to a specialized flute; the panel ex
 that restriction instead of changing the selection.
 
 
-### Saved views on each flute
+### Saved views across flutes
 
 The view picker sits beside the status tabs. **All companions** clears the filters;
 **Selected on this flute** shows that flute's current recipients. **+ Filter** opens a
@@ -121,13 +121,14 @@ differs from its saved version. Hover over it to see the unsaved-changes hint.
 The icon saves those changes to the selected view.
 For a new view, it asks for a name and saves the current status, nearby setting,
 search, sort, and extra filters together. The edit icon opens the name field and
-Delete view action. Each flute holds up to 16 views and reopens to its selected
-saved view. Deleting the current view returns to All companions. Filters remain
+Delete view action. A player can save up to 16 views shared by their ordinary
+command flutes. Each flute remembers its own selected view and unsaved draft.
+Deleting the current view returns that flute to All companions. Filters remain
 rules, so newly owned animals that match appear automatically. An unavailable
 species or group stays in the filter until removed.
 
 When a named saved view is selected, the flute's item name adds that view name
-and its tooltip lists the saved filters below the normal description. Unsaved
+and its tooltip shows the saved filters in color above the normal description. Unsaved
 changes in the menu do not change the item tooltip until the view is saved.
 
 Changing a view does not change command recipients. **Select all matching** replaces

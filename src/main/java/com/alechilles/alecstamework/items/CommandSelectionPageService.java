@@ -361,10 +361,10 @@ final class CommandSelectionPageService {
         if (config.getRosterStorage() == TwCommandItemConfig.RosterStorage.ItemMetadata
                 && genericAuthority.getAsBoolean()) {
             toolInventoryService.mutateToolStack(player, toolId, stack -> {
-                var saved = CommandCompanionViewStore.read(stack);
-                ItemStack selected = saved.selectedId().isBlank() ? stack
-                        : CommandCompanionViewStore.choose(stack, saved.selectedId());
-                return CommandCompanionViewItemDisplay.apply(player, selected);
+                var views = CommandCompanionViews.read(player);
+                if (views == null) return stack;
+                ItemStack selected = CommandCompanionViewService.restore(stack, views);
+                return CommandCompanionViewItemDisplay.apply(player, selected, views);
             });
         }
         CommandUiPageCoordinator coordinator = commandUiCoordinator;

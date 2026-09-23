@@ -70,9 +70,14 @@ panel preferences on the physical item. The owned panel discovers all owned
 companions from the player's profile projection, then uses those records only to
 decide which rows are selected for that flute. A selected row is eligible for
 dispatch only after the held item's owner, tame, role, command, and capacity checks.
-Saved views and their current draft live in the flute's `Tamework.Command.CompanionViews`
-item metadata. They contain presentation settings only. Opening the ordinary menu restores
-the selected preset; legacy items without view metadata keep their previous preferences.
+Named view definitions live in the player's saved `TameworkCompanionViewsComponent`,
+shared by ordinary command flutes. The selected view ID and current draft remain in
+each flute's `Tamework.Command.CompanionViews` item metadata. These are presentation
+settings only. Opening the ordinary menu restores that flute's selected preset;
+items without view metadata keep their previous preferences. A missing named view
+falls back to All companions. Saving, renaming, or deleting a shared view refreshes
+other carried flutes' tooltips without changing their selections or drafts;
+deleting the selected view resets the active flute to All companions.
 The paged source retains unfiltered summaries for options/counts, evaluates all view criteria
 before slicing, and hydrates details only for the selected page. Select all matching resolves
 fresh owned entries, revalidates each candidate, and applies the flute's existing capacity.

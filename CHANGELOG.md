@@ -8,8 +8,8 @@
 
 - Added `/tw debug clear-owned` to preview and permanently clear a player's ordinary animals, including unloaded, dead, and lost entries. Protected stored and bonded companions are preserved.
 
-- Added saved views on ordinary command flutes, with combined species, group, and selected-only filters. Each flute reopens to its chosen view. Filters can be added or edited one at a time, and the save icon flashes cream and amber for unsaved view changes. Panel refreshes and status-tab changes preserve those edits until the view is saved or reopened. Select all matching works across pages, while page controls appear only when more pages exist.
-- Named saved views now appear in the flute's item name, and the item tooltip lists the view's saved filters. Unsaved menu edits leave the tooltip unchanged until saved.
+- Added player-shared saved views for ordinary command flutes, with combined species, group, and selected-only filters. Each flute reopens to its own selected view and keeps its own unsaved draft. Filters can be added or edited one at a time, and the save icon flashes cream and amber for unsaved changes. Panel refreshes and status-tab changes preserve those edits until the view is saved or reopened. Select all matching works across pages, while page controls appear only when more pages exist.
+- Named saved views appear in the flute's item name. The item tooltip shows the saved filters with colored labels above the normal description; unsaved menu edits leave it unchanged until saved.
 
 - Added companion-menu pagination with 50 cards per page by default. Server owners can choose 1–100 in `/tw settings`. Ordinary flute menus build detailed cards only for the selected page, while search, status tabs, sorting, and group selection cover the full roster.
 

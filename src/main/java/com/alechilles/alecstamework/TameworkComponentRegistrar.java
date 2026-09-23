@@ -54,6 +54,7 @@ final class TameworkComponentRegistrar {
     @Nonnull
     static RegisteredComponents register(@Nonnull Tamework plugin) {
         com.alechilles.alecstamework.items.components.TameworkCompanionGroupsComponent.register(plugin);
+        com.alechilles.alecstamework.items.components.TameworkCompanionViewsComponent.register(plugin);
         ComponentType<EntityStore, TameworkOwnerComponent> owner = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkOwnerComponent.class, "TameworkOwner", TameworkOwnerComponent.CODEC);
         ComponentType<EntityStore, TameworkTamedComponent> tamed = plugin.getEntityStoreRegistry()

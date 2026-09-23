@@ -285,6 +285,26 @@ final class CommandToolInventoryService {
         return false;
     }
 
+    /** Refreshes carried item tooltips after a shared view or group definition changes. */
+    void refreshViewDisplays(Player player) {
+        if (player == null || player.getInventory() == null) return;
+        Inventory inventory = player.getInventory();
+        var views = CommandCompanionViews.read(player);
+        if (views == null) return;
+        for (ItemContainer container : new ItemContainer[] {
+                inventory.getHotbar(), inventory.getStorage(), inventory.getBackpack(),
+                inventory.getUtility(), inventory.getTools() }) {
+            if (container == null) continue;
+            for (short slot = 0; slot < container.getCapacity(); slot++) {
+                ItemStack stack = container.getItemStack(slot);
+                if (stack == null || stack.isEmpty()
+                        || stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING) == null) continue;
+                ItemStack updated = CommandCompanionViewItemDisplay.apply(player, stack, views);
+                if (updated != stack) container.setItemStackForSlot(slot, updated);
+            }
+        }
+    }
+
     /**
      * Returns the currently equipped command flute when it is the same physical
      * item that opened the command menu.
