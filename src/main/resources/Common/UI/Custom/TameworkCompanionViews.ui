@@ -11,7 +11,7 @@ Group #CompanionViewToolbar {
   TextButton #CompanionViewManage { Anchor: (Left: 314, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.manageButton; Style: $A.@PanelButton; }
   Group { Anchor: (Left: 319, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewEdit_Glyph_Default.png", Color: #e8e4da); HitTestVisible: false; }
   TextButton #CompanionViewIconButton { Anchor: (Left: 350, Width: 28, Height: 28); Text: ""; TooltipText: %server.tamework.ui.views.fluteIcon; Style: $A.@PanelButton; Visible: false; }
-  Group #CompanionViewIconGlyph { Anchor: (Left: 355, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #e8e4da); HitTestVisible: false; Visible: false; }
+  Group #CompanionViewIconGlyph { Anchor: (Left: 355, Top: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelActions/ViewIcon_Glyph_Default.png", Color: #e8e4da); HitTestVisible: false; Visible: false; }
 }
 TextButton #CompanionAddFilter {
   Anchor: (Top: 46, Right: 10, Width: 92, Height: 28);
