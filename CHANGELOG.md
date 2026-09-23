@@ -2,6 +2,8 @@
 
 ## 4.1.3 - Stored Companions and Coop Stability - 2026-09-20
 
+- Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.
+
 - Fixed startup failing when an unfinished death or lost transition was superseded by later companion changes. Recovery now retires the obsolete pending operation while preserving the companion's current saved state.
 
 - Expanded automatic persistence failure reports with nested error codes and bounded, anonymized operation and related-record evidence, including failures during startup. Reports preserve collection limits and unavailable evidence so support can diagnose more failures without requesting a save.

@@ -108,6 +108,28 @@ class CommandOwnedPanelRecordSourceTest {
         }
     }
 
+    /** A dead or lost linked card must resolve its retired NPC UUID to the owned profile. */
+    @Test
+    void resolvesRetiredLinkedAliasForRestoration() {
+        UUID owner = UUID.randomUUID();
+        for (LifecycleState state : new LifecycleState[]{LifecycleState.DEAD_REVIVABLE, LifecycleState.LOST}) {
+            var profile = profile(owner, state, null, Set.of());
+            UUID retiredAlias = UUID.randomUUID();
+            var linked = new LinkedNpcRecord(retiredAlias, profile.profileId().toString(),
+                    null, null, null, "My animal", null, "Cow", null, true, false, null);
+            var source = new CommandOwnedPanelRecordSource(() -> Map.of(profile.profileId(), profile));
+
+            var snapshot = source.snapshot(owner, java.util.List.of(linked), Set.of());
+
+            assertEquals(retiredAlias, snapshot.ownedRecords().getFirst().npcUuid);
+            assertEquals(profile.profileId(), snapshot.profilesByRow().get(retiredAlias));
+            assertEquals(profile.profileId(), source.profileForRow(owner, retiredAlias,
+                    java.util.List.of(linked)).orElseThrow());
+            assertFalse(source.snapshot(UUID.randomUUID(), java.util.List.of(linked), Set.of())
+                    .profilesByRow().containsKey(retiredAlias));
+        }
+    }
+
     /** An unaliased Owned card can be abandoned only through its owner's stable profile. */
     @Test
     void resolvesUnaliasedRowForItsOwnerAndRejectsForgedOwner() {

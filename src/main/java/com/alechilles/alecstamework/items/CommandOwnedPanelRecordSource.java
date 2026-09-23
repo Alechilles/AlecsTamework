@@ -73,6 +73,7 @@ final class CommandOwnedPanelRecordSource {
                 if (currentAlias != null) rows.putIfAbsent(currentAlias, profile.profileId());
                 var linked = linkedByProfile.get(id);
                 if (linked == null && currentAlias != null) linked = linkedByAlias.get(currentAlias);
+                if (linked != null) rows.putIfAbsent(linked.npcUuid, profile.profileId());
                 records.add(linked != null ? linked : displayRecord(profile,
                         currentAlias == null ? presentation : currentAlias, false));
             } else if (profile.ownerId() == null && profile.lifecycleState() == LifecycleState.CAPTURED) {
@@ -109,16 +110,14 @@ final class CommandOwnedPanelRecordSource {
 
     /** Resolves a server-generated row freshly; display snapshots never authorize actions. */
     java.util.Optional<ProfileId> profileForRow(UUID ownerUuid, UUID rowUuid) {
+        return profileForRow(ownerUuid, rowUuid, List.of());
+    }
+
+    java.util.Optional<ProfileId> profileForRow(UUID ownerUuid, UUID rowUuid,
+                                                List<LinkedNpcRecord> linkedRecords) {
         if (ownerUuid == null || rowUuid == null) return java.util.Optional.empty();
-        for (var profile : profiles.get().values()) {
-            if (profile.ownerId() == null || !ownerUuid.equals(profile.ownerId().value())
-                    || profile.lifecycleState() == LifecycleState.RELEASED) continue;
-            if (profile.currentAlias() != null && rowUuid.equals(profile.currentAlias().value())
-                    || rowUuid.equals(CommandRosterPanelRecordSource.presentationUuid(profile.profileId()))) {
-                return java.util.Optional.of(profile.profileId());
-            }
-        }
-        return java.util.Optional.empty();
+        return java.util.Optional.ofNullable(
+                snapshot(ownerUuid, linkedRecords, java.util.Set.of()).profilesByRow().get(rowUuid));
     }
 
     List<LinkedNpcRecord> capturedRecordsFor(List<LinkedNpcRecord> linkedRecords,

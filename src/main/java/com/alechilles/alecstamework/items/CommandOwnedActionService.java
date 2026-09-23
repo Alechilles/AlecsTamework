@@ -43,14 +43,16 @@ final class CommandOwnedActionService {
     private boolean requestInternal(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action,
             boolean locate) {
-        if (!ownedMode(player, toolId)) return false;
+        var stack = inventory.findToolStack(player, toolId);
+        if (stack == null) return false;
         UUID owner = player.getUuid();
         if (persistence == null || owner == null || rowId == null) {
             warn(player);
             return true;
         }
         var profileId = new CommandOwnedPanelRecordSource(
-                persistence.queries()::projectedProfileSnapshot).profileForRow(owner, rowId);
+                persistence.queries()::projectedProfileSnapshot).profileForRow(
+                        owner, rowId, links.readLinkedNpcRecords(stack));
         if (profileId.isEmpty()) {
             warn(player);
             return true;
