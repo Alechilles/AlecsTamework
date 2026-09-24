@@ -4,6 +4,10 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.movement.NativeMountSourceRole;
+import com.alechilles.alecstamework.npc.movement.NativeSwimPhysics;
+import com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.interaction.Interactions;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -86,6 +90,28 @@ final class NativeMountMovementApplication {
         boolean riderSettingsApplied = movementSettings.applyScaledSettings(
                 sourceRoleId, owner.resolveRoleScopes(role),
                 riderRef, riderPlayerRef, rider, store, multiplier);
+        double swimCruise = owner.getRoleNumberParam(role, "MountSwimCruiseSpeed", 0);
+        if (swimCruise > 0) {
+            NativeSwimPhysics.Settings swimSettings = new NativeSwimPhysics.Settings(swimCruise,
+                    owner.getRoleNumberParam(role, "MountSwimAcceleration", 4),
+                    owner.getRoleNumberParam(role, "MountSwimCoastDeceleration", 2),
+                    owner.getRoleNumberParam(role, "MountSwimBrakeDeceleration", 8),
+                    owner.getRoleNumberParam(role, "MountSwimBoostImpulse", 5),
+                    owner.getRoleNumberParam(role, "MountSwimBoostCooldown", 2),
+                    owner.getRoleNumberParam(role, "MountSwimBoostDecay", 3));
+            UUIDComponent identity = store.getComponent(npcRef, UUIDComponent.getComponentType());
+            if (swimSettings.isValid() && identity != null && identity.getUuid() != null) {
+                var swimType = NativeSwimRiderComponent.getComponentType();
+                var existingSwim = store.getComponent(riderRef, swimType);
+                var interactions = store.getComponent(riderRef, Interactions.getComponentType());
+                if (existingSwim != null) interactions = existingSwim.restoreAbility(interactions);
+                var swim = new NativeSwimRiderComponent();
+                swim.mountUuid = identity.getUuid();
+                swim.settings = swimSettings;
+                store.putComponent(riderRef, swimType, swim);
+                store.putComponent(riderRef, Interactions.getComponentType(), swim.bindAbility(interactions));
+            }
+        }
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         logApplied(role, sourceRoleId, originalRoleIndex, multiplier, riderSettingsApplied, anchorX, anchorY, anchorZ);
         return true;

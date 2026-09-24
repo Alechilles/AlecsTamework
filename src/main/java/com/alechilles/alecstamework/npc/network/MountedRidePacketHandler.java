@@ -55,6 +55,7 @@ import javax.annotation.Nullable;
 public final class MountedRidePacketHandler implements SubPacketHandler {
     private static final ConcurrentMap<UUID, RideSession> ACTIVE_TAMEWORK_RIDES = new ConcurrentHashMap<>();
     private final IPacketHandler packetHandler;
+    private final NativeSwimInputCapture swimInputCapture = new NativeSwimInputCapture();
     private Consumer<ToServerPacket> clientMovementDelegate;
     private Consumer<ToServerPacket> mountMovementDelegate;
     private Consumer<ToServerPacket> mouseInteractionDelegate;
@@ -177,6 +178,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
+        swimInputCapture.capture(packet, packetHandler);
         PlayerInputDebugProbe.logClientMovement(packetHandler.getPlayerRef(), packet);
         avatarFlightPacketInputCapture.capture(packet, packetHandler);
         glidePacketInputCapture.capture(packet, packetHandler);

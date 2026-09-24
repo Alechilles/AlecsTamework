@@ -134,6 +134,8 @@ public final class TameworkCompanionRuntimeParticipants {
             TameworkRuntimeParticipantRegistry participants,
             ComponentType<EntityStore, NPCMountComponent> npcMount
     ) {
+        participants.entitySystem(TameworkRuntimeModule.MOUNTS, "nativeswimsystem",
+                com.alechilles.alecstamework.npc.systems.NativeSwimSystem::new);
         participants.entitySystem(TameworkRuntimeModule.MOUNTS, "mountedownerreferencesanitysystem",
                 () -> new MountedOwnerReferenceSanitySystem(NPCEntity.getComponentType(), npcMount,
                         Player.getComponentType(), Interactable.getComponentType()));

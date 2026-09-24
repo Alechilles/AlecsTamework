@@ -12,7 +12,7 @@ The normal cruising limit applies to total 3D speed, including combined directio
 
 Leaving liquid releases custom velocity and clears the controller's stored speed. The avatar mount session remains active, so entering liquid again resumes swimming and normal dismount still restores the same NPC. Native fluid flags are preserved rather than forcing flying mode. This follows the existing fluid-state detection, including water contact; it does not add water-type filtering or require full head submersion. Breath and environmental damage retain native behavior.
 
-An optional hammerhead shark example is provided in `examples/asset-pack`. It is not enabled by the framework pack. Live client checks are still required for native swim prediction, surface transitions, camera and rider placement, and underwater dismount/recovery.
+The optional hammerhead shark role in `examples/asset-pack` now tests native mounting with W acceleration, coasting, S braking, and a Q boost without a talisman. Its earlier underwater avatar config remains available for comparison. See the example pack README for the role parameters. Live client checks are still required for native swim prediction, surface transitions, camera and rider placement, and underwater dismount/recovery.
 
 ## NPC Mounting
 

@@ -1,0 +1,6 @@
+{
+  "Parent": "Mount",
+  "BaseSpeed": 8,
+  "JumpForce": 0,
+  "SwimJumpForce": 5
+}

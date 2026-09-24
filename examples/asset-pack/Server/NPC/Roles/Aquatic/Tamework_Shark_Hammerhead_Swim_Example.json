@@ -25,11 +25,18 @@
       "Value": true
     },
     "MountMode": {
-      "Value": "TameworkAvatarFlight"
+      "Value": "Native"
     },
-    "AvatarFlightConfig": {
-      "Value": "Tamework_Shark_Hammerhead_Swim_Example"
+    "MountMovementConfig": {
+      "Value": "Tamework_Shark_Swim_Mount"
     },
+    "MountSwimCruiseSpeed": { "Value": 8.0 },
+    "MountSwimAcceleration": { "Value": 4.0 },
+    "MountSwimCoastDeceleration": { "Value": 2.0 },
+    "MountSwimBrakeDeceleration": { "Value": 8.0 },
+    "MountSwimBoostImpulse": { "Value": 5.0 },
+    "MountSwimBoostCooldown": { "Value": 2.0 },
+    "MountSwimBoostDecay": { "Value": 3.0 },
     "MountAnchorX": {
       "Value": 0.0
     },
