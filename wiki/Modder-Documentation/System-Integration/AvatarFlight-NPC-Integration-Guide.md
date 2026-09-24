@@ -1,4 +1,6 @@
 ---
+
+Native prototype status (Hytale 0.6.8): live testing receives jump input, but crouch and Q did not reach the observed handlers while mounted. The trace also omitted forward wish input, so custom W acceleration is unverified. Native swimming still introduces passive sinking. The configured controls below describe the intended behavior, not a verified working control scheme.
 title: "AvatarFlight NPC Integration Guide"
 order: 10
 published: true

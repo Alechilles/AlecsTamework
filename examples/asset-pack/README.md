@@ -1,5 +1,7 @@
 # Hammerhead swim mount example
 
+Native prototype status (Hytale 0.6.8): live testing receives jump input, but crouch and Q did not reach the observed handlers while mounted. The trace also omitted forward wish input, so custom W acceleration is unverified. Native swimming still introduces passive sinking. The configured controls below describe the intended behavior, not a verified working control scheme.
+
 The optional example pack includes `Tamework_Shark_Hammerhead_Swim_Example`, a small aquatic NPC role with Hytale's `Dive` motion controller and a slow swimming wander. Its Tamework interaction config accepts raw fish for taming and uses the normal owner, crouch, and mountable checks for mounting. It now uses native mounting with an aquatic propulsion overlay. No talisman is required.
 
 While mounted in water, hold W to accelerate to cruising speed, release W to coast and slow down, hold S to brake harder, and press Q for a temporary boost. Q uses the normal Ability1 binding and follows key remapping. Space ascends and crouch descends. Native mounting owns rider placement and dismounting. The shark retains its original role breathing rules while ridden. Spawn the role in sufficiently deep water, tame it with `Food_Fish_Raw`, then crouch and interact. This is a demonstration role, not a full shark taming or combat species. Live checks are still needed for input delivery, native prediction, vertical swimming, and surface transitions.
