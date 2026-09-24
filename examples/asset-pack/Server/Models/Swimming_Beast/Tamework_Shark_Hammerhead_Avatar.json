@@ -23,7 +23,7 @@
         "Min": -15
       },
       "TargetNodes": [
-        "AF_Head"
+        "Head"
       ]
     },
     "Yaw": {
@@ -32,7 +32,7 @@
         "Min": -15
       },
       "TargetNodes": [
-        "AF_Head"
+        "Head"
       ]
     }
   },
