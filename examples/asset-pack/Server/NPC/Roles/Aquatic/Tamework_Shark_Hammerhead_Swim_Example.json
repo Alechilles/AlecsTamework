@@ -1,0 +1,112 @@
+{
+  "$Comment": "Small aquatic mount example. Uses the vanilla Dive controller and a gentle swimming wander while unmounted.",
+  "Type": "Generic",
+  "StartState": "Idle",
+  "Appearance": "Shark_Hammerhead",
+  "NameTranslationKey": "server.npcRoles.Shark_Hammerhead.name",
+  "DefaultPlayerAttitude": "Neutral",
+  "BreathesInWater": true,
+  "KnockbackScale": 0.5,
+  "MaxHealth": 145,
+  "DisableDamageGroups": [
+    "Self"
+  ],
+  "Parameters": {
+    "MasterTargetSlot": {
+      "Value": "MasterTarget"
+    },
+    "LovedItems": {
+      "Value": [
+        "Food_Fish_Raw"
+      ],
+      "TypeHint": "String"
+    },
+    "IsMountable": {
+      "Value": true
+    },
+    "MountMode": {
+      "Value": "TameworkAvatarFlight"
+    },
+    "AvatarFlightConfig": {
+      "Value": "Tamework_Shark_Hammerhead_Swim_Example"
+    },
+    "MountAnchorX": {
+      "Value": 0.0
+    },
+    "MountAnchorY": {
+      "Value": 0.85
+    },
+    "MountAnchorZ": {
+      "Value": 0.1
+    }
+  },
+  "MotionControllerList": [
+    {
+      "Type": "Dive",
+      "MaxSwimSpeed": 10,
+      "Acceleration": 10,
+      "MaxDiveSpeed": 8,
+      "SwimDepth": 0.6,
+      "SinkRatio": 0.5,
+      "MinDiveDepth": 0,
+      "MaxDiveDepth": 100,
+      "MinDepthAboveGround": 1,
+      "MinDepthBelowSurface": 1,
+      "Gravity": 10,
+      "MaxRotationSpeed": 360,
+      "MaxSwimTurnAngle": 180
+    }
+  ],
+  "Instructions": [
+    {
+      "Sensor": {
+        "Type": "State",
+        "State": "Idle"
+      },
+      "Instructions": [
+        {
+          "Sensor": {
+            "Type": "Any"
+          },
+          "BodyMotion": {
+            "Type": "WanderInCircle",
+            "Radius": 4,
+            "MaxHeadingChange": 60,
+            "RelativeSpeed": 0.25
+          }
+        }
+      ]
+    }
+  ],
+  "InteractionInstruction": {
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "TameworkInteractPrompt"
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "HasInteracted"
+        },
+        "Actions": [
+          {
+            "Type": "LockOnInteractionTarget",
+            "TargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
+          },
+          {
+            "Type": "TameworkInteract"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+# Hammerhead swim mount example
+
+The optional example pack includes `Tamework_Shark_Hammerhead_Swim_Example`, a small aquatic NPC role with Hytale's `Dive` motion controller and a slow swimming wander. Its Tamework interaction config accepts raw fish for taming and uses the normal owner, crouch, and mountable checks for mounting. The mount selects `Tamework_Shark_Hammerhead_Swim_Example`, a `TwAvatarFlightConfig` with `Underwater: true`. The player needs Flightmaster's Talisman selected before mounting.
+
+While mounted, mouse look steers, forward movement cruises, Space rises, crouch descends, right-click brakes, Q boosts, and F dismounts. The shark has no charged launch, wing flap, flight particles, trails, or flight sounds. The normal Tamework session restores the same source NPC when the player dismounts. Spawn this example role with your usual NPC tooling in sufficiently deep water, tame it with `Food_Fish_Raw`, then crouch and interact while holding the talisman. This is a demonstration role, not a full shark taming or combat species.
+
+The role and model reference the vanilla `Shark_Hammerhead` appearance and `server.npcRoles.Shark_Hammerhead.name` translation. The separate avatar model uses the vanilla shark texture and icon. Its copied model and seven clips come from the installed stable release assets; player-like rig nodes are namespaced so the visible rider's skin and equipment do not share animation tracks with the shark. All animation sets in the avatar model point to these copied clips, including grounded fallback, swim, damage, and spawn sets. The pose overlay stays disabled because no shark-specific pitch or bank clips are supplied.
+
+The example uses a small standalone role rather than overriding the game's `Shark_Hammerhead` role. It retains an aquatic `Dive` controller and water breathing, but only demonstrates idle swimming, taming, and mounting. It does not alter vanilla shark spawn, combat, or flock behavior.

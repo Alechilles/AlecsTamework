@@ -1,0 +1,438 @@
+{
+  "Model": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Models/Model.blockymodel",
+  "Texture": "NPC/Swimming_Beast/Shark_Hammerhead/Models/Texture.png",
+  "EyeHeight": 0.6,
+  "CrouchOffset": -0.05,
+  "HitBox": {
+    "Max": {
+      "X": 0.8,
+      "Y": 1,
+      "Z": 0.8
+    },
+    "Min": {
+      "X": -0.8,
+      "Y": 0,
+      "Z": -0.8
+    }
+  },
+  "Icon": "Icons/ModelsGenerated/Shark_Hammerhead.png",
+  "Camera": {
+    "Pitch": {
+      "AngleRange": {
+        "Max": 15,
+        "Min": -15
+      },
+      "TargetNodes": [
+        "AF_Head"
+      ]
+    },
+    "Yaw": {
+      "AngleRange": {
+        "Max": 15,
+        "Min": -15
+      },
+      "TargetNodes": [
+        "AF_Head"
+      ]
+    }
+  },
+  "AnimationSets": {
+    "Idle": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Walk": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "WalkBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "Run": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "RunBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "Sprint": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "Crouch": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "CrouchWalk": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "CrouchWalkBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "StepWalk": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "StepRun": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "StepSprint": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "Jump": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "JumpWalk": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "JumpRun": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "JumpSprint": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "Fall": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Alerted": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Spawn.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "FlyIdle": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Fly": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "FlyBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "FlyFast": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "SwimIdle": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Swim": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "SwimFast": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "SwimJump": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimFloat": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimSink": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimDive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimDiveBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "SwimDiveFast": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "FluidIdle": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "FluidWalk": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "FluidWalkBackward": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "FluidRun": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    },
+    "Hurt": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Hurt.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "Death": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Death.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "Laydown": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Sleep": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimIdle.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "Wake": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Spawn.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "Spawn": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Spawn.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "HurtFly": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Hurt.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "DeathFly": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Death.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "DeathFlyImpact": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Death.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "HurtSwim": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Hurt.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "DeathSwim": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Death.blockyanim",
+          "Looping": false
+        }
+      ]
+    },
+    "SwimFloatPassive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimSinkPassive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimDivePassive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/Swim.blockyanim",
+          "Speed": 0.5
+        }
+      ]
+    },
+    "SwimDiveBackwardPassive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimBackward.blockyanim"
+        }
+      ]
+    },
+    "SwimDiveFastPassive": {
+      "Animations": [
+        {
+          "Animation": "NPC/Swimming_Beast/Tamework_Shark_Hammerhead_Avatar/Animations/SwimFast.blockyanim"
+        }
+      ]
+    }
+  }
+}
