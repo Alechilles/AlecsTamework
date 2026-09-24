@@ -2,6 +2,8 @@
 
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
+- Simplified companion stat and timer tooltips by removing explanations of saved data and loading.
+
 - Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.
 
 - Fixed startup failing when an unfinished death or lost transition was superseded by later companion changes. Recovery now retires the obsolete pending operation while preserving the companion's current saved state.
