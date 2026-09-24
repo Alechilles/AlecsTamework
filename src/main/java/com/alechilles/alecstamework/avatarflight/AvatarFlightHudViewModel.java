@@ -21,10 +21,27 @@ public record AvatarFlightHudViewModel(boolean visible,
                                        double launchChargeRatio,
                                        double launchMinChargeRatio,
                                        @Nonnull CombatGlyph ability2,
-                                       @Nonnull CombatGlyph ability3) {
+                                       @Nonnull CombatGlyph ability3,
+                                       boolean underwater) {
     public static final int MAX_DISPLAY_PIPS = 6;
     private static final double FULL_EPSILON = 0.0001;
     private static final String RECHARGE_MODE_NONE = "NONE";
+
+    public AvatarFlightHudViewModel(boolean visible, double speedRatio, double targetSpeedRatio,
+            double pitchDegrees, double vigourCharges, double maxVigourCharges, boolean dimmed,
+            @Nonnull String rechargeMode, boolean launchChargeVisible, double launchChargeRatio,
+            double launchMinChargeRatio, @Nonnull CombatGlyph ability2, @Nonnull CombatGlyph ability3) {
+        this(visible, speedRatio, targetSpeedRatio, pitchDegrees, vigourCharges, maxVigourCharges,
+                dimmed, rechargeMode, launchChargeVisible, launchChargeRatio, launchMinChargeRatio,
+                ability2, ability3, false);
+    }
+
+    @Nonnull
+    public AvatarFlightHudViewModel withUnderwater(boolean value) {
+        return new AvatarFlightHudViewModel(visible, speedRatio, targetSpeedRatio, pitchDegrees,
+                vigourCharges, maxVigourCharges, dimmed, rechargeMode, launchChargeVisible,
+                launchChargeRatio, launchMinChargeRatio, ability2, ability3, value);
+    }
 
     public AvatarFlightHudViewModel {
         if (!visible) {

@@ -18,6 +18,7 @@ final class TwAvatarFlightConfigInheritance {
                                    @Nonnull Set<String> top,
                                    @Nullable Map<String, Set<String>> nestedByTop) {
         if (!top.contains("Enabled")) target.enabled = parent.enabled;
+        if (!top.contains("Underwater")) target.underwater = parent.underwater;
         if (!top.contains("Priority")) target.priority = parent.priority;
         inheritModel(target, parent, nested(nestedByTop, "Model"), top);
         inheritInput(target, parent, nested(nestedByTop, "Input"), top);

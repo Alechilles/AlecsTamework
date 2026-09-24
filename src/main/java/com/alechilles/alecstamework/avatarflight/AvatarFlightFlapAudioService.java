@@ -31,7 +31,7 @@ final class AvatarFlightFlapAudioService {
               long now,
               @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         AvatarFlightAudioSettings audio = config.getAudio();
-        if (!audio.isEnabled() || !output.applyVelocity() || output.fastFlight()
+        if (config.isUnderwater() || !audio.isEnabled() || !output.applyVelocity() || output.fastFlight()
                 || transform == null || transform.getPosition() == null) {
             reset(flight);
             return;

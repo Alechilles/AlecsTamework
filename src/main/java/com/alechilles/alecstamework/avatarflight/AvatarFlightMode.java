@@ -8,6 +8,7 @@ public enum AvatarFlightMode {
     LAUNCHING,
     HOVER,
     FORWARD_FLIGHT,
+    BOOSTING,
     BRAKING,
     BACKING,
     DESCENDING

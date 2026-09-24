@@ -134,7 +134,7 @@ public final class AvatarFlightMovementSystem
                     identity == null ? null : identity.getUuid(),
                     flight.getConfigId());
         }
-        awardFlightXp(flight, output, ref, store, commandBuffer, now);
+        awardFlightXp(flight, output, config, ref, store, commandBuffer, now);
         groundMovementService.sync(
                 ref,
                 commandBuffer,
@@ -194,7 +194,7 @@ public final class AvatarFlightMovementSystem
                 AvatarFlightAnimationService.shouldSuppressPlayerOverlayAnimations(
                         config, applyingVelocity, hasFlightVisualOverrides);
         boolean groundedMovementIntent = hasGroundedMovementIntent(controllerInput, config);
-        syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
+        syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity && !config.isUnderwater());
         animationService.tick(
                 ref, commandBuffer, flight, config, output, applyingVelocity, suppressingOverlays,
                 groundedMovementIntent, controllerInput.inFluid(), now);
@@ -205,7 +205,11 @@ public final class AvatarFlightMovementSystem
                     null,
                     ChangeVelocityType.Set
             );
-            applyFlightMovementState(ref, commandBuffer, output);
+            if (config.isUnderwater()) {
+                releaseFlightMovementStateForSwimming(ref, commandBuffer);
+            } else {
+                applyFlightMovementState(ref, commandBuffer, output);
+            }
         } else if (hasFlightVisualOverrides) {
             if (controllerInput.inFluid()) {
                 releaseFlightMovementStateForSwimming(ref, commandBuffer);
@@ -231,6 +235,7 @@ public final class AvatarFlightMovementSystem
 
     private void awardFlightXp(@Nonnull AvatarFlightComponent flight,
                                @Nonnull AvatarFlightController.Output output,
+                               @Nonnull TwAvatarFlightConfig movementConfig,
                                @Nonnull Ref<EntityStore> playerRef,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer,
@@ -258,7 +263,7 @@ public final class AvatarFlightMovementSystem
                         flight.getFlightXpLastSampleAtMs()
                 ),
                 config == null ? null : config.getXpSources().getFlight(),
-                qualifiesForFlightXp(output, sourceValid),
+                !movementConfig.isUnderwater() && qualifiesForFlightXp(output, sourceValid),
                 now
         );
         applyFlightXpState(flight, result.state());
@@ -378,10 +383,10 @@ public final class AvatarFlightMovementSystem
                                        @Nonnull AvatarFlightProgressionTuning tuning,
                                        @Nonnull AvatarFlightController.Input input,
                                        long now) {
-        double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
+        double horizontalSpeed = AvatarFlightSpeedMetrics.movementSpeed(
                 flight.getVelocityX(),
                 flight.getVelocityY(),
-                flight.getVelocityZ()
+                flight.getVelocityZ(), config
         );
         AvatarFlightVigourService.Result recharge = AvatarFlightVigourService.recharge(
                 new AvatarFlightVigourService.State(
@@ -391,7 +396,7 @@ public final class AvatarFlightMovementSystem
                 ),
                 config,
                 tuning,
-                input.onGround(),
+                input.onGround() && !(config.isUnderwater() && input.inFluid()),
                 horizontalSpeed,
                 now
         );
@@ -449,7 +454,7 @@ public final class AvatarFlightMovementSystem
                 tuning,
                 launchCost
         );
-        if (flapAllowed
+        if (!config.isUnderwater() && flapAllowed
                 && flapEligibleThisTick(input, flight, now)
                 && boostEligibleThisTick(input, flight, now)
                 && !AvatarFlightVigourService.canSpend(state, config, tuning, combinedCost(flapCost, boostCost))) {
@@ -772,6 +777,9 @@ public final class AvatarFlightMovementSystem
         double pitch = stale ? resolvePitch(ref, commandBuffer) : input.getPitchRadians();
         boolean onGround = stale ? states == null || states.onGround : input.isOnGround();
         boolean inFluid = states != null && (states.inFluid || states.swimming);
+        if (input != null && config.isUnderwater()) {
+            input.cancelLaunchCharge();
+        }
         boolean reinsFlap = input != null && input.consumeReinsFlap(
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
@@ -796,10 +804,10 @@ public final class AvatarFlightMovementSystem
         long launchHoldMs = launchRelease && input != null ? input.getLaunchHoldMs() : 0L;
         boolean activeFlight = flight.getMode() != AvatarFlightMode.GROUNDED;
         boolean itemFlightStart = reinsFlap || reinsBoost;
-        boolean jumpIntent = activeFlight
+        boolean jumpIntent = config.isUnderwater() ? !stale && input.isJumping() : activeFlight
                 ? reinsFlap || (!stale && input.isJumping())
                 : reinsFlap;
-        boolean boostIntent = reinsBoost || (activeFlight && sprintBoost);
+        boolean boostIntent = reinsBoost || ((activeFlight || config.isUnderwater()) && sprintBoost);
         AvatarFlightController.Input controllerInput = new AvatarFlightController.Input(
                 stale ? 0.0 : input.getForwardAxis(),
                 stale ? 0.0 : input.getStrafeAxis(),
@@ -818,7 +826,7 @@ public final class AvatarFlightMovementSystem
                 reinsAirbrakeActivated,
                 inFluid
         );
-        if (input != null) {
+        if (input != null && !config.isUnderwater()) {
             input.clearTransientVerticalIntent();
         }
         return controllerInput;

@@ -91,17 +91,17 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                                                @Nonnull TwAvatarFlightConfig config,
                                                @Nonnull AvatarFlightProgressionTuning tuning,
                                                long nowMs) {
-        double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
+        double horizontalSpeed = AvatarFlightSpeedMetrics.movementSpeed(
                 flight.getVelocityX(),
                 flight.getVelocityY(),
-                flight.getVelocityZ()
+                flight.getVelocityZ(), config
         );
         double speedRatio = AvatarFlightSpeedMetrics.speedRatio(horizontalSpeed, config);
         double maxCharges = config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier();
         boolean groundedAtFull = flight.getMode() == AvatarFlightMode.GROUNDED
                 && fullVigour(flight.getVigourCharges(), maxCharges);
         long maxChargeMs = config.getLaunch().getMaxChargeMs();
-        boolean launchChargeVisible = config.getLaunch().isEnabled()
+        boolean launchChargeVisible = !config.isUnderwater() && config.getLaunch().isEnabled()
                 && maxChargeMs > 0L
                 && input.isLaunchCharging()
                 && input.isOnGround();
@@ -132,7 +132,7 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                         AvatarFlightCombatAbilitySlot.ABILITY_3,
                         nowMs,
                         flight.getNextAbility3CombatAtMs())
-        );
+        ).withUnderwater(config.isUnderwater());
     }
 
     @Nonnull

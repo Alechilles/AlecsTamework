@@ -2,6 +2,8 @@
 
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
+- Added opt-in underwater avatar mounting with acceleration, a cruising speed limit, temporary forward boosts, braking, and direct rise/descend controls. It reuses AvatarFlight's rider and recovery lifecycle without altitude-based speed changes. An optional hammerhead shark example is included in the example pack.
+
 - Simplified companion stat and timer tooltips by removing explanations of saved data and loading.
 
 - Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.

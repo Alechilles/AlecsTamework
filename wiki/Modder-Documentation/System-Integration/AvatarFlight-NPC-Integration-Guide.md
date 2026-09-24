@@ -21,6 +21,28 @@ role, and a new saved profile waits until the real role is visible.
 Use this for dragon-style companions and other rideable NPCs whose flight form
 should be controlled as the player rather than as a conventional mounted NPC.
 
+## Underwater Mounts
+
+For an underwater mount, use the same integration steps with `Underwater: true`
+in its `TwAvatarFlightConfig`. W accelerates along the view direction, Space
+and crouch rise and descend, right-click brakes, Q gives a temporary forward
+boost, and F dismounts. Launch charging and upward flaps are disabled. Pitch
+steers without trading height for speed.
+
+Underwater cruise uses `Movement.MaxForwardSpeed` and `ForwardAcceleration`.
+The boost cap is cruise plus `Boost.ForwardImpulse`; its duration and cooldown
+use the existing boost settings. Set a positive `Curve.BoostedSpeedDecay` to
+return boosted speed to cruise. All limits and Vigour speed checks use total
+3D speed. Native fluid state activates propulsion; leaving liquid hands
+movement back to native control while preserving the mount session. Breath
+and environmental damage stay native. Existing flight profiles are unchanged
+because `Underwater` defaults to false, with normal parent inheritance.
+
+Use swimming animation IDs and appropriate model/rider offsets. Tamework's
+optional example pack includes a hammerhead shark demonstration. Check native
+swim prediction, surface transitions, rider placement, and dismount in a live
+client before using a new profile in a published pack.
+
 ## What You Need
 
 - Tamework installed as a dependency for the server and clients.

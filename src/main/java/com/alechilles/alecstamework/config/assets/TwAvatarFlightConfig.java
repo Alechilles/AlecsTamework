@@ -426,6 +426,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.enabled)
             .documentation("Enables this avatar-flight profile.")
             .add()
+            .<Boolean>append(new KeyedCodec<>("Underwater", Codec.BOOLEAN),
+                    (asset, value) -> asset.underwater = Boolean.TRUE.equals(value),
+                    asset -> asset.underwater)
+            .documentation("Uses underwater propulsion instead of flight. Defaults to false. Inheritance: omitted inherits parent; explicit value overrides. Uses forward acceleration, cruise speed and boost settings without launch, flap or altitude trading.")
+            .add()
             .<Integer>append(new KeyedCodec<>("Priority", Codec.INTEGER),
                     (asset, value) -> asset.priority = value == null ? 0 : value,
                     asset -> asset.priority)
@@ -522,6 +527,7 @@ public final class TwAvatarFlightConfig implements
     private AssetExtraInfo.Data data;
     private String id;
     boolean enabled = true;
+    boolean underwater;
     int priority;
     ModelSettings model = new ModelSettings();
     InputSettings input = new InputSettings();
@@ -603,6 +609,7 @@ public final class TwAvatarFlightConfig implements
 
     public String getId() { return id; }
     public boolean isEnabled() { return enabled; }
+    public boolean isUnderwater() { return underwater; }
     public int getPriority() { return priority; }
     public ModelSettings getModel() { return model == null ? new ModelSettings() : model; }
     public InputSettings getInput() { return input == null ? new InputSettings() : input; }

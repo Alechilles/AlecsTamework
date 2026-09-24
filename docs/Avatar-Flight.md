@@ -2,6 +2,18 @@
 
 Avatar flight is the transformed-player flight path used by dragon-style mounts. The real player becomes the flight model, while Tamework can attach a visual rider copy for the seated player appearance.
 
+## Underwater Mounts
+
+Set `Underwater` to `true` on a `TwAvatarFlightConfig` to use swimming propulsion with the same mount session, talisman, visual rider, source NPC preservation, and dismount/recovery lifecycle. Keep `MountMode=TameworkAvatarFlight` and give the role an explicit `AvatarFlightConfig` id. Existing profiles default to `Underwater=false`. Omitted `Underwater` inherits from the parent; an explicit value overrides it. The existing avatar-flight asset loader, overrides, editor schema, and reload behavior apply.
+
+Underwater movement starts automatically while the player has native `inFluid` or `swimming` state. W accelerates along mouse look, S reverses, A/D strafe, Space rises, and crouch descends. Right-click brakes and Q boosts through Flightmaster's Talisman. F dismounts. No launch charge or upward flap is available. Pitch changes direction without giving dive speed, climb penalties, gravity sink, or stall. Launch/flap HUD controls and the pitch readout are hidden. Flight XP is not awarded for swimming.
+
+The normal cruising limit applies to total 3D speed, including combined directional inputs. `Movement.MaxForwardSpeed` sets cruise and `Movement.ForwardAcceleration` sets acceleration. `MaxBackwardSpeed` and `BackwardAcceleration` tune reverse; `DescendSpeed` also controls direct rise/descend and strafe speed, capped at cruise. `HoverHorizontalDamping` slows coasting and `AirbrakeDeceleration` controls braking. Boost uses `Boost.ForwardImpulse`, `DurationSeconds`, and `CooldownSeconds`, plus the existing Vigour cost. Its maximum speed is cruise plus the forward impulse. Above-cruise speed decays using `Curve.BoostedSpeedDecay`; use a positive value. Swimming ignores `MaxGlideSpeed` and all pitch/load/launch/flap tuning. The speed HUD, fast animation, and fast-movement Vigour recharge use total speed.
+
+Leaving liquid releases custom velocity and clears the controller's stored speed. The avatar mount session remains active, so entering liquid again resumes swimming and normal dismount still restores the same NPC. Native fluid flags are preserved rather than forcing flying mode. This follows the existing fluid-state detection, including water contact; it does not add water-type filtering or require full head submersion. Breath and environmental damage retain native behavior.
+
+An optional hammerhead shark example is provided in `examples/asset-pack`. It is not enabled by the framework pack. Live client checks are still required for native swim prediction, surface transitions, camera and rider placement, and underwater dismount/recovery.
+
 ## NPC Mounting
 
 Avatar flight can start from an ordinary optimized `Mount` interaction. Set the NPC role parameters `MountMode` to `TameworkAvatarFlight` and `AvatarFlightConfig` to an enabled `TwAvatarFlightConfig` asset id. The normal mount entry still owns tame, owner, crouch, and mountable requirements, so no species-specific Java is needed.

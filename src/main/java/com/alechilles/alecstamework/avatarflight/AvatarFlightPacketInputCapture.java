@@ -97,8 +97,8 @@ public final class AvatarFlightPacketInputCapture {
         if (stateObserved) {
             input.setOnGround(grounded, now);
         }
-        boolean jumpHoldLaunchInput = config.getLaunch().isEnabled() && usesJumpHoldLaunch(config);
-        boolean crouchHoldLaunchInput = config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config);
+        boolean jumpHoldLaunchInput = !config.isUnderwater() && config.getLaunch().isEnabled() && usesJumpHoldLaunch(config);
+        boolean crouchHoldLaunchInput = !config.isUnderwater() && config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config);
         boolean launchHeld = (jumpHoldLaunchInput && jumpHeld) || (crouchHoldLaunchInput && crouchHeld);
         handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded,
                 stateObserved);
