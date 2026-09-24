@@ -42,7 +42,7 @@ Use swimming animation IDs and appropriate model/rider offsets. Tamework's
 optional example pack retains an underwater avatar profile, but its hammerhead
 role now tests native mounting instead. The native role uses `MountMode=Native`
 and a positive `MountSwimCruiseSpeed` to opt in to W acceleration, coasting,
-S braking, and a Q boost without a talisman. See the example pack README for
+S braking, a Q boost, and crouch descent without a talisman. The mount retains its source role breathing rules. See the example pack README for
 the remaining `MountSwim*` numeric role parameters. Check native
 swim prediction, surface transitions, rider placement, and dismount in a live
 client before using a new profile in a published pack.

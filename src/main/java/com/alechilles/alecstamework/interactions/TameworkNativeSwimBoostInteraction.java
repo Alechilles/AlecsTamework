@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.protocol.InteractionState;
@@ -33,6 +34,11 @@ public final class TameworkNativeSwimBoostInteraction extends SimpleInteraction 
             } else {
                 rider.boost = true;
                 buffer.putComponent(entity, componentType, rider);
+            }
+            var plugin = Tamework.getInstance();
+            if (plugin != null && plugin.isDebugRideEnabled()) {
+                plugin.getLogger().atInfo().log("Tamework native swim boost: input received, activeRider=%s",
+                        rider != null && rider.settings != null);
             }
         }
         super.tick0(firstRun, time, type, context, cooldown);

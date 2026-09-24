@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.movement.NativeSwimPhysics;
 import com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
@@ -36,6 +37,7 @@ public final class NativeSwimSystem extends EntityTickingSystem<EntityStore> imp
         var riderId = chunk.getComponent(index, UUIDComponent.getComponentType()).getUuid();
         if (rider.settings == null || mount == null || mount.getOwnerPlayerRef() == null
                 || !riderId.equals(mount.getOwnerPlayerRef().getUuid())) {
+            if (rider.boost) logBoost("mount_ended", rider.speed, rider.speed, rider.cooldown);
             var existing = buffer.getComponent(riderRef, Interactions.getComponentType());
             var restored = rider.restoreAbility(existing);
             if (restored != existing) buffer.putComponent(riderRef, Interactions.getComponentType(), restored);
@@ -44,8 +46,12 @@ public final class NativeSwimSystem extends EntityTickingSystem<EntityStore> imp
         }
         var movement = buffer.getComponent(mountRef, MovementStatesComponent.getComponentType());
         var states = movement == null ? null : movement.getMovementStates();
-        boolean inWater = states != null && (states.inFluid || states.swimming);
+        var riderMovement = buffer.getComponent(riderRef, MovementStatesComponent.getComponentType());
+        var riderStates = riderMovement == null ? null : riderMovement.getMovementStates();
+        boolean inWater = (states != null && (states.inFluid || states.swimming))
+                || (riderStates != null && (riderStates.inFluid || riderStates.swimming));
         if (!inWater) {
+            if (rider.boost) logBoost("outside_water", rider.speed, rider.speed, rider.cooldown);
             rider.speed = 0;
             rider.boost = false;
             rider.cooldown = Math.max(0, rider.cooldown - dt);
@@ -55,18 +61,36 @@ public final class NativeSwimSystem extends EntityTickingSystem<EntityStore> imp
         var velocity = buffer.getComponent(riderRef, Velocity.getComponentType());
         var head = buffer.getComponent(riderRef, HeadRotation.getComponentType());
         var transform = buffer.getComponent(mountRef, TransformComponent.getComponentType());
-        if (velocity == null || transform == null) return;
+        if (velocity == null || transform == null) {
+            if (rider.boost) {
+                logBoost("missing_movement_components", rider.speed, rider.speed, rider.cooldown);
+                rider.boost = false;
+                buffer.putComponent(riderRef, type, rider);
+            }
+            return;
+        }
         double forward = System.currentTimeMillis() - rider.lastInputMs <= 500 ? rider.forward : 0;
         var step = NativeSwimPhysics.advance(rider.speed, rider.cooldown, forward, rider.boost, dt, rider.settings);
+        if (rider.boost) logBoost("processed", rider.speed, step.speed(), step.boostCooldownSeconds());
         rider.speed = step.speed();
         rider.cooldown = step.boostCooldownSeconds();
         rider.boost = false;
         double yaw = head == null ? transform.getRotation().yaw() : head.getRotation().yaw();
-        // Correct only horizontal speed; do not replace native swimming or queued vertical impulses.
-        velocity.addInstruction(new Vector3d(-Math.sin(yaw) * rider.speed - velocity.getX(), 0,
+        // Native jump still owns ascent. Crouch supplies the missing downward swim control.
+        double verticalCorrection = rider.isDescending(System.currentTimeMillis())
+                ? Math.min(0, -5.0 - velocity.getY()) : 0;
+        velocity.addInstruction(new Vector3d(-Math.sin(yaw) * rider.speed - velocity.getX(), verticalCorrection,
                 -Math.cos(yaw) * rider.speed - velocity.getZ()), null, ChangeVelocityType.Add);
         buffer.putComponent(riderRef, type, rider);
     }
 
     @Override @Nonnull public Query<EntityStore> getQuery() { return query; }
+
+    private static void logBoost(String result, double before, double after, double cooldown) {
+        var plugin = Tamework.getInstance();
+        if (plugin != null && plugin.isDebugRideEnabled()) {
+            plugin.getLogger().atInfo().log("Tamework native swim boost: result=%s speed=%s->%s cooldown=%s",
+                    result, before, after, cooldown);
+        }
+    }
 }

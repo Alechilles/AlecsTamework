@@ -2,7 +2,7 @@
 
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
-- Added an experimental native swimming mount option. The hammerhead example now uses W acceleration, coasting, stronger S braking, and a Q boost without requiring Flightmaster's Talisman or transforming the rider.
+- Added an experimental native swimming mount option. The hammerhead example now uses W acceleration, coasting, stronger S braking, a Q boost, and crouch descent while preserving the mount's breathing rules, without requiring Flightmaster's Talisman or transforming the rider.
 
 - Added opt-in underwater avatar mounting with acceleration, a cruising speed limit, temporary forward boosts, braking, and direct rise/descend controls. It reuses AvatarFlight's rider and recovery lifecycle without altitude-based speed changes. An optional hammerhead shark example is included in the example pack.
 

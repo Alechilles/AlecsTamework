@@ -9,13 +9,15 @@ import com.hypixel.hytale.server.core.universe.Universe;
 final class NativeSwimInputCapture {
     void capture(ClientMovement packet, IPacketHandler handler) {
         var player = handler.getPlayerRef();
-        if (player == null || packet.wishMovement == null || player.getWorldUuid() == null) return;
+        if (player == null || player.getWorldUuid() == null) return;
         var world = Universe.get().getWorld(player.getWorldUuid());
         if (world == null) return;
         var playerId = player.getUuid();
-        double forward = packet.wishMovement.z;
-        if (!Double.isFinite(forward)) return;
-        double input = Math.max(-1.0, Math.min(1.0, forward));
+        Double forward = packet.wishMovement == null ? null : packet.wishMovement.z;
+        Double vertical = packet.wishMovement == null ? null : packet.wishMovement.y;
+        var states = packet.riderMovementStates != null ? packet.riderMovementStates : packet.movementStates;
+        Boolean crouching = states == null ? null : states.crouching || states.forcedCrouching;
+        Boolean jumping = states == null ? null : states.jumping || states.swimJumping;
         long receivedAt = System.currentTimeMillis();
         // Only stable identity and primitive input cross the packet/world boundary.
         world.execute(() -> {
@@ -25,8 +27,7 @@ final class NativeSwimInputCapture {
             var store = world.getEntityStore().getStore();
             var rider = store.getComponent(ref, type);
             if (rider == null || rider.settings == null) return;
-            rider.forward = input;
-            rider.lastInputMs = receivedAt;
+            rider.captureInput(forward, vertical, crouching, jumping, receivedAt);
             store.putComponent(ref, type, rider);
         });
     }

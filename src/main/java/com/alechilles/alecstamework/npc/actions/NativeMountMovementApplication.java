@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.movement.NativeSwimPhysics;
 import com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.interaction.Interactions;
+import com.hypixel.hytale.server.core.modules.entity.component.BreathingComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -108,8 +109,17 @@ final class NativeMountMovementApplication {
                 var swim = new NativeSwimRiderComponent();
                 swim.mountUuid = identity.getUuid();
                 swim.settings = swimSettings;
+                swim.breathesInAir = role.isBreathesInAir();
+                swim.breathesInWater = role.isBreathesInWater();
+                swim.invulnerable = role.isInvulnerable();
                 store.putComponent(riderRef, swimType, swim);
                 store.putComponent(riderRef, Interactions.getComponentType(), swim.bindAbility(interactions));
+                var breathing = store.getComponent(npcRef, BreathingComponent.getComponentType());
+                if (breathing != null) {
+                    // Recheck even if the shark stays submerged throughout mounting.
+                    breathing.setLastFluidId(-1);
+                    store.putComponent(npcRef, BreathingComponent.getComponentType(), breathing);
+                }
             }
         }
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
