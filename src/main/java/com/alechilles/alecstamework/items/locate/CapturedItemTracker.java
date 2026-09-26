@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.*;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Holder;
 import com.hypixel.hytale.component.*;
@@ -115,7 +116,8 @@ public final class CapturedItemTracker implements AutoCloseable {
                     .getComponent(ref, ItemContainerBlock.getComponentType());
             if (block == null) index.observe(holder, List.of(), System.currentTimeMillis());
             else {
-                var type = chunk.getBlockType((int) holder.x(), (int) holder.y(), (int) holder.z());
+                var type = HytaleBlockStateAccess.blockTypeAt(chunk,
+                        (int) holder.x(), (int) holder.y(), (int) holder.z());
                 Holder current = new Holder(holder.kind(), holder.worldName(), holder.id(),
                         type == null ? "" : type.getId(), holder.x(), holder.y(), holder.z());
                 observeContainer(current, block.getItemContainer());

@@ -91,7 +91,7 @@ final class HytaleDirectLiveCoopScanner {
         if (chunk == null) {
             return false;
         }
-        BlockType block = chunk.getBlockType(slot.x(), slot.y(), slot.z());
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, slot.x(), slot.y(), slot.z());
         TwCoopConfig config = resolveConfig(block == null ? null : block.getId(), null);
         String foundId = normalize(config == null ? null : config.getCoopId());
         if (slot.coopId().equals(foundId)) {
@@ -221,11 +221,11 @@ final class HytaleDirectLiveCoopScanner {
         int x = resolved.x();
         int y = resolved.y();
         int z = resolved.z();
-        BlockType block = chunk.getBlockType(x, y, z);
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
         return new CoopLocation(
                 new Vector3i(x, y, z),
                 normalizeBlockType(block == null ? null : block.getId()),
-                chunk.getRotationIndex(x, y, z)
+                HytaleBlockStateAccess.rotationAt(chunk, x, y, z)
         );
     }
 

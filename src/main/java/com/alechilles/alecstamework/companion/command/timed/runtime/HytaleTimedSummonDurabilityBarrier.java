@@ -46,7 +46,7 @@ final class HytaleTimedSummonDurabilityBarrier {
             ChunkStore chunkStore = world.getChunkStore();
             IChunkSaver saver =
                     chunkStore == null ? null : chunkStore.getSaver();
-            if (chunk == null || chunk.getWorld() != world
+            if (chunk == null || !HytaleChunkAccess.isOwnedBy(chunk, world)
                     || chunk.getIndex() != chunkIndex || saver == null) {
                 return completed(
                         HytaleChunkSaveSupport.Outcome.retryable(null)

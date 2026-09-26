@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceStandTargetSelector;
 import com.alechilles.alecstamework.npc.progression.ReachableBlockSourceCache;
 import com.alechilles.alecstamework.util.StoreScopedState;
@@ -463,7 +464,7 @@ final class ReachableBlockColdScanner {
                             x,
                             y,
                             z,
-                            worldChunk.getBlockType(x, y, z)
+                            HytaleBlockStateAccess.blockTypeAt(worldChunk, x, y, z)
                     );
                 }
                 matches.add(new ReachableBlockSourceCache.SourceCoordinate(x, y, z));

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -144,7 +145,7 @@ final class DirectLiveCoopProduceService {
         if (chunk == null) {
             return;
         }
-        BlockType block = chunk.getBlockType(
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk,
                 coop.block().x, coop.block().y, coop.block().z
         );
         if (block == null) {
@@ -154,7 +155,8 @@ final class DirectLiveCoopProduceService {
                 ? DEFAULT_INTERACTION_STATE
                 : PRODUCE_READY_INTERACTION_STATE;
         try {
-            chunk.setBlockInteractionState(coop.block(), block, state);
+            HytaleBlockStateAccess.setInteractionState(chunk,
+                    coop.block().x, coop.block().y, coop.block().z, block, state);
         } catch (RuntimeException ignored) {
             // Optional presentation can race a chunk state update.
         }

@@ -77,7 +77,7 @@ final class HytaleCaptureReleaseDurabilityBarrier {
                     store.getComponent(target, transformType);
             WorldChunk chunk = HytaleChunkAccess.currentWorldChunk(transform, world);
             if (chunk == null
-                    || chunk.getWorld() != world) {
+                    || !HytaleChunkAccess.isOwnedBy(chunk, world)) {
                 return completed(ReceiptPersistence.retryable(null));
             }
             if (chunk.getIndex() != expectedChunkIndex) {

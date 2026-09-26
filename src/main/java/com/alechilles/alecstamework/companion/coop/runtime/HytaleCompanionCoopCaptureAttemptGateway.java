@@ -353,7 +353,7 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
                         request.targetSlot().z()
                 )
         );
-        if (chunk == null || chunk.getWorld() != world) {
+        if (chunk == null || !HytaleChunkAccess.isOwnedBy(chunk, world)) {
             return null;
         }
         Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added Hytale Update 7 compatibility, including the `0.7.0-pre.4` pre-release, while retaining Update 5 and Update 6 support.
+
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
 - Added an experimental native swimming mount option. The hammerhead example now uses W acceleration, coasting, stronger S braking, a Q boost, and crouch descent while preserving the mount's breathing rules, without requiring Flightmaster's Talisman or transforming the rider.

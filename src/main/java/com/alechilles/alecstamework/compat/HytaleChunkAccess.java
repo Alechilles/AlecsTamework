@@ -49,7 +49,20 @@ public final class HytaleChunkAccess {
             return null;
         }
         WorldChunk chunk = chunks.getComponent(columnRef, WorldChunk.getComponentType());
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return isOwnedBy(chunk, world) ? chunk : null;
+    }
+
+    /** Checks the owning store, since Update 7 no longer exposes WorldChunk.getWorld(). */
+    public static boolean isOwnedBy(@Nullable WorldChunk chunk, @Nullable World world) {
+        if (chunk == null || world == null) {
+            return false;
+        }
+        Ref<ChunkStore> ref = chunk.getReference();
+        if (ref == null || !ref.isValid()) {
+            return false;
+        }
+        ChunkStore owner = ref.getStore().getExternalData();
+        return owner != null && owner.getWorld() == world;
     }
 
     /** Marks the current source entity section for persistence before an entity is detached. */

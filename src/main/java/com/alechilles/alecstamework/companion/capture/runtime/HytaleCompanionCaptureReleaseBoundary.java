@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.capture.runtime;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseLiveBoundary;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -122,7 +123,7 @@ public final class HytaleCompanionCaptureReleaseBoundary
     ) {
         try {
             scheduled.execute(() -> {
-                if (chunk.getWorld() != scheduled
+                if (!HytaleChunkAccess.isOwnedBy(chunk, scheduled)
                         || chunk.getIndex() != receiptChunkIndex(
                                 request.placement()
                         )) {

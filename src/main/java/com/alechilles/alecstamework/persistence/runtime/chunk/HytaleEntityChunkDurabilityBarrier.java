@@ -74,7 +74,7 @@ public final class HytaleEntityChunkDurabilityBarrier {
         WorldChunk chunk = HytaleChunkAccess.currentWorldChunk(transform, world);
         IChunkSaver saver =
                 chunkStore == null ? null : chunkStore.getSaver();
-        return chunk == null || chunk.getWorld() != world || saver == null
+        return chunk == null || !HytaleChunkAccess.isOwnedBy(chunk, world) || saver == null
                 ? null
                 : new SaveContext(chunk, saver);
     }

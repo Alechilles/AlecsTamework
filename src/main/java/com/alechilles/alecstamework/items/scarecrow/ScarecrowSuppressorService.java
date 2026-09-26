@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.scarecrow;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -143,7 +144,8 @@ public final class ScarecrowSuppressorService {
                 ChunkUtil.indexChunkFromBlock(blockPosition.x, blockPosition.z)
         );
         return chunk != null
-                ? chunk.getBlockType(blockPosition.x, blockPosition.y, blockPosition.z)
+                ? HytaleBlockStateAccess.blockTypeAt(
+                        chunk, blockPosition.x, blockPosition.y, blockPosition.z)
                 : null;
     }
 

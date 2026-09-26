@@ -6,7 +6,10 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.universe.world.chunk.BlockOperations;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -24,6 +27,10 @@ public final class HytaleBlockStateAccess {
     private static final String CHUNK_SECTION_CLASS =
             "com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection";
     private static final Bindings BINDINGS = bind();
+    private static final MethodHandle LEGACY_GET_BLOCK = bindLegacyGetBlock();
+    private static final MethodHandle LEGACY_GET_ROTATION = bindLegacyGetRotation();
+    private static final MethodHandle LEGACY_SET_BLOCK = bindLegacySetBlock();
+    private static final MethodHandle LEGACY_SET_INTERACTION_STATE = bindLegacySetInteractionState();
 
     private HytaleBlockStateAccess() {
     }
@@ -40,6 +47,151 @@ public final class HytaleBlockStateAccess {
                     : resolveColumnLocation(store, blockStateInfo);
         } catch (Throwable ignored) {
             return null;
+        }
+    }
+
+    @Nullable
+    public static BlockType blockTypeAt(@Nullable WorldChunk chunk, int x, int y, int z) {
+        int blockId = blockIdAt(chunk, x, y, z);
+        return blockId < 0 ? null : BlockType.getAssetMap().getAsset(blockId);
+    }
+
+    /** Returns -1 when the requested block section is unavailable. */
+    public static int blockIdAt(@Nullable WorldChunk chunk, int x, int y, int z) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return -1;
+        }
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            BlockSection section = blockSectionAt(chunk, x, y, z);
+            return section == null ? -1 : section.get(x, y, z);
+        }
+        try {
+            return (int) LEGACY_GET_BLOCK.invoke(chunk, x, y, z);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not read an Update 5 block", failure);
+        }
+    }
+
+    public static int rotationAt(@Nullable WorldChunk chunk, int x, int y, int z) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return 0;
+        }
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            BlockSection section = blockSectionAt(chunk, x, y, z);
+            return section == null ? 0 : section.getRotationIndex(x, y, z);
+        }
+        try {
+            return (int) LEGACY_GET_ROTATION.invoke(chunk, x, y, z);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not read an Update 5 block rotation", failure);
+        }
+    }
+
+    public static boolean setBlock(@Nullable WorldChunk chunk, int x, int y, int z,
+                                   int id, @Nonnull BlockType type, int rotation,
+                                   int filler, int settings) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return false;
+        }
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            ChunkStore chunkStore = chunkStore(chunk);
+            Ref<ChunkStore> sectionRef = sectionRefAt(chunkStore, x, y, z);
+            return sectionRef != null && BlockOperations.setBlock(
+                    chunkStore, sectionRef, x, y, z, id, type, rotation, filler, settings);
+        }
+        try {
+            return (boolean) LEGACY_SET_BLOCK.invoke(chunk, x, y, z, id, type,
+                    rotation, filler, settings);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not write an Update 5 block", failure);
+        }
+    }
+
+    public static void setInteractionState(@Nullable WorldChunk chunk, int x, int y, int z,
+                                           @Nonnull BlockType type, @Nonnull String state) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return;
+        }
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            ChunkStore chunkStore = chunkStore(chunk);
+            Ref<ChunkStore> sectionRef = sectionRefAt(chunkStore, x, y, z);
+            if (sectionRef != null) {
+                BlockOperations.setBlockInteractionState(chunkStore, sectionRef,
+                        x, y, z, type, state, false);
+            }
+            return;
+        }
+        try {
+            LEGACY_SET_INTERACTION_STATE.invoke(chunk, x, y, z, type, state, false);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not set an Update 5 block interaction state", failure);
+        }
+    }
+
+    private static boolean sameColumn(@Nonnull WorldChunk chunk, int x, int z) {
+        return chunk.getIndex() == ChunkUtil.indexChunkFromBlock(x, z);
+    }
+
+    @Nullable
+    private static ChunkStore chunkStore(@Nonnull WorldChunk chunk) {
+        Ref<ChunkStore> ref = chunk.getReference();
+        return ref != null && ref.isValid() ? ref.getStore().getExternalData() : null;
+    }
+
+    @Nullable
+    private static Ref<ChunkStore> sectionRefAt(@Nullable ChunkStore chunkStore,
+                                                int x, int y, int z) {
+        if (chunkStore == null) {
+            return null;
+        }
+        Ref<ChunkStore> ref = chunkStore.getChunkSectionReferenceAtBlock(x, y, z);
+        return ref != null && ref.isValid() ? ref : null;
+    }
+
+    @Nullable
+    private static BlockSection blockSectionAt(@Nonnull WorldChunk chunk, int x, int y, int z) {
+        ChunkStore chunkStore = chunkStore(chunk);
+        Ref<ChunkStore> sectionRef = sectionRefAt(chunkStore, x, y, z);
+        return sectionRef == null ? null
+                : chunkStore.getStore().getComponent(sectionRef, BlockSection.getComponentType());
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacyGetBlock() {
+        return bindLegacy("getBlock", int.class,
+                int.class, int.class, int.class);
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacyGetRotation() {
+        return bindLegacy("getRotationIndex", int.class,
+                int.class, int.class, int.class);
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacySetBlock() {
+        return bindLegacy("setBlock", boolean.class,
+                int.class, int.class, int.class, int.class, BlockType.class,
+                int.class, int.class, int.class);
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacySetInteractionState() {
+        return bindLegacy("setBlockInteractionState", void.class,
+                int.class, int.class, int.class, BlockType.class,
+                String.class, boolean.class);
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacy(String name, Class<?> returnType, Class<?>... parameters) {
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            return null;
+        }
+        try {
+            return MethodHandles.publicLookup().findVirtual(WorldChunk.class, name,
+                    MethodType.methodType(returnType, parameters));
+        } catch (NoSuchMethodException | IllegalAccessException failure) {
+            throw new ExceptionInInitializerError(failure);
         }
     }
 

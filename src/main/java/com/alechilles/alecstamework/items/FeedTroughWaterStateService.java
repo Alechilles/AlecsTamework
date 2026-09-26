@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
@@ -74,7 +75,7 @@ public final class FeedTroughWaterStateService {
         if (chunk == null) {
             return false;
         }
-        BlockType currentType = chunk.getBlockType(x, y, z);
+        BlockType currentType = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
         String currentBlockId = normalizeId(currentType != null ? currentType.getId() : null);
         if (!isWaterTroughBlockId(currentBlockId)) {
             return false;
@@ -101,7 +102,7 @@ public final class FeedTroughWaterStateService {
             return false;
         }
         Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
-        BlockType currentType = chunk.getBlockType(x, y, z);
+        BlockType currentType = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
         String currentBlockId = normalizeId(currentType != null ? currentType.getId() : null);
         if (state == null || !isWaterTroughBlockId(currentBlockId)) {
             return false;
@@ -283,8 +284,9 @@ public final class FeedTroughWaterStateService {
         if (targetIndex == Integer.MIN_VALUE) {
             return false;
         }
-        int rotation = chunk.getRotationIndex(x, y, z);
-        chunk.setBlock(x, y, z, targetIndex, targetType, rotation, 0, 198);
+        int rotation = HytaleBlockStateAccess.rotationAt(chunk, x, y, z);
+        HytaleBlockStateAccess.setBlock(chunk, x, y, z, targetIndex, targetType,
+                rotation, 0, 198);
         return true;
     }
 

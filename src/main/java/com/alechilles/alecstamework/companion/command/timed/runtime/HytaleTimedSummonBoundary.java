@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.command.timed.runtime;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.command.timed
         .TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.command.timed
@@ -165,7 +166,7 @@ public final class HytaleTimedSummonBoundary
             return loaded.handle((chunk, failure) ->
                     failure != null
                             || chunk == null
-                            || chunk.getWorld() != scheduled
+                            || !HytaleChunkAccess.isOwnedBy(chunk, scheduled)
                             || chunk.getIndex() != expected
                             ? ChunkLoad.failed(failure)
                             : ChunkLoad.success()

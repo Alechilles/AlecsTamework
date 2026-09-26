@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.revival.runtime;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveBoundary;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
@@ -115,7 +116,7 @@ public final class HytalePaidRevivalBoundary
         try {
             World current = findWorld(request.targetWorldKey());
             if (current != scheduled
-                    || chunk.getWorld() != scheduled
+                    || !HytaleChunkAccess.isOwnedBy(chunk, scheduled)
                     || chunk.getIndex() != chunkIndex(request)) {
                 completion.complete(retry(
                         "world_instance_changed", null

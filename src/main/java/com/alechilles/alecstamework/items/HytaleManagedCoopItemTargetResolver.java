@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
@@ -45,7 +46,7 @@ public final class HytaleManagedCoopItemTargetResolver {
         if (chunk == null) {
             return null;
         }
-        BlockType blockType = chunk.getBlockType(
+        BlockType blockType = HytaleBlockStateAccess.blockTypeAt(chunk,
                 targetBlock.x, targetBlock.y, targetBlock.z
         );
         String blockTypeId = normalizeBlockType(
