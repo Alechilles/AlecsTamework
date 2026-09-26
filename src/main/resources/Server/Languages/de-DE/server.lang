@@ -1906,3 +1906,8 @@ tamework.ui.commandItem.view.species=Arten: {0}
 tamework.ui.commandItem.view.groups=Gruppen: {0}
 tamework.ui.commandItem.view.selected=Nur auf dieser Flöte ausgewählte
 tamework.ui.commandItem.view.search=Suche: {0}
+
+items.Tamework_Input_Rune_E.name = Tamework-Steuerung E
+items.Tamework_Input_Rune_E.description = Vorübergehende Steuerungsrune. Deine ausgerüstete Rune wird wiederhergestellt, wenn du den Gegenstand wechselst oder den Avatarflug beendest.
+items.Tamework_Input_Rune_R.name = Tamework-Steuerung R
+items.Tamework_Input_Rune_R.description = Vorübergehende Steuerungsrune. Deine ausgerüstete Rune wird wiederhergestellt, wenn du den Gegenstand wechselst oder den Avatarflug beendest.

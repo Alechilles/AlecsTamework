@@ -11,6 +11,26 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 ## Main orchestrator
 `CommandItemFeatureHandler`
 
+## Update 7 rune inputs
+
+Update 7 reserves `Ability2` and `Ability3` for rune casts. The example command
+whistle and HyDragon's Dragon Horn temporarily use Tamework control runes while
+selected, preserving their E/R assignments. The two original primary runes are
+saved with the player, restored when the item is switched, and recovered on
+reconnect. Support rune slots are left in place. Players cannot move or drop the
+temporary primary runes.
+
+The rune bridge forks the held item's existing interaction root with a hotbar
+context, so command metadata and assignments still belong to the physical tool.
+It checks the active lease and selected item again before dispatch. A late cast
+after a switch cannot invoke the old tool's action.
+
+Items opt into this route with `Tags.Family: ["TameworkInput"]`, a `Weapon`
+definition, and existing `Ability2` or `Ability3` roots. The supplied Patchwork
+patches add the tag and weapon definition only when the native Update 7 rune
+assets exist, preserving the items' tool classification on older servers. Keep
+the existing E/R roots for Update 5 and Update 6.
+
 ## Major service clusters
 - Resolution and recipient selection: `CommandResolutionService`, `CommandRecipientService`
 - Link persistence and mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`, `CommandLinkPolicyService`

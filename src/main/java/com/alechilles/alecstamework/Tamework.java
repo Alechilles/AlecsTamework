@@ -1249,6 +1249,18 @@ public class Tamework extends JavaPlugin {
     }
 
     private void deferPersistenceIndependentRuntimeParticipants() {
+        if (com.alechilles.alecstamework.compat.runes.RuneInputRuntime.isSupported()) {
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-load", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.Load::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-tick", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.Tick::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-active-slot", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.ActiveSlot::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-hotbar-change", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.HotbarChange::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-flight-change", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.FlightChange::new);
+        }
         deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
                 "scarecrow-block-placed", ScarecrowBlockEventSystems.Placed::new);
         deferEntitySystem(TameworkRuntimeModule.SCARECROWS,

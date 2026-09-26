@@ -53,6 +53,7 @@ final class TameworkComponentRegistrar {
 
     @Nonnull
     static RegisteredComponents register(@Nonnull Tamework plugin) {
+        com.alechilles.alecstamework.compat.runes.RuneInputLeaseComponent.register(plugin);
         com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionGroupsComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionViewsComponent.register(plugin);

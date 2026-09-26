@@ -12,6 +12,8 @@ public final class TameworkInteractionCodecRegistrar {
 
     /** Registers all Tamework interaction codecs. */
     public static void registerAll() {
+        Interaction.CODEC.register("TameworkRuneInput", TameworkRuneInputInteraction.class,
+                TameworkRuneInputInteraction.CODEC);
         Interaction.CODEC.register("TameworkNativeSwimBoost", TameworkNativeSwimBoostInteraction.class,
                 TameworkNativeSwimBoostInteraction.CODEC);
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class,

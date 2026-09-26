@@ -1918,3 +1918,8 @@ tamework.ui.commandItem.view.species=Species: {0}
 tamework.ui.commandItem.view.groups=Groups: {0}
 tamework.ui.commandItem.view.selected=Selected on this flute only
 tamework.ui.commandItem.view.search=Search: {0}
+
+items.Tamework_Input_Rune_E.name = Tamework input E
+items.Tamework_Input_Rune_E.description = Temporary control rune. Your equipped rune returns when you switch items or leave avatar flight.
+items.Tamework_Input_Rune_R.name = Tamework input R
+items.Tamework_Input_Rune_R.description = Temporary control rune. Your equipped rune returns when you switch items or leave avatar flight.

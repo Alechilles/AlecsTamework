@@ -1906,3 +1906,8 @@ tamework.ui.commandItem.view.species=Espécies: {0}
 tamework.ui.commandItem.view.groups=Grupos: {0}
 tamework.ui.commandItem.view.selected=Somente os selecionados nesta flauta
 tamework.ui.commandItem.view.search=Busca: {0}
+
+items.Tamework_Input_Rune_E.name = Controle do Tamework E
+items.Tamework_Input_Rune_E.description = Runa de controle temporária. Sua runa equipada é restaurada quando você troca de item ou sai do voo de avatar.
+items.Tamework_Input_Rune_R.name = Controle do Tamework R
+items.Tamework_Input_Rune_R.description = Runa de controle temporária. Sua runa equipada é restaurada quando você troca de item ou sai do voo de avatar.

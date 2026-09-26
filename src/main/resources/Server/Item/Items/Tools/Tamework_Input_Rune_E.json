@@ -1,0 +1,19 @@
+{
+  "$Comment": "Temporary Update 7 input rune. Installed and restored by the player rune lease.",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Input_Rune_E.name",
+    "Description": "server.items.Tamework_Input_Rune_E.description"
+  },
+  "Quality": "Tool",
+  "Model": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman.blockymodel",
+  "Texture": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Tamework_Flightmasters_Talisman.png",
+  "MaxStack": 1,
+  "Ability": {
+    "Slot": "Primary",
+    "Weapons": [
+      "TameworkInput"
+    ],
+    "Cast": "Root_Tamework_Input_Rune_E"
+  }
+}

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added Hytale Update 7 compatibility, including the `0.7.0-pre.4` pre-release, while retaining Update 5 and Update 6 support.
+- Preserved E/R flight combat and command-item shortcuts on Update 7 using temporary control runes that restore the player's equipped runes when released.
 
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
