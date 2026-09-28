@@ -2,6 +2,24 @@
 
 This file maps Tamework's currently registered NPC builders, item interactions, runtime components, and `/tw` commands.
 
+## Targeted Leap Movement
+
+`BodyMotion.Type: "TameworkLeap"` captures its sensor's position when movement
+starts and follows a parabolic arc to that exact point. `Duration` defaults to
+1.2 seconds and `Height` to 4 blocks above the line between the endpoints. Both
+must be positive. It requires a Walk controller and Hytale 0.6.7 or later.
+
+Keep the motion selected for the flight duration. Use a stored position sensor
+when target movement or target loss must not change the selected instruction.
+After the flight duration, wait for `OnGround` before triggering landing effects.
+If the target was airborne, normal gravity completes the descent after the arc.
+The destination is not continually updated, so players can dodge after takeoff.
+
+Movement uses the native collision-checked rail step on the NPC's world thread.
+Solid blocks stop the arc and normal gravity resumes; other entities do not
+shorten it. Deactivating the motion cancels it. The motion creates no system,
+scheduled task, persistence, or global entity scan.
+
 ## Shared NPC Instruction Components
 
 Use these components from downstream role assets with `Reference` and override

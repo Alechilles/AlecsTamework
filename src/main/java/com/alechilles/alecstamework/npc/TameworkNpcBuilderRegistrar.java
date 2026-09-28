@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc;
 
 import java.util.logging.Level;
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkLeap;
 
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
@@ -227,6 +229,10 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Body motion factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Body motion factory ready.");
+            if (HytaleApiLevel.isUpdate6OrLater()) {
+                bodyMotionFactory.add(BuilderBodyMotionTameworkLeap.BUILDER_ID,
+                        BuilderBodyMotionTameworkLeap::new);
+            }
             bodyMotionFactory.add(
                     BuilderBodyMotionTameworkFlyingOrbit.BUILDER_ID,
                     BuilderBodyMotionTameworkFlyingOrbit::new

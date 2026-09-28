@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added `TameworkLeap` NPC movement for a timed arc to a captured target position,
+  with native block collision checks. Requires Hytale 0.6.7 or later.
+
 - Added optional landing markers, feet targeting, and NPC hatching to arc projectiles. Projectile effects now activate when a projectile interaction is loaded, including servers with capture and tranquilizers disabled.
 
 - Added Hytale Update 7 compatibility, including the `0.7.0-pre.4` pre-release, while retaining Update 5 and Update 6 support.
