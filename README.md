@@ -32,6 +32,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Non-destructive asset patching**: Embedded Patchwork can add, merge, and insert JSON into one or many Hytale assets with composable conditions. It regenerates at startup, on an administrator reload, and after relevant directory-pack edits, and it reports which changes require a restart.
 - **A shared standard for tameable NPCs**: mods built on Tamework can present familiar ownership, naming, command, linked-panel, breeding, and progression behavior instead of inventing incompatible one-off systems.
 - **Optimized interactions**: build taming, feeding, mounting, harvesting, breeding, and custom interactions with `TwInteractionConfig` and `TameworkInteract`.
+- **Boss and combat tools**: author sweeping beams, targeted leaps, native boss health bars, projectile landing markers, and hatching NPCs through assets. Targeted leaps require Hytale 0.6.7 or later.
 - **Ownership and tame-state systems**: use reusable builders and role-scoped policy for owner checks, protection rules, and companion behavior.
 - **Spawner, naming, and command items**: capture and respawn NPCs with metadata, name companions with custom items, and build command tools with radial and linked-panel support.
 - **Linked companion runtime**: manage loaded, unloaded, dead, and lost companions through a linked panel with recall, home, revive, and related flows.

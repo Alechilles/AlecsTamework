@@ -1,28 +1,36 @@
 # Changelog
 
-## Unreleased
+## 4.3.0 - Boss Tools and Update 7 Compatibility - 2026-09-28
 
-- Added a terrain-blocked NPC beam action that follows the NPC's actual look direction.
-
-- Fixed translation keys in configured interaction notifications.
-- Added an owned-NPC transformation effect that creates the replacement NPC and safely releases the original companion.
-
-- Added the `TameworkBossBar` NPC action for native boss health bars with nearby-player visibility and automatic cleanup.
-- Added `TameworkLeap` NPC movement for a timed arc to a captured target position,
-  with native block collision checks. Requires Hytale 0.6.7 or later.
-
-- Added optional landing markers, feet targeting, and NPC hatching to arc projectiles. Projectile effects now activate when a projectile interaction is loaded, including servers with capture and tranquilizers disabled.
-
-- Added Hytale Update 7 compatibility, including the `0.7.0-pre.4` pre-release, while retaining Update 5 and Update 6 support.
-- Preserved E/R flight combat and command-item shortcuts on Update 7 using temporary control runes that restore the player's equipped runes when released.
+- Added `TameworkBeam`, a terrain-blocked NPC beam that follows the NPC's look
+  direction. Roles control its duration and turning speed to create dodgeable
+  sweeping attacks.
+- Added `TameworkBossBar` for native boss health bars with nearby-player
+  visibility and cleanup when combat ends, the boss dies, or it unloads.
+- Added `TameworkLeap` for a timed arc to a captured target position, with block
+  collision checks. This movement requires Hytale 0.6.7 or later.
+- Added optional landing markers, feet targeting, and NPC hatching to arc
+  projectiles. Projectile effects now activate when a projectile interaction is
+  loaded, including servers with capture and tranquilizers disabled.
+- Added an owned-NPC transformation effect that creates the replacement before
+  safely releasing the original companion. Fixed translation keys appearing
+  instead of configured interaction notifications.
+- Added Hytale Update 7 compatibility, including `0.7.0-pre.4`, while retaining
+  Update 5 and Update 6 support. E/R flight combat and command-item shortcuts
+  preserve and restore equipped runes when their temporary control runes are
+  released.
+- Added opt-in underwater avatar mounting with acceleration, a cruising speed
+  limit, forward boosts, braking, and rise/descend controls. It uses AvatarFlight's
+  rider and recovery lifecycle without altitude-based speed changes.
+- Added an experimental native hammerhead swimming mount to the optional example
+  pack, preserving the mount's breathing rules without a talisman or rider
+  transformation. In Hytale 0.6.8 live testing, crouch and Q input did not reach
+  the mounted handlers, W acceleration remained unverified, and passive sinking
+  remained. This example's custom controls still need further testing.
+- Simplified companion stat and timer tooltips by removing explanations of saved
+  data and loading.
 
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
-
-- Added an experimental native swimming mount option. The hammerhead example now uses W acceleration, coasting, stronger S braking, a Q boost, and crouch descent while preserving the mount's breathing rules, without requiring Flightmaster's Talisman or transforming the rider.
-
-- Added opt-in underwater avatar mounting with acceleration, a cruising speed limit, temporary forward boosts, braking, and direct rise/descend controls. It reuses AvatarFlight's rider and recovery lifecycle without altitude-based speed changes. An optional hammerhead shark example is included in the example pack.
-
-- Simplified companion stat and timer tooltips by removing explanations of saved data and loading.
 
 - Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.
 
