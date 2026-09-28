@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.runtime;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.*;
 import com.alechilles.alecstamework.metrics.HStatsServerUuidFile;
+import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.runtime.activation.TameworkAssetActivationEvidenceAdapter;
 import com.alechilles.alecstamework.runtime.activation.TameworkEffectiveAssetFact;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
@@ -10,6 +11,7 @@ import com.hypixel.hytale.assetstore.JsonAsset;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -112,6 +114,9 @@ public final class TameworkRuntimeActivationEvidenceSource {
                 "Tamework/Global/AssetSets/Tranquilizers", TwGlobalConfig.getAssetMap(),
                 TwGlobalConfig::isEnabled,
                 TameworkRuntimeActivationEvidenceSource::usesDamageProjectileRuntime);
+        addEnabledFact(facts, TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "Interaction/TameworkLaunchProjectile", Interaction.getAssetMap(), ignored -> true,
+                interaction -> interaction instanceof TameworkLaunchProjectileInteraction);
         addEnabledFact(facts, TameworkRuntimeModule.DEBUG_SELF_TEST,
                 "Tamework/Debug", TwDebugConfig.getAssetMap(),
                 TwDebugConfig::isEnabled,

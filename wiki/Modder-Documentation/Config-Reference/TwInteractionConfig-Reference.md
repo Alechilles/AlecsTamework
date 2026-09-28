@@ -150,6 +150,9 @@ Fields:
 - `ProjectileId` (required)
 - `Target` (optional: `USER`, `OWNER`, `TARGET`; default `TARGET`)
 - `TargetSlot` (optional; preferred NPC marked target slot before `Target` fallback)
+- `TargetGroundOffset` (optional; entity feet plus this Y offset, replacing eye-height aiming; no terrain projection)
+- `LandingMarkerParticleSystemId` (optional; particle emitted once at the frozen solver target after successful launch)
+- `ImpactSpawnNpcRole` (optional; one NPC role spawned at the final projectile position on normal removal, including expiry)
 - `YawSpreadDegrees` (optional)
 - `PitchSpreadDegrees` (optional)
 - `FailIfNoSolution` (optional; default `true`)
@@ -175,6 +178,8 @@ Fields:
 - `EffectId` (optional)
 
 Use this when you need combat-oriented lobs, source-centered barrage patterns, impact debuffs, or hazard zones that continue after projectile death.
+
+The ground offset applies only to entity targets. Look and random targets keep their existing positions. Marker lifetime comes from the particle asset; spread and projectile shot offsets can move the actual impact away from the marker. Hatch spawns also happen on lifetime expiry, but not world unload. The spawned role owns movement, lifetime, and despawn behavior.
 
 ## Requirement Schema
 `Requires` is split into two buckets:

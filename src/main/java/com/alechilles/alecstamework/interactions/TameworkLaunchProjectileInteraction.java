@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.hypixel.hytale.codec.Codec;
@@ -14,6 +15,7 @@ import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.logger.HytaleLogger;
 import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
@@ -39,7 +41,9 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -47,6 +51,7 @@ import javax.annotation.Nullable;
  * Custom interaction that launches a projectile using a solved high-angle ballistic arc.
  */
 public class TameworkLaunchProjectileInteraction extends SimpleInstantInteraction implements BallisticDataProvider {
+    private static final HytaleLogger LOGGER = HytaleLogger.getLogger();
     private static final double MIN_HORIZONTAL_DISTANCE = 1.0e-4;
     private static final double MIN_POSITIVE_VALUE = 1.0e-6;
 
@@ -86,6 +91,30 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.lookTargetDistance = parent.lookTargetDistance
             )
             .documentation("Optional positive distance along the source look direction used instead of Target or TargetSlot. This supports transformed players and other actors without an NPC marked-target role.")
+            .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("TargetGroundOffset", Codec.DOUBLE),
+                    (interaction, value) -> interaction.targetGroundOffset = value,
+                    interaction -> interaction.targetGroundOffset,
+                    (interaction, parent) -> interaction.targetGroundOffset = parent.targetGroundOffset
+            )
+            .documentation("When set, aims at the entity's feet plus this Y offset instead of its eye height. This does not project airborne targets onto terrain. Look and random targets are unchanged.")
+            .add()
+            .<String>appendInherited(
+                    new KeyedCodec<>("LandingMarkerParticleSystemId", Codec.STRING),
+                    (interaction, value) -> interaction.landingMarkerParticleSystemId = value,
+                    interaction -> interaction.landingMarkerParticleSystemId,
+                    (interaction, parent) -> interaction.landingMarkerParticleSystemId = parent.landingMarkerParticleSystemId
+            )
+            .documentation("Optional particle emitted once at the frozen target position after a successful launch. Configure the particle asset's lifetime and use zero spread for a precise landing marker.")
+            .add()
+            .<String>appendInherited(
+                    new KeyedCodec<>("ImpactSpawnNpcRole", Codec.STRING),
+                    (interaction, value) -> interaction.impactSpawnNpcRole = value,
+                    interaction -> interaction.impactSpawnNpcRole,
+                    (interaction, parent) -> interaction.impactSpawnNpcRole = parent.impactSpawnNpcRole
+            )
+            .documentation("Optional NPC role spawned once at the projectile's final position on normal removal, including lifetime expiry. Role assets control the spawned NPC's lifetime and behavior.")
             .add()
             .<Double>appendInherited(
                     new KeyedCodec<>("YawSpreadDegrees", Codec.DOUBLE),
@@ -164,6 +193,12 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     @Nullable
     private String targetSlot;
     private double lookTargetDistance = 0.0;
+    @Nullable
+    private Double targetGroundOffset;
+    @Nullable
+    private String landingMarkerParticleSystemId;
+    @Nullable
+    private String impactSpawnNpcRole;
     private double yawSpreadDegrees = 0.0;
     private double pitchSpreadDegrees = 0.0;
     private boolean failIfNoSolution = true;
@@ -288,6 +323,8 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
             holder.putComponent(TameworkLingeringHazardProjectileComponent.getComponentType(), lingeringHazardComponent);
         }
         commandBuffer.addEntity(holder, AddReason.SPAWN);
+        emitLandingMarker(targetPosition,
+                (particleId, position) -> HytaleParticleAccess.spawn(particleId, position, commandBuffer));
     }
 
     @Override
@@ -409,13 +446,34 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         double eyeHeight = 0.0;
-        ModelComponent modelComponent = commandBuffer.getComponent(targetRef, ModelComponent.getComponentType());
-        if (modelComponent != null) {
-            eyeHeight = modelComponent.getModel().getEyeHeight(targetRef, commandBuffer);
+        if (this.targetGroundOffset == null || !Double.isFinite(this.targetGroundOffset)) {
+            ModelComponent modelComponent = commandBuffer.getComponent(targetRef, ModelComponent.getComponentType());
+            if (modelComponent != null) {
+                eyeHeight = modelComponent.getModel().getEyeHeight(targetRef, commandBuffer);
+            }
         }
 
-        Vector3d position = transformComponent.getPosition();
-        return new Vector3d(position.x, position.y + eyeHeight, position.z);
+        return resolveEntityAimPosition(transformComponent.getPosition(), eyeHeight);
+    }
+
+    @Nonnull
+    Vector3d resolveEntityAimPosition(@Nonnull Vector3d feetPosition, double eyeHeight) {
+        double height = this.targetGroundOffset != null && Double.isFinite(this.targetGroundOffset)
+                ? this.targetGroundOffset : eyeHeight;
+        return new Vector3d(feetPosition.x, feetPosition.y + height, feetPosition.z);
+    }
+
+    void emitLandingMarker(@Nonnull Vector3d targetPosition,
+                           @Nonnull BiConsumer<String, Vector3d> emitter) {
+        if (this.landingMarkerParticleSystemId == null || this.landingMarkerParticleSystemId.isBlank()) {
+            return;
+        }
+        try {
+            emitter.accept(this.landingMarkerParticleSystemId, new Vector3d(targetPosition));
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).log("Could not emit landing marker %s for projectile %s: %s",
+                    this.landingMarkerParticleSystemId, this.projectileId, failure.getMessage());
+        }
     }
 
     @Nullable
@@ -474,15 +532,19 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     }
 
     @Nullable
-    private TameworkProjectileImpactEffectComponent buildImpactEffectComponent(@Nonnull UUID sourceUuid) {
-        if (this.impactEffect == null || !this.impactEffect.isEnabled()) {
+    TameworkProjectileImpactEffectComponent buildImpactEffectComponent(@Nonnull UUID sourceUuid) {
+        boolean applyEffect = this.impactEffect != null && this.impactEffect.isEnabled();
+        String spawnRole = this.impactSpawnNpcRole == null || this.impactSpawnNpcRole.isBlank()
+                ? null : this.impactSpawnNpcRole;
+        if (!applyEffect && spawnRole == null) {
             return null;
         }
         return new TameworkProjectileImpactEffectComponent(
-                this.impactEffect.getRadius(),
-                this.impactEffect.getEffectId(),
-                this.impactEffect.isExcludeSource(),
-                sourceUuid.toString()
+                applyEffect ? this.impactEffect.getRadius() : 0.0,
+                applyEffect ? this.impactEffect.getEffectId() : null,
+                !applyEffect || this.impactEffect.isExcludeSource(),
+                sourceUuid.toString(),
+                spawnRole
         );
     }
 

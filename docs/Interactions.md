@@ -363,6 +363,9 @@ Fields:
 - `ProjectileId` required projectile asset id.
 - `Target` optional enum: `USER`, `OWNER`, `TARGET`. Defaults to `TARGET`.
 - `TargetSlot` optional NPC marked target slot. When present, Tamework first tries the source NPC's marked target in that slot and falls back to `Target` resolution if none is present.
+- `TargetGroundOffset` optional Y offset above the entity's feet. When omitted, entity aiming still uses eye height. This does not project airborne targets onto terrain and does not change look or random targets.
+- `LandingMarkerParticleSystemId` optional particle system emitted once at the frozen solver target after a successful launch. Its asset controls marker lifetime. Use zero spread and zero projectile shot offsets when matching the marked point matters.
+- `ImpactSpawnNpcRole` optional role ID spawned once at the projectile's final position on normal removal, including lifetime expiry. The role controls chase, lifetime, and despawn behavior. Unloading a world does not hatch projectiles.
 - `YawSpreadDegrees` optional symmetric yaw spread applied after the arc is solved.
 - `PitchSpreadDegrees` optional symmetric pitch spread applied after the arc is solved.
 - `FailIfNoSolution` optional bool. Defaults to `true`.

@@ -14,20 +14,33 @@ import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.entities.ProjectileComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import org.joml.Vector3d;
 
 public final class TameworkProjectileImpactEffectSystem extends RefSystem<EntityStore> {
     private final ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> impactEffectType;
     private final ComponentType<EntityStore, ProjectileComponent> projectileType;
     private final ComponentType<EntityStore, TransformComponent> transformType;
+    private final NpcSpawner npcSpawner;
 
     public TameworkProjectileImpactEffectSystem(
             ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> impactEffectType,
             ComponentType<EntityStore, ProjectileComponent> projectileType,
             ComponentType<EntityStore, TransformComponent> transformType) {
+        this(impactEffectType, projectileType, transformType, TameworkProjectileImpactEffectSystem::spawnNpc);
+    }
+
+    TameworkProjectileImpactEffectSystem(
+            ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> impactEffectType,
+            ComponentType<EntityStore, ProjectileComponent> projectileType,
+            ComponentType<EntityStore, TransformComponent> transformType,
+            NpcSpawner npcSpawner) {
         this.impactEffectType = impactEffectType;
         this.projectileType = projectileType;
         this.transformType = transformType;
+        this.npcSpawner = npcSpawner;
     }
 
     @Override
@@ -56,7 +69,40 @@ public final class TameworkProjectileImpactEffectSystem extends RefSystem<Entity
             return;
         }
 
-        applyEffectSweep(impactEffect, transform, store, commandBuffer);
+        if (impactEffect.isEffectEnabled()) {
+            applyEffectSweep(impactEffect, transform, store, commandBuffer);
+        }
+        String spawnRole = impactEffect.getSpawnNpcRole();
+        if (spawnRole != null) {
+            // Removal invalidates the projectile; deferred work owns only copied values.
+            Vector3d spawnPosition = new Vector3d(transform.getPosition());
+            commandBuffer.run(callbackStore -> npcSpawner.spawn(spawnRole, spawnPosition, callbackStore));
+        }
+    }
+
+    private static void spawnNpc(@Nonnull String roleId,
+                                 @Nonnull Vector3d position,
+                                 @Nonnull Store<EntityStore> store) {
+        NPCPlugin plugin = NPCPlugin.get();
+        if (plugin == null) {
+            return;
+        }
+        int roleIndex = plugin.getIndex(roleId);
+        if (roleIndex < 0) {
+            plugin.getLogger().at(Level.WARNING).log("Could not hatch projectile: NPC role %s does not exist", roleId);
+            return;
+        }
+        try {
+            plugin.spawnEntity(store, roleIndex, position, null, null, null);
+        } catch (RuntimeException failure) {
+            plugin.getLogger().at(Level.WARNING).log("Could not hatch projectile as NPC role %s: %s",
+                    roleId, failure.getMessage());
+        }
+    }
+
+    @FunctionalInterface
+    interface NpcSpawner {
+        void spawn(String roleId, Vector3d position, Store<EntityStore> store);
     }
 
     private void applyEffectSweep(@Nonnull TameworkProjectileImpactEffectComponent impactEffect,
