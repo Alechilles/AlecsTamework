@@ -98,6 +98,7 @@ import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
+import com.alechilles.alecstamework.items.OwnedNpcTransformationInteractionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
@@ -809,6 +810,10 @@ public class Tamework extends JavaPlugin {
                 HeldItemAttachmentInteractionService.EXCHANGE_ATTACHMENT_EFFECT_ID,
                 heldItemAttachmentInteractions::exchangeAttachment
         );
+        OwnedNpcTransformationInteractionService ownedNpcTransformations =
+                new OwnedNpcTransformationInteractionService(persistenceComposition.facades());
+        interactionExtensionRegistry.registerBuiltInEffect(
+                "tamework:transform_owned_npc", ownedNpcTransformations::apply);
         traitEffectRegistry = new TraitEffectRegistry(
                 getLogger(),
                 new ReplacementNpcProfilesApi(

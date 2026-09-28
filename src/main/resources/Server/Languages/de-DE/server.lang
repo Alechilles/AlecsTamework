@@ -1911,3 +1911,5 @@ items.Tamework_Input_Rune_E.name = Tamework-Steuerung E
 items.Tamework_Input_Rune_E.description = Vorübergehende Steuerungsrune. Deine ausgerüstete Rune wird wiederhergestellt, wenn du den Gegenstand wechselst oder den Avatarflug beendest.
 items.Tamework_Input_Rune_R.name = Tamework-Steuerung R
 items.Tamework_Input_Rune_R.description = Vorübergehende Steuerungsrune. Deine ausgerüstete Rune wird wiederhergestellt, wenn du den Gegenstand wechselst oder den Avatarflug beendest.
+
+tamework.ui.notifications.transformation.unavailable=Dieses Tier kann sich gerade nicht verwandeln.

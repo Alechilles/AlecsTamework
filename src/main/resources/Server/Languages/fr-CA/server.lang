@@ -1911,3 +1911,5 @@ items.Tamework_Input_Rune_E.name = Commande Tamework E
 items.Tamework_Input_Rune_E.description = Rune de commande temporaire. Votre rune équipée est restaurée lorsque vous changez d’objet ou quittez le vol d’avatar.
 items.Tamework_Input_Rune_R.name = Commande Tamework R
 items.Tamework_Input_Rune_R.description = Rune de commande temporaire. Votre rune équipée est restaurée lorsque vous changez d’objet ou quittez le vol d’avatar.
+
+tamework.ui.notifications.transformation.unavailable=Cet animal ne peut pas se transformer pour le moment.

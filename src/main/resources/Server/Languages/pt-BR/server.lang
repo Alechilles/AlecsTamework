@@ -1911,3 +1911,5 @@ items.Tamework_Input_Rune_E.name = Controle do Tamework E
 items.Tamework_Input_Rune_E.description = Runa de controle temporária. Sua runa equipada é restaurada quando você troca de item ou sai do voo de avatar.
 items.Tamework_Input_Rune_R.name = Controle do Tamework R
 items.Tamework_Input_Rune_R.description = Runa de controle temporária. Sua runa equipada é restaurada quando você troca de item ou sai do voo de avatar.
+
+tamework.ui.notifications.transformation.unavailable=Este animal não pode se transformar agora.

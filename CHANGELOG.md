@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed translation keys in configured interaction notifications.
+- Added an owned-NPC transformation effect that creates the replacement NPC and safely releases the original companion.
+
 - Added the `TameworkBossBar` NPC action for native boss health bars with nearby-player visibility and automatic cleanup.
 - Added `TameworkLeap` NPC movement for a timed arc to a captured target position,
   with native block collision checks. Requires Hytale 0.6.7 or later.

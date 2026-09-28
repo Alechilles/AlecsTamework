@@ -552,3 +552,26 @@ Optional action overrides:
 - `IsMountable`
 - `IsHarvestable`
 - `HarvestInteractionContext`
+
+## Owned NPC transformations
+
+The built-in custom effect `tamework:transform_owned_npc` replaces an owned,
+tamed NPC with a fresh NPC. It creates the replacement before releasing the
+original companion through the existing persistence authority, and removes the
+replacement if release fails. Use `Param` for the target role and `JsonPayload`
+for `Item` (one held item consumed) and `Message` (a notification translation key).
+The interacting player must own the NPC, crouch, and hold the specified item.
+This effect supports ordinary companions, not command-roster projections.
+The new NPC starts at full health without the original companion's owner,
+command links, or progression. Other effects should not be combined with this
+asynchronous effect; it owns the item cost and success notification.
+
+```json
+{
+  "Custom": [{
+    "Id": "tamework:transform_owned_npc",
+    "Param": "My_Boss_Role",
+    "JsonPayload": "{\"Item\":\"Ingredient_Bar_Gold\",\"Message\":\"server.myMod.bossSummoned\"}"
+  }]
+}
+```

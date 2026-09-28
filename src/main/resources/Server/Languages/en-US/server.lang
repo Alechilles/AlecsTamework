@@ -1923,3 +1923,5 @@ items.Tamework_Input_Rune_E.name = Tamework input E
 items.Tamework_Input_Rune_E.description = Temporary control rune. Your equipped rune returns when you switch items or leave avatar flight.
 items.Tamework_Input_Rune_R.name = Tamework input R
 items.Tamework_Input_Rune_R.description = Temporary control rune. Your equipped rune returns when you switch items or leave avatar flight.
+
+tamework.ui.notifications.transformation.unavailable=This animal cannot transform right now.
