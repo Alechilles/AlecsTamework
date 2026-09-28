@@ -388,3 +388,26 @@ boss-bar components; it does not replace NPC role support with an encounter.
 ```json
 { "Continue": true, "Actions": [{ "Type": "TameworkBossBar", "Range": 40, "Name": "server.npcRoles.MyBoss.name" }] }
 ```
+
+
+## TameworkBeam
+
+Update 6 and later. Repeats a terrain-clipped particle beam along the NPC's
+current head direction while the action is active. The role owns attack timing
+and turning: use `HeadMotion: Aim` with a low `RelativeTurnSpeed` and
+`BodyMotion: MatchLook` to create a dodgeable sweep. The action never aims directly
+at the target. Losing the locked target or dying stops emission and damage.
+
+`Range` limits the beam length, `Damage` is damage per tick, and
+`DamageInterval` sets tick spacing in seconds. Zero damage is supported for a
+harmless charge effect. Only player collision boxes are hit, through the native
+damage pipeline. Terrain clips both damage and visuals.
+
+`ParticleSystem` names a short-lived beam effect centered at its emitter and
+aligned to local Z. `ParticleNativeLength` is its full authored length at scale
+one. The effect is scaled to the clipped distance and emitted at the midpoint
+at most ten times per second. Particle lifetime should be about 0.11 seconds.
+`OriginHeight` and `OriginForward` position the source relative to the NPC;
+`BeamRadius` widens player collision checks. Intervals do not catch up with
+multiple damage ticks after a stall. State changes leave only the short-lived
+visual tail, with no deferred damage or background worker.

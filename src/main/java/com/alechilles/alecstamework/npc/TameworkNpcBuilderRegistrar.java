@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkLeap;
 
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkBossBar;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkBeam;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
@@ -169,6 +170,7 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
             if (HytaleApiLevel.isUpdate6OrLater()) {
                 actionFactory.add(BuilderActionTameworkBossBar.BUILDER_ID, BuilderActionTameworkBossBar::new);
+                actionFactory.add(BuilderActionTameworkBeam.BUILDER_ID, BuilderActionTameworkBeam::new);
             }
         }
 

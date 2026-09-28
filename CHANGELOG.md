@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a terrain-blocked NPC beam action that follows the NPC's actual look direction.
+
 - Fixed translation keys in configured interaction notifications.
 - Added an owned-NPC transformation effect that creates the replacement NPC and safely releases the original companion.
 
