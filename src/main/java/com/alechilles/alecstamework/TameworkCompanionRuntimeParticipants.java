@@ -1,5 +1,10 @@
 package com.alechilles.alecstamework;
 
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
+import com.hypixel.hytale.builtin.encountermanager.EncounterManagerPlugin;
+import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
+import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
+
 import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
@@ -56,6 +61,11 @@ public final class TameworkCompanionRuntimeParticipants {
     }
 
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            participants.optionalEntitySystem(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "npcbossbarcleanupsystem",
+                    () -> EncounterManagerPlugin.get() == null ? null : new NpcBossBarCleanupSystem(NPCEntity.getComponentType(),
+                            EncounterMembers.getComponentType(), EncounterBossBarState.getComponentType()));
+        }
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockentitysystem",
                 CompanionFollowFlockMembershipSystems.EntityRef::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockmembershipsystem",

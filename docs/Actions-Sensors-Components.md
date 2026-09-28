@@ -373,3 +373,18 @@ specific to each NPC.
 - `TameworkAlarm` is the instruction-side reset bridge for durable Tamework alarm state.
 - `TameworkEffectActive` is useful for gating behavior while status effects (for example tranquilizer) are active.
 - `/tw config reload` only reloads item-feature assets (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).
+
+## TameworkBossBar
+
+Update 6 NPC action that shows the native boss health bar to nearby players.
+Use it in a continuing combat instruction. `Range` defaults to 40 blocks;
+`Name` is an optional localization key (otherwise the native display name is used).
+Membership refreshes every 0.25 seconds using the world's player spatial index.
+The native encounter member system expires viewers after 0.75 seconds without
+a refresh, including when combat ends or NPC AI stops on death. Entity removal
+and unload explicitly hide the bar. This attaches only native membership and
+boss-bar components; it does not replace NPC role support with an encounter.
+
+```json
+{ "Continue": true, "Actions": [{ "Type": "TameworkBossBar", "Range": 40, "Name": "server.npcRoles.MyBoss.name" }] }
+```

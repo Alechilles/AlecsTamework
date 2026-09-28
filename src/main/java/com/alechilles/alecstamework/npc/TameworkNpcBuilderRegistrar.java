@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkLeap;
 
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkBossBar;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
@@ -166,6 +167,9 @@ public final class TameworkNpcBuilderRegistrar {
             );
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
+            if (HytaleApiLevel.isUpdate6OrLater()) {
+                actionFactory.add(BuilderActionTameworkBossBar.BUILDER_ID, BuilderActionTameworkBossBar::new);
+            }
         }
 
         BuilderFactory<Sensor> sensorFactory = npcPlugin.getBuilderManager().getFactory(Sensor.class);
