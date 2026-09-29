@@ -2,6 +2,8 @@
 
 ## 4.3.0 - Boss Tools and Update 7 Compatibility - 2026-09-28
 
+- Fixed blank talent pages for newly tamed companions. Owned, loaded companions
+  can open their talents without being selected on a command flute.
 - Added `TameworkBeam`, a terrain-blocked NPC beam that follows the NPC's look
   direction. Roles control its duration and turning speed to create dodgeable
   sweeping attacks.

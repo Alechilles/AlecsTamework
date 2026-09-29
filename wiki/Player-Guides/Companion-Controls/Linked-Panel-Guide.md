@@ -87,7 +87,10 @@ available talent points from that exact live companion. These updates are
 grouped so the panel stays responsive while you use its controls. Stored and
 dead companions continue to show their saved progression snapshot.
 
-## Saved talent points
+## Talent points
+
+You can open the talent tree for your loaded, tamed companions as soon as you
+tame them. They do not need to be selected on the command flute first.
 
 You can open the talent tree and spend or reset points for your dead and `LOST`
 companions when Tamework has a complete saved restoration snapshot. Changes are

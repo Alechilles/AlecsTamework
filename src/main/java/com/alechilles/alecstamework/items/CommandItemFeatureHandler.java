@@ -298,7 +298,7 @@ public final class CommandItemFeatureHandler {
         this.callbackAuthority = new CommandPanelCallbackAuthority(
                 registry, toolInventoryService);
         this.talentPageService = new CommandTalentPageService(
-                linkMutationService,
+                linkPolicyService,
                 toolInventoryService,
                 feedbackService,
                 npcNameResolver

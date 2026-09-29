@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -29,20 +28,20 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Opens and mutates the companion talents page for command-linked companions.
+ * Opens and mutates the companion talents page for owned live companions.
  */
 final class CommandTalentPageService {
-    private final CommandLinkMutationService linkMutationService;
+    private final CommandLinkPolicyService linkPolicyService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
     private CommandSavedTalentPageService savedTalentPages;
 
-    CommandTalentPageService(@Nonnull CommandLinkMutationService linkMutationService,
+    CommandTalentPageService(@Nonnull CommandLinkPolicyService linkPolicyService,
                              @Nonnull CommandToolInventoryService toolInventoryService,
                              @Nonnull CommandFeedbackService feedbackService,
                              @Nonnull CommandNpcNameResolver npcNameResolver) {
-        this.linkMutationService = linkMutationService;
+        this.linkPolicyService = linkPolicyService;
         this.toolInventoryService = toolInventoryService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
@@ -557,23 +556,13 @@ final class CommandTalentPageService {
         if (toolStack == null || toolStack.isEmpty()) {
             return null;
         }
-        LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(
-                linkMutationService.readLinkedNpcRecords(toolStack),
-                npcUuid
-        );
-        if (record == null) {
+        // Talent access follows ownership, independently of this flute's selection.
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                || !linkPolicyService.passesOwnerAndTamed(true, true, npcRef, player.getUuid(), store)) {
             return null;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            return null;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || !links.containsToolId(toolId)) {
-            return null;
-        }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId != null && !ownerId.equals(player.getUuid())) {
             return null;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);

@@ -1,12 +1,15 @@
 package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -40,6 +43,57 @@ class CommandFreshTamePanelSelectionTest {
             "78000000-0000-0000-0000-000000000001");
     private static final UUID NPC = UUID.fromString(
             "78000000-0000-0000-0000-000000000002");
+
+    @Test
+    void freshOwnedAnimalCanOpenTalentsWithoutLegacyToolLinks() throws Exception {
+        try (TestScope scope = TestScope.install()) {
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(scope.world);
+            player.setReference(scope.store.createReference());
+            ItemStack stack = new MetadataStack("test:flute", new BsonDocument())
+                    .withMetadata(com.alechilles.alecstamework.config.TameworkMetadataKeys.COMMAND_TOOL_ID,
+                            com.hypixel.hytale.codec.Codec.STRING, "flute");
+            var hotbar = new com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer((short) 1);
+            hotbar.setItemStackForSlot((short) 0, stack);
+            var inventory = new com.hypixel.hytale.server.core.inventory.Inventory();
+            setField(inventory, com.hypixel.hytale.server.core.inventory.Inventory.class, "hotbar",
+                    new com.hypixel.hytale.server.core.inventory.InventoryComponent.Hotbar(
+                            hotbar, (byte) 0));
+            setField(player, com.hypixel.hytale.server.core.entity.LivingEntity.class, "inventory", inventory);
+
+            Ref<EntityStore> npcRef = scope.store.createReference();
+            NPCEntity npc = new NPCEntity();
+            npc.setLegacyUUID(NPC);
+            scope.store.put(npcRef, scope.npcType, npc);
+            scope.store.put(npcRef, scope.ownerType, new TameworkOwnerComponent(OWNER, "Owner"));
+            scope.store.put(npcRef, scope.tamedType, new TameworkTamedComponent(true));
+            scope.world.references.put(NPC, npcRef);
+            var service = new CommandTalentPageService(
+                    new CommandLinkPolicyService(),
+                    new CommandToolInventoryService(null, null, null, null),
+                    null, new CommandNpcNameResolver());
+
+            assertNotNull(service.managedSnapshot(player, "flute", NPC),
+                    "An owned companion must have talent page data even before it is selected on a flute.");
+            var selected = new CommandLinkedNpcRecordStore().write(stack, List.of(new LinkedNpcRecord(
+                    NPC, null, null, null, null, "Companion", null, "Cow", null, true, false, null)));
+            hotbar.setItemStackForSlot((short) 0, selected);
+            assertNotNull(service.managedSnapshot(player, "flute", NPC),
+                    "Normal taming creates an item selection without an NPC-side tool link.");
+
+            scope.store.put(npcRef, scope.ownerType, new TameworkOwnerComponent(UUID.randomUUID(), "Other"));
+            assertNull(service.managedSnapshot(player, "flute", NPC),
+                    "A stale item selection must not grant talent access after ownership changes.");
+            assertTrue(service.purchaseManaged(player, "flute", NPC, "test-talent").notFound());
+            assertTrue(service.resetManaged(player, "flute", NPC).notFound());
+            scope.store.put(npcRef, scope.ownerType, new TameworkOwnerComponent(OWNER, "Owner"));
+            scope.store.put(npcRef, scope.projectionType,
+                    TameworkProjectionIdentityComponent.bondedCompanion("profile", "lease"));
+            assertNull(service.managedSnapshot(player, "flute", NPC),
+                    "Bonded companions must use their own talent authority.");
+        }
+    }
 
     @Test
     void freshOwnedAnimalReflectsItemSelectionWithoutProfileProjection() throws Exception {
@@ -179,6 +233,7 @@ class CommandFreshTamePanelSelectionTest {
         private final ComponentType<EntityStore, TransformComponent> transformType = new ComponentType<>();
         private final ComponentType<EntityStore, NPCMountComponent> mountType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
+        private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
         private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType;
         private final TestWorld world;
         private final TestEntityComponentStore store;
@@ -198,6 +253,8 @@ class CommandFreshTamePanelSelectionTest {
             this.ownerType = EntityStore.REGISTRY.registerComponent(
                     TameworkOwnerComponent.class, "TestFreshTameOwner",
                     TameworkOwnerComponent.CODEC);
+            this.tamedType = EntityStore.REGISTRY.registerComponent(
+                    TameworkTamedComponent.class, "TestFreshTameTamed", TameworkTamedComponent.CODEC);
             this.projectionType = EntityStore.REGISTRY.registerComponent(
                     TameworkProjectionIdentityComponent.class, "TestFreshTameProjection",
                     TameworkProjectionIdentityComponent.CODEC);
@@ -216,6 +273,7 @@ class CommandFreshTamePanelSelectionTest {
 
             Tamework tamework = (Tamework) unsafe().allocateInstance(Tamework.class);
             setField(tamework, Tamework.class, "ownerComponentType", ownerType);
+            setField(tamework, Tamework.class, "tamedComponentType", tamedType);
             setField(tamework, Tamework.class, "projectionIdentityComponentType", projectionType);
             staticField(Tamework.class, "instance").set(null, tamework);
 
@@ -244,6 +302,7 @@ class CommandFreshTamePanelSelectionTest {
             staticField(com.hypixel.hytale.server.npc.NPCPlugin.class, "instance").set(null, oldNpcPlugin);
             EntityStore.REGISTRY.unregisterComponent(projectionType);
             EntityStore.REGISTRY.unregisterComponent(ownerType);
+            EntityStore.REGISTRY.unregisterComponent(tamedType);
             staticField(Tamework.class, "instance").set(null, oldTamework);
             staticField(EntityModule.class, "instance").set(null, oldEntityModule);
             staticField(MountPlugin.class, "instance").set(null, oldMountPlugin);
