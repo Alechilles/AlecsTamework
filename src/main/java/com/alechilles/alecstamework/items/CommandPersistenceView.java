@@ -229,7 +229,7 @@ final class CommandPersistenceView {
         for (String raw : record.toolIds()) {
             try {
                 tools.add(UUID.fromString(raw));
-            } catch (IllegalArgumentException | NullPointerException ignored) {
+            } catch (IllegalArgumentException ignored) {
                 // A malformed tool id links nothing.
             }
         }

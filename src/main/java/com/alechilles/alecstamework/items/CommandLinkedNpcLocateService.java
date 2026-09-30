@@ -132,9 +132,16 @@ final class CommandLinkedNpcLocateService {
      * index read is lock-free, so no work is deferred.
      */
     private void locateIndexed(Player player, LinkedNpcRecord record, boolean owned) {
-        UUID profileId = persistenceView == null ? null
-                : persistenceView.find(record).map(profile -> profile.profileId().value()).orElse(null);
-        CompanionRecord companion = profileId != null ? companions.get(profileId) : companions.byNpcUuid(record.npcUuid);
+        try {
+            showIndexed(player, record, owned);
+        } catch (RuntimeException failure) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.locate.unavailable");
+        }
+    }
+
+    private void showIndexed(Player player, LinkedNpcRecord record, boolean owned) {
+        CompanionRecord companion = persistenceView == null ? null
+                : persistenceView.find(record).map(profile -> companions.get(profile.profileId().value())).orElse(null);
         if (companion == null) {
             if (!owned) showLiveLocation(player, record);
             return;
