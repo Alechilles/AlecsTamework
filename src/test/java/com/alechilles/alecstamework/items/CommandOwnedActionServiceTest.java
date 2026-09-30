@@ -4,6 +4,9 @@ import com.alechilles.alecstamework.companion.identity.*;
 import com.alechilles.alecstamework.companion.lifecycle.*;
 import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +54,32 @@ class CommandOwnedActionServiceTest {
             assertFalse(CommandOwnedActionService.allowsLocate(owner, profile,
                     java.util.Set.of(), java.util.Set.of(profile.identity().profileId())));
         }
+    }
+
+    /** Index records open actions only to their owner, and locate also reaches captured and cooped ones. */
+    @Test void indexRecordsGateOnTheirOwnerAndWhereTheCompanionIs() {
+        UUID owner = UUID.randomUUID();
+        UUID stranger = UUID.randomUUID();
+        for (var location : List.of(CompanionLocation.live("default", 0, 0, 0),
+                CompanionLocation.dead(null), CompanionLocation.lost(null))) {
+            var companion = companion(owner, location);
+            assertTrue(CommandOwnedActionService.allows(owner, companion));
+            assertFalse(CommandOwnedActionService.allows(stranger, companion));
+        }
+        for (var location : List.of(CompanionLocation.item(), CompanionLocation.coop("default", 1, 2, 3, 0))) {
+            var companion = companion(owner, location);
+            assertFalse(CommandOwnedActionService.allows(owner, companion));
+            assertTrue(CommandOwnedActionService.allowsLocate(owner, companion));
+            assertFalse(CommandOwnedActionService.allowsLocate(stranger, companion));
+        }
+        for (var location : List.of(CompanionLocation.stored(StoredReason.ROSTER), CompanionLocation.released(null))) {
+            assertFalse(CommandOwnedActionService.allowsLocate(owner, companion(owner, location)));
+        }
+        assertFalse(CommandOwnedActionService.allows(owner, (CompanionRecord) null));
+    }
+
+    private static CompanionRecord companion(UUID owner, CompanionLocation location) {
+        return CompanionRecord.builder(UUID.randomUUID(), "Sheep", location).ownerUuid(owner).build();
     }
 
     @Test void actionRecordUsesCurrentAliasInsteadOfStaleCardId() {

@@ -3,9 +3,12 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Sighting;
@@ -47,6 +50,8 @@ final class CommandLinkedNpcLocateService {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandToolInventoryService toolInventoryService;
     private final PersistenceDomainFacades persistence;
+    @Nullable
+    private final CompanionQueries companions;
     private final CommandPersistenceView persistenceView;
     private final CapturedItemTracker itemTracker;
     private final Map<UUID, UUID> pending = new ConcurrentHashMap<>();
@@ -57,6 +62,7 @@ final class CommandLinkedNpcLocateService {
                                   CommandNpcNameResolver npcNameResolver,
                                   CommandToolInventoryService toolInventoryService,
                                   PersistenceDomainFacades persistence,
+                                  @Nullable CompanionQueries companions,
                                   CommandPersistenceView persistenceView,
                                   CapturedItemTracker itemTracker) {
         this.linkMutationService = linkMutationService;
@@ -65,6 +71,7 @@ final class CommandLinkedNpcLocateService {
         this.npcNameResolver = npcNameResolver;
         this.toolInventoryService = toolInventoryService;
         this.persistence = persistence;
+        this.companions = companions;
         this.persistenceView = persistenceView;
         this.itemTracker = itemTracker;
     }
@@ -109,11 +116,49 @@ final class CommandLinkedNpcLocateService {
             );
             return;
         }
+        if (companions != null) {
+            locateIndexed(player, record, ownedRecord != null);
+            return;
+        }
         if (persistence != null) {
             locateCanonical(player, toolId, record, ownedRecord != null, authority);
             return;
         }
         showLiveLocation(player, record);
+    }
+
+    /**
+     * Reports the location the companion index holds. Runs on the player's world thread; the
+     * index read is lock-free, so no work is deferred.
+     */
+    private void locateIndexed(Player player, LinkedNpcRecord record, boolean owned) {
+        UUID profileId = persistenceView == null ? null
+                : persistenceView.find(record).map(profile -> profile.profileId().value()).orElse(null);
+        CompanionRecord companion = profileId != null ? companions.get(profileId) : companions.byNpcUuid(record.npcUuid);
+        if (companion == null) {
+            if (!owned) showLiveLocation(player, record);
+            return;
+        }
+        if (owned && !CommandOwnedActionService.allowsLocate(player.getUuid(), companion)) return;
+        String name = npcNameResolver.resolveCachedUnloadedDisplayName(record);
+        if (name == null || name.isBlank()) name = companion.summary().customName();
+        if (name == null || name.isBlank()) name = companion.displayName();
+        if (name == null || name.isBlank()) name = LocalizedText.resolve(player, "tamework.ui.linkedPanel.subtitle.defaultNpcName");
+        CompanionLocation location = companion.location();
+        switch (location.kind()) {
+            case LIVE -> showLiveLocation(player, new LinkedNpcRecord(
+                    companion.currentNpcUuid() == null ? record.npcUuid : companion.currentNpcUuid(),
+                    companion.profileId().toString(), new Vector3d(location.x(), location.y(), location.z()),
+                    location.world(), record.homePosition, name, record.cachedNameKey, record.cachedRoleId,
+                    record.cachedCommandState, record.active, record.breedingEnabled, record.groupId));
+            case COOP -> showStatus(player, name, location.world(),
+                    TameworkLinkedNpcLocationFormatter.formatCoordinates(location.x(), location.y(), location.z()),
+                    LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.coop"));
+            // The index keeps no capture key, so the held item cannot be traced here.
+            case ITEM -> showStatus(player, name, "", "",
+                    LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.captureUnknown"));
+            default -> feedbackService.showWarningKey(player, "tamework.ui.notifications.command.locate.unavailable");
+        }
     }
 
     private void showLiveLocation(Player player, LinkedNpcRecord record) {
@@ -251,6 +296,10 @@ final class CommandLinkedNpcLocateService {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.locate.unavailable");
             return;
         }
+        showStatus(player, name, world, coordinates, status);
+    }
+
+    private void showStatus(Player player, String name, String world, String coordinates, String status) {
         String displayWorld = world.isBlank() ? "—" : TameworkLinkedNpcLocationFormatter.formatDisplayWorldName(world, world);
         if (!openLocationPage(player, name, displayWorld, coordinates, status)) {
             feedbackService.showDefault(player, name + ": " + status + (coordinates.isBlank() ? "" : " — " + displayWorld + " (" + coordinates + ")"));

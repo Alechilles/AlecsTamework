@@ -1,11 +1,16 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
 import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -28,6 +33,8 @@ import javax.annotation.Nullable;
  * boundary.</p>
  */
 final class CommandPersistenceView {
+    private final SnapshotLookup snapshots;
+    @Nullable
     private final ProjectionLookup projections;
     private CommandSavedNpcPanelCache savedPanels;
     private java.util.function.Function<ProfileId, ProfileExtensionProjectionValue> checkpointLookup = ignored -> null;
@@ -63,12 +70,44 @@ final class CommandPersistenceView {
         this.projections = Objects.requireNonNull(
                 projections, "Profile projections are required"
         );
+        this.snapshots = new SnapshotLookup() {
+            @Override
+            public Optional<ProfileSnapshot> find(ProfileId profileId) {
+                return projections.find(profileId).map(ProfileSnapshot::from);
+            }
+
+            @Override
+            public Optional<ProfileSnapshot> find(NpcAlias alias) {
+                return projections.find(alias).map(ProfileSnapshot::from);
+            }
+        };
+    }
+
+    /**
+     * Reads profiles from the companion index. The saved panel for unloaded companions does
+     * not come from this source yet, so {@link #savedPanel} returns null.
+     */
+    CommandPersistenceView(@Nonnull CompanionQueries companions) {
+        Objects.requireNonNull(companions, "Companion queries are required");
+        this.projections = null;
+        this.snapshots = new SnapshotLookup() {
+            @Override
+            public Optional<ProfileSnapshot> find(ProfileId profileId) {
+                return Optional.ofNullable(companions.get(profileId.value())).map(CommandPersistenceView::from);
+            }
+
+            @Override
+            public Optional<ProfileSnapshot> find(NpcAlias alias) {
+                return Optional.ofNullable(companions.byNpcUuid(alias.value())).map(CommandPersistenceView::from);
+            }
+        };
     }
 
     CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
+        if (savedPanels == null) return null;
         ProfileId id = find(record).map(ProfileSnapshot::profileId).orElse(null);
-        CompanionProfileProjectionState projection = id == null ? null : safeFind(id).orElse(null);
-        if (savedPanels == null || projection == null) return null;
+        CompanionProfileProjectionState projection = id == null ? null : safeProjection(id).orElse(null);
+        if (projection == null) return null;
         ProfileExtensionProjectionValue checkpoint = checkpointLookup.apply(id);
         return savedPanels.peek(id, viewer, new CommandSavedNpcPanelCache.Revision(
                 projection.lastUpdatedAtMs(), checkpoint == null ? null : checkpoint.key().toString(),
@@ -107,20 +146,17 @@ final class CommandPersistenceView {
         }
         ProfileId explicit = parseProfileId(record.profileId);
         if (explicit != null) {
-            Optional<CompanionProfileProjectionState> byProfile =
-                    safeFind(explicit);
+            Optional<ProfileSnapshot> byProfile = safeFind(explicit);
             if (byProfile.isPresent()) {
-                return byProfile.map(ProfileSnapshot::from);
+                return byProfile;
             }
         }
-        Optional<CompanionProfileProjectionState> byAlias =
-                safeFind(new NpcAlias(record.npcUuid));
+        Optional<ProfileSnapshot> byAlias = safeFind(new NpcAlias(record.npcUuid));
         if (byAlias.isPresent()) {
-            return byAlias.map(ProfileSnapshot::from);
+            return byAlias;
         }
         if (explicit == null) {
-            return safeFind(new ProfileId(record.npcUuid))
-                    .map(ProfileSnapshot::from);
+            return safeFind(new ProfileId(record.npcUuid));
         }
         return Optional.empty();
     }
@@ -136,7 +172,7 @@ final class CommandPersistenceView {
             return false;
         }
         return safeFind(new NpcAlias(candidate.value()))
-                .map(CompanionProfileProjectionState::profileId)
+                .map(ProfileSnapshot::profileId)
                 .filter(profileId::equals)
                 .isPresent();
     }
@@ -157,25 +193,63 @@ final class CommandPersistenceView {
     }
 
     @Nonnull
-    private Optional<CompanionProfileProjectionState> safeFind(
-            ProfileId profileId
-    ) {
+    private Optional<ProfileSnapshot> safeFind(ProfileId profileId) {
         try {
-            return projections.find(profileId);
+            return snapshots.find(profileId);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
     }
 
     @Nonnull
-    private Optional<CompanionProfileProjectionState> safeFind(
-            NpcAlias alias
-    ) {
+    private Optional<ProfileSnapshot> safeFind(NpcAlias alias) {
         try {
-            return projections.find(alias);
+            return snapshots.find(alias);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
+    }
+
+    @Nonnull
+    private Optional<CompanionProfileProjectionState> safeProjection(ProfileId profileId) {
+        try {
+            return projections == null ? Optional.empty() : projections.find(profileId);
+        } catch (RuntimeException | LinkageError ignored) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Maps one index record to the command-facing snapshot. The location kind decides the
+     * lifecycle state; tool ids that are not UUIDs are skipped.
+     */
+    @Nonnull
+    static ProfileSnapshot from(@Nonnull CompanionRecord record) {
+        Set<UUID> tools = new HashSet<>();
+        for (String raw : record.toolIds()) {
+            try {
+                tools.add(UUID.fromString(raw));
+            } catch (IllegalArgumentException | NullPointerException ignored) {
+                // A malformed tool id links nothing.
+            }
+        }
+        return new ProfileSnapshot(new ProfileId(record.profileId()), record.currentNpcUuid(), record.ownerUuid(),
+                record.roleId(), record.displayName(), record.summary().customName(), tools,
+                lifecycleState(record.location()), record.reviveAvailableAtMs());
+    }
+
+    @Nonnull
+    private static LifecycleState lifecycleState(@Nonnull CompanionLocation location) {
+        return switch (location.kind()) {
+            case LIVE -> LifecycleState.ACTIVE;
+            case ITEM -> LifecycleState.CAPTURED;
+            case COOP -> LifecycleState.COOP;
+            case STORED -> location.reason() == StoredReason.PROVISIONED
+                    ? LifecycleState.PROVISIONED_DORMANT : LifecycleState.ROSTER_STORED;
+            case DEAD -> LifecycleState.DEAD_REVIVABLE;
+            case LOST -> LifecycleState.LOST;
+            case RELEASED -> LifecycleState.RELEASED;
+        };
     }
 
     @Nullable
@@ -241,7 +315,7 @@ final class CommandPersistenceView {
         }
 
         @Nonnull
-        private static ProfileSnapshot from(
+        static ProfileSnapshot from(
                 CompanionProfileProjectionState projection
         ) {
             return new ProfileSnapshot(
@@ -260,6 +334,15 @@ final class CommandPersistenceView {
                     projection.restorationAvailableAtMs()
             );
         }
+    }
+
+    /** Profile lookups by id and by NPC alias, from whichever source backs this view. */
+    private interface SnapshotLookup {
+        @Nonnull
+        Optional<ProfileSnapshot> find(@Nonnull ProfileId profileId);
+
+        @Nonnull
+        Optional<ProfileSnapshot> find(@Nonnull NpcAlias alias);
     }
 
     /** Adapter seam for deterministic projection tests. */

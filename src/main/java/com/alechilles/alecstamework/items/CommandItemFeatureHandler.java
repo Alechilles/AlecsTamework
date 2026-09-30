@@ -32,6 +32,8 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Holder;
@@ -192,9 +194,13 @@ public final class CommandItemFeatureHandler {
     ) {
         this(registry, relocationService, stateSnapshotService, persistence,
                 restorationAuthor, timedSummoning, paidRevival, populationGroups,
-                bondedCompanions, null);
+                bondedCompanions, null, null, null);
     }
 
+    /**
+     * Full constructor. When {@code companions} is set, the panel, owned rows, owned actions,
+     * locate, release and cull read the companion index instead of {@code persistence}.
+     */
     public CommandItemFeatureHandler(
             CommandItemRegistry registry,
             CommandNpcRelocationService relocationService,
@@ -205,7 +211,9 @@ public final class CommandItemFeatureHandler {
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
-            @Nullable CompanionProgressionSignalBus progressionSignals
+            @Nullable CompanionProgressionSignalBus progressionSignals,
+            @Nullable CompanionQueries companions,
+            @Nullable ReleaseFlow releaseFlow
     ) {
         this.registry = registry;
         this.relocationService = relocationService;
@@ -218,7 +226,9 @@ public final class CommandItemFeatureHandler {
         this.npcExistenceService = stateSnapshotService != null
                 ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
                 : new CommandNpcExistenceService();
-        this.persistenceView = persistence != null
+        this.persistenceView = companions != null
+                ? new CommandPersistenceView(companions)
+                : persistence != null
                 ? new CommandPersistenceView(persistence)
                 : null;
         CommandRosterPanelRecordSource rosterPanelRecordSource =
@@ -270,7 +280,8 @@ public final class CommandItemFeatureHandler {
                 rosterPanelRecordSource,
                 featurePresentations,
                 BondedCompanionPanelEntrySourceService.production(bondedCompanions),
-                persistence == null ? null : new CommandOwnedPanelRecordSource(
+                companions != null ? new CommandOwnedPanelRecordSource(companions)
+                        : persistence == null ? null : new CommandOwnedPanelRecordSource(
                         persistence.queries()::projectedProfileSnapshot,
                         () -> {
                             var managed = new java.util.HashSet<>(
@@ -349,8 +360,11 @@ public final class CommandItemFeatureHandler {
                         restorationAuthor
                 )
                 : null;
-        this.ownedActions = new CommandOwnedActionService(persistence, toolInventoryService,
-                panelPreferenceService, feedbackService, linkMutationService);
+        this.ownedActions = companions != null
+                ? new CommandOwnedActionService(companions, toolInventoryService,
+                        panelPreferenceService, feedbackService, linkMutationService)
+                : new CommandOwnedActionService(persistence, toolInventoryService,
+                        panelPreferenceService, feedbackService, linkMutationService);
         this.freeRestorationActions =
                 new CommandFreeRestorationActionService(
                         restorationService,
@@ -362,8 +376,8 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 feedbackService,
                 npcNameResolver,
-                null,
-                null,
+                releaseFlow,
+                companions,
                 inventoryRepairService
         );
         this.ownerCullService = new CommandOwnerCullService(
@@ -372,8 +386,8 @@ public final class CommandItemFeatureHandler {
                 linkMutationService,
                 feedbackService,
                 npcNameResolver,
-                null,
-                null
+                releaseFlow,
+                companions
         );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
@@ -395,6 +409,7 @@ public final class CommandItemFeatureHandler {
                 npcNameResolver,
                 toolInventoryService,
                 persistence,
+                companions,
                 persistenceView,
                 capturedItemTracker
         );

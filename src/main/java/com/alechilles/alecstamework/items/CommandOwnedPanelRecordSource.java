@@ -3,18 +3,23 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.items.CommandPersistenceView.ProfileSnapshot;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
-/** Reads owned companions across worlds from the existing immutable profile projection. */
+/** Reads owned companions across worlds from the companion index or the old profile projection. */
 final class CommandOwnedPanelRecordSource {
-    private final Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles;
+    /** Candidate profiles for one owner; a null owner asks for the unowned captured profiles. */
+    private final Function<UUID, Collection<ProfileSnapshot>> profiles;
     private final Supplier<java.util.Set<ProfileId>> managedProfiles;
 
     CommandOwnedPanelRecordSource(
@@ -25,8 +30,18 @@ final class CommandOwnedPanelRecordSource {
     CommandOwnedPanelRecordSource(
             Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles,
             Supplier<java.util.Set<ProfileId>> managedProfiles) {
-        this.profiles = profiles;
+        this.profiles = ignoredOwner -> profiles.get().values().stream().map(ProfileSnapshot::from).toList();
         this.managedProfiles = managedProfiles;
+    }
+
+    /**
+     * Owned rows from the companion index. The index lists records by owner only, so unowned
+     * captured rows and roster-managed features are absent from this source.
+     */
+    CommandOwnedPanelRecordSource(CompanionQueries companions) {
+        this.profiles = owner -> owner == null ? List.of()
+                : companions.owned(owner).stream().map(CommandPersistenceView::from).toList();
+        this.managedProfiles = java.util.Set::of;
     }
 
     /** One refresh owns this immutable display snapshot; action handlers still read current authority. */
@@ -56,10 +71,10 @@ final class CommandOwnedPanelRecordSource {
         var captures = new ArrayList<LinkedNpcRecord>();
         var rows = new HashMap<UUID, ProfileId>();
         var features = new HashMap<UUID, CommandPanelFeaturePresentation>();
-        for (var profile : profiles.get().values()) {
+        for (var profile : profiles.apply(ownerUuid)) {
             String id = profile.profileId().toString();
-            UUID currentAlias = profile.currentAlias() == null ? null : profile.currentAlias().value();
-            if (profile.ownerId() != null && profile.ownerId().value().equals(ownerUuid)) {
+            UUID currentAlias = profile.currentNpcUuid();
+            if (profile.ownerUuid() != null && profile.ownerUuid().equals(ownerUuid)) {
                 UUID presentation = CommandRosterPanelRecordSource.presentationUuid(profile.profileId());
                 if (managed.contains(profile.profileId()) || profile.lifecycleState() == LifecycleState.ROSTER_STORED
                         || profile.lifecycleState() == LifecycleState.PROVISIONED_DORMANT) {
@@ -76,7 +91,7 @@ final class CommandOwnedPanelRecordSource {
                 if (linked != null) rows.putIfAbsent(linked.npcUuid, profile.profileId());
                 records.add(linked != null ? linked : displayRecord(profile,
                         currentAlias == null ? presentation : currentAlias, false));
-            } else if (profile.ownerId() == null && profile.lifecycleState() == LifecycleState.CAPTURED) {
+            } else if (profile.ownerUuid() == null && profile.lifecycleState() == LifecycleState.CAPTURED) {
                 // Preserve the first matching legacy record when profile and alias matches differ.
                 var match = firstByProfile.get(id);
                 var aliasMatch = firstByAlias.get(currentAlias);
@@ -94,7 +109,7 @@ final class CommandOwnedPanelRecordSource {
 
     private record IndexedRecord(int index, LinkedNpcRecord record) { }
 
-    private static LinkedNpcRecord displayRecord(CompanionProfileProjectionState profile, UUID alias, boolean active) {
+    private static LinkedNpcRecord displayRecord(ProfileSnapshot profile, UUID alias, boolean active) {
         return new LinkedNpcRecord(alias, profile.profileId().toString(), null, null, null,
                 profile.customName() != null ? profile.customName() : profile.displayName(),
                 null, profile.roleId(), null, active, false, null);

@@ -935,7 +935,9 @@ public class Tamework extends JavaPlugin {
                 api::paidCommandRevival,
                 api::populationGroups,
                 api::bondedCompanions,
-                companionProgressionSignalBus
+                companionProgressionSignalBus,
+                null,
+                null
         );
         commandItemFeatureHandler.configureCommandUi(api.commandUi());
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
