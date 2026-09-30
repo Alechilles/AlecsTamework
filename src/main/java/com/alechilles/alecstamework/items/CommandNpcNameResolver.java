@@ -16,6 +16,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import javax.annotation.Nullable;
 
 /**
  * Resolves NPC-facing names for command item UI and metadata.
@@ -25,7 +26,7 @@ import java.util.Locale;
  * 2) translated name key,
  * 3) role id.
  */
-final class CommandNpcNameResolver {
+public final class CommandNpcNameResolver {
     private final TranslationRegistry translationRegistry;
 
     CommandNpcNameResolver() {
@@ -195,6 +196,16 @@ final class CommandNpcNameResolver {
     }
 
     String resolveNpcNameKey(NPCEntity npc) {
+        return npcNameKey(npc);
+    }
+
+    /**
+     * Returns the raw translation key for the NPC's species name, never translated text: the
+     * role's name parameter, else the role id when it is already a key, else the default key
+     * derived from the role id. Shared with the companion summary.
+     */
+    @Nullable
+    public static String npcNameKey(@Nullable NPCEntity npc) {
         if (npc == null) {
             return null;
         }
@@ -202,17 +213,21 @@ final class CommandNpcNameResolver {
         if (roleParamNameKey != null && !roleParamNameKey.isBlank()) {
             return roleParamNameKey;
         }
-        String roleId = resolveNpcRoleId(npc);
+        String roleId = npcRoleId(npc);
         if (roleId == null || roleId.isBlank()) {
             return null;
         }
-        if (looksLikeTranslationKey(roleId)) {
+        if (RoleNameResolver.looksLikeTranslationKey(roleId)) {
             return roleId;
         }
         return RoleNameResolver.defaultRoleNameKey(roleId);
     }
 
     String resolveNpcRoleId(NPCEntity npc) {
+        return npcRoleId(npc);
+    }
+
+    private static String npcRoleId(NPCEntity npc) {
         if (npc == null) {
             return null;
         }

@@ -55,7 +55,7 @@ import javax.annotation.Nullable;
 /**
  * Builds the loaded-NPC status surface shared by linked panels, nearby panels, and target HUDs.
  */
-final class CommandLoadedNpcStatusSnapshotService {
+public final class CommandLoadedNpcStatusSnapshotService {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLinkedPanelProgressionPresentationService progressionPresentationService;
@@ -306,19 +306,40 @@ final class CommandLoadedNpcStatusSnapshotService {
                 TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
                         .getShoulderRide();
         boolean mounted = isShoulderMounted(npcRef, player, store);
-        TameworkLifeStageComponent lifeStage = safeGetComponent(
-                store, npcRef, TameworkLifeStageComponent.getComponentType());
         return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted)
                 .withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                         customName, resolvedRoleId, resolvedContext.cachedNameKey()))
                 .withPortraitIcon(resolvedOptions.includePortrait() ? resolvePortrait(npcRef, store, resolvedRoleId) : null)
-                .withAnimalLifecycle(AnimalProgressionService.loadedPresentation(lifeStage, resolvedRoleId,
-                        maxHunger > 0 ? hunger * 100.0 / maxHunger : 100,
-                        maxThirst > 0 ? thirst * 100.0 / maxThirst : 100));
+                .withAnimalLifecycle(loadedLifecycle(npcRef, store, resolvedRoleId, needsSnapshot));
     }
 
-    /** Reads appearance only in the existing world-thread card snapshot pass. */
-    private String resolvePortrait(Ref<EntityStore> npcRef, Store<EntityStore> store, String roleId) {
+    /**
+     * Life-cycle view of a loaded animal at its current care rate, or null without a life stage.
+     * World thread only. Shared with the companion summary.
+     */
+    @Nullable
+    public static AnimalProgressionService.Presentation loadedLifecycle(Ref<EntityStore> npcRef,
+                                                                        Store<EntityStore> store,
+                                                                        @Nullable String roleId) {
+        return loadedLifecycle(npcRef, store, roleId,
+                readNpcNeedsSnapshot(npcRef, store, TameworkNeedsComponent.getComponentType()));
+    }
+
+    @Nullable
+    private static AnimalProgressionService.Presentation loadedLifecycle(Ref<EntityStore> npcRef,
+                                                                         Store<EntityStore> store,
+                                                                         @Nullable String roleId,
+                                                                         @Nullable NeedsSnapshot needs) {
+        TameworkLifeStageComponent lifeStage = safeGetComponent(
+                store, npcRef, TameworkLifeStageComponent.getComponentType());
+        return AnimalProgressionService.loadedPresentation(lifeStage, roleId,
+                needs != null && needs.hungerMax > 0 ? needs.hungerCurrent * 100.0 / needs.hungerMax : 100,
+                needs != null && needs.thirstMax > 0 ? needs.thirstCurrent * 100.0 / needs.thirstMax : 100);
+    }
+
+    /** Portrait icon id from the body's model. World thread only. Shared with the companion summary. */
+    @Nullable
+    public static String resolvePortrait(Ref<EntityStore> npcRef, Store<EntityStore> store, @Nullable String roleId) {
         ModelComponent component = safeGetComponent(store, npcRef, ModelComponent.getComponentType());
         var model = component == null ? null : component.getModel();
         String icon = TwDynamicIconConfig.resolveIcon(roleId,
@@ -419,6 +440,21 @@ final class CommandLoadedNpcStatusSnapshotService {
 
     @Nullable
     private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        EntityStatValue value = readHealthStat(npcRef, store);
+        if (value == null) {
+            return null;
+        }
+        int current = Math.max(0, Math.round(value.get()));
+        int max = Math.max(1, Math.round(value.getMax()));
+        if (current > max) {
+            current = max;
+        }
+        return new HealthSnapshot(current, max);
+    }
+
+    /** The body's raw health stat, or null when it has none. World thread only. Shared with the companion summary. */
+    @Nullable
+    public static EntityStatValue readHealthStat(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -434,16 +470,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         if (healthIndex < 0) {
             return null;
         }
-        EntityStatValue value = statMap.get(healthIndex);
-        if (value == null) {
-            return null;
-        }
-        int current = Math.max(0, Math.round(value.get()));
-        int max = Math.max(1, Math.round(value.getMax()));
-        if (current > max) {
-            current = max;
-        }
-        return new HealthSnapshot(current, max);
+        return statMap.get(healthIndex);
     }
 
     @Nullable
@@ -857,9 +884,9 @@ final class CommandLoadedNpcStatusSnapshotService {
     }
 
     @Nullable
-    private NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
-                                               Store<EntityStore> store,
-                                               ComponentType<EntityStore, TameworkNeedsComponent> needsType) {
+    private static NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
+                                                      Store<EntityStore> store,
+                                                      ComponentType<EntityStore, TameworkNeedsComponent> needsType) {
         if (npcRef == null || !npcRef.isValid() || store == null || needsType == null) {
             return null;
         }
@@ -917,9 +944,9 @@ final class CommandLoadedNpcStatusSnapshotService {
         return null;
     }
 
-    private <T extends Component<EntityStore>> T safeGetComponent(Store<EntityStore> store,
-                                                                  Ref<EntityStore> npcRef,
-                                                                  ComponentType<EntityStore, T> componentType) {
+    private static <T extends Component<EntityStore>> T safeGetComponent(Store<EntityStore> store,
+                                                                         Ref<EntityStore> npcRef,
+                                                                         ComponentType<EntityStore, T> componentType) {
         if (store == null || npcRef == null || !npcRef.isValid() || componentType == null) {
             return null;
         }
@@ -938,7 +965,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private double clamp(double value, double min, double max) {
+    private static double clamp(double value, double min, double max) {
         if (!Double.isFinite(value)) {
             return min;
         }
