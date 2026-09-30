@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -13,7 +15,6 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentAccessor;
@@ -59,18 +60,19 @@ public final class TameworkNpcCullService {
     TameworkNpcCullService(TameworkCullEligibility eligibility,
                            @Nullable CommandItemRegistry registry,
                            CommandLinkMutationService linkMutationService) {
-        this(eligibility, registry, linkMutationService, (PersistenceDomainFacades) null);
+        this(eligibility, registry, linkMutationService, (ReleaseFlow) null, null);
     }
 
     TameworkNpcCullService(TameworkCullEligibility eligibility,
                            @Nullable CommandItemRegistry registry,
                            CommandLinkMutationService linkMutationService,
-                           @Nullable PersistenceDomainFacades persistence) {
+                           @Nullable ReleaseFlow releaseFlow,
+                           @Nullable CompanionQueries companions) {
         this(eligibility, registry, linkMutationService,
                 () -> {
                     Tamework plugin = Tamework.getInstance();
                     return plugin == null ? null : plugin.getApi();
-                }, CullTerminalOwnerReleaseService.from(persistence));
+                }, CullTerminalOwnerReleaseService.from(releaseFlow, companions));
     }
 
     TameworkNpcCullService(TameworkCullEligibility eligibility,
@@ -78,7 +80,7 @@ public final class TameworkNpcCullService {
                            CommandLinkMutationService linkMutationService,
                            Supplier<TameworkApi> api) {
         this(eligibility, registry, linkMutationService, api,
-                CullTerminalOwnerReleaseService.from(null));
+                CullTerminalOwnerReleaseService.from(null, null));
     }
 
     TameworkNpcCullService(TameworkCullEligibility eligibility,
@@ -93,7 +95,7 @@ public final class TameworkNpcCullService {
                 registry, api
         );
         this.terminalOwnerRelease = terminalOwnerRelease == null
-                ? CullTerminalOwnerReleaseService.from(null)
+                ? CullTerminalOwnerReleaseService.from(null, null)
                 : terminalOwnerRelease;
     }
 

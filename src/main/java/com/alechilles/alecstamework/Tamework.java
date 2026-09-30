@@ -811,7 +811,7 @@ public class Tamework extends JavaPlugin {
                 heldItemAttachmentInteractions::exchangeAttachment
         );
         OwnedNpcTransformationInteractionService ownedNpcTransformations =
-                new OwnedNpcTransformationInteractionService(persistenceComposition.facades());
+                new OwnedNpcTransformationInteractionService(null, null);
         interactionExtensionRegistry.registerBuiltInEffect(
                 "tamework:transform_owned_npc", ownedNpcTransformations::apply);
         traitEffectRegistry = new TraitEffectRegistry(

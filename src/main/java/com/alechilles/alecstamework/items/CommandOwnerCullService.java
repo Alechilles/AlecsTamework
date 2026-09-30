@@ -1,11 +1,12 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -28,7 +29,7 @@ final class CommandOwnerCullService {
                             CommandFeedbackService feedbackService,
                             CommandNpcNameResolver npcNameResolver) {
         this(linkPolicyService, registry, linkMutationService, feedbackService,
-                npcNameResolver, null);
+                npcNameResolver, null, null);
     }
 
     CommandOwnerCullService(CommandLinkPolicyService linkPolicyService,
@@ -36,12 +37,14 @@ final class CommandOwnerCullService {
                             CommandLinkMutationService linkMutationService,
                             CommandFeedbackService feedbackService,
                             CommandNpcNameResolver npcNameResolver,
-                            @Nullable PersistenceDomainFacades persistence) {
+                            @Nullable ReleaseFlow releaseFlow,
+                            @Nullable CompanionQueries companions) {
         this.cullService = new TameworkNpcCullService(
                 new TameworkCullEligibility(linkPolicyService),
                 registry,
                 linkMutationService,
-                persistence
+                releaseFlow,
+                companions
         );
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;

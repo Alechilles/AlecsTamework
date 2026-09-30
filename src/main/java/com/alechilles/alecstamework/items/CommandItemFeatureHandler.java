@@ -362,9 +362,9 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 feedbackService,
                 npcNameResolver,
-                persistence,
-                inventoryRepairService,
-                CommandUiCurrentWorldDispatcher.production()
+                null,
+                null,
+                inventoryRepairService
         );
         this.ownerCullService = new CommandOwnerCullService(
                 linkPolicyService,
@@ -372,7 +372,8 @@ public final class CommandItemFeatureHandler {
                 linkMutationService,
                 feedbackService,
                 npcNameResolver,
-                persistence
+                null,
+                null
         );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,

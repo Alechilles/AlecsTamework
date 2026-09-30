@@ -1,45 +1,47 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.items.ReleasedCompanionCleanup;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
-import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
-import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.universe.Universe;
-import java.nio.charset.StandardCharsets;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Preview and explicit confirmation for a finite, sequential ordinary-companion cleanup. */
+/**
+ * Preview and explicit confirmation for clearing a player's ordinary companions. Each record is
+ * released through the companion index; loaded bodies are removed on their world thread and
+ * unloaded bodies are removed by the fence when they next load.
+ */
 public final class TameworkDebugClearOwnedCommand extends AbstractTameworkServerCommand {
     private static final String PREFIX = "server.tamework.commands.clearOwned.";
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private final PublicPersistenceQueries queries;
-    private final PublicPersistenceOperations operations;
-    private final AtomicBoolean running = new AtomicBoolean();
+    @Nullable private final ReleaseFlow releaseFlow;
+    @Nullable private final CompanionQueries companions;
 
-    public TameworkDebugClearOwnedCommand(@Nullable PublicPersistenceQueries queries,
-                                          @Nullable PublicPersistenceOperations operations) {
+    public TameworkDebugClearOwnedCommand(@Nullable ReleaseFlow releaseFlow,
+                                          @Nullable CompanionQueries companions) {
         super("clear-owned", PREFIX + "description");
         requirePermission(TameworkCommandRoot.ROOT_PERMISSION);
         setAllowsExtraArguments(true);
-        this.queries = queries;
-        this.operations = operations;
+        this.releaseFlow = releaseFlow;
+        this.companions = companions;
     }
 
     @Override protected void executeServer(@Nonnull CommandContext context) {
@@ -50,19 +52,14 @@ public final class TameworkDebugClearOwnedCommand extends AbstractTameworkServer
         }
         UUID owner = resolveOwner(args.length == 0 ? null : args[0], context);
         if (owner == null) { context.sendMessage(Message.translation(PREFIX + "unknownPlayer")); return; }
-        if (queries == null || operations == null) {
+        if (releaseFlow == null || companions == null) {
             context.sendMessage(Message.translation(PREFIX + "unavailable")); return;
         }
-        boolean acquired = false;
         try {
-            var protectedProfiles = new HashSet<>(queries.projectedCommandRosterActions().keySet());
-            protectedProfiles.addAll(queries.projectedLaggingCommandRosterProfiles());
-            var candidates = new ArrayList<ProfileId>();
+            List<CompanionRecord> candidates = new ArrayList<>();
             int protectedCount = 0;
-            for (var profile : queries.projectedProfileSnapshot().values()) {
-                if (profile.ownerId() == null || !owner.equals(profile.ownerId().value())) continue;
-                if (OwnedAnimalCleanupService.eligible(profile.lifecycleState())
-                        && !protectedProfiles.contains(profile.profileId())) candidates.add(profile.profileId());
+            for (CompanionRecord record : companions.owned(owner)) {
+                if (clearable(record)) candidates.add(record);
                 else protectedCount++;
             }
             if (args.length < 2) {
@@ -71,62 +68,61 @@ public final class TameworkDebugClearOwnedCommand extends AbstractTameworkServer
                         .param("skipped", protectedCount));
                 return;
             }
-            if (!running.compareAndSet(false, true)) {
-                context.sendMessage(Message.translation(PREFIX + "busy")); return;
-            }
-            acquired = true;
-            int skipped = protectedCount;
             context.sendMessage(Message.translation(PREFIX + "started")
                     .param("owner", owner.toString()).param("count", candidates.size()));
-            new OwnedAnimalCleanupService(port()).clear(owner, candidates).whenComplete((result, failure) -> {
-                running.set(false);
-                if (failure != null) {
-                    LOGGER.at(Level.WARNING).withCause(failure).log("Owned animal cleanup failed for %s", owner);
-                    context.sendMessage(Message.translation(PREFIX + "unavailable"));
-                } else {
-                    context.sendMessage(Message.translation(PREFIX + "completed").param("owner", owner.toString())
-                            .param("cleared", result.cleared()).param("skipped", skipped + result.skipped())
-                            .param("failed", result.failed()));
+            int cleared = 0;
+            int skipped = protectedCount;
+            int failed = 0;
+            for (CompanionRecord record : candidates) {
+                try {
+                    ReleaseFlow.Outcome outcome = releaseFlow.release(record.profileId(), null);
+                    if (outcome.result() != ReleaseFlow.Result.RELEASED) {
+                        skipped++;
+                        continue;
+                    }
+                    cleared++;
+                    if (outcome.body() != null && record.currentNpcUuid() != null) {
+                        removeOnBodyWorld(outcome.body(), record.currentNpcUuid());
+                    }
+                } catch (RuntimeException failure) {
+                    failed++;
+                    LOGGER.at(Level.WARNING).withCause(failure).log("Could not clear companion %s of %s",
+                            record.profileId(), owner);
                 }
-            });
+            }
+            context.sendMessage(Message.translation(PREFIX + "completed").param("owner", owner.toString())
+                    .param("cleared", cleared).param("skipped", skipped).param("failed", failed));
         } catch (RuntimeException failure) {
-            if (acquired) running.set(false);
-            LOGGER.at(Level.WARNING).withCause(failure).log("Could not start owned animal cleanup for %s", owner);
+            LOGGER.at(Level.WARNING).withCause(failure).log("Owned animal cleanup failed for %s", owner);
             context.sendMessage(Message.translation(PREFIX + "unavailable"));
         }
     }
 
-    private OwnedAnimalCleanupService.Port port() {
-        return new OwnedAnimalCleanupService.Port() {
-            public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>> read(ProfileId id) {
-                return queries.findProfile(id);
-            }
-            public CompletionStage<Boolean> release(OwnerPopulationTransitionRequest request) {
-                String key = "debug-clear-owned:" + request.profileId() + ":" + request.expectedLifecycleRevision();
-                var submitted = operations.transitionOwnerPopulation(
-                        new OperationId(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8))),
-                        new IdempotencyKey(key), request);
-                if (!submitted.accepted()) return CompletableFuture.completedFuture(false);
-                return submitted.completion().thenApply(result -> {
-                    boolean published = result != null && result.status() == OperationWorkflowResult.Status.PUBLISHED;
-                    if (!published) LOGGER.at(Level.WARNING).log("Owned animal cleanup did not publish for %s: %s",
-                            request.profileId(), result == null ? "no result" : result.status());
-                    return published;
-                });
-            }
-            public CompletionStage<Void> cleanup(CompanionProfileReadModel profile) {
-                if (profile.currentAlias() == null) return CompletableFuture.completedFuture(null);
-                var universe = Universe.get();
-                if (universe == null) return CompletableFuture.failedFuture(new IllegalStateException("universe_unavailable"));
-                UUID alias = profile.currentAlias().alias().value();
-                CompletionStage<Void> result = CompletableFuture.completedFuture(null);
-                // Exact UUID lookup in each loaded world, not an entity scan. Unloaded aliases are handled on load.
-                for (String worldName : universe.getWorlds().keySet()) {
-                    result = result.thenCompose(ignored -> ReleasedCompanionCleanup.remove(queries, worldName, alias));
-                }
-                return result;
-            }
-        };
+    /** Only ordinary companions: captured, cooped, stored, roster-managed and bonded ones are kept. */
+    private static boolean clearable(CompanionRecord record) {
+        LocationKind kind = record.location().kind();
+        return (kind == LocationKind.LIVE || kind == LocationKind.DEAD || kind == LocationKind.LOST)
+                && !record.bonded() && record.rosterId() == null;
+    }
+
+    /** Carries only the NPC uuid into the world task and resolves the live entity there. */
+    private static void removeOnBodyWorld(Ref<EntityStore> body, UUID npcUuid) {
+        Store<EntityStore> bodyStore = body.getStore();
+        World world = bodyStore == null || bodyStore.getExternalData() == null
+                ? null : bodyStore.getExternalData().getWorld();
+        if (world == null || !world.isAlive()) return;
+        world.execute(() -> {
+            Store<EntityStore> store = world.getEntityStore() == null ? null : world.getEntityStore().getStore();
+            Ref<EntityStore> ref = store == null ? null : world.getEntityRef(npcUuid);
+            if (ref == null || !ref.isValid() || store.getComponent(ref, NPCEntity.getComponentType()) == null) return;
+            var ownerType = TameworkOwnerComponent.getComponentType();
+            var tamedType = TameworkTamedComponent.getComponentType();
+            var linksType = TameworkCommandLinksComponent.getComponentType();
+            if (ownerType != null) store.tryRemoveComponent(ref, ownerType);
+            if (tamedType != null) store.tryRemoveComponent(ref, tamedType);
+            if (linksType != null) store.tryRemoveComponent(ref, linksType);
+            store.removeEntity(ref, RemoveReason.REMOVE);
+        });
     }
 
     @Nullable private static UUID resolveOwner(String value, CommandContext context) {

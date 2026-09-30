@@ -1,70 +1,59 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
-import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
-import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
-import com.alechilles.alecstamework.ui.CommandUiHostPage;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
-/** Commits permanent release, then applies live cleanup on the current world thread. */
+/**
+ * Releases a companion through the companion index, then removes its loaded body on the body's
+ * world thread. Runs on the releasing player's world thread.
+ */
 final class CommandOwnerReleaseService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
-    @Nullable private final PersistenceDomainFacades persistence;
+    @Nullable private final ReleaseFlow releaseFlow;
+    @Nullable private final CompanionQueries companions;
     @Nullable private final CommandLinkedNpcInventoryRepairService inventoryRepair;
-    private final CommandUiHostPage.WorldDispatcher worldDispatcher;
 
     CommandOwnerReleaseService(CommandLinkPolicyService linkPolicyService,
                                CommandFeedbackService feedbackService,
                                CommandNpcNameResolver npcNameResolver) {
-        this(linkPolicyService, feedbackService,
-                npcNameResolver, null, null,
-                CommandUiCurrentWorldDispatcher.production());
+        this(linkPolicyService, feedbackService, npcNameResolver, null, null, null);
     }
 
+    /** With a null flow or null queries, release falls back to removing a loaded, owned NPC only. */
     CommandOwnerReleaseService(
             CommandLinkPolicyService linkPolicyService,
             CommandFeedbackService feedbackService,
             CommandNpcNameResolver npcNameResolver,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable CommandLinkedNpcInventoryRepairService inventoryRepair,
-            CommandUiHostPage.WorldDispatcher worldDispatcher
+            @Nullable ReleaseFlow releaseFlow,
+            @Nullable CompanionQueries companions,
+            @Nullable CommandLinkedNpcInventoryRepairService inventoryRepair
     ) {
         this.linkPolicyService = linkPolicyService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
-        this.persistence = persistence;
+        this.releaseFlow = releaseFlow;
+        this.companions = companions;
         this.inventoryRepair = inventoryRepair;
-        this.worldDispatcher = worldDispatcher;
     }
 
     void release(Player player,
@@ -78,131 +67,59 @@ final class CommandOwnerReleaseService {
         if (ownerUuid == null) {
             return;
         }
-        if (persistence == null) {
+        if (releaseFlow == null || companions == null) {
             releaseLive(player, config, npcUuid);
             return;
         }
-        var ownedProfile = new CommandOwnedPanelRecordSource(
-                persistence.queries()::projectedProfileSnapshot).profileForRow(ownerUuid, npcUuid);
-        // The row lookup is presentation data; completeRead rechecks the durable owner and revision.
-        var profileRead = ownedProfile.isPresent()
-                ? persistence.queries().findProfile(ownedProfile.get()) : findProfile(npcUuid);
-        profileRead.whenComplete((read, failure) -> {
-            try {
-                completeRead(ownerUuid, npcUuid, read, failure);
-            } catch (RuntimeException failureToSubmit) {
-                warnUnavailable(ownerUuid);
-            }
-        });
-    }
-
-    private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
-    findProfile(UUID npcUuid) {
-        return persistence.queries().findProfile(new NpcAlias(npcUuid))
-                .thenCompose(result -> result instanceof PersistenceReadResult.Absent<?>
-                        ? persistence.queries().findProfile(new ProfileId(npcUuid))
-                        : CompletableFuture.completedFuture(result));
-    }
-
-    private void completeRead(
-            UUID ownerUuid,
-            UUID requestedAlias,
-            PersistenceReadResult<CompanionProfileReadModel> read,
-            Throwable failure
-    ) {
-        if (failure != null || !(read instanceof PersistenceReadResult.Found<?>)) {
-            warnUnavailable(ownerUuid);
+        // Panel rows carry the loaded NPC uuid, or the profile id for a companion without a body.
+        CompanionRecord record = companions.byNpcUuid(npcUuid);
+        if (record == null) {
+            record = companions.get(npcUuid);
+        }
+        // Bonded companions are released through their own flow, never by a generic tool.
+        if (record == null || record.bonded()) {
+            warn(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
-        @SuppressWarnings("unchecked")
-        var found = (PersistenceReadResult.Found<CompanionProfileReadModel>) read;
-        var profile = found.value();
-        var lifecycle = profile.lifecycle();
-        if (lifecycle.ownerId() == null
-                || !ownerUuid.equals(lifecycle.ownerId().value())
-                || lifecycle.state() == LifecycleState.RELEASED
-                || lifecycle.state() == LifecycleState.CAPTURED
-                || lifecycle.state() == LifecycleState.ROSTER_STORED
-                || lifecycle.state() == LifecycleState.PROVISIONED_DORMANT
-                || lifecycle.state() == LifecycleState.COOP) {
-            warnUnavailable(ownerUuid);
-            return;
-        }
-        String operationKey = "command-permanent-release:"
-                + lifecycle.profileId() + ":" + lifecycle.revision();
-        OperationId operationId = new OperationId(UUID.nameUUIDFromBytes(
-                operationKey.getBytes(StandardCharsets.UTF_8)
-        ));
-        var submission = persistence.operations().transitionOwnerPopulation(
-                operationId,
-                new IdempotencyKey(operationKey),
-                new OwnerPopulationTransitionRequest(
-                        lifecycle.profileId(),
-                        lifecycle.revision(),
-                        lifecycle.ownerId(),
-                        lifecycle.ownerWorldKey(),
-                        null,
-                        null,
-                        0,
-                        0,
-                        lifecycle.stateChangedAtMs() + 1L
-                )
-        );
-        if (!submission.accepted()) {
-            warnUnavailable(ownerUuid);
-            return;
-        }
-        UUID liveAlias = profile.currentAlias() == null
-                ? requestedAlias : profile.currentAlias().alias().value();
-        String displayName = profile.identity().displayName();
-        submission.completion().whenComplete((result, submitFailure) -> {
-            if (submitFailure != null || result == null
-                    || result.status() != OperationWorkflowResult.Status.PUBLISHED) {
-                warnUnavailable(ownerUuid);
-                return;
-            }
-            String sourceWorldName = lifecycle.location().worldKey();
-            if (sourceWorldName != null && Universe.get() != null) {
-                World sourceWorld = Universe.get().getWorld(sourceWorldName);
-                if (sourceWorld != null) {
-                    sourceWorld.execute(() -> releaseLiveEntity(sourceWorld, ownerUuid, liveAlias));
+        UUID bodyUuid = record.currentNpcUuid();
+        ReleaseFlow.Outcome outcome = releaseFlow.release(record.profileId(), ownerUuid);
+        switch (outcome.result()) {
+            case NOT_OWNER -> warn(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
+            case NOT_FOUND, NOT_RELEASABLE -> warn(player, "tamework.ui.notifications.command.release.unavailable");
+            case RELEASED -> {
+                if (outcome.body() != null && bodyUuid != null) {
+                    removeOnBodyWorld(outcome.body(), ownerUuid, bodyUuid);
                 }
-            }
-            dispatch(ownerUuid, current -> {
-                releaseLiveEntity(current.getWorld(), ownerUuid, liveAlias);
                 if (inventoryRepair != null) {
-                    inventoryRepair.canonicalize(current);
+                    inventoryRepair.canonicalize(player);
                 }
+                String displayName = record.displayName();
                 feedbackService.showSuccessKey(
-                        current,
+                        player,
                         "tamework.ui.notifications.command.release.success",
                         displayName == null || displayName.isBlank()
-                                ? LocalizedText.resolve(current,
+                                ? LocalizedText.resolve(player,
                                 "tamework.ui.notifications.command.shared.defaultMobName")
                                 : displayName
                 );
-            });
-        });
-    }
-
-    private void warnUnavailable(UUID ownerUuid) {
-        dispatch(ownerUuid, current -> feedbackService.showWarningKey(
-                current, "tamework.ui.notifications.command.release.unavailable"
-        ));
-    }
-
-    private void dispatch(UUID ownerUuid, Consumer<Player> action) {
-        worldDispatcher.dispatch(ownerUuid, new CommandUiHostPage.WorldOperation() {
-            @Override
-            public void run(Ref<EntityStore> playerRef, Store<EntityStore> store) {
-                Player current = playerRef == null || !playerRef.isValid()
-                        || store == null ? null
-                        : store.getComponent(playerRef, Player.getComponentType());
-                if (current != null) {
-                    action.accept(current);
-                }
             }
-        });
+        }
+    }
+
+    /** The body may be in another world; its removal runs on that world's thread and re-resolves the ref there. */
+    private void removeOnBodyWorld(Ref<EntityStore> body, UUID ownerUuid, UUID bodyUuid) {
+        Store<EntityStore> bodyStore = body.getStore();
+        World world = bodyStore == null || bodyStore.getExternalData() == null
+                ? null : bodyStore.getExternalData().getWorld();
+        if (world == null || !world.isAlive()) {
+            // The fence removes the released body when it next loads.
+            return;
+        }
+        world.execute(() -> releaseLiveEntity(world, ownerUuid, bodyUuid));
+    }
+
+    private void warn(Player player, String key) {
+        feedbackService.showWarningKey(player, key);
     }
 
     private void releaseLive(Player player,

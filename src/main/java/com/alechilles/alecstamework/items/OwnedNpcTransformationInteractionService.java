@@ -2,11 +2,12 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.google.gson.JsonElement;
@@ -48,8 +49,9 @@ public final class OwnedNpcTransformationInteractionService {
     private final Set<UUID> pendingTargets = ConcurrentHashMap.newKeySet();
     private final TameworkUiMessageService messages = new TameworkUiMessageService();
 
-    public OwnedNpcTransformationInteractionService(@Nullable PersistenceDomainFacades persistence) {
-        ownerRelease = CullTerminalOwnerReleaseService.from(persistence);
+    public OwnedNpcTransformationInteractionService(@Nullable ReleaseFlow releaseFlow,
+                                                    @Nullable CompanionQueries companions) {
+        ownerRelease = CullTerminalOwnerReleaseService.from(releaseFlow, companions);
     }
 
     /** Param is the target role; JsonPayload supplies Item and an optional Message translation key. */
