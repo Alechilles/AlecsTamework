@@ -62,6 +62,8 @@ public final class CompanionTransitions {
         return at.kind() != LocationKind.LIVE
                 || !body.world().equals(at.world())
                 || !body.npcUuid().equals(record.currentNpcUuid())
+                || !body.roleId().equals(record.roleId())
+                || !Objects.equals(body.displayName(), record.displayName())
                 || Math.abs(at.x() - body.x()) > MOVE_THRESHOLD
                 || Math.abs(at.y() - body.y()) > MOVE_THRESHOLD
                 || Math.abs(at.z() - body.z()) > MOVE_THRESHOLD;
@@ -69,13 +71,16 @@ public final class CompanionTransitions {
 
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> seenAt(@Nonnull BodyFacts body) {
-        return b -> b.location(live(body)).currentNpcUuid(body.npcUuid());
+        // The body is the authority for its role and name (they change on growth and rename).
+        return b -> b.location(live(body)).currentNpcUuid(body.npcUuid())
+                .roleId(body.roleId()).displayName(body.displayName());
     }
 
     /** A body newer than its record wins (spec 6.8): the record moves to LIVE at its generation. */
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> raisedTo(long generation, @Nonnull BodyFacts body) {
-        return b -> seenAt(body).apply(b).generation(generation).summary(body.summary());
+        return b -> seenAt(body).apply(b).generation(generation).summary(body.summary())
+                .diedAtMs(0L).reviveAvailableAtMs(0L);
     }
 
     @Nonnull
