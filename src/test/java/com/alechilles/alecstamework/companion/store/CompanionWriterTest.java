@@ -132,6 +132,28 @@ class CompanionWriterTest {
     }
 
     @Test
+    void transferKeepsTheOldOwnersFileUntilTheNewOwnerIsWritten() throws Exception {
+        CompanionRecord r = insertLive(ALICE);
+        writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
+
+        index.update(r.profileId(), 0, b -> b.ownerUuid(BOB));
+        io.failPaths.add(ownerFile(BOB));
+        assertThrows(ExecutionException.class, () -> writer.flushNow(ALICE).get(2, TimeUnit.SECONDS));
+
+        BsonDocument aliceFile = io.files.get(ownerFile(ALICE));
+        assertTrue(aliceFile != null, "the old owner's file must keep the record until the new owner holds it");
+        assertEquals(r.profileId().toString(),
+                aliceFile.getArray("WorldBound").get(0).asDocument().getString("ProfileId").getValue());
+
+        io.failPaths.clear();
+        writer.flushNow(BOB).get(2, TimeUnit.SECONDS);
+        writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
+
+        assertTrue(io.files.containsKey(ownerFile(BOB)));
+        assertFalse(io.files.containsKey(ownerFile(ALICE)), "an owner with nothing left has no file");
+    }
+
+    @Test
     void oneFailingOwnerDoesNotBlockOthers() throws Exception {
         insertLive(ALICE);
         insertLive(BOB);

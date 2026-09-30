@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,20 +29,31 @@ import org.bson.BsonDocument;
 /**
  * Write-behind for the companion store (spec 6.9). Record changes mark owner files dirty;
  * one executor thread writes snapshots first, then each dirty owner file, every flush
- * interval or immediately on {@link #flushNow(UUID)}. When a record changes owner, the new
- * owner's file is written before the old owner's. Each file is written independently: a
- * failed write keeps only that item pending and retries with backoff, and an owner file that
- * references a snapshot whose write failed waits for that snapshot. Nothing that has not been
- * written is dropped.
+ * interval or immediately on {@link #flushNow(UUID)}. Each file is written independently: a
+ * failed write keeps only that item pending and retries with backoff. Two ordering rules keep
+ * every record on disk through a crash: an owner file that references a snapshot whose write
+ * failed waits for that snapshot, and after a record changes owner the old owner's file is not
+ * rewritten until the new owner's file has been written. Nothing that has not been written is
+ * dropped.
  *
  * <p>Lock order is index lock, then writer lock: {@link #onRecordChanged} runs under the index
- * lock, and the flush reads the index (which takes no lock) while holding the writer lock.
+ * lock, and the flush captures its work under both, in that order. No I/O runs under either.
  */
 public final class CompanionWriter {
     public record Status(int pendingOwners, int pendingSnapshots, @Nullable String lastFailure, long lastFlushAtMs) {
     }
 
     private static final long MAX_BACKOFF_MS = 30_000L;
+
+    /** Work taken by one flush. */
+    private record Batch(
+            Map<String, List<CompanionRecord>> owners,
+            Map<UUID, SnapshotEnvelope> snapshots,
+            Set<UUID> deletes,
+            Map<String, List<CompletableFuture<Void>>> taken,
+            Map<String, Map<String, Long>> waitsFor
+    ) {
+    }
 
     private final CompanionIndex index;
     private final CompanionStore store;
@@ -56,6 +69,13 @@ public final class CompanionWriter {
     private final Map<UUID, SnapshotEnvelope> pendingSnapshots = new LinkedHashMap<>();
     private final Set<UUID> pendingSnapshotDeletes = new LinkedHashSet<>();
     private final Map<String, List<CompletableFuture<Void>>> waiters = new HashMap<>();
+    /**
+     * Old owner key to the new owner keys it must wait for, each with the sequence number of the
+     * latest transfer between them. An edge is removed only when the new owner's file has been
+     * written from a capture that already included that transfer.
+     */
+    private final Map<String, Map<String, Long>> waitsFor = new HashMap<>();
+    private long transferSeq;
     private boolean closed;
     @Nullable
     private Boolean shutdownResult;
@@ -89,7 +109,8 @@ public final class CompanionWriter {
 
     /**
      * Index listener. On an owner change the new owner is queued before the old one, even when
-     * the old owner was already dirty, so the owner that lost the record is written last.
+     * the old owner was already dirty, and the old owner is made to wait until the new owner's
+     * file has been written.
      */
     public void onRecordChanged(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
         String afterKey = CompanionStore.ownerKey(after.ownerUuid());
@@ -102,6 +123,7 @@ public final class CompanionWriter {
             dirtyOwners.remove(beforeKey);
             dirtyOwners.add(afterKey);
             dirtyOwners.add(beforeKey);
+            waitsFor.computeIfAbsent(beforeKey, k -> new HashMap<>()).put(afterKey, ++transferSeq);
         }
     }
 
@@ -166,7 +188,6 @@ public final class CompanionWriter {
                 return Boolean.TRUE.equals(shutdownResult);
             }
             closed = true;
-            nextRetryAtMs = 0;
         }
         boolean finished = false;
         try {
@@ -204,45 +225,61 @@ public final class CompanionWriter {
         }
     }
 
+    /**
+     * Takes the pending work, or returns {@code null} when there is none or backoff applies.
+     * Runs under the index lock and then the writer lock, so no index update is half-seen and an
+     * owner file never references a snapshot queued (per the caller contract) after it.
+     */
+    @Nullable
+    private Batch capture() {
+        return index.atomically(() -> {
+            synchronized (lock) {
+                boolean someoneWaiting = !waiters.isEmpty();
+                if (!closed && !someoneWaiting && clock.getAsLong() < nextRetryAtMs) {
+                    return null;
+                }
+                if (dirtyOwners.isEmpty() && pendingSnapshots.isEmpty() && pendingSnapshotDeletes.isEmpty()) {
+                    return null;
+                }
+                Map<String, List<CompanionRecord>> owners = new LinkedHashMap<>();
+                Map<String, List<CompletableFuture<Void>>> taken = new HashMap<>();
+                for (String owner : dirtyOwners) {
+                    owners.put(owner, index.fileRecords(CompanionStore.ownerOf(owner)));
+                    List<CompletableFuture<Void>> w = waiters.remove(owner);
+                    if (w != null) {
+                        taken.put(owner, w);
+                    }
+                }
+                dirtyOwners.clear();
+                Map<String, Map<String, Long>> edges = new HashMap<>();
+                waitsFor.forEach((from, to) -> edges.put(from, new HashMap<>(to)));
+                Batch batch = new Batch(owners, new LinkedHashMap<>(pendingSnapshots),
+                        new LinkedHashSet<>(pendingSnapshotDeletes), taken, edges);
+                pendingSnapshots.clear();
+                pendingSnapshotDeletes.clear();
+                flushesInFlight++;
+                return batch;
+            }
+        });
+    }
+
     /** Runs only on the executor thread. */
     private void flush() {
-        Map<String, List<CompanionRecord>> owners = new LinkedHashMap<>();
-        Map<UUID, SnapshotEnvelope> snapshots;
-        Set<UUID> deletes;
-        Map<String, List<CompletableFuture<Void>>> taken = new HashMap<>();
-        synchronized (lock) {
-            boolean someoneWaiting = !waiters.isEmpty();
-            if (!someoneWaiting && clock.getAsLong() < nextRetryAtMs) {
-                return;
-            }
-            if (dirtyOwners.isEmpty() && pendingSnapshots.isEmpty() && pendingSnapshotDeletes.isEmpty()) {
-                return;
-            }
-            // Records are captured together with the snapshots, under the writer lock, so an
-            // owner file never references a snapshot queued (per the caller contract) after it.
-            for (String owner : dirtyOwners) {
-                owners.put(owner, index.fileRecords(CompanionStore.ownerOf(owner)));
-                List<CompletableFuture<Void>> w = waiters.remove(owner);
-                if (w != null) {
-                    taken.put(owner, w);
-                }
-            }
-            dirtyOwners.clear();
-            snapshots = new LinkedHashMap<>(pendingSnapshots);
-            pendingSnapshots.clear();
-            deletes = new LinkedHashSet<>(pendingSnapshotDeletes);
-            pendingSnapshotDeletes.clear();
-            flushesInFlight++;
+        Batch batch = capture();
+        if (batch == null) {
+            return;
         }
-
+        Map<String, List<CompletableFuture<Void>>> taken = batch.taken();
         // Whatever is still in these after the loops was not written and goes back in the queue.
-        Map<UUID, SnapshotEnvelope> snapshotsLeft = new LinkedHashMap<>(snapshots);
-        Set<UUID> deletesLeft = new LinkedHashSet<>(deletes);
-        Set<String> ownersLeft = new LinkedHashSet<>(owners.keySet());
+        Map<UUID, SnapshotEnvelope> snapshotsLeft = new LinkedHashMap<>(batch.snapshots());
+        Set<UUID> deletesLeft = new LinkedHashSet<>(batch.deletes());
+        Set<String> ownersLeft = new LinkedHashSet<>(batch.owners().keySet());
+        Set<String> ownersWritten = new HashSet<>();
+        Map<String, Throwable> ownersFailed = new HashMap<>();
         Map<UUID, Throwable> failedSnapshots = new HashMap<>();
         Throwable failure = null;
         try {
-            for (SnapshotEnvelope snapshot : snapshots.values()) {
+            for (SnapshotEnvelope snapshot : batch.snapshots().values()) {
                 try {
                     store.writeSnapshot(snapshot).join();
                     snapshotsLeft.remove(snapshot.profileId());
@@ -251,7 +288,7 @@ public final class CompanionWriter {
                     failedSnapshots.put(snapshot.profileId(), failure);
                 }
             }
-            for (UUID profileId : deletes) {
+            for (UUID profileId : batch.deletes()) {
                 try {
                     store.deleteSnapshot(profileId).join();
                     deletesLeft.remove(profileId);
@@ -259,22 +296,57 @@ public final class CompanionWriter {
                     failure = unwrap(t);
                 }
             }
-            for (Map.Entry<String, List<CompanionRecord>> entry : owners.entrySet()) {
-                String owner = entry.getKey();
-                List<CompanionRecord> records = entry.getValue();
-                Throwable blocked = snapshotFailureFor(records, failedSnapshots);
-                if (blocked != null) {
-                    complete(taken.remove(owner), blocked);
-                    continue;
+            // An old owner is deferred until the new owners it waits for have been tried in this
+            // flush. If no pass makes progress the remaining owners form a transfer cycle, which
+            // no write order can make crash safe, so they are written in dirty order.
+            List<String> todo = new ArrayList<>(batch.owners().keySet());
+            boolean ignoreOrder = false;
+            while (!todo.isEmpty()) {
+                boolean progress = false;
+                for (Iterator<String> it = todo.iterator(); it.hasNext(); ) {
+                    String owner = it.next();
+                    List<CompanionRecord> records = batch.owners().get(owner);
+                    Throwable blocked = snapshotFailureFor(records, failedSnapshots);
+                    boolean deferred = false;
+                    for (String dep : batch.waitsFor().getOrDefault(owner, Map.of()).keySet()) {
+                        if (blocked != null) {
+                            break;
+                        }
+                        if (ownersWritten.contains(dep)) {
+                            continue;
+                        }
+                        if (todo.contains(dep)) {
+                            deferred |= !ignoreOrder;
+                            continue;
+                        }
+                        blocked = new IllegalStateException(
+                                "companion_owner_waiting_for_new_owner " + dep, ownersFailed.get(dep));
+                    }
+                    if (blocked == null && deferred) {
+                        continue;
+                    }
+                    it.remove();
+                    progress = true;
+                    if (blocked != null) {
+                        failure = blocked;
+                        ownersFailed.put(owner, blocked);
+                        complete(taken.remove(owner), blocked);
+                        continue;
+                    }
+                    try {
+                        long version = versions.merge(owner, 1L, Long::sum);
+                        store.writeOwner(owner, version, records, preserved.get(owner)).join();
+                        ownersLeft.remove(owner);
+                        ownersWritten.add(owner);
+                        complete(taken.remove(owner), null);
+                    } catch (Throwable t) {
+                        failure = unwrap(t);
+                        ownersFailed.put(owner, failure);
+                        complete(taken.remove(owner), failure);
+                    }
                 }
-                try {
-                    long version = versions.merge(owner, 1L, Long::sum);
-                    store.writeOwner(owner, version, records, preserved.get(owner)).join();
-                    ownersLeft.remove(owner);
-                    complete(taken.remove(owner), null);
-                } catch (Throwable t) {
-                    failure = unwrap(t);
-                    complete(taken.remove(owner), failure);
+                if (!progress) {
+                    ignoreOrder = true;
                 }
             }
         } catch (Throwable t) {
@@ -292,6 +364,7 @@ public final class CompanionWriter {
                     }
                 }
                 dirtyOwners.addAll(ownersLeft);
+                releaseTransfers(batch.waitsFor(), ownersWritten);
                 if (failure != null) {
                     backoffMs = backoffMs == 0 ? 1_000L : Math.min(backoffMs * 2, MAX_BACKOFF_MS);
                     nextRetryAtMs = clock.getAsLong() + backoffMs;
@@ -310,6 +383,28 @@ public final class CompanionWriter {
             Throwable leftover = failure != null ? failure : new IllegalStateException("companion_flush_incomplete");
             taken.values().forEach(w -> complete(w, leftover));
         }
+    }
+
+    /**
+     * Drops each captured transfer edge whose new owner was written in this flush, unless a newer
+     * transfer between the same owners happened after the capture. Caller holds the writer lock.
+     */
+    private void releaseTransfers(Map<String, Map<String, Long>> captured, Set<String> written) {
+        if (written.isEmpty()) {
+            return;
+        }
+        captured.forEach((from, to) -> to.forEach((newOwner, seq) -> {
+            if (!written.contains(newOwner)) {
+                return;
+            }
+            Map<String, Long> live = waitsFor.get(from);
+            if (live != null) {
+                live.remove(newOwner, seq);
+                if (live.isEmpty()) {
+                    waitsFor.remove(from);
+                }
+            }
+        }));
     }
 
     @Nullable
