@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.companion.flow;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
-import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
@@ -24,7 +23,7 @@ public final class CompanionDeathTiming {
     private static final String REVIVE_COOLDOWN_MULTIPLIER = "ReviveCooldownMultiplier";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
 
-    /** Why the companion died. {@link #OLD_AGE} is only set for the Tamework old-age death. */
+    /** Why the companion died. */
     public enum Kind {
         STARVATION,
         DEHYDRATION,
@@ -32,13 +31,11 @@ public final class CompanionDeathTiming {
         PLAYER,
         NPC,
         ENVIRONMENT,
-        UNKNOWN,
-        OLD_AGE
+        UNKNOWN
     }
 
     /**
-     * @param reviveAvailableAtMs wall-clock time the companion can be revived; {@code diedAtMs}
-     *                            for an old-age death
+     * @param reviveAvailableAtMs wall-clock time the companion can be revived
      * @param attackerName        the recent attacker's name, when one was remembered
      */
     public record Timing(long reviveAvailableAtMs, @Nonnull Kind kind, @Nullable String attackerName) {
@@ -57,6 +54,8 @@ public final class CompanionDeathTiming {
     }
 
     /**
+     * Precondition: not an old-age death; callers handle old age first.
+     *
      * @param ref the dying body, or null when the death is seen only at removal; then the
      *            progression modifier is not read and the multiplier is 1.0
      */
@@ -64,9 +63,6 @@ public final class CompanionDeathTiming {
     public static Timing resolve(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                                  @Nullable UUID npcUuid, @Nullable String roleId,
                                  @Nonnull DeathComponent death, long diedAtMs) {
-        if (CompanionRevivePolicy.isOldAgeDeath(death)) {
-            return new Timing(diedAtMs, Kind.OLD_AGE, null);
-        }
         DamageTargetMemoryService.RecentAttackerSnapshot attacker =
                 DamageTargetMemoryService.getInstance().getRecentAttacker(npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs);
         DeathSnapshotV2Payload.DeathCauseKind needs =

@@ -76,14 +76,20 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
-        if (body == null || body.ownerUuid() == null) {
+        if (body == null) {
+            warn("tame-skipped", "Could not read an owned companion body; it was not registered");
+            return;
+        }
+        if (body.ownerUuid() == null) {
             return;
         }
         UUID profileId = UUID.randomUUID();
-        if (CompanionRegistration.register(index, loaded, CompanionTransitions.newLive(profileId, 0, body), ref)) {
-            buffer.addComponent(ref, stampType, new TameworkCompanionComponent(profileId, 0));
-            CompanionSaves.markChanged(buffer, ref);
+        if (!CompanionRegistration.register(index, loaded, CompanionTransitions.newLive(profileId, 0, body), ref)) {
+            warn("tame-skipped", "A record already names NPC %s; the tame was not registered", body.npcUuid());
+            return;
         }
+        buffer.addComponent(ref, stampType, new TameworkCompanionComponent(profileId, 0));
+        CompanionSaves.markChanged(buffer, ref);
     }
 
     /** The owner component of a stamped body changed (for example the set-owner command). */
@@ -93,7 +99,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         if (stamp == null || stamp.getProfileId() == null || !ref.equals(loaded.get(stamp.getProfileId()))) {
             return;
         }
-        update(stamp.getProfileId(), r -> !Objects.equals(r.ownerUuid(), owner),
+        update(stamp.getProfileId(), r -> !Objects.equals(r.ownerUuid(), owner) || !Objects.equals(r.ownerName(), ownerName),
                 r -> CompanionTransitions.ownerChanged(owner, ownerName));
     }
 
@@ -231,37 +237,27 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
 
     /**
      * An old-age death ends the companion's life: the record becomes a RELEASED tombstone, as in
-     * the old dormant path. The snapshot is deleted only after the owner file with the tombstone
-     * is written, so a failed write never leaves a record without its snapshot.
+     * the old dormant path. The writer deletes the snapshot only after the owner file with the
+     * tombstone is written, so a failed write never leaves a record without its snapshot.
      */
     private void recordEndOfLife(UUID profileId, @Nullable Ref<EntityStore> registered, CompanionRecord record) {
-        CompanionRecord released = index.atomically(() -> {
+        boolean released = index.atomically(() -> {
             if (registered != null) {
                 loaded.removeIfSame(profileId, registered);
             }
             CompanionRecord current = index.get(profileId);
             if (current == null || current.location().kind() != LocationKind.LIVE
                     || current.generation() != record.generation()) {
-                return null;
+                return false;
             }
-            return index.update(profileId, current.revision(), CompanionTransitions.released(current)).after();
+            return index.update(profileId, current.revision(), CompanionTransitions.released(current)).applied();
         });
-        if (released == null) {
+        if (!released) {
             warn("death-skipped", "Companion record %s changed before its death was recorded", profileId);
             return;
         }
-        // The flush runs on the writer thread; the callback reads only the index and queues a delete.
-        writer.flushNow(released.ownerUuid()).whenComplete((ignored, failure) -> {
-            if (failure != null) {
-                warn("end-of-life-flush-failed", "Kept the snapshot of released companion %s: owner file not written",
-                        profileId);
-                return;
-            }
-            CompanionRecord now = index.get(profileId);
-            if (now != null && now.location().kind() == LocationKind.RELEASED) {
-                writer.queueSnapshotDelete(profileId);
-            }
-        });
+        // The writer holds the delete until the owner file with the tombstone is written, and retries it.
+        writer.queueSnapshotDelete(profileId);
     }
 
     /** Takes and queues a snapshot; returns its time, or null when capture failed (old one kept, spec 6.5). */

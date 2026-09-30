@@ -209,14 +209,14 @@ public final class HytaleDormantCompanionObservationFactory
             DeathComponent death,
             long diedAtMs
     ) {
-        CompanionDeathTiming.Timing timing = CompanionDeathTiming.resolve(
-                reference, store, npcUuid, roleId, death, diedAtMs
-        );
-        if (timing.kind() == CompanionDeathTiming.Kind.OLD_AGE) {
+        if (CompanionRevivePolicy.isOldAgeDeath(death)) {
             return new DormantCompanionObservation.DeathObservation(
                     diedAtMs, 0L, DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
                     CompanionRevivePolicy.OLD_AGE_SOURCE);
         }
+        CompanionDeathTiming.Timing timing = CompanionDeathTiming.resolve(
+                reference, store, npcUuid, roleId, death, diedAtMs
+        );
         return new DormantCompanionObservation.DeathObservation(
                 diedAtMs,
                 timing.reviveAvailableAtMs(),
