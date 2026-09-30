@@ -207,7 +207,52 @@ public final class CompanionRecordBson {
         putString(d, "NextLifeStage", s.nextLifeStage());
         d.put("LifeStageRemaining", new BsonInt64(s.lifeStageRemainingMs()));
         d.put("ObservedAt", new BsonInt64(s.observedAtMs()));
+        d.put("HarvestAlarmStartedAt", new BsonInt64(s.harvestAlarmStartedAtMs()));
+        d.put("HarvestAlarmDuration", new BsonInt64(s.harvestAlarmDurationMs()));
+        putString(d, "TraitsConfig", s.traitsConfigId());
+        putString(d, "TalentsConfig", s.talentsConfigId());
+        if (s.progression() != null) {
+            d.put("Progression", encodeProgression(s.progression()));
+        }
         return d;
+    }
+
+    private static BsonDocument encodeProgression(CompanionSummary.Progression p) {
+        BsonDocument d = new BsonDocument();
+        putString(d, "Stage", p.stage());
+        d.put("BornAt", new BsonInt64(p.bornAtMs()));
+        d.put("AdolescentAt", new BsonInt64(p.adolescentAtMs()));
+        d.put("AdultAt", new BsonInt64(p.adultAtMs()));
+        d.put("GrowthScaling", BsonBoolean.valueOf(p.growthScalingEnabled()));
+        d.put("AgeProgress", new BsonDouble(p.ageProgressMs()));
+        putUuid(d, "ProgressionOwner", p.progressionOwnerId());
+        d.put("ProgressionClock", new BsonInt64(p.progressionClockMs()));
+        d.put("ProgressionInitialized", BsonBoolean.valueOf(p.progressionInitialized()));
+        d.put("LastProgressionWorld", new BsonInt64(p.lastProgressionWorldMs()));
+        d.put("LifecycleNow", new BsonInt64(p.lifecycleNowMs()));
+        d.put("JuvenileClockInitialized", BsonBoolean.valueOf(p.juvenileClockInitialized()));
+        d.put("ProgressionPaused", BsonBoolean.valueOf(p.progressionPaused()));
+        d.put("ActiveProgress", new BsonInt64(p.activeProgressMs()));
+        return d;
+    }
+
+    /** Presentation data only, so a malformed owner id reads as no owner instead of failing the record. */
+    private static CompanionSummary.Progression decodeProgression(BsonDocument d) {
+        UUID owner = null;
+        String rawOwner = getString(d, "ProgressionOwner");
+        if (rawOwner != null) {
+            try {
+                owner = UUID.fromString(rawOwner);
+            } catch (IllegalArgumentException ignored) {
+                // Leave the owner unset.
+            }
+        }
+        return new CompanionSummary.Progression(getString(d, "Stage"), getLong(d, "BornAt", 0),
+                getLong(d, "AdolescentAt", 0), getLong(d, "AdultAt", 0), getBoolean(d, "GrowthScaling"),
+                getDouble(d, "AgeProgress"), owner, getLong(d, "ProgressionClock", 0),
+                getBoolean(d, "ProgressionInitialized"), getLong(d, "LastProgressionWorld", 0),
+                getLong(d, "LifecycleNow", 0), getBoolean(d, "JuvenileClockInitialized"),
+                getBoolean(d, "ProgressionPaused"), getLong(d, "ActiveProgress", 0));
     }
 
     private static CompanionSummary decodeSummary(BsonDocument d) {
@@ -228,7 +273,10 @@ public final class CompanionRecordBson {
                 getString(d, "LevelingConfig"), (int) getLong(d, "Level", 0), getDouble(d, "CurrentXp"),
                 getDouble(d, "TotalXp"), (int) getLong(d, "TalentPointsSpent", 0), traits,
                 getString(d, "LifeStage"), getDouble(d, "LifeStageProgress"), getString(d, "NextLifeStage"),
-                getLong(d, "LifeStageRemaining", 0), getLong(d, "ObservedAt", 0));
+                getLong(d, "LifeStageRemaining", 0), getLong(d, "ObservedAt", 0),
+                getLong(d, "HarvestAlarmStartedAt", 0), getLong(d, "HarvestAlarmDuration", 0),
+                getString(d, "TraitsConfig"), getString(d, "TalentsConfig"),
+                d.isDocument("Progression") ? decodeProgression(d.getDocument("Progression")) : null);
     }
 
     private static void putString(BsonDocument d, String key, @Nullable String value) {

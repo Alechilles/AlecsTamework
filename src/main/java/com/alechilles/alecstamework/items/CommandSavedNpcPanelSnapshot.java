@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -157,6 +159,67 @@ final class CommandSavedNpcPanelSnapshot {
         var capture = CommandLinkedNpcLocateService.captureKey(profile, profile.identity().profileId().value());
         return coop == null && capture == null ? state
                 : new CommandSavedNpcPanelSnapshot(state, new StoredLocation(coop, capture));
+    }
+
+    /**
+     * Builds the unloaded panel from the index summary (spec 6.6) without decoding a snapshot.
+     * The summary was captured from the live body, so its absent sections follow exact-checkpoint
+     * semantics. Returns null when the summary was never captured. Stored locations and
+     * restoration-snapshot talent editing are not carried by the summary.
+     */
+    @Nullable
+    static CommandSavedNpcPanelSnapshot fromSummary(CompanionRecord record) {
+        CompanionSummary s = record == null ? null : record.summary();
+        if (s == null || s.observedAtMs() == 0L) {
+            return null;
+        }
+        Health health = s.healthMax() > 0f ? new Health(s.healthCurrent(), s.healthMax()) : null;
+        Happiness happiness = s.happinessConfigId() == null ? null : new Happiness(s.happinessConfigId(), s.happiness());
+        Needs needs = s.needsConfigId() == null ? null : new Needs(s.needsConfigId(), s.hunger(), s.thirst());
+        boolean hasBreeding = s.breedingEnabled() || s.breedingCooldownUntilMs() != 0L
+                || s.breedingCooldownStartedAtMs() != 0L || s.breedingCooldownDurationMs() != 0L;
+        Breeding breeding = hasBreeding ? new Breeding(s.breedingEnabled(), s.breedingCooldownUntilMs(),
+                s.breedingCooldownStartedAtMs(), s.breedingCooldownDurationMs()) : null;
+        Leveling leveling = s.levelingConfigId() == null ? null
+                : new Leveling(s.levelingConfigId(), s.level(), s.currentXp(), s.totalXp());
+        Talents talents = s.talentsConfigId() == null ? null : new Talents(s.talentsConfigId(), s.talentPointsSpent());
+        ArrayList<Trait> traitValues = new ArrayList<>();
+        s.traits().forEach((id, value) -> {
+            if (trimToNull(id) != null) traitValues.add(new Trait(id.trim(), value));
+        });
+        Traits traits = s.traitsConfigId() == null && traitValues.isEmpty() ? null
+                : new Traits(s.traitsConfigId(), List.copyOf(traitValues));
+        Harvest harvest = new Harvest(s.harvestAlarmUntilMs() == 0L ? List.of()
+                : List.of(new Alarm(CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName(),
+                        s.harvestAlarmUntilMs(), s.harvestAlarmStartedAtMs(), s.harvestAlarmDurationMs())));
+        return new CommandSavedNpcPanelSnapshot(s.observedAtMs(), firstNonBlank(s.roleId(), record.roleId()),
+                new Facts(health, happiness, needs, breeding, leveling, traits, talents, harvest,
+                        lifeStage(s.progression())),
+                new Appearance(null, Map.of(), s.iconId()), true);
+    }
+
+    /** A detached component holding the summary's progression values, for the shared apply math. */
+    @Nullable
+    private static TameworkLifeStageComponent lifeStage(@Nullable CompanionSummary.Progression p) {
+        if (p == null) {
+            return null;
+        }
+        TameworkLifeStageComponent state = new TameworkLifeStageComponent();
+        state.setStage(p.stage());
+        state.setBornAtMs(p.bornAtMs());
+        state.setAdolescentAtMs(p.adolescentAtMs());
+        state.setAdultAtMs(p.adultAtMs());
+        state.setGrowthScalingEnabled(p.growthScalingEnabled());
+        state.setAgeProgressMs(p.ageProgressMs());
+        state.setProgressionOwnerId(p.progressionOwnerId() == null ? null : p.progressionOwnerId().toString());
+        state.setProgressionClockMs(p.progressionClockMs());
+        state.setProgressionInitialized(p.progressionInitialized());
+        state.setLastProgressionWorldMs(p.lastProgressionWorldMs());
+        state.setLifecycleNowMs(p.lifecycleNowMs());
+        state.setJuvenileClockInitialized(p.juvenileClockInitialized());
+        state.setStoredProgressionPaused(p.progressionPaused());
+        state.setActiveProgressMs(p.activeProgressMs());
+        return state;
     }
 
     private static CommandSavedNpcPanelSnapshot decodeState(
@@ -504,6 +567,9 @@ final class CommandSavedNpcPanelSnapshot {
 
     /** Resolves optional saved appearance only while the caller owns the world-thread card pass. */
     private String resolvePortrait(String role, String fallback) {
+        if (appearance != null && appearance.icon != null) {
+            return appearance.icon;
+        }
         String resolved = TwDynamicIconConfig.resolveIcon(
                 role,
                 appearance == null ? null : appearance.attachments);
@@ -529,9 +595,11 @@ final class CommandSavedNpcPanelSnapshot {
             return new Facts(health, happiness == null ? null : new Happiness(happiness.getConfigId(), happiness.getValue()), needs == null ? null : new Needs(needs.getConfigId(), needs.getHunger(), needs.getThirst()), breeding == null ? null : new Breeding(breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(), breeding.getCooldownDurationMs()), leveling == null ? null : new Leveling(leveling.getConfigId(), leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp()), traits == null ? null : Traits.from(traits), talents == null ? null : new Talents(talents.getConfigId(), talents.getSpentPoints()), harvest, lifeStage);
         }
     }
-    private record Appearance(@Nullable String modelId, Map<String, String> attachments) {
+    /** {@code icon} is a portrait already resolved from the live body (summary path); it wins when set. */
+    private record Appearance(@Nullable String modelId, Map<String, String> attachments, @Nullable String icon) {
         private Appearance {
             modelId = trimToNull(modelId);
+            icon = trimToNull(icon);
             attachments = attachments == null || attachments.isEmpty() ? Map.of() : Map.copyOf(attachments);
         }
 
@@ -543,7 +611,7 @@ final class CommandSavedNpcPanelSnapshot {
             if (attachmentIds == null || attachmentIds.isEmpty()) {
                 attachmentIds = stringMap(component(modelState, "RandomAttachments"));
             }
-            return new Appearance(modelId, attachmentIds);
+            return new Appearance(modelId, attachmentIds, null);
         }
 
         @Nullable

@@ -36,6 +36,8 @@ final class CommandPersistenceView {
     private final SnapshotLookup snapshots;
     @Nullable
     private final ProjectionLookup projections;
+    @Nullable
+    private final CompanionQueries companions;
     private CommandSavedNpcPanelCache savedPanels;
     private java.util.function.Function<ProfileId, ProfileExtensionProjectionValue> checkpointLookup = ignored -> null;
 
@@ -70,6 +72,7 @@ final class CommandPersistenceView {
         this.projections = Objects.requireNonNull(
                 projections, "Profile projections are required"
         );
+        this.companions = null;
         this.snapshots = new SnapshotLookup() {
             @Override
             public Optional<ProfileSnapshot> find(ProfileId profileId) {
@@ -84,11 +87,11 @@ final class CommandPersistenceView {
     }
 
     /**
-     * Reads profiles from the companion index. The saved panel for unloaded companions does
-     * not come from this source yet, so {@link #savedPanel} returns null.
+     * Reads profiles from the companion index. The saved panel for unloaded companions comes
+     * from the record's in-memory summary, so it needs no cache or refresh signals.
      */
     CommandPersistenceView(@Nonnull CompanionQueries companions) {
-        Objects.requireNonNull(companions, "Companion queries are required");
+        this.companions = Objects.requireNonNull(companions, "Companion queries are required");
         this.projections = null;
         this.snapshots = new SnapshotLookup() {
             @Override
@@ -104,6 +107,10 @@ final class CommandPersistenceView {
     }
 
     CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
+        if (companions != null) {
+            return find(record).map(profile -> companions.get(profile.profileId().value()))
+                    .map(CommandSavedNpcPanelSnapshot::fromSummary).orElse(null);
+        }
         if (savedPanels == null) return null;
         ProfileId id = find(record).map(ProfileSnapshot::profileId).orElse(null);
         CompanionProfileProjectionState projection = id == null ? null : safeProjection(id).orElse(null);

@@ -30,7 +30,10 @@ class CompanionRecordBsonTest {
                         true, -3000L, -9000L, 6000L, 123456L,
                         "TwLevelingDefault", 4, 12.5, 340.0, 2,
                         java.util.Map.of("speed", 1.25, "strength", 0.75),
-                        "Adult", 1.0, null, 0L, 1_700_000_000_000L))
+                        "Adult", 1.0, null, 0L, 1_700_000_000_000L, -4000L, 2500L, "TwTraitsDefault",
+                        "TwTalentsDefault", new CompanionSummary.Progression("Adult", -900L, -600L, -300L, true,
+                                660_000.0, UUID.randomUUID(), 12_345L, true, -1_000_000L, -250L, true, true,
+                                5_000L)))
                 .rosterId("hydragon:dragon_horn").rosterSlot(3).bonded(true)
                 .summonedUntilMs(-123456789L).summonCooldownUntilMs(0L).reviveAvailableAtMs(-5L).diedAtMs(42L).lastSnapshotAtMs(99L)
                 .origin("Alechilles:HyDragon", "soul-1")

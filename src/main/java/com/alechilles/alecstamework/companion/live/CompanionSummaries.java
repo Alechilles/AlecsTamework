@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -45,7 +47,9 @@ public final class CompanionSummaries {
                          @Nullable String levelingConfigId, int level, double currentXp, double totalXp,
                          int talentPointsSpent, @Nonnull Map<String, Double> traits,
                          @Nullable String lifeStage, double lifeStageProgress, @Nullable String nextLifeStage,
-                         long lifeStageRemainingMs) {
+                         long lifeStageRemainingMs, long harvestAlarmStartedAtMs, long harvestAlarmDurationMs,
+                         @Nullable String traitsConfigId, @Nullable String talentsConfigId,
+                         @Nullable CompanionSummary.Progression progression) {
     }
 
     private final Sources sources;
@@ -73,7 +77,33 @@ public final class CompanionSummaries {
                 in.levelingConfigId(), Math.max(0, in.level()), finiteNonNegative(in.currentXp()),
                 finiteNonNegative(in.totalXp()), Math.max(0, in.talentPointsSpent()), traits,
                 in.lifeStage(), clamp01(in.lifeStageProgress()), in.nextLifeStage(),
-                Math.max(0L, in.lifeStageRemainingMs()), observedAtMs);
+                Math.max(0L, in.lifeStageRemainingMs()), observedAtMs, in.harvestAlarmStartedAtMs(),
+                Math.max(0L, in.harvestAlarmDurationMs()), in.traitsConfigId(), in.talentsConfigId(),
+                in.progression());
+    }
+
+    /**
+     * Copies the life-stage values the saved panel advances at display time, or null when the
+     * companion has no life-stage component. An owner id that is not a UUID becomes null.
+     */
+    @Nullable
+    public static CompanionSummary.Progression progression(@Nullable TameworkLifeStageComponent state) {
+        if (state == null) {
+            return null;
+        }
+        UUID owner = null;
+        if (state.getProgressionOwnerId() != null) {
+            try {
+                owner = UUID.fromString(state.getProgressionOwnerId());
+            } catch (IllegalArgumentException ignored) {
+                // Only UUID owners are ever written; anything else has no owner clock.
+            }
+        }
+        return new CompanionSummary.Progression(state.getStage(), state.getBornAtMs(), state.getAdolescentAtMs(),
+                state.getAdultAtMs(), state.isGrowthScalingEnabled(), finite(state.getAgeProgressMs()),
+                owner, state.getProgressionClockMs(), state.isProgressionInitialized(),
+                state.getLastProgressionWorldMs(), state.getLifecycleNowMs(), state.isJuvenileClockInitialized(),
+                state.isStoredProgressionPaused(), state.getActiveProgressMs());
     }
 
     /**
@@ -94,6 +124,7 @@ public final class CompanionSummaries {
         TameworkLevelingComponent leveling = get(store, ref, TameworkLevelingComponent.getComponentType());
         TameworkTalentsComponent talents = get(store, ref, TameworkTalentsComponent.getComponentType());
         TameworkTraitsComponent traits = get(store, ref, TameworkTraitsComponent.getComponentType());
+        TameworkLifeStageComponent lifeStage = get(store, ref, TameworkLifeStageComponent.getComponentType());
         float[] health = sources.health(ref, store);
         LifeStageView stage = sources.lifeStage(ref, store, roleId);
         TameworkAlarmComponent.AlarmEntry harvest = alarms == null ? null : alarms.getAlarm(sources.harvestAlarmName());
@@ -119,7 +150,10 @@ public final class CompanionSummaries {
                 leveling == null ? 0.0 : leveling.getCurrentXp(), leveling == null ? 0.0 : leveling.getTotalXp(),
                 talents == null ? 0 : talents.getSpentPoints(), traitValues,
                 stage == null ? null : stage.stage(), stage == null ? 0.0 : stage.progress(),
-                stage == null ? null : stage.nextStage(), stage == null ? 0L : stage.remainingMs()),
+                stage == null ? null : stage.nextStage(), stage == null ? 0L : stage.remainingMs(),
+                harvest == null ? 0L : harvest.getStartedAtMs(), harvest == null ? 0L : harvest.getDurationMs(),
+                traits == null ? null : traits.getConfigId(), talents == null ? null : talents.getConfigId(),
+                progression(lifeStage)),
                 observedAtMs);
     }
 

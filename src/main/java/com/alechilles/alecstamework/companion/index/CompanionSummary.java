@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -14,7 +15,12 @@ import javax.annotation.Nullable;
  * Times named {@code ...Ms} follow the component they came from: breeding cooldowns and the
  * harvest alarm are world time (signed, 0 = unset); {@code observedAtMs} is wall clock.
  * {@code lifeStageRemainingMs} is {@code Long.MAX_VALUE} when the stage never ends (no
- * countdown) and 0 when the companion has no life stage.
+ * countdown) and 0 when the companion has no life stage. The life-stage presentation fields
+ * are a capture-time view at the loaded care rate; the saved panel instead advances
+ * {@link #progression} at display time, as it did from a decoded checkpoint.
+ *
+ * <p>A config id is null when the companion had no such component; the saved panel then
+ * keeps its fallback values for that section.</p>
  */
 public record CompanionSummary(
         @Nullable String customName,
@@ -43,7 +49,12 @@ public record CompanionSummary(
         double lifeStageProgress,
         @Nullable String nextLifeStage,
         long lifeStageRemainingMs,
-        long observedAtMs
+        long observedAtMs,
+        long harvestAlarmStartedAtMs,
+        long harvestAlarmDurationMs,
+        @Nullable String traitsConfigId,
+        @Nullable String talentsConfigId,
+        @Nullable Progression progression
 ) {
     public CompanionSummary {
         // Insertion order keeps saved files stable across restarts; Map.copyOf order is per-JVM.
@@ -57,5 +68,31 @@ public record CompanionSummary(
     @Nonnull
     public static final CompanionSummary EMPTY = new CompanionSummary(null, null, null, null,
             0f, 0f, null, 0.0, null, 0.0, 0.0, false, 0L, 0L, 0L, 0L,
-            null, 0, 0.0, 0.0, 0, Map.of(), null, 0.0, null, 0L, 0L);
+            null, 0, 0.0, 0.0, 0, Map.of(), null, 0.0, null, 0L, 0L, 0L, 0L, null, null, null);
+
+    /**
+     * The raw life-stage component values that the saved panel needs to rebuild live countdowns
+     * and advance the life stage lazily for an unloaded companion (spec 6.6, phase-3 note).
+     * Null on the summary when the companion has no life-stage component. World-time fields
+     * ({@code bornAtMs}, {@code adolescentAtMs}, {@code adultAtMs}, {@code lastProgressionWorldMs},
+     * {@code lifecycleNowMs}) keep their sign; {@code progressionClockMs} and
+     * {@code activeProgressMs} are the owner's progression clock and settled active time.
+     */
+    public record Progression(
+            @Nullable String stage,
+            long bornAtMs,
+            long adolescentAtMs,
+            long adultAtMs,
+            boolean growthScalingEnabled,
+            double ageProgressMs,
+            @Nullable UUID progressionOwnerId,
+            long progressionClockMs,
+            boolean progressionInitialized,
+            long lastProgressionWorldMs,
+            long lifecycleNowMs,
+            boolean juvenileClockInitialized,
+            boolean progressionPaused,
+            long activeProgressMs
+    ) {
+    }
 }
