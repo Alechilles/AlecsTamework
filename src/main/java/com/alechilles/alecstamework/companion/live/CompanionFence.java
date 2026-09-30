@@ -19,20 +19,22 @@ public final class CompanionFence {
         if (bodyGeneration == STALE_MIGRATED_GENERATION) {
             return FenceAction.REMOVE;
         }
-        if (unreadable) {
-            return FenceAction.IGNORE;
-        }
         if (record == null) {
-            return bodyIsOwnedAndTamed ? FenceAction.ADOPT : FenceAction.REMOVE;
+            // The unreadable mark only matters when there is no readable record to fence by.
+            if (unreadable) {
+                return FenceAction.IGNORE;
+            }
+            return bodyIsOwnedAndTamed && !anotherBodyLoaded ? FenceAction.ADOPT : FenceAction.REMOVE;
         }
         if (record.location().kind() == LocationKind.RELEASED) {
             return FenceAction.REMOVE;
         }
-        if (anotherBodyLoaded) {
-            return FenceAction.REMOVE;
-        }
+        // A newer body wins even over a registered body; the system displaces the older one.
         if (bodyGeneration > record.generation()) {
             return FenceAction.ACCEPT_AND_RAISE;
+        }
+        if (anotherBodyLoaded) {
+            return FenceAction.REMOVE;
         }
         if (record.location().kind() == LocationKind.LIVE && bodyGeneration == record.generation()) {
             return FenceAction.ACCEPT;

@@ -47,6 +47,21 @@ class CompanionFenceTest {
     }
 
     @Test
+    void newerBodyWinsEvenWhenAnotherBodyIsLoaded() {
+        assertEquals(FenceAction.ACCEPT_AND_RAISE, CompanionFence.decide(LIVE_G3, false, 4, true, true));
+    }
+
+    @Test
+    void missingRecordDoesNotAdoptWhileAnotherBodyIsLoaded() {
+        assertEquals(FenceAction.REMOVE, CompanionFence.decide(null, false, 0, true, true));
+    }
+
+    @Test
+    void aReadableRecordFencesTheBodyEvenIfTheIdIsMarkedUnreadable() {
+        assertEquals(FenceAction.ACCEPT, CompanionFence.decide(LIVE_G3, true, 3, true, false));
+    }
+
+    @Test
     void olderBodyOrARecordThatIsNotLiveRemovesTheBody() {
         assertEquals(FenceAction.REMOVE, CompanionFence.decide(LIVE_G3, false, 2, true, false));
         assertEquals(FenceAction.REMOVE, CompanionFence.decide(record(CompanionLocation.item(), 3), false, 3, true, false));

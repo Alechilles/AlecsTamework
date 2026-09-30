@@ -25,4 +25,18 @@ public interface CompanionBodyCallbacks {
     /** The registered body for {@code profileId} is being removed (UNLOAD or REMOVE; spec 6.8 part 2). */
     void onLoadedBodyRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull RemoveReason reason, @Nonnull Store<EntityStore> store,
                              @Nonnull CommandBuffer<EntityStore> buffer, @Nonnull UUID profileId);
+
+    /**
+     * A newer body was accepted for {@code profileId} and replaced {@code displacedBody} as the
+     * registered body. The displaced body may belong to another world's store: implementations
+     * remove it on its owning world thread via {@code world.execute} with stable ids, and never
+     * directly from this callback's store unless it is the same store.
+     */
+    void onDisplaced(@Nonnull Ref<EntityStore> displacedBody, @Nonnull UUID profileId);
+
+    /**
+     * The fence returned {@link FenceAction#REMOVE} or {@link FenceAction#IGNORE} for a body of
+     * {@code profileId}. A diagnostics seam only: the system has already queued any removal.
+     */
+    void onFenced(@Nonnull FenceAction action, @Nonnull UUID profileId);
 }

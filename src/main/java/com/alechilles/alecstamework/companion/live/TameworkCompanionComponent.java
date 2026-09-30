@@ -22,13 +22,14 @@ public final class TameworkCompanionComponent implements Component<EntityStore> 
             .append(new KeyedCodec<>("ProfileId", new UUIDBinaryCodec()),
                     TameworkCompanionComponent::setProfileId, TameworkCompanionComponent::getProfileId)
             .add()
-            .append(new KeyedCodec<>("Generation", Codec.LONG),
-                    TameworkCompanionComponent::setGeneration, TameworkCompanionComponent::getGeneration)
+            .<Long>append(new KeyedCodec<>("Generation", Codec.LONG),
+                    (component, value) -> component.setGeneration(value == null ? 0L : value),
+                    TameworkCompanionComponent::getGeneration)
             .add()
             .build();
 
     private UUID profileId;
-    private Long generation = 0L;
+    private long generation;
 
     public TameworkCompanionComponent() {
     }
@@ -47,16 +48,16 @@ public final class TameworkCompanionComponent implements Component<EntityStore> 
         this.profileId = profileId;
     }
 
-    public Long getGeneration() {
-        return generation == null ? 0L : generation;
+    public long getGeneration() {
+        return generation;
     }
 
-    public void setGeneration(Long generation) {
-        this.generation = generation == null ? 0L : generation;
+    public void setGeneration(long generation) {
+        this.generation = generation;
     }
 
     @Override
     public TameworkCompanionComponent clone() {
-        return new TameworkCompanionComponent(profileId, getGeneration());
+        return new TameworkCompanionComponent(profileId, generation);
     }
 }

@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Applies the generation fence to companion bodies as they enter a world, and reports
@@ -36,6 +37,15 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
     private final Set<Dependency<EntityStore>> dependencies =
             Set.of(new SystemDependency<>(Order.AFTER, EntityStore.UUIDSystem.class));
 
+    /** The fence outcome and, for a newer body, the older registered body it replaced. */
+    private record Outcome(@Nonnull FenceAction action, @Nullable Ref<EntityStore> displaced) {
+    }
+
+    /**
+     * @param unreadable true for profile ids whose record could not be read at startup. It runs
+     *                   under the global index lock on world threads, so it must be a pure
+     *                   in-memory lookup (no I/O, no blocking).
+     */
     public CompanionBodySystem(@Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
                                @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamedType,
@@ -60,7 +70,7 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
             return;
         }
         UUID profileId = stamp.getProfileId();
-        FenceAction action = index.atomically(() -> {
+        Outcome outcome = index.atomically(() -> {
             Ref<EntityStore> other = loaded.get(profileId);
             boolean anotherLoaded = other != null && other.isValid() && !other.equals(ref);
             FenceAction decided = CompanionFence.decide(index.get(profileId), unreadable.test(profileId),
@@ -68,14 +78,22 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
             if (decided == FenceAction.ACCEPT || decided == FenceAction.ACCEPT_AND_RAISE || decided == FenceAction.ADOPT) {
                 loaded.put(profileId, ref);
             }
-            return decided;
+            // Only a newer body can win while another body is registered (the fence removes the rest).
+            Ref<EntityStore> displaced = decided == FenceAction.ACCEPT_AND_RAISE && anotherLoaded ? other : null;
+            return new Outcome(decided, displaced);
         });
-        switch (action) {
+        switch (outcome.action()) {
             case ACCEPT -> callbacks.onAccepted(ref, store, buffer, stamp, false);
             case ACCEPT_AND_RAISE -> callbacks.onAccepted(ref, store, buffer, stamp, true);
             case ADOPT -> callbacks.onAdopt(ref, store, buffer, stamp);
-            case REMOVE -> buffer.removeEntity(ref, RemoveReason.REMOVE);
-            case IGNORE -> { }
+            case REMOVE -> {
+                buffer.removeEntity(ref, RemoveReason.REMOVE);
+                callbacks.onFenced(FenceAction.REMOVE, profileId);
+            }
+            case IGNORE -> callbacks.onFenced(FenceAction.IGNORE, profileId);
+        }
+        if (outcome.displaced() != null) {
+            callbacks.onDisplaced(outcome.displaced(), profileId);
         }
     }
 
@@ -86,8 +104,10 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
         if (stamp == null || stamp.getProfileId() == null) {
             return;
         }
-        if (loaded.removeIfSame(stamp.getProfileId(), ref)) {
-            callbacks.onLoadedBodyRemoved(ref, reason, store, buffer, stamp.getProfileId());
+        UUID profileId = stamp.getProfileId();
+        boolean wasRegistered = index.atomically(() -> loaded.removeIfSame(profileId, ref));
+        if (wasRegistered) {
+            callbacks.onLoadedBodyRemoved(ref, reason, store, buffer, profileId);
         }
     }
 
