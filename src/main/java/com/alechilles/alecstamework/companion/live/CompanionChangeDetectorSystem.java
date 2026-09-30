@@ -85,14 +85,14 @@ public final class CompanionChangeDetectorSystem extends EntityTickingSystem<Ent
             if (tracker.observe(now, fingerprints.discrete(chunk, index), fingerprints.drift(chunk, index))) {
                 CompanionSaves.markChanged(commandBuffer, ref);
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             tracker.deferDueChecks(now);
             warnThrottled(now, index, chunk, ref, e);
         }
     }
 
     private void warnThrottled(long now, int index, @Nonnull ArchetypeChunk<EntityStore> chunk,
-                               @Nonnull Ref<EntityStore> ref, @Nonnull RuntimeException e) {
+                               @Nonnull Ref<EntityStore> ref, @Nonnull Throwable e) {
         if (now < nextWarnAtMs) {
             return;
         }

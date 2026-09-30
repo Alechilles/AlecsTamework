@@ -74,7 +74,10 @@ public final class CompanionChangeTracker implements Component<EntityStore> {
             discreteHash = currentDiscreteHash;
             driftHash = currentDriftHash;
             nextDiscreteAtMs = nowMs + discreteIntervalMs + staggerMs;
-            nextDriftAtMs = nowMs + driftIntervalMs + staggerMs;
+            // Spread first drift checks over the whole drift interval so a region load does not
+            // run every drift encode in the same short window each minute.
+            long driftStagger = discreteIntervalMs > 0 ? staggerMs * (driftIntervalMs / discreteIntervalMs) : staggerMs;
+            nextDriftAtMs = nowMs + driftIntervalMs + driftStagger;
             return true;
         }
         boolean mark = false;

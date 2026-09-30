@@ -76,11 +76,14 @@ public final class CompanionSummaries {
                 Math.max(0L, in.lifeStageRemainingMs()), observedAtMs);
     }
 
-    /** Reads the live body and builds its summary. */
-    @Nonnull
+    /**
+     * Reads the live body and builds its summary. Returns null when the ref is no longer valid,
+     * so a caller keeps the previously stored summary instead of overwriting it with a blank one.
+     */
+    @Nullable
     public CompanionSummary capture(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, long observedAtMs) {
         if (!ref.isValid()) {
-            return CompanionSummary.EMPTY;
+            return null;
         }
         String roleId = sources.roleId(ref, store);
         TameworkNpcNameComponent name = get(store, ref, TameworkNpcNameComponent.getComponentType());
