@@ -11,7 +11,7 @@ class CompanionSummariesTest {
     private static CompanionSummaries.Inputs inputs(float health, float max, double hunger) {
         return new CompanionSummaries.Inputs("Wooly", "server.npcs.sheep.name", "Sheep", "Icon_Sheep",
                 health, max, "TwHappinessDefault", 50.0, "TwNeedsDefault", hunger, 20.0,
-                true, -3000L, -9000L, 6000L, 0L, "TwLevelingDefault", 3, 5.0, 100.0, 1,
+                true, -3000L, -9000L, 6000L, -1500L, "TwLevelingDefault", 3, 5.0, 100.0, 1,
                 Map.of("speed", 1.1), "Adult", 1.0, null, 0L);
     }
 
@@ -38,6 +38,8 @@ class CompanionSummariesTest {
         CompanionSummary summary = CompanionSummaries.build(inputs(10f, 20f, 10.0), 1L);
 
         assertEquals(-3000L, summary.breedingCooldownUntilMs());
+        assertEquals(-9000L, summary.breedingCooldownStartedAtMs());
+        assertEquals(-1500L, summary.harvestAlarmUntilMs());
         assertEquals(Map.of("speed", 1.1), summary.traits());
         assertTrue(summary.breedingEnabled());
     }

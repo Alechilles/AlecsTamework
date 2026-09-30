@@ -79,6 +79,9 @@ public final class CompanionSummaries {
     /** Reads the live body and builds its summary. */
     @Nonnull
     public CompanionSummary capture(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, long observedAtMs) {
+        if (!ref.isValid()) {
+            return CompanionSummary.EMPTY;
+        }
         String roleId = sources.roleId(ref, store);
         TameworkNpcNameComponent name = get(store, ref, TameworkNpcNameComponent.getComponentType());
         TameworkHappinessComponent happiness = get(store, ref, TameworkHappinessComponent.getComponentType());

@@ -13,6 +13,8 @@ import javax.annotation.Nullable;
  * by {@code CompanionSummaries} from live components when a snapshot is taken and on unload.
  * Times named {@code ...Ms} follow the component they came from: breeding cooldowns and the
  * harvest alarm are world time (signed, 0 = unset); {@code observedAtMs} is wall clock.
+ * {@code lifeStageRemainingMs} is {@code Long.MAX_VALUE} when the stage never ends (no
+ * countdown) and 0 when the companion has no life stage.
  */
 public record CompanionSummary(
         @Nullable String customName,
