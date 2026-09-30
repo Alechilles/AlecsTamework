@@ -1,14 +1,11 @@
 package com.alechilles.alecstamework.items.persistence;
 
+import com.alechilles.alecstamework.companion.flow.CompanionDeathTiming;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
-import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.persistence.operation.StablePersistenceIds;
 import com.hypixel.hytale.component.ComponentType;
@@ -21,7 +18,6 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.LongSupplier;
@@ -42,9 +38,6 @@ public final class HytaleDormantCompanionObservationFactory
             "companion-dormant-observation:v1";
     private static final String RECEIPT_NAMESPACE =
             "companion-dormant-evidence:v1";
-    private static final String REVIVE_COOLDOWN_MULTIPLIER =
-            "ReviveCooldownMultiplier";
-    private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
 
     private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, TameworkProjectionIdentityComponent>
@@ -216,86 +209,20 @@ public final class HytaleDormantCompanionObservationFactory
             DeathComponent death,
             long diedAtMs
     ) {
-        if (CompanionRevivePolicy.isOldAgeDeath(death)) {
+        CompanionDeathTiming.Timing timing = CompanionDeathTiming.resolve(
+                reference, store, npcUuid, roleId, death, diedAtMs
+        );
+        if (timing.kind() == CompanionDeathTiming.Kind.OLD_AGE) {
             return new DormantCompanionObservation.DeathObservation(
                     diedAtMs, 0L, DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
                     CompanionRevivePolicy.OLD_AGE_SOURCE);
         }
-        DamageTargetMemoryService.RecentAttackerSnapshot attacker =
-                DamageTargetMemoryService.getInstance().getRecentAttacker(
-                        npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs
-                );
-        DeathSnapshotV2Payload.DeathCauseKind needs =
-                RecentNeedsDeathCauseService.getInstance().consumeRecent(
-                        npcUuid, diedAtMs
-                );
-        DeathSnapshotV2Payload.DeathCauseKind cause = needs != null
-                ? needs
-                : attacker != null
-                ? attackerCause(attacker)
-                : persistedCause(death);
-        long cooldown = reviveCooldownMs(reference, store, roleId);
         return new DormantCompanionObservation.DeathObservation(
                 diedAtMs,
-                saturatingAdd(diedAtMs, cooldown),
-                cause,
-                attacker == null ? null : attacker.attackerName()
+                timing.reviveAvailableAtMs(),
+                DeathSnapshotV2Payload.DeathCauseKind.valueOf(timing.kind().name()),
+                timing.attackerName()
         );
-    }
-
-    private long reviveCooldownMs(
-            Ref<EntityStore> reference,
-            Store<EntityStore> store,
-            String roleId
-    ) {
-        long configured = Math.max(
-                0L,
-                TwCompanionConfig.resolveEffectiveForRole(roleId)
-                        .getDeadRespawnCooldownMs()
-        );
-        double multiplier =
-                CompanionProgressionModifierService.resolveMultiplier(
-                        reference,
-                        store,
-                        REVIVE_COOLDOWN_MULTIPLIER,
-                        1.0
-                );
-        if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
-            multiplier = 1.0;
-        }
-        double scaled = configured * multiplier;
-        return Double.isFinite(scaled)
-                ? Math.max(0L, Math.round(scaled))
-                : configured;
-    }
-
-    @Nonnull
-    private DeathSnapshotV2Payload.DeathCauseKind attackerCause(
-            DamageTargetMemoryService.RecentAttackerSnapshot attacker
-    ) {
-        return switch (attacker.attackerKind()) {
-            case PLAYER -> DeathSnapshotV2Payload.DeathCauseKind.PLAYER;
-            case NPC -> DeathSnapshotV2Payload.DeathCauseKind.NPC;
-            case OTHER -> DeathSnapshotV2Payload.DeathCauseKind.UNKNOWN;
-        };
-    }
-
-    @Nonnull
-    private DeathSnapshotV2Payload.DeathCauseKind persistedCause(
-            DeathComponent death
-    ) {
-        if (death.getDeathCause() == null) {
-            return DeathSnapshotV2Payload.DeathCauseKind.UNKNOWN;
-        }
-        String id = death.getDeathCause().getId();
-        if (id == null || id.isBlank()) {
-            return DeathSnapshotV2Payload.DeathCauseKind.UNKNOWN;
-        }
-        String normalized = id.toLowerCase(Locale.ROOT);
-        return normalized.contains("physical")
-                || normalized.contains("projectile")
-                ? DeathSnapshotV2Payload.DeathCauseKind.UNKNOWN
-                : DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT;
     }
 
     @Nullable
@@ -370,11 +297,5 @@ public final class HytaleDormantCompanionObservationFactory
                 .KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(
                         projection.getProjectionKind()
                 );
-    }
-
-    private long saturatingAdd(long value, long nonnegativeDelta) {
-        return value > Long.MAX_VALUE - nonnegativeDelta
-                ? Long.MAX_VALUE
-                : value + nonnegativeDelta;
     }
 }
