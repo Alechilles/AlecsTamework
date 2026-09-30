@@ -32,7 +32,10 @@ import org.joml.Vector3d;
  * fresh-spawn logic (random name, reset inventories, spawn effect).
  */
 public final class CompanionRespawn {
-    /** Component types used by {@link #prepare}. Null entries are skipped. */
+    /**
+     * Component types used by {@link #prepare}. {@code refCount}, {@code velocity},
+     * {@code headRotation} and {@code markedEntities} may be null and are then skipped.
+     */
     public record Types(
             @Nonnull ComponentType<EntityStore, UUIDComponent> uuid,
             @Nonnull ComponentType<EntityStore, NPCEntity> npc,
@@ -61,7 +64,8 @@ public final class CompanionRespawn {
             addIfPresent(strip, com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent::getComponentType);
             addIfPresent(strip, com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent::getComponentType);
             addIfPresent(strip, com.hypixel.hytale.server.core.modules.entity.damage.DeferredCorpseRemoval::getComponentType);
-            addIfPresent(strip, com.hypixel.hytale.builtin.mounts.NPCMountComponent::getComponentType);
+            // NPCMountComponent is kept: on add without a rider, NPCMountSystems.OnAdd restores the
+            // original role, so a body snapshotted mid-ride does not stay in Empty_Role.
             addIfPresent(strip, com.hypixel.hytale.server.core.modules.entity.component.FromPrefab::getComponentType);
             // Tamework components that link this body to another entity or hold a stale signal
             // (Task 4 step 1.2). Their cleanup systems would act on the partner (for example,
@@ -131,11 +135,7 @@ public final class CompanionRespawn {
             npc.setLeashHeading(rotation.yaw());
             npc.setLeashPitch(rotation.pitch());
         }
-        for (ComponentType<EntityStore, ?> type : types.strip()) {
-            if (type != null) {
-                holder.tryRemoveComponent(type);
-            }
-        }
+        types.strip().forEach(holder::tryRemoveComponent);
         TransformComponent transform = holder.getComponent(types.transform());
         if (transform != null) {
             transform.setPosition(position);
