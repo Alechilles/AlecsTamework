@@ -63,4 +63,13 @@ class CompanionChangeTrackerTest {
         assertFalse(t.isDue(1_999L));
         assertTrue(t.isDue(2_000L));
     }
+
+    @Test
+    void aFailedCheckRetriesAtTheNextIntervalAndStillMarksFirstSight() {
+        CompanionChangeTracker t = tracker();
+        t.deferDueChecks(0L);
+        assertFalse(t.isDue(1_999L), "a failing body must not be retried every tick");
+        assertTrue(t.isDue(2_000L));
+        assertTrue(t.observe(2_000L, 11, 22), "first successful check still marks");
+    }
 }

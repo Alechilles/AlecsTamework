@@ -23,7 +23,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /** Fingerprints of the Tamework components on one companion body (spec 6.4). */
 public final class CompanionFingerprints {
@@ -38,25 +37,25 @@ public final class CompanionFingerprints {
 
     private final List<Encoded<?>> discrete;
     private final List<Encoded<?>> drift;
-    @Nullable private final ComponentType<EntityStore, TameworkLevelingComponent> leveling;
-    @Nullable private final ComponentType<EntityStore, TameworkLifeStageComponent> lifeStage;
-    @Nullable private final ComponentType<EntityStore, TameworkBreedingComponent> breeding;
-    @Nullable private final ComponentType<EntityStore, TameworkNeedsComponent> needs;
-    @Nullable private final ComponentType<EntityStore, TameworkHappinessComponent> happiness;
+    @Nonnull private final ComponentType<EntityStore, TameworkLevelingComponent> leveling;
+    @Nonnull private final ComponentType<EntityStore, TameworkLifeStageComponent> lifeStage;
+    @Nonnull private final ComponentType<EntityStore, TameworkBreedingComponent> breeding;
+    @Nonnull private final ComponentType<EntityStore, TameworkNeedsComponent> needs;
+    @Nonnull private final ComponentType<EntityStore, TameworkHappinessComponent> happiness;
 
     public CompanionFingerprints(@Nonnull List<Encoded<?>> discrete, @Nonnull List<Encoded<?>> drift,
-                                 @Nullable ComponentType<EntityStore, TameworkLevelingComponent> leveling,
-                                 @Nullable ComponentType<EntityStore, TameworkLifeStageComponent> lifeStage,
-                                 @Nullable ComponentType<EntityStore, TameworkBreedingComponent> breeding,
-                                 @Nullable ComponentType<EntityStore, TameworkNeedsComponent> needs,
-                                 @Nullable ComponentType<EntityStore, TameworkHappinessComponent> happiness) {
+                                 @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> leveling,
+                                 @Nonnull ComponentType<EntityStore, TameworkLifeStageComponent> lifeStage,
+                                 @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breeding,
+                                 @Nonnull ComponentType<EntityStore, TameworkNeedsComponent> needs,
+                                 @Nonnull ComponentType<EntityStore, TameworkHappinessComponent> happiness) {
         this.discrete = List.copyOf(discrete);
         this.drift = List.copyOf(drift);
-        this.leveling = leveling;
-        this.lifeStage = lifeStage;
-        this.breeding = breeding;
-        this.needs = needs;
-        this.happiness = happiness;
+        this.leveling = Objects.requireNonNull(leveling, "leveling");
+        this.lifeStage = Objects.requireNonNull(lifeStage, "lifeStage");
+        this.breeding = Objects.requireNonNull(breeding, "breeding");
+        this.needs = Objects.requireNonNull(needs, "needs");
+        this.happiness = Objects.requireNonNull(happiness, "happiness");
     }
 
     /** Production set, built after TameworkComponentRegistrar has registered every type. */
@@ -91,24 +90,24 @@ public final class CompanionFingerprints {
         for (Encoded<?> e : discrete) {
             h = 31 * h + e.hash(chunk, index);
         }
-        TameworkLevelingComponent lv = leveling == null ? null : chunk.getComponent(index, leveling);
+        TameworkLevelingComponent lv = chunk.getComponent(index, leveling);
         if (lv != null) {
             h = 31 * h + Objects.hash(lv.getConfigId(), lv.getLevel());
         }
-        TameworkLifeStageComponent ls = lifeStage == null ? null : chunk.getComponent(index, lifeStage);
+        TameworkLifeStageComponent ls = chunk.getComponent(index, lifeStage);
         if (ls != null) {
             h = 31 * h + Objects.hashCode(ls.getStage());
         }
-        TameworkBreedingComponent br = breeding == null ? null : chunk.getComponent(index, breeding);
+        TameworkBreedingComponent br = chunk.getComponent(index, breeding);
         if (br != null) {
             h = 31 * h + Objects.hash(br.getConfigId(), br.isEnabled(), br.getCooldownUntilMs(),
                     br.getManualBreedingPlayerUuid(), br.getManualBreedingUntilMs());
         }
-        TameworkNeedsComponent nd = needs == null ? null : chunk.getComponent(index, needs);
+        TameworkNeedsComponent nd = chunk.getComponent(index, needs);
         if (nd != null) {
             h = 31 * h + Objects.hashCode(nd.getConfigId());
         }
-        TameworkHappinessComponent hp = happiness == null ? null : chunk.getComponent(index, happiness);
+        TameworkHappinessComponent hp = chunk.getComponent(index, happiness);
         if (hp != null) {
             h = 31 * h + Objects.hashCode(hp.getConfigId());
         }
