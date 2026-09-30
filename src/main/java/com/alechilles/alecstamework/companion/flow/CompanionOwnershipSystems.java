@@ -43,9 +43,21 @@ public final class CompanionOwnershipSystems {
         @Override
         public void onEntityAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AddReason reason,
                                   @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
-            if (isTamed(store, ref)) {
-                lifecycle.tame(ref, store, buffer);
+            admit(lifecycle, ref, store, buffer);
+        }
+
+        /**
+         * Stamps an owned, tamed, unstamped NPC; also used by the startup pass. World thread only.
+         *
+         * @return true when the NPC was owned and tamed, so a tame was attempted
+         */
+        static boolean admit(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull Ref<EntityStore> ref,
+                             @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+            if (!isTamed(store, ref)) {
+                return false;
             }
+            lifecycle.tame(ref, store, buffer);
+            return true;
         }
 
         @Override

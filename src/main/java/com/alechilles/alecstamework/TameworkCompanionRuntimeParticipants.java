@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.companion.flow.CompanionDeathSystem;
 import com.alechilles.alecstamework.companion.flow.CompanionOwnershipSystems;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
-import com.alechilles.alecstamework.companion.runtime.CompanionPersistenceModule;
 import com.hypixel.hytale.builtin.encountermanager.EncounterManagerPlugin;
 import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
 import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
@@ -73,13 +72,12 @@ public final class TameworkCompanionRuntimeParticipants {
     static void addCompanionIndex(
             Tamework plugin,
             TameworkRuntimeParticipantRegistry participants,
-            CompanionPersistenceModule module,
+            CompanionBodySystem bodySystem,
             CompanionBodyLifecycle lifecycle
     ) {
+        // The startup pass shares this instance, so it is built by the caller.
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionbodysystem",
-                () -> new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
-                        plugin.getOwnerComponentType(), plugin.getTamedComponentType(), module.index(),
-                        module.unreadable(), module.loaded(), lifecycle));
+                () -> bodySystem);
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownershiponaddsystem",
                 () -> new CompanionOwnershipSystems.OnAdd(lifecycle, NPCEntity.getComponentType(),
                         plugin.getOwnerComponentType(), plugin.getTamedComponentType(),

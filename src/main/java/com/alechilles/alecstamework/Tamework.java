@@ -29,6 +29,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionCompone
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.SpawnBeaconVisualizationService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -228,7 +229,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
+import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
+import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
@@ -277,6 +282,7 @@ public class Tamework extends JavaPlugin {
     private TameworkApi api;
     private CompanionPersistenceModule companionModule;
     private ReleaseFlow companionReleaseFlow;
+    private CompanionStartupAdmission companionStartupAdmission;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
     private AutoCloseable companionXpLegacyAdapter;
@@ -628,15 +634,14 @@ public class Tamework extends JavaPlugin {
             throw new IllegalStateException(
                     "Could not install Tamework's companion XP legacy adapter.");
         }
-        TameworkDataPathService dataPaths = new TameworkDataPathService(getLogger());
-        runtimeDataDirectory = dataPaths
-                .resolveAndInitializeDataPathLayout(getDataDirectory())
-                .targetDirectory();
+        TameworkDataPathLayout dataPaths = new TameworkDataPathService(getLogger())
+                .resolveAndInitializeDataPathLayout(getDataDirectory());
+        runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
         if (diagnosticRuntime != null) {
             diagnosticRuntime.preparePersistence(runtimeDataDirectory);
         }
-        openCompanionPersistence(dataPaths);
+        openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
         CompanionQueries companionQueries = null;
         if (companionModule != null && companionModule.ready()) {
@@ -1266,6 +1271,7 @@ public class Tamework extends JavaPlugin {
         preflightDeclaredRuntimeParticipants();
         initializeRuntimeServices();
         registerRuntimeParticipants();
+        admitCompanionsAlreadyLoaded();
         runtimeActivationState = TameworkRuntimeActivationState.of(
                 runtimeStartupPlan, runtimeStartupDiagnostics
         );
@@ -1310,7 +1316,7 @@ public class Tamework extends JavaPlugin {
      * I/O; this runs in plugin start, not on a world thread. The universe's StorageManager is a
      * final field set when the core Universe plugin is constructed, so it is usable here.
      */
-    private void openCompanionPersistence(@Nonnull TameworkDataPathService dataPaths) {
+    private void openCompanionPersistence(@Nonnull List<Path> legacyDirectories) {
         Universe universe = Universe.get();
         if (universe == null) {
             getLogger().at(Level.SEVERE).log(
@@ -1319,11 +1325,26 @@ public class Tamework extends JavaPlugin {
         }
         companionModule = CompanionPersistenceModule.open(
                 CompanionStorage.root(universe.getPath()),
-                dataPaths.resolveDataPathLayout(getDataDirectory()).persistenceSourceDirectories(),
+                legacyDirectories,
                 Files::exists,
                 new HytaleCompanionFileIo(() -> Universe.get().getStorageManager()),
                 System::currentTimeMillis,
                 String.valueOf(getManifest().getVersion()));
+    }
+
+    /**
+     * Runs the one-shot companion startup pass after the companion systems registered. Worlds
+     * already loading when Tamework starts keep their bodies; the add systems never see those.
+     */
+    private void admitCompanionsAlreadyLoaded() {
+        CompanionStartupAdmission admission = companionStartupAdmission;
+        companionStartupAdmission = null;
+        Universe universe = Universe.get();
+        if (admission == null || universe == null
+                || !runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return;
+        }
+        admission.admitLoadedWorlds(universe.getWorlds().values());
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */
@@ -1335,7 +1356,13 @@ public class Tamework extends JavaPlugin {
                 CompanionSnapshots.production(),
                 new CompanionSummaries(new HytaleSummarySources()),
                 module.warnings(), System::currentTimeMillis);
-        TameworkCompanionRuntimeParticipants.addCompanionIndex(this, runtimeParticipants, module, lifecycle);
+        CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
+                ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
+                lifecycle);
+        TameworkCompanionRuntimeParticipants.addCompanionIndex(this, runtimeParticipants, bodySystem, lifecycle);
+        companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
+                TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
+                ownerComponentType, tamedComponentType);
         CompanionWorldRemovalListener worldRemoval =
                 new CompanionWorldRemovalListener(lifecycle, module.index(), module.loaded());
         deferGlobalListener(
@@ -1446,6 +1473,7 @@ public class Tamework extends JavaPlugin {
             companionModule = null;
         }
         companionReleaseFlow = null;
+        companionStartupAdmission = null;
         if (diagnosticRuntime != null) {
             diagnosticRuntime.close();
             diagnosticRuntime = null;
@@ -1468,6 +1496,7 @@ public class Tamework extends JavaPlugin {
         }
         ownerPopulationLiveIndex.clear();
         LinkedNpcPanelPortraitItemIndex.clear();
+        AvatarFlightStaleOwnerRecoveryRegistry.clear();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().close();
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;

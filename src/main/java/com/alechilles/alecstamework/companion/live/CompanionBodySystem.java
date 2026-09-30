@@ -65,9 +65,21 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
     @Override
     public void onEntityAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+        admit(ref, store, buffer);
+    }
+
+    /**
+     * Fences one stamped body entering its store; also used by the startup pass for bodies that
+     * were already in a store when this system registered. World thread of {@code store} only.
+     *
+     * @return the fence action, or null when the entity has no stamp
+     */
+    @Nullable
+    public FenceAction admit(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                             @Nonnull CommandBuffer<EntityStore> buffer) {
         TameworkCompanionComponent stamp = store.getComponent(ref, stampType);
         if (stamp == null || stamp.getProfileId() == null) {
-            return;
+            return null;
         }
         UUID profileId = stamp.getProfileId();
         Outcome outcome = index.atomically(() -> {
@@ -95,6 +107,7 @@ public final class CompanionBodySystem extends RefSystem<EntityStore> {
         if (outcome.displaced() != null) {
             callbacks.onDisplaced(outcome.displaced(), profileId);
         }
+        return outcome.action();
     }
 
     @Override
