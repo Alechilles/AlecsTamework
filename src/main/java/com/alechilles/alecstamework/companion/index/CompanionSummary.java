@@ -45,7 +45,11 @@ public record CompanionSummary(
 ) {
     public CompanionSummary {
         // Insertion order keeps saved files stable across restarts; Map.copyOf order is per-JVM.
-        traits = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(traits, "traits")));
+        Objects.requireNonNull(traits, "traits").forEach((id, value) -> {
+            Objects.requireNonNull(id, "trait id");
+            Objects.requireNonNull(value, "trait value");
+        });
+        traits = Collections.unmodifiableMap(new LinkedHashMap<>(traits));
     }
 
     @Nonnull
