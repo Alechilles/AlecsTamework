@@ -166,14 +166,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         // UNLOAD and builder-tools undo: the body is saved with its chunk; refresh where it is.
-        CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
-        if (body == null) {
-            return;
-        }
-        Long snapshotAt = CompanionTransitions.snapshotDue(record, clock.getAsLong())
-                ? snapshot(ref, store, record, record.generation()) : null;
-        update(profileId, r -> r.location().kind() == LocationKind.LIVE,
-                r -> CompanionTransitions.unloaded(body, snapshotAt));
+        refreshUnloaded(ref, store, record, profileId);
     }
 
     @Override
@@ -230,14 +223,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         index.atomically(() -> loaded.removeIfSame(profileId, ref));
-        CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
-        if (body == null) {
-            return;
-        }
-        Long snapshotAt = CompanionTransitions.snapshotDue(record, clock.getAsLong())
-                ? snapshot(ref, store, record, record.generation()) : null;
-        update(profileId, r -> r.location().kind() == LocationKind.LIVE,
-                r -> CompanionTransitions.unloaded(body, snapshotAt));
+        refreshUnloaded(ref, store, record, profileId);
     }
 
     /**
@@ -306,6 +292,22 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         }
         // The writer holds the delete until the owner file with the tombstone is written, and retries it.
         writer.queueSnapshotDelete(profileId);
+    }
+
+    /**
+     * Refreshes a LIVE record from a body that is leaving memory with its chunk or world, taking a
+     * snapshot at the current generation only when one is due.
+     */
+    private void refreshUnloaded(Ref<EntityStore> ref, Store<EntityStore> store, CompanionRecord record,
+                                 UUID profileId) {
+        CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
+        if (body == null) {
+            return;
+        }
+        Long snapshotAt = CompanionTransitions.snapshotDue(record, clock.getAsLong())
+                ? snapshot(ref, store, record, record.generation()) : null;
+        update(profileId, r -> r.location().kind() == LocationKind.LIVE,
+                r -> CompanionTransitions.unloaded(body, snapshotAt));
     }
 
     /** Takes and queues a snapshot; returns its time, or null when capture failed (old one kept, spec 6.5). */

@@ -43,7 +43,11 @@ public final class CompanionWorldRemovalListener {
     }
 
     public void onRemoveWorld(@Nullable RemoveWorldEvent event) {
-        if (event == null || event.isCancelled() || event.getWorld() == null) {
+        if (event == null || event.getWorld() == null) {
+            return;
+        }
+        // An exceptional removal (world thread crash) removes the world even when cancelled.
+        if (event.isCancelled() && event.getRemovalReason() != RemoveWorldEvent.RemovalReason.EXCEPTIONAL) {
             return;
         }
         World world = event.getWorld();
