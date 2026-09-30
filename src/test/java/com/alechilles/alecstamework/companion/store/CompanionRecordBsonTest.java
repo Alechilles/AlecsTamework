@@ -25,7 +25,12 @@ class CompanionRecordBsonTest {
                 .ownerUuid(UUID.randomUUID()).ownerName("Alec")
                 .displayName("Wooly").scope(RecordScope.PORTABLE).homeWorld("default")
                 .currentNpcUuid(UUID.randomUUID())
-                .summary(new CompanionSummary("Wooly", "Tamed_Sheep", "Icon_Sheep", 4, 0.5f, "Adult", 2, 1, "Follow", true))
+                .summary(new CompanionSummary("Wooly", "server.npcs.sheep.name", "Tamed_Sheep", "Icon_Sheep",
+                        12.5f, 20f, "TwHappinessDefault", 55.5, "TwNeedsDefault", 40.0, 35.25,
+                        true, -3000L, -9000L, 6000L, 123456L,
+                        "TwLevelingDefault", 4, 12.5, 340.0, 2,
+                        java.util.Map.of("speed", 1.25, "strength", 0.75),
+                        "Adult", 1.0, null, 0L, 1_700_000_000_000L))
                 .rosterId("hydragon:dragon_horn").rosterSlot(3).bonded(true)
                 .summonedUntilMs(-123456789L).summonCooldownUntilMs(0L).reviveAvailableAtMs(-5L).diedAtMs(42L).lastSnapshotAtMs(99L)
                 .origin("Alechilles:HyDragon", "soul-1")

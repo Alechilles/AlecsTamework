@@ -178,24 +178,57 @@ public final class CompanionRecordBson {
 
     private static BsonDocument encodeSummary(CompanionSummary s) {
         BsonDocument d = new BsonDocument();
-        putString(d, "Name", s.displayName());
+        putString(d, "CustomName", s.customName());
+        putString(d, "NameKey", s.nameKey());
         putString(d, "Role", s.roleId());
         putString(d, "Icon", s.iconId());
+        d.put("HealthCurrent", new BsonDouble(s.healthCurrent()));
+        d.put("HealthMax", new BsonDouble(s.healthMax()));
+        putString(d, "HappinessConfig", s.happinessConfigId());
+        d.put("Happiness", new BsonDouble(s.happiness()));
+        putString(d, "NeedsConfig", s.needsConfigId());
+        d.put("Hunger", new BsonDouble(s.hunger()));
+        d.put("Thirst", new BsonDouble(s.thirst()));
+        d.put("BreedingEnabled", BsonBoolean.valueOf(s.breedingEnabled()));
+        d.put("BreedingCooldownUntil", new BsonInt64(s.breedingCooldownUntilMs()));
+        d.put("BreedingCooldownStartedAt", new BsonInt64(s.breedingCooldownStartedAtMs()));
+        d.put("BreedingCooldownDuration", new BsonInt64(s.breedingCooldownDurationMs()));
+        d.put("HarvestAlarmUntil", new BsonInt64(s.harvestAlarmUntilMs()));
+        putString(d, "LevelingConfig", s.levelingConfigId());
         d.put("Level", new BsonInt32(s.level()));
-        d.put("Health", new BsonDouble(s.healthFraction()));
+        d.put("CurrentXp", new BsonDouble(s.currentXp()));
+        d.put("TotalXp", new BsonDouble(s.totalXp()));
+        d.put("TalentPointsSpent", new BsonInt32(s.talentPointsSpent()));
+        BsonDocument traits = new BsonDocument();
+        s.traits().forEach((id, value) -> traits.put(id, new BsonDouble(value)));
+        d.put("Traits", traits);
         putString(d, "LifeStage", s.lifeStage());
-        d.put("Happiness", new BsonInt32(s.happinessBand()));
-        d.put("Needs", new BsonInt32(s.needsBand()));
-        putString(d, "CommandState", s.commandState());
-        d.put("BreedingPending", BsonBoolean.valueOf(s.breedingPending()));
+        d.put("LifeStageProgress", new BsonDouble(s.lifeStageProgress()));
+        putString(d, "NextLifeStage", s.nextLifeStage());
+        d.put("LifeStageRemaining", new BsonInt64(s.lifeStageRemainingMs()));
+        d.put("ObservedAt", new BsonInt64(s.observedAtMs()));
         return d;
     }
 
     private static CompanionSummary decodeSummary(BsonDocument d) {
-        return new CompanionSummary(getString(d, "Name"), getString(d, "Role"), getString(d, "Icon"),
-                (int) getLong(d, "Level", 0), d.containsKey("Health") ? (float) getDouble(d, "Health") : 1f,
-                getString(d, "LifeStage"), (int) getLong(d, "Happiness", 0), (int) getLong(d, "Needs", 0),
-                getString(d, "CommandState"), getBoolean(d, "BreedingPending"));
+        Map<String, Double> traits = new LinkedHashMap<>();
+        if (d.isDocument("Traits")) {
+            for (Map.Entry<String, BsonValue> e : d.getDocument("Traits").entrySet()) {
+                if (e.getValue().isNumber()) {
+                    traits.put(e.getKey(), e.getValue().asNumber().doubleValue());
+                }
+            }
+        }
+        return new CompanionSummary(getString(d, "CustomName"), getString(d, "NameKey"), getString(d, "Role"),
+                getString(d, "Icon"), (float) getDouble(d, "HealthCurrent"), (float) getDouble(d, "HealthMax"),
+                getString(d, "HappinessConfig"), getDouble(d, "Happiness"), getString(d, "NeedsConfig"),
+                getDouble(d, "Hunger"), getDouble(d, "Thirst"), getBoolean(d, "BreedingEnabled"),
+                getLong(d, "BreedingCooldownUntil", 0), getLong(d, "BreedingCooldownStartedAt", 0),
+                getLong(d, "BreedingCooldownDuration", 0), getLong(d, "HarvestAlarmUntil", 0),
+                getString(d, "LevelingConfig"), (int) getLong(d, "Level", 0), getDouble(d, "CurrentXp"),
+                getDouble(d, "TotalXp"), (int) getLong(d, "TalentPointsSpent", 0), traits,
+                getString(d, "LifeStage"), getDouble(d, "LifeStageProgress"), getString(d, "NextLifeStage"),
+                getLong(d, "LifeStageRemaining", 0), getLong(d, "ObservedAt", 0));
     }
 
     private static void putString(BsonDocument d, String key, @Nullable String value) {
