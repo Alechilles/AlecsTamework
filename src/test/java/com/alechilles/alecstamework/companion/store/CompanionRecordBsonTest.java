@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.index.StoredReason;
 import java.util.List;
 import java.util.UUID;
 import org.bson.BsonDocument;
+import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +62,15 @@ class CompanionRecordBsonTest {
                 .append("Location", new BsonDocument("Kind", new BsonString("TELEPORTING")));
 
         assertThrows(IllegalArgumentException.class, () -> CompanionRecordBson.decode(future));
+    }
+
+    @Test
+    void anOwnerOfTheWrongTypeIsUnreadableRatherThanDropped() {
+        BsonDocument wrongOwner = new BsonDocument("ProfileId", new BsonString(UUID.randomUUID().toString()))
+                .append("Role", new BsonString("Sheep"))
+                .append("Location", new BsonDocument("Kind", new BsonString("ITEM")))
+                .append("Owner", new BsonInt64(42));
+
+        assertThrows(IllegalArgumentException.class, () -> CompanionRecordBson.decode(wrongOwner));
     }
 }

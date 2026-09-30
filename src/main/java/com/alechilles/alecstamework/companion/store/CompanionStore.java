@@ -31,6 +31,8 @@ import org.bson.BsonValue;
  */
 public final class CompanionStore {
     public static final int FORMAT = 1;
+    private static final int SNAPSHOT_FORMAT = 1;
+    private static final List<String> SECTIONS = List.of("WorldBound", "Portable", "Unreadable");
     public static final String UNOWNED_KEY = "_unowned";
 
     /** Result of reading every owner file at startup. */
@@ -80,26 +82,20 @@ public final class CompanionStore {
             try {
                 doc = io.readNow(file);
             } catch (IOException | RuntimeException e) {
-                String suffix = ".unreadable-" + clock.getAsLong();
-                io.moveAside(file, suffix);
-                quarantined.add(file.resolveSibling(name + suffix));
+                quarantined.add(moveAside(file));
                 continue;
             }
             if (doc == null) {
                 continue;
             }
+            List<BsonDocument> raw = entries(doc);
+            if (raw == null) {
+                // Readable, but not a layout this build can rewrite without losing data.
+                quarantined.add(moveAside(file));
+                continue;
+            }
             BsonValue version = doc.get("Version");
             versions.put(key, version != null && version.isNumber() ? version.asNumber().longValue() : 0L);
-            List<BsonDocument> raw = new ArrayList<>();
-            for (String section : List.of("WorldBound", "Portable", "Unreadable")) {
-                if (doc.isArray(section)) {
-                    for (BsonValue value : doc.getArray(section)) {
-                        if (value.isDocument()) {
-                            raw.add(value.asDocument());
-                        }
-                    }
-                }
-            }
             for (BsonDocument entry : raw) {
                 try {
                     CompanionRecord record = CompanionRecordBson.decode(entry);
@@ -120,6 +116,42 @@ public final class CompanionStore {
             }
         }
         return new LoadResult(new ArrayList<>(best.values()), unreadable, unreadableIds, versions, quarantined);
+    }
+
+    /**
+     * Returns every record entry of an owner document, or {@code null} when this build cannot
+     * rewrite the file safely: the format is missing or newer, or a section holds something
+     * other than record documents.
+     */
+    @Nullable
+    private static List<BsonDocument> entries(BsonDocument doc) {
+        BsonValue format = doc.get("Format");
+        if (format == null || !format.isNumber() || format.asNumber().longValue() > FORMAT) {
+            return null;
+        }
+        List<BsonDocument> raw = new ArrayList<>();
+        for (String section : SECTIONS) {
+            BsonValue value = doc.get(section);
+            if (value == null) {
+                continue;
+            }
+            if (!value.isArray()) {
+                return null;
+            }
+            for (BsonValue entry : value.asArray()) {
+                if (!entry.isDocument()) {
+                    return null;
+                }
+                raw.add(entry.asDocument());
+            }
+        }
+        return raw;
+    }
+
+    private Path moveAside(Path file) throws IOException {
+        String suffix = ".unreadable-" + clock.getAsLong();
+        io.moveAside(file, suffix);
+        return file.resolveSibling(file.getFileName() + suffix);
     }
 
     /**
@@ -154,11 +186,31 @@ public final class CompanionStore {
         return io.write(snapshotFile(snapshot.profileId()), snapshot.toBson());
     }
 
-    /** Blocking read; call it off the world thread. {@code null} when there is no snapshot. */
+    /**
+     * Blocking read; call it off the world thread. {@code null} when there is no snapshot.
+     * Throws {@link IOException} when the file is not a snapshot envelope, belongs to another
+     * profile, or uses a newer format.
+     */
     @Nullable
     public SnapshotEnvelope readSnapshotNow(@Nonnull UUID profileId) throws IOException {
-        BsonDocument doc = io.readNow(snapshotFile(profileId));
-        return doc == null ? null : SnapshotEnvelope.fromBson(doc);
+        Path file = snapshotFile(profileId);
+        BsonDocument doc = io.readNow(file);
+        if (doc == null) {
+            return null;
+        }
+        SnapshotEnvelope snapshot;
+        try {
+            snapshot = SnapshotEnvelope.fromBson(doc);
+        } catch (RuntimeException e) {
+            throw new IOException("unreadable snapshot " + file, e);
+        }
+        if (!snapshot.profileId().equals(profileId)) {
+            throw new IOException("snapshot " + file + " belongs to " + snapshot.profileId());
+        }
+        if (snapshot.format() > SNAPSHOT_FORMAT) {
+            throw new IOException("snapshot " + file + " has newer format " + snapshot.format());
+        }
+        return snapshot;
     }
 
     @Nonnull

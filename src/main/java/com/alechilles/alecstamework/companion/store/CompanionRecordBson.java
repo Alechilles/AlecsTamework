@@ -95,7 +95,7 @@ public final class CompanionRecordBson {
             b.revision(getLong(d, "Revision", 0)).generation(getLong(d, "Generation", 0));
             b.ownerUuid(getUuid(d, "Owner")).ownerName(getString(d, "OwnerName"));
             b.displayName(getString(d, "Name"));
-            String scope = getString(d, "Scope");
+            String scope = getStrictString(d, "Scope");
             b.scope(scope == null ? RecordScope.WORLD_BOUND : RecordScope.valueOf(scope));
             b.homeWorld(getString(d, "HomeWorld")).currentNpcUuid(getUuid(d, "NpcUuid"));
             if (d.isDocument("Summary")) {
@@ -229,9 +229,21 @@ public final class CompanionRecordBson {
         return d.isString(key) ? d.getString(key).getValue() : null;
     }
 
+    /**
+     * Like {@link #getString} for fields whose value decides identity or placement: a missing
+     * key means the default, but a value of another type makes the record unreadable.
+     */
+    @Nullable
+    private static String getStrictString(BsonDocument d, String key) {
+        if (d.containsKey(key) && !d.isString(key)) {
+            throw new IllegalArgumentException(key + " is not a string");
+        }
+        return getString(d, key);
+    }
+
     @Nullable
     private static UUID getUuid(BsonDocument d, String key) {
-        String value = getString(d, key);
+        String value = getStrictString(d, key);
         return value == null ? null : UUID.fromString(value);
     }
 

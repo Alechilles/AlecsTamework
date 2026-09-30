@@ -28,6 +28,9 @@ public interface CompanionFileIo {
     @Nonnull
     List<Path> list(@Nonnull Path directory) throws IOException;
 
-    /** Moves {@code file} and its {@code .bak} aside so they are never overwritten. */
+    /**
+     * Moves {@code file} and its {@code .bak} aside so they are never overwritten. Afterwards
+     * {@code <file><suffix>} exists. Fails rather than replacing a file already at a target name.
+     */
     void moveAside(@Nonnull Path file, @Nonnull String suffix) throws IOException;
 }

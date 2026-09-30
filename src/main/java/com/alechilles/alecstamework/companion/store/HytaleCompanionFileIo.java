@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
@@ -31,14 +31,8 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
     @Override
     @Nonnull
     public CompletableFuture<Void> write(@Nonnull Path file, @Nonnull BsonDocument document) {
-        return storage.get().doSave(file, () -> {
-            try {
-                Files.createDirectories(file.getParent());
-            } catch (IOException e) {
-                return CompletableFuture.failedFuture(e);
-            }
-            return BsonUtil.writeDocument(file, document, true);
-        });
+        // BsonUtil.writeDocument creates missing parent directories itself.
+        return storage.get().doSave(file, () -> BsonUtil.writeDocument(file, document, true));
     }
 
     @Override
@@ -50,7 +44,8 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
         }
         BsonDocument document;
         try {
-            document = BsonUtil.readDocument(file, true).join();
+            // Through doLoad so a pending save or delete of the same path finishes first.
+            document = storage.get().doLoad(file, () -> BsonUtil.readDocument(file, true)).join();
         } catch (CompletionException | IllegalStateException e) {
             throw new IOException("unreadable companion file " + file, e);
         }
@@ -74,24 +69,45 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
         }));
     }
 
+    /**
+     * Also returns {@code <key>.json} for a {@code <key>.json.bak} whose main file is missing.
+     * A crash between BsonUtil's two moves can leave only the backup, and {@link #readNow}
+     * then loads it.
+     */
     @Override
     @Nonnull
     public List<Path> list(@Nonnull Path directory) throws IOException {
         if (!Files.isDirectory(directory)) {
             return List.of();
         }
+        TreeSet<Path> result = new TreeSet<>();
         try (Stream<Path> files = Files.list(directory)) {
-            return files.filter(p -> p.getFileName().toString().endsWith(".json")).sorted().toList();
+            files.forEach(p -> {
+                String name = p.getFileName().toString();
+                if (name.endsWith(".json")) {
+                    result.add(p);
+                } else if (name.endsWith(".json.bak")) {
+                    result.add(p.resolveSibling(name.substring(0, name.length() - ".bak".length())));
+                }
+            });
         }
+        return List.copyOf(result);
     }
 
+    /**
+     * Never replaces an existing file, so a name collision fails instead of overwriting an
+     * earlier quarantined copy. A backup with no main file becomes {@code <file><suffix>}, so
+     * that path always exists after a successful call.
+     */
     @Override
     public void moveAside(@Nonnull Path file, @Nonnull String suffix) throws IOException {
+        Path aside = file.resolveSibling(file.getFileName() + suffix);
         if (Files.exists(file)) {
-            Files.move(file, file.resolveSibling(file.getFileName() + suffix), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(file, aside);
+            aside = file.resolveSibling(file.getFileName() + ".bak" + suffix);
         }
         if (Files.exists(bak(file))) {
-            Files.move(bak(file), file.resolveSibling(file.getFileName() + ".bak" + suffix), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(bak(file), aside);
         }
     }
 

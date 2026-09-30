@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.RecordScope;
 import com.hypixel.hytale.server.core.universe.StorageManager;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionStoreTest {
@@ -128,5 +130,54 @@ class CompanionStoreTest {
 
         store.deleteSnapshot(id).join();
         assertNull(store.readSnapshotNow(id));
+    }
+
+    @Test
+    void anOwnerFileLeftOnlyAsABackupStillLoads() throws Exception {
+        CompanionStore store = store();
+        CompanionRecord first = record(ALICE, 0, RecordScope.WORLD_BOUND);
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(first), List.of()).join();
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(first, record(ALICE, 0, RecordScope.WORLD_BOUND)), List.of()).join();
+        Files.delete(root.resolve("owners").resolve(ALICE + ".json"));
+
+        CompanionStore.LoadResult loaded = store().loadAll();
+
+        assertEquals(List.of(first), loaded.records());
+        assertTrue(loaded.quarantinedFiles().isEmpty());
+    }
+
+    @Test
+    void anOwnerFileFromANewerFormatIsMovedAsideAndOtherOwnersStillLoad() throws Exception {
+        CompanionStore store = store();
+        CompanionRecord bobs = record(BOB, 0, RecordScope.WORLD_BOUND);
+        store.writeOwner(CompanionStore.ownerKey(BOB), 1, List.of(bobs), List.of()).join();
+        Path alice = root.resolve("owners").resolve(ALICE + ".json");
+        BsonDocument newer = new BsonDocument("Format", new org.bson.BsonInt32(CompanionStore.FORMAT + 1))
+                .append("Owner", new BsonString(ALICE.toString()))
+                .append("WorldBound", new org.bson.BsonArray(List.of(CompanionRecordBson.encode(record(ALICE, 0, RecordScope.WORLD_BOUND)))));
+        new HytaleCompanionFileIo(() -> new StorageManager(() -> false)).write(alice, newer).join();
+
+        CompanionStore.LoadResult loaded = store().loadAll();
+
+        assertEquals(List.of(bobs), loaded.records());
+        assertEquals(1, loaded.quarantinedFiles().size());
+        assertTrue(Files.notExists(alice));
+        assertTrue(Files.exists(loaded.quarantinedFiles().get(0)));
+    }
+
+    @Test
+    void aSnapshotThatIsNotAnEnvelopeOrBelongsToAnotherProfileFailsToRead() throws Exception {
+        CompanionStore store = store();
+        Path snapshots = root.resolve("snapshots");
+        UUID notAnEnvelope = UUID.randomUUID();
+        Files.createDirectories(snapshots);
+        Files.writeString(snapshots.resolve(notAnEnvelope + ".json"), "{ \"Hello\": 1 }");
+        UUID someoneElse = UUID.randomUUID();
+        UUID mismatched = UUID.randomUUID();
+        store.writeSnapshot(new SnapshotEnvelope(someoneElse, 1, 1, new BsonDocument())).join();
+        Files.move(snapshots.resolve(someoneElse + ".json"), snapshots.resolve(mismatched + ".json"));
+
+        assertThrows(IOException.class, () -> store.readSnapshotNow(notAnEnvelope));
+        assertThrows(IOException.class, () -> store.readSnapshotNow(mismatched));
     }
 }
