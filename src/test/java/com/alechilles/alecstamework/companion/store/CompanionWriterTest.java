@@ -75,9 +75,11 @@ class CompanionWriterTest {
     void flushNowIsNotCompletedByAFlushThatStartedBeforeTheChange() throws Exception {
         CompanionRecord r = insertLive(ALICE);
         CountDownLatch gate = new CountDownLatch(1);
+        CountDownLatch entered = new CountDownLatch(1);
+        io.writeEntered = entered;
         io.blockWrites = gate;
         CompletableFuture<Void> first = writer.flushNow(ALICE);   // this flush blocks inside write
-        Thread.sleep(100);
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
         index.update(r.profileId(), 0, b -> b.displayName("After"));
         CompletableFuture<Void> second = writer.flushNow(ALICE);
 
@@ -115,6 +117,66 @@ class CompanionWriterTest {
 
         assertEquals(List.of(ownerFile(BOB)), io.writeOrder.subList(0, 1));
         assertFalse(io.files.containsKey(ownerFile(ALICE)), "an owner with nothing left has no file");
+    }
+
+    @Test
+    void transferWhileOldOwnerIsAlreadyDirtyStillWritesNewOwnerFirst() throws Exception {
+        CompanionRecord r = insertLive(ALICE);   // ALICE is dirty and not yet flushed
+
+        index.update(r.profileId(), 0, b -> b.ownerUuid(BOB));
+        writer.flushNow(BOB).get(2, TimeUnit.SECONDS);
+
+        assertEquals(List.of(ownerFile(BOB), ownerFile(ALICE)), io.opOrder);
+        assertTrue(io.files.containsKey(ownerFile(BOB)));
+        assertFalse(io.files.containsKey(ownerFile(ALICE)), "an owner with nothing left has no file");
+    }
+
+    @Test
+    void oneFailingOwnerDoesNotBlockOthers() throws Exception {
+        insertLive(ALICE);
+        insertLive(BOB);
+        io.failPaths.add(ownerFile(ALICE));
+        CountDownLatch hold = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { hold.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+        CompletableFuture<Void> alice = writer.flushNow(ALICE);
+        CompletableFuture<Void> bob = writer.flushNow(BOB);
+        hold.countDown();   // both waiters are registered before the flush takes them
+
+        bob.get(2, TimeUnit.SECONDS);
+        assertTrue(io.files.containsKey(ownerFile(BOB)));
+        ExecutionException failure = assertThrows(ExecutionException.class, () -> alice.get(2, TimeUnit.SECONDS));
+        assertTrue(failure.getCause().getMessage().contains("injected"));
+        assertFalse(io.files.containsKey(ownerFile(ALICE)));
+    }
+
+    @Test
+    void aFailedDeleteDoesNotEraseANewerSnapshot() throws Exception {
+        insertLive(ALICE);
+        UUID profile = UUID.randomUUID();
+        Path snapshotFile = ROOT.resolve("snapshots").resolve(profile + ".json");
+        writer.queueSnapshotDelete(profile);
+        io.failPaths.add(snapshotFile);
+        CountDownLatch gate = new CountDownLatch(1);
+        CountDownLatch entered = new CountDownLatch(1);
+        io.writeEntered = entered;
+        io.blockWrites = gate;
+
+        // The delete fails, then the flush holds on ALICE's owner write.
+        CompletableFuture<Void> first = writer.flushNow(ALICE);
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        writer.queueSnapshot(new SnapshotEnvelope(profile, 1, 2, new BsonDocument()));
+        io.failPaths.clear();
+        io.blockWrites = null;
+        gate.countDown();
+        first.get(2, TimeUnit.SECONDS);
+
+        writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
+
+        SnapshotEnvelope written = store.readSnapshotNow(profile);
+        assertTrue(written != null, "the newer snapshot must survive the failed delete");
+        assertEquals(2, written.generation());
     }
 
     @Test
