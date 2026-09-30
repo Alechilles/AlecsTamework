@@ -221,11 +221,12 @@ public final class CompanionWriter {
     }
 
     /**
-     * Final flush on shutdown, then shuts the executor down. Returns true only when the final
-     * flush finished in time and nothing is left unwritten. A second call returns the first
-     * call's result, or false while the first call is still running.
+     * Final flush on shutdown, then shuts the executor down. {@code timeoutMs} is how long to
+     * wait for the final flush, not an absolute time. Returns true only when the final flush
+     * finished within it and nothing is left unwritten. A second call returns the first call's
+     * result, or false while the first call is still running.
      */
-    public boolean shutdown(long deadlineMs) {
+    public boolean shutdown(long timeoutMs) {
         synchronized (lock) {
             if (closed) {
                 return Boolean.TRUE.equals(shutdownResult);
@@ -235,7 +236,7 @@ public final class CompanionWriter {
         boolean finished = false;
         try {
             Future<?> finalFlush = executor.submit(this::flushSafely);
-            finalFlush.get(deadlineMs, TimeUnit.MILLISECONDS);
+            finalFlush.get(timeoutMs, TimeUnit.MILLISECONDS);
             finished = true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -7,6 +7,9 @@ import com.alechilles.alecstamework.companion.store.MemoryCompanionFileIo;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import org.bson.BsonDocument;
+import org.bson.BsonInt32;
+import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,8 +57,12 @@ class CompanionPersistenceModuleTest {
     }
 
     @Test
-    void anUnreadableStoreFailsWithoutWriting() {
+    void anUnreadableStoreFailsWithoutTouchingItsFiles() throws Exception {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
+        Path ownerFile = ROOT.resolve("owners").resolve(OWNER + ".json");
+        BsonDocument saved = new BsonDocument("Format", new BsonInt32(1)).append("Owner", new BsonString(OWNER.toString()));
+        io.write(ownerFile, saved).join();
+        List<Path> seeded = io.writtenPaths();
         io.failReads(true);
 
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
@@ -63,7 +70,9 @@ class CompanionPersistenceModuleTest {
 
         assertEquals(CompanionPersistenceModule.State.FAILED, module.state());
         assertNotNull(module.failure());
-        assertTrue(io.writtenPaths().isEmpty());
+        assertEquals(seeded, io.writtenPaths(), "nothing may be written or deleted, not even meta.json");
+        io.failReads(false);
+        assertEquals(saved, io.readNow(ownerFile), "the unread owner file must stay as it was");
         module.shutdown(System.currentTimeMillis() + 1_000L);
     }
 

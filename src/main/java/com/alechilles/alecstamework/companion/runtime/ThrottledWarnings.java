@@ -6,7 +6,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** Allows one WARN per key per interval, so repeated failures on hot paths stay readable. */
+/**
+ * Allows one WARN per key per interval, so repeated failures on hot paths stay readable. Keys
+ * must be a small fixed set of categories, not per-entity or per-file values: the map is never
+ * pruned.
+ */
 public final class ThrottledWarnings {
     private final LongSupplier clock;
     private final long intervalMs;

@@ -81,7 +81,9 @@ public final class CompanionPersistenceModule {
         CompanionStore.LoadResult result;
         try {
             result = store.loadAll();
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
+            // RuntimeException covers UncheckedIOException and DirectoryIteratorException from
+            // listing, and a missing StorageManager.
             LOGGER.at(Level.SEVERE).withCause(e).log("Companion store at %s could not be read; "
                     + "companion persistence is disabled and nothing will be written", root);
             return failed(State.FAILED, String.valueOf(e.getMessage()), clock);
@@ -92,7 +94,7 @@ public final class CompanionPersistenceModule {
         if (!exists.test(meta)) {
             try {
                 io.write(meta, CompanionStorage.meta(createdBy)).join();
-            } catch (CompletionException | IllegalStateException e) {
+            } catch (RuntimeException e) {
                 Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
                 LOGGER.at(Level.SEVERE).withCause(cause).log("Could not write %s; "
                         + "companion persistence is disabled", meta);
