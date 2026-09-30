@@ -1913,3 +1913,6 @@ items.Tamework_Input_Rune_R.name = Tamework-Steuerung R
 items.Tamework_Input_Rune_R.description = Vorübergehende Steuerungsrune. Deine ausgerüstete Rune wird wiederhergestellt, wenn du den Gegenstand wechselst oder den Avatarflug beendest.
 
 tamework.ui.notifications.transformation.unavailable=Dieses Tier kann sich gerade nicht verwandeln.
+
+tamework.companions.persistence.migrationRequired = Tamework hat in dieser Welt Begleiter-Speicherdaten einer älteren Version gefunden. Das Speichern von Begleitern ist pausiert, bis die Welt von einer Tamework-Version mit Importfunktion migriert wurde. Bewahre eine Sicherung dieser Welt auf.
+tamework.companions.persistence.failed = Tamework konnte seine Begleiter-Speicherdateien nicht lesen. Das Speichern von Begleitern ist pausiert, um sie zu schützen. Prüfe das Serverprotokoll.

@@ -247,6 +247,16 @@ public final class ReplacementTameworkApiFactory {
         );
     }
 
+    /**
+     * Installs the activity runtime without a public api, for the companion index cut-over.
+     * The feed has no subscribers, so activities are dropped; care credits and producers work.
+     */
+    public static void installStandaloneActivityRuntime(
+            @Nonnull ManagedActivityConfigRegistry managedActivities
+    ) {
+        ActivityRuntime.install(new LiveActivityFeed().publisher(), managedActivities);
+    }
+
     private static TameworkApiImpl base(
             PersistenceBootstrap persistence,
             Duration readTimeout,

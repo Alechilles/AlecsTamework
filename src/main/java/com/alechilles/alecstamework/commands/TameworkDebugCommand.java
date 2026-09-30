@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.persistence.runtime.PersistenceDiagnosticsRe
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
 import java.util.function.Consumer;
@@ -21,7 +23,9 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
             SpawnBeaconVisualizationService spawnBeaconVisualizationService,
             @Nullable PublicPersistenceQueries persistenceQueries,
             @Nullable PublicPersistenceOperations persistenceOperations,
-            @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink
+            @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink,
+            @Nullable ReleaseFlow releaseFlow,
+            @Nullable CompanionQueries companions
     ) {
         super("debug", "server.tamework.commands.debug.description");
         addSubCommand(new TameworkDebugSetCommand());
@@ -29,7 +33,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugLogCommand());
         addSubCommand(new TameworkDebugViewCommand(spawnBeaconVisualizationService));
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());
-        addSubCommand(new TameworkDebugClearOwnedCommand(null, null));
+        addSubCommand(new TameworkDebugClearOwnedCommand(releaseFlow, companions));
         addSubCommand(new TameworkDebugTelemetryCommand());
         addSubCommand(new TameworkDebugPersistenceCommand(
                 persistenceDiagnostics,

@@ -1913,3 +1913,6 @@ items.Tamework_Input_Rune_R.name = Commande Tamework R
 items.Tamework_Input_Rune_R.description = Rune de commande temporaire. Votre rune équipée est restaurée lorsque vous changez d’objet ou quittez le vol d’avatar.
 
 tamework.ui.notifications.transformation.unavailable=Cet animal ne peut pas se transformer pour le moment.
+
+tamework.companions.persistence.migrationRequired = Tamework a trouvé des sauvegardes de compagnons d'une ancienne version dans ce monde. La sauvegarde des compagnons est suspendue jusqu'à ce que le monde soit migré par une version de Tamework dotée de l'importateur. Conservez une sauvegarde de ce monde.
+tamework.companions.persistence.failed = Tamework n'a pas pu lire ses fichiers de sauvegarde de compagnons. La sauvegarde des compagnons est suspendue pour les protéger. Consultez le journal du serveur.

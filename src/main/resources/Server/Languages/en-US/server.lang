@@ -1925,3 +1925,6 @@ items.Tamework_Input_Rune_R.name = Tamework input R
 items.Tamework_Input_Rune_R.description = Temporary control rune. Your equipped rune returns when you switch items or leave avatar flight.
 
 tamework.ui.notifications.transformation.unavailable=This animal cannot transform right now.
+
+tamework.companions.persistence.migrationRequired = Tamework found companion saves from an older version on this world. Companion saving is paused until the world is migrated by a Tamework build that includes the importer. Keep a backup of this world.
+tamework.companions.persistence.failed = Tamework could not read its companion save files. Companion saving is paused to protect them. Check the server log.

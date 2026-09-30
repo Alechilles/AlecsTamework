@@ -1913,3 +1913,6 @@ items.Tamework_Input_Rune_R.name = Controle do Tamework R
 items.Tamework_Input_Rune_R.description = Runa de controle temporária. Sua runa equipada é restaurada quando você troca de item ou sai do voo de avatar.
 
 tamework.ui.notifications.transformation.unavailable=Este animal não pode se transformar agora.
+
+tamework.companions.persistence.migrationRequired = O Tamework encontrou salvamentos de companheiros de uma versão anterior neste mundo. O salvamento de companheiros está pausado até que o mundo seja migrado por uma versão do Tamework com o importador. Mantenha um backup deste mundo.
+tamework.companions.persistence.failed = O Tamework não conseguiu ler seus arquivos de salvamento de companheiros. O salvamento de companheiros está pausado para protegê-los. Verifique o log do servidor.
