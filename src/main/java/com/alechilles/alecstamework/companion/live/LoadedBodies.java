@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.live;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -27,6 +28,11 @@ public final class LoadedBodies<R> {
     /** Unregisters {@code body} only if it is the registered body. Returns true when it was. */
     public boolean removeIfSame(@Nonnull UUID profileId, @Nonnull R body) {
         return bodies.remove(profileId, body);
+    }
+
+    /** Visits every entry. The map is concurrent, so entries changed during the visit may or may not be seen. */
+    public void forEach(@Nonnull BiConsumer<UUID, R> action) {
+        bodies.forEach(action);
     }
 
     /** Drops every entry matching {@code filter}, for example all bodies of a removed world. */

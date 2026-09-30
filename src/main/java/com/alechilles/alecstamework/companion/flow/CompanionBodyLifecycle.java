@@ -193,6 +193,54 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     }
 
     /**
+     * Spec 8.8: the registered body's delete-on-remove world is being removed, and its entities
+     * get no removal callbacks. Takes a snapshot at generation+1 and records LOST with cause
+     * WORLD_REMOVED, then unregisters the body. Runs on the body's world thread.
+     */
+    void worldRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull UUID profileId) {
+        CompanionRecord record = index.get(profileId);
+        if (record == null || record.location().kind() != LocationKind.LIVE || !ref.equals(loaded.get(profileId))) {
+            return;
+        }
+        Long snapshotAt = snapshot(ref, store, record, record.generation() + 1);
+        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(ref, store, summaries);
+        boolean recorded = index.atomically(() -> {
+            // Re-read under the lock: apply only to the same LIVE holder the snapshot was taken for.
+            CompanionRecord current = index.get(profileId);
+            boolean sameHolder = current != null && current.location().kind() == LocationKind.LIVE
+                    && current.generation() == record.generation() && ref.equals(loaded.get(profileId));
+            loaded.removeIfSame(profileId, ref);
+            return sameHolder && index.update(profileId, current.revision(), CompanionTransitions.lost(current,
+                    facts == null ? current.summary() : facts.summary(),
+                    CompanionTransitions.CAUSE_WORLD_REMOVED, snapshotAt)).applied();
+        });
+        if (!recorded) {
+            warn("world-removed-skipped", "Companion record %s changed before its world removal was recorded", profileId);
+        }
+    }
+
+    /**
+     * Spec 8.8: the registered body's world is being removed but kept on disk, and its entities
+     * get no removal callbacks. Unregisters the body and refreshes the record as the UNLOAD path
+     * does, with a snapshot only when one is due. Runs on the body's world thread.
+     */
+    void worldUnloaded(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull UUID profileId) {
+        CompanionRecord record = index.get(profileId);
+        if (record == null || !ref.equals(loaded.get(profileId))) {
+            return;
+        }
+        index.atomically(() -> loaded.removeIfSame(profileId, ref));
+        CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
+        if (body == null) {
+            return;
+        }
+        Long snapshotAt = CompanionTransitions.snapshotDue(record, clock.getAsLong())
+                ? snapshot(ref, store, record, record.generation()) : null;
+        update(profileId, r -> r.location().kind() == LocationKind.LIVE,
+                r -> CompanionTransitions.unloaded(body, snapshotAt));
+    }
+
+    /**
      * Moves a LIVE record to DEAD, or to RELEASED for an old-age death. {@code registered} is the
      * dying body when it is still the registered body; null when the death is seen only at
      * removal (no snapshot is taken then).
