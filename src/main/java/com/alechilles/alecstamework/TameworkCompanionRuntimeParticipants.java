@@ -80,6 +80,15 @@ public final class TameworkCompanionRuntimeParticipants {
                         NPCEntity.getComponentType(), plugin.getOwnerComponentType()));
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "npcnamepersistencesystem",
                 () -> new NpcNamePersistenceSystem(plugin.getNpcNameComponentType(), NPCEntity.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionchangedetectorsystem",
+                () -> new com.alechilles.alecstamework.companion.live.CompanionChangeDetectorSystem(
+                        NPCEntity.getComponentType(),
+                        com.alechilles.alecstamework.npc.components.TameworkOwnerComponent.getComponentType(),
+                        com.alechilles.alecstamework.companion.live.CompanionChangeTracker.getComponentType(),
+                        com.alechilles.alecstamework.companion.live.CompanionFingerprints.production(),
+                        () -> System.nanoTime() / 1_000_000L, // monotonic: wall-clock steps must not stall checks
+                        2_000L,
+                        60_000L));
         participants.entitySystem(TameworkRuntimeModule.DEBUG_SELF_TEST, "playerinputdebugsystem",
                 () -> new PlayerInputDebugSystem(PlayerInput.getComponentType(), UUIDComponent.getComponentType(),
                         MovementStatesComponent.getComponentType(), HeadRotation.getComponentType(),
