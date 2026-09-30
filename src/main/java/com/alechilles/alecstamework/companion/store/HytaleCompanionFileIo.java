@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.store;
 
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.StorageManager;
 import com.hypixel.hytale.server.core.util.BsonUtil;
 import java.io.IOException;
@@ -10,10 +11,13 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -24,6 +28,10 @@ import org.bson.BsonDocument;
  * serialized per path and held back while a Hytale backup runs.
  */
 public final class HytaleCompanionFileIo implements CompanionFileIo {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    /** Files already reported as loaded from backup, so each is logged once per process. */
+    private static final Set<Path> WARNED_BACKUPS = ConcurrentHashMap.newKeySet();
+
     private final Supplier<StorageManager> storage;
 
     public HytaleCompanionFileIo(@Nonnull Supplier<StorageManager> storage) {
@@ -41,7 +49,8 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
      * Every check and read runs inside {@code doLoad}, so a pending save or delete of the same
      * path finishes first: a read racing a delete returns {@code null}, never "unreadable". Any
      * failure other than a parse failure, including a failed pending save of the same path, is
-     * reported as {@link CompanionFileAccessException}. Logs nothing.
+     * reported as {@link CompanionFileAccessException}. Logs one WARN per file per process when
+     * the {@code .bak} copy is used.
      */
     @Override
     @Nullable
@@ -80,6 +89,10 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
         if (backup != null) {
             BsonDocument document = parseOrNull(backup);
             if (document != null) {
+                if (WARNED_BACKUPS.add(file)) {
+                    LOGGER.at(Level.WARNING).log("Companion file %s was %s; loaded its backup copy instead",
+                            file, main == null ? "missing" : "unreadable");
+                }
                 return new ReadOutcome(document, false);
             }
         }

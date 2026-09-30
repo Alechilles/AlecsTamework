@@ -16,9 +16,10 @@ import org.bson.BsonDocument;
 /**
  * In-memory file access for writer tests. Records the order of successful writes and deletes,
  * can fail the next N writes or every write and delete to chosen paths, and can hold writes at
- * a gate while signalling that a write has started.
+ * a gate while signalling that a write has started. Public so other companion packages' tests
+ * can use it.
  */
-final class MemoryCompanionFileIo implements CompanionFileIo {
+public final class MemoryCompanionFileIo implements CompanionFileIo {
     final Map<Path, BsonDocument> files = new ConcurrentHashMap<>();
     /** Successful writes, in order. */
     final List<Path> writeOrder = Collections.synchronizedList(new ArrayList<>());
@@ -28,6 +29,26 @@ final class MemoryCompanionFileIo implements CompanionFileIo {
     final Set<Path> failPaths = ConcurrentHashMap.newKeySet();
     volatile CountDownLatch blockWrites;
     volatile CountDownLatch writeEntered;
+    private volatile boolean failReads;
+
+    public MemoryCompanionFileIo() {
+    }
+
+    /** When true, {@link #readNow} and {@link #list} throw {@link CompanionFileAccessException}. */
+    public void failReads(boolean fail) {
+        failReads = fail;
+    }
+
+    public boolean exists(Path file) {
+        return files.containsKey(file);
+    }
+
+    /** Every successful write and delete so far, in order. */
+    public List<Path> writtenPaths() {
+        synchronized (opOrder) {
+            return List.copyOf(opOrder);
+        }
+    }
 
     @Override
     public CompletableFuture<Void> write(Path file, BsonDocument document) {
@@ -49,7 +70,10 @@ final class MemoryCompanionFileIo implements CompanionFileIo {
     }
 
     @Override
-    public BsonDocument readNow(Path file) {
+    public BsonDocument readNow(Path file) throws IOException {
+        if (failReads) {
+            throw new CompanionFileAccessException("injected read failure " + file, null);
+        }
         return files.get(file);
     }
 
@@ -64,7 +88,10 @@ final class MemoryCompanionFileIo implements CompanionFileIo {
     }
 
     @Override
-    public List<Path> list(Path directory) {
+    public List<Path> list(Path directory) throws IOException {
+        if (failReads) {
+            throw new CompanionFileAccessException("injected list failure " + directory, null);
+        }
         return files.keySet().stream().filter(p -> directory.equals(p.getParent())).sorted().toList();
     }
 
