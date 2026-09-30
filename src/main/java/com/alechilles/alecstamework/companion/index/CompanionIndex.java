@@ -69,7 +69,11 @@ public final class CompanionIndex {
         return records.get(profileId);
     }
 
-    /** Every record filed under this owner, including RELEASED tombstones. {@code null} means unowned. */
+    /**
+     * Every record filed under this owner, including RELEASED tombstones. {@code null} means unowned.
+     * Secondary maps can briefly hold a stale id during an update, so each hit is checked against
+     * the authoritative record.
+     */
     @Nonnull
     public List<CompanionRecord> fileRecords(@Nullable UUID owner) {
         Set<UUID> ids = profilesByOwner.get(ownerKey(owner));
@@ -79,7 +83,7 @@ public final class CompanionIndex {
         List<CompanionRecord> out = new ArrayList<>(ids.size());
         for (UUID id : ids) {
             CompanionRecord record = records.get(id);
-            if (record != null) {
+            if (record != null && Objects.equals(record.ownerUuid(), owner)) {
                 out.add(record);
             }
         }
@@ -107,13 +111,16 @@ public final class CompanionIndex {
     @Nullable
     public CompanionRecord byNpcUuid(@Nonnull UUID npcUuid) {
         UUID id = profileByNpc.get(npcUuid);
-        return id == null ? null : records.get(id);
+        CompanionRecord record = id == null ? null : records.get(id);
+        return record != null && npcUuid.equals(record.currentNpcUuid()) ? record : null;
     }
 
     @Nullable
     public CompanionRecord byOrigin(@Nonnull String namespace, @Nonnull String key) {
         UUID id = profileByOrigin.get(originKey(namespace, key));
-        return id == null ? null : records.get(id);
+        CompanionRecord record = id == null ? null : records.get(id);
+        return record != null && namespace.equals(record.originNamespace()) && key.equals(record.originKey())
+                ? record : null;
     }
 
     public void forEach(@Nonnull Consumer<CompanionRecord> action) {
@@ -171,17 +178,55 @@ public final class CompanionIndex {
             String origin = originKey(changed);
             UUID originHolder = origin == null ? null : profileByOrigin.get(origin);
             if (originHolder != null && !originHolder.equals(profileId)) {
-                return new Mutation(Status.DUPLICATE, before, null);
+                return new Mutation(Status.DUPLICATE, records.get(originHolder), null);
             }
             CompanionRecord after = changed.toBuilder()
                     .revision(before.revision() + 1)
                     .updatedAtMs(clock.getAsLong())
                     .build();
-            removeFromMaps(before);
-            records.put(profileId, after);
-            addToMaps(after);
+            replaceInMaps(before, after);
             listener.onChanged(before, after);
             return new Mutation(Status.APPLIED, before, after);
+        }
+    }
+
+    /**
+     * Swaps {@code before} for {@code after} without a window where lock-free readers miss the
+     * record: only changed secondary keys are touched, new keys are added before the record is
+     * replaced, and old keys are removed after. Empty owner sets are left in place.
+     */
+    private void replaceInMaps(CompanionRecord before, CompanionRecord after) {
+        UUID profileId = after.profileId();
+        UUID oldOwner = ownerKey(before.ownerUuid());
+        UUID newOwner = ownerKey(after.ownerUuid());
+        UUID oldNpc = before.currentNpcUuid();
+        UUID newNpc = after.currentNpcUuid();
+        String oldOrigin = originKey(before);
+        String newOrigin = originKey(after);
+
+        if (!oldOwner.equals(newOwner)) {
+            profilesByOwner.computeIfAbsent(newOwner, k -> ConcurrentHashMap.newKeySet()).add(profileId);
+        }
+        if (newNpc != null && !newNpc.equals(oldNpc)) {
+            profileByNpc.put(newNpc, profileId);
+        }
+        if (newOrigin != null && !newOrigin.equals(oldOrigin)) {
+            profileByOrigin.put(newOrigin, profileId);
+        }
+
+        records.put(profileId, after);
+
+        if (!oldOwner.equals(newOwner)) {
+            Set<UUID> ids = profilesByOwner.get(oldOwner);
+            if (ids != null) {
+                ids.remove(profileId);
+            }
+        }
+        if (oldNpc != null && !oldNpc.equals(newNpc)) {
+            profileByNpc.remove(oldNpc, profileId);
+        }
+        if (oldOrigin != null && !oldOrigin.equals(newOrigin)) {
+            profileByOrigin.remove(oldOrigin, profileId);
         }
     }
 
@@ -194,24 +239,6 @@ public final class CompanionIndex {
         String origin = originKey(record);
         if (origin != null) {
             profileByOrigin.put(origin, record.profileId());
-        }
-    }
-
-    private void removeFromMaps(CompanionRecord record) {
-        UUID owner = ownerKey(record.ownerUuid());
-        Set<UUID> ids = profilesByOwner.get(owner);
-        if (ids != null) {
-            ids.remove(record.profileId());
-            if (ids.isEmpty()) {
-                profilesByOwner.remove(owner);
-            }
-        }
-        if (record.currentNpcUuid() != null) {
-            profileByNpc.remove(record.currentNpcUuid(), record.profileId());
-        }
-        String origin = originKey(record);
-        if (origin != null) {
-            profileByOrigin.remove(origin, record.profileId());
         }
     }
 

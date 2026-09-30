@@ -8,9 +8,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -86,6 +88,51 @@ class CompanionIndexTest {
 
         assertEquals(CompanionIndex.Status.DUPLICATE, second.status());
         assertEquals(ALICE, index.byOrigin("hydragon", "soul-1").ownerUuid());
+    }
+
+    @Test
+    void updateCannotTakeAnotherRecordsOrigin() {
+        CompanionRecord a = live(ALICE).toBuilder().origin("hydragon", "soul-1").build();
+        CompanionRecord b = live(BOB);
+        index.insert(a);
+        index.insert(b);
+
+        CompanionIndex.Mutation taken = index.update(b.profileId(), 0, x -> x.origin("hydragon", "soul-1"));
+
+        assertEquals(CompanionIndex.Status.DUPLICATE, taken.status());
+        assertEquals(a.profileId(), taken.before().profileId());
+        assertEquals(a.profileId(), index.byOrigin("hydragon", "soul-1").profileId());
+    }
+
+    @Test
+    void readersNeverMissARecordDuringConcurrentUpdates() throws Exception {
+        UUID body = UUID.randomUUID();
+        CompanionRecord r = live(ALICE).toBuilder().currentNpcUuid(body).build();
+        index.insert(r);
+        AtomicReference<Throwable> writerFailure = new AtomicReference<>();
+        Thread writer = new Thread(() -> {
+            try {
+                long revision = 0;
+                for (int i = 0; i < 20_000; i++) {
+                    String name = "Name" + i;
+                    CompanionIndex.Mutation m = index.update(r.profileId(), revision, b -> b.displayName(name));
+                    revision = m.after().revision();
+                }
+            } catch (Throwable t) {
+                writerFailure.set(t);
+            }
+        });
+        writer.start();
+        try {
+            for (int i = 0; i < 200_000; i++) {
+                assertEquals(1, index.fileRecords(ALICE).size());
+                assertEquals(1, index.ownedCount(ALICE));
+                assertNotNull(index.byNpcUuid(body));
+            }
+        } finally {
+            writer.join();
+        }
+        assertNull(writerFailure.get());
     }
 
     @Test
