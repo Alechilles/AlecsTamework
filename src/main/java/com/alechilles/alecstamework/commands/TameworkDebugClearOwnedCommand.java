@@ -4,19 +4,11 @@ import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
-import com.hypixel.hytale.component.Store;
+import com.alechilles.alecstamework.items.ReleasedBodyRemoval;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.universe.Universe;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -82,7 +74,7 @@ public final class TameworkDebugClearOwnedCommand extends AbstractTameworkServer
                     }
                     cleared++;
                     if (outcome.body() != null && record.currentNpcUuid() != null) {
-                        removeOnBodyWorld(outcome.body(), record.currentNpcUuid());
+                        ReleasedBodyRemoval.removeOnBodyWorld(outcome.body(), record.currentNpcUuid());
                     }
                 } catch (RuntimeException failure) {
                     failed++;
@@ -103,26 +95,6 @@ public final class TameworkDebugClearOwnedCommand extends AbstractTameworkServer
         LocationKind kind = record.location().kind();
         return (kind == LocationKind.LIVE || kind == LocationKind.DEAD || kind == LocationKind.LOST)
                 && !record.bonded() && record.rosterId() == null;
-    }
-
-    /** Carries only the NPC uuid into the world task and resolves the live entity there. */
-    private static void removeOnBodyWorld(Ref<EntityStore> body, UUID npcUuid) {
-        Store<EntityStore> bodyStore = body.getStore();
-        World world = bodyStore == null || bodyStore.getExternalData() == null
-                ? null : bodyStore.getExternalData().getWorld();
-        if (world == null || !world.isAlive()) return;
-        world.execute(() -> {
-            Store<EntityStore> store = world.getEntityStore() == null ? null : world.getEntityStore().getStore();
-            Ref<EntityStore> ref = store == null ? null : world.getEntityRef(npcUuid);
-            if (ref == null || !ref.isValid() || store.getComponent(ref, NPCEntity.getComponentType()) == null) return;
-            var ownerType = TameworkOwnerComponent.getComponentType();
-            var tamedType = TameworkTamedComponent.getComponentType();
-            var linksType = TameworkCommandLinksComponent.getComponentType();
-            if (ownerType != null) store.tryRemoveComponent(ref, ownerType);
-            if (tamedType != null) store.tryRemoveComponent(ref, tamedType);
-            if (linksType != null) store.tryRemoveComponent(ref, linksType);
-            store.removeEntity(ref, RemoveReason.REMOVE);
-        });
     }
 
     @Nullable private static UUID resolveOwner(String value, CommandContext context) {

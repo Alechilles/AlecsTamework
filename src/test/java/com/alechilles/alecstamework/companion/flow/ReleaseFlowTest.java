@@ -36,29 +36,19 @@ class ReleaseFlowTest {
     }
 
     @Test
-    void aRefusedReleaseQueuesNoSnapshotDelete() {
+    void refusedReleasesChangeNothingAndQueueNoDelete() {
         CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
         UUID profile = UUID.randomUUID();
         index.insert(live(profile));
         List<UUID> deleted = new ArrayList<>();
         ReleaseFlow flow = new ReleaseFlow(index, new LoadedBodies<>(), deleted::add);
-        flow.release(profile, OWNER);
-        deleted.clear();
-
-        assertEquals(ReleaseFlow.Result.NOT_OWNER, flow.release(profile, UUID.randomUUID()).result());
-        assertEquals(ReleaseFlow.Result.NOT_RELEASABLE, flow.release(profile, OWNER).result());
-
-        assertTrue(deleted.isEmpty());
-    }
-
-    @Test
-    void onlyTheOwnerMayRelease() {
-        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
-        UUID profile = UUID.randomUUID();
-        index.insert(live(profile));
-        ReleaseFlow flow = new ReleaseFlow(index, new LoadedBodies<>(), id -> { });
 
         assertEquals(ReleaseFlow.Result.NOT_OWNER, flow.release(profile, UUID.randomUUID()).result());
         assertEquals(LocationKind.LIVE, index.get(profile).location().kind());
+        assertTrue(deleted.isEmpty());
+
+        assertEquals(ReleaseFlow.Result.RELEASED, flow.release(profile, OWNER).result());
+        assertEquals(ReleaseFlow.Result.NOT_RELEASABLE, flow.release(profile, OWNER).result());
+        assertEquals(List.of(profile), deleted);
     }
 }

@@ -3,9 +3,11 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.logging.Level;
 import javax.annotation.Nullable;
 
 /**
@@ -25,6 +27,7 @@ final class CullTerminalOwnerReleaseService {
         CompletionStage<Outcome> release(UUID ownerUuid, UUID npcUuid);
     }
 
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final ReleaseFlow releaseFlow;
     private final CompanionQueries companions;
 
@@ -56,6 +59,7 @@ final class CullTerminalOwnerReleaseService {
             };
             return CompletableFuture.completedFuture(outcome);
         } catch (RuntimeException | LinkageError failure) {
+            LOGGER.at(Level.WARNING).withCause(failure).log("Could not release cull target %s", npcUuid);
             return unavailable();
         }
     }

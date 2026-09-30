@@ -6,13 +6,8 @@ import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -88,7 +83,7 @@ final class CommandOwnerReleaseService {
             case NOT_FOUND, NOT_RELEASABLE -> warn(player, "tamework.ui.notifications.command.release.unavailable");
             case RELEASED -> {
                 if (outcome.body() != null && bodyUuid != null) {
-                    removeOnBodyWorld(outcome.body(), ownerUuid, bodyUuid);
+                    ReleasedBodyRemoval.removeOnBodyWorld(outcome.body(), bodyUuid);
                 }
                 if (inventoryRepair != null) {
                     inventoryRepair.canonicalize(player);
@@ -104,18 +99,6 @@ final class CommandOwnerReleaseService {
                 );
             }
         }
-    }
-
-    /** The body may be in another world; its removal runs on that world's thread and re-resolves the ref there. */
-    private void removeOnBodyWorld(Ref<EntityStore> body, UUID ownerUuid, UUID bodyUuid) {
-        Store<EntityStore> bodyStore = body.getStore();
-        World world = bodyStore == null || bodyStore.getExternalData() == null
-                ? null : bodyStore.getExternalData().getWorld();
-        if (world == null || !world.isAlive()) {
-            // The fence removes the released body when it next loads.
-            return;
-        }
-        world.execute(() -> releaseLiveEntity(world, ownerUuid, bodyUuid));
     }
 
     private void warn(Player player, String key) {
@@ -151,34 +134,12 @@ final class CommandOwnerReleaseService {
             return;
         }
         String displayName = resolveDisplayName(player, npcRef, store, npc);
-        removeReleasedNpc(npcRef, store);
+        ReleasedBodyRemoval.removeNow(npcRef, store);
         feedbackService.showSuccessKey(
                 player,
                 "tamework.ui.notifications.command.release.success",
                 displayName
         );
-    }
-
-    private void releaseLiveEntity(World world, UUID ownerUuid, UUID npcUuid) {
-        Store<EntityStore> store = world == null || world.getEntityStore() == null
-                ? null : world.getEntityStore().getStore();
-        Ref<EntityStore> npcRef = store == null ? null : world.getEntityRef(npcUuid);
-        NPCEntity npc = npcRef == null || !npcRef.isValid() ? null
-                : store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null || !CommandGenericTargetAuthority
-                .allowsGenericTargetMutation(npcRef, store)
-                || !linkPolicyService.passesOwnerAndTamed(true, false, npcRef, ownerUuid, store)) {
-            return;
-        }
-        removeReleasedNpc(npcRef, store);
-    }
-
-    private void removeReleasedNpc(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        clearOwner(npcRef, store);
-        clearTamedAndLinks(npcRef, store);
-        // Release runs on the owning world thread, outside an ECS system callback.
-        // NPC despawn timers cannot finish while the entity is frozen or non-ticking.
-        store.removeEntity(npcRef, RemoveReason.REMOVE);
     }
 
     private boolean canRelease(Player player,
@@ -203,34 +164,6 @@ final class CommandOwnerReleaseService {
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
         TwGlobalConfig resolved = global == null ? TwGlobalConfig.defaultConfig() : global;
         return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
-    }
-
-    private void clearTamedAndLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
-        TameworkTamedComponent tamed = tamedType == null ? null : store.getComponent(npcRef, tamedType);
-        if (tamed != null && tamed.isTamed()) {
-            tamed.setTamed(false);
-            store.putComponent(npcRef, tamedType, tamed);
-        }
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
-                TameworkCommandLinksComponent.getComponentType();
-        TameworkCommandLinksComponent links = linksType == null ? null : store.getComponent(npcRef, linksType);
-        if (links == null) {
-            return;
-        }
-        // Match Cull: terminal removal must not be observed as a lost linked companion.
-        store.removeComponent(npcRef, linksType);
-    }
-
-    private void clearOwner(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
-                TameworkOwnerComponent.getComponentType();
-        TameworkOwnerComponent owner = ownerType == null ? null : store.getComponent(npcRef, ownerType);
-        if (owner != null && (owner.getOwnerId() != null || owner.getOwnerName() != null)) {
-            owner.setOwnerId(null);
-            owner.setOwnerName(null);
-            store.putComponent(npcRef, ownerType, owner);
-        }
     }
 
     private String resolveDisplayName(Player player,
