@@ -313,18 +313,7 @@ public final class CommandLoadedNpcStatusSnapshotService {
                 .withAnimalLifecycle(loadedLifecycle(npcRef, store, resolvedRoleId, needsSnapshot));
     }
 
-    /**
-     * Life-cycle view of a loaded animal at its current care rate, or null without a life stage.
-     * World thread only. Shared with the companion summary.
-     */
-    @Nullable
-    public static AnimalProgressionService.Presentation loadedLifecycle(Ref<EntityStore> npcRef,
-                                                                        Store<EntityStore> store,
-                                                                        @Nullable String roleId) {
-        return loadedLifecycle(npcRef, store, roleId,
-                readNpcNeedsSnapshot(npcRef, store, TameworkNeedsComponent.getComponentType()));
-    }
-
+    /** Life-cycle view of a loaded animal at its current care rate, or null without a life stage. */
     @Nullable
     private static AnimalProgressionService.Presentation loadedLifecycle(Ref<EntityStore> npcRef,
                                                                          Store<EntityStore> store,

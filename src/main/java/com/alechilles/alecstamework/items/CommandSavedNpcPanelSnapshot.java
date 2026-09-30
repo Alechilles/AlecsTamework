@@ -176,9 +176,7 @@ final class CommandSavedNpcPanelSnapshot {
         Health health = s.healthMax() > 0f ? new Health(s.healthCurrent(), s.healthMax()) : null;
         Happiness happiness = s.happinessConfigId() == null ? null : new Happiness(s.happinessConfigId(), s.happiness());
         Needs needs = s.needsConfigId() == null ? null : new Needs(s.needsConfigId(), s.hunger(), s.thirst());
-        boolean hasBreeding = s.breedingEnabled() || s.breedingCooldownUntilMs() != 0L
-                || s.breedingCooldownStartedAtMs() != 0L || s.breedingCooldownDurationMs() != 0L;
-        Breeding breeding = hasBreeding ? new Breeding(s.breedingEnabled(), s.breedingCooldownUntilMs(),
+        Breeding breeding = s.breedingPresent() ? new Breeding(s.breedingEnabled(), s.breedingCooldownUntilMs(),
                 s.breedingCooldownStartedAtMs(), s.breedingCooldownDurationMs()) : null;
         Leveling leveling = s.levelingConfigId() == null ? null
                 : new Leveling(s.levelingConfigId(), s.level(), s.currentXp(), s.totalXp());
@@ -211,7 +209,7 @@ final class CommandSavedNpcPanelSnapshot {
         state.setAdultAtMs(p.adultAtMs());
         state.setGrowthScalingEnabled(p.growthScalingEnabled());
         state.setAgeProgressMs(p.ageProgressMs());
-        state.setProgressionOwnerId(p.progressionOwnerId() == null ? null : p.progressionOwnerId().toString());
+        state.setProgressionOwnerId(p.progressionOwnerId());
         state.setProgressionClockMs(p.progressionClockMs());
         state.setProgressionInitialized(p.progressionInitialized());
         state.setLastProgressionWorldMs(p.lastProgressionWorldMs());

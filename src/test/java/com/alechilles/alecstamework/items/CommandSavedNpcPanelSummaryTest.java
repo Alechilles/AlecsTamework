@@ -72,9 +72,9 @@ class CommandSavedNpcPanelSummaryTest {
             CommandSavedNpcPanelSnapshot decoded = decode(profileId, lifeStage, breeding, alarms, needs);
             CompanionSummary summary = CompanionSummaries.build(new CompanionSummaries.Inputs(null, null, ROLE, null,
                     0f, 0f, null, 0.0, needs.getConfigId(), needs.getHunger(), needs.getThirst(),
-                    breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(),
+                    true, breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(),
                     breeding.getCooldownDurationMs(), harvest.getUntilMs(), null, 0, 0.0, 0.0, 0, Map.of(),
-                    null, 0.0, null, 0L, harvest.getStartedAtMs(), harvest.getDurationMs(), null, null,
+                    harvest.getStartedAtMs(), harvest.getDurationMs(), null, null,
                     CompanionSummaries.progression(lifeStage)), 1L);
             CompanionRecord record = CompanionRecord.builder(profileId.value(), ROLE,
                     CompanionLocation.live("world", 0, 0, 0)).summary(summary).build();
@@ -85,6 +85,7 @@ class CommandSavedNpcPanelSummaryTest {
 
             // Guards against a vacuous comparison: the decoded panel shows running timers and a prime adult.
             assertEquals(6_000L, expected.breedingCooldownRemainingMs());
+            assertTrue(expected.harvestCooldownActive());
             assertTrue(expected.animalLifecycle().prime());
 
             assertEquals(expected.breedingCooldownKnown(), actual.breedingCooldownKnown());

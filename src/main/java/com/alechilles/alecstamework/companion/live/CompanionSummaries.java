@@ -16,7 +16,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -29,12 +28,7 @@ public final class CompanionSummaries {
         @Nullable String iconId(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nullable String roleId);
         /** {current, max}, or null when the body has no health stat. */
         @Nullable float[] health(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store);
-        /** Life-stage presentation, or null when the companion has no life stage. */
-        @Nullable LifeStageView lifeStage(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nullable String roleId);
         @Nonnull String harvestAlarmName();
-    }
-
-    public record LifeStageView(@Nullable String stage, double progress, @Nullable String nextStage, long remainingMs) {
     }
 
     /** Raw inputs; {@link #build} clamps them. */
@@ -42,12 +36,11 @@ public final class CompanionSummaries {
                          @Nullable String iconId, float healthCurrent, float healthMax,
                          @Nullable String happinessConfigId, double happiness,
                          @Nullable String needsConfigId, double hunger, double thirst,
-                         boolean breedingEnabled, long breedingCooldownUntilMs, long breedingCooldownStartedAtMs,
+                         boolean breedingPresent, boolean breedingEnabled, long breedingCooldownUntilMs, long breedingCooldownStartedAtMs,
                          long breedingCooldownDurationMs, long harvestAlarmUntilMs,
                          @Nullable String levelingConfigId, int level, double currentXp, double totalXp,
                          int talentPointsSpent, @Nonnull Map<String, Double> traits,
-                         @Nullable String lifeStage, double lifeStageProgress, @Nullable String nextLifeStage,
-                         long lifeStageRemainingMs, long harvestAlarmStartedAtMs, long harvestAlarmDurationMs,
+                         long harvestAlarmStartedAtMs, long harvestAlarmDurationMs,
                          @Nullable String traitsConfigId, @Nullable String talentsConfigId,
                          @Nullable CompanionSummary.Progression progression) {
     }
@@ -72,36 +65,27 @@ public final class CompanionSummaries {
         return new CompanionSummary(in.customName(), in.nameKey(), in.roleId(), in.iconId(), current, max,
                 in.happinessConfigId(), finite(in.happiness()), in.needsConfigId(),
                 finiteNonNegative(in.hunger()), finiteNonNegative(in.thirst()),
-                in.breedingEnabled(), in.breedingCooldownUntilMs(), in.breedingCooldownStartedAtMs(),
+                in.breedingPresent(), in.breedingEnabled(), in.breedingCooldownUntilMs(), in.breedingCooldownStartedAtMs(),
                 Math.max(0L, in.breedingCooldownDurationMs()), in.harvestAlarmUntilMs(),
                 in.levelingConfigId(), Math.max(0, in.level()), finiteNonNegative(in.currentXp()),
                 finiteNonNegative(in.totalXp()), Math.max(0, in.talentPointsSpent()), traits,
-                in.lifeStage(), clamp01(in.lifeStageProgress()), in.nextLifeStage(),
-                Math.max(0L, in.lifeStageRemainingMs()), observedAtMs, in.harvestAlarmStartedAtMs(),
+                observedAtMs, in.harvestAlarmStartedAtMs(),
                 Math.max(0L, in.harvestAlarmDurationMs()), in.traitsConfigId(), in.talentsConfigId(),
                 in.progression());
     }
 
     /**
      * Copies the life-stage values the saved panel advances at display time, or null when the
-     * companion has no life-stage component. An owner id that is not a UUID becomes null.
+     * companion has no life-stage component.
      */
     @Nullable
     public static CompanionSummary.Progression progression(@Nullable TameworkLifeStageComponent state) {
         if (state == null) {
             return null;
         }
-        UUID owner = null;
-        if (state.getProgressionOwnerId() != null) {
-            try {
-                owner = UUID.fromString(state.getProgressionOwnerId());
-            } catch (IllegalArgumentException ignored) {
-                // Only UUID owners are ever written; anything else has no owner clock.
-            }
-        }
         return new CompanionSummary.Progression(state.getStage(), state.getBornAtMs(), state.getAdolescentAtMs(),
                 state.getAdultAtMs(), state.isGrowthScalingEnabled(), finite(state.getAgeProgressMs()),
-                owner, state.getProgressionClockMs(), state.isProgressionInitialized(),
+                state.getProgressionOwnerId(), state.getProgressionClockMs(), state.isProgressionInitialized(),
                 state.getLastProgressionWorldMs(), state.getLifecycleNowMs(), state.isJuvenileClockInitialized(),
                 state.isStoredProgressionPaused(), state.getActiveProgressMs());
     }
@@ -126,7 +110,6 @@ public final class CompanionSummaries {
         TameworkTraitsComponent traits = get(store, ref, TameworkTraitsComponent.getComponentType());
         TameworkLifeStageComponent lifeStage = get(store, ref, TameworkLifeStageComponent.getComponentType());
         float[] health = sources.health(ref, store);
-        LifeStageView stage = sources.lifeStage(ref, store, roleId);
         TameworkAlarmComponent.AlarmEntry harvest = alarms == null ? null : alarms.getAlarm(sources.harvestAlarmName());
         Map<String, Double> traitValues = new LinkedHashMap<>();
         if (traits != null && traits.getTraitValues() != null) {
@@ -142,15 +125,14 @@ public final class CompanionSummaries {
                 happiness == null ? null : happiness.getConfigId(), happiness == null ? 0.0 : happiness.getValue(),
                 needs == null ? null : needs.getConfigId(), needs == null ? 0.0 : needs.getHunger(),
                 needs == null ? 0.0 : needs.getThirst(),
-                breeding != null && breeding.isEnabled(), breeding == null ? 0L : breeding.getCooldownUntilMs(),
+                breeding != null, breeding != null && breeding.isEnabled(),
+                breeding == null ? 0L : breeding.getCooldownUntilMs(),
                 breeding == null ? 0L : breeding.getCooldownStartedAtMs(),
                 breeding == null ? 0L : breeding.getCooldownDurationMs(),
                 harvest == null ? 0L : harvest.getUntilMs(),
                 leveling == null ? null : leveling.getConfigId(), leveling == null ? 0 : leveling.getLevel(),
                 leveling == null ? 0.0 : leveling.getCurrentXp(), leveling == null ? 0.0 : leveling.getTotalXp(),
                 talents == null ? 0 : talents.getSpentPoints(), traitValues,
-                stage == null ? null : stage.stage(), stage == null ? 0.0 : stage.progress(),
-                stage == null ? null : stage.nextStage(), stage == null ? 0L : stage.remainingMs(),
                 harvest == null ? 0L : harvest.getStartedAtMs(), harvest == null ? 0L : harvest.getDurationMs(),
                 traits == null ? null : traits.getConfigId(), talents == null ? null : talents.getConfigId(),
                 progression(lifeStage)),
@@ -174,9 +156,5 @@ public final class CompanionSummaries {
 
     private static double finite(double value) {
         return Double.isFinite(value) ? value : 0.0;
-    }
-
-    private static double clamp01(double value) {
-        return Double.isFinite(value) ? Math.max(0.0, Math.min(1.0, value)) : 0.0;
     }
 }

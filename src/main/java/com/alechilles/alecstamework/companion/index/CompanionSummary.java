@@ -4,7 +4,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -14,12 +13,11 @@ import javax.annotation.Nullable;
  * by {@code CompanionSummaries} from live components when a snapshot is taken and on unload.
  * Times named {@code ...Ms} follow the component they came from: breeding cooldowns and the
  * harvest alarm are world time (signed, 0 = unset); {@code observedAtMs} is wall clock.
- * {@code lifeStageRemainingMs} is {@code Long.MAX_VALUE} when the stage never ends (no
- * countdown) and 0 when the companion has no life stage. The life-stage presentation fields
- * are a capture-time view at the loaded care rate; the saved panel instead advances
- * {@link #progression} at display time, as it did from a decoded checkpoint.
+ * The life stage is not stored as presentation: the saved panel advances {@link #progression}
+ * at display time, as it did from a decoded checkpoint.
  *
- * <p>A config id is null when the companion had no such component; the saved panel then
+ * <p>A config id is null when the companion had no such component, and
+ * {@code breedingPresent} records whether it had a breeding component; the saved panel then
  * keeps its fallback values for that section.</p>
  */
 public record CompanionSummary(
@@ -34,6 +32,7 @@ public record CompanionSummary(
         @Nullable String needsConfigId,
         double hunger,
         double thirst,
+        boolean breedingPresent,
         boolean breedingEnabled,
         long breedingCooldownUntilMs,
         long breedingCooldownStartedAtMs,
@@ -45,10 +44,6 @@ public record CompanionSummary(
         double totalXp,
         int talentPointsSpent,
         @Nonnull Map<String, Double> traits,
-        @Nullable String lifeStage,
-        double lifeStageProgress,
-        @Nullable String nextLifeStage,
-        long lifeStageRemainingMs,
         long observedAtMs,
         long harvestAlarmStartedAtMs,
         long harvestAlarmDurationMs,
@@ -67,8 +62,8 @@ public record CompanionSummary(
 
     @Nonnull
     public static final CompanionSummary EMPTY = new CompanionSummary(null, null, null, null,
-            0f, 0f, null, 0.0, null, 0.0, 0.0, false, 0L, 0L, 0L, 0L,
-            null, 0, 0.0, 0.0, 0, Map.of(), null, 0.0, null, 0L, 0L, 0L, 0L, null, null, null);
+            0f, 0f, null, 0.0, null, 0.0, 0.0, false, false, 0L, 0L, 0L, 0L,
+            null, 0, 0.0, 0.0, 0, Map.of(), 0L, 0L, 0L, null, null, null);
 
     /**
      * The raw life-stage component values that the saved panel needs to rebuild live countdowns
@@ -85,7 +80,7 @@ public record CompanionSummary(
             long adultAtMs,
             boolean growthScalingEnabled,
             double ageProgressMs,
-            @Nullable UUID progressionOwnerId,
+            @Nullable String progressionOwnerId,
             long progressionClockMs,
             boolean progressionInitialized,
             long lastProgressionWorldMs,

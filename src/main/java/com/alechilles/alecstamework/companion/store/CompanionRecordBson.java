@@ -189,6 +189,7 @@ public final class CompanionRecordBson {
         putString(d, "NeedsConfig", s.needsConfigId());
         d.put("Hunger", new BsonDouble(s.hunger()));
         d.put("Thirst", new BsonDouble(s.thirst()));
+        d.put("BreedingPresent", BsonBoolean.valueOf(s.breedingPresent()));
         d.put("BreedingEnabled", BsonBoolean.valueOf(s.breedingEnabled()));
         d.put("BreedingCooldownUntil", new BsonInt64(s.breedingCooldownUntilMs()));
         d.put("BreedingCooldownStartedAt", new BsonInt64(s.breedingCooldownStartedAtMs()));
@@ -202,10 +203,6 @@ public final class CompanionRecordBson {
         BsonDocument traits = new BsonDocument();
         s.traits().forEach((id, value) -> traits.put(id, new BsonDouble(value)));
         d.put("Traits", traits);
-        putString(d, "LifeStage", s.lifeStage());
-        d.put("LifeStageProgress", new BsonDouble(s.lifeStageProgress()));
-        putString(d, "NextLifeStage", s.nextLifeStage());
-        d.put("LifeStageRemaining", new BsonInt64(s.lifeStageRemainingMs()));
         d.put("ObservedAt", new BsonInt64(s.observedAtMs()));
         d.put("HarvestAlarmStartedAt", new BsonInt64(s.harvestAlarmStartedAtMs()));
         d.put("HarvestAlarmDuration", new BsonInt64(s.harvestAlarmDurationMs()));
@@ -225,7 +222,7 @@ public final class CompanionRecordBson {
         d.put("AdultAt", new BsonInt64(p.adultAtMs()));
         d.put("GrowthScaling", BsonBoolean.valueOf(p.growthScalingEnabled()));
         d.put("AgeProgress", new BsonDouble(p.ageProgressMs()));
-        putUuid(d, "ProgressionOwner", p.progressionOwnerId());
+        putString(d, "ProgressionOwner", p.progressionOwnerId());
         d.put("ProgressionClock", new BsonInt64(p.progressionClockMs()));
         d.put("ProgressionInitialized", BsonBoolean.valueOf(p.progressionInitialized()));
         d.put("LastProgressionWorld", new BsonInt64(p.lastProgressionWorldMs()));
@@ -236,20 +233,10 @@ public final class CompanionRecordBson {
         return d;
     }
 
-    /** Presentation data only, so a malformed owner id reads as no owner instead of failing the record. */
     private static CompanionSummary.Progression decodeProgression(BsonDocument d) {
-        UUID owner = null;
-        String rawOwner = getString(d, "ProgressionOwner");
-        if (rawOwner != null) {
-            try {
-                owner = UUID.fromString(rawOwner);
-            } catch (IllegalArgumentException ignored) {
-                // Leave the owner unset.
-            }
-        }
         return new CompanionSummary.Progression(getString(d, "Stage"), getLong(d, "BornAt", 0),
                 getLong(d, "AdolescentAt", 0), getLong(d, "AdultAt", 0), getBoolean(d, "GrowthScaling"),
-                getDouble(d, "AgeProgress"), owner, getLong(d, "ProgressionClock", 0),
+                getDouble(d, "AgeProgress"), getString(d, "ProgressionOwner"), getLong(d, "ProgressionClock", 0),
                 getBoolean(d, "ProgressionInitialized"), getLong(d, "LastProgressionWorld", 0),
                 getLong(d, "LifecycleNow", 0), getBoolean(d, "JuvenileClockInitialized"),
                 getBoolean(d, "ProgressionPaused"), getLong(d, "ActiveProgress", 0));
@@ -267,13 +254,13 @@ public final class CompanionRecordBson {
         return new CompanionSummary(getString(d, "CustomName"), getString(d, "NameKey"), getString(d, "Role"),
                 getString(d, "Icon"), (float) getDouble(d, "HealthCurrent"), (float) getDouble(d, "HealthMax"),
                 getString(d, "HappinessConfig"), getDouble(d, "Happiness"), getString(d, "NeedsConfig"),
-                getDouble(d, "Hunger"), getDouble(d, "Thirst"), getBoolean(d, "BreedingEnabled"),
+                getDouble(d, "Hunger"), getDouble(d, "Thirst"), getBoolean(d, "BreedingPresent"),
+                getBoolean(d, "BreedingEnabled"),
                 getLong(d, "BreedingCooldownUntil", 0), getLong(d, "BreedingCooldownStartedAt", 0),
                 getLong(d, "BreedingCooldownDuration", 0), getLong(d, "HarvestAlarmUntil", 0),
                 getString(d, "LevelingConfig"), (int) getLong(d, "Level", 0), getDouble(d, "CurrentXp"),
                 getDouble(d, "TotalXp"), (int) getLong(d, "TalentPointsSpent", 0), traits,
-                getString(d, "LifeStage"), getDouble(d, "LifeStageProgress"), getString(d, "NextLifeStage"),
-                getLong(d, "LifeStageRemaining", 0), getLong(d, "ObservedAt", 0),
+                getLong(d, "ObservedAt", 0),
                 getLong(d, "HarvestAlarmStartedAt", 0), getLong(d, "HarvestAlarmDuration", 0),
                 getString(d, "TraitsConfig"), getString(d, "TalentsConfig"),
                 d.isDocument("Progression") ? decodeProgression(d.getDocument("Progression")) : null);
