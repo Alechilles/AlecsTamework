@@ -18,7 +18,10 @@ import org.bson.BsonString;
 
 /**
  * Full-entity snapshots of companion bodies (spec 6.5). Runs on the body's world thread.
- * Each call builds a fresh document, so a queued snapshot is never shared or mutated later.
+ * Each call builds a fresh top-level document, so a later capture never overwrites a queued
+ * one. Data of unregistered third-party components may still share nested documents with the
+ * live entity (engine behavior), so treat a snapshot's data as read-only. The readers below
+ * expect {@link #FORMAT}; check the envelope's format before calling them.
  */
 public final class CompanionSnapshots {
     public static final int FORMAT = 1;
