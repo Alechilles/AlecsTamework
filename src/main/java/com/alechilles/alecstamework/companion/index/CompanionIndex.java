@@ -191,6 +191,46 @@ public final class CompanionIndex {
     }
 
     /**
+     * Restores every field of {@code previous}, including a lower generation, if the current
+     * revision equals {@code expectedRevision}. The revision still goes up by one and
+     * {@code updatedAtMs} is set to now, so the listener marks the file dirty like any update.
+     *
+     * <p>Only for undoing a change that was never committed (spec 6.9 step 4: a commit-first flow
+     * whose {@code flushNow} timed out or failed), and only before any holder (body, item or coop
+     * entry) was stamped with the newer generation. Lowering the generation after that would let
+     * a stale holder pass the fence.
+     *
+     * @throws IllegalArgumentException when {@code previous} belongs to another profile
+     */
+    @Nonnull
+    public Mutation revert(@Nonnull UUID profileId, long expectedRevision, @Nonnull CompanionRecord previous) {
+        if (!previous.profileId().equals(profileId)) {
+            throw new IllegalArgumentException("previous belongs to another profile");
+        }
+        synchronized (lock) {
+            CompanionRecord before = records.get(profileId);
+            if (before == null) {
+                return new Mutation(Status.NOT_FOUND, null, null);
+            }
+            if (before.revision() != expectedRevision) {
+                return new Mutation(Status.CONFLICT, before, null);
+            }
+            String origin = originKey(previous);
+            UUID originHolder = origin == null ? null : profileByOrigin.get(origin);
+            if (originHolder != null && !originHolder.equals(profileId)) {
+                return new Mutation(Status.DUPLICATE, records.get(originHolder), null);
+            }
+            CompanionRecord after = previous.toBuilder()
+                    .revision(before.revision() + 1)
+                    .updatedAtMs(clock.getAsLong())
+                    .build();
+            replaceInMaps(before, after);
+            listener.onChanged(before, after);
+            return new Mutation(Status.APPLIED, before, after);
+        }
+    }
+
+    /**
      * Swaps {@code before} for {@code after} without a window where lock-free readers miss the
      * record: only changed secondary keys are touched, new keys are added before the record is
      * replaced, and old keys are removed after. Empty owner sets are left in place.

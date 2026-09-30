@@ -67,7 +67,12 @@ public final class CompanionStore {
         return UNOWNED_KEY.equals(key) ? null : UUID.fromString(key);
     }
 
-    /** Reads every owner file. A profile found in two files keeps the higher revision. */
+    /**
+     * Reads every owner file. A profile found in two files keeps the higher revision. A file
+     * whose every copy fails to parse is moved aside. A file that cannot be read at the I/O
+     * level aborts the whole load with {@link CompanionFileAccessException} and is left in place,
+     * so the caller disables companion persistence (spec 10) instead of starting that owner empty.
+     */
     @Nonnull
     public LoadResult loadAll() throws IOException {
         Map<UUID, CompanionRecord> best = new LinkedHashMap<>();
@@ -81,6 +86,8 @@ public final class CompanionStore {
             BsonDocument doc;
             try {
                 doc = io.readNow(file);
+            } catch (CompanionFileAccessException e) {
+                throw e;
             } catch (IOException | RuntimeException e) {
                 quarantined.add(moveAside(file));
                 continue;
@@ -189,7 +196,8 @@ public final class CompanionStore {
     /**
      * Blocking read; call it off the world thread. {@code null} when there is no snapshot.
      * Throws {@link IOException} when the file is not a snapshot envelope, belongs to another
-     * profile, or uses a newer format.
+     * profile, or uses a newer format, and {@link CompanionFileAccessException} when the file
+     * cannot be read at the I/O level.
      */
     @Nullable
     public SnapshotEnvelope readSnapshotNow(@Nonnull UUID profileId) throws IOException {

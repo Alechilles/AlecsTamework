@@ -38,6 +38,22 @@ class CompanionRecordBsonTest {
         BsonDocument viaJson = BsonDocument.parse(CompanionRecordBson.encode(record).toJson());
 
         assertEquals(record, CompanionRecordBson.decode(viaJson));
+
+        CompanionRecord slotOnly = CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.item())
+                .rosterSlot(2).build();
+        assertEquals(slotOnly, CompanionRecordBson.decode(BsonDocument.parse(CompanionRecordBson.encode(slotOnly).toJson())));
+    }
+
+    @Test
+    void aRevisionOrGenerationThatIsNotANumberIsUnreadableRatherThanZero() {
+        for (String field : List.of("Revision", "Generation")) {
+            BsonDocument wrong = new BsonDocument("ProfileId", new BsonString(UUID.randomUUID().toString()))
+                    .append("Role", new BsonString("Sheep"))
+                    .append("Location", new BsonDocument("Kind", new BsonString("ITEM")))
+                    .append(field, new BsonString("7"));
+
+            assertThrows(IllegalArgumentException.class, () -> CompanionRecordBson.decode(wrong), field);
+        }
     }
 
     @Test

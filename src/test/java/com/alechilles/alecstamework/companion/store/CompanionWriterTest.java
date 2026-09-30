@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,20 +186,57 @@ class CompanionWriterTest {
         io.writeEntered = entered;
         io.blockWrites = gate;
 
-        // The delete fails, then the flush holds on ALICE's owner write.
+        // The flush holds on ALICE's owner write, a newer snapshot is queued, then the delete fails.
         CompletableFuture<Void> first = writer.flushNow(ALICE);
         assertTrue(entered.await(2, TimeUnit.SECONDS));
         writer.queueSnapshot(new SnapshotEnvelope(profile, 1, 2, new BsonDocument()));
-        io.failPaths.clear();
         io.blockWrites = null;
         gate.countDown();
         first.get(2, TimeUnit.SECONDS);
+        executor.submit(() -> { }).get(2, TimeUnit.SECONDS);   // the flush, and its failed delete, are done
+        io.failPaths.clear();
 
         writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
 
         SnapshotEnvelope written = store.readSnapshotNow(profile);
         assertTrue(written != null, "the newer snapshot must survive the failed delete");
         assertEquals(2, written.generation());
+    }
+
+    @Test
+    void aSnapshotDeleteWaitsUntilItsOwnerFileIsWritten() throws Exception {
+        CompanionRecord r = insertLive(ALICE);
+        Path snapshotFile = ROOT.resolve("snapshots").resolve(r.profileId() + ".json");
+        writer.queueSnapshot(new SnapshotEnvelope(r.profileId(), 1, 0, new BsonDocument()));
+        writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
+
+        index.update(r.profileId(), 0, b -> b.location(CompanionLocation.released("owner_release")));
+        writer.queueSnapshotDelete(r.profileId());
+        io.failPaths.add(ownerFile(ALICE));
+        assertThrows(ExecutionException.class, () -> writer.flushNow(ALICE).get(2, TimeUnit.SECONDS));
+        executor.submit(() -> { }).get(2, TimeUnit.SECONDS);   // the failed flush has finished
+
+        assertTrue(io.files.containsKey(snapshotFile), "the owner file still points at the snapshot");
+
+        io.failPaths.clear();
+        writer.flushNow(ALICE).get(2, TimeUnit.SECONDS);
+        executor.submit(() -> { }).get(2, TimeUnit.SECONDS);
+
+        assertFalse(io.files.containsKey(snapshotFile), "the delete is retried once the owner file is written");
+    }
+
+    @Test
+    void unflushedSnapshotsAndDeletesAreVisibleToReaders() {
+        UUID profile = UUID.randomUUID();
+        SnapshotEnvelope snapshot = new SnapshotEnvelope(profile, 1, 3, new BsonDocument());
+
+        writer.queueSnapshot(snapshot);
+        assertEquals(snapshot, writer.pendingSnapshot(profile));
+        assertFalse(writer.isSnapshotDeletePending(profile));
+
+        writer.queueSnapshotDelete(profile);
+        assertTrue(writer.isSnapshotDeletePending(profile));
+        assertNull(writer.pendingSnapshot(profile));
     }
 
     @Test

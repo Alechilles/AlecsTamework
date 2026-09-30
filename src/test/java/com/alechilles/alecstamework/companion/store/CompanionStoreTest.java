@@ -83,6 +83,20 @@ class CompanionStoreTest {
     }
 
     @Test
+    void anOwnerFileThatCannotBeReadFailsTheLoadAndStaysInPlace() throws Exception {
+        // A directory named like an owner file: it exists, but reading its bytes fails at the I/O level.
+        Path alice = root.resolve("owners").resolve(ALICE + ".json");
+        Files.createDirectories(alice);
+
+        assertThrows(CompanionFileAccessException.class, () -> store().loadAll());
+
+        assertTrue(Files.isDirectory(alice), "a file that could not be read must not be quarantined");
+        try (var siblings = Files.list(alice.getParent())) {
+            assertEquals(1, siblings.count());
+        }
+    }
+
+    @Test
     void anUnreadableRecordIsReportedAndKeptOnTheNextWrite() throws Exception {
         CompanionStore store = store();
         CompanionRecord good = record(ALICE, 0, RecordScope.WORLD_BOUND);

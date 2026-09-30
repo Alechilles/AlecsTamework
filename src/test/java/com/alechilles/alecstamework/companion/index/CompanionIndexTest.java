@@ -144,6 +144,25 @@ class CompanionIndexTest {
     }
 
     @Test
+    void revertRestoresTheUncommittedRecordIncludingItsGeneration() {
+        UUID body = UUID.randomUUID();
+        index.insert(live(ALICE).toBuilder().currentNpcUuid(body).build());
+        CompanionRecord previous = index.fileRecords(ALICE).get(0);
+        CompanionIndex.Mutation capture = index.update(previous.profileId(), 0,
+                b -> b.generation(1).location(CompanionLocation.item()).currentNpcUuid(null));
+
+        CompanionIndex.Mutation reverted = index.revert(previous.profileId(), capture.after().revision(), previous);
+
+        assertTrue(reverted.applied());
+        CompanionRecord now = index.get(previous.profileId());
+        assertEquals(0, now.generation());
+        assertEquals(previous.location(), now.location());
+        assertEquals(2, now.revision());
+        assertEquals(previous.profileId(), index.byNpcUuid(body).profileId());
+        assertEquals(CompanionIndex.Status.CONFLICT, index.revert(previous.profileId(), 1, previous).status());
+    }
+
+    @Test
     void checkAndApplyUnderTheLockIsAtomicAcrossThreads() throws Exception {
         int cap = 5;
         ExecutorService pool = Executors.newFixedThreadPool(8);

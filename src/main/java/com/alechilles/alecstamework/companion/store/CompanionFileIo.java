@@ -15,8 +15,10 @@ public interface CompanionFileIo {
     CompletableFuture<Void> write(@Nonnull Path file, @Nonnull BsonDocument document);
 
     /**
-     * Reads {@code file}, falling back to its {@code .bak}. Returns {@code null} when neither
-     * exists. Throws when a file exists but neither copy decodes.
+     * Reads {@code file}, falling back to its {@code .bak} when the main file is missing or does
+     * not parse. Returns {@code null} when neither exists. Throws
+     * {@link CompanionFileAccessException} when an existing copy cannot be read at the I/O level,
+     * and a plain {@link IOException} only when every existing copy was read but failed to parse.
      */
     @Nullable
     BsonDocument readNow(@Nonnull Path file) throws IOException;

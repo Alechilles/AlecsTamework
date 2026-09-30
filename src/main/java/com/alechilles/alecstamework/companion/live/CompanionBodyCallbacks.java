@@ -14,7 +14,12 @@ import javax.annotation.Nonnull;
  * command buffer and do no file I/O.
  */
 public interface CompanionBodyCallbacks {
-    /** The body is the current holder. {@code raised} means its generation was newer than the record's. */
+    /**
+     * The body is the current holder. {@code raised} means its generation was newer than the
+     * record's. With {@code raised} the implementation must move the record to {@code LIVE} with
+     * this body's world, position and NPC UUID, not only raise the generation. It runs after the
+     * index lock is released, so when two newer bodies arrive the last callback to run wins.
+     */
     void onAccepted(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                     @Nonnull CommandBuffer<EntityStore> buffer, @Nonnull TameworkCompanionComponent stamp, boolean raised);
 

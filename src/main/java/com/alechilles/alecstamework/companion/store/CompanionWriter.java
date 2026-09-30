@@ -28,16 +28,20 @@ import org.bson.BsonDocument;
 
 /**
  * Write-behind for the companion store (spec 6.9). Record changes mark owner files dirty;
- * one executor thread writes snapshots first, then each dirty owner file, every flush
- * interval or immediately on {@link #flushNow(UUID)}. Each file is written independently: a
- * failed write keeps only that item pending and retries with backoff. Two ordering rules keep
- * every record on disk through a crash: an owner file that references a snapshot whose write
- * failed waits for that snapshot, and after a record changes owner the old owner's file is not
- * rewritten until the new owner's file has been written. Nothing that has not been written is
- * dropped.
+ * one executor thread writes snapshots first, then each dirty owner file, then snapshot
+ * deletes, every flush interval or immediately on {@link #flushNow(UUID)}. Each file is written
+ * independently: a failed write keeps only that item pending and retries with backoff. Three
+ * ordering rules keep every record on disk through a crash: an owner file that references a
+ * snapshot whose write failed waits for that snapshot; after a record changes owner the old
+ * owner's file is not rewritten until the new owner's file has been written; and a snapshot is
+ * deleted only once the owner file that held its record no longer needs it. Nothing that has
+ * not been written is dropped.
  *
  * <p>Lock order is index lock, then writer lock: {@link #onRecordChanged} runs under the index
  * lock, and the flush captures its work under both, in that order. No I/O runs under either.
+ * Never wait on the writer ({@code flushNow(...).join()} or {@code get()}, {@link #shutdown})
+ * while holding the index lock, including inside {@link CompanionIndex#atomically}: the writer
+ * thread takes the index lock in its capture step, so that wait blocks until it times out.
  */
 public final class CompanionWriter {
     public record Status(int pendingOwners, int pendingSnapshots, @Nullable String lastFailure, long lastFlushAtMs) {
@@ -49,7 +53,8 @@ public final class CompanionWriter {
     private record Batch(
             Map<String, List<CompanionRecord>> owners,
             Map<UUID, SnapshotEnvelope> snapshots,
-            Set<UUID> deletes,
+            /* Profile id to the owner key of its record at capture, or null for no record. */
+            Map<UUID, String> deletes,
             Map<String, List<CompletableFuture<Void>>> taken,
             Map<String, Map<String, Long>> waitsFor
     ) {
@@ -80,6 +85,9 @@ public final class CompanionWriter {
     @Nullable
     private Boolean shutdownResult;
     private int flushesInFlight;
+    /** The batch the running flush took, so snapshot reads still see it until it is done. */
+    @Nullable
+    private Batch inFlight;
     private long backoffMs;
     private long nextRetryAtMs;
     private volatile String lastFailure;
@@ -146,8 +154,43 @@ public final class CompanionWriter {
     }
 
     /**
+     * The snapshot the writer still has to write (queued or in the running flush) for this
+     * profile, or {@code null}. Snapshot reads must consult the writer before disk: a pending
+     * snapshot is newer than the file, and when {@link #isSnapshotDeletePending} is true the file
+     * is about to go and must be treated as absent. Phase 2 composition wires this into reads.
+     */
+    @Nullable
+    public SnapshotEnvelope pendingSnapshot(@Nonnull UUID profileId) {
+        synchronized (lock) {
+            if (pendingSnapshotDeletes.contains(profileId)) {
+                return null;
+            }
+            SnapshotEnvelope queued = pendingSnapshots.get(profileId);
+            if (queued != null || inFlight == null || inFlight.deletes().containsKey(profileId)) {
+                return queued;
+            }
+            return inFlight.snapshots().get(profileId);
+        }
+    }
+
+    /** True when the latest queued change to this profile's snapshot is a delete not yet done. */
+    public boolean isSnapshotDeletePending(@Nonnull UUID profileId) {
+        synchronized (lock) {
+            if (pendingSnapshotDeletes.contains(profileId)) {
+                return true;
+            }
+            if (pendingSnapshots.containsKey(profileId)) {
+                return false;
+            }
+            return inFlight != null && inFlight.deletes().containsKey(profileId);
+        }
+    }
+
+    /**
      * Completes when a flush that started after this call has written the owner's file, or
-     * fails when that write fails or {@code flushNowTimeoutMs} passes.
+     * fails when that write fails or {@code flushNowTimeoutMs} passes. After a record moved from
+     * this owner to another, this owner's file waits for the new owner's file, so a flushNow for
+     * the old owner keeps failing while the new owner's file keeps failing to write.
      */
     @Nonnull
     public CompletableFuture<Void> flushNow(@Nullable UUID owner) {
@@ -253,11 +296,16 @@ public final class CompanionWriter {
                 dirtyOwners.clear();
                 Map<String, Map<String, Long>> edges = new HashMap<>();
                 waitsFor.forEach((from, to) -> edges.put(from, new HashMap<>(to)));
-                Batch batch = new Batch(owners, new LinkedHashMap<>(pendingSnapshots),
-                        new LinkedHashSet<>(pendingSnapshotDeletes), taken, edges);
+                Map<UUID, String> deletes = new LinkedHashMap<>();
+                for (UUID id : pendingSnapshotDeletes) {
+                    CompanionRecord record = index.get(id);
+                    deletes.put(id, record == null ? null : CompanionStore.ownerKey(record.ownerUuid()));
+                }
+                Batch batch = new Batch(owners, new LinkedHashMap<>(pendingSnapshots), deletes, taken, edges);
                 pendingSnapshots.clear();
                 pendingSnapshotDeletes.clear();
                 flushesInFlight++;
+                inFlight = batch;
                 return batch;
             }
         });
@@ -272,11 +320,13 @@ public final class CompanionWriter {
         Map<String, List<CompletableFuture<Void>>> taken = batch.taken();
         // Whatever is still in these after the loops was not written and goes back in the queue.
         Map<UUID, SnapshotEnvelope> snapshotsLeft = new LinkedHashMap<>(batch.snapshots());
-        Set<UUID> deletesLeft = new LinkedHashSet<>(batch.deletes());
+        Set<UUID> deletesLeft = new LinkedHashSet<>(batch.deletes().keySet());
         Set<String> ownersLeft = new LinkedHashSet<>(batch.owners().keySet());
         Set<String> ownersWritten = new HashSet<>();
         Map<String, Throwable> ownersFailed = new HashMap<>();
         Map<UUID, Throwable> failedSnapshots = new HashMap<>();
+        // Waiters are failed only after lastFailure is set, so a woken waiter sees the cause.
+        List<Runnable> failedWaiters = new ArrayList<>();
         Throwable failure = null;
         try {
             for (SnapshotEnvelope snapshot : batch.snapshots().values()) {
@@ -286,14 +336,6 @@ public final class CompanionWriter {
                 } catch (Throwable t) {
                     failure = unwrap(t);
                     failedSnapshots.put(snapshot.profileId(), failure);
-                }
-            }
-            for (UUID profileId : batch.deletes()) {
-                try {
-                    store.deleteSnapshot(profileId).join();
-                    deletesLeft.remove(profileId);
-                } catch (Throwable t) {
-                    failure = unwrap(t);
                 }
             }
             // An old owner is deferred until the new owners it waits for have been tried in this
@@ -330,7 +372,7 @@ public final class CompanionWriter {
                     if (blocked != null) {
                         failure = blocked;
                         ownersFailed.put(owner, blocked);
-                        complete(taken.remove(owner), blocked);
+                        deferFailure(failedWaiters, taken.remove(owner), blocked);
                         continue;
                     }
                     try {
@@ -342,11 +384,26 @@ public final class CompanionWriter {
                     } catch (Throwable t) {
                         failure = unwrap(t);
                         ownersFailed.put(owner, failure);
-                        complete(taken.remove(owner), failure);
+                        deferFailure(failedWaiters, taken.remove(owner), failure);
                     }
                 }
                 if (!progress) {
                     ignoreOrder = true;
+                }
+            }
+            // A snapshot is deleted only after the file that held its record at capture no longer
+            // points at it: that owner was written in this flush, was not dirty (its file on disk
+            // is current), or the profile had no record. Otherwise the delete waits for a retry.
+            for (Map.Entry<UUID, String> delete : batch.deletes().entrySet()) {
+                String owner = delete.getValue();
+                if (owner != null && batch.owners().containsKey(owner) && !ownersWritten.contains(owner)) {
+                    continue;
+                }
+                try {
+                    store.deleteSnapshot(delete.getKey()).join();
+                    deletesLeft.remove(delete.getKey());
+                } catch (Throwable t) {
+                    failure = unwrap(t);
                 }
             }
         } catch (Throwable t) {
@@ -373,6 +430,7 @@ public final class CompanionWriter {
                     nextRetryAtMs = 0;
                 }
                 flushesInFlight--;
+                inFlight = null;
             }
             if (failure != null) {
                 lastFailure = String.valueOf(failure);
@@ -380,6 +438,7 @@ public final class CompanionWriter {
                 lastFailure = null;
                 lastFlushAtMs = clock.getAsLong();
             }
+            failedWaiters.forEach(Runnable::run);
             Throwable leftover = failure != null ? failure : new IllegalStateException("companion_flush_incomplete");
             taken.values().forEach(w -> complete(w, leftover));
         }
@@ -423,6 +482,13 @@ public final class CompanionWriter {
 
     private static Throwable unwrap(Throwable t) {
         return t instanceof CompletionException && t.getCause() != null ? t.getCause() : t;
+    }
+
+    private static void deferFailure(List<Runnable> out, @Nullable List<CompletableFuture<Void>> futures,
+                                     Throwable failure) {
+        if (futures != null) {
+            out.add(() -> complete(futures, failure));
+        }
     }
 
     private static void complete(@Nullable List<CompletableFuture<Void>> futures, @Nullable Throwable failure) {

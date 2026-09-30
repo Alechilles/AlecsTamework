@@ -4,7 +4,9 @@ import com.hypixel.hytale.server.core.universe.StorageManager;
 import com.hypixel.hytale.server.core.util.BsonUtil;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -35,25 +37,79 @@ public final class HytaleCompanionFileIo implements CompanionFileIo {
         return storage.get().doSave(file, () -> BsonUtil.writeDocument(file, document, true));
     }
 
+    /**
+     * Every check and read runs inside {@code doLoad}, so a pending save or delete of the same
+     * path finishes first: a read racing a delete returns {@code null}, never "unreadable". Any
+     * failure other than a parse failure, including a failed pending save of the same path, is
+     * reported as {@link CompanionFileAccessException}. Logs nothing.
+     */
     @Override
     @Nullable
     public BsonDocument readNow(@Nonnull Path file) throws IOException {
-        boolean mainExists = Files.exists(file);
-        if (!mainExists && !Files.exists(bak(file))) {
+        ReadOutcome outcome;
+        try {
+            outcome = storage.get()
+                    .doLoad(file, () -> CompletableFuture.supplyAsync(() -> readWithBackup(file)))
+                    .join();
+        } catch (CompletionException | IllegalStateException e) {
+            Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof UncheckedIOException unchecked && unchecked.getCause() instanceof CompanionFileAccessException access) {
+                throw access;
+            }
+            throw new CompanionFileAccessException("could not read companion file " + file, cause);
+        }
+        if (outcome.unreadable()) {
+            throw new IOException("unreadable companion file " + file + " (no copy parses)");
+        }
+        return outcome.document();
+    }
+
+    /** Result of reading a file and its backup: a document, nothing, or unparseable. */
+    private record ReadOutcome(@Nullable BsonDocument document, boolean unreadable) {
+    }
+
+    private static ReadOutcome readWithBackup(Path file) {
+        String main = readIfPresent(file);
+        if (main != null) {
+            BsonDocument document = parseOrNull(main);
+            if (document != null) {
+                return new ReadOutcome(document, false);
+            }
+        }
+        String backup = readIfPresent(bak(file));
+        if (backup != null) {
+            BsonDocument document = parseOrNull(backup);
+            if (document != null) {
+                return new ReadOutcome(document, false);
+            }
+        }
+        return new ReadOutcome(null, main != null || backup != null);
+    }
+
+    /** File contents, or {@code null} when the file does not exist. */
+    @Nullable
+    private static String readIfPresent(Path file) {
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(file);
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (IOException e) {
+            throw new UncheckedIOException(new CompanionFileAccessException("could not read companion file " + file, e));
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    @Nullable
+    private static BsonDocument parseOrNull(String json) {
+        if (json.isBlank()) {
             return null;
         }
-        BsonDocument document;
         try {
-            // Through doLoad so a pending save or delete of the same path finishes first.
-            document = storage.get().doLoad(file, () -> BsonUtil.readDocument(file, true)).join();
-        } catch (CompletionException | IllegalStateException e) {
-            throw new IOException("unreadable companion file " + file, e);
+            return BsonDocument.parse(json);
+        } catch (RuntimeException e) {
+            return null;
         }
-        if (document == null && mainExists) {
-            // The main file exists but neither it nor a backup produced a document.
-            throw new IOException("unreadable companion file " + file);
-        }
-        return document;
     }
 
     @Override

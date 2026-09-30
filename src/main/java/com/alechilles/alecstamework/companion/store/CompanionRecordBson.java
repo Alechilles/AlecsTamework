@@ -49,7 +49,7 @@ public final class CompanionRecordBson {
         putString(d, "HomeWorld", r.homeWorld());
         putUuid(d, "NpcUuid", r.currentNpcUuid());
         d.put("Summary", encodeSummary(r.summary()));
-        if (r.rosterId() != null || r.bonded()) {
+        if (r.rosterId() != null || r.bonded() || r.rosterSlot() >= 0) {
             BsonDocument roster = new BsonDocument();
             putString(roster, "Id", r.rosterId());
             roster.put("Slot", new BsonInt32(r.rosterSlot()));
@@ -92,7 +92,7 @@ public final class CompanionRecordBson {
             UUID profileId = UUID.fromString(requireString(d, "ProfileId"));
             CompanionRecord.Builder b = CompanionRecord.builder(profileId, requireString(d, "Role"),
                     decodeLocation(requireDocument(d, "Location")));
-            b.revision(getLong(d, "Revision", 0)).generation(getLong(d, "Generation", 0));
+            b.revision(getStrictLong(d, "Revision")).generation(getStrictLong(d, "Generation"));
             b.ownerUuid(getUuid(d, "Owner")).ownerName(getString(d, "OwnerName"));
             b.displayName(getString(d, "Name"));
             String scope = getStrictString(d, "Scope");
@@ -250,6 +250,17 @@ public final class CompanionRecordBson {
     private static long getLong(BsonDocument d, String key, long fallback) {
         BsonValue v = d.get(key);
         return v != null && v.isNumber() ? v.asNumber().longValue() : fallback;
+    }
+
+    /**
+     * For revision and generation, which the fence and the compare-and-set rely on: a missing key
+     * means 0, but a value of another type makes the record unreadable instead of resetting it.
+     */
+    private static long getStrictLong(BsonDocument d, String key) {
+        if (d.containsKey(key) && !d.get(key).isNumber()) {
+            throw new IllegalArgumentException(key + " is not a number");
+        }
+        return getLong(d, key, 0);
     }
 
     private static double getDouble(BsonDocument d, String key) {
