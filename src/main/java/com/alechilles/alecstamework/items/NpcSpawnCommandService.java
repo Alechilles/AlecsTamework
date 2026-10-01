@@ -160,12 +160,10 @@ public final class NpcSpawnCommandService {
         if (managed == null) {
             OwnerPopulationCapService.Decision cap =
                     OwnerPopulationCapService.evaluateAcquisition(
-                            store, preparation.ownerId()
+                            store, preparation.ownerId(), preparation.roleId()
                     );
             if (!cap.allowed()) {
-                OwnerMessageUtil.sendPopulationCapReached(
-                        player, cap.currentCount(), cap.limit(), cap.scope()
-                );
+                OwnerMessageUtil.sendAcquisitionDenied(player, cap);
                 tracker.stop("Owner population cap reached.");
                 return false;
             }

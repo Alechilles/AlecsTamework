@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
@@ -14,16 +15,57 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Pre-checks the owner cap for the tame, set-owner and spawn sites against the owner's records in
- * the companion index: every owned companion counts, loaded or not. The binding check is
- * {@link com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate} under the index
- * lock; this one only refuses early with a message.
+ * Pre-checks the owner cap, and with a role id the population-group caps, for the tame, set-owner
+ * and spawn sites against the owner's records in the companion index: every owned companion
+ * counts, loaded or not. The binding check is {@link CompanionAdmissionGate#refuse} under the
+ * index lock; this one only refuses early with a message, before food is spent or effects play.
  *
  * <p>Reads are in-memory index reads. They never enter another world thread, block on futures,
  * or create durable reservations.
  */
 public final class OwnerPopulationCapService {
+    /** Reason of a {@link Decision} refused by a population-group cap. */
+    public static final String REASON_GROUP_CAP = "owner-group-cap-reached";
+
+    private static volatile CompanionAdmissionGate admissionGate;
+
     private OwnerPopulationCapService() {
+    }
+
+    /**
+     * Installs the gate the role-aware pre-check uses, or removes it with null. Without a gate
+     * the group caps are not pre-checked; the gate still enforces them under the index lock.
+     */
+    public static void useAdmissionGate(@Nullable CompanionAdmissionGate gate) {
+        admissionGate = gate;
+    }
+
+    /**
+     * As {@link #evaluateAcquisition(Store, UUID)}, then the population-group caps for a new
+     * companion of {@code roleId} in the store's world. A group refusal has reason
+     * {@link #REASON_GROUP_CAP}. A null or blank role checks the owner cap only.
+     */
+    @Nonnull
+    public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store,
+                                               @Nullable UUID ownerId,
+                                               @Nullable String roleId) {
+        return withGroupCaps(evaluateAcquisition(store, ownerId), admissionGate, ownerId, roleId,
+                resolveWorldName(store));
+    }
+
+    @Nonnull
+    static Decision withGroupCaps(@Nonnull Decision owned, @Nullable CompanionAdmissionGate gate,
+                                  @Nullable UUID ownerId, @Nullable String roleId, @Nullable String worldName) {
+        if (!owned.allowed() || gate == null || ownerId == null || roleId == null || roleId.isBlank()) {
+            return owned;
+        }
+        CompanionAdmission.Refusal refusal = gate.precheck(ownerId, roleId, worldName);
+        if (refusal == null) {
+            return owned;
+        }
+        return refusal == CompanionAdmission.Refusal.OWNED
+                ? Decision.denyAtCap(owned.limit(), owned.currentCount(), owned.scope())
+                : new Decision(false, true, owned.limit(), owned.currentCount(), 0, owned.scope(), REASON_GROUP_CAP);
     }
 
     @Nonnull

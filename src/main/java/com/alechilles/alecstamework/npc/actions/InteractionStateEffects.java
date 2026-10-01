@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
@@ -228,11 +229,10 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
             return false;
         }
         OwnerPopulationCapService.Decision ownerCap =
-                OwnerPopulationCapService.evaluateAcquisition(store, player.getUuid());
+                OwnerPopulationCapService.evaluateAcquisition(store, player.getUuid(),
+                        CompanionRoleIdResolver.resolveRoleId(npcRef, store));
         if (!ownerCap.allowed()) {
-            OwnerMessageUtil.sendPopulationCapReached(
-                    player, ownerCap.currentCount(), ownerCap.limit(), ownerCap.scope()
-            );
+            OwnerMessageUtil.sendAcquisitionDenied(player, ownerCap);
             return true;
         }
         BreedingClaimLimitPolicyService.Decision claimCap =

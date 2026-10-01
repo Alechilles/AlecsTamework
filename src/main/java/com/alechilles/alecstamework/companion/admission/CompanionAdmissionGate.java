@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.companion.admission;
 
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -18,12 +20,25 @@ import javax.annotation.Nullable;
  */
 public final class CompanionAdmissionGate {
     private final CompanionIndex index;
-    private final Supplier<PopulationGroupConfigIndex> groups;
+    private final Supplier<CompanionAdmission.Rules> rules;
 
     /** {@code groups} returns the current population-group config; null is read as no groups. */
     public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups) {
+        Objects.requireNonNull(groups, "groups");
         this.index = Objects.requireNonNull(index, "index");
-        this.groups = Objects.requireNonNull(groups, "groups");
+        this.rules = () -> configuredRules(groups.get());
+    }
+
+    private CompanionAdmissionGate(Supplier<CompanionAdmission.Rules> rules, CompanionIndex index) {
+        this.index = Objects.requireNonNull(index, "index");
+        this.rules = Objects.requireNonNull(rules, "rules");
+    }
+
+    /** A gate with fixed rules instead of the configured ones; {@code rules} is read on each check. */
+    @Nonnull
+    static CompanionAdmissionGate withRules(@Nonnull CompanionIndex index,
+                                            @Nonnull Supplier<CompanionAdmission.Rules> rules) {
+        return new CompanionAdmissionGate(rules, index);
     }
 
     /**
@@ -35,18 +50,33 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return null;
         }
-        return CompanionAdmission.check(index.fileRecords(after.ownerUuid()), before, after, rules());
+        return CompanionAdmission.check(index.fileRecords(after.ownerUuid()), before, after, rules.get());
+    }
+
+    /**
+     * Lock-free pre-check for the tame, set-owner and spawn sites, so a capped tame is refused
+     * before food is spent or effects play: would a new LIVE companion of {@code roleId} for
+     * {@code owner} in {@code world} be refused? A null world checks a companion with no world
+     * (the deployed group limit is then not checked). The binding check is {@link #refuse} under
+     * the index lock; this one may miss a change made after it returns.
+     */
+    @Nullable
+    public CompanionAdmission.Refusal precheck(@Nonnull UUID owner, @Nonnull String roleId, @Nullable String world) {
+        CompanionLocation at = world == null || world.isBlank() ? CompanionLocation.item()
+                : CompanionLocation.live(world, 0, 0, 0);
+        CompanionRecord candidate = CompanionRecord.builder(UUID.randomUUID(), roleId, at)
+                .ownerUuid(owner).homeWorld(world).build();
+        return CompanionAdmission.check(index.fileRecords(owner), null, candidate, rules.get());
     }
 
     @Nonnull
-    private CompanionAdmission.Rules rules() {
+    private static CompanionAdmission.Rules configuredRules(@Nullable PopulationGroupConfigIndex current) {
         TwGlobalConfig active = TwGlobalConfig.resolveActive();
         TwGlobalConfig global = active == null ? TwGlobalConfig.defaultConfig() : active;
         int ownedLimit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
                 global.getPopulationLimitPerPlayerOwnedTotal());
         boolean perWorld = TameworkRuntimeSettings.populationPerPlayerLimitScope(
                 global.getPopulationPerPlayerLimitScope()) == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD;
-        PopulationGroupConfigIndex current = groups.get();
         PopulationGroupConfigIndex groupIndex = current == null ? PopulationGroupConfigIndex.empty() : current;
         return new CompanionAdmission.Rules(Math.max(0, ownedLimit), perWorld, groupIndex::resolvePoliciesForRole);
     }

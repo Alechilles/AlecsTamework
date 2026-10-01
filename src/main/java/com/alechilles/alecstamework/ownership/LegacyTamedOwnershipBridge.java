@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -63,7 +64,8 @@ public final class LegacyTamedOwnershipBridge {
             return ClaimResult.none();
         }
         OwnerPopulationCapService.Decision cap =
-                OwnerPopulationCapService.evaluateAcquisition(store, playerId);
+                OwnerPopulationCapService.evaluateAcquisition(store, playerId,
+                        CompanionRoleIdResolver.resolveRoleId(npcRef, store));
         if (!cap.allowed()) {
             sendCapDenial(player, cap);
             return ClaimResult.denied(cap.reason());
@@ -154,13 +156,9 @@ public final class LegacyTamedOwnershipBridge {
             @Nonnull Player player,
             @Nonnull OwnerPopulationCapService.Decision decision
     ) {
-        if ("owner-cap-reached".equals(decision.reason())) {
-            OwnerMessageUtil.sendPopulationCapReached(
-                    player,
-                    decision.currentCount(),
-                    decision.limit(),
-                    decision.scope()
-            );
+        if ("owner-cap-reached".equals(decision.reason())
+                || OwnerPopulationCapService.REASON_GROUP_CAP.equals(decision.reason())) {
+            OwnerMessageUtil.sendAcquisitionDenied(player, decision);
             return;
         }
         sendUnavailable(player, decision.reason());

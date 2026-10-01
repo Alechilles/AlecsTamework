@@ -29,8 +29,6 @@ public final class CompanionAdmission {
      */
     public record Rules(int ownedLimit, boolean ownedPerWorld,
                         @Nonnull Function<String, List<PopulationGroupPolicy>> groupsForRole) {
-        public static final Rules NONE = new Rules(0, false, role -> List.of());
-
         public Rules {
             Objects.requireNonNull(groupsForRole, "groupsForRole");
         }

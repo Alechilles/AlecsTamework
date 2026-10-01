@@ -176,9 +176,14 @@ public final class RestoreFlow<R> {
         UUID newNpcUuid = UUID.randomUUID();
         UnaryOperator<CompanionRecord.Builder> change = commitChange(before, request, newNpcUuid);
         CompanionAdmission.Refusal[] refused = new CompanionAdmission.Refusal[1];
-        // The revision check makes a change made while the snapshot was read win. The caps are
-        // checked in the same locked step, so no other change can fill the slot in between.
+        // The revision check makes a change made while the snapshot was read win, before the caps
+        // are checked. The caps are checked in the same locked step, so no other change can fill
+        // the slot in between.
         Commit<R> commit = index.atomically(() -> {
+            CompanionRecord current = index.get(profileId);
+            if (current == null || current.revision() != before.revision()) {
+                return null;
+            }
             refused[0] = admission.apply(before, change.apply(before.toBuilder()).build());
             if (refused[0] != null) {
                 return null;

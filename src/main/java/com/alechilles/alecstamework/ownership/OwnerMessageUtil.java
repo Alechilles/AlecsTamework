@@ -61,6 +61,23 @@ public final class OwnerMessageUtil {
     }
 
     /**
+     * Tells the player why {@link OwnerPopulationCapService} refused an acquisition, in the
+     * player's language: the owned limit, a population-group limit, or that the limits cannot be
+     * checked right now.
+     */
+    public static void sendAcquisitionDenied(Player player, OwnerPopulationCapService.Decision decision) {
+        if (decision == null || decision.allowed() || !canSend(player)) {
+            return;
+        }
+        String key = switch (decision.reason()) {
+            case "owner-cap-reached" -> "tamework.ui.population.ownedLimit";
+            case OwnerPopulationCapService.REASON_GROUP_CAP -> "tamework.ui.population.groupLimit";
+            default -> "tamework.ui.population.unavailable";
+        };
+        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning, key);
+    }
+
+    /**
      * Tells the player the owned companion limit is reached, in the player's language. The count,
      * limit and scope are not shown; they stay in the signature for the existing callers.
      */

@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -89,10 +90,12 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
      *
      * <p>Spec 8.10: {@code enforceCaps} is true only for a live ownership assignment (owner or
      * tamed state put on a loaded NPC). The tame sites check the caps first; this re-check under
-     * the index lock covers the race where another change filled the slot in between. A refused
-     * body loses its owner (it stays tamed, as an unowned release does) and the owner is told why.
-     * Bodies that arrive already owned (chunk loads, pre-rework bodies, the startup pass) pass
-     * false: they are registered without the caps and never lose their owner.
+     * the index lock covers the race where another change filled the slot in between, and the
+     * pre-check makes it rare. A refused body is reverted to untamed through the command buffer:
+     * its owner, tamed and command-link components are removed, and the owner is told why. A role
+     * change the tame already made (for example wild to tamed livestock) is not undone; the body
+     * keeps its current role. Bodies that arrive already owned (chunk loads, pre-rework bodies,
+     * the startup pass) pass false: they are registered without the caps and never lose their owner.
      */
     public void tame(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> buffer, boolean enforceCaps) {
@@ -113,6 +116,8 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                 record -> enforceCaps ? admission.apply(null, record) : null);
         if (outcome.refusal() != null) {
             buffer.tryRemoveComponent(ref, TameworkOwnerComponent.getComponentType());
+            buffer.tryRemoveComponent(ref, TameworkTamedComponent.getComponentType());
+            buffer.tryRemoveComponent(ref, TameworkCommandLinksComponent.getComponentType());
             tellOwnerAtLimit(store.getExternalData().getWorld(), body.ownerUuid(), outcome.refusal());
             return;
         }
