@@ -156,6 +156,23 @@ class LinkedNpcPanelCardRenderStateTest {
                 < meters.getNumber("Top").intValue());
         assertVisible(commands, card + " #InlineLocation #CopyButton.Visible", true);
         assertVisible(commands, card + " #LocateButton.Visible", false);
+
+        // A status long enough to wrap keeps its second line clear of the rows and meters below it.
+        UICommandBuilder wrapped = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(wrapped, new UIEventBuilder(), 0, animal.withLocation(
+                new LinkedNpcEntry.Location("Contained in a Soul Lantern in PlayerName's inventory.", "default",
+                        "1054.1, 122.0, 120.4", "220m south, 153m east")).withOwnedActions(), false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        var wrappedStatus = anchor(wrapped, card + " #InlineLocation #Status.Anchor");
+        var wrappedWorld = anchor(wrapped, card + " #InlineLocation #World.Anchor");
+        var wrappedDirections = anchor(wrapped, card + " #InlineLocation #RelativeDistance.Anchor");
+        var wrappedMeters = anchor(wrapped, card + " #CooldownRow.Anchor");
+        assertEquals(wrappedStatus.getNumber("Top").intValue() + 28, wrappedWorld.getNumber("Top").intValue());
+        org.junit.jupiter.api.Assertions.assertTrue(anchor(wrapped, card + " #InlineLocation.Anchor")
+                .getNumber("Top").intValue() + wrappedDirections.getNumber("Top").intValue()
+                + wrappedDirections.getNumber("Height").intValue() < wrappedMeters.getNumber("Top").intValue());
+        org.junit.jupiter.api.Assertions.assertTrue(wrappedMeters.getNumber("Top").intValue()
+                + wrappedMeters.getNumber("Height").intValue() <= 160);
         assertVisible(commands, card + " #LifecycleProgress #Paused.Visible", true);
 
         // Capture may clear ownership; restricting actions must not replace the ordinary card layout.

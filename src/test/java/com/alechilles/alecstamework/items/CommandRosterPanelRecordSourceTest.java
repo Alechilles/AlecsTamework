@@ -75,6 +75,9 @@ class CommandRosterPanelRecordSourceTest {
 
         assertEquals(CommandTimedSummoningState.UNLOADED, rows.get(unloaded.currentNpcUuid()).roster().state());
         assertTrue(rows.get(row(dead)).roster().paidRevivalState());
+        // With no deployed limit the row still counts the roster's summoned members.
+        assertTrue(summonedRow.capUnlimited());
+        assertEquals(2, summonedRow.activeCount());
     }
 
     @Test

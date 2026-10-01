@@ -14,7 +14,11 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int NORMAL_CARD_HEIGHT = 176;
-    private static final int ROSTER_CARD_HEIGHT = 212;
+    /** Width of the right section, and of the inline status text when action buttons sit beside it. */
+    private static final int ACTION_SECTION_WIDTH = 414;
+    private static final int INLINE_LOCATION_WIDTH_BESIDE_ACTIONS = 296;
+    /** Left edge that centers a 48 px action button in the column the roster Summon/Dismiss button uses. */
+    private static final int ROSTER_ACTION_LEFT = 767;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
                                      LinkedNpcEntry entry, String language) {
@@ -169,6 +173,9 @@ final class LinkedNpcPanelCardBinder {
         // Read-only ordinary companions keep the normal card and location layout.
         boolean rosterLayout = config.ownerCommandFamilyRoster()
                 || feature != null && (feature.roster() != null || feature.bonded() != null);
+        // Roster lines take the status area at the top of the action section, as inline location
+        // text does on generic cards, so the emblem and its label are not drawn under them.
+        boolean rosterLines = feature != null && feature.roster() != null;
         boolean legacyLinked = isLinked && !managedRoster;
         boolean genericLinkedOrOwned = !managedRoster
                 && (legacyLinked || entry.ownedActions());
@@ -250,7 +257,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !showInlineLocation
+                !showInlineLocation && !rosterLines
                         && (!entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop())
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
@@ -350,11 +357,12 @@ final class LinkedNpcPanelCardBinder {
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        // Roster and bonded rows keep the emblem and report revival in #RosterTimer; the removal
-        // menu keeps the emblem because its buttons occupy the strip's area.
+        // Roster rows report state and revival in their roster lines; the removal menu keeps the
+        // emblem because its buttons occupy the strip's area.
         boolean showStatusStrip = emblem != null && !showInlineLocation && !rosterLayout
                 && !pendingUnlink && LinkedNpcPanelStatusStrip.applies(entry);
-        int actionLeft = showInlineLocation ? 736 : 432;
+        // A roster row's only icon action is Revive/Recover, shown when Summon and Dismiss are not.
+        int actionLeft = rosterLines ? ROSTER_ACTION_LEFT : showInlineLocation ? 736 : 432;
         String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
                 showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
                 respawnSelector, locateSelector, recallSelector, setHomeSelector,
@@ -379,12 +387,12 @@ final class LinkedNpcPanelCardBinder {
         }
         commandBuilder.set(entrySelector + " #StatusStrip.Visible", false);
         commandBuilder.set(entrySelector + " #StatusEmblem.Visible",
-                emblem != null && !showInlineLocation && !showStatusStrip);
+                emblem != null && !showInlineLocation && !showStatusStrip && !rosterLines);
         if (showStatusStrip) {
             commandBuilder.set(statusUnloadedSelector + ".Visible", false);
             LinkedNpcPanelStatusStrip.bind(commandBuilder, entrySelector, entry, emblem,
                     respawnSelector, showRespawn, language);
-        } else if (emblem != null && !showInlineLocation) {
+        } else if (emblem != null && !showInlineLocation && !rosterLines) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
@@ -431,10 +439,13 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.set(inlineLocationCoordinatesSelector + ".Value", location.coordinates());
             commandBuilder.set(inlineLocationCoordinatesSelector + ".MaxLength",
                     Math.max(64, location.coordinates().length() + 16));
-            int locationRow = showInlineStatus ? 28 : 14;
-            int inlineLocationWidth = showRecall || showReturnHome || showSetHome ? 296 : 414;
+            int inlineLocationWidth = showRecall || showReturnHome || showSetHome
+                    ? INLINE_LOCATION_WIDTH_BESIDE_ACTIONS : ACTION_SECTION_WIDTH;
+            int statusLines = inlineStatusLines(location.status(), inlineLocationWidth);
+            int locationRow = showInlineStatus ? 14 + statusLines * 14 : 14;
+            // The label is always two lines tall, so a status that wraps unexpectedly is not clipped.
             commandBuilder.setObject(inlineLocationStatusSelector + ".Anchor",
-                    fixedAnchor(14, 0, inlineLocationWidth, 14));
+                    fixedAnchor(14, 0, inlineLocationWidth, 28));
             commandBuilder.setObject(inlineLocationWorldSelector + ".Anchor",
                     fixedAnchor(locationRow, 0, inlineLocationWidth, 14));
             locationRow += showInlineWorld ? 14 : 0;
@@ -455,8 +466,16 @@ final class LinkedNpcPanelCardBinder {
                         inlineLocationSelector + " #CopyButton",
                         EventData.of(config.eventCommandId(), LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid()), false);
             }
-            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 74);
+            int inlineBottom = !showInlineCoordinates ? locationRow
+                    : locationRow + (location.relativeDistance().isBlank() ? 18 : 32);
+            int inlineHeight = Math.max(74, inlineBottom);
+            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, inlineHeight);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
+            if (inlineHeight > 74) {
+                // A two-line status above world, coordinates and distance pushes the meters down.
+                commandBuilder.setObject(entrySelector + " #CooldownRow.Anchor",
+                        fixedAnchor(32 + inlineHeight + 3, 432, ACTION_SECTION_WIDTH, 34));
+            }
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(88, 730, 116, 20));
             commandBuilder.set(recallCountdownSelector + ".Style",
@@ -652,7 +671,7 @@ final class LinkedNpcPanelCardBinder {
                                boolean showInlineLocation) {
         boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation
                 && (entry.dead() || entry.lost());
-        Anchor cardAnchor = buildCardAnchor(managedRoster, compact);
+        Anchor cardAnchor = buildCardAnchor(compact);
         commands.setObject(card + ".Anchor", cardAnchor);
         Anchor cooldownAnchor = fixedAnchor(111, 432, 414, 34);
         commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
@@ -689,6 +708,14 @@ final class LinkedNpcPanelCardBinder {
         nameAnchor.setWidth(null);
         nameAnchor.setRight(Value.of(36));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
+    }
+
+    /**
+     * Lines to reserve for the inline status text. The server has no font metrics, so this assumes
+     * about 6 px per character of the bold 11 px status font, which errs toward reserving two lines.
+     */
+    static int inlineStatusLines(String status, int width) {
+        return status != null && status.length() * 6 > width ? 2 : 1;
     }
 
     static LifecycleDisplay resolveLifecycleDisplay(LinkedNpcEntry entry, String language) {
@@ -807,13 +834,12 @@ final class LinkedNpcPanelCardBinder {
         return anchor;
     }
 
-    private static Anchor buildCardAnchor(boolean managedRoster, boolean compact) {
+    private static Anchor buildCardAnchor(boolean compact) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(managedRoster
-                ? ROSTER_CARD_HEIGHT : compact ? 124 : NORMAL_CARD_HEIGHT));
+        anchor.setHeight(Value.of(compact ? 124 : NORMAL_CARD_HEIGHT));
         return anchor;
     }
 

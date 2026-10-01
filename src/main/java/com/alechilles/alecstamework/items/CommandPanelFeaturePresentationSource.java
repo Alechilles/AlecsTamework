@@ -103,11 +103,17 @@ final class CommandPanelFeaturePresentationSource {
             return Map.of();
         }
         long nowMs = clock.getAsLong();
+        int deployedMembers = 0;
+        for (CommandRosterPanelRecordSource.PanelMember member : members) {
+            if (member.record().isDeployed()) {
+                deployedMembers++;
+            }
+        }
         LinkedHashMap<UUID, CommandPanelFeaturePresentation> result =
                 new LinkedHashMap<>();
         for (CommandRosterPanelRecordSource.PanelMember member : members) {
             CommandRosterStatusPresentation roster = roster(
-                    ownerUuid, ownershipWorldName, familyId, member, nowMs
+                    ownerUuid, ownershipWorldName, familyId, member, deployedMembers, nowMs
             );
             CommandReviveCostPresentation revival =
                     roster.paidRevivalState()
@@ -160,6 +166,7 @@ final class CommandPanelFeaturePresentationSource {
             String ownershipWorldName,
             String familyId,
             CommandRosterPanelRecordSource.PanelMember member,
+            int deployedMembers,
             long nowMs
     ) {
         CompanionRecord record = member.record();
@@ -168,7 +175,7 @@ final class CommandPanelFeaturePresentationSource {
                 ? remaining(record.summonedUntilMs(), nowMs) : null;
         long configuredDurationMs = configuredDurationMs(member.roleId());
         Capacity capacity = capacity(
-                ownerUuid, ownershipWorldName, member.roleId()
+                ownerUuid, ownershipWorldName, member.roleId(), deployedMembers
         );
         return new CommandRosterStatusPresentation(
                 member.profileId(),
@@ -269,12 +276,15 @@ final class CommandPanelFeaturePresentationSource {
     /**
      * The member role's deployed group with the least headroom, counted as {@link
      * CompanionAdmission} counts it: the owner's LIVE records in that group, in the player's world
-     * for a per-world group. Groups without a deployed limit are skipped.
+     * for a per-world group. Groups without a deployed limit are skipped. When no limit applies,
+     * the count is this roster's deployed members, so the row never reads zero beside a summoned
+     * member.
      */
     private Capacity capacity(
             UUID ownerUuid,
             String ownershipWorldName,
-            String roleId
+            String roleId,
+            int deployedMembers
     ) {
         long selectedActive = 0L;
         long selectedLimit = 0L;
@@ -283,7 +293,7 @@ final class CommandPanelFeaturePresentationSource {
         try {
             CompanionAdmission.Rules rules = admissionRules.get();
             if (rules == null) {
-                return Capacity.unlimited();
+                return Capacity.unlimited(deployedMembers);
             }
             List<CompanionRecord> owned = ownedRecords.apply(ownerUuid);
             String world = normalize(ownershipWorldName);
@@ -309,7 +319,10 @@ final class CommandPanelFeaturePresentationSource {
                 }
             }
         } catch (RuntimeException | LinkageError ignored) {
-            return Capacity.unlimited();
+            return Capacity.unlimited(deployedMembers);
+        }
+        if (selectedGroup == null) {
+            return Capacity.unlimited(deployedMembers);
         }
         return new Capacity(
                 saturatedInt(selectedActive),
@@ -370,8 +383,8 @@ final class CommandPanelFeaturePresentationSource {
             @Nullable String blockingGroupId,
             @Nullable String blockingReason
     ) {
-        private static Capacity unlimited() {
-            return new Capacity(0, 0, null, null);
+        private static Capacity unlimited(int activeCount) {
+            return new Capacity(activeCount, 0, null, null);
         }
     }
 }
