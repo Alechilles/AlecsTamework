@@ -80,7 +80,7 @@ public final class SummonExpiryScheduler {
         }
     }
 
-    /** Tracks {@code profileId} to come due at {@code atMs}, whatever its record says now. */
+    /** Tracks {@code profileId} to come due at {@code atMs}, or later if a newer timer is tracked. */
     void retryAt(@Nonnull UUID profileId, long atMs) {
         synchronized (lock) {
             // A newer timer tracked since the poll (a re-summon) must not be pulled earlier or lost.
