@@ -115,6 +115,7 @@ class CompanionWriterTest {
 
         index.update(r.profileId(), 0, b -> b.ownerUuid(BOB));
         writer.flushNow(BOB).get(2, TimeUnit.SECONDS);
+        executor.submit(() -> { }).get(2, TimeUnit.SECONDS);   // the flush has finished ALICE's file too
 
         assertEquals(List.of(ownerFile(BOB)), io.writeOrder.subList(0, 1));
         assertFalse(io.files.containsKey(ownerFile(ALICE)), "an owner with nothing left has no file");
@@ -126,6 +127,7 @@ class CompanionWriterTest {
 
         index.update(r.profileId(), 0, b -> b.ownerUuid(BOB));
         writer.flushNow(BOB).get(2, TimeUnit.SECONDS);
+        executor.submit(() -> { }).get(2, TimeUnit.SECONDS);   // the flush has finished ALICE's file too
 
         assertEquals(List.of(ownerFile(BOB), ownerFile(ALICE)), io.opOrder);
         assertTrue(io.files.containsKey(ownerFile(BOB)));
