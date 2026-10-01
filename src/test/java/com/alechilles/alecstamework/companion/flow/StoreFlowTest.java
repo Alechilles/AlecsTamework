@@ -32,6 +32,7 @@ class StoreFlowTest {
     private CompletableFuture<StoreFlow.CapturedBody> captured = CompletableFuture.completedFuture(
             new StoreFlow.CapturedBody(ENTITY, CompanionSummary.EMPTY));
     private SnapshotEnvelope stored;
+    private CompletableFuture<SnapshotEnvelope> storedRead;
 
     private CompanionRecord insertLive(long generation) {
         CompanionTransitions.BodyFacts facts = new CompanionTransitions.BodyFacts(UUID.randomUUID(), owner, "Alec",
@@ -44,7 +45,7 @@ class StoreFlowTest {
     private StoreFlow<String> flow() {
         return new StoreFlow<>(index, loaded,
                 body -> { events.add("capture"); return captured; },
-                id -> CompletableFuture.completedFuture(stored),
+                id -> storedRead != null ? storedRead : CompletableFuture.completedFuture(stored),
                 (id, envelope) -> { events.add("snapshot"); queued.add(envelope); },
                 who -> { events.add("flush"); return flush; },
                 (id, body) -> events.add("remove"), () -> NOW);
@@ -153,5 +154,52 @@ class StoreFlowTest {
 
         assertEquals(StoreFlow.Result.NOT_LIVE, flow().store(live.profileId(), StoredReason.ROSTER, 0L).join());
         assertEquals(StoreFlow.Result.NOT_FOUND, flow().store(UUID.randomUUID(), StoredReason.ROSTER, 0L).join());
+    }
+
+    @Test
+    void aBodyThatRegistersWhileTheStoredSnapshotIsReadBlocksTheStore() {
+        CompanionRecord live = insertLive(2);
+        storedRead = new CompletableFuture<>();
+        CompletableFuture<StoreFlow.Result> pending = flow().store(live.profileId(), StoredReason.ROSTER, 0L);
+        loaded.put(live.profileId(), "late-body");
+
+        storedRead.complete(new SnapshotEnvelope(live.profileId(), CompanionSnapshots.FORMAT, 2, ENTITY));
+
+        assertEquals(StoreFlow.Result.CONFLICT, pending.join());
+        assertEquals(live, index.get(live.profileId()));
+        assertEquals("late-body", loaded.get(live.profileId()));
+        assertTrue(events.isEmpty(), "nothing was flushed or removed");
+    }
+
+    @Test
+    void aCaptureThatIsNotARestorableSnapshotChangesNothing() {
+        CompanionRecord live = insertLive(2);
+        loaded.put(live.profileId(), "body");
+        captured = CompletableFuture.completedFuture(new StoreFlow.CapturedBody(new BsonDocument(), CompanionSummary.EMPTY));
+
+        StoreFlow.Result result = flow().store(live.profileId(), StoredReason.ROSTER, 0L).join();
+
+        assertEquals(StoreFlow.Result.COMMIT_FAILED, result);
+        assertEquals(live, index.get(live.profileId()));
+        assertEquals("body", loaded.get(live.profileId()));
+        assertEquals(List.of("capture"), events);
+    }
+
+    @Test
+    void aFailedFlushAfterANewerChangeLeavesThatChangeAndRemovesTheStaleBody() {
+        CompanionRecord live = insertLive(0);
+        loaded.put(live.profileId(), "body");
+        flush = new CompletableFuture<>();
+        CompletableFuture<StoreFlow.Result> pending = flow().store(live.profileId(), StoredReason.ROSTER, 0L);
+        CompanionRecord committed = index.get(live.profileId());
+        index.update(live.profileId(), committed.revision(),
+                CompanionTransitions.died(committed, CompanionSummary.EMPTY, 5L, 6L, "PLAYER", null));
+
+        flush.completeExceptionally(new RuntimeException("disk"));
+
+        assertEquals(StoreFlow.Result.COMMIT_FAILED, pending.join());
+        assertEquals(LocationKind.DEAD, index.get(live.profileId()).location().kind());
+        assertNull(loaded.get(live.profileId()));
+        assertTrue(events.contains("remove"));
     }
 }

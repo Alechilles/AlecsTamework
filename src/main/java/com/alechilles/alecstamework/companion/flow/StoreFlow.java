@@ -86,8 +86,21 @@ public final class StoreFlow<R> {
     /**
      * Stores the companion for {@code reason}; {@code cooldownUntilMs} is the wall-clock time the
      * next summon is allowed, 0 for none. Never completes exceptionally for an expected failure;
-     * the {@link Result} says what happened. After any result but STORED and CONFLICT the companion
-     * is still LIVE with its body registered.
+     * the {@link Result} says what happened:
+     * <ul>
+     *   <li>NOT_FOUND, NOT_LIVE, NO_SNAPSHOT: nothing changed.
+     *   <li>CONFLICT before the commit (the record changed while the snapshot was taken or read, or
+     *       a body registered while the stored snapshot was read): the companion is still LIVE with
+     *       its body registered; the caller may retry.
+     *   <li>COMMIT_FAILED when the capture failed, was not a usable snapshot, or the flush failed and
+     *       the revert applied: the companion is still LIVE with its body registered.
+     *   <li>COMMIT_FAILED when the flush failed but a newer change had already replaced the commit:
+     *       the revert does not apply, the record is no longer LIVE (it keeps the newer change) and
+     *       the stale body is removed.
+     *   <li>CONFLICT after the flush (a newer change replaced the commit): the record keeps that
+     *       change and the stale body is removed.
+     *   <li>STORED: written, and the body removed.
+     * </ul>
      */
     @Nonnull
     public CompletableFuture<Result> store(@Nonnull UUID profileId, @Nonnull StoredReason reason, long cooldownUntilMs) {
@@ -128,14 +141,24 @@ public final class StoreFlow<R> {
                         : CompletableFuture.completedFuture(Result.NO_SNAPSHOT));
     }
 
-    /** {@code body} and {@code fresh} are both null on the unloaded path. */
+    /** {@code body} and {@code fresh} are both null on the unloaded path, which commits only while no body is registered. */
     private CompletableFuture<Result> commit(CompanionRecord before, @Nullable R body, @Nullable CapturedBody fresh,
                                              StoredReason reason, long cooldownUntilMs) {
         UUID profileId = before.profileId();
+        if (fresh != null && RestoreRules.forSnapshot(before,
+                new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, before.generation(), fresh.snapshotData()),
+                RestoreRules.Reason.RECALL) != RestoreRules.Verdict.ALLOWED) {
+            LOGGER.at(Level.WARNING).log("Companion %s has no usable snapshot to store; it stays live", profileId);
+            return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
+        }
         Long snapshotAtMs = fresh == null ? null : clock.getAsLong();
         CompanionSummary summary = fresh == null ? null : fresh.summary();
-        // The revision check makes a change made while the snapshot was taken or read win.
+        // The revision check makes a change made while the snapshot was taken or read win. Without a
+        // fresh capture, a body that registered meanwhile is not covered by the stored snapshot.
         Commit commit = index.atomically(() -> {
+            if (fresh == null && loaded.get(profileId) != null) {
+                return null;
+            }
             CompanionIndex.Mutation m = index.update(profileId, before.revision(),
                     CompanionTransitions.stored(before, reason, summary, snapshotAtMs, cooldownUntilMs));
             if (!m.applied()) {
