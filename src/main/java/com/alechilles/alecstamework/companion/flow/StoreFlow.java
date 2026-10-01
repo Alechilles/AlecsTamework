@@ -171,8 +171,17 @@ public final class StoreFlow<R> {
         }
         CompanionRecord after = commit.after();
         if (fresh != null) {
-            queueSnapshot.accept(profileId,
-                    new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, after.generation(), fresh.snapshotData()));
+            try {
+                queueSnapshot.accept(profileId,
+                        new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, after.generation(), fresh.snapshotData()));
+            } catch (RuntimeException failure) {
+                LOGGER.at(Level.WARNING).withCause(failure)
+                        .log("Could not queue the snapshot of stored companion %s; the store is undone", profileId);
+                if (!revertCommit(before, commit, body, fresh)) {
+                    removeBodySafely(profileId, body);
+                }
+                return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
+            }
         }
         return flush(after).handle((ignored, error) -> error).thenApply(error -> {
             if (error != null) {
@@ -212,8 +221,14 @@ public final class StoreFlow<R> {
                 loaded.put(profileId, body);
             }
             if (fresh != null) {
-                queueSnapshot.accept(profileId,
-                        new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, before.generation(), fresh.snapshotData()));
+                try {
+                    queueSnapshot.accept(profileId,
+                            new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, before.generation(), fresh.snapshotData()));
+                } catch (RuntimeException failure) {
+                    // The record and registry are already back; only the snapshot write is missing.
+                    LOGGER.at(Level.WARNING).withCause(failure)
+                            .log("Could not re-queue the snapshot of companion %s after an undone store", profileId);
+                }
             }
             return true;
         });
