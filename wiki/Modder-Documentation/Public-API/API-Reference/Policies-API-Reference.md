@@ -8,6 +8,10 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
+> **API `3.0.0`**
+> `populationAdmissions()` and its reservation tokens were removed. Tamework
+> checks every limit itself in the step that changes a companion.
+
 Capability: `POLICY`
 
 Entry point: `TameworkApi.policies()`.
@@ -21,18 +25,28 @@ Entry point: `TameworkApi.policies()`.
 - `evaluateDamage(profileId, attackerPlayerUuid)`
 - `evaluatePopulationCap(ownerUuid)`
 - `evaluatePopulationCap(requestV2)`
-- `populationAdmissions()`
+- `admissionProviders()`
 
 ## Owner cap
 
-The legacy `evaluatePopulationCap(ownerUuid)` remains a compatibility view.
-`evaluatePopulationCap(requestV2)` reads the durable canonical owner count for
-an explicit global/per-world scope. Both are informational preflights.
+`evaluatePopulationCap(ownerUuid)` remains as a compatibility view.
 
-Use `populationAdmissions()` when a custom gameplay mutation must bind a
-positive acquisition to durable capacity. Its try/claim-for-apply/commit/cancel
-protocol prevents another concurrent mutation from consuming the same slot.
-Do not treat a read-only preflight as a reservation.
+`evaluatePopulationCap(requestV2)` counts every companion the owner has in the
+requested scope, loaded or not. The request names no role, so population-group
+limits and admission providers are not part of the answer. `pendingCount` is
+`0` when the count is known.
+
+Both calls are informational. They reserve nothing. The binding check runs when
+the companion record changes, so a later change by the same owner can still be
+refused. There is no public way to reserve capacity in 3.0.0.
+
+Admin tamed spawns of managed roles go through the same limits as every other
+way of getting a companion. There is no admin bypass.
+
+## Admission providers
+
+`admissionProviders()` returns the registry for external admission policy. See
+[Admission Providers API Reference](/mod/alecs-tamework/admission-providers-api-reference).
 
 ## SimpleClaims
 

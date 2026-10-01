@@ -10,9 +10,8 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection contains the reference contract for each public API family.
 
-> **Stable API Contract (`2.0.0`)**
-> Reference pages describe the supported public contract that ships with
-> Tamework 3.3.0.
+> **API `3.0.0`**
+> Reference pages describe the public contract that ships with Tamework 5.0.0.
 
 ## Child Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
@@ -30,13 +29,14 @@ This subsection contains the reference contract for each public API family.
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
 - [Captured Item Display API Reference](/mod/alecs-tamework/captured-item-display-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
-- [Command Family Rosters API Reference](/mod/alecs-tamework/command-family-rosters-api-reference)
-- [Timed Summoning API Reference](/mod/alecs-tamework/timed-summoning-api-reference)
-- [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
-- [Paid Command Revival API Reference](/mod/alecs-tamework/paid-command-revival-api-reference)
+- [Admission Providers API Reference](/mod/alecs-tamework/admission-providers-api-reference)
 - [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)
 - [Command UI Renderer and Contributor API Reference](/mod/alecs-tamework/command-ui-provider-api-reference)
 - [Command HUD Renderer and Contributor API Reference](/mod/alecs-tamework/command-hud-renderer-and-contributor-api-reference)
 
+## Removed in 3.0.0
 
-
+The Command Family Rosters, Timed Summoning, Companion Provisioning, and Paid
+Command Revival APIs were removed. The
+[Public API Overview](/mod/alecs-tamework/public-api-overview) names the
+replacement for each.

@@ -8,83 +8,97 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
-> This reference tracks the current `profileData()` contract in `TameworkApi`.
+> **API `3.0.0`**
+> `findOperation` was removed. There is no stored operation log. A namespace
+> may no longer contain `/`.
 
-Capabilities: `PROFILE_DATA` for basic reads/writes and
-`PROFILE_DATA_TRANSACTIONS` for revision-fenced, restart-visible mutations.
-
-Tamework 3.0.0 advertises `PROFILE_DATA_TRANSACTIONS` when the replacement
-profile-data operations are installed over the canonical facade bundle.
-Consumers must require the capability before using the transactional methods.
+Capabilities: `PROFILE_DATA` for basic reads and writes and
+`PROFILE_DATA_TRANSACTIONS` for revision-checked writes. Both are advertised
+in 3.0.0.
 
 ## Entry Point
 `TameworkApi.profileData() -> ProfileDataApi`
 
-## Methods
+## Data Model
+A value is JSON text stored on the companion's record under `profileId`,
+`namespace`, and `key`. Each value has its own revision.
+
+## Rules
+- `namespace` and `key` must be nonblank. Both are trimmed. A namespace has at
+  most 128 characters and a key at most 256.
+- `namespace` may not contain `/`. A key may.
+- `tamework` and `Alechilles:Tamework` are reserved, in any letter case.
+- `jsonPayload` must be valid JSON of at most 1,048,576 characters. It is
+  stored in canonical form.
+- A reserved or invalid namespace, an unparsable profile ID, and a released
+  companion read as "no profile data" and refuse writes.
+
+Use your plugin ID (for example `example.plugin`) as the namespace.
+
+## Simple methods
 - `Optional<String> get(String profileId, String namespace, String key)`
 - `Map<String, String> list(String profileId, String namespace)`
 - `boolean put(String profileId, String namespace, String key, String jsonPayload)`
 - `boolean delete(String profileId, String namespace, String key)`
 
-The simple `put`/`delete` methods return queue acceptance, not a durable
-cross-mod transaction result. Integrations that
-must coordinate material consumption, cooldowns, entitlement, or another
-durable domain should require `PROFILE_DATA_TRANSACTIONS` and use the methods
-below.
+Reads are synchronous and safe from any thread.
 
-## Transactional methods
+`put` and `delete` change the record in memory and return at once. The owner's
+file is written on the writer's next flush. `true` means the change was
+applied in memory, not that it is on disk. `delete` returns `true` when the
+profile exists and no longer has the value, including when it never had it.
+
+## Revision-checked methods
 
 - `Optional<ProfileDataEntryView> getVersioned(String profileId, String namespace, String key)`
 - `CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(ProfileDataCompareAndSetRequest request)`
 - `CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(String profileId, String namespace, String key, long expectedRevision, String idempotencyKey, String jsonPayload)`
-- `CompletionStage<Optional<ProfileDataOperationView>> findOperation(String namespace, String idempotencyKey)`
 
-An existing value starts at revision `1`. Expected revision `0`
-(`MISSING_REVISION`) means the key must not exist. A committed compare-and-set
-publishes exactly `expectedRevision + 1`.
+Revisions:
 
-The namespace plus idempotency key is the durable operation origin. Reuse it
-for the same logical mutation across callbacks, timeouts, or restart. A
-conflicting retry does not overwrite the original operation.
+- The first value has revision `1`.
+- Expected revision `0` means the key must not exist.
+- A committed write has revision `expectedRevision + 1`.
+- A `put` also adds one to the revision.
 
-## Durable outcomes
+`compareAndSet` checks the revision and changes the value in one step. The
+stage completes only after the owner's file is written. When that write fails
+the change is undone.
 
-`ProfileDataCompareAndSetResult` reports:
+The stage may complete on a thread that is not a world thread (the store's
+writer thread). A continuation must not block and must not read or change
+entities, components, or worlds. Hop to the owning world with
+`world.execute(...)` first.
 
-- `COMMITTED`: includes the matching committed operation and revisioned entry.
-- `TERMINAL_DENIED`: includes durable denial and no entry.
-- `QUARANTINED`: includes durable ambiguous/fenced state and no entry.
-- `UNAVAILABLE`: claims no durable result.
+### Results
 
-`findOperation` can expose `PREPARED`, `APPLYING`, `COMMITTED`,
-`TERMINAL_DENIED`, or `QUARANTINED`. Unknown, unavailable, or nonterminal state
-never authorizes a caller to invent a second idempotency key or compensate as
-though the mutation failed.
+| Status | Reason | Meaning |
+| --- | --- | --- |
+| `COMMITTED` | `profile-data-committed` | Written to disk. The result has the operation and the entry. |
+| `TERMINAL_DENIED` | `profile-data-revision-mismatch` | The value's revision is not the expected one. Read again and retry. |
+| `TERMINAL_DENIED` | `profile-data-profile-not-found` | No such companion, or it was released. |
+| `TERMINAL_DENIED` | `profile-data-namespace-refused` | Reserved namespace, or a namespace with `/`. |
+| `UNAVAILABLE` | `profile-data-flush-failed` | The file write failed. The change was undone. The result has no operation. |
 
-When `PROFILE_DATA_TRANSACTIONS` is not advertised, transactional methods are
-deliberately unavailable. Do not infer support from the presence of their DTO
-classes.
+`QUARANTINED` is not returned in 3.0.0.
 
-## Data Model
-Profile-scoped extension data is stored as UTF-8 JSON text keyed by:
-- `profileId`
-- `namespace`
-- `key`
+### Repeated requests
 
-## Rules
-- `namespace` and `key` must be nonblank.
-- `jsonPayload` must parse as JSON text.
-- `Alechilles:Tamework` is reserved for internal use.
-- Writes go through Tamework's canonical persistence operation boundary.
-- `put(...)` and `delete(...)` returning `true` proves queue acceptance,
-  not a restart-visible cross-domain commit.
+The `ProfileDataOperationView` in a result is built from the profile, key, and
+revision. It is not read from a log, and `findOperation` no longer exists.
 
-## Recommended Namespace
-Use your plugin id (for example `example.plugin`) as the namespace.
+Repeating a request while its value and revision are still the current ones
+returns `COMMITTED` again, after the same wait for the file. After a later
+change the same request returns a revision mismatch. To find out what happened
+after a restart, call `getVersioned` and compare the revision and payload.
+
+## Bonded extension data
+
+Bonded companions use `BondedCompanionApi.getExtensionData` and
+`compareAndSetExtensionData`. The namespace rules are the same. The public
+revision there starts at `0`, not `1`. See
+[Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference).
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Store Per-Mob Plugin State JSON Recipe](/mod/alecs-tamework/store-per-mob-plugin-state-json-recipe)
-
-

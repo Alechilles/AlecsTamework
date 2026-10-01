@@ -36,7 +36,11 @@ public void stop() {
 ```
 
 ## Notes
-- Event callbacks run synchronously on Tamework's emit thread.
+- Event callbacks run on the thread that made the change, after Tamework's
+  companion store lock is released. That thread is often a world thread but
+  not always. Hop to the owning world before touching entities.
+- There is no order guarantee between changes made on different threads.
+- Events are not replayed after a restart.
 - Listener exceptions are isolated by Tamework and logged.
 - Always close subscriptions on plugin disable/unload.
 

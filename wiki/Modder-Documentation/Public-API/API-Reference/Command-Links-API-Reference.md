@@ -8,8 +8,8 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
-> This reference tracks the current `commandLinks()` contract in `TameworkApi`.
+> **API `3.0.0`**
+> The home position is no longer saved with the companion's record.
 
 Capability: `COMMAND_LINKS`
 
@@ -35,16 +35,21 @@ Capability: `COMMAND_LINKS`
 - `lastUpdatedAtMs`
 
 ## Home Position Resolution
-Tamework resolves `homePosition` in this order:
-1. Live NPC command-links component.
-2. Last-live immutable command snapshot.
-3. Active persisted snapshot payload (`capture`, `death`, `lost`).
+`homePosition` comes from the live NPC's command-links component, or from the
+last state Tamework saw while the body was loaded in this server session.
+
+The companion's saved record holds no home position. `getHomePosition(...)`
+and `hasHomePosition(...)` are reliable only while the body is loaded. A
+companion that is unloaded, stored, captured, dead, or lost can report no
+home.
+
+`lastKnownPosition` falls back to the position saved on the record.
 
 ## Notes
 - Values are detached immutable snapshots (`record` + defensive copies).
 - `listLinkedToolIds(...)` returns an empty set when the profile is not found.
-- Command links are a read model over the canonical profile and current
-  evidence. They are not a second lifecycle or persistence authority.
+- Command links are a read model over the profile and the live body. They are
+  not a second lifecycle or persistence authority.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

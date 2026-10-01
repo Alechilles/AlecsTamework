@@ -8,8 +8,9 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
-> This reference tracks the current `profiles()` contract in `TameworkApi`.
+> **API `3.0.0`**
+> Profiles are read from the companion store. Snapshot reads return a small
+> description, not the full body snapshot.
 
 Capability: `PROFILES`
 
@@ -40,19 +41,39 @@ Capability: `PROFILES`
 
 ## Notes
 - Values are detached immutable snapshots (`record` + defensive copies).
-- Prefer `profileId` for long-lived references; UUIDs can remap.
-- `getActiveSnapshot(...)` returns raw JSON payload text for the active snapshot type.
-- Snapshot names and payloads are data views, not a substitute for Tamework's
-  canonical lifecycle decisions. Do not create a parallel lifecycle state from
-  them.
+- Every read is synchronous and safe from any thread.
+- A profile ID is a UUID as text. A blank or unparsable ID, and a released
+  companion, read as "no profile".
+- Prefer `profileId` for long-lived references; NPC UUIDs can change.
+- `tamed` is true for every companion that has an owner and is not released.
+- `coopId` is set only while the companion is housed. It is the coop's
+  position as `world:x:y:z`, not an asset ID.
 
-## Unreleased: saved owner trait pages
+## Active snapshots
+
+A companion has at most one active snapshot type. It comes from where the
+companion is:
+
+| Location | Snapshot type |
+| --- | --- |
+| In a capture item | `capture` |
+| Dead | `death` |
+| Lost | `lost` |
+| Anywhere else | none |
+
+`getActiveSnapshot(profileId, type)` returns a small JSON description built
+from the companion's record: `snapshotType`, `profileId`, `roleId`,
+`createdAtMs`, `updatedAtMs`, and, when known, `ownerUuid`, `displayName`,
+`customName`, `cause`, `diedAtMs`, and `reviveAvailableAtMs`. The full body
+snapshot is not exposed. Do not build a second lifecycle state from it.
+
+## Saved owner trait pages
 
 `getOwnedTraitSnapshots(UUID ownerUuid, int offset, int limit)` returns
 `CompletionStage<Optional<List<OwnedTraitSnapshot>>>`. The built-in implementation
 accepts a non-null owner, offset >= 0, and limit 1..64. It reads saved state without
-loading NPCs. Rows are sorted by profile ID and include captured/stored companions,
-but exclude released/dead companions. This list is not an admission-capacity count.
+loading NPCs. Rows are sorted by profile ID and include captured, stored, housed, lost, and
+live companions, but exclude released and dead companions. This list is not an admission-capacity count.
 
 An empty optional means unavailable; a present empty list means no matching rows.
 Each immutable row exposes `profileId`, `roleId`, `displayName`, `traitConfigId`,
@@ -61,8 +82,9 @@ data remains explicitly unavailable. Values describe the latest decodable saved
 full-state snapshot, not necessarily current live values.
 
 The method has a default unavailable implementation for older API implementers.
-Existing methods are unchanged. Completion may run off the world thread: return
-to the original world and revalidate the player/page before changing UI. Pagination
+In 3.0.0 the stage is already complete when it is returned. Still treat it as
+asynchronous: return to the original world and revalidate the player/page
+before changing UI. Pagination
 can shift when ownership changes; it is not a durable cursor.
 
 ## Related Pages

@@ -26,6 +26,7 @@ import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -207,6 +208,12 @@ class ApiSurfaceCompatibilityTest {
         assertEquals("HEALTHY", inspector(health, "status"));
         assertInstanceOf(Long.class, inspector(health, "lastFailureAtMs"));
         resolves(health, "reason");
+
+        // The file-store fields added in 3.0.0.
+        assertEquals(1L, ((Map<?, ?>) inspector(diagnostics, "recordsByLocation")).get("LIVE"));
+        assertInstanceOf(Long.class, inspector(diagnostics, "lastFlushAtMs"));
+        assertInstanceOf(Integer.class, inspector(diagnostics, "unreadableRecords"));
+        resolves(diagnostics, "lastFailure");
     }
 
     @Test
@@ -288,10 +295,66 @@ class ApiSurfaceCompatibilityTest {
                 runeteria("RequiredContentProfileStatus", status, "providerContractVersion"));
     }
 
-    // ---- Served by later tasks; add their reflective names here when they land ----
-    // Runeteria: activities().subscribe(String, ActivityFilter, ActivityConsumer) through a proxy;
-    //   husbandryOutcomes().register(provider) and interactionExtensions().registerRequirement
-    //   through proxies; the admission request unwrap request.admission().request().request().
+    @Test
+    void runeteriaSubscribesToTheActivityFeedThroughAProxyAndUnsubscribes() throws Exception {
+        String consumerId = "runeteria:rune_professions_husbandry";
+        Class<?> filterType = Class.forName(API_PACKAGE + "ActivityFilter");
+        Class<?> consumerType = Class.forName(API_PACKAGE + "ActivityConsumer");
+        Object filter = filterType.getConstructor(Set.class, Set.class)
+                .newInstance(Set.of(ActivityDomain.TAMING), Set.of());
+        Object feed = runeteria("TameworkApi", api, "activities");
+
+        Object subscription = runeteria("ActivityFeedApi", feed, "subscribe",
+                types(String.class, filterType, consumerType), consumerId, filter, proxy(consumerType));
+
+        assertEquals(Boolean.TRUE, runeteria("ActivityFeedStatus",
+                runeteria("ActivityFeedApi", feed, "status", types(String.class), consumerId), "subscribed"));
+        // Runeteria keeps the handle as an AutoCloseable; its own class is not public.
+        assertInstanceOf(AutoCloseable.class, subscription).close();
+        assertEquals(Boolean.FALSE, runeteria("ActivityFeedStatus",
+                runeteria("ActivityFeedApi", feed, "status", types(String.class), consumerId), "subscribed"));
+    }
+
+    @Test
+    void runeteriaRegistersAHusbandryOutcomeProviderThroughAProxyAndUnregistersIt() throws Exception {
+        Class<?> providerType = Class.forName(API_PACKAGE + "HusbandryOutcomeProvider");
+        Object outcomes = runeteria("TameworkApi", api, "husbandryOutcomes");
+
+        Object handle = runeteria("HusbandryOutcomeApi", outcomes, "register", types(providerType),
+                proxy(providerType));
+
+        // Only one provider may be active, so a second registration succeeds only after the close.
+        assertInstanceOf(AutoCloseable.class, handle).close();
+        assertInstanceOf(AutoCloseable.class, runeteria("HusbandryOutcomeApi", outcomes, "register",
+                types(providerType), proxy(providerType)));
+    }
+
+    @Test
+    void runeteriaRegistersATameRequirementThroughAProxyAndUnregistersIt() throws Exception {
+        String requirementId = "runeteria:husbandry_unlocked";
+        Class<?> handlerType = Class.forName(API_PACKAGE + "InteractionRequirementHandler");
+        InteractionExtensionApi extensions =
+                (InteractionExtensionApi) runeteria("TameworkApi", api, "interactionExtensions");
+
+        Object handle = runeteria("InteractionExtensionApi", extensions, "registerRequirement",
+                types(String.class, handlerType), requirementId, proxy(handlerType));
+
+        assertTrue(extensions.listRequirementIds().contains(requirementId));
+        assertInstanceOf(AutoCloseable.class, handle).close();
+        assertFalse(extensions.listRequirementIds().contains(requirementId));
+    }
+
+    /** A consumer-side implementation of an API interface, as Runeteria builds them. Never called here. */
+    private static Object proxy(Class<?> apiInterface) {
+        return Proxy.newProxyInstance(apiInterface.getClassLoader(), new Class<?>[] {apiInterface},
+                (proxy, method, args) -> switch (method.getName()) {
+                    // The registries compare and hash the handlers they keep.
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "toString" -> apiInterface.getSimpleName() + " proxy";
+                    default -> null;
+                });
+    }
 
     /** The Inspector's lookup: the method comes from the object's own class. */
     private static Object inspector(Object target, String method) {

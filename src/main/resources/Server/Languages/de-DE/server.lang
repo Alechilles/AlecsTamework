@@ -1273,13 +1273,13 @@ tamework.ui.talents.mutation.saving=Talentänderungen werden noch gespeichert. V
 tamework.ui.talents.mutation.bondedUnlockFailed=Dieses Talent kann nicht mehr freigeschaltet werden.
 tamework.ui.talents.mutation.bondedRefundFailed=Es konnten keine Talentpunkte zurückerstattet werden.
 tamework.ui.linkedPanel.progression.happinessBreakdown=Zufriedenheit: {0} - [+0 / {1} / {2}]
-tamework.ui.linkedPanel.progression.healthBonus=Deutsch: {0} HP
-tamework.ui.linkedPanel.progression.speedBonus=Deutsch: {0} m/s
-tamework.ui.linkedPanel.progression.effect.unknown=Deutsch: {0}
-tamework.ui.linkedPanel.trait.flatBonus=Deutsch: {0}: {1}
-tamework.ui.linkedPanel.trait.minimum=Deutsch: min
-tamework.ui.linkedPanel.trait.maximum=Deutsch: max
-tamework.ui.linkedPanel.trait.tooltip=Deutsch: {0}: {1} / {2} {3} ({4})
+tamework.ui.linkedPanel.progression.healthBonus={0} LP
+tamework.ui.linkedPanel.progression.speedBonus={0} m/s
+tamework.ui.linkedPanel.progression.effect.unknown={0}
+tamework.ui.linkedPanel.trait.flatBonus={0}: {1}
+tamework.ui.linkedPanel.trait.minimum=Min.
+tamework.ui.linkedPanel.trait.maximum=Max.
+tamework.ui.linkedPanel.trait.tooltip={0}: {1} / {2} {3} ({4})
 tamework.ui.spawnerTooltip.traits=Eigenschaften
 tamework.ui.spawnerTooltip.appearance=Aussehen
 tamework.ui.spawnerTooltip.level=Stufe {level}
@@ -1289,7 +1289,7 @@ tamework.ui.roster.progression.level=Stufe: {0}
 tamework.ui.roster.progression.max=Stufe: {0}/{1} - MAX XP
 tamework.ui.roster.progression.xp=Stufe: {0}/{1} - {2}/{3} XP
 tamework.ui.shared.item=Gegenstand
-tamework.ui.shared.levelAbbreviation=Deutsch: Lv.
+tamework.ui.shared.levelAbbreviation=St.
 
 tamework.commands.addTrait.result.clamped=Eigenschaft für NPC {0} hinzugefügt: {1}={2}, Anzahl={3} (angefordert {4}, auf den Zuchtbereich begrenzt).
 tamework.commands.getHappiness.result=Zufriedenheit für NPC {0}: {1} (source={2}, config={3}, lastUpdateMs={4}, base={5}, target={6}, modifiers={7}). Zucht: readyFlag={8}, cooldownActive={9}, cooldownUntilMs={10}, cooldownRemainingMs={11}, readyNow={12}, config={13}, fertilityOffspringFactor={14}, cooldownEigenschaftFactor={15}, timerBasis={16}, gameSecPerRealSecAktueller={17}, gameSecPerRealSecBaseline={18}, cooldownRemainingRealSec~={19}, effective={20}, threshold={21}, eligible={22}.

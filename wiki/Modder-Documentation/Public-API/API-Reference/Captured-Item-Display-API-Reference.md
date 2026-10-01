@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference)
 
-Development addition to API `2.0.0`: `TameworkApi.capturedItemDisplay()`.
+Part of API `3.0.0`: `TameworkApi.capturedItemDisplay()`.
 Check `CAPTURED_ITEM_DISPLAY` and `available()` before registering.
 Older or degraded implementations return an unavailable facade. Tamework
 does not assign stars or impose a rarity policy on animals.

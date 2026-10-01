@@ -42,16 +42,18 @@ their read-only `all` aggregate are available.
   fixture baseline
 - `interaction-extensions` and `trait-effects`: registration, lookup,
   unregister, and invalid-ID behavior
-- `policies`: ownership, damage/claim decisions, and the durable owner-cap
-  preflight
-- `diagnostics`: persistence path, health, and metrics readability
-- `hydragon-integrations`: capture mechanics plus independent readiness for
-  capture policy, transactional profile data, persistence resilience,
-  population groups, provisioning, command-family rosters, timed summoning,
-  paid revival, resolved-attempt consumption, and tame/link capture
+- `policies`: ownership, damage/claim decisions, and the owner-cap preflight
+- `diagnostics`: companion folder path, health, and queue metrics readability
+- `hydragon-integrations`: the capture mechanics fixture plus one check per
+  capability HyDragon gates a feature on under API 3.0.0:
+  `BONDED_COMPANIONS`, `CAPTURE_POLICY`,
+  `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `INTERACTION_EXTENSIONS`, `EVENTS`,
+  and `DIAGNOSTICS`
+
+The `core` suite reports the API version (`3.0.0`) in its first line.
 
 The runner logs a verbose report even when chat output is summarized. These
-checks validate the packaged public API; they do not replace the Maven suite or
-the replacement-persistence live smoke tests. `command-hud` is included in the
+checks validate the packaged public API; they do not replace the Gradle test
+suite or the companion store live checks. `command-hud` is included in the
 console-safe `all` aggregate. `command-ui` remains player-only because its
 runtime smoke flow needs a player context.

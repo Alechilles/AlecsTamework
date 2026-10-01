@@ -8,8 +8,10 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
-> This reference tracks the current `events()` contract in `TameworkApi`.
+> **API `3.0.0`**
+> Companion events now come from the companion store's change listener.
+> `NpcProfileChangedEvent` has four new fields and `ProfileChangeType` has two
+> new values. Events are not replayed after a restart.
 
 Capabilities: `EVENTS`, `COMPANION_XP_EVENTS`
 
@@ -28,32 +30,118 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 ```
 
 ## Event Types
+
+Published in 3.0.0:
+
 - `NpcProfileChangedEvent`
 - `NpcCapturedEvent`
 - `NpcDeathRecordedEvent`
 - `NpcLostRecordedEvent`
 - `CaptureAttemptResolvedEvent`
-- `PopulationGroupMembershipChangedEvent`
-- `PopulationGroupLimitChangedEvent`
+- `BondedCompanionCaptureResolvedEvent`
 - `CommandFamilyRosterMembershipChangedEvent`
-- `CommandTimedSummoningChangedEvent`
-- `CompanionProvisionedEvent`
-- `ProvisionedCompanionDeathRecordedEvent`
-- `ProvisionedCompanionRevivedEvent`
-- `PaidCommandRevivedEvent`
 - `ConfigReloadedEvent`
 - `CompanionXpAwardedEvent`
 
-## Event Semantics
-- Dispatch is synchronous on the thread that emits the event.
-- Listener exceptions are caught and logged so one consumer cannot break others.
-- Always close the returned `AutoCloseable` during unload/shutdown.
-- Payloads are immutable snapshots (`record` + defensive copies).
-- Persistence semantic events are published from one checkpointed outbox
-  observer. Replay after restart does not redeliver an already checkpointed
-  event to the same runtime consumer.
-- `CompanionXpAwardedEvent` is emitted only after Tamework accepts an XP award and applies or queues the component write.
-- Companion XP does not require a command-tool link; command links only add optional tool id context.
+No longer published in 3.0.0, because their APIs were removed or replaced:
+
+- `PopulationGroupMembershipChangedEvent` and
+  `PopulationGroupLimitChangedEvent`. Use the `groupIds` and location kinds on
+  `NpcProfileChangedEvent`, and `ConfigReloadedEvent` for `POPULATION_GROUP`.
+- `CommandTimedSummoningChangedEvent`, `CompanionProvisionedEvent`,
+  `ProvisionedCompanionDeathRecordedEvent`,
+  `ProvisionedCompanionRevivedEvent`, and `PaidCommandRevivedEvent`. Use
+  `NpcProfileChangedEvent`, or `BondedCompanionApi.subscribe` for bonded
+  companions.
+
+A subscription to one of these types is accepted and never called.
+
+## Delivery
+
+- Companion events are delivered after the change is applied and after the
+  companion store's lock is released, so a listener may read the API.
+- They are delivered on the thread that made the change. That is often a world
+  thread, but it can be the store's writer thread or another thread. Do not
+  assume a world thread. Hop to the owning world with `world.execute(...)`
+  before touching entities.
+- Changes made by one thread are delivered in the order that thread made them.
+  There is no order guarantee between changes made on different threads.
+- A change that is undone (for example because the file write failed) is
+  followed by an event for the compensating change. A subscriber can see a
+  state that is reverted a moment later.
+- Events are published when the change is applied in memory. They do not wait
+  for the file write.
+- Events are live notifications. Nothing is stored or replayed after a
+  restart.
+- A listener must not block.
+- Listener exceptions are caught and logged so one consumer cannot break
+  others.
+- Always close the returned `AutoCloseable` during unload or shutdown.
+- Payloads are immutable snapshots.
+
+## `NpcProfileChangedEvent`
+
+Published for every change a subscriber can see: created or tamed, released or
+culled, owner changed, renamed, role changed, and every change of where the
+companion is. Position, summary, and timer refreshes publish nothing.
+
+| Field | Meaning |
+| --- | --- |
+| `profileId` | The companion's profile ID. |
+| `changeTypes` | What changed. See below. |
+| `before` | The profile before. Null for a new profile. |
+| `after` | The profile after. Null for a released one. |
+| `emittedAtMs` | Wall-clock time. |
+| `oldLocationKind` | New in 3.0.0. Null for a new profile. |
+| `newLocationKind` | New in 3.0.0. |
+| `groupIds` | New in 3.0.0. The population groups of the companion's role. |
+| `domainClaims` | New in 3.0.0. The admission-provider claims the companion holds after the change. For a release, the claims it gave up. |
+
+Location kinds are `LIVE`, `ITEM`, `COOP`, `STORED`, `DEAD`, `LOST`, and
+`RELEASED`.
+
+`ProfileChangeType` values: `CREATED`, `CURRENT_NPC_UUID`, `OWNER`, `ROLE`,
+`DISPLAY_NAME`, `CUSTOM_NAME`, `TAMED`, `COOP_ASSIGNMENT`, `TOOL_LINKS`,
+`ACTIVE_SNAPSHOTS`, and two new in 3.0.0:
+
+- `LOCATION`: the companion moved between location kinds, for example `LIVE`
+  to `STORED`.
+- `RELEASED`: the companion was released or culled and no longer counts for
+  its owner.
+
+A change of domain claims alone publishes an event with an empty
+`changeTypes`.
+
+The five-argument constructor from 2.x still exists. It leaves the kinds null
+and the sets empty.
+
+## Holder events
+
+- `NpcCapturedEvent`: a companion went into a capture item from the world.
+- `NpcDeathRecordedEvent`: a companion died.
+- `NpcLostRecordedEvent`: a companion's body vanished without a confirmed
+  death.
+
+These follow `NpcProfileChangedEvent` for the same change. Home positions are
+null in 3.0.0, and the lost event's relocation fields are zero.
+
+`CommandFamilyRosterMembershipChangedEvent` is published when a companion that
+is not bonded joins or leaves an owner's command roster.
+
+## Capture events
+
+`CaptureAttemptResolvedEvent` is published for a capture that succeeds and for
+a failed roll that spent its source item.
+
+- For a capture into an item it is published from the hand-over, on the
+  body's world thread, once the body is known to be there. When the hand-over
+  does not happen (the body vanished first, or a newer change replaced the
+  capture) no event is published.
+- For a capture into bonded storage it is published once the capture is saved,
+  together with `BondedCompanionCaptureResolvedEvent`, even when the body has
+  vanished.
+
+There is no replay evidence in 3.0.0. The attempt ID is also the operation ID.
 
 ## Activity API V2
 
@@ -76,6 +164,9 @@ family policy data and these fields are unavailable. Check the
 
 ## `CompanionXpAwardedEvent`
 Use this successful-only event when an integration wants to credit external player progression from companion activity.
+
+- It is emitted only after Tamework accepts an XP award and applies or queues the component write.
+- Companion XP does not require a command-tool link; command links only add optional tool id context.
 
 Source buckets:
 - `FEED`
@@ -131,5 +222,3 @@ Payload fields:
 - [Pause Companion Jobs on Death or Lost Event Recipe](/mod/alecs-tamework/pause-companion-jobs-on-death-or-lost-event-recipe)
 - [Keep Companion Cache in Sync with Profile Changed Events Recipe](/mod/alecs-tamework/keep-companion-cache-in-sync-with-profile-changed-events-recipe)
 - [Credit External Skill XP from Companion XP Recipe](/mod/alecs-tamework/credit-external-skill-xp-from-companion-xp-recipe)
-
-

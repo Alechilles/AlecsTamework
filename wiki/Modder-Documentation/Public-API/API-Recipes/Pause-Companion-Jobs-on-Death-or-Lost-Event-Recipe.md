@@ -34,7 +34,7 @@ public void start(TameworkApi api) {
 
 ## Notes
 - Keep your own resume policy explicit (manual resume, timer, or explicit event).
-- You can also use `event.homePosition()` and `event.lastKnownPosition()` for diagnostics.
+- You can also use `event.lastKnownPosition()` for diagnostics. `event.homePosition()` is null in API 3.0.0.
 
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
