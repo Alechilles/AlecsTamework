@@ -653,7 +653,9 @@ public final class CommandItemFeatureHandler {
                                 current, config, toolId, genericBinding)),
                 commandId -> withCurrentPlayer(ownerUuid,
                         current -> applyMenuSelection(
-                                current, toolId, config, commandId))
+                                current, toolId, config, commandId)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuForget(current, toolId, config, npcUuid))
         );
         return selectionPageService.open(
                 player, store, config, working, toolId, actions,
@@ -831,6 +833,17 @@ public final class CommandItemFeatureHandler {
         );
     }
 
+    /** The panel's Forget for a companion in a capture item (spec 8.14). */
+    private void applyMenuForget(Player player,
+                                 String toolId,
+                                 TwCommandItemConfig config,
+                                 UUID presentationUuid) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
+            return;
+        }
+        ownerReleaseService.release(player, toolId, config, presentationUuid, true);
+    }
+
     /** Routes item culling through the same durable release path as command culling. */
     public boolean cullFromItemInteraction(Player player, Ref<EntityStore> target,
                                           Store<EntityStore> store,
@@ -858,7 +871,7 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        if (!ownedActions.request(player, toolId, npcUuid,
+        if (!ownedActions.requestRecover(player, toolId, npcUuid,
                 current -> callbackAuthority.allowsGeneric(current, toolId, config),
                 (current, record) -> freeRestorationActions.request(current, toolId, record.npcUuid, record))) {
             freeRestorationActions.request(player, toolId, npcUuid);

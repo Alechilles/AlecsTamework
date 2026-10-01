@@ -427,6 +427,51 @@ class CommandGenericTargetAuthorityTest {
         }
     }
 
+    /** Release and Forget each refuse the other's records, so a stale confirmation never does the other action. */
+    @Test
+    void panelReleaseAndForgetEachRefuseTheOthersRecords() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
+            LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
+            CompanionTransitions.BodyFacts body = new CompanionTransitions.BodyFacts(UUID.randomUUID(), target.owner,
+                    "Alec", "Tamed_Chicken", "Chicken", "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY);
+            CompanionRecord item = CompanionTransitions.newItem(UUID.randomUUID(), body, target.owner, "Alec");
+            index.insert(item);
+            CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0, body);
+            index.insert(live);
+            index.update(live.profileId(), index.get(live.profileId()).revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            CompanionQueries companions = new CompanionQueries(index, loaded);
+            CommandOwnerReleaseService release = new CommandOwnerReleaseService(
+                    new CommandFeedbackService(null),
+                    new ReleaseFlow(index, loaded, ignored -> { }),
+                    companions,
+                    new CommandPersistenceView(companions),
+                    new CommandToolInventoryService(null, null, null, null),
+                    new CommandLinkMutationService(new CommandLinkedNpcRecordStore(),
+                            new CommandLinkPolicyService(), null, null),
+                    null);
+            release.useCaptureItemFlows(new com.alechilles.alecstamework.companion.item.CaptureItemFlows(
+                    index, ignored -> { }, new com.alechilles.alecstamework.companion.flow.RestoreFlow<Ref<EntityStore>>(
+                    index, loaded, id -> CompletableFuture.completedFuture(null),
+                    owner -> CompletableFuture.completedFuture(null),
+                    (committed, snapshot, destination, reason) -> CompletableFuture.completedFuture(false),
+                    (id, oldBody) -> { }, System::currentTimeMillis, (before, after) -> null)));
+            UUID itemRow = CommandRosterPanelRecordSource.presentationUuid(new ProfileId(item.profileId()));
+            UUID deadRow = CommandRosterPanelRecordSource.presentationUuid(new ProfileId(live.profileId()));
+
+            release.release(target.player, "generic-tool", genericConfig(), itemRow, false);
+            release.release(target.player, "generic-tool", genericConfig(), deadRow, true);
+            assertEquals(LocationKind.ITEM, index.get(item.profileId()).location().kind());
+            assertEquals(LocationKind.DEAD, index.get(live.profileId()).location().kind());
+
+            release.release(target.player, "generic-tool", genericConfig(), itemRow, true);
+            assertEquals(LocationKind.RELEASED, index.get(item.profileId()).location().kind());
+            assertEquals(CompanionTransitions.CAUSE_FORGOTTEN, index.get(item.profileId()).location().cause());
+        }
+    }
+
     @Test
     void forgedGenericCullLeavesBondedTargetLinksUntouched()
             throws Exception {

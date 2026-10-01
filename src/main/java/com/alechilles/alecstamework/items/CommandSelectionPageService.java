@@ -1397,6 +1397,9 @@ final class CommandSelectionPageService {
                     context.toolId(), context.config()));
         }
         page.configureShoulderRideCallback(shoulderRideCallback(context));
+        if (context.genericRosterActions()) {
+            page.configureForgetCallback(guardedUuid(context.genericAuthority(), context.actions().forget()));
+        }
         page.configureHotswapAssignments(
                 () -> toolInventoryService.findActiveToolStack(
                         resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
@@ -1826,7 +1829,15 @@ final class CommandSelectionPageService {
                    Consumer<UUID> returnHome,
                    Runnable manageGroups,
                    Runnable reopenMenu,
-                   Consumer<String> selectCommand) {
+                   Consumer<String> selectCommand,
+                   Consumer<UUID> forget) {
+        /** Without the panel's Forget (spec 8.14). */
+        Actions(Consumer<UUID> unlink, Consumer<UUID> release, Consumer<UUID> cull, Consumer<UUID> respawn,
+                Consumer<UUID> locate, Consumer<UUID> recall, Consumer<UUID> setHome, Consumer<UUID> returnHome,
+                Runnable manageGroups, Runnable reopenMenu, Consumer<String> selectCommand) {
+            this(unlink, release, cull, respawn, locate, recall, setHome, returnHome, manageGroups, reopenMenu,
+                    selectCommand, ignored -> { });
+        }
     }
 
     private record PageContext(

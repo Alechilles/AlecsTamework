@@ -133,6 +133,8 @@ public final class TameworkCommandSelectionPage
     private final LinkedNpcPanelFeatureAction rosterAbandonCallback;
     private final LinkedNpcPanelFeatureAction flightToggleCallback;
     private LinkedNpcPanelFeatureAction shoulderRideCallback = (id, ref, store) -> { };
+    @Nullable
+    private Consumer<UUID> forgetCallback;
     private final Consumer<UUID> locateCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -1102,6 +1104,11 @@ public final class TameworkCommandSelectionPage
         shoulderRideCallback = Objects.requireNonNull(callback, "callback");
     }
 
+    /** The panel's Forget for a companion in a capture item (spec 8.14); without it Forget is not offered. */
+    public void configureForgetCallback(@Nonnull Consumer<UUID> callback) {
+        forgetCallback = Objects.requireNonNull(callback, "callback");
+    }
+
     private boolean handleLinkedFlightToggle(
             String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
         return finishAuxiliaryCommand(BondedCompanionAuxiliaryCommandHandler.handleLinkedFlight(commandId,
@@ -1205,11 +1212,10 @@ public final class TameworkCommandSelectionPage
             cullCallback.accept(npcUuid);
             completed = true;
         } else if (action == LinkedNpcPanelRemovalConfirmOverlayState.Action.FORGET
-                && releaseCallback != null
+                && forgetCallback != null
                 && isPendingUnlink(npcUuid)
                 && genericForgetAvailable(npcUuid)) {
-            // The release action forgets a record that is in a capture item.
-            releaseCallback.accept(npcUuid);
+            forgetCallback.accept(npcUuid);
             completed = true;
         }
         if (completed) {
@@ -1245,7 +1251,7 @@ public final class TameworkCommandSelectionPage
         }
         boolean available = switch (action) {
             case RELEASE -> releaseCallback != null && genericReleaseAvailable(npcUuid);
-            case FORGET -> releaseCallback != null && genericForgetAvailable(npcUuid);
+            case FORGET -> forgetCallback != null && genericForgetAvailable(npcUuid);
             case CULL -> cullCallback != null && genericCullAvailable(npcUuid);
         };
         if (!available) {

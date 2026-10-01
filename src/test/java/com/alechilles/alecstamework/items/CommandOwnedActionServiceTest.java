@@ -78,6 +78,17 @@ class CommandOwnedActionServiceTest {
         assertFalse(CommandOwnedActionService.allows(owner, (CompanionRecord) null));
     }
 
+    /** Recover reaches a companion in a capture item (spec 8.14) but not a coop resident or a stranger's. */
+    @Test void recoverAlsoReachesAnOwnedCompanionInACaptureItem() {
+        UUID owner = UUID.randomUUID();
+        var item = companion(owner, CompanionLocation.item());
+        assertTrue(CommandOwnedActionService.allowsRecover(owner, item));
+        assertFalse(CommandOwnedActionService.allowsRecover(UUID.randomUUID(), item));
+        assertFalse(CommandOwnedActionService.allowsRecover(owner,
+                companion(owner, CompanionLocation.coop("default", 1, 2, 3, 0))));
+        assertTrue(CommandOwnedActionService.allowsRecover(owner, companion(owner, CompanionLocation.lost(null))));
+    }
+
     /** A crafted generic-item action must not reach a command-family roster member; bonded records keep their gate. */
     @Test void indexRosterMembersAreNotActionableFromGenericItems() {
         UUID owner = UUID.randomUUID();

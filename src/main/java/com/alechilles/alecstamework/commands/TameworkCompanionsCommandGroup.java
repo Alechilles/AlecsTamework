@@ -133,7 +133,8 @@ public final class TameworkCompanionsCommandGroup extends AbstractCommandCollect
             CompanionRecord record = find(companions, target, context);
             if (record == null) return;
             String name = name(record);
-            if (record.location().kind() != LocationKind.ITEM) {
+            // Bonded companions keep their own flows.
+            if (record.bonded() || record.location().kind() != LocationKind.ITEM) {
                 context.sendMessage(Message.translation(PREFIX + "forget.nothingToDo").param("name", name));
                 return;
             }

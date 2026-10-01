@@ -55,24 +55,34 @@ final class CommandOwnedActionService {
         this.links = links;
     }
 
+    /** Which locations an owned action may reach. */
+    private enum Gate { ACTION, LOCATE, RECOVER }
+
     boolean request(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
-        return requestInternal(player, toolId, rowId, authority, action, false);
+        return requestInternal(player, toolId, rowId, authority, action, Gate.ACTION);
     }
 
     boolean requestLocate(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
-        return requestInternal(player, toolId, rowId, authority, action, true);
+        return requestInternal(player, toolId, rowId, authority, action, Gate.LOCATE);
+    }
+
+    /** Revive and Recover; also open for a companion in a capture item (spec 8.14). */
+    boolean requestRecover(Player player, String toolId, UUID rowId,
+            Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
+        return requestInternal(player, toolId, rowId, authority, action, Gate.RECOVER);
     }
 
     private boolean requestInternal(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action,
-            boolean locate) {
+            Gate gate) {
+        boolean locate = gate == Gate.LOCATE;
         var stack = inventory.findToolStack(player, toolId);
         if (stack == null) return false;
         UUID owner = player.getUuid();
         if (companions != null && owner != null && rowId != null) {
-            return requestIndexed(player, owner, stack, toolId, rowId, authority, action, locate);
+            return requestIndexed(player, owner, stack, toolId, rowId, authority, action, gate);
         }
         if (persistence == null || owner == null || rowId == null) {
             warn(player);
@@ -113,7 +123,7 @@ final class CommandOwnedActionService {
     }
 
     private boolean requestIndexed(Player player, UUID owner, ItemStack stack, String toolId, UUID rowId,
-            Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action, boolean locate) {
+            Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action, Gate gate) {
         var profileId = new CommandOwnedPanelRecordSource(companions).profileForRow(
                 owner, rowId, links.readLinkedNpcRecords(stack));
         if (profileId.isEmpty()) {
@@ -127,7 +137,11 @@ final class CommandOwnedActionService {
                         ? null : store.getComponent(ref, Player.getComponentType());
                 if (current == null || !authority.test(current) || !ownedMode(current, toolId)) return;
                 CompanionRecord companion = companions.get(id);
-                boolean allowed = locate ? allowsLocate(owner, companion) : allows(owner, companion);
+                boolean allowed = switch (gate) {
+                    case ACTION -> allows(owner, companion);
+                    case LOCATE -> allowsLocate(owner, companion);
+                    case RECOVER -> allowsRecover(owner, companion);
+                };
                 if (!allowed) {
                     warn(current);
                     return;
@@ -146,24 +160,29 @@ final class CommandOwnedActionService {
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> managed,
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> lagging) {
         return allowsOwnedProfile(owner, profile, managed, lagging)
-                && stateAllows(profile.lifecycle().state(), false);
+                && stateAllows(profile.lifecycle().state(), Gate.ACTION);
     }
 
     static boolean allowsLocate(UUID owner, CompanionProfileReadModel profile,
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> managed,
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> lagging) {
         return allowsOwnedProfile(owner, profile, managed, lagging)
-                && stateAllows(profile.lifecycle().state(), true);
+                && stateAllows(profile.lifecycle().state(), Gate.LOCATE);
     }
 
     /** Recall and respawn gate for an index record: the viewer owns it and it is live, dead or lost. */
     static boolean allows(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return ownedBy(owner, companion) && stateAllows(state(companion), false);
+        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.ACTION);
+    }
+
+    /** Revive and Recover gate for an index record: also open for a companion in a capture item. */
+    static boolean allowsRecover(@Nullable UUID owner, @Nullable CompanionRecord companion) {
+        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.RECOVER);
     }
 
     /** Locate gate for an index record: also open for captured and cooped companions. */
     static boolean allowsLocate(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return ownedBy(owner, companion) && stateAllows(state(companion), true);
+        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.LOCATE);
     }
 
     /**
@@ -179,10 +198,11 @@ final class CommandOwnedActionService {
         return CommandPersistenceView.from(companion).lifecycleState();
     }
 
-    private static boolean stateAllows(LifecycleState state, boolean locate) {
+    private static boolean stateAllows(LifecycleState state, Gate gate) {
         return switch (state) {
             case ACTIVE, UNLOADED, DEAD_REVIVABLE, LOST -> true;
-            case CAPTURED, COOP -> locate;
+            case CAPTURED -> gate != Gate.ACTION;
+            case COOP -> gate == Gate.LOCATE;
             default -> false;
         };
     }

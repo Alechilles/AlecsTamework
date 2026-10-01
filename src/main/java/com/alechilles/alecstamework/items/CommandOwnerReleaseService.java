@@ -60,6 +60,18 @@ final class CommandOwnerReleaseService {
                  String toolId,
                  TwCommandItemConfig config,
                  UUID npcUuid) {
+        release(player, toolId, config, npcUuid, false);
+    }
+
+    /**
+     * Release, or with {@code forget} the panel's Forget for a companion in a capture item (spec
+     * 8.14). Each refuses the other's records, so a stale confirmation never does the other action.
+     */
+    void release(Player player,
+                 String toolId,
+                 TwCommandItemConfig config,
+                 UUID npcUuid,
+                 boolean forget) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -77,7 +89,11 @@ final class CommandOwnerReleaseService {
             warn(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
-        if (record.location().kind() == LocationKind.ITEM) {
+        if (forget != (record.location().kind() == LocationKind.ITEM)) {
+            warn(player, "tamework.ui.notifications.command.release.unavailable");
+            return;
+        }
+        if (forget) {
             forget(player, ownerUuid, record);
             return;
         }

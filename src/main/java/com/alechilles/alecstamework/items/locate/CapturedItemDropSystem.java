@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.DespawnComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.PickupItemComponent;
@@ -36,8 +37,6 @@ public final class CapturedItemDropSystem extends RefSystem<EntityStore> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final CapturedItemTracker tracker;
     @Nullable private final CaptureItemFlows destroyedItems;
-
-    public CapturedItemDropSystem(CapturedItemTracker tracker) { this(tracker, null); }
 
     /** {@code destroyedItems} is null when the companion index is not ready; removals then only update the locator. */
     public CapturedItemDropSystem(CapturedItemTracker tracker, @Nullable CaptureItemFlows destroyedItems) {
@@ -96,8 +95,12 @@ public final class CapturedItemDropSystem extends RefSystem<EntityStore> {
                 && type.getInteractions().get(InteractionType.Pickup) != null;
     }
 
-    /** The despawn system removes an item once the world time is after its despawn instant. */
+    /**
+     * The despawn system removes an item once the world time is after its despawn instant. It skips
+     * Interactable entities, so an Interactable item past its instant was removed by something else.
+     */
     private static boolean despawned(Ref<EntityStore> ref, Store<EntityStore> store, CommandBuffer<EntityStore> buffer) {
+        if (buffer.getComponent(ref, Interactable.getComponentType()) != null) return false;
         DespawnComponent despawn = buffer.getComponent(ref, DespawnComponent.getComponentType());
         Instant at = despawn == null ? null : despawn.getDespawn();
         TimeResource time = store.getResource(TimeResource.getResourceType());
