@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionFailureFeedback;
 import com.alechilles.alecstamework.items.persistence.CompanionLifecycleAuthorResult;
@@ -39,6 +40,8 @@ public final class CommandRestorationCompletionListener
             case COMMIT_FAILED, CONFLICT -> PREFIX + "respawn.unavailable";
             case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
+            case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
+            case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
         };
     }
 

@@ -46,7 +46,61 @@ class RosterSummonsTest {
                     events.add("flush:" + who);
                     return CompletableFuture.completedFuture(null);
                 },
-                policies::get, () -> NOW);
+                policies::get, () -> NOW,
+                current -> {
+                    stores.add(current.profileId() + ":bonded");
+                    return CompletableFuture.completedFuture(StoreFlow.Result.STORED);
+                });
+    }
+
+    private UUID addBonded(CompanionLocation location, long summonedUntilMs) {
+        UUID id = UUID.randomUUID();
+        records.put(id, CompanionRecord.builder(id, "Timed_Wolf", location)
+                .ownerUuid(owner).rosterId("horn").bonded(true).summonedUntilMs(summonedUntilMs).build());
+        return id;
+    }
+
+    @Test
+    void anExpiredBondedSummonGoesToTheBondedStoreNotTheRosterOne() {
+        UUID bonded = addBonded(CompanionLocation.live("default", 0, 0, 0), NOW - 1L);
+
+        assertEquals(StoreFlow.Result.STORED, summons().storeExpired(bonded).join());
+        assertEquals(StoreFlow.Result.STORED, summons().store(bonded).join());
+
+        assertEquals(List.of(bonded + ":bonded", bonded + ":bonded"), stores);
+    }
+
+    @Test
+    void aBondedCompanionIsNeverSummonedAsARosterCompanion() {
+        UUID bonded = addBonded(CompanionLocation.stored(StoredReason.BONDED), 0L);
+
+        assertEquals(RestoreFlow.Result.NOT_ALLOWED, summons().summon(bonded, DEST).join());
+        assertEquals(List.of(), restores);
+    }
+
+    @Test
+    void everyActiveBondedCompanionIsStoredOnOwnerLogoutAndNoneOnOwnerDeath() {
+        UUID timed = addBonded(CompanionLocation.live("default", 0, 0, 0), NOW + 1_000L);
+        UUID untimed = addBonded(CompanionLocation.live("default", 0, 0, 0), 0L);
+        addBonded(CompanionLocation.stored(StoredReason.BONDED), 0L);
+
+        assertEquals(0, summons().storeTimedSummons(owner, false));
+        assertEquals(List.of(), stores);
+
+        assertEquals(2, summons().storeTimedSummons(owner, true));
+        assertEquals(List.of(timed + ":bonded", untimed + ":bonded").stream().sorted().toList(),
+                stores.stream().sorted().toList());
+    }
+
+    @Test
+    void anOwnerChangingWorldStoresTheActiveBondedCompanionsLeftBehind() {
+        UUID leftBehind = addBonded(CompanionLocation.live("default", 0, 0, 0), 0L);
+        addBonded(CompanionLocation.live("nether", 0, 0, 0), 0L);
+        add("Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0), 0L);
+
+        assertEquals(1, summons().storeBondedOutside(owner, "nether"));
+
+        assertEquals(List.of(leftBehind + ":bonded"), stores);
     }
 
     private UUID add(String roleId, CompanionLocation location, long summonedUntilMs) {
@@ -99,7 +153,7 @@ class RosterSummonsTest {
     }
 
     @Test
-    void prepareTransferLeavesNonRosterBondedAndStoredCompanionsAlone() {
+    void prepareTransferLeavesNonRosterAndStoredCompanionsAloneAndStoresBondedOnesThroughTheirOwnPath() {
         UUID id = UUID.randomUUID();
         records.put(id, CompanionRecord.builder(id, "Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0))
                 .ownerUuid(owner).build());
@@ -110,7 +164,7 @@ class RosterSummonsTest {
 
         summons().prepareTransfer(owner).join();
 
-        assertEquals(List.of(), stores);
+        assertEquals(List.of(bonded + ":bonded"), stores);
         assertEquals(List.of("flush:" + owner), events);
     }
 

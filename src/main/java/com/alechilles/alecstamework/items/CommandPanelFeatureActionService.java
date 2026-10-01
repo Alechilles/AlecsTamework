@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RosterSummons;
 import com.alechilles.alecstamework.companion.flow.StoreFlow;
@@ -157,6 +158,8 @@ final class CommandPanelFeatureActionService {
             case COOLDOWN -> "tamework.ui.notifications.command.shared.cooldown";
             case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
+            case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
+            case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
             default -> ROSTER_KEYS + "summonFailed";
         };
     }

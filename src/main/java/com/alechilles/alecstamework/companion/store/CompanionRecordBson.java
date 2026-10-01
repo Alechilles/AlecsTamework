@@ -8,11 +8,13 @@ import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.index.RecordScope;
 import com.alechilles.alecstamework.companion.index.StoredReason;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonArray;
@@ -31,6 +33,8 @@ import org.bson.BsonValue;
  * byte-for-byte instead of guessing.
  */
 public final class CompanionRecordBson {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
     private CompanionRecordBson() {
     }
 
@@ -141,7 +145,15 @@ public final class CompanionRecordBson {
                 List<DomainClaim> claims = new ArrayList<>();
                 for (BsonValue v : d.getArray("DomainClaims")) {
                     BsonDocument c = v.asDocument();
-                    claims.add(new DomainClaim(requireString(c, "Domain"), (int) getLong(c, "Weight", 0),
+                    long weight = getLong(c, "Weight", 0);
+                    if (weight <= 0 || weight > Integer.MAX_VALUE) {
+                        // A claim that cannot count is dropped, so one bad entry does not make the
+                        // record (and the rest of the owner's file) unreadable.
+                        LOGGER.at(Level.WARNING).log("Dropped domain claim %s of companion %s: weight %d is not valid",
+                                c.get("Domain"), profileId, weight);
+                        continue;
+                    }
+                    claims.add(new DomainClaim(requireString(c, "Domain"), (int) weight,
                             getBoolean(c, "Owned"), getBoolean(c, "Deployable")));
                 }
                 b.domainClaims(claims);

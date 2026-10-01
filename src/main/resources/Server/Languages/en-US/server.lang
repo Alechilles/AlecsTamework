@@ -1228,6 +1228,7 @@ tamework.ui.population.unavailable=Companion limits cannot be checked right now.
 tamework.ui.population.familyLocked=Your Husbandry level is too low to {0} this companion.
 tamework.ui.population.familyUnknown=This companion family is not configured for Husbandry.
 tamework.ui.population.providerUnavailable=Husbandry requirements are temporarily unavailable. Try again shortly.
+tamework.ui.population.providerDenied=You do not meet the Husbandry requirements for this companion.
 tamework.ui.notifications.spawner.captureFailed=Capture could not be completed.
 tamework.ui.notifications.spawner.commandItemRequired=You need {0} in your inventory to capture with this item.
 tamework.ui.notifications.spawner.releaseFailed=Companion release could not be completed.

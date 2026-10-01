@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
@@ -25,8 +27,12 @@ import javax.annotation.Nullable;
  * written, and only then is the old body removed and the new one spawned. Any failure puts the
  * record back. A change to the record while the restore runs wins: nothing spawns.
  *
- * <p>Continuations run on whichever thread completes the snapshot read, the flush or the spawn
- * (usually the writer thread). {@code removeOldBody} and the {@link Spawner} must therefore hand
+ * <p>A managed role's admission provider is asked after the snapshot read and before the commit
+ * (plan 6 R10). Its claims and domain limits are checked again with the built-in caps under the
+ * index lock, and the claims are stored on the committed record.
+ *
+ * <p>Continuations run on whichever thread completes the snapshot read, the provider's decision,
+ * the flush or the spawn (usually the writer thread). {@code removeOldBody} and the {@link Spawner} must therefore hand
  * their entity work to the owning world thread themselves; they must not touch live entities on
  * the calling thread.
  *
@@ -38,8 +44,19 @@ import javax.annotation.Nullable;
 public final class RestoreFlow<R> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
+    /**
+     * {@code PROVIDER_DENIED}: an admission provider denied the restore or one of its domain limits
+     * is reached. {@code PROVIDER_UNAVAILABLE}: the provider gave no decision. Nothing changed.
+     */
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED,
-        STALE, OWNED_LIMIT, GROUP_LIMIT }
+        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+
+    /**
+     * A restore's result with the translation key of a population refusal (a cap, a provider's
+     * denial or a domain limit); {@code messageKey} is null for every other result.
+     */
+    public record Outcome(@Nonnull Result result, @Nullable String messageKey) {
+    }
 
     /**
      * Where to restore. {@code world} is a world name; the production spawner resolves it.
@@ -117,7 +134,18 @@ public final class RestoreFlow<R> {
     private final Spawner spawner;
     private final BiConsumer<UUID, R> removeOldBody;
     private final LongSupplier clock;
-    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
+    private final ProviderAdmission providers;
+    private final CompanionAdmissionGate.Check admission;
+
+    /** A flow with no admission providers; {@code admission} is the built-in caps only. */
+    public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
+                       @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> snapshots,
+                       @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner, @Nonnull Spawner spawner,
+                       @Nonnull BiConsumer<UUID, R> removeOldBody, @Nonnull LongSupplier clock,
+                       @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+        this(index, loaded, snapshots, flushOwner, spawner, removeOldBody, clock, ProviderAdmission.none(),
+                builtInOnly(admission));
+    }
 
     /**
      * @param snapshots     reads a profile's snapshot off the world thread; completes with null when there is none
@@ -125,14 +153,16 @@ public final class RestoreFlow<R> {
      * @param removeOldBody removes the old body from its world; called only after the commit is written,
      *                      or once a newer change replaced the commit and the old body is stale
      * @param clock         wall clock, used for the revive cooldown
-     * @param admission     population caps for the change from the current record to the committed
-     *                      one; returns null to admit. Called under the index lock.
+     * @param providers     the admission provider stage, asked before the index lock is taken
+     * @param admission     population caps and provider domain limits for the change from the
+     *                      current record to the committed one; returns null to admit. Called
+     *                      under the index lock.
      */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
                        @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> snapshots,
                        @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner, @Nonnull Spawner spawner,
                        @Nonnull BiConsumer<UUID, R> removeOldBody, @Nonnull LongSupplier clock,
-                       @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+                       @Nonnull ProviderAdmission providers, @Nonnull CompanionAdmissionGate.Check admission) {
         this.index = Objects.requireNonNull(index, "index");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
@@ -140,6 +170,7 @@ public final class RestoreFlow<R> {
         this.spawner = Objects.requireNonNull(spawner, "spawner");
         this.removeOldBody = Objects.requireNonNull(removeOldBody, "removeOldBody");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.providers = Objects.requireNonNull(providers, "providers");
         this.admission = Objects.requireNonNull(admission, "admission");
     }
 
@@ -153,29 +184,51 @@ public final class RestoreFlow<R> {
     /** Never completes exceptionally for an expected failure; the {@link Result} says what happened. */
     @Nonnull
     public CompletableFuture<Result> restore(@Nonnull Request request) {
+        return restoreOutcome(request).thenApply(Outcome::result);
+    }
+
+    /** As {@link #restore(Request)}, with the message key of a population refusal. */
+    @Nonnull
+    public CompletableFuture<Outcome> restoreOutcome(@Nonnull Request request) {
         UUID profileId = request.profileId();
         CompanionRecord before = index.get(profileId);
         RestoreRules.Verdict verdict = RestoreRules.forRecord(before, request.reason(), clock.getAsLong(),
                 request.expectedGeneration());
         if (verdict != RestoreRules.Verdict.ALLOWED) {
-            return CompletableFuture.completedFuture(map(verdict));
+            return done(map(verdict));
         }
         return snapshots.apply(profileId).handle((snapshot, error) -> error == null ? snapshot : null)
-                .thenCompose(snapshot -> commitAndSpawn(before, snapshot, request));
+                .thenCompose(snapshot -> admitAndCommit(before, snapshot, request));
     }
 
-    private CompletableFuture<Result> commitAndSpawn(CompanionRecord before, @Nullable SnapshotEnvelope snapshot,
-                                                     Request request) {
+    /** Asks the admission provider, off the index lock, then commits with what it allowed. */
+    private CompletableFuture<Outcome> admitAndCommit(CompanionRecord before, @Nullable SnapshotEnvelope snapshot,
+                                                      Request request) {
+        RestoreRules.Verdict snapshotVerdict = RestoreRules.forSnapshot(before, snapshot, request.reason());
+        if (snapshotVerdict != RestoreRules.Verdict.ALLOWED) {
+            return done(map(snapshotVerdict));
+        }
+        UnaryOperator<CompanionRecord.Builder> change = commitChange(before, request, UUID.randomUUID());
+        return providers.evaluate(before, change.apply(before.toBuilder()).build()).toCompletableFuture()
+                .thenCompose(provider -> {
+                    if (!provider.admitted()) {
+                        return CompletableFuture.completedFuture(
+                                new Outcome(map(provider.refusal()), provider.messageKey()));
+                    }
+                    CompanionAdmission.Provided provided = provider.provided();
+                    UnaryOperator<CompanionRecord.Builder> withClaims = !provider.asked() ? change
+                            : b -> change.apply(b).domainClaims(provided.claims());
+                    return commitAndSpawn(before, snapshot, request, withClaims, provided);
+                });
+    }
+
+    private CompletableFuture<Outcome> commitAndSpawn(CompanionRecord before, SnapshotEnvelope snapshot,
+                                                      Request request, UnaryOperator<CompanionRecord.Builder> change,
+                                                      CompanionAdmission.Provided provided) {
         RestoreRules.Reason reason = request.reason();
         Destination destination = request.destination();
-        RestoreRules.Verdict snapshotVerdict = RestoreRules.forSnapshot(before, snapshot, reason);
-        if (snapshotVerdict != RestoreRules.Verdict.ALLOWED) {
-            return CompletableFuture.completedFuture(map(snapshotVerdict));
-        }
         UUID profileId = before.profileId();
-        UUID newNpcUuid = UUID.randomUUID();
-        UnaryOperator<CompanionRecord.Builder> change = commitChange(before, request, newNpcUuid);
-        CompanionAdmission.Refusal[] refused = new CompanionAdmission.Refusal[1];
+        CompanionAdmissionGate.Denial[] refused = new CompanionAdmissionGate.Denial[1];
         // The revision check makes a change made while the snapshot was read win, before the caps
         // are checked. The caps are checked in the same locked step, so no other change can fill
         // the slot in between.
@@ -184,7 +237,7 @@ public final class RestoreFlow<R> {
             if (current == null || current.revision() != before.revision()) {
                 return null;
             }
-            refused[0] = admission.apply(before, change.apply(before.toBuilder()).build());
+            refused[0] = admission.deny(before, change.apply(before.toBuilder()).build(), provided);
             if (refused[0] != null) {
                 return null;
             }
@@ -200,10 +253,10 @@ public final class RestoreFlow<R> {
         });
         if (refused[0] != null) {
             return CompletableFuture.completedFuture(
-                    refused[0] == CompanionAdmission.Refusal.OWNED ? Result.OWNED_LIMIT : Result.GROUP_LIMIT);
+                    new Outcome(map(refused[0].refusal()), refused[0].messageKey()));
         }
         if (commit == null) {
-            return CompletableFuture.completedFuture(Result.CONFLICT);
+            return done(Result.CONFLICT);
         }
         return OwnerFileFlush.flushOwners(flushOwner, before, commit.after())
                 .handle((ignored, error) -> error)
@@ -212,21 +265,21 @@ public final class RestoreFlow<R> {
                         if (!revertCommit(commit, before)) {
                             removeStaleOldBody(commit);
                         }
-                        return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
+                        return done(Result.COMMIT_FAILED);
                     }
                     CompanionRecord now = index.get(profileId);
                     if (now == null || now.revision() != commit.after().revision()) {
                         removeStaleOldBody(commit);
-                        return CompletableFuture.completedFuture(Result.CONFLICT);
+                        return done(Result.CONFLICT);
                     }
                     removeOldBodySafely(profileId, commit.oldBody());
                     return spawnSafely(commit.after(), snapshot, destination, reason)
                             .thenApply(ok -> {
                                 if (ok) {
-                                    return Result.RESTORED;
+                                    return new Outcome(Result.RESTORED, null);
                                 }
                                 index.revert(profileId, commit.after().revision(), before);
-                                return Result.SPAWN_FAILED;
+                                return new Outcome(Result.SPAWN_FAILED, null);
                             });
                 });
     }
@@ -301,6 +354,28 @@ public final class RestoreFlow<R> {
             LOGGER.at(Level.WARNING).withCause(failure)
                     .log("Could not remove the old body of restored companion %s", profileId);
         }
+    }
+
+    private static CompletableFuture<Outcome> done(Result result) {
+        return CompletableFuture.completedFuture(new Outcome(result, null));
+    }
+
+    private static CompanionAdmissionGate.Check builtInOnly(
+            BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+        Objects.requireNonNull(admission, "admission");
+        return (before, after, provided) -> {
+            CompanionAdmission.Refusal refusal = admission.apply(before, after);
+            return refusal == null ? null : CompanionAdmissionGate.Denial.of(refusal);
+        };
+    }
+
+    private static Result map(CompanionAdmission.Refusal refusal) {
+        return switch (refusal) {
+            case OWNED -> Result.OWNED_LIMIT;
+            case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
+            case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
+            case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;
+        };
     }
 
     private static Result map(RestoreRules.Verdict verdict) {

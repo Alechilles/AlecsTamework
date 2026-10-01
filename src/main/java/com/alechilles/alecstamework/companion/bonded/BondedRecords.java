@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -33,6 +34,14 @@ public final class BondedRecords {
     public static final String UNRESOLVED_FAMILY_ID = "tamework:unresolved";
     /** Presentation key: the full length of the cooldown a stored or dead companion waits on. */
     public static final String COOLDOWN_DURATION_MS = "cooldownDurationMs";
+    /** {@code roleId} of a listed record whose stored role id is blank; it resolves to no family. */
+    public static final String UNKNOWN_ROLE_ID = "unknown";
+    /** Tamework's own extension namespace. Public callers may not read or write it. */
+    public static final String TAMEWORK_NAMESPACE = "tamework";
+    /** The one extension value a caller namespace keeps per bonded companion. */
+    public static final String EXTENSION_DATA_KEY = "bonded";
+    /** Extension key of the capture evidence written when a companion is captured into storage (plan 6 R17). */
+    public static final String CAPTURE_EVIDENCE_KEY = extensionKey(TAMEWORK_NAMESPACE, "bonded-capture");
 
     /** Finds the roster family that governs a role. */
     @FunctionalInterface
@@ -64,10 +73,36 @@ public final class BondedRecords {
         };
     }
 
-    /** The record's family policy; null when it is not bonded or its role resolves to no single family. */
+    /**
+     * The key of a record extension entry: {@code namespace + "/" + key}, both trimmed. The same
+     * layout as profile data, so {@code profileData()} reads a bonded extension value under
+     * {@link #EXTENSION_DATA_KEY}.
+     */
+    @Nonnull
+    public static String extensionKey(@Nonnull String namespace, @Nonnull String key) {
+        return namespace.trim() + "/" + key.trim();
+    }
+
+    /**
+     * Whether a public caller may use {@code namespace}. Tamework's own namespaces are reserved,
+     * and a namespace with "/" could not be told apart from a shorter namespace with a longer key.
+     */
+    public static boolean publicNamespace(@Nullable String namespace) {
+        if (namespace == null || namespace.isBlank()) {
+            return false;
+        }
+        String normalized = namespace.trim();
+        return !normalized.contains("/") && !normalized.equalsIgnoreCase(TAMEWORK_NAMESPACE)
+                && !normalized.equalsIgnoreCase("Alechilles:Tamework");
+    }
+
+    /**
+     * The record's family policy; null when it is not bonded, has a blank role, or its role
+     * resolves to no single family.
+     */
     @Nullable
     public static BondedCompanionPolicy policy(@Nonnull CompanionRecord record, @Nonnull Families families) {
-        return record.bonded() && record.rosterId() != null
+        return record.bonded() && record.rosterId() != null && !record.roleId().isBlank()
                 ? families.resolve(record.rosterId(), record.roleId()) : null;
     }
 
@@ -94,7 +129,8 @@ public final class BondedRecords {
     /** True when {@code record} is a bonded record that counts toward the caps of {@code family}. */
     public static boolean inFamily(@Nonnull CompanionRecord record, @Nonnull BondedCompanionPolicy family,
                                    @Nonnull Families families) {
-        if (!record.countsAsOwned()) {
+        // Cheap checks first: most of an owner's records are not in this roster at all.
+        if (!record.bonded() || !record.countsAsOwned() || !family.rosterId().equals(record.rosterId())) {
             return false;
         }
         BondedCompanionPolicy own = policy(record, families);
@@ -118,8 +154,9 @@ public final class BondedRecords {
      *
      * <p>{@code summonAvailable}: STORED, the Summon feature is on, the summon cooldown has passed
      * and the family has a free active place. {@code storeAvailable}: ACTIVE and the Dismiss
-     * feature is on. {@code reviveAvailable}: DEAD, the Revive feature is on and the revive
-     * cooldown has passed. A dead companion whose family allows revival carries a quote.</p>
+     * feature is on. {@code reviveAvailable}: DEAD, the Revive feature is on, the revive cooldown
+     * has passed and the family has a free active place, because a revived companion comes back
+     * active. A dead companion whose family allows revival carries a quote.</p>
      *
      * @param ownerRecords     every record of the record's owner, for the family's active count
      * @param presentationData caller-supplied presentation entries; they win over the capacity
@@ -136,12 +173,12 @@ public final class BondedRecords {
         }
         BondedCompanionPolicy policy = policy(record, families);
         int active = policy == null ? 0 : activeCount(ownerRecords, policy, families);
+        boolean activePlace = policy != null && (policy.maximumActive() == 0 || active < policy.maximumActive());
         boolean summon = policy != null && state == BondedCompanionStateView.STORED && policy.features().summon()
-                && passed(record.summonCooldownUntilMs(), nowMs)
-                && (policy.maximumActive() == 0 || active < policy.maximumActive());
+                && passed(record.summonCooldownUntilMs(), nowMs) && activePlace;
         boolean store = policy != null && state == BondedCompanionStateView.ACTIVE && policy.features().dismiss();
         BondedCompanionReviveQuote quote = policy == null ? null : reviveQuote(record, policy, nowMs);
-        boolean revive = quote != null && quote.cooldownRemainingSeconds() == 0L;
+        boolean revive = quote != null && quote.cooldownRemainingSeconds() == 0L && activePlace;
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         if (policy != null) {
             presentation.putAll(capacityAttributes(policy, active));
@@ -153,7 +190,8 @@ public final class BondedRecords {
         }
         presentation.putAll(Objects.requireNonNull(presentationData, "presentationData"));
         return new BondedCompanionProfileView(record.profileId().toString(), record.ownerUuid(), record.rosterId(),
-                policy == null ? UNRESOLVED_FAMILY_ID : policy.familyId(), record.roleId(), record.displayName(),
+                policy == null ? UNRESOLVED_FAMILY_ID : policy.familyId(),
+                record.roleId().isBlank() ? UNKNOWN_ROLE_ID : record.roleId(), record.displayName(),
                 null, null, record.generation(), state, summon, store, revive, presentation,
                 state == BondedCompanionStateView.ACTIVE
                         ? lease(record, policy == null ? 0L : millis(policy.sessionDurationSeconds())) : null,
@@ -240,8 +278,9 @@ public final class BondedRecords {
         return untilMs == 0L || nowMs >= untilMs;
     }
 
-    private static long millis(long seconds) {
-        return seconds > Long.MAX_VALUE / 1_000L ? Long.MAX_VALUE : seconds * 1_000L;
+    /** Saturates at {@code Long.MAX_VALUE}. */
+    public static long millis(long seconds) {
+        return TimeUnit.SECONDS.toMillis(seconds);
     }
 
     private static long saturatingSubtract(long value, long delta) {

@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -100,8 +101,7 @@ public final class CompanionDeathTiming {
 
     /** The roster's revive cooldown; the summon talent timer modifiers do not touch it. */
     static long bondedReviveCooldownMs(@Nonnull BondedCompanionPolicy family) {
-        long seconds = family.reviveCooldownSeconds();
-        return seconds > Long.MAX_VALUE / 1_000L ? Long.MAX_VALUE : seconds * 1_000L;
+        return TimeUnit.SECONDS.toMillis(family.reviveCooldownSeconds());
     }
 
     private static long reviveCooldownMs(@Nullable Ref<EntityStore> ref, Store<EntityStore> store,

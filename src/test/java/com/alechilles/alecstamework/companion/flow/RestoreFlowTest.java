@@ -1,6 +1,12 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderDecision;
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderStatus;
+import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -12,6 +18,8 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
@@ -233,5 +241,97 @@ class RestoreFlowTest {
                 RestoreFlow.Request.of(live.profileId(), RestoreRules.Reason.SUMMON, there).withSummonedUntil(5_000)).join();
 
         assertEquals(5_000, index.get(live.profileId()).summonedUntilMs());
+    }
+
+    private static final String PASTURE = "runeteria:husbandry_deployable";
+
+    private static PopulationAdmissionProviderDecision allowPasture(int weight, int limit) {
+        return new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.ALLOW, "ok",
+                Set.of(new PopulationDomainClaim(PASTURE, weight, false, true)), Map.of(PASTURE, limit), 1L, 0L);
+    }
+
+    /** A flow whose every role is managed by a provider that answers with {@code decision}. */
+    private RestoreFlow<String> managedFlow(CompletableFuture<PopulationAdmissionProviderDecision> decision) {
+        ProviderAdmission providers = new ProviderAdmission(
+                role -> new ProviderAdmission.Managed("husbandry", 1, "husbandry", "sheep", Set.of("sheep"),
+                        "husbandry.sheep", 1, 0L),
+                request -> { events.add("provider"); return decision; });
+        CompanionAdmissionGate.Check domainLimits = (before, after, provided) -> {
+            CompanionAdmission.DomainRefusal refusal = CompanionAdmission.checkDomains(
+                    index.fileRecords(after.ownerUuid()), before, after, provided);
+            return refusal == null ? null
+                    : new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED, refusal.messageKey());
+        };
+        return new RestoreFlow<>(index, loaded, id -> CompletableFuture.completedFuture(snapshot(index.get(id))),
+                owner -> { events.add("flush"); return CompletableFuture.completedFuture(null); },
+                (committed, snap, dest, reason) -> { events.add("spawn gen" + committed.generation());
+                    return CompletableFuture.completedFuture(true); },
+                (id, body) -> events.add("remove " + body),
+                System::currentTimeMillis, providers, domainLimits);
+    }
+
+    private CompanionRecord insertItem() {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(),
+                b -> b.location(CompanionLocation.item()).generation(1).currentNpcUuid(null));
+        return index.get(live.profileId());
+    }
+
+    @Test
+    void anAllowedRestoreWaitsForTheProviderAndStoresItsClaimsOnTheRecord() {
+        CompanionRecord item = insertItem();
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+
+        CompletableFuture<RestoreFlow.Result> pending = managedFlow(decision)
+                .restore(item.profileId(), RestoreRules.Reason.RELEASE, there);
+
+        assertEquals(List.of("provider"), events, "nothing is committed before the provider answers");
+        assertEquals(item, index.get(item.profileId()));
+
+        decision.complete(allowPasture(2, 2));
+
+        assertEquals(RestoreFlow.Result.RESTORED, pending.join());
+        CompanionRecord after = index.get(item.profileId());
+        assertEquals(LocationKind.LIVE, after.location().kind());
+        assertEquals(List.of(new DomainClaim(PASTURE, 2, false, true)), after.domainClaims());
+        assertEquals(List.of("provider", "flush", "spawn gen2"), events);
+    }
+
+    @Test
+    void aDeniedOrUnavailableProviderChangesNothingAndCarriesItsMessageKey() {
+        CompanionRecord item = insertItem();
+
+        RestoreFlow.Outcome denied = managedFlow(CompletableFuture.completedFuture(
+                new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.DENY,
+                        "runeteria.husbandry.levelTooLow", Set.of(), Map.of(), 1L, 0L)))
+                .restoreOutcome(RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there)).join();
+        RestoreFlow.Outcome unavailable = managedFlow(CompletableFuture.completedFuture(
+                PopulationAdmissionProviderDecision.unavailable("provider-timeout")))
+                .restoreOutcome(RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there)).join();
+
+        assertEquals(new RestoreFlow.Outcome(RestoreFlow.Result.PROVIDER_DENIED, "runeteria.husbandry.levelTooLow"),
+                denied);
+        assertEquals(new RestoreFlow.Outcome(RestoreFlow.Result.PROVIDER_UNAVAILABLE,
+                CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY), unavailable);
+        assertEquals(List.of("provider", "provider"), events, "no flush, no removal and no spawn");
+        assertEquals(item, index.get(item.profileId()));
+    }
+
+    @Test
+    void aDomainLimitFilledWhileTheProviderWasAskedRefusesUnderTheLock() {
+        CompanionRecord item = insertItem();
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+        CompletableFuture<RestoreFlow.Outcome> pending = managedFlow(decision)
+                .restoreOutcome(RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there));
+        // Another of the owner's companions takes the last pasture slot before the provider answers.
+        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.live("other", 0, 0, 0))
+                .ownerUuid(item.ownerUuid()).domainClaims(List.of(new DomainClaim(PASTURE, 1, false, true))).build());
+
+        decision.complete(allowPasture(1, 1));
+
+        assertEquals(new RestoreFlow.Outcome(RestoreFlow.Result.PROVIDER_DENIED,
+                CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY), pending.join());
+        assertEquals(List.of("provider"), events, "no flush, no removal and no spawn");
+        assertEquals(item, index.get(item.profileId()));
     }
 }

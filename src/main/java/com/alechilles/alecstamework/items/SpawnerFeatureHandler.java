@@ -558,7 +558,7 @@ public final class SpawnerFeatureHandler {
     private boolean refusedByCaps(Player player, UUID owner, String roleId, String world, boolean deployed) {
         CompanionAdmission.Refusal refusal = admissionGate.precheck(owner, roleId, world, deployed);
         if (refusal != null) {
-            showPopulationLimit(player, refusal == CompanionAdmission.Refusal.OWNED);
+            showPopulationLimit(player, CompanionAdmissionGate.Denial.of(refusal).messageKey());
             return true;
         }
         return false;
@@ -717,7 +717,7 @@ public final class SpawnerFeatureHandler {
         if (!outcome.registered()) {
             spend.compensate();
             if (outcome.refusal() != null) {
-                showPopulationLimit(player, outcome.refusal() == CompanionAdmission.Refusal.OWNED);
+                showPopulationLimit(player, CompanionAdmissionGate.Denial.of(outcome.refusal()).messageKey());
             } else {
                 warn(player, "captureProfileConflict");
             }
@@ -883,9 +883,11 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_CAPTURABLE -> warnLater(playerUuid, "captureProfileConflict");
             case COMMIT_FAILED -> warnLater(playerUuid, "captureUnavailable");
-            case OWNED_LIMIT, GROUP_LIMIT -> HytaleCaptureDelivery.onPlayerWorld(playerUuid,
-                    (world, store, ref, player) -> showPopulationLimit(player, result == CaptureFlow.Result.OWNED_LIMIT),
-                    null);
+            case OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE -> {
+                String key = populationKey(result.name(), outcome.messageKey());
+                HytaleCaptureDelivery.onPlayerWorld(playerUuid,
+                        (world, store, ref, player) -> showPopulationLimit(player, key), null);
+            }
         }
     }
 
@@ -939,9 +941,9 @@ public final class SpawnerFeatureHandler {
             // A release of this companion is still running; this one could only end stale.
             return false;
         }
-        CompletableFuture<RestoreFlow.Result> restored;
+        CompletableFuture<RestoreFlow.Outcome> restored;
         try {
-            restored = restoreFlow.restore(request);
+            restored = restoreFlow.restoreOutcome(request);
         } catch (RuntimeException failure) {
             releasing.remove(profileId);
             logger.at(Level.WARNING).withCause(failure).log("Release of companion %s could not start", profileId);
@@ -954,7 +956,8 @@ public final class SpawnerFeatureHandler {
                 logger.at(Level.WARNING).withCause(error).log("Release of companion %s failed unexpectedly",
                         ref.profileId());
             }
-            RestoreFlow.Result outcome = error != null || result == null ? RestoreFlow.Result.COMMIT_FAILED : result;
+            RestoreFlow.Outcome outcome = error != null || result == null
+                    ? new RestoreFlow.Outcome(RestoreFlow.Result.COMMIT_FAILED, null) : result;
             HytaleCaptureDelivery.onPlayerWorld(playerUuid,
                     (world, store, actorRef, actor) -> finishRelease(outcome, world, actor, ref, prepared),
                     null);
@@ -963,8 +966,9 @@ public final class SpawnerFeatureHandler {
     }
 
     /** Runs on the player's current world thread. */
-    private void finishRelease(RestoreFlow.Result result, World world, Player player, CaptureItemKeys.Ref ref,
+    private void finishRelease(RestoreFlow.Outcome outcome, World world, Player player, CaptureItemKeys.Ref ref,
                                SpawnerReleaseIntentFactory.PreparedRelease prepared) {
+        RestoreFlow.Result result = outcome.result();
         switch (result) {
             case RESTORED -> {
                 emptyHeldCapture(player, ref, prepared);
@@ -980,8 +984,8 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
-            case OWNED_LIMIT -> showPopulationLimit(player, true);
-            case GROUP_LIMIT -> showPopulationLimit(player, false);
+            case OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
+                    showPopulationLimit(player, populationKey(result.name(), outcome.messageKey()));
             default -> warn(player, "releaseFailed");
         }
     }
@@ -1100,9 +1104,24 @@ public final class SpawnerFeatureHandler {
         }
     }
 
-    private void showPopulationLimit(Player player, boolean owned) {
-        messages.showKey(player, NotificationStyle.Warning,
-                owned ? "tamework.ui.population.ownedLimit" : "tamework.ui.population.groupLimit");
+    private void showPopulationLimit(Player player, String messageKey) {
+        messages.showKey(player, NotificationStyle.Warning, messageKey);
+    }
+
+    /**
+     * The message of a flow's population refusal: the key the flow gave (a cap's, the provider's
+     * or a domain limit's), else the built-in one for the result.
+     */
+    private static String populationKey(String result, @Nullable String messageKey) {
+        if (messageKey != null && !messageKey.isBlank()) {
+            return messageKey;
+        }
+        return switch (result) {
+            case "OWNED_LIMIT" -> CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY;
+            case "PROVIDER_DENIED" -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
+            case "PROVIDER_UNAVAILABLE" -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
+            default -> CompanionAdmissionGate.GROUP_LIMIT_MESSAGE_KEY;
+        };
     }
 
     @Nullable

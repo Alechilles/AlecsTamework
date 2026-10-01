@@ -21,15 +21,17 @@ import javax.annotation.Nullable;
  * counted in and that bucket would then pass its limit, so moves that add nothing always pass,
  * even for an owner already over a limit lowered by config. A limit of 0 means no limit.
  *
- * <p>An admission provider's domain limits follow the same rule, with two differences: a claim
- * counts by its weight, and a domain limit of 0 admits nothing (a domain with no limit entry is
- * not limited).</p>
+ * <p>An admission provider's domain limits follow the same rule, with these differences: a claim
+ * counts by its weight, a domain limit of 0 admits nothing, and a claim on a domain with no limit
+ * entry is refused, because the provider's answer is incomplete.</p>
  */
 public final class CompanionAdmission {
     /** Message key of a refused owned-domain claim. */
     public static final String OWNED_LIMIT_MESSAGE_KEY = "tamework.ui.population.ownedLimit";
     /** Message key of a refused deployable-domain claim. */
     public static final String DEPLOYED_LIMIT_MESSAGE_KEY = "tamework.ui.population.deployedLimit";
+    /** Message key of a {@link Refusal#PROVIDER_DENIED} that reached a presenter without its own key. */
+    public static final String PROVIDER_DENIED_MESSAGE_KEY = "tamework.ui.population.providerDenied";
     /** Message key of {@link Refusal#PROVIDER_UNAVAILABLE}. */
     public static final String PROVIDER_UNAVAILABLE_MESSAGE_KEY = "tamework.ui.population.providerUnavailable";
 
@@ -117,7 +119,8 @@ public final class CompanionAdmission {
      * The provider domain limit that refuses the change, or null. An owned claim counts on every
      * record of the owner that counts as owned, a deployable claim on the deployed (LIVE) ones;
      * the claims already stored on the owner's other records are summed by weight. {@code before}
-     * is read with the claims stored on it, so a move that adds nothing passes.
+     * is read with the claims stored on it: a bucket is checked only when the record's weight in
+     * it grows, so a move that adds nothing passes. A claim whose domain has no limit is refused.
      */
     @Nullable
     public static DomainRefusal checkDomains(@Nonnull Collection<CompanionRecord> ownerRecords,
@@ -131,13 +134,14 @@ public final class CompanionAdmission {
         for (DomainClaim claim : provided.claims()) {
             Integer limit = provided.domainLimits().get(claim.domainId());
             if (limit == null) {
-                continue;
+                return new DomainRefusal(claim.domainId(),
+                        claim.owned() ? OWNED_LIMIT_MESSAGE_KEY : DEPLOYED_LIMIT_MESSAGE_KEY);
             }
-            if (claim.owned() && claimWeight(prior, claim.domainId(), false) == 0
+            if (claim.owned() && claim.weight() > claimWeight(prior, claim.domainId(), false)
                     && claim.weight() + claimed(ownerRecords, after, claim.domainId(), false) > limit) {
                 return new DomainRefusal(claim.domainId(), OWNED_LIMIT_MESSAGE_KEY);
             }
-            if (claim.deployable() && after.isDeployed() && claimWeight(prior, claim.domainId(), true) == 0
+            if (claim.deployable() && after.isDeployed() && claim.weight() > claimWeight(prior, claim.domainId(), true)
                     && claim.weight() + claimed(ownerRecords, after, claim.domainId(), true) > limit) {
                 return new DomainRefusal(claim.domainId(), DEPLOYED_LIMIT_MESSAGE_KEY);
             }
@@ -186,9 +190,9 @@ public final class CompanionAdmission {
     }
 
     /** The summed weight of the owner's other records in a domain's owned or deployed bucket. */
-    private static int claimed(Collection<CompanionRecord> records, CompanionRecord self, String domainId,
-                               boolean deployed) {
-        int sum = 0;
+    private static long claimed(Collection<CompanionRecord> records, CompanionRecord self, String domainId,
+                                boolean deployed) {
+        long sum = 0;
         for (CompanionRecord record : records) {
             if (!record.profileId().equals(self.profileId())) {
                 sum += claimWeight(record, domainId, deployed);
@@ -198,11 +202,11 @@ public final class CompanionAdmission {
     }
 
     /** What {@code record} holds in a domain's owned or deployed bucket; 0 when it is not counted there. */
-    private static int claimWeight(@Nullable CompanionRecord record, String domainId, boolean deployed) {
+    private static long claimWeight(@Nullable CompanionRecord record, String domainId, boolean deployed) {
         if (record == null || !record.countsAsOwned() || (deployed && !record.isDeployed())) {
             return 0;
         }
-        int sum = 0;
+        long sum = 0;
         for (DomainClaim claim : record.domainClaims()) {
             if (claim.domainId().equals(domainId) && (deployed ? claim.deployable() : claim.owned())) {
                 sum += claim.weight();

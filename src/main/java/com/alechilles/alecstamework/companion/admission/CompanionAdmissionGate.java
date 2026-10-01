@@ -19,6 +19,9 @@ import javax.annotation.Nullable;
  * in-memory config, so a reload applies to the next change.
  */
 public final class CompanionAdmissionGate {
+    /** Message key of a refused group limit. */
+    public static final String GROUP_LIMIT_MESSAGE_KEY = "tamework.ui.population.groupLimit";
+
     private final CompanionIndex index;
     private final Supplier<CompanionAdmission.Rules> rules;
 
@@ -52,6 +55,53 @@ public final class CompanionAdmissionGate {
         }
         return CompanionAdmission.check(index.fileRecords(after.ownerUuid()), before, after, rules.get(),
                 CompanionAdmission.Provided.none());
+    }
+
+    /** Why a change is refused, with the translation key to show the player. */
+    public record Denial(@Nonnull CompanionAdmission.Refusal refusal, @Nonnull String messageKey) {
+        /** The built-in message of a refusal that carries no key of its own. */
+        @Nonnull
+        public static Denial of(@Nonnull CompanionAdmission.Refusal refusal) {
+            return new Denial(refusal, switch (refusal) {
+                case OWNED -> CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY;
+                case GROUP_OWNED, GROUP_DEPLOYED -> GROUP_LIMIT_MESSAGE_KEY;
+                case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
+                case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
+            });
+        }
+    }
+
+    /** The under-lock check the asynchronous flows call; {@link #deny} in production. */
+    @FunctionalInterface
+    public interface Check {
+        @Nullable
+        Denial deny(@Nullable CompanionRecord before, @Nonnull CompanionRecord after,
+                    @Nonnull CompanionAdmission.Provided provided);
+    }
+
+    /**
+     * As {@link #refuse}, with what an admission provider allowed for {@code after}: the built-in
+     * caps and each claimed domain's limit are checked in one step. A domain limit names its own
+     * message key. Call it under the index lock, in the step that applies the change.
+     */
+    @Nullable
+    public Denial deny(@Nullable CompanionRecord before, @Nonnull CompanionRecord after,
+                       @Nonnull CompanionAdmission.Provided provided) {
+        if (after.ownerUuid() == null) {
+            return null;
+        }
+        var ownerRecords = index.fileRecords(after.ownerUuid());
+        CompanionAdmission.Refusal refusal = CompanionAdmission.check(ownerRecords, before, after, rules.get(), provided);
+        if (refusal == null) {
+            return null;
+        }
+        if (refusal == CompanionAdmission.Refusal.PROVIDER_DENIED) {
+            CompanionAdmission.DomainRefusal domain = CompanionAdmission.checkDomains(ownerRecords, before, after, provided);
+            if (domain != null) {
+                return new Denial(refusal, domain.messageKey());
+            }
+        }
+        return Denial.of(refusal);
     }
 
     /**

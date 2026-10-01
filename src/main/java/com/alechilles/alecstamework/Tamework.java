@@ -239,6 +239,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
@@ -321,6 +322,7 @@ public class Tamework extends JavaPlugin {
     private CaptureItemFlows captureItemFlows;
     /** Roster summon and store; null unless the companion module is ready and generic persistence is active. */
     private RosterSummons companionRosterSummons;
+    private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bondedCompanionApi;
     private CompanionStartupAdmission companionStartupAdmission;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
@@ -693,6 +695,7 @@ public class Tamework extends JavaPlugin {
         RestoreFlow<Ref<EntityStore>> restoreFlow = null;
         CompanionRestoreRecallSink recallRestore = null;
         CompanionAdmissionGate admissionGate = null;
+        ProviderAdmission providerAdmission = ProviderAdmission.none();
         if (companionModule != null && companionModule.ready()) {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
@@ -700,12 +703,17 @@ public class Tamework extends JavaPlugin {
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
             admissionProviderRegistry = new AdmissionProviderRegistry();
-            restoreFlow = createRestoreFlow(companionModule, admissionGate);
+            providerAdmission = ProviderAdmission.of(managedActivityConfigRegistry, admissionProviderRegistry);
+            // Bonded families come from the roster config on every call, so a reload applies at once.
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies =
+                    com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
+            restoreFlow = createRestoreFlow(companionModule, providerAdmission, admissionGate, bondedFamilies);
             captureItemFlows = new CaptureItemFlows(companionModule.index(),
                     companionModule.writer()::queueSnapshotDelete, restoreFlow);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
-            registerCompanionPersistenceRuntime(admissionGate, restoreFlow);
-            companionRosterSummons = startRosterSummons(companionModule, restoreFlow);
+            registerCompanionPersistenceRuntime(admissionGate, restoreFlow, bondedFamilies);
+            bondedCompanionApi = createBondedCompanionApi(companionModule, restoreFlow, bondedFamilies);
+            companionRosterSummons = startRosterSummons(companionModule, restoreFlow, bondedCompanionApi);
         } else if (companionModule != null && companionModule.legacyKind() == null) {
             registerCompanionPersistenceFailedNotice();
         }
@@ -774,6 +782,7 @@ public class Tamework extends JavaPlugin {
                     admissionProviderRegistry,
                     managedActivityConfigRegistry);
             ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
+            indexApi.useBondedCompanions(bondedCompanionApi);
             api = indexApi;
             // Companion events go out after the index lock is released, on the changing thread (spec 9).
             apiModule.addAfterUnlockListener(new CompanionEventPublisher(
@@ -822,7 +831,7 @@ public class Tamework extends JavaPlugin {
                     capturePolicyRegistry, interactionExtensionRegistry, module.index(), module.loaded(),
                     new CaptureFlow<>(module.index(), module.loaded(),
                             (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
-                            module.writer()::flushNow, admissionGate::refuse),
+                            module.writer()::flushNow, providerAdmission, admissionGate::deny),
                     restoreFlow, new HytaleCaptureDelivery(module.index()),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
                     admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent);
@@ -1473,8 +1482,10 @@ public class Tamework extends JavaPlugin {
      * Builds the restore used by recall, world-change follow and the panel's Recover and Revive.
      * The snapshot is a fresh capture when the body is loaded, otherwise the stored one.
      */
-    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(CompanionPersistenceModule module,
-                                                                   CompanionAdmissionGate admissionGate) {
+    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(
+            CompanionPersistenceModule module, ProviderAdmission providerAdmission,
+            CompanionAdmissionGate admissionGate,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
         CompanionSnapshotSource snapshots = new CompanionSnapshotSource(
                 module.queries()::loadedBody, module.index()::get, module.writer()::queueSnapshot,
                 module::readSnapshot, CompanionSnapshots.production());
@@ -1486,7 +1497,31 @@ public class Tamework extends JavaPlugin {
         // generation fence removes it.
         return new RestoreFlow<>(module.index(), module.loaded(), snapshots::read,
                 module.writer()::flushNow, spawner, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
-                System::currentTimeMillis, admissionGate::refuse);
+                System::currentTimeMillis, providerAdmission,
+                // A bonded family's owned and active limits join the caps under the index lock (plan 6 R15).
+                com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
+                        admissionGate::deny, module.index()::fileRecords, bondedFamilies));
+    }
+
+    /**
+     * Builds the bonded companion API over the companion index (plan 6 task 9). Its change events
+     * go out after the index lock is released. {@link #closeApiComposition} closes it.
+     */
+    private static com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi createBondedCompanionApi(
+            CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
+        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded =
+                new com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi(
+                        module.index(), bondedFamilies, restoreFlow::restore, createStoreFlow(module)::store,
+                        module.writer()::flushNow,
+                        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi.bodies(
+                                module.loaded(), CompanionBodies::removeOnOwnWorld),
+                        module.writer()::queueSnapshotDelete,
+                        com.alechilles.alecstamework.companion.bonded.BondedTalentTimers.fromSnapshots(
+                                module::readSnapshot),
+                        System::currentTimeMillis);
+        module.addAfterUnlockListener(bonded::onChanged);
+        return bonded;
     }
 
     /**
@@ -1527,15 +1562,16 @@ public class Tamework extends JavaPlugin {
      * active: a timed summon would never expire, so there are no summons.
      */
     @Nullable
-    private RosterSummons startRosterSummons(CompanionPersistenceModule module,
-                                             RestoreFlow<Ref<EntityStore>> restoreFlow) {
+    private RosterSummons startRosterSummons(
+            CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded) {
         if (!runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
             return null;
         }
         StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(module);
         RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
                 restoreFlow::restore, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
-                System::currentTimeMillis);
+                System::currentTimeMillis, bonded::storeActive);
         SummonExpiryScheduler expiry = new SummonExpiryScheduler(summons::storeExpired);
         module.index().atomically(() -> {
             module.addChangeListener(expiry::onChange);
@@ -1558,21 +1594,42 @@ public class Tamework extends JavaPlugin {
                         "companion timed summon logout auto-store"
                 )
         );
+        // An active bonded companion does not follow its owner to another world (plan 6 R18). Only
+        // the owner id and the world name leave the event; the store hops to the body's world itself.
+        deferGlobalListener(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "bonded-companion-owner-world-change",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        event -> {
+                            if (event == null || event.getWorld() == null || event.getHolder() == null) {
+                                return;
+                            }
+                            PlayerRef player = event.getHolder().getComponent(PlayerRef.getComponentType());
+                            if (player != null && player.getUuid() != null) {
+                                summons.storeBondedOutside(player.getUuid(), event.getWorld().getName());
+                            }
+                        },
+                        "bonded companion owner world-change auto-store"
+                )
+        );
         deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companion-timed-summon-owner-death",
                 () -> new CompanionOwnerDeathSystem(owner -> summons.storeTimedSummons(owner, false)));
         return summons;
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */
-    private void registerCompanionPersistenceRuntime(CompanionAdmissionGate admissionGate,
-                                                     RestoreFlow<Ref<EntityStore>> restoreFlow) {
+    private void registerCompanionPersistenceRuntime(
+            CompanionAdmissionGate admissionGate, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
         CompanionPersistenceModule module = companionModule;
         CompanionBodyLifecycle lifecycle = new CompanionBodyLifecycle(
                 module.index(), module.writer(), module.loaded(),
                 TameworkCompanionComponent.getComponentType(),
                 CompanionSnapshots.production(),
                 new CompanionSummaries(new HytaleSummarySources()),
-                module.warnings(), System::currentTimeMillis, admissionGate::refuse);
+                module.warnings(), System::currentTimeMillis, admissionGate::refuse, bondedFamilies);
         CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
                 ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
                 lifecycle);
@@ -1836,6 +1893,11 @@ public class Tamework extends JavaPlugin {
         api = null;
         if (closing != null) {
             closing.close();
+        }
+        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi closingBonded = bondedCompanionApi;
+        bondedCompanionApi = null;
+        if (closingBonded != null) {
+            closingBonded.close();
         }
         AdmissionProviderRegistry closingProviders = admissionProviderRegistry;
         admissionProviderRegistry = null;

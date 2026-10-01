@@ -186,4 +186,14 @@ class BondedRecordsTest {
         assertNull(BondedRecords.view(bonded(DRAGON, CompanionLocation.coop("w", 0, 0, 0, 0)).build(), List.of(), families, 0L, Map.of()));
         assertNull(BondedRecords.view(unbonded, List.of(), families, 0L, Map.of()));
     }
+
+    @Test
+    void aDeadCompanionIsNotRevivableWhileItsFamilyHasNoFreeActivePlace() {
+        CompanionRecord live = bonded(DRAGON, CompanionLocation.live("world-a", 0, 0, 0)).build();
+        CompanionRecord dead = bonded(DRAGON, CompanionLocation.dead("PLAYER")).build();
+
+        assertFalse(view(dead, List.of(live, dead), dragons(1, ALL), 0L).reviveAvailable(),
+                "a revived companion comes back active");
+        assertTrue(view(dead, List.of(live, dead), dragons(2, ALL), 0L).reviveAvailable());
+    }
 }

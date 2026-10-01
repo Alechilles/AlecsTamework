@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -15,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,7 +33,13 @@ import org.bson.BsonDocument;
  * ({@link Result#CONFLICT}), the body is already unregistered and its stamp is stale, so the
  * generation fence removes it when it next loads.
  *
- * <p>Continuations run on whichever thread completes the flush. The flow touches no live
+ * <p>A capture that gives a managed role's companion a new owner first asks the role's admission
+ * provider (plan 6 R10), before the index lock is taken. The claims and domain limits it allows
+ * are checked again with the built-in caps under the lock, and the claims are stored on the
+ * committed record. Every other capture commits before {@link #capture} returns.
+ *
+ * <p>Continuations run on whichever thread completes the provider's decision or the flush, so
+ * the caller hands its entity work back to the owning world thread. The flow touches no live
  * entities; {@code R} is only a registry key for the body.
  *
  * @param <R> the body reference type (Ref&lt;EntityStore&gt; in production)
@@ -38,11 +47,23 @@ import org.bson.BsonDocument;
 public final class CaptureFlow<R> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    /** OWNED_LIMIT and GROUP_LIMIT: the record after capture would pass a population cap; nothing changed. */
-    public enum Result { CAPTURED, NOT_CAPTURABLE, CONFLICT, COMMIT_FAILED, OWNED_LIMIT, GROUP_LIMIT }
+    /**
+     * OWNED_LIMIT and GROUP_LIMIT: the record after capture would pass a population cap.
+     * PROVIDER_DENIED: an admission provider denied the capture or one of its domain limits is
+     * reached. PROVIDER_UNAVAILABLE: the provider gave no decision. Nothing changed for any of them.
+     */
+    public enum Result { CAPTURED, NOT_CAPTURABLE, CONFLICT, COMMIT_FAILED, OWNED_LIMIT, GROUP_LIMIT,
+        PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
 
-    /** {@code itemRef} is what to write on the item; null unless CAPTURED. */
-    public record Outcome(@Nonnull Result result, @Nullable CaptureItemKeys.Ref itemRef) {
+    /**
+     * {@code itemRef} is what to write on the item; null unless CAPTURED. {@code messageKey} is the
+     * translation key of a population refusal (a cap, a provider's denial or a domain limit); null
+     * for every other result.
+     */
+    public record Outcome(@Nonnull Result result, @Nullable CaptureItemKeys.Ref itemRef, @Nullable String messageKey) {
+        public Outcome(@Nonnull Result result, @Nullable CaptureItemKeys.Ref itemRef) {
+            this(result, itemRef, null);
+        }
     }
 
     /**
@@ -64,31 +85,63 @@ public final class CaptureFlow<R> {
     private final LoadedBodies<R> loaded;
     private final BiConsumer<UUID, SnapshotEnvelope> queueSnapshot;
     private final Function<UUID, CompletableFuture<Void>> flushOwner;
-    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
+    private final ProviderAdmission providers;
+    private final CompanionAdmissionGate.Check admission;
 
-    /**
-     * @param queueSnapshot queues a snapshot write for a profile
-     * @param flushOwner    writes the given owner's file now (null for unowned); fails on error or timeout
-     * @param admission     population caps for the change from the current record (null for a new one)
-     *                      to the captured one; returns null to admit. Called under the index lock.
-     */
+    /** A flow with no admission providers; {@code admission} is the built-in caps only. */
     public CaptureFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
                        @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
                        @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
                        @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+        this(index, loaded, queueSnapshot, flushOwner, ProviderAdmission.none(), builtInOnly(admission));
+    }
+
+    /**
+     * @param queueSnapshot queues a snapshot write for a profile
+     * @param flushOwner    writes the given owner's file now (null for unowned); fails on error or timeout
+     * @param providers     the admission provider stage, asked before the index lock is taken
+     * @param admission     population caps and provider domain limits for the change from the
+     *                      current record (null for a new one) to the captured one; returns null
+     *                      to admit. Called under the index lock.
+     */
+    public CaptureFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
+                       @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
+                       @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
+                       @Nonnull ProviderAdmission providers, @Nonnull CompanionAdmissionGate.Check admission) {
         this.index = Objects.requireNonNull(index, "index");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
         this.flushOwner = Objects.requireNonNull(flushOwner, "flushOwner");
+        this.providers = Objects.requireNonNull(providers, "providers");
         this.admission = Objects.requireNonNull(admission, "admission");
     }
 
     /** Never completes exceptionally for an expected failure; the {@link Result} says what happened. */
     @Nonnull
     public CompletableFuture<Outcome> capture(@Nonnull Capture<R> capture) {
-        Commit commit = index.atomically(() -> commit(capture));
+        // What the commit would write, read without the lock, so the provider is asked off it.
+        UUID stamped = capture.stampedProfileId();
+        CompanionRecord seen = stamped == null ? null : index.get(stamped);
+        if (stamped != null && seen == null) {
+            return CompletableFuture.completedFuture(new Outcome(Result.NOT_CAPTURABLE, null));
+        }
+        CompanionRecord created = stamped != null ? null
+                : CompanionTransitions.newItem(UUID.randomUUID(), capture.facts(), capture.owner(), capture.ownerName());
+        CompanionRecord preview = created != null ? created
+                : CompanionTransitions.capturedToItem(seen, capture.facts().summary(), capture.owner(),
+                        capture.ownerName()).apply(seen.toBuilder()).build();
+        return providers.evaluate(seen, preview).toCompletableFuture().thenCompose(provider -> provider.admitted()
+                ? commitAndFlush(capture, seen, created, provider)
+                : CompletableFuture.completedFuture(
+                        new Outcome(result(provider.refusal()), null, provider.messageKey())));
+    }
+
+    private CompletableFuture<Outcome> commitAndFlush(Capture<R> capture, @Nullable CompanionRecord seen,
+                                                      @Nullable CompanionRecord created,
+                                                      ProviderAdmission.Outcome provider) {
+        Commit commit = index.atomically(() -> commit(capture, seen, created, provider));
         if (commit.refusal() != null) {
-            return CompletableFuture.completedFuture(new Outcome(commit.refusal(), null));
+            return CompletableFuture.completedFuture(new Outcome(commit.refusal(), null, commit.messageKey()));
         }
         CompanionRecord after = commit.after();
         UUID profileId = after.profileId();
@@ -119,9 +172,16 @@ public final class CaptureFlow<R> {
                 });
     }
 
-    private Commit commit(Capture<R> capture) {
+    /**
+     * @param seen     the stamped record the provider was asked about; null for an unstamped body
+     * @param created  the new record of an unstamped body; null for a stamped one
+     * @param provider what the provider allowed for the change from {@code seen}
+     */
+    private Commit commit(Capture<R> capture, @Nullable CompanionRecord seen, @Nullable CompanionRecord created,
+                          ProviderAdmission.Outcome provider) {
         CompanionTransitions.BodyFacts facts = capture.facts();
         UUID stamped = capture.stampedProfileId();
+        CompanionAdmission.Provided provided = provider.provided();
         if (stamped != null) {
             CompanionRecord before = index.get(stamped);
             if (before == null || before.location().kind() != LocationKind.LIVE
@@ -133,35 +193,62 @@ public final class CaptureFlow<R> {
                 // Another body holds this profile; capturing this one would strand the registered one.
                 return Commit.refused(Result.NOT_CAPTURABLE);
             }
-            var change = CompanionTransitions.capturedToItem(before, facts.summary(), capture.owner(), capture.ownerName());
-            Result capped = capped(before, change.apply(before.toBuilder()).build());
+            if (!Objects.equals(before.ownerUuid(), seen.ownerUuid())) {
+                // The owner changed while the provider was asked; its answer is for another change.
+                return Commit.refused(Result.CONFLICT);
+            }
+            UnaryOperator<CompanionRecord.Builder> captured =
+                    CompanionTransitions.capturedToItem(before, facts.summary(), capture.owner(), capture.ownerName());
+            UnaryOperator<CompanionRecord.Builder> change = !provider.asked() ? captured
+                    : b -> captured.apply(b).domainClaims(provided.claims());
+            Commit capped = capped(before, change.apply(before.toBuilder()).build(), provided);
             if (capped != null) {
-                return Commit.refused(capped);
+                return capped;
             }
             CompanionIndex.Mutation m = index.update(stamped, before.revision(), change);
             if (!m.applied()) {
                 return Commit.refused(Result.CONFLICT);
             }
             boolean unregistered = loaded.removeIfSame(stamped, capture.body());
-            return new Commit(null, before, m.after(), unregistered);
+            return new Commit(null, null, before, m.after(), unregistered);
         }
         if (index.byNpcUuid(facts.npcUuid()) != null) {
             return Commit.refused(Result.NOT_CAPTURABLE);
         }
-        CompanionRecord created = CompanionTransitions.newItem(UUID.randomUUID(), facts, capture.owner(), capture.ownerName());
-        Result capped = capped(null, created);
+        CompanionRecord claimed = !provider.asked() ? created
+                : created.toBuilder().domainClaims(provided.claims()).build();
+        Commit capped = capped(null, claimed, provided);
         if (capped != null) {
-            return Commit.refused(capped);
+            return capped;
         }
-        CompanionIndex.Mutation m = index.insert(created);
-        return m.applied() ? new Commit(null, null, m.after(), false) : Commit.refused(Result.CONFLICT);
+        CompanionIndex.Mutation m = index.insert(claimed);
+        return m.applied() ? new Commit(null, null, null, m.after(), false) : Commit.refused(Result.CONFLICT);
     }
 
+    /** The refused commit when a cap or a provider domain limit refuses the change; null when admitted. */
     @Nullable
-    private Result capped(@Nullable CompanionRecord before, CompanionRecord after) {
-        CompanionAdmission.Refusal refusal = admission.apply(before, after);
-        return refusal == null ? null
-                : refusal == CompanionAdmission.Refusal.OWNED ? Result.OWNED_LIMIT : Result.GROUP_LIMIT;
+    private Commit capped(@Nullable CompanionRecord before, CompanionRecord after,
+                          CompanionAdmission.Provided provided) {
+        CompanionAdmissionGate.Denial denial = admission.deny(before, after, provided);
+        return denial == null ? null : new Commit(result(denial.refusal()), denial.messageKey(), null, null, false);
+    }
+
+    private static Result result(CompanionAdmission.Refusal refusal) {
+        return switch (refusal) {
+            case OWNED -> Result.OWNED_LIMIT;
+            case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
+            case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
+            case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;
+        };
+    }
+
+    private static CompanionAdmissionGate.Check builtInOnly(
+            BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+        Objects.requireNonNull(admission, "admission");
+        return (before, after, provided) -> {
+            CompanionAdmission.Refusal refusal = admission.apply(before, after);
+            return refusal == null ? null : CompanionAdmissionGate.Denial.of(refusal);
+        };
     }
 
     /** A failed undo is logged; it never fails the returned future. */
@@ -200,10 +287,10 @@ public final class CaptureFlow<R> {
         });
     }
 
-    private record Commit(@Nullable Result refusal, @Nullable CompanionRecord before,
+    private record Commit(@Nullable Result refusal, @Nullable String messageKey, @Nullable CompanionRecord before,
                           @Nullable CompanionRecord after, boolean unregistered) {
         static Commit refused(Result refusal) {
-            return new Commit(refusal, null, null, false);
+            return new Commit(refusal, null, null, null, false);
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -62,17 +64,21 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private final ThrottledWarnings warnings;
     private final LongSupplier clock;
     private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
+    private final BondedRecords.Families bondedFamilies;
 
     /**
      * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
      * checks a new record against the population caps under the index lock; null admits it.
+     * {@code bondedFamilies} gives a bonded companion's roster family, whose revive cooldown its
+     * death uses (plan 6 R18).
      */
     public CompanionBodyLifecycle(@Nonnull CompanionIndex index, @Nonnull CompanionWriter writer,
                                   @Nonnull LoadedBodies<Ref<EntityStore>> loaded,
                                   @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                   @Nonnull CompanionSnapshots snapshots, @Nonnull CompanionSummaries summaries,
                                   @Nonnull ThrottledWarnings warnings, @Nonnull LongSupplier clock,
-                                  @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
+                                  @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission,
+                                  @Nonnull BondedRecords.Families bondedFamilies) {
         this.index = Objects.requireNonNull(index, "index");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
@@ -82,6 +88,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         this.warnings = Objects.requireNonNull(warnings, "warnings");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.admission = Objects.requireNonNull(admission, "admission");
+        this.bondedFamilies = Objects.requireNonNull(bondedFamilies, "bondedFamilies");
     }
 
     /**
@@ -311,7 +318,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         }
         long now = clock.getAsLong();
         CompanionDeathTiming.Timing timing = CompanionDeathTiming.resolve(registered, store,
-                record.currentNpcUuid(), record.roleId(), death, now);
+                record.currentNpcUuid(), record.roleId(), death, now, bondedPolicy(record));
         Long snapshotAt = registered == null ? null : snapshot(registered, store, record, record.generation() + 1);
         CompanionTransitions.BodyFacts facts = registered == null
                 ? null : CompanionBodyFacts.read(registered, store, summaries);
@@ -331,6 +338,18 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         });
         if (!recorded) {
             warn("death-skipped", "Companion record %s changed before its death was recorded", profileId);
+        }
+    }
+
+    /** A failed roster lookup falls back to the companion config cooldown: the death must be recorded. */
+    @Nullable
+    private BondedCompanionPolicy bondedPolicy(CompanionRecord record) {
+        try {
+            return BondedRecords.policy(record, bondedFamilies);
+        } catch (RuntimeException | LinkageError failure) {
+            warn("bonded-death-policy", "Could not resolve the bonded roster of companion %s; "
+                    + "its death uses the companion config revive cooldown", record.profileId());
+            return null;
         }
     }
 

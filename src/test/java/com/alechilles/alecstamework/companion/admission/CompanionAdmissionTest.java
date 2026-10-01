@@ -131,13 +131,29 @@ class CompanionAdmissionTest {
     }
 
     @Test
-    void aDomainLimitOfZeroAdmitsNothingAndADomainWithoutALimitIsNotLimited() {
+    void aDomainLimitOfZeroAdmitsNothingAndAClaimWithoutALimitIsRefused() {
         CompanionRecord tamed = rec("Cow", LIVE);
 
         assertEquals(CompanionAdmission.Refusal.PROVIDER_DENIED,
                 CompanionAdmission.check(List.of(), null, tamed, rules(0, false), provided(deployable(1), 0)));
-        assertNull(CompanionAdmission.check(List.of(claiming(LIVE, deployable(9))), null, tamed, rules(0, false),
-                new CompanionAdmission.Provided(List.of(deployable(1)), Map.of())));
+        assertEquals(CompanionAdmission.Refusal.PROVIDER_DENIED,
+                CompanionAdmission.check(List.of(), null, tamed, rules(0, false),
+                        new CompanionAdmission.Provided(List.of(deployable(1)), Map.of())));
+    }
+
+    @Test
+    void aRecordThatAlreadyHoldsTheClaimIsCheckedOnlyWhenItsWeightGrows() {
+        CompanionRecord mine = claiming(LIVE, deployable(2));
+        CompanionRecord other = claiming(LIVE, deployable(2));
+        CompanionRecord moved = mine.toBuilder().location(CompanionLocation.live("w", 9, 0, 9)).build();
+        List<CompanionRecord> all = List.of(mine, other);
+
+        // The owner is already over a lowered limit: the same or a smaller weight adds nothing.
+        assertNull(CompanionAdmission.check(all, mine, moved, rules(0, false), provided(deployable(2), 3)));
+        assertNull(CompanionAdmission.check(all, mine, moved, rules(0, false), provided(deployable(1), 3)));
+        assertEquals(CompanionAdmission.Refusal.PROVIDER_DENIED,
+                CompanionAdmission.check(all, mine, moved, rules(0, false), provided(deployable(3), 4)));
+        assertNull(CompanionAdmission.check(all, mine, moved, rules(0, false), provided(deployable(3), 5)));
     }
 
     @Test

@@ -1,6 +1,13 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderDecision;
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderStatus;
+import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
@@ -10,6 +17,8 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -269,5 +278,115 @@ class CaptureFlowTest {
         assertTrue(index.fileRecords(null).stream().anyMatch(r -> r.profileId().equals(live.profileId())));
         assertTrue(index.fileRecords(owner).isEmpty());
         assertEquals(List.of("snapshot", "flush", "flush"), events, "the unowned file and the old owner's file");
+    }
+
+    private static final String BARN = "runeteria:husbandry_owned";
+
+    private static PopulationAdmissionProviderDecision allowBarn(int limit) {
+        return new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.ALLOW, "ok",
+                Set.of(new PopulationDomainClaim(BARN, 1, true, false)), Map.of(BARN, limit), 1L, 0L);
+    }
+
+    /** A flow whose every role is managed by a provider that answers with {@code decision}. */
+    private CaptureFlow<String> managedFlow(CompletableFuture<PopulationAdmissionProviderDecision> decision) {
+        ProviderAdmission providers = new ProviderAdmission(
+                role -> new ProviderAdmission.Managed("husbandry", 1, "husbandry", "sheep", Set.of("sheep"),
+                        "husbandry.sheep", 1, 0L),
+                request -> { events.add("provider"); return decision; });
+        CompanionAdmissionGate.Check domainLimits = (before, after, provided) -> {
+            CompanionAdmission.DomainRefusal refused = CompanionAdmission.checkDomains(
+                    index.fileRecords(after.ownerUuid()), before, after, provided);
+            return refused == null ? null
+                    : new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED, refused.messageKey());
+        };
+        return new CaptureFlow<>(index, loaded, (id, envelope) -> events.add("snapshot"),
+                owner -> { events.add("flush"); return CompletableFuture.completedFuture(null); },
+                providers, domainLimits);
+    }
+
+    private CaptureFlow.Capture<String> wild(UUID npc) {
+        return new CaptureFlow.Capture<>(null, 0, "wild", facts(npc), owner, "Alec", DATA);
+    }
+
+    @Test
+    void anAllowedCaptureWaitsForTheProviderAndStoresItsClaimsOnTheNewRecord() {
+        UUID npc = UUID.randomUUID();
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(wild(npc));
+
+        assertEquals(List.of("provider"), events, "nothing is committed before the provider answers");
+        assertNull(index.byNpcUuid(npc));
+
+        decision.complete(allowBarn(1));
+
+        assertEquals(CaptureFlow.Result.CAPTURED, pending.join().result());
+        CompanionRecord created = index.get(pending.join().itemRef().profileId());
+        assertEquals(LocationKind.ITEM, created.location().kind());
+        assertEquals(List.of(new DomainClaim(BARN, 1, true, false)), created.domainClaims());
+    }
+
+    @Test
+    void aCaptureOfTheOwnersOwnCompanionDoesNotAskTheProvider() {
+        CompanionRecord live = insertLive(2);
+
+        CaptureFlow.Outcome outcome = managedFlow(new CompletableFuture<>()).capture(stamped(live, owner)).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        assertEquals(List.of("snapshot", "flush"), events);
+    }
+
+    @Test
+    void aDeniedOrUnavailableProviderChangesNothingAndCarriesItsMessageKey() {
+        UUID npc = UUID.randomUUID();
+        CompanionRecord live = insertLive(1);
+
+        CaptureFlow.Outcome denied = managedFlow(CompletableFuture.completedFuture(
+                new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.DENY,
+                        "runeteria.husbandry.levelTooLow", Set.of(), Map.of(), 1L, 0L))).capture(wild(npc)).join();
+        CaptureFlow.Outcome unavailable = managedFlow(CompletableFuture.completedFuture(
+                PopulationAdmissionProviderDecision.unavailable("provider-timeout")))
+                .capture(stamped(live, UUID.randomUUID())).join();
+
+        assertEquals(new CaptureFlow.Outcome(CaptureFlow.Result.PROVIDER_DENIED, null,
+                "runeteria.husbandry.levelTooLow"), denied);
+        assertEquals(new CaptureFlow.Outcome(CaptureFlow.Result.PROVIDER_UNAVAILABLE, null,
+                CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY), unavailable);
+        assertNull(index.byNpcUuid(npc));
+        assertEquals(live, index.get(live.profileId()));
+        assertEquals("body", loaded.get(live.profileId()));
+        assertEquals(List.of("provider", "provider"), events, "no snapshot queued and no flush");
+    }
+
+    @Test
+    void aDomainLimitFilledWhileTheProviderWasAskedRefusesUnderTheLock() {
+        UUID npc = UUID.randomUUID();
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(wild(npc));
+        // Another of the owner's companions takes the last barn slot before the provider answers.
+        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.item())
+                .ownerUuid(owner).domainClaims(List.of(new DomainClaim(BARN, 1, true, false))).build());
+
+        decision.complete(allowBarn(1));
+
+        assertEquals(new CaptureFlow.Outcome(CaptureFlow.Result.PROVIDER_DENIED, null,
+                CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY), pending.join());
+        assertNull(index.byNpcUuid(npc));
+        assertEquals(List.of("provider"), events, "no snapshot queued and no flush");
+    }
+
+    @Test
+    void anOwnerChangeWhileTheProviderWasAskedMakesTheCaptureAConflict() {
+        CompanionRecord live = insertLive(1);
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(stamped(live, UUID.randomUUID()));
+        UUID third = UUID.randomUUID();
+        index.update(live.profileId(), live.revision(), CompanionTransitions.ownerChanged(third, "Cy"));
+
+        decision.complete(allowBarn(5));
+
+        assertEquals(CaptureFlow.Result.CONFLICT, pending.join().result());
+        assertEquals(third, index.get(live.profileId()).ownerUuid());
+        assertEquals(LocationKind.LIVE, index.get(live.profileId()).location().kind());
     }
 }

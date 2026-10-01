@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.companion.bonded;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -46,6 +50,33 @@ public final class BondedAdmission {
             return Refusal.ACTIVE_CAPACITY;
         }
         return null;
+    }
+
+    /**
+     * {@code base} followed by the family caps, for a flow's under-lock admission check. A family
+     * refusal is reported as the built-in refusal of the same kind: owned as
+     * {@link CompanionAdmission.Refusal#OWNED}, active as
+     * {@link CompanionAdmission.Refusal#GROUP_DEPLOYED}.
+     *
+     * @param ownerRecords every record filed under an owner; {@code CompanionIndex::fileRecords}
+     */
+    @Nonnull
+    public static CompanionAdmissionGate.Check withFamilyCaps(
+            @Nonnull CompanionAdmissionGate.Check base,
+            @Nonnull Function<UUID, ? extends Collection<CompanionRecord>> ownerRecords,
+            @Nonnull BondedRecords.Families families) {
+        Objects.requireNonNull(base, "base");
+        Objects.requireNonNull(ownerRecords, "ownerRecords");
+        Objects.requireNonNull(families, "families");
+        return (before, after, provided) -> {
+            CompanionAdmissionGate.Denial denied = base.deny(before, after, provided);
+            if (denied != null || !after.bonded() || after.ownerUuid() == null) {
+                return denied;
+            }
+            Refusal refusal = check(ownerRecords.apply(after.ownerUuid()), before, after, families);
+            return refusal == null ? null : CompanionAdmissionGate.Denial.of(refusal == Refusal.OWNED_CAPACITY
+                    ? CompanionAdmission.Refusal.OWNED : CompanionAdmission.Refusal.GROUP_DEPLOYED);
+        };
     }
 
     private static int count(Collection<CompanionRecord> records, CompanionRecord self, BondedCompanionPolicy family,

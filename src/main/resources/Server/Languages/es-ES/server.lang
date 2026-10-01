@@ -1114,6 +1114,7 @@ tamework.ui.population.groupLimit=Has alcanzado tu límite para este tipo de com
 tamework.ui.population.claimLimit=No puedes domar más compañeros en este reclamo ahora mismo ({0}/{1} propios en este reclamo).
 tamework.ui.population.unavailable=No se pueden comprobar los límites de compañeros en este momento. Inténtalo de nuevo en breve.
 tamework.ui.population.providerUnavailable=Los requisitos de Ganadería no están disponibles temporalmente. Vuelve a intentarlo en breve.
+tamework.ui.population.providerDenied=No cumples los requisitos de Ganadería para este compañero.
 tamework.ui.population.slot=espacio
 tamework.ui.population.slots=espacios
 tamework.ui.linkedLocation.copyHint=Selecciona el texto para copiarlo

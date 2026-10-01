@@ -3,10 +3,12 @@ package com.alechilles.alecstamework.companion.admission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -48,5 +50,26 @@ class CompanionAdmissionGateTest {
 
         own("Dragon_Fire", CompanionLocation.stored(StoredReason.ROSTER));
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.precheck(owner, "Dragon_Fire", "w", false));
+    }
+
+    /** The flows show the denial's key, so a provider domain limit must not read as a group limit. */
+    @Test
+    void aDenialNamesTheMessageOfTheCapOrTheDomainLimitThatRefused() {
+        DomainClaim pasture = new DomainClaim("pasture", 2, false, true);
+        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 0, 0, 0))
+                .ownerUuid(owner).domainClaims(List.of(pasture)).build());
+        own("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0));
+        CompanionRecord cow = CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 0, 0, 0))
+                .ownerUuid(owner).build();
+        CompanionRecord dragon = CompanionRecord.builder(UUID.randomUUID(), "Dragon_Fire",
+                CompanionLocation.live("w", 0, 0, 0)).ownerUuid(owner).build();
+
+        assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,
+                        CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY),
+                gate.deny(null, cow, new CompanionAdmission.Provided(List.of(pasture), Map.of("pasture", 3))));
+        assertNull(gate.deny(null, cow, new CompanionAdmission.Provided(List.of(pasture), Map.of("pasture", 4))));
+        assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.GROUP_DEPLOYED,
+                        CompanionAdmissionGate.GROUP_LIMIT_MESSAGE_KEY),
+                gate.deny(null, dragon, CompanionAdmission.Provided.none()));
     }
 }

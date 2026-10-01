@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.TameActivityView;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.Vector3View;
+import com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IndexTameworkApiTest {
@@ -97,6 +99,26 @@ class IndexTameworkApiTest {
         assertEquals(1, seen.size());
         assertFalse(api.getCapabilities().contains(TameworkApiCapability.ACTIVITY_FEED_V2));
         assertFalse(api.activities().status("consumer").available());
+    }
+
+    @Test
+    void bondedCompanionsAreAdvertisedOnlyWhileTheirAuthorityIsAvailable() {
+        IndexBondedCompanionApi bonded = new IndexBondedCompanionApi(index, (rosterId, roleId) -> null,
+                request -> null, (profileId, reason, cooldownUntilMs) -> null,
+                owner -> CompletableFuture.completedFuture(null), profileId -> null, profileId -> { },
+                (record, family) -> CompletableFuture.completedFuture(family), () -> 1_000L);
+
+        try (IndexTameworkApi api = api()) {
+            assertFalse(api.getCapabilities().contains(TameworkApiCapability.BONDED_COMPANIONS));
+            assertFalse(api.bondedCompanions().availability().available());
+
+            api.useBondedCompanions(bonded);
+            assertTrue(api.getCapabilities().contains(TameworkApiCapability.BONDED_COMPANIONS));
+            assertSame(bonded, api.bondedCompanions());
+
+            bonded.close();
+            assertFalse(api.getCapabilities().contains(TameworkApiCapability.BONDED_COMPANIONS));
+        }
     }
 
     private static TameActivityView tame() {

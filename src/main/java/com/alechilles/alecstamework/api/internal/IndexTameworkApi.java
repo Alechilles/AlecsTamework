@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ActivityFeedApi;
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CapturedItemDisplayApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
@@ -45,6 +46,7 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     private final RequiredContentProfileApi requiredContentProfiles;
     private final LiveActivityFeed activities = new LiveActivityFeed();
     private final AtomicBoolean closed = new AtomicBoolean();
+    @Nullable private volatile BondedCompanionApi bondedCompanions;
 
     public IndexTameworkApi(
             @Nonnull IndexNpcProfilesApi profiles,
@@ -89,6 +91,15 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         return activities.publisher();
     }
 
+    /**
+     * Sets the bonded companion authority this API hands out and advertises. The caller owns it
+     * and closes it; null, or an authority that reports itself unavailable, leaves bonded
+     * companions unavailable and {@code BONDED_COMPANIONS} unadvertised.
+     */
+    public void useBondedCompanions(@Nullable BondedCompanionApi bondedCompanions) {
+        this.bondedCompanions = bondedCompanions;
+    }
+
     /** Drops reflected optional-claim contracts after a settings change. */
     public void onRuntimeSettingsChanged() {
         base.onRuntimeSettingsChanged();
@@ -109,6 +120,9 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         result.add(TameworkApiCapability.REQUIRED_CONTENT_PROFILES);
         result.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK);
         result.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION);
+        if (bondedCompanions().availability().available()) {
+            result.add(TameworkApiCapability.BONDED_COMPANIONS);
+        }
         if (activities.isOpen()) {
             result.add(TameworkApiCapability.ACTIVITY_FEED_V2);
             result.add(TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT);
@@ -164,6 +178,12 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     @Override
     public DiagnosticsApi diagnostics() {
         return base.diagnostics();
+    }
+
+    @Override
+    public BondedCompanionApi bondedCompanions() {
+        BondedCompanionApi current = bondedCompanions;
+        return current == null || closed.get() ? BondedCompanionApi.unavailable() : current;
     }
 
     @Override

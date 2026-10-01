@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.companion.index.RecordScope;
 import com.alechilles.alecstamework.companion.index.StoredReason;
 import java.util.List;
 import java.util.UUID;
+import org.bson.BsonArray;
+import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
@@ -96,5 +98,27 @@ class CompanionRecordBsonTest {
                 .append("Owner", new BsonInt64(42));
 
         assertThrows(IllegalArgumentException.class, () -> CompanionRecordBson.decode(wrongOwner));
+    }
+
+    /** A stored claim that cannot count is dropped, so the record and its owner file stay readable. */
+    @Test
+    void aStoredDomainClaimWithoutAPositiveWeightIsDroppedAndTheRecordStillLoads() {
+        UUID id = UUID.randomUUID();
+        BsonArray claims = new BsonArray(List.of(claim("pasture", 0), claim("barn", 2)));
+        BsonDocument stored = new BsonDocument("ProfileId", new BsonString(id.toString()))
+                .append("Role", new BsonString("Sheep"))
+                .append("Location", new BsonDocument("Kind", new BsonString("ITEM")))
+                .append("Revision", new BsonInt64(1)).append("Generation", new BsonInt64(1))
+                .append("DomainClaims", claims);
+
+        CompanionRecord decoded = CompanionRecordBson.decode(stored);
+
+        assertEquals(id, decoded.profileId());
+        assertEquals(List.of(new DomainClaim("barn", 2, true, false)), decoded.domainClaims());
+    }
+
+    private static BsonDocument claim(String domain, long weight) {
+        return new BsonDocument("Domain", new BsonString(domain)).append("Weight", new BsonInt64(weight))
+                .append("Owned", BsonBoolean.TRUE).append("Deployable", BsonBoolean.FALSE);
     }
 }

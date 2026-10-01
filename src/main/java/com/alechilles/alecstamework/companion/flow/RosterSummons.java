@@ -24,6 +24,12 @@ import javax.annotation.Nullable;
  * duration}; every store of a roster companion writes {@code summonCooldownUntilMs = now +
  * cooldown}. Only timed summons auto-store when their owner logs out or dies.
  *
+ * <p>Bonded companions keep their own timers (plan 6 R18). This class never summons one, and
+ * every store of one goes to the bonded store path given at construction, which stores it as
+ * {@code STORED(BONDED)} with its roster's cooldown. Unlike roster summons, every active bonded
+ * companion is stored when its owner logs out, leaves for another server or changes world.
+ * Without a bonded store path bonded companions are left alone.
+ *
  * <p>Every method returns at once and may be called from any thread; the flows hop to the body's
  * world themselves. Reads only the lock-free index and config.
  */
@@ -62,6 +68,16 @@ public final class RosterSummons {
     private final Function<UUID, CompletableFuture<Void>> flush;
     private final Function<String, Policy> policies;
     private final LongSupplier clock;
+    @Nullable private final Function<CompanionRecord, CompletableFuture<StoreFlow.Result>> bondedStore;
+
+    /** Roster summons with no bonded store path: bonded companions are left alone. */
+    public RosterSummons(@Nonnull Function<UUID, CompanionRecord> record,
+                         @Nonnull Function<UUID, List<CompanionRecord>> owned,
+                         @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore,
+                         @Nonnull Store store, @Nonnull Function<UUID, CompletableFuture<Void>> flush,
+                         @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock) {
+        this(record, owned, restore, store, flush, policies, clock, null);
+    }
 
     /**
      * @param record   a profile's current record, or null
@@ -70,12 +86,16 @@ public final class RosterSummons {
      * @param flush    writes an owner's file to disk; {@code CompanionWriter::flushNow} in production
      * @param policies the summon policy of a role id; {@link Policy#forRole} in production
      * @param clock    wall clock
+     * @param bondedStore stores an active bonded companion with its roster's cooldown
+     *                    ({@code IndexBondedCompanionApi::storeActive}); null leaves bonded
+     *                    companions alone
      */
     public RosterSummons(@Nonnull Function<UUID, CompanionRecord> record,
                          @Nonnull Function<UUID, List<CompanionRecord>> owned,
                          @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore,
                          @Nonnull Store store, @Nonnull Function<UUID, CompletableFuture<Void>> flush,
-                         @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock) {
+                         @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock,
+                         @Nullable Function<CompanionRecord, CompletableFuture<StoreFlow.Result>> bondedStore) {
         this.record = Objects.requireNonNull(record, "record");
         this.owned = Objects.requireNonNull(owned, "owned");
         this.restore = Objects.requireNonNull(restore, "restore");
@@ -83,11 +103,13 @@ public final class RosterSummons {
         this.flush = Objects.requireNonNull(flush, "flush");
         this.policies = Objects.requireNonNull(policies, "policies");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.bondedStore = bondedStore;
     }
 
     /**
      * Summons a stored roster companion to {@code destination}, timed when its role has a summon
      * duration. COOLDOWN, OWNED_LIMIT and GROUP_LIMIT come back from the restore as they are.
+     * A bonded companion is NOT_ALLOWED: the bonded API summons it with its roster's timers.
      */
     @Nonnull
     public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId,
@@ -106,6 +128,9 @@ public final class RosterSummons {
         if (current == null) {
             return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_FOUND);
         }
+        if (current.bonded()) {
+            return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_ALLOWED);
+        }
         long durationMs = policy(current).durationMs();
         RestoreFlow.Request request = RestoreFlow.Request.of(profileId, RestoreRules.Reason.SUMMON, destination)
                 .withGeneration(expectedGeneration);
@@ -121,6 +146,9 @@ public final class RosterSummons {
         CompanionRecord current = record.apply(profileId);
         if (current == null) {
             return CompletableFuture.completedFuture(StoreFlow.Result.NOT_FOUND);
+        }
+        if (current.bonded()) {
+            return storeBonded(current);
         }
         return storeWithCooldown(current, current.summonedUntilMs() != 0L ? StoredReason.TIMED : StoredReason.ROSTER);
     }
@@ -139,17 +167,26 @@ public final class RosterSummons {
         if (!timedLive(current) || current.summonedUntilMs() > clock.getAsLong()) {
             return CompletableFuture.completedFuture(StoreFlow.Result.NOT_LIVE);
         }
-        return report(current, "expired", storeWithCooldown(current, StoredReason.TIMED));
+        return report(current, "expired",
+                current.bonded() ? storeBonded(current) : storeWithCooldown(current, StoredReason.TIMED));
     }
 
     /**
      * Stores every LIVE timed summon of {@code owner}. On logout a role whose settings turn
-     * auto-store off keeps its summon; on death every timed summon is stored. Returns how many
-     * stores were started.
+     * auto-store off keeps its summon; on death every timed summon is stored. A bonded companion
+     * is stored on logout whether it is timed or not, and stays out on its owner's death.
+     * Returns how many stores were started.
      */
     public int storeTimedSummons(@Nonnull UUID owner, boolean logout) {
         int started = 0;
         for (CompanionRecord current : owned.apply(owner)) {
+            if (current.bonded()) {
+                if (logout && bondedStore != null && current.location().kind() == LocationKind.LIVE) {
+                    report(current, "owner-logout", storeBonded(current));
+                    started++;
+                }
+                continue;
+            }
             if (!timedLive(current) || logout && !policy(current).autoStoreOnLogout()) {
                 continue;
             }
@@ -160,8 +197,28 @@ public final class RosterSummons {
     }
 
     /**
+     * Stores every active bonded companion of {@code owner} that is not in {@code world}, the
+     * world its owner just entered (plan 6 R18). Returns how many stores were started.
+     */
+    public int storeBondedOutside(@Nonnull UUID owner, @Nonnull String world) {
+        if (bondedStore == null) {
+            return 0;
+        }
+        int started = 0;
+        for (CompanionRecord current : owned.apply(owner)) {
+            if (current.bonded() && current.location().kind() == LocationKind.LIVE
+                    && !world.equals(current.location().world())) {
+                report(current, "owner-world-change", storeBonded(current));
+                started++;
+            }
+        }
+        return started;
+    }
+
+    /**
      * Readies {@code owner} to leave this server: stores every summoned roster companion (LIVE,
-     * with a roster id, not bonded), timed or not, then flushes the owner's file. Each store keeps
+     * with a roster id), timed or not, and every active bonded companion through the bonded store
+     * path, then flushes the owner's file. Each store keeps
      * the re-summon cooldown, so hopping servers does not reset timers. Companions without a roster
      * stay in the world (spec 13.4). Never blocks: a store that fails is logged and does not stop
      * the others or the flush. The future fails only when the flush itself fails.
@@ -170,11 +227,14 @@ public final class RosterSummons {
     public CompletableFuture<Void> prepareTransfer(@Nonnull UUID owner) {
         List<CompletableFuture<Void>> stores = new ArrayList<>();
         for (CompanionRecord current : owned.apply(owner)) {
-            if (current.location().kind() != LocationKind.LIVE || current.rosterId() == null || current.bonded()) {
+            if (current.location().kind() != LocationKind.LIVE || current.rosterId() == null
+                    || current.bonded() && bondedStore == null) {
                 continue;
             }
             StoredReason reason = current.summonedUntilMs() != 0L ? StoredReason.TIMED : StoredReason.ROSTER;
-            stores.add(report(current, "transfer", storeWithCooldown(current, reason)).handle((outcome, error) -> null));
+            stores.add(report(current, "transfer",
+                    current.bonded() ? storeBonded(current) : storeWithCooldown(current, reason))
+                    .handle((outcome, error) -> null));
         }
         return CompletableFuture.allOf(stores.toArray(new CompletableFuture<?>[0])).thenCompose(ignored -> {
             try {
@@ -190,6 +250,18 @@ public final class RosterSummons {
         long cooldownUntilMs = cooldownMs > 0L ? saturatedAdd(clock.getAsLong(), cooldownMs) : 0L;
         try {
             return store.store(current.profileId(), reason, cooldownUntilMs);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    /** NOT_LIVE, changing nothing, when there is no bonded store path. */
+    private CompletableFuture<StoreFlow.Result> storeBonded(CompanionRecord current) {
+        if (bondedStore == null) {
+            return CompletableFuture.completedFuture(StoreFlow.Result.NOT_LIVE);
+        }
+        try {
+            return bondedStore.apply(current);
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
