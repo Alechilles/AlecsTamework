@@ -83,7 +83,9 @@ public final class SummonExpiryScheduler {
     /** Tracks {@code profileId} to come due at {@code atMs}, whatever its record says now. */
     void retryAt(@Nonnull UUID profileId, long atMs) {
         synchronized (lock) {
-            track(profileId, atMs);
+            // A newer timer tracked since the poll (a re-summon) must not be pulled earlier or lost.
+            Long current = untilById.get(profileId);
+            track(profileId, current == null ? atMs : Math.max(atMs, current));
         }
     }
 
