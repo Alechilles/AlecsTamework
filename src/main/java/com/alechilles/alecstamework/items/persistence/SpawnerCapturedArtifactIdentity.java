@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -17,13 +16,14 @@ import org.bson.BsonValue;
  * Classifies the supported captured-spawner identity shapes.
  *
  * <p>Current artifacts carry the exact profile, source alias, and capture snapshot. Public
- * releases through 2.16.1 carry only the source alias. Mixed shapes are rejected so damaged
- * current artifacts cannot silently enter the legacy compatibility path.</p>
+ * releases through 2.16.1 carry only the source alias. A snapshot id without a profile id is
+ * rejected so damaged current artifacts cannot silently enter the legacy compatibility path.</p>
  *
- * <p>Companion-index artifacts (5.0) carry a profile id and a generation and no snapshot id.
- * {@link #isSupported} accepts them, but {@link #parse} and its {@link Claim} describe only the
- * two shapes above: the old release and recovery flows need a source alias and snapshot id that
- * a 5.0 item does not have. Read a 5.0 item with {@link CaptureItemKeys#read}.</p>
+ * <p>A profile id without a snapshot id is read as a companion-index (5.0) item: a profile id and
+ * a generation, no snapshot id. {@link #isSupported} accepts it, but {@link #parse} and its
+ * {@link Claim} describe only the two shapes above: the old release and recovery flows need a
+ * source alias and snapshot id that a 5.0 item does not have. Read a 5.0 item with
+ * {@link CaptureItemKeys#readIndexItem}.</p>
  */
 public final class SpawnerCapturedArtifactIdentity {
     private SpawnerCapturedArtifactIdentity() {
@@ -31,19 +31,7 @@ public final class SpawnerCapturedArtifactIdentity {
 
     /** Returns whether a stack has one complete supported identity shape. */
     public static boolean isSupported(@Nullable ItemStack stack) {
-        return parse(stack) != null || isCompanionIndexArtifact(stack);
-    }
-
-    /** True for a 5.0 item: a readable profile id (and generation) with no snapshot id. */
-    private static boolean isCompanionIndexArtifact(@Nullable ItemStack stack) {
-        if (CaptureItemKeys.read(stack) == null) {
-            return false;
-        }
-        try {
-            return stack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) == null;
-        } catch (RuntimeException unreadable) {
-            return false;
-        }
+        return parse(stack) != null || CaptureItemKeys.readIndexItem(stack) != null;
     }
 
     /** Parses a complete current or released-public identity claim. */

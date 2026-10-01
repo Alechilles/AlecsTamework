@@ -25,8 +25,8 @@ public final class CapturedItemMetadata {
     @Nullable
     public static CaptureKey read(@Nullable ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        CaptureItemKeys.Ref ref = CaptureItemKeys.read(stack);
-        if (ref != null && !has(stack, TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID)) {
+        CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(stack);
+        if (ref != null) {
             return new CaptureKey(ref.profileId().toString(), GENERATION_KEY_PREFIX + ref.generation(), ref.profileId());
         }
         if (!has(stack, TameworkMetadataKeys.TARGET_UUID)) return null;

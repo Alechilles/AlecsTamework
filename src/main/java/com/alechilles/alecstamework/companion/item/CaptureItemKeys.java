@@ -45,6 +45,23 @@ public final class CaptureItemKeys {
         }
     }
 
+    /**
+     * Like {@link #read}, but null for an older item that also carries a capture snapshot id
+     * (4.x shape, or a damaged one): only a profile id without a snapshot id is a 5.0 index item.
+     */
+    @Nullable
+    public static Ref readIndexItem(@Nullable ItemStack stack) {
+        Ref ref = read(stack);
+        if (ref == null) {
+            return null;
+        }
+        try {
+            return stack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) == null ? ref : null;
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
     /** A copy of {@code stack} carrying {@code ref}. */
     @Nonnull
     public static ItemStack write(@Nonnull ItemStack stack, @Nonnull Ref ref) {

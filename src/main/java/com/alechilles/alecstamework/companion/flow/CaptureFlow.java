@@ -84,18 +84,27 @@ public final class CaptureFlow<R> {
         }
         CompanionRecord after = commit.after();
         UUID profileId = after.profileId();
-        queueSnapshot.accept(profileId, new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT,
-                after.generation(), capture.snapshotData()));
+        try {
+            queueSnapshot.accept(profileId, new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT,
+                    after.generation(), capture.snapshotData()));
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).withCause(failure)
+                    .log("Could not queue the snapshot of captured companion %s; the capture is undone", profileId);
+            revertSafely(capture, commit);
+            return CompletableFuture.completedFuture(new Outcome(Result.COMMIT_FAILED, null));
+        }
         return flushOwners(commit.before(), after).handle((ignored, error) -> error)
                 .thenApply(error -> {
                     if (error != null) {
                         LOGGER.at(Level.WARNING).withCause(error)
                                 .log("Capture of companion %s was not written; the capture is undone", profileId);
-                        revertCommit(capture, commit);
+                        revertSafely(capture, commit);
                         return new Outcome(Result.COMMIT_FAILED, null);
                     }
+                    // A change that kept the item holder (a rename, say) does not undo the capture.
                     CompanionRecord now = index.get(profileId);
-                    if (now == null || now.revision() != after.revision()) {
+                    if (now == null || now.location().kind() != LocationKind.ITEM
+                            || now.generation() != after.generation()) {
                         return new Outcome(Result.CONFLICT, null);
                     }
                     return new Outcome(Result.CAPTURED, new CaptureItemKeys.Ref(profileId, after.generation()));
@@ -109,6 +118,11 @@ public final class CaptureFlow<R> {
             CompanionRecord before = index.get(stamped);
             if (before == null || before.location().kind() != LocationKind.LIVE
                     || before.generation() != capture.stampedGeneration()) {
+                return Commit.refused(Result.NOT_CAPTURABLE);
+            }
+            R registered = loaded.get(stamped);
+            if (registered != null && !registered.equals(capture.body())) {
+                // Another body holds this profile; capturing this one would strand the registered one.
                 return Commit.refused(Result.NOT_CAPTURABLE);
             }
             CompanionIndex.Mutation m = index.update(stamped, before.revision(),
@@ -139,6 +153,16 @@ public final class CaptureFlow<R> {
             return first;
         }
         return first.thenCompose(v -> flushOwner.apply(before.ownerUuid()));
+    }
+
+    /** A failed undo is logged; it never fails the returned future. */
+    private void revertSafely(Capture<R> capture, Commit commit) {
+        try {
+            revertCommit(capture, commit);
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).withCause(failure)
+                    .log("Could not undo the capture of companion %s", commit.after().profileId());
+        }
     }
 
     /**

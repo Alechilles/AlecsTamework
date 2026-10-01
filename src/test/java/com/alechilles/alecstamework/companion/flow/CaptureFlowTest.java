@@ -93,6 +93,52 @@ class CaptureFlowTest {
     }
 
     @Test
+    void aDifferentRegisteredBodyForTheProfileRefusesTheCapture() {
+        CompanionRecord live = insertLive(2);
+        loaded.put(live.profileId(), "other-body");
+
+        CaptureFlow.Outcome outcome = flow(CompletableFuture.completedFuture(null))
+                .capture(stamped(live, owner)).join();
+
+        assertEquals(CaptureFlow.Result.NOT_CAPTURABLE, outcome.result());
+        assertTrue(events.isEmpty());
+        assertEquals(live, index.get(live.profileId()));
+        assertEquals("other-body", loaded.get(live.profileId()));
+    }
+
+    @Test
+    void anEditThatKeepsTheItemHolderDuringTheFlushStillCaptures() {
+        CompanionRecord live = insertLive(2);
+        CompletableFuture<Void> flush = new CompletableFuture<>();
+        CompletableFuture<CaptureFlow.Outcome> pending = flow(flush).capture(stamped(live, owner));
+        CompanionRecord committed = index.get(live.profileId());
+        index.update(live.profileId(), committed.revision(), b -> b.displayName("Renamed"));
+
+        flush.complete(null);
+
+        CaptureFlow.Outcome outcome = pending.join();
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        assertEquals(3, outcome.itemRef().generation());
+        assertEquals("Renamed", index.get(live.profileId()).displayName());
+    }
+
+    @Test
+    void aSnapshotQueueFailureUndoesTheCaptureWithoutFailingTheFuture() {
+        CompanionRecord live = insertLive(2);
+        CaptureFlow<String> flow = new CaptureFlow<>(index, loaded,
+                (id, envelope) -> { throw new IllegalStateException("queue full"); },
+                owner -> CompletableFuture.completedFuture(null));
+
+        CaptureFlow.Outcome outcome = flow.capture(stamped(live, owner)).join();
+
+        assertEquals(CaptureFlow.Result.COMMIT_FAILED, outcome.result());
+        CompanionRecord after = index.get(live.profileId());
+        assertEquals(LocationKind.LIVE, after.location().kind());
+        assertEquals(2, after.generation());
+        assertEquals("body", loaded.get(live.profileId()));
+    }
+
+    @Test
     void aFailedFlushLeavesTheRecordLiveAndTheBodyRegistered() {
         CompanionRecord live = insertLive(2);
 

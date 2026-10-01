@@ -194,7 +194,8 @@ public final class CompanionTransitions {
 
     /**
      * A live body captured into an item (spec 8.2): ITEM, one generation newer, no body. The
-     * owner is the one the item leaves the record with; null files the record unowned.
+     * owner is the one the item leaves the record with; null files the record unowned. The NPC UUID
+     * is cleared here because the generation check already blocks a second capture of a stamped body.
      */
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> capturedToItem(@Nonnull CompanionRecord before,
@@ -212,8 +213,8 @@ public final class CompanionTransitions {
 
     /**
      * The first record of a body that never had one, captured straight into an item at generation 0.
-     * It keeps the body's NPC UUID so a repeat capture of the same body is refused until a restore
-     * gives the companion a new one.
+     * It keeps the body's NPC UUID (unlike the stamped path) because an unstamped body has no
+     * generation to block a second capture or tame of the same NPC; a restore gives it a new UUID.
      */
     @Nonnull
     public static CompanionRecord newItem(@Nonnull UUID profileId, @Nonnull BodyFacts body,
