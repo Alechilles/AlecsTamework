@@ -9,15 +9,17 @@ import java.util.Locale;
 import javax.annotation.Nonnull;
 
 /**
- * Fixture-free live checks for every public capability required by HyDragon.
+ * Fixture-free live checks for every public capability HyDragon gates a feature on
+ * (its {@code HyDragonFeature} enum) under API 3.0.0.
  */
 final class HyDragonApiSelfTestSuite {
     private static final List<TameworkApiCapability> REQUIRED = List.of(
+            TameworkApiCapability.BONDED_COMPANIONS,
             TameworkApiCapability.CAPTURE_POLICY,
-            TameworkApiCapability.PROFILE_DATA_TRANSACTIONS,
-            TameworkApiCapability.POPULATION_GROUPS,
             TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
-            TameworkApiCapability.CAPTURE_TAME_AND_LINK
+            TameworkApiCapability.INTERACTION_EXTENSIONS,
+            TameworkApiCapability.EVENTS,
+            TameworkApiCapability.DIAGNOSTICS
     );
 
     private HyDragonApiSelfTestSuite() {

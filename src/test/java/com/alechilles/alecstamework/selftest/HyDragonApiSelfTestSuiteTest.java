@@ -17,19 +17,19 @@ class HyDragonApiSelfTestSuiteTest {
                         EnumSet.allOf(TameworkApiCapability.class)
                 );
 
-        assertEquals(5, assertions.size());
+        assertEquals(6, assertions.size());
         assertTrue(assertions.stream().allMatch(ApiSelfTestAssertion::passed));
         assertTrue(assertions.stream().anyMatch(assertion ->
                 assertion.name().contains("capture_policy")));
         assertTrue(assertions.stream().anyMatch(assertion ->
-                assertion.name().contains("capture_tame_and_link")));
+                assertion.name().contains("bonded_companions")));
     }
 
     @Test
     void namesOnlyTheUnavailableCapabilityAsFailed() {
         EnumSet<TameworkApiCapability> available =
                 EnumSet.allOf(TameworkApiCapability.class);
-        available.remove(TameworkApiCapability.POPULATION_GROUPS);
+        available.remove(TameworkApiCapability.BONDED_COMPANIONS);
 
         List<ApiSelfTestAssertion> assertions =
                 HyDragonApiSelfTestSuite.capabilityAssertions(available);
@@ -42,6 +42,6 @@ class HyDragonApiSelfTestSuiteTest {
                 .findFirst()
                 .orElseThrow();
         assertFalse(failure.passed());
-        assertTrue(failure.name().contains("population_groups"));
+        assertTrue(failure.name().contains("bonded_companions"));
     }
 }
