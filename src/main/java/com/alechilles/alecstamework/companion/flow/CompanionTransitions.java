@@ -149,6 +149,18 @@ public final class CompanionTransitions {
         };
     }
 
+    /** A restored body at a new place: LIVE, one generation newer, new NPC UUID, death timers cleared. */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> restored(@Nonnull CompanionRecord before, @Nonnull String world,
+                                                                 double x, double y, double z, @Nonnull UUID newNpcUuid) {
+        long generation = before.generation() + 1;
+        return b -> b.generation(generation)
+                .location(CompanionLocation.live(world, x, y, z))
+                .currentNpcUuid(newNpcUuid)
+                .diedAtMs(0L)
+                .reviveAvailableAtMs(0L);
+    }
+
     /** Spec 8.12: a tombstone that keeps old bodies from being adopted. */
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> released(@Nonnull CompanionRecord before) {

@@ -92,6 +92,23 @@ class CompanionTransitionsTest {
     }
 
     @Test
+    void aRestoreMakesTheRecordLiveOneGenerationNewerWithoutReviveTimers() {
+        CompanionRecord live = CompanionTransitions.newLive(PROFILE, 3, body("default", 10));
+        CompanionRecord dead = apply(live, CompanionTransitions.died(live, CompanionSummary.EMPTY,
+                1_000L, 61_000L, "PLAYER", 1_000L));
+        UUID newNpc = UUID.fromString("00000000-0000-0000-0000-000000000004");
+
+        CompanionRecord restored = apply(dead, CompanionTransitions.restored(dead, "other", 1, 2, 3, newNpc));
+
+        assertEquals(LocationKind.LIVE, restored.location().kind());
+        assertEquals("other", restored.location().world());
+        assertEquals(dead.generation() + 1, restored.generation());
+        assertEquals(newNpc, restored.currentNpcUuid());
+        assertEquals(0L, restored.reviveAvailableAtMs());
+        assertEquals(0L, restored.diedAtMs());
+    }
+
+    @Test
     void anUnloadSnapshotIsDueAfterFiveMinutesOrWhenNoneExists() {
         CompanionRecord record = CompanionTransitions.newLive(PROFILE, 0, body("default", 10));
 
