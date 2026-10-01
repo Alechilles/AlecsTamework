@@ -1,13 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
-import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
-import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
-import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
-import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -17,108 +13,16 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.GetChunkFlags;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.Map;
-import java.util.Set;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Internal runtime bridge for the codec-created breeding action path.
- *
- * <p>The action package cannot receive the root composition through Hytale's
- * codec constructors. This bridge carries only stable operation values and
- * facade callbacks. It is not part of {@code TameworkApi}.</p>
+ * World-thread helpers for the old durable litter recovery path and for breeding XP. Litters
+ * hold no reservation: they are checked as a whole when they are born.
  */
 public final class BreedingLitterRuntime {
-    private static final AtomicReference<BreedingLitterRuntime> CURRENT =
-            new AtomicReference<>(unavailable());
-
-    private final Supplier<ManagedBatchAdmissionAuthority> admissions;
-    private final Function<BreedingLitterOperation, CompletionStage<Boolean>>
-            prepareDurable;
-    private final Function<BreedingLitterOperation, PublicOperationSubmission>
-            submitDurable;
-
-    private BreedingLitterRuntime(
-            Supplier<ManagedBatchAdmissionAuthority> admissions,
-            Function<BreedingLitterOperation, CompletionStage<Boolean>>
-                    prepareDurable,
-            Function<BreedingLitterOperation, PublicOperationSubmission>
-                    submitDurable
-    ) {
-        this.admissions = Objects.requireNonNull(admissions, "admissions");
-        this.prepareDurable = Objects.requireNonNull(
-                prepareDurable, "prepareDurable"
-        );
-        this.submitDurable = Objects.requireNonNull(
-                submitDurable, "submitDurable"
-        );
-    }
-
-    /** Installs the current composition callbacks for internal breeding use. */
-    public static void install(
-            @Nonnull Supplier<ManagedBatchAdmissionAuthority> admissions,
-            @Nonnull Function<BreedingLitterOperation, CompletionStage<Boolean>>
-                    prepareDurable,
-            @Nonnull Function<BreedingLitterOperation, PublicOperationSubmission>
-                    submitDurable
-    ) {
-        CURRENT.set(new BreedingLitterRuntime(
-                admissions, prepareDurable, submitDurable
-        ));
-    }
-
-    static BreedingLitterRuntime current() {
-        return CURRENT.get();
-    }
-
-    CompletionStage<PopulationAdmissionDecision> prepareManaged(
-            ManagedBatchAdmissionRequest request
-    ) {
-        ManagedBatchAdmissionAuthority authority = admissions.get();
-        return authority == null
-                ? CompletableFuture.completedFuture(
-                        PopulationAdmissionDecision.unavailable(
-                                "breeding_litter_runtime_unavailable"
-                        )
-                )
-                : authority.prepareManagedBatch(request);
-    }
-
-    CompletionStage<Boolean> prepareDurable(BreedingLitterOperation litter) {
-        try {
-            CompletionStage<Boolean> result = prepareDurable.apply(litter);
-            return result == null
-                    ? CompletableFuture.completedFuture(false) : result;
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(false);
-        }
-    }
-
-    /**
-     * The companion index holds no reservation for a litter, so there is nothing to cancel. Births
-     * are checked as a whole by {@code OwnerPopulationCapService.evaluateBatch} when they spawn.
-     */
-    CompletionStage<ManagedBatchSettlement> cancelManaged(
-            PopulationAdmissionToken token
-    ) {
-        return CompletableFuture.completedFuture(unavailable(
-                "breeding_litter_cancel_unavailable"
-        ));
-    }
-
-    PublicOperationSubmission submitDurable(BreedingLitterOperation litter) {
-        try {
-            return submitDurable.apply(litter);
-        } catch (RuntimeException | LinkageError failure) {
-            return null;
-        }
+    private BreedingLitterRuntime() {
     }
 
     static CompletionStage<BreedingLitterLiveResult> recover(
@@ -293,23 +197,5 @@ public final class BreedingLitterRuntime {
     ) {
         return ref != null && ref.isValid()
                 && store.getComponent(ref, NPCEntity.getComponentType()) != null;
-    }
-
-    private static BreedingLitterRuntime unavailable() {
-        return new BreedingLitterRuntime(
-                () -> ManagedBatchAdmissionAuthority.unavailable(),
-                ignored -> CompletableFuture.completedFuture(false),
-                ignored -> null
-        );
-    }
-
-    private static ManagedBatchSettlement unavailable(String reason) {
-        return new ManagedBatchSettlement(
-                ManagedBatchSettlement.Status.UNAVAILABLE,
-                reason,
-                1,
-                Set.of(),
-                Map.of()
-        );
     }
 }

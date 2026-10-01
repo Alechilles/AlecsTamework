@@ -1676,17 +1676,6 @@ tamework.commands.npcSpawnTamed.result.failure.position=Unable to resolve a spaw
 tamework.commands.npcSpawnTamed.result.stopped.populationCap=Owner population cap reached.
 tamework.commands.npcSpawnTamed.result.stopped.spawnFailed=Spawn failed before completing the requested quantity.
 tamework.commands.npcSpawnTamed.result.stopped.applyState=Spawn failed while applying owned companion state.
-tamework.commands.npcSpawnTamed.result.stopped.admissionUnavailable=Managed population admission is unavailable.
-tamework.commands.npcSpawnTamed.result.stopped.admissionFailed=Managed population admission failed.
-tamework.commands.npcSpawnTamed.result.stopped.admissionRejected=Managed population admission was not accepted.
-tamework.commands.npcSpawnTamed.result.stopped.worldClosedAdmission=World closed during managed spawn admission.
-tamework.commands.npcSpawnTamed.result.stopped.npcUnavailable=Spawned NPC was no longer available.
-tamework.commands.npcSpawnTamed.result.stopped.admissionClaim=Managed population admission could not be claimed.
-tamework.commands.npcSpawnTamed.result.stopped.worldDispatchAdmission=World dispatch failed during managed spawn admission.
-tamework.commands.npcSpawnTamed.result.stopped.profilePublication=Managed profile publication failed.
-tamework.commands.npcSpawnTamed.result.stopped.admissionCommit=Managed population admission did not commit.
-tamework.commands.npcSpawnTamed.result.stopped.worldClosedSettlement=World closed during managed spawn settlement.
-tamework.commands.npcSpawnTamed.result.stopped.worldDispatchSettlement=World dispatch failed during managed spawn settlement.
 
 tamework.ui.commandMenu.flightToggle=Flight Toggle
 

@@ -189,6 +189,11 @@ public final class NpcSpawnCommandService {
         AttachmentResolution resolution =
                 resolveAttachmentOverrides(npcRef, store, attachmentOverrides);
         applyPostAdmissionState(store, world, playerRef, npcRef, npc, resolution);
+        if (store.getComponent(npcRef, ownerType) == null) {
+            // The admission gate refused the tame and stripped the owner; it has told the owner why.
+            npc.setToDespawn();
+            return null;
+        }
         AutoLinkContext autoLink = resolveHeldCommandItem(player);
         boolean linked = linkHeldCommandItem(
                 autoLink, player, store, npcRef, npc

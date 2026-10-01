@@ -1,24 +1,10 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.PopulationAdmissionForcePolicy;
-import com.alechilles.alecstamework.api.PopulationAdmissionIdentity;
-import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
-import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
-import com.alechilles.alecstamework.api.PopulationAdmissionToken;
-import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
-import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
-import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.util.ArrayList;
@@ -30,7 +16,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Freezes one litter before managed admission and delayed world work. */
+/** Freezes one litter before the delayed birth. */
 final class BreedingLitterPlanner {
     private final BreedingFertilityOffspringService fertility =
             new BreedingFertilityOffspringService();
@@ -92,9 +78,7 @@ final class BreedingLitterPlanner {
                     family == null ? null : family.getSelectedLineId()
             ));
         }
-        String targetRole = children.getFirst().roleId();
-        // Retained mappings still require managed admission when a config reload
-        // makes them stale. The admission service checks profile readiness.
+        // A litter that mixes managed profiles is still refused. Its caps are checked at birth.
         Map<String, ManagedActivityConfigRegistry.RoleResolution> managedRoles =
                 plugin.getManagedActivityConfigRegistry().snapshot().rolesById();
         String managedProfile = resolveManagedProfile(children, roleId -> {
@@ -104,56 +88,7 @@ final class BreedingLitterPlanner {
         if (managedProfile == null) {
             return null;
         }
-        if (managedProfile.isEmpty()) {
-            return new Plan(litterId, roll, List.copyOf(children), null,
-                    rotation(parentARef, parentBRef, store), List.copyOf(resolvedRoles));
-        }
-        UUID inheritedOwner = BreedingInheritedOwnerResolver.resolve(
-                config,
-                targetRole,
-                context.parentAOwner(),
-                context.parentBOwner()
-        ).ownerId();
-        PopulationAdmissionLocation destination =
-                new PopulationAdmissionLocation(
-                        worldName,
-                        ChunkUtil.chunkCoordinate((int) Math.floor(spawn.x)),
-                        ChunkUtil.chunkCoordinate((int) Math.floor(spawn.z))
-                );
-        PopulationAdmissionRequest admission =
-                new PopulationAdmissionRequest(
-                        new PopulationAdmissionIdentity(
-                                null,
-                                childIds.getFirst().toString(),
-                                "breeding-litter:" + litterId
-                        ),
-                        null,
-                        PopulationAdmissionRequest.NEW_PROFILE_REVISION,
-                        null,
-                        inheritedOwner,
-                        null,
-                        destination,
-                        PopulationAdmissionOperation.BREEDING,
-                        1,
-                        PopulationAdmissionForcePolicy.ENFORCE,
-                        PopulationCompanionLifecycle.ACTIVE
-                );
-        PopulationAdmissionRequestV3 v3 = new PopulationAdmissionRequestV3(
-                new PopulationAdmissionRequestV2(
-                        admission, targetRole, worldName
-                ),
-                managedProfile
-        );
-        return new Plan(
-                litterId,
-                roll,
-                List.copyOf(children),
-                ManagedBatchAdmissionRequest.create(
-                        litterId, v3, roll.offspringCount()
-                ),
-                rotation(parentARef, parentBRef, store),
-                List.copyOf(resolvedRoles)
-        );
+        return new Plan(roll, List.copyOf(children), List.copyOf(resolvedRoles));
     }
 
     /** Returns an empty profile for ordinary births, or null for incompatible profiles. */
@@ -176,125 +111,15 @@ final class BreedingLitterPlanner {
         return profileId;
     }
 
-    @Nonnull
-    BreedingLitterOperation operation(
-            @Nonnull Plan plan,
-            @Nonnull BreedingPairContext context,
-            @Nonnull String worldName,
-            @Nonnull PopulationAdmissionToken token,
-            long requestedAtMs
-    ) {
-        Vector3d spawn = context.spawnAnchor();
-        if (spawn == null || plan.empty()) {
-            throw new IllegalArgumentException(
-                    "A positive frozen litter plan is required"
-            );
-        }
-        BreedingLitterOperation.Parent first = parent(
-                context.parentAUuid(),
-                context.parentARoleId(),
-                context.parentARoleIndex(),
-                context.parentAOwner(),
-                context.parentATamed()
-        );
-        BreedingLitterOperation.Parent second = parent(
-                context.parentBUuid(),
-                context.parentBRoleId(),
-                context.parentBRoleIndex(),
-                context.parentBOwner(),
-                context.parentBTamed()
-        );
-        BreedingLitterOperation.Parent parentA = compare(
-                first.uuid(), second.uuid()
-        ) < 0 ? first : second;
-        BreedingLitterOperation.Parent parentB = parentA == first
-                ? second : first;
-        boolean firstIsSortedParentA = parentA == first;
-        return new BreedingLitterOperation(
-                plan.litterId(),
-                parentA,
-                parentB,
-                worldName,
-                spawn.x,
-                spawn.y,
-                spawn.z,
-                plan.rotation().yaw(),
-                plan.rotation().pitch(),
-                plan.rotation().roll(),
-                context.breedingConfigId(),
-                firstIsSortedParentA
-                        ? plan.fertility().parentAMultiplier()
-                        : plan.fertility().parentBMultiplier(),
-                firstIsSortedParentA
-                        ? plan.fertility().parentBMultiplier()
-                        : plan.fertility().parentAMultiplier(),
-                plan.fertility().expectedOffspring(),
-                plan.children().size(),
-                plan.children(),
-                token,
-                requestedAtMs
-        );
-    }
-
-    private static BreedingLitterOperation.Parent parent(
-            UUID uuid,
-            String roleId,
-            int roleIndex,
-            BreedingOffspringProgressionService.OwnerSnapshot owner,
-            boolean tamed
-    ) {
-        return new BreedingLitterOperation.Parent(
-                uuid,
-                roleId,
-                roleIndex,
-                owner.ownerId(),
-                owner.ownerName(),
-                tamed
-        );
-    }
-
-    private static Rotation3f rotation(
-            Ref<EntityStore> parentA,
-            Ref<EntityStore> parentB,
-            Store<EntityStore> store
-    ) {
-        TransformComponent a = store.getComponent(
-                parentA, TransformComponent.getComponentType()
-        );
-        TransformComponent b = store.getComponent(
-                parentB, TransformComponent.getComponentType()
-        );
-        if (a != null && b != null) {
-            Vector3d delta = new Vector3d(b.getPosition())
-                    .sub(a.getPosition());
-            if (delta.lengthSquared() > 0.00001) {
-                return TameworkRotationUtil.lookAt(delta);
-            }
-        }
-        TransformComponent fallback = a != null ? a : b;
-        return fallback == null
-                ? new Rotation3f()
-                : new Rotation3f(fallback.getRotation());
-    }
-
-    private static int compare(UUID left, UUID right) {
-        return left.toString().compareTo(right.toString());
-    }
-
     record Plan(
-            @Nullable UUID litterId,
             @Nonnull BreedingFertilityOffspringService.FertilityRoll fertility,
             @Nonnull List<BreedingLitterOperation.ChildPlan> children,
-            @Nullable ManagedBatchAdmissionRequest admission,
-            @Nonnull Rotation3f rotation,
             @Nonnull List<BreedingResolvedSpawnRole> resolvedRoles
     ) {
         static Plan empty(
                 BreedingFertilityOffspringService.FertilityRoll fertility
         ) {
-            return new Plan(
-                    null, fertility, List.of(), null, new Rotation3f(), List.of()
-            );
+            return new Plan(fertility, List.of(), List.of());
         }
 
         boolean empty() {

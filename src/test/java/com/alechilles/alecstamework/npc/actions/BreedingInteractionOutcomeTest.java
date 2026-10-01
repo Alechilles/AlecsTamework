@@ -1,14 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
-import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
-import com.alechilles.alecstamework.api.PopulationAdmissionToken;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Regression coverage for actionable manual-breeding feedback. */
 class BreedingInteractionOutcomeTest {
@@ -55,61 +50,6 @@ class BreedingInteractionOutcomeTest {
                 "tamework.ui.notifications.breeding.submitted",
                 new Object[0]
         );
-    }
-
-    @Test
-    void finalAdmissionFailureResolvesToActionableFeedback() {
-        PopulationAdmissionDecision progressionDenied = new PopulationAdmissionDecision(
-                PopulationAdmissionDecision.Status.DENIED,
-                "runehusbandry.admission.family_locked",
-                null,
-                OwnerPopulationCapDecisionViewV2.Readiness.READY,
-                10,
-                0
-        );
-
-        assertEquals(
-                BreedingInteractionOutcome.progressionRequired(),
-                BreedingLitterCommitService.admissionFailure(progressionDenied, null)
-        );
-        assertEquals(
-                BreedingInteractionOutcome.capacityReached(),
-                BreedingLitterCommitService.admissionFailure(
-                        PopulationAdmissionDecision.unavailable(
-                                "population_domain_owned_capacity_reached"
-                        ),
-                        null
-                )
-        );
-        assertEquals(
-                BreedingInteractionOutcome.integrationUnavailable(),
-                BreedingLitterCommitService.admissionFailure(
-                        PopulationAdmissionDecision.unavailable("provider-not-ready"),
-                        null
-                )
-        );
-        assertEquals(
-                BreedingInteractionOutcome.integrationUnavailable(),
-                BreedingLitterCommitService.admissionFailure(null, new RuntimeException("offline"))
-        );
-        assertNull(BreedingLitterCommitService.admissionFailure(
-                new PopulationAdmissionDecision(
-                        PopulationAdmissionDecision.Status.RESERVED,
-                        "reserved",
-                        new PopulationAdmissionToken(
-                                UUID.randomUUID(),
-                                UUID.randomUUID(),
-                                Long.MAX_VALUE,
-                                1,
-                                "test",
-                                OwnerPopulationCapDecisionViewV2.Readiness.READY
-                        ),
-                        OwnerPopulationCapDecisionViewV2.Readiness.READY,
-                        1,
-                        1
-                ),
-                null
-        ));
     }
 
     private static void assertFeedback(

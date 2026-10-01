@@ -22,7 +22,8 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Matches a live pair and schedules an ordinary or managed litter.
+ * Matches a live pair and schedules its litter. Every litter, managed role or not, is born
+ * through {@link BreedingOffspringBirthService}, which checks the whole litter against the caps.
  */
 final class BreedingHytalePairingService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
@@ -32,7 +33,7 @@ final class BreedingHytalePairingService {
     private final BreedingLitterPlanner litterPlanner =
             new BreedingLitterPlanner();
     private final BreedingLitterCommitService litterCommit =
-            new BreedingLitterCommitService(litterPlanner);
+            new BreedingLitterCommitService();
     private final BreedingClaimLimitPolicyService limitPolicy;
     private final BreedingOffspringBirthService ordinaryBirth;
     private final BreedingPairingEffectsService delayedEffects =
@@ -157,18 +158,11 @@ final class BreedingHytalePairingService {
                     : BreedingInteractionOutcome.unavailable();
         }
         reserveSweepHeadroom(population, pendingClaims, pendingOwners);
-        if (litter.admission() == null) {
-            if (!litterCommit.applyPairEffects(candidate, config, commandBuffer)) {
-                admission.close();
-                return BreedingInteractionOutcome.unavailable();
-            }
-            return scheduleOrdinaryBirth(candidate.world(), context, litter, admission);
+        if (!litterCommit.applyPairEffects(candidate, config, commandBuffer)) {
+            admission.close();
+            return BreedingInteractionOutcome.unavailable();
         }
-        return litterCommit.prepare(
-                candidate.world().getName(), context, litter, admission,
-                readiness.manualPlayerUuid()
-        ) ? BreedingInteractionOutcome.submitted()
-                : BreedingInteractionOutcome.unavailable();
+        return scheduleOrdinaryBirth(candidate.world(), context, litter, admission);
     }
 
     private BreedingInteractionOutcome scheduleOrdinaryBirth(
