@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.companion.admission;
 
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
@@ -18,9 +20,48 @@ import javax.annotation.Nullable;
  * record (spec 8.10). Refuses only where the change adds the companion to a bucket it was not
  * counted in and that bucket would then pass its limit, so moves that add nothing always pass,
  * even for an owner already over a limit lowered by config. A limit of 0 means no limit.
+ *
+ * <p>An admission provider's domain limits follow the same rule, with two differences: a claim
+ * counts by its weight, and a domain limit of 0 admits nothing (a domain with no limit entry is
+ * not limited).</p>
  */
 public final class CompanionAdmission {
-    public enum Refusal { OWNED, GROUP_OWNED, GROUP_DEPLOYED }
+    /** Message key of a refused owned-domain claim. */
+    public static final String OWNED_LIMIT_MESSAGE_KEY = "tamework.ui.population.ownedLimit";
+    /** Message key of a refused deployable-domain claim. */
+    public static final String DEPLOYED_LIMIT_MESSAGE_KEY = "tamework.ui.population.deployedLimit";
+    /** Message key of {@link Refusal#PROVIDER_UNAVAILABLE}. */
+    public static final String PROVIDER_UNAVAILABLE_MESSAGE_KEY = "tamework.ui.population.providerUnavailable";
+
+    /**
+     * {@code PROVIDER_DENIED}: an admission provider denied the change, or one of its domain
+     * limits is reached ({@link #checkDomains} names the message key). {@code PROVIDER_UNAVAILABLE}:
+     * the provider gave no decision; {@link #check} never returns it.
+     */
+    public enum Refusal { OWNED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+
+    /**
+     * What an admission provider allowed for the record being changed: the domain claims the
+     * record will carry and the owner's limit per domain id.
+     */
+    public record Provided(@Nonnull List<DomainClaim> claims, @Nonnull Map<String, Integer> domainLimits) {
+        private static final Provided NONE = new Provided(List.of(), Map.of());
+
+        public Provided {
+            claims = List.copyOf(claims);
+            domainLimits = Map.copyOf(domainLimits);
+        }
+
+        /** No provider is involved: no claims and no domain limits. */
+        @Nonnull
+        public static Provided none() {
+            return NONE;
+        }
+    }
+
+    /** A domain limit that refused a change, with the translation key to show the player. */
+    public record DomainRefusal(@Nonnull String domainId, @Nonnull String messageKey) {
+    }
 
     /**
      * @param ownedLimit    owned companions per owner (0 = none)
@@ -37,10 +78,14 @@ public final class CompanionAdmission {
     private CompanionAdmission() {
     }
 
-    /** @param ownerRecords every record filed under {@code after}'s owner; tombstones are skipped */
+    /**
+     * @param ownerRecords every record filed under {@code after}'s owner; tombstones are skipped
+     * @param provided     the provider's claims and domain limits for {@code after}, or
+     *                     {@link Provided#none()}
+     */
     @Nullable
     public static Refusal check(@Nonnull Collection<CompanionRecord> ownerRecords, @Nullable CompanionRecord before,
-                                @Nonnull CompanionRecord after, @Nonnull Rules rules) {
+                                @Nonnull CompanionRecord after, @Nonnull Rules rules, @Nonnull Provided provided) {
         UUID owner = after.ownerUuid();
         if (owner == null || !after.countsAsOwned()) {
             return null;
@@ -65,6 +110,38 @@ public final class CompanionAdmission {
                 return Refusal.GROUP_DEPLOYED;
             }
         }
+        return checkDomains(ownerRecords, before, after, provided) == null ? null : Refusal.PROVIDER_DENIED;
+    }
+
+    /**
+     * The provider domain limit that refuses the change, or null. An owned claim counts on every
+     * record of the owner that counts as owned, a deployable claim on the deployed (LIVE) ones;
+     * the claims already stored on the owner's other records are summed by weight. {@code before}
+     * is read with the claims stored on it, so a move that adds nothing passes.
+     */
+    @Nullable
+    public static DomainRefusal checkDomains(@Nonnull Collection<CompanionRecord> ownerRecords,
+                                             @Nullable CompanionRecord before, @Nonnull CompanionRecord after,
+                                             @Nonnull Provided provided) {
+        UUID owner = after.ownerUuid();
+        if (owner == null || !after.countsAsOwned() || provided.claims().isEmpty()) {
+            return null;
+        }
+        CompanionRecord prior = before != null && owner.equals(before.ownerUuid()) && before.countsAsOwned() ? before : null;
+        for (DomainClaim claim : provided.claims()) {
+            Integer limit = provided.domainLimits().get(claim.domainId());
+            if (limit == null) {
+                continue;
+            }
+            if (claim.owned() && claimWeight(prior, claim.domainId(), false) == 0
+                    && claim.weight() + claimed(ownerRecords, after, claim.domainId(), false) > limit) {
+                return new DomainRefusal(claim.domainId(), OWNED_LIMIT_MESSAGE_KEY);
+            }
+            if (claim.deployable() && after.isDeployed() && claimWeight(prior, claim.domainId(), true) == 0
+                    && claim.weight() + claimed(ownerRecords, after, claim.domainId(), true) > limit) {
+                return new DomainRefusal(claim.domainId(), DEPLOYED_LIMIT_MESSAGE_KEY);
+            }
+        }
         return null;
     }
 
@@ -74,7 +151,7 @@ public final class CompanionAdmission {
                                      @Nonnull List<CompanionRecord> candidates, @Nonnull Rules rules) {
         List<CompanionRecord> working = new ArrayList<>(ownerRecords);
         for (CompanionRecord candidate : candidates) {
-            Refusal refusal = check(working, null, candidate, rules);
+            Refusal refusal = check(working, null, candidate, rules, Provided.none());
             if (refusal != null) {
                 return refusal;
             }
@@ -106,6 +183,32 @@ public final class CompanionAdmission {
             }
         }
         return false;
+    }
+
+    /** The summed weight of the owner's other records in a domain's owned or deployed bucket. */
+    private static int claimed(Collection<CompanionRecord> records, CompanionRecord self, String domainId,
+                               boolean deployed) {
+        int sum = 0;
+        for (CompanionRecord record : records) {
+            if (!record.profileId().equals(self.profileId())) {
+                sum += claimWeight(record, domainId, deployed);
+            }
+        }
+        return sum;
+    }
+
+    /** What {@code record} holds in a domain's owned or deployed bucket; 0 when it is not counted there. */
+    private static int claimWeight(@Nullable CompanionRecord record, String domainId, boolean deployed) {
+        if (record == null || !record.countsAsOwned() || (deployed && !record.isDeployed())) {
+            return 0;
+        }
+        int sum = 0;
+        for (DomainClaim claim : record.domainClaims()) {
+            if (claim.domainId().equals(domainId) && (deployed ? claim.deployable() : claim.owned())) {
+                sum += claim.weight();
+            }
+        }
+        return sum;
     }
 
     private static int count(Collection<CompanionRecord> records, CompanionRecord self, Predicate<CompanionRecord> filter) {

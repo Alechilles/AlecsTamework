@@ -53,7 +53,8 @@ class CaptureItemOwnershipTest {
                         .ownerUuid(holder).homeWorld("w").build());
         CompanionAdmission.Rules oneOwned = new CompanionAdmission.Rules(1, false, role -> List.of());
         CompanionAdmission.Refusal refusal = CompanionAdmission.check(holderRecords, record,
-                CaptureItemOwnership.asOwnedBy(record, holder, "Holder"), oneOwned);
+                CaptureItemOwnership.asOwnedBy(record, holder, "Holder"), oneOwned,
+                CompanionAdmission.Provided.none());
 
         assertEquals(CompanionAdmission.Refusal.OWNED, refusal);
         assertEquals(Decision.REFUSE, CaptureItemOwnership.decide(record, 1, holder, refusal));

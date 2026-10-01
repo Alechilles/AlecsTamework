@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
+import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import com.alechilles.alecstamework.api.internal.CompanionEventPublisher;
 import com.alechilles.alecstamework.api.internal.IndexDiagnosticsApi;
@@ -332,6 +333,8 @@ public class Tamework extends JavaPlugin {
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ManagedActivityConfigRegistry managedActivityConfigRegistry;
+    /** External admission providers; built with the public API and closed with it. */
+    private AdmissionProviderRegistry admissionProviderRegistry;
     private ManagedActivityAssetRegistrar managedActivityAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
@@ -696,6 +699,7 @@ public class Tamework extends JavaPlugin {
             companionQueries = companionModule.queries();
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
+            admissionProviderRegistry = new AdmissionProviderRegistry();
             restoreFlow = createRestoreFlow(companionModule, admissionGate);
             captureItemFlows = new CaptureItemFlows(companionModule.index(),
                     companionModule.writer()::queueSnapshotDelete, restoreFlow);
@@ -766,7 +770,9 @@ public class Tamework extends JavaPlugin {
                     new CommandUiRegistry(),
                     new CommandHudRegistry(),
                     itemFeatureRegistry,
-                    capturePolicyRegistry);
+                    capturePolicyRegistry,
+                    admissionProviderRegistry,
+                    managedActivityConfigRegistry);
             ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
             api = indexApi;
             // Companion events go out after the index lock is released, on the changing thread (spec 9).
@@ -1830,6 +1836,11 @@ public class Tamework extends JavaPlugin {
         api = null;
         if (closing != null) {
             closing.close();
+        }
+        AdmissionProviderRegistry closingProviders = admissionProviderRegistry;
+        admissionProviderRegistry = null;
+        if (closingProviders != null) {
+            closingProviders.close();
         }
     }
 

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.api.internal.IndexDiagnosticsApi;
@@ -18,9 +19,11 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
+import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -61,6 +65,7 @@ class ApiSurfaceCompatibilityTest {
             .ownerUuid(OWNER).ownerName("Alec").currentNpcUuid(NPC)
             .toolIds(List.of("00000000-0000-0000-0000-0000000000c0")).build();
     private final String profileId = record.profileId().toString();
+    private final AdmissionProviderRegistry providers = new AdmissionProviderRegistry();
     private final Object api = buildApi();
 
     private Object buildApi() {
@@ -80,12 +85,15 @@ class ApiSurfaceCompatibilityTest {
                 new CommandUiRegistry(),
                 new CommandHudRegistry(),
                 new ItemFeatureRegistry(),
-                new CapturePolicyRegistry());
+                new CapturePolicyRegistry(),
+                providers,
+                new ManagedActivityConfigRegistry());
     }
 
     @AfterEach
     void closeApi() throws Exception {
         ((AutoCloseable) api).close();
+        providers.close();
     }
 
     // ---- NPC Debug Inspector (debug/NpcDebugTameworkApiIntegration.java) ----
@@ -223,7 +231,9 @@ class ApiSurfaceCompatibilityTest {
         assertTrue(((Collection<?>) capabilities).containsAll(Set.of(
                 TameworkApiCapability.POPULATION_GROUPS,
                 TameworkApiCapability.DURABLE_POPULATION_GROUP_COUNTS,
-                TameworkApiCapability.DURABLE_DEPLOYABLE_POPULATION_COUNTS)));
+                TameworkApiCapability.DURABLE_DEPLOYABLE_POPULATION_COUNTS,
+                TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,
+                TameworkApiCapability.REQUIRED_CONTENT_PROFILES)));
 
         Object feed = runeteria("TameworkApi", api, "activities");
         Object status = runeteria("ActivityFeedApi", feed, "status", types(String.class),
@@ -249,10 +259,37 @@ class ApiSurfaceCompatibilityTest {
         assertEquals(GROUP, runeteria("PopulationGroupDefinitionView", definition, "groupId"));
     }
 
+    @Test
+    void runeteriaRegistersAnAdmissionProviderThroughAProxyAndUnregistersIt() throws Exception {
+        Class<?> providerType = Class.forName(API_PACKAGE + "PopulationAdmissionProvider");
+        Object provider = Proxy.newProxyInstance(providerType.getClassLoader(), new Class<?>[] {providerType},
+                (proxy, method, args) -> CompletableFuture.completedFuture(null));
+        // Both lookups: the API types Runeteria loads by name, and the returned objects' own classes.
+        Object registry = runeteria("PolicyApi", runeteria("TameworkApi", api, "policies"), "admissionProviders");
+        assertEquals(registry, inspector(inspector(api, "policies"), "admissionProviders"));
+
+        Object handle = inspector(registry, "register", types(String.class, int.class, providerType),
+                "runeteria:husbandry", 1, provider);
+
+        assertTrue(providers.readiness("runeteria:husbandry", 1).available());
+        inspector(handle, "close");
+        assertFalse(providers.readiness("runeteria:husbandry", 1).available());
+    }
+
+    @Test
+    void runeteriaReadsRequiredContentProfileReadiness() {
+        Object profiles = runeteria("TameworkApi", api, "requiredContentProfiles");
+
+        Object status = inspector(profiles, "status", types(String.class), "runeteria:husbandry");
+
+        assertEquals(Boolean.FALSE, runeteria("RequiredContentProfileStatus", status, "available"));
+        assertInstanceOf(String.class, runeteria("RequiredContentProfileStatus", status, "providerId"));
+        assertInstanceOf(Integer.class,
+                runeteria("RequiredContentProfileStatus", status, "providerContractVersion"));
+    }
+
     // ---- Served by later tasks; add their reflective names here when they land ----
-    // Runeteria: requiredContentProfiles().status(String) with available, providerId and
-    //   providerContractVersion; policies().admissionProviders().register(String, int, provider);
-    //   activities().subscribe(String, ActivityFilter, ActivityConsumer) through a proxy;
+    // Runeteria: activities().subscribe(String, ActivityFilter, ActivityConsumer) through a proxy;
     //   husbandryOutcomes().register(provider) and interactionExtensions().registerRequirement
     //   through proxies; the admission request unwrap request.admission().request().request().
 

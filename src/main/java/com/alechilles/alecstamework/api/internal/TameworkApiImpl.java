@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
@@ -127,6 +128,7 @@ public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
     static final String API_VERSION = "3.0.0";
+    private volatile AdmissionProviderApi admissionProviders = AdmissionProviderApi.unavailable();
     private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {
             CompanionRecordApiMapper.SNAPSHOT_CAPTURE,
             CompanionRecordApiMapper.SNAPSHOT_DEATH,
@@ -446,6 +448,17 @@ public final class TameworkApiImpl
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.CAPTURE_POLICY);
         }
+    }
+
+    /** Serves {@code policies().admissionProviders()} from {@code registry} instead of the fail-closed default. */
+    public void useAdmissionProviders(@Nonnull AdmissionProviderApi registry) {
+        admissionProviders = Objects.requireNonNull(registry, "registry");
+    }
+
+    @Override
+    @Nonnull
+    public AdmissionProviderApi admissionProviders() {
+        return admissionProviders;
     }
 
     /** Drops reflected optional-claim contracts after a settings change. */

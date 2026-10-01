@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import java.time.Instant;
@@ -35,6 +36,7 @@ class IndexTameworkApiTest {
     private static final String TOOL = "00000000-0000-0000-0000-0000000000c0";
 
     private final CompanionIndex index = new CompanionIndex(() -> 1_000L, (before, after) -> { });
+    private final AdmissionProviderRegistry providers = new AdmissionProviderRegistry();
 
     private IndexTameworkApi api() {
         IndexNpcProfilesApi profiles = new IndexNpcProfilesApi(
@@ -53,7 +55,9 @@ class IndexTameworkApiTest {
                 new CommandUiRegistry(),
                 new CommandHudRegistry(),
                 new ItemFeatureRegistry(),
-                new CapturePolicyRegistry());
+                new CapturePolicyRegistry(),
+                providers,
+                new ManagedActivityConfigRegistry());
     }
 
     @Test

@@ -142,7 +142,11 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         return Map.copyOf(result);
     }
 
-    /** Evaluates a request outside Tamework's SQLite writer transaction. */
+    /**
+     * Evaluates a request on the callback pool. Never blocks the caller; the stage completes with
+     * UNAVAILABLE when the provider is missing, slow, saturated or fails. Call it before taking
+     * the index lock.
+     */
     @Nonnull
     public CompletionStage<PopulationAdmissionProviderDecision> evaluate(
             @Nonnull PopulationAdmissionProviderRequest request
@@ -334,7 +338,8 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         return normalized;
     }
 
-    private final class RegistrationHandle implements AutoCloseable {
+    /** Public so a consumer in another class loader can call {@code close} by reflection. */
+    public final class RegistrationHandle implements AutoCloseable {
         private final String id;
         private final Registration registration;
         private final AtomicBoolean closed = new AtomicBoolean();
@@ -373,7 +378,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         }
     }
 
-    /** Immutable provider registration evidence frozen into admission tokens. */
+    /** Immutable provider registration evidence. */
     public record ProviderReadiness(
             @Nonnull String providerId,
             int contractVersion,

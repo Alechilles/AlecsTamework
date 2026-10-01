@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProgressionApi;
+import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
@@ -19,6 +20,7 @@ import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.api.commandhud.CommandHudApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
@@ -32,13 +34,15 @@ import javax.annotation.Nullable;
  * The public API root (3.0.0) over the companion index. It exists only while the companion
  * module is ready. Profile, command link, progression, policy and config reads come from
  * {@link TameworkApiImpl} over {@link IndexNpcProfilesApi}, which also forwards profile data and
- * diagnostics to the index-backed delegates given here; this class adds population group reads
- * and the activity feed, and owns the lifecycle. The command UI and HUD registries it returns
+ * diagnostics to the index-backed delegates given here; this class adds population group reads,
+ * required content profile readiness and the activity feed, and owns the lifecycle. The admission
+ * provider registry is owned by the caller, which closes it. The command UI and HUD registries it returns
  * are the instances the command handlers and HUD services use.
  */
 public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     private final TameworkApiImpl base;
     private final PopulationGroupApi populationGroups;
+    private final RequiredContentProfileApi requiredContentProfiles;
     private final LiveActivityFeed activities = new LiveActivityFeed();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -55,8 +59,11 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
             @Nonnull CommandUiRegistry commandUi,
             @Nonnull CommandHudRegistry commandHud,
             @Nonnull ItemFeatureRegistry captureItemConfigs,
-            @Nonnull CapturePolicyRegistry capturePolicies
+            @Nonnull CapturePolicyRegistry capturePolicies,
+            @Nonnull AdmissionProviderRegistry admissionProviders,
+            @Nonnull ManagedActivityConfigRegistry managedActivities
     ) {
+        Objects.requireNonNull(managedActivities, "managedActivities");
         this.base = new TameworkApiImpl(
                 profiles,
                 profileData,
@@ -70,7 +77,10 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
                 commandHud
         );
         this.populationGroups = Objects.requireNonNull(populationGroups, "populationGroups");
+        this.requiredContentProfiles =
+                new RequiredContentProfileReadiness(managedActivities::readiness, admissionProviders);
         base.activateCapturePolicyRuntime(captureItemConfigs, capturePolicies);
+        base.useAdmissionProviders(admissionProviders);
     }
 
     /** The publisher of the one shared activity feed, for {@code ActivityRuntime.install}. */
@@ -95,6 +105,8 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         result.add(TameworkApiCapability.POPULATION_GROUPS);
         result.add(TameworkApiCapability.DURABLE_POPULATION_GROUP_COUNTS);
         result.add(TameworkApiCapability.DURABLE_DEPLOYABLE_POPULATION_COUNTS);
+        result.add(TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS);
+        result.add(TameworkApiCapability.REQUIRED_CONTENT_PROFILES);
         result.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK);
         result.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION);
         if (activities.isOpen()) {
@@ -162,6 +174,11 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     @Override
     public ActivityFeedApi activities() {
         return activities;
+    }
+
+    @Override
+    public RequiredContentProfileApi requiredContentProfiles() {
+        return requiredContentProfiles;
     }
 
     @Override

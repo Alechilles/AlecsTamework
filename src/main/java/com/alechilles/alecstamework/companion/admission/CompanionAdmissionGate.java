@@ -50,7 +50,8 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return null;
         }
-        return CompanionAdmission.check(index.fileRecords(after.ownerUuid()), before, after, rules.get());
+        return CompanionAdmission.check(index.fileRecords(after.ownerUuid()), before, after, rules.get(),
+                CompanionAdmission.Provided.none());
     }
 
     /**
@@ -78,7 +79,8 @@ public final class CompanionAdmissionGate {
                 ? CompanionLocation.live(world, 0, 0, 0) : CompanionLocation.item();
         CompanionRecord candidate = CompanionRecord.builder(UUID.randomUUID(), roleId, at)
                 .ownerUuid(owner).homeWorld(world).build();
-        return CompanionAdmission.check(index.fileRecords(owner), null, candidate, rules.get());
+        return CompanionAdmission.check(index.fileRecords(owner), null, candidate, rules.get(),
+                CompanionAdmission.Provided.none());
     }
 
     /** The rules the gate checks with now, for callers that check a whole batch (a litter). */

@@ -154,11 +154,11 @@ class OwnerPopulationCapServiceTest {
         CompanionAdmission.Rules roomy = new CompanionAdmission.Rules(5, false, role -> List.of());
 
         OwnerPopulationCapService.Decision group = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, groupFull), groupFull);
+                CompanionAdmission.check(owned, null, candidate, groupFull, CompanionAdmission.Provided.none()), groupFull);
         OwnerPopulationCapService.Decision ownedLimit = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, ownedFull), ownedFull);
+                CompanionAdmission.check(owned, null, candidate, ownedFull, CompanionAdmission.Provided.none()), ownedFull);
         OwnerPopulationCapService.Decision allowed = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, roomy), roomy);
+                CompanionAdmission.check(owned, null, candidate, roomy, CompanionAdmission.Provided.none()), roomy);
 
         assertFalse(group.allowed());
         assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, group.reason());
