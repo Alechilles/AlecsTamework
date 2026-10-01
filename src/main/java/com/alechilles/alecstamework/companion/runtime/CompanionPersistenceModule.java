@@ -47,6 +47,7 @@ public final class CompanionPersistenceModule {
 
     private final State state;
     @Nullable private final String failure;
+    @Nullable private final CompanionStorage.LegacyKind legacyKind;
     @Nullable private final CompanionIndex index;
     @Nullable private final CompanionWriter writer;
     @Nullable private final CompanionStore store;
@@ -59,12 +60,14 @@ public final class CompanionPersistenceModule {
     private final LongSupplier clock;
     private final ThrottledWarnings warnings;
 
-    private CompanionPersistenceModule(State state, @Nullable String failure, @Nullable CompanionIndex index,
+    private CompanionPersistenceModule(State state, @Nullable String failure,
+                                       @Nullable CompanionStorage.LegacyKind legacyKind, @Nullable CompanionIndex index,
                                        @Nullable CompanionWriter writer, @Nullable CompanionStore store,
                                        List<CompanionIndex.ChangeListener> changeListeners,
                                        Set<UUID> unreadable, LongSupplier clock) {
         this.state = state;
         this.failure = failure;
+        this.legacyKind = legacyKind;
         this.index = index;
         this.writer = writer;
         this.store = store;
@@ -100,10 +103,14 @@ public final class CompanionPersistenceModule {
                                                   @Nonnull Predicate<Path> exists, @Nonnull CompanionFileIo io,
                                                   @Nonnull LongSupplier clock, @Nonnull String createdBy) {
         Objects.requireNonNull(clock, "clock");
-        if (CompanionStorage.detect(root, legacyDirs, exists) == CompanionStorage.Status.MIGRATION_REQUIRED) {
-            LOGGER.at(Level.SEVERE).log("Tamework found companion saves from an older version next to %s. "
-                    + "Companion persistence is disabled until this world is migrated (spec 12.1).", root);
-            return failed(State.MIGRATION_REQUIRED, "migration-required", clock);
+        CompanionStorage.LegacyKind legacy = CompanionStorage.detectLegacy(root, legacyDirs, exists);
+        if (legacy != null) {
+            LOGGER.at(Level.SEVERE).log("Tamework found companion data from version %s (%s) on this world and no "
+                    + "store at %s. This version cannot convert it. Stop the server, run Tamework %s once on this "
+                    + "world to convert it, then update to this version again. Companion persistence is disabled "
+                    + "until then and the old files are not changed (spec 12.1).",
+                    legacy.dataVersions(), legacy, root, legacy.converterVersion());
+            return failed(State.MIGRATION_REQUIRED, "migration-required", legacy, clock);
         }
         CompanionStore store = new CompanionStore(root, io, clock);
         CompanionStore.LoadResult result;
@@ -114,7 +121,7 @@ public final class CompanionPersistenceModule {
             // listing, and a missing StorageManager.
             LOGGER.at(Level.SEVERE).withCause(e).log("Companion store at %s could not be read; "
                     + "companion persistence is disabled and nothing will be written", root);
-            return failed(State.FAILED, String.valueOf(e.getMessage()), clock);
+            return failed(State.FAILED, String.valueOf(e.getMessage()), null, clock);
         }
         // meta.json goes first so a failure here leaves no writer thread behind. It marks the
         // store as created; the old-save importer (phase 7) skips worlds that have it.
@@ -126,7 +133,7 @@ public final class CompanionPersistenceModule {
                 Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
                 LOGGER.at(Level.SEVERE).withCause(cause).log("Could not write %s; "
                         + "companion persistence is disabled", meta);
-                return failed(State.FAILED, String.valueOf(cause.getMessage()), clock);
+                return failed(State.FAILED, String.valueOf(cause.getMessage()), null, clock);
             }
         }
         AtomicReference<CompanionWriter> writerRef = new AtomicReference<>();
@@ -153,17 +160,21 @@ public final class CompanionPersistenceModule {
             LOGGER.at(Level.WARNING).log("Companion store loaded with %d quarantined files and %d unreadable records",
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
-        return new CompanionPersistenceModule(State.READY, null, index, writer, store, listeners,
+        return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
                 result.unreadableIds(), clock);
     }
 
-    private static CompanionPersistenceModule failed(State state, String failure, LongSupplier clock) {
-        return new CompanionPersistenceModule(state, failure, null, null, null, List.of(), Set.of(), clock);
+    private static CompanionPersistenceModule failed(State state, String failure,
+                                                     @Nullable CompanionStorage.LegacyKind legacyKind,
+                                                     LongSupplier clock) {
+        return new CompanionPersistenceModule(state, failure, legacyKind, null, null, null, List.of(), Set.of(), clock);
     }
 
     @Nonnull public State state() { return state; }
     /** Why the module is not {@link State#READY}, or {@code null} when it is. */
     @Nullable public String failure() { return failure; }
+    /** The old saves that block this world; non-null exactly when the state is {@link State#MIGRATION_REQUIRED}. */
+    @Nullable public CompanionStorage.LegacyKind legacyKind() { return legacyKind; }
     public boolean ready() { return state == State.READY; }
 
     /** @throws IllegalStateException when the module is not {@link State#READY}. */

@@ -1964,5 +1964,7 @@ items.Tamework_Input_Rune_R.description = Temporary control rune. Your equipped 
 
 tamework.ui.notifications.transformation.unavailable=This animal cannot transform right now.
 
-tamework.companions.persistence.migrationRequired = Tamework found companion saves from an older version on this world. Companion saving is paused until the world is migrated by a Tamework build that includes the importer. Keep a backup of this world.
+tamework.companions.persistence.migrationRequired.title = World needs conversion
+tamework.companions.persistence.migrationRequired.legacy2x = Tamework found companion data from version 2.x on this world. This version cannot convert it. Stop the server, run Tamework {0} once on this world to convert it, then update to this version again. Until then, companion saving, capture, recall and the companion panel are turned off. Your old files are not changed. Keep a backup of this world.
+tamework.companions.persistence.migrationRequired.legacy3x4x = Tamework found companion data from version 3.x or 4.x on this world. This version cannot convert it. Stop the server, run Tamework {0} once on this world to convert it, then update to this version again. Until then, companion saving, capture, recall and the companion panel are turned off. Your old files are not changed. Keep a backup of this world.
 tamework.companions.persistence.failed = Tamework could not read its companion save files. Companion saving is paused to protect them. Check the server log.

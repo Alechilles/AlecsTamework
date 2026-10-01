@@ -38,6 +38,7 @@ public final class TameworkSettingsAnnouncementPage
     private static final String OPT_OUT_KEY = "tamework.ui.settingsAnnouncement.optOut";
     private static final String LATER_BUTTON_KEY = "tamework.ui.settingsAnnouncement.button.later";
     private static final String REVIEW_BUTTON_KEY = "tamework.ui.settingsAnnouncement.button.review";
+    private static final String CLOSE_BUTTON_KEY = "tamework.ui.shared.button.close";
 
     private final String title;
     private final String subtitle;
@@ -45,6 +46,7 @@ public final class TameworkSettingsAnnouncementPage
     private final String optOutLabel;
     private final Consumer<Boolean> reviewCallback;
     private final Consumer<Boolean> dismissCallback;
+    private final boolean noticeOnly;
     private boolean suppressUntilNextAnnouncement;
     private boolean handled;
     private boolean dismissed;
@@ -57,7 +59,30 @@ public final class TameworkSettingsAnnouncementPage
                                             @Nullable String optOutLabel,
                                             @Nullable Consumer<Boolean> reviewCallback,
                                             @Nullable Consumer<Boolean> dismissCallback) {
+        this(playerRef, title, subtitle, bodyText, optOutLabel, reviewCallback, dismissCallback, false);
+    }
+
+    /**
+     * A notice with only a title, a body and a Close button: no subtitle, no opt-out and no
+     * settings shortcut. Closing it stores nothing.
+     */
+    @Nonnull
+    public static TameworkSettingsAnnouncementPage notice(@Nonnull PlayerRef playerRef,
+                                                          @Nonnull String title,
+                                                          @Nonnull String bodyText) {
+        return new TameworkSettingsAnnouncementPage(playerRef, title, null, bodyText, null, null, null, true);
+    }
+
+    private TameworkSettingsAnnouncementPage(@Nonnull PlayerRef playerRef,
+                                             @Nullable String title,
+                                             @Nullable String subtitle,
+                                             @Nullable String bodyText,
+                                             @Nullable String optOutLabel,
+                                             @Nullable Consumer<Boolean> reviewCallback,
+                                             @Nullable Consumer<Boolean> dismissCallback,
+                                             boolean noticeOnly) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
+        this.noticeOnly = noticeOnly;
         this.title = normalize(playerRef, title, TITLE_KEY);
         this.subtitle = normalize(playerRef, subtitle, SUBTITLE_KEY);
         this.bodyText = normalize(playerRef, bodyText, BODY_KEY);
@@ -78,8 +103,20 @@ public final class TameworkSettingsAnnouncementPage
         try {
             commandBuilder.append(UI_PATH);
             commandBuilder.set("#TwSettingsAnnouncementTitle.Text", title);
-            commandBuilder.set("#TwSettingsAnnouncementSubtitle.Text", subtitle);
             commandBuilder.set("#TwSettingsAnnouncementBody.Text", bodyText);
+            if (noticeOnly) {
+                commandBuilder.set("#TwSettingsAnnouncementSubtitle.Visible", false);
+                commandBuilder.set("#TwSettingsAnnouncementOptOutCheck.Visible", false);
+                commandBuilder.set("#TwSettingsAnnouncementOptOutLabel.Visible", false);
+                commandBuilder.set("#TwSettingsAnnouncementReviewButton.Visible", false);
+                commandBuilder.set(
+                        "#TwSettingsAnnouncementLaterButton.Text",
+                        LocalizedText.resolve(playerRef, CLOSE_BUTTON_KEY)
+                );
+                bindEvents(eventBuilder);
+                return;
+            }
+            commandBuilder.set("#TwSettingsAnnouncementSubtitle.Text", subtitle);
             commandBuilder.set("#TwSettingsAnnouncementOptOutLabel.Text", optOutLabel);
             commandBuilder.set("#TwSettingsAnnouncementOptOutCheck.Value", suppressUntilNextAnnouncement);
             commandBuilder.set(

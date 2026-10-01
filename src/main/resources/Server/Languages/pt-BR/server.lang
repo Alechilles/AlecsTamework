@@ -1952,5 +1952,7 @@ items.Tamework_Input_Rune_R.description = Runa de controle temporária. Sua runa
 
 tamework.ui.notifications.transformation.unavailable=Este animal não pode se transformar agora.
 
-tamework.companions.persistence.migrationRequired = O Tamework encontrou salvamentos de companheiros de uma versão anterior neste mundo. O salvamento de companheiros está pausado até que o mundo seja migrado por uma versão do Tamework com o importador. Mantenha um backup deste mundo.
+tamework.companions.persistence.migrationRequired.title = O mundo precisa ser convertido
+tamework.companions.persistence.migrationRequired.legacy2x = O Tamework encontrou dados de companheiros da versão 2.x neste mundo. Esta versão não consegue convertê-los. Pare o servidor, execute o Tamework {0} uma vez neste mundo para convertê-los e depois atualize para esta versão novamente. Até lá, o salvamento, a captura e o chamado de volta de companheiros e o painel de companheiros ficam desativados. Seus arquivos antigos não são alterados. Mantenha um backup deste mundo.
+tamework.companions.persistence.migrationRequired.legacy3x4x = O Tamework encontrou dados de companheiros da versão 3.x ou 4.x neste mundo. Esta versão não consegue convertê-los. Pare o servidor, execute o Tamework {0} uma vez neste mundo para convertê-los e depois atualize para esta versão novamente. Até lá, o salvamento, a captura e o chamado de volta de companheiros e o painel de companheiros ficam desativados. Seus arquivos antigos não são alterados. Mantenha um backup deste mundo.
 tamework.companions.persistence.failed = O Tamework não conseguiu ler seus arquivos de salvamento de companheiros. O salvamento de companheiros está pausado para protegê-los. Verifique o log do servidor.

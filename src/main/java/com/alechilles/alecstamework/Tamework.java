@@ -219,6 +219,8 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import java.util.function.Supplier;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
+import com.hypixel.hytale.server.core.permissions.provider.HytalePermissionsProvider;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -263,8 +265,6 @@ import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.HytaleCompanionFileIo;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.ShutdownEvent;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
-import com.hypixel.hytale.server.core.permissions.provider.HytalePermissionsProvider;
 import java.nio.file.Files;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
@@ -690,8 +690,8 @@ public class Tamework extends JavaPlugin {
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
             registerCompanionPersistenceRuntime(admissionGate, restoreFlow);
             companionRosterSummons = startRosterSummons(companionModule, restoreFlow);
-        } else if (companionModule != null) {
-            registerCompanionPersistenceNotice(companionModule.state());
+        } else if (companionModule != null && companionModule.legacyKind() == null) {
+            registerCompanionPersistenceFailedNotice();
         }
         this.companionReleaseFlow = releaseFlow;
         if (spawnMarkerEntityType != null) {
@@ -887,6 +887,7 @@ public class Tamework extends JavaPlugin {
 
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
+        registerCompanionMigrationPopup(companionModule == null ? null : companionModule.legacyKind());
 
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
@@ -1569,10 +1570,11 @@ public class Tamework extends JavaPlugin {
         });
     }
 
-    /** Tells admins on connect that companion saving is paused. The module logged the cause. */
-    private void registerCompanionPersistenceNotice(@Nonnull CompanionPersistenceModule.State state) {
-        String key = "server.tamework.companions.persistence."
-                + (state == CompanionPersistenceModule.State.MIGRATION_REQUIRED ? "migrationRequired" : "failed");
+    /**
+     * Tells admins on connect that companion saving is paused because the store could not be
+     * read. The module logged the cause.
+     */
+    private void registerCompanionPersistenceFailedNotice() {
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerConnectEvent.class,
@@ -1584,9 +1586,50 @@ public class Tamework extends JavaPlugin {
                             .contains(HytalePermissionsProvider.GROUP_ADMIN)) {
                         return;
                     }
-                    player.sendMessage(Message.translation(key));
+                    player.sendMessage(Message.translation("server.tamework.companions.persistence.failed"));
                 },
                 "companion persistence operator notice"
+        );
+    }
+
+    /**
+     * Tells admins, operators and the local singleplayer owner that the world needs converting,
+     * on every login while old saves block the store: a chat message on connect and a popup when
+     * the player is ready. Registered directly, not through a runtime module, so it does not
+     * depend on which Tamework features are active. The disconnect listener lets the popup
+     * return on the next login.
+     */
+    private void registerCompanionMigrationPopup(@Nullable CompanionStorage.LegacyKind legacyKind) {
+        TameworkSettingsAnnouncementService service = settingsAnnouncementService;
+        if (legacyKind == null || service == null) {
+            return;
+        }
+        service.requireMigrationNotice(legacyKind);
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerConnectEvent.class,
+                event -> {
+                    PlayerRef player = event == null ? null : event.getPlayerRef();
+                    if (service.migrationNoticeFor(player) == null) {
+                        return;
+                    }
+                    player.sendMessage(Message.translation("server."
+                                    + TameworkSettingsAnnouncementService.migrationNoticeKey(legacyKind))
+                            .param("0", legacyKind.converterVersion()));
+                },
+                "companion migration chat notice"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerReadyEvent.class,
+                service::onPlayerReadyMigrationNotice,
+                "companion migration popup"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerDisconnectEvent.class,
+                service::onPlayerDisconnect,
+                "companion migration popup session reset"
         );
     }
 

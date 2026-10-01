@@ -58,6 +58,7 @@ class CompanionPersistenceModuleTest {
                 p -> p.equals(DATA.resolve("tamework-state.sqlite")), io, System::currentTimeMillis, "test");
 
         assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, module.state());
+        assertEquals(CompanionStorage.LegacyKind.LEGACY_3X_4X, module.legacyKind());
         assertTrue(io.writtenPaths().isEmpty(), "nothing may be written, not even meta.json");
         module.shutdown(System.currentTimeMillis() + 1_000L);
     }

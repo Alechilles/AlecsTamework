@@ -1952,5 +1952,7 @@ items.Tamework_Input_Rune_R.description = Vorübergehende Steuerungsrune. Deine 
 
 tamework.ui.notifications.transformation.unavailable=Dieses Tier kann sich gerade nicht verwandeln.
 
-tamework.companions.persistence.migrationRequired = Tamework hat in dieser Welt Begleiter-Speicherdaten einer älteren Version gefunden. Das Speichern von Begleitern ist pausiert, bis die Welt von einer Tamework-Version mit Importfunktion migriert wurde. Bewahre eine Sicherung dieser Welt auf.
+tamework.companions.persistence.migrationRequired.title = Welt muss umgewandelt werden
+tamework.companions.persistence.migrationRequired.legacy2x = Tamework hat in dieser Welt Begleiterdaten aus Version 2.x gefunden. Diese Version kann sie nicht umwandeln. Stoppe den Server, starte Tamework {0} einmal mit dieser Welt, um sie umzuwandeln, und aktualisiere danach wieder auf diese Version. Bis dahin sind das Speichern, Einfangen und Zurückrufen von Begleitern sowie das Begleiter-Menü deaktiviert. Deine alten Dateien werden nicht verändert. Bewahre eine Sicherung dieser Welt auf.
+tamework.companions.persistence.migrationRequired.legacy3x4x = Tamework hat in dieser Welt Begleiterdaten aus Version 3.x oder 4.x gefunden. Diese Version kann sie nicht umwandeln. Stoppe den Server, starte Tamework {0} einmal mit dieser Welt, um sie umzuwandeln, und aktualisiere danach wieder auf diese Version. Bis dahin sind das Speichern, Einfangen und Zurückrufen von Begleitern sowie das Begleiter-Menü deaktiviert. Deine alten Dateien werden nicht verändert. Bewahre eine Sicherung dieser Welt auf.
 tamework.companions.persistence.failed = Tamework konnte seine Begleiter-Speicherdateien nicht lesen. Das Speichern von Begleitern ist pausiert, um sie zu schützen. Prüfe das Serverprotokoll.

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonString;
@@ -21,16 +22,40 @@ public final class CompanionStorage {
 
     public static final int META_FORMAT = 1;
 
-    /** Old persistence files, in any of the old source directories (TameworkDataPathLayout). */
-    public static final List<String> LEGACY_FILES = List.of(
-            "tamework-state.sqlite",
-            "bonded-companions.sqlite",
-            "tamework.sqlite",
-            "CommandLinkedNpcCaptures.dat",
-            "CommandLinkedNpcCoops.dat",
-            "CommandLinkedNpcDeaths.dat",
-            "CommandLinkedNpcLost.dat",
-            "CoopResidentSnapshots.dat");
+    /**
+     * Which old Tamework saves a world holds, and the Tamework release line that converts them.
+     * The old files live in any of the old source directories (TameworkDataPathLayout).
+     */
+    public enum LegacyKind {
+        /** 3.x and 4.x SQLite stores. Checked first (spec 12.1). */
+        LEGACY_3X_4X("3.x or 4.x", "5.0.x", List.of(
+                "tamework-state.sqlite",
+                "bonded-companions.sqlite")),
+        /** 2.x database and data bundles. */
+        LEGACY_2X("2.x", "4.3.x", List.of(
+                "tamework.sqlite",
+                "CommandLinkedNpcCaptures.dat",
+                "CommandLinkedNpcCoops.dat",
+                "CommandLinkedNpcDeaths.dat",
+                "CommandLinkedNpcLost.dat",
+                "CoopResidentSnapshots.dat"));
+
+        private final String dataVersions;
+        private final String converterVersion;
+        private final List<String> files;
+
+        LegacyKind(String dataVersions, String converterVersion, List<String> files) {
+            this.dataVersions = dataVersions;
+            this.converterVersion = converterVersion;
+            this.files = files;
+        }
+
+        /** The Tamework versions that wrote this data, for logs. */
+        @Nonnull public String dataVersions() { return dataVersions; }
+        /** The Tamework release line an operator must run once on the world to convert it. */
+        @Nonnull public String converterVersion() { return converterVersion; }
+        @Nonnull public List<String> files() { return files; }
+    }
 
     private CompanionStorage() {
     }
@@ -47,20 +72,32 @@ public final class CompanionStorage {
 
     @Nonnull
     public static Status detect(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs, @Nonnull Predicate<Path> exists) {
+        return detectLegacy(root, legacyDirs, exists) == null ? Status.READY : Status.MIGRATION_REQUIRED;
+    }
+
+    /**
+     * The old saves that block this world, or {@code null} when the world may use the new store
+     * (it already has one, or holds no old saves). 3.x/4.x data in any directory wins over 2.x.
+     */
+    @Nullable
+    public static LegacyKind detectLegacy(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs,
+                                          @Nonnull Predicate<Path> exists) {
         if (exists.test(metaFile(root))) {
-            return Status.READY;
+            return null;
         }
-        for (Path dir : legacyDirs) {
-            if (dir == null) {
-                continue;
-            }
-            for (String name : LEGACY_FILES) {
-                if (exists.test(dir.resolve(name))) {
-                    return Status.MIGRATION_REQUIRED;
+        for (LegacyKind kind : LegacyKind.values()) {
+            for (Path dir : legacyDirs) {
+                if (dir == null) {
+                    continue;
+                }
+                for (String name : kind.files()) {
+                    if (exists.test(dir.resolve(name))) {
+                        return kind;
+                    }
                 }
             }
         }
-        return Status.READY;
+        return null;
     }
 
     @Nonnull
