@@ -78,6 +78,18 @@ class CommandOwnedActionServiceTest {
         assertFalse(CommandOwnedActionService.allows(owner, (CompanionRecord) null));
     }
 
+    /** A crafted generic-item action must not reach a command-family roster member; bonded records keep their gate. */
+    @Test void indexRosterMembersAreNotActionableFromGenericItems() {
+        UUID owner = UUID.randomUUID();
+        var live = CompanionLocation.live("default", 0, 0, 0);
+        var member = companion(owner, live).toBuilder().rosterId("dragons").build();
+        var bonded = companion(owner, live).toBuilder().rosterId("dragons").bonded(true).build();
+
+        assertFalse(CommandOwnedActionService.allows(owner, member));
+        assertFalse(CommandOwnedActionService.allowsLocate(owner, member));
+        assertTrue(CommandOwnedActionService.allows(owner, bonded));
+    }
+
     private static CompanionRecord companion(UUID owner, CompanionLocation location) {
         return CompanionRecord.builder(UUID.randomUUID(), "Sheep", location).ownerUuid(owner).build();
     }

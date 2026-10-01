@@ -166,8 +166,13 @@ final class CommandOwnedActionService {
         return ownedBy(owner, companion) && stateAllows(state(companion), true);
     }
 
+    /**
+     * The viewer owns the record and a generic item may act on it. A command-family roster member
+     * (a roster id, not bonded) is read-only here: only its family item's panel acts on it.
+     */
     private static boolean ownedBy(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return owner != null && companion != null && owner.equals(companion.ownerUuid());
+        return owner != null && companion != null && owner.equals(companion.ownerUuid())
+                && !(companion.rosterId() != null && !companion.bonded());
     }
 
     private static LifecycleState state(CompanionRecord companion) {

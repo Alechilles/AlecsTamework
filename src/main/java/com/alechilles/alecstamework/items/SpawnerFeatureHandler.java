@@ -433,12 +433,14 @@ public final class SpawnerFeatureHandler {
             refuseMisconfigured(player, source, "tamed-role-missing", mechanics, targetRole);
             return null;
         }
-        String denial = commandAccessDenial(mechanics, targetRole);
+        // One read of the command config: a reload in between must not change what the gates checked.
+        TwCommandItemConfig command = mechanics.requiredCommandConfigId() == null ? null
+                : commandItems.getByConfigId(mechanics.requiredCommandConfigId());
+        String denial = commandAccessDenial(mechanics, command, targetRole);
         if (denial != null) {
             refuseMisconfigured(player, source, denial, mechanics, targetRole);
             return null;
         }
-        TwCommandItemConfig command = commandItems.getByConfigId(mechanics.requiredCommandConfigId());
         if (!holdsCommandItem(player, command, source)) {
             messages.showKey(player, NotificationStyle.Warning, SPAWNER_KEYS + "commandItemRequired",
                     new CommandItemDisplayResolver().resolveItemDisplayName(player, firstItemId(command)));
@@ -461,25 +463,33 @@ public final class SpawnerFeatureHandler {
 
     /**
      * The tame-and-link command gates of the old spawner flow: the item requires a command access
-     * item and names its command config; that config exists, is enabled with linking on, uses the
-     * owner command-family roster, requires an owner, belongs to the item's family and its
-     * {@code AllowedRoles} admit the tamed role. Returns the failed gate, or null.
+     * item and names its command config; that config ({@code command}, read once by the caller)
+     * exists, is enabled with linking on, uses the owner command-family roster, requires an owner,
+     * belongs to the item's family and its {@code AllowedRoles} admit the tamed role. Returns the
+     * failed gate, or null.
      */
     @Nullable
-    private String commandAccessDenial(ItemFeatureConfig.CaptureItemMechanics mechanics, String targetRole) {
+    private static String commandAccessDenial(ItemFeatureConfig.CaptureItemMechanics mechanics,
+                                              @Nullable TwCommandItemConfig command, String targetRole) {
         if (!mechanics.requireCommandAccessItem() || mechanics.requiredCommandConfigId() == null) {
             return "command-access-item-not-required";
         }
-        String denial = commandItems.validateOwnerFamilyAccess(mechanics.commandFamilyId(),
-                mechanics.requiredCommandConfigId(), null, targetRole);
-        if (denial != null) {
-            return denial;
+        if (command == null || !command.isEnabled()) {
+            return "command-config-unavailable";
         }
-        TwCommandItemConfig command = commandItems.getByConfigId(mechanics.requiredCommandConfigId());
+        if (!command.usesOwnerCommandFamilyRoster()) {
+            return "command-config-not-owner-family";
+        }
+        if (!Objects.equals(command.getCommandFamilyId(), mechanics.commandFamilyId())) {
+            return "command-family-mismatch";
+        }
         if (!command.isLinkEnabled()) {
             return "command-config-link-disabled";
         }
-        return command.isRequireOwner() ? null : "command-config-owner-not-required";
+        if (!command.isRequireOwner()) {
+            return "command-config-owner-not-required";
+        }
+        return new CommandLinkPolicyService().isRoleAllowed(targetRole, command) ? null : "tamed-role-not-allowed";
     }
 
     /**

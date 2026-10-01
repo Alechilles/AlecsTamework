@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent;
@@ -41,6 +42,26 @@ class DirectLiveCoopProduceServiceTest {
         assertEquals(0L, DirectLiveCoopProduceService.startingWatermark(
                 TameworkCoopSlotsComponent.Slot.companion(
                         0, UUID.randomUUID(), 1L), now, INTERVAL));
+    }
+
+    @Test
+    void unownedResidentWithoutLifeStageProducesOnWorldGameTime() {
+        var wild = new DirectLiveCoopProduceService.Resident(
+                TameworkCoopSlotsComponent.Slot.unowned(0, new BsonDocument()), "Chicken", null);
+        long gameInterval = 24L * 3_600_000L;
+        // World game time can be negative.
+        long worldNow = -3L * gameInterval;
+
+        DirectLiveCoopProduceService.Clock clock = DirectLiveCoopProduceService.clock(wild, 1_000L, worldNow,
+                gameInterval);
+        long start = DirectLiveCoopProduceService.startingWatermark(wild.entry(), clock.nowMs(), clock.intervalMs());
+
+        assertEquals(new DirectLiveCoopProduceService.Clock(worldNow, gameInterval), clock);
+        assertEquals(1, DirectLiveCoopProduceService.cyclesDue(clock.nowMs(), start, clock.intervalMs()));
+        // A companion without a life stage has no known clock and produces nothing.
+        assertNull(DirectLiveCoopProduceService.clock(new DirectLiveCoopProduceService.Resident(
+                TameworkCoopSlotsComponent.Slot.companion(0, UUID.randomUUID(), 1L), "Chicken", null),
+                1_000L, worldNow, gameInterval));
     }
 
     @Test
