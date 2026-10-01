@@ -751,12 +751,7 @@ public final class SpawnerFeatureHandler {
         if (source == null || source.getItemId() == null) {
             return null;
         }
-        ItemFeatureConfig direct = registry.get(source.getItemId());
-        if (direct != null) {
-            return direct;
-        }
-        String emptyItemId = itemMetadata.resolveEmptyItemId(source.getItemId());
-        return emptyItemId == null ? null : registry.get(emptyItemId);
+        return registry.getForFilledOrEmpty(source.getItemId());
     }
 
     @Nullable

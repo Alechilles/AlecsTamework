@@ -22,6 +22,8 @@ final class SpawnerInteractionConfigResolver {
         return ItemFeatureConfig.builder()
                 .spawnerEnabled(baseConfig.isSpawnerEnabled())
                 .captureClearsOwner(settings.captureClearsOwner())
+                .captureOwnershipFollowsHolder(baseConfig.isCaptureOwnershipFollowsHolder())
+                .captureBlockIneligibleHolders(baseConfig.isCaptureBlockIneligibleHolders())
                 .captureRequireTamed(baseConfig.isCaptureRequireTamed())
                 .captureTamesTarget(baseConfig.isCaptureTamesTarget())
                 .captureOwnerRestricted(baseConfig.isCaptureOwnerRestricted())

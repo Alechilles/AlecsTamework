@@ -229,7 +229,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
-import com.alechilles.alecstamework.companion.item.CaptureItemHolderSystems;
+import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;

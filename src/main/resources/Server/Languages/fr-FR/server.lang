@@ -1211,6 +1211,7 @@ tamework.ui.population.deployedLimit=Votre limite de compagnons déployés est a
 tamework.ui.population.ownedLimit=Votre limite de compagnons possédés est atteinte.
 tamework.ui.notifications.captureItem.transferRefused=Vous ne pouvez pas posséder plus de compagnons ; celui-ci appartient toujours à {0}.
 tamework.ui.notifications.captureItem.pickupBlocked=Vous ne pouvez pas posséder plus de compagnons, vous ne pouvez donc pas ramasser ceci.
+tamework.ui.notifications.captureItem.anotherPlayer=un autre joueur
 tamework.ui.population.groupLimit=Vous avez atteint votre limite pour ce type de compagnon.
 tamework.ui.population.claimLimit=Vous ne pouvez pas apprivoiser plus de compagnons dans cette zone revendiquée pour le moment ({0}/{1} possédés dans cette zone).
 tamework.ui.population.unavailable=Les limites de compagnons ne peuvent pas être vérifiées pour le moment. Réessayez dans un instant.

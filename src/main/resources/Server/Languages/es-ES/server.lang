@@ -1105,6 +1105,7 @@ tamework.ui.population.familyUnknown=La familia de este compañero no está conf
 tamework.ui.population.ownedLimit=Has alcanzado el límite de compañeros propios.
 tamework.ui.notifications.captureItem.transferRefused=No puedes tener más compañeros; este sigue perteneciendo a {0}.
 tamework.ui.notifications.captureItem.pickupBlocked=No puedes tener más compañeros, así que no puedes recoger esto.
+tamework.ui.notifications.captureItem.anotherPlayer=otro jugador
 tamework.ui.population.groupLimit=Has alcanzado tu límite para este tipo de compañero.
 tamework.ui.population.claimLimit=No puedes domar más compañeros en este reclamo ahora mismo ({0}/{1} propios en este reclamo).
 tamework.ui.population.unavailable=No se pueden comprobar los límites de compañeros en este momento. Inténtalo de nuevo en breve.

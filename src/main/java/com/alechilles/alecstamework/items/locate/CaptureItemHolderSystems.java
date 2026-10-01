@@ -1,18 +1,19 @@
-package com.alechilles.alecstamework.companion.item;
+package com.alechilles.alecstamework.items.locate;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Decision;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Kind;
-import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
-import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -39,7 +40,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -120,18 +120,22 @@ public final class CaptureItemHolderSystems {
         @Override
         public void handle(int index, @Nonnull ArchetypeChunk<EntityStore> chunk, @Nonnull Store<EntityStore> store,
                            @Nonnull CommandBuffer<EntityStore> buffer, @Nonnull InventoryChangeEvent event) {
-            if (!CapturedItemMetadata.affectsCapture(event.getTransaction())) {
-                return;
-            }
             Player player = chunk.getComponent(index, Player.getComponentType());
             if (player == null || player.getUuid() == null) {
                 return;
             }
             if (transfers != null) {
-                transfers.changed(chunk.getReferenceTo(index), player, event);
+                // Every change, so a resized or replaced container is noticed without a capture item.
+                transfers.containerSeen(chunk.getReferenceTo(index), player.getUuid(), event);
+            }
+            if (!CapturedItemMetadata.affectsCapture(event.getTransaction())) {
+                return;
             }
             tracker.queue(CapturedItemTracker.entityHolder(
                     Kind.PLAYER, store.getExternalData().getWorld().getName(), player.getUuid()));
+            if (transfers != null) {
+                transfers.changed(player, event);
+            }
         }
     }
 
@@ -143,7 +147,9 @@ public final class CaptureItemHolderSystems {
      */
     public static final class Transfers {
         static final String TRANSFER_REFUSED_KEY = "tamework.ui.notifications.captureItem.transferRefused";
+        static final String ANOTHER_PLAYER_KEY = "tamework.ui.notifications.captureItem.anotherPlayer";
         private static final long REFUSAL_NOTICE_INTERVAL_MS = 10_000L;
+        private static volatile ComponentType<EntityStore, ? extends InventoryComponent>[] holderTypes;
 
         private record NoticeKey(@Nonnull UUID player, @Nonnull UUID profileId) {
         }
@@ -167,7 +173,6 @@ public final class CaptureItemHolderSystems {
         private final CompanionWriter writer;
         private final CompanionAdmissionGate gate;
         private final ItemFeatureRegistry configs;
-        private final LongSupplier clock;
         private final TameworkUiMessageService messages = new TameworkUiMessageService();
         private final Map<UUID, Held> held = new ConcurrentHashMap<>();
         private final Map<NoticeKey, Long> refusalNotices = new ConcurrentHashMap<>();
@@ -178,7 +183,6 @@ public final class CaptureItemHolderSystems {
             this.writer = Objects.requireNonNull(writer, "writer");
             this.gate = Objects.requireNonNull(gate, "gate");
             this.configs = Objects.requireNonNull(configs, "configs");
-            this.clock = System::currentTimeMillis;
         }
 
         /** Join check: items that arrived while the player was away (spec 8.14). */
@@ -199,22 +203,31 @@ public final class CaptureItemHolderSystems {
             refusalNotices.keySet().removeIf(key -> key.player().equals(player));
         }
 
-        void changed(@Nonnull Ref<EntityStore> ref, @Nonnull Player player, @Nonnull InventoryChangeEvent event) {
+        /**
+         * Any change to one of the player's inventories: records, by identity, the container it
+         * uses now. The component's current container is used, since a resize replaces it and
+         * leaves the event's one detached.
+         *
+         * @return true when a filtered inventory's container is new for this player (first seen,
+         *         or it replaced the recorded one), so its slot filters must be installed on it
+         */
+        boolean containerSeen(@Nonnull Ref<EntityStore> ref, @Nonnull UUID player, @Nonnull InventoryChangeEvent event) {
             ComponentType<EntityStore, ? extends InventoryComponent> type = event.getComponentType();
-            if (!isHolderInventory(type)) {
-                return;
+            return isHolderInventory(type) && noteContainer(player, ref, type, event.getInventory().getInventory());
+        }
+
+        /** A capture-related change: checks the changed inventory's capture items. */
+        void changed(@Nonnull Player player, @Nonnull InventoryChangeEvent event) {
+            if (isHolderInventory(event.getComponentType())) {
+                // The whole container rather than the transaction's slots: a move's transaction also
+                // names the other container's slots, and the queued event can be older than the slots.
+                checkContainer(player, event.getInventory().getInventory());
             }
-            // The component's current container: a resize replaces it, leaving the event's one detached.
-            ItemContainer container = event.getInventory().getInventory();
-            noteContainer(player.getUuid(), ref, type, container);
-            // The whole container rather than the transaction's slots: a move's transaction also
-            // names the other container's slots, and the queued event can be older than the slots.
-            checkContainer(player, container);
         }
 
         /**
-         * Records the container a filtered inventory uses now. Returns true when it replaced a
-         * different one, which drops any slot filters set on the old container.
+         * Records the container a filtered inventory (Hotbar, Storage, Backpack) uses now. Returns
+         * true when it differs from the recorded one, including the first time it is seen.
          */
         private boolean noteContainer(UUID player, Ref<EntityStore> ref,
                                       ComponentType<EntityStore, ? extends InventoryComponent> type,
@@ -222,10 +235,12 @@ public final class CaptureItemHolderSystems {
             if (type == InventoryComponent.Tool.getComponentType()) {
                 return false;
             }
-            Held entry = held.compute(player, (id, current) -> current == null || !current.ref.equals(ref)
-                    ? new Held(ref) : current);
-            ItemContainer previous = entry.containers.put(type, container);
-            return previous != null && previous != container;
+            Held entry = held.get(player);
+            if (entry == null || !entry.ref.equals(ref)) {
+                entry = new Held(ref);
+                held.put(player, entry);
+            }
+            return entry.containers.put(type, container) != container;
         }
 
         private void checkContainer(Player player, @Nullable ItemContainer container) {
@@ -246,7 +261,7 @@ public final class CaptureItemHolderSystems {
                           ItemStack stack, CaptureItemKeys.Ref item) {
             UUID holder = player.getUuid();
             // Lock-free pre-check: only a current item owned by someone else can move or be refused.
-            if (CaptureItemOwnership.decide(index.get(item.profileId()), item.generation(), holder, true, null)
+            if (CaptureItemOwnership.decide(index.get(item.profileId()), item.generation(), holder, null)
                     != Decision.TRANSFER || !follows(stack.getItemId())) {
                 return;
             }
@@ -254,7 +269,7 @@ public final class CaptureItemHolderSystems {
                 CompanionRecord record = index.get(item.profileId());
                 CompanionAdmission.Refusal refusal = record == null
                         ? null : gate.refuse(record, CaptureItemOwnership.asOwnedBy(record, holder, name));
-                Decision decided = CaptureItemOwnership.decide(record, item.generation(), holder, true, refusal);
+                Decision decided = CaptureItemOwnership.decide(record, item.generation(), holder, refusal);
                 if (decided == Decision.TRANSFER && !index.update(item.profileId(), record.revision(),
                         CompanionTransitions.ownerChanged(holder, name)).applied()) {
                     return new Attempt(Decision.IGNORE, record);
@@ -274,59 +289,49 @@ public final class CaptureItemHolderSystems {
         }
 
         private void noticeRefused(Player player, UUID profileId, CompanionRecord record) {
-            long now = clock.getAsLong();
+            long now = System.currentTimeMillis();
             NoticeKey key = new NoticeKey(player.getUuid(), profileId);
             Long last = refusalNotices.get(key);
             if (last != null && now - last < REFUSAL_NOTICE_INTERVAL_MS) {
                 return;
             }
-            refusalNotices.put(key, now);
             String owner = record.ownerName() != null && !record.ownerName().isBlank()
-                    ? record.ownerName() : String.valueOf(record.ownerUuid());
-            messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, owner);
+                    ? record.ownerName() : LocalizedText.resolve(player, ANOTHER_PLAYER_KEY);
+            if (messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, owner)) {
+                refusalNotices.put(key, now);
+            }
         }
 
         /** {@code OwnershipFollowsHolder}, which applies only while capture keeps the owner. */
         private boolean follows(@Nullable String itemId) {
-            ItemFeatureConfig config = configFor(itemId);
+            ItemFeatureConfig config = configs.getForFilledOrEmpty(itemId);
             return config != null && config.isCaptureOwnershipFollowsHolder()
                     && !TameworkRuntimeSettings.current().captureClearsOwner();
         }
 
-        /** The spawner config of a filled or empty item id, found as the spawner handler finds it. */
-        @Nullable
-        private ItemFeatureConfig configFor(@Nullable String itemId) {
-            if (itemId == null) {
-                return null;
-            }
-            ItemFeatureConfig direct = configs.get(itemId);
-            if (direct != null) {
-                return direct;
-            }
-            String normalized = ItemFeatureRegistry.normalizeStateItemId(itemId);
-            for (ItemFeatureConfig config : configs.snapshot().values()) {
-                String filled = config == null ? null : config.getSpawnerFilledItemId();
-                if (filled != null && !filled.isBlank()
-                        && normalized.equals(ItemFeatureRegistry.normalizeStateItemId(filled))) {
-                    return config;
-                }
-            }
-            return null;
-        }
-
-        /** Hotbar, Storage, Backpack and Tool: where a player can hold a capture item. */
+        /**
+         * Hotbar, Storage, Backpack and Tool: where a player can hold a capture item. Built on first
+         * use, after the entity module registered the types; a racing first use builds equal arrays.
+         */
         @SuppressWarnings("unchecked")
         private static ComponentType<EntityStore, ? extends InventoryComponent>[] holderInventories() {
-            return new ComponentType[]{InventoryComponent.Hotbar.getComponentType(),
-                    InventoryComponent.Storage.getComponentType(), InventoryComponent.Backpack.getComponentType(),
-                    InventoryComponent.Tool.getComponentType()};
+            ComponentType<EntityStore, ? extends InventoryComponent>[] types = holderTypes;
+            if (types == null) {
+                types = new ComponentType[]{InventoryComponent.Hotbar.getComponentType(),
+                        InventoryComponent.Storage.getComponentType(), InventoryComponent.Backpack.getComponentType(),
+                        InventoryComponent.Tool.getComponentType()};
+                holderTypes = types;
+            }
+            return types;
         }
 
         private static boolean isHolderInventory(ComponentType<EntityStore, ? extends InventoryComponent> type) {
-            return type == InventoryComponent.Hotbar.getComponentType()
-                    || type == InventoryComponent.Storage.getComponentType()
-                    || type == InventoryComponent.Backpack.getComponentType()
-                    || type == InventoryComponent.Tool.getComponentType();
+            for (ComponentType<EntityStore, ? extends InventoryComponent> holder : holderInventories()) {
+                if (holder == type) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

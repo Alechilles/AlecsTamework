@@ -1218,6 +1218,7 @@ tamework.ui.population.deployedLimit=Seu limite de companheiros ativos foi alcan
 tamework.ui.population.ownedLimit=Seu limite de companheiros possuídos foi alcançado.
 tamework.ui.notifications.captureItem.transferRefused=Você não pode ter mais companheiros; este ainda pertence a {0}.
 tamework.ui.notifications.captureItem.pickupBlocked=Você não pode ter mais companheiros, então não pode pegar isto.
+tamework.ui.notifications.captureItem.anotherPlayer=outro jogador
 tamework.ui.population.groupLimit=Você atingiu seu limite para este tipo de companheiro.
 tamework.ui.population.claimLimit=Você não pode domar mais companheiros nesta área reivindicada agora ({0}/{1} possuídos nesta área).
 tamework.ui.population.unavailable=Não é possível verificar os limites de companheiros agora. Tente novamente em instantes.

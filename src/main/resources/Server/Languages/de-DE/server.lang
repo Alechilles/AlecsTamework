@@ -1218,6 +1218,7 @@ tamework.ui.population.deployedLimit=Dein Limit für eingesetzte Begleiter wurde
 tamework.ui.population.ownedLimit=Dein Limit für eigene Begleiter wurde erreicht.
 tamework.ui.notifications.captureItem.transferRefused=Du kannst keine weiteren Begleiter besitzen; dieser gehört weiterhin {0}.
 tamework.ui.notifications.captureItem.pickupBlocked=Du kannst keine weiteren Begleiter besitzen und das hier daher nicht aufheben.
+tamework.ui.notifications.captureItem.anotherPlayer=einem anderen Spieler
 tamework.ui.population.groupLimit=Du hast dein Limit für diese Art von Begleiter erreicht.
 tamework.ui.population.claimLimit=Du kannst in diesem Gebiet gerade keine weiteren Begleiter zähmen ({0}/{1} eigene in diesem Gebiet).
 tamework.ui.population.unavailable=Begleiterlimits können gerade nicht geprüft werden. Versuche es gleich noch einmal.

@@ -7,7 +7,10 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Spec 8.14: whether a capture item entering a player's inventory moves its companion's owner. */
+/**
+ * Spec 8.14: whether a capture item entering a player's inventory moves its companion's owner.
+ * Callers check the item config's {@code OwnershipFollowsHolder} (false while ClearsOwner) first.
+ */
 public final class CaptureItemOwnership {
     public enum Decision { IGNORE, STALE, ALREADY_OWNED, TRANSFER, REFUSE }
 
@@ -18,13 +21,12 @@ public final class CaptureItemOwnership {
      * @param record  the profile's record, or null
      * @param itemGen the generation on the item
      * @param holder  the player now holding the item
-     * @param follows the item config's OwnershipFollowsHolder, false when ClearsOwner
      * @param refusal the admission result for {@code holder} taking the record, or null when allowed
      */
     @Nonnull
-    public static Decision decide(@Nullable CompanionRecord record, long itemGen, @Nonnull UUID holder, boolean follows,
+    public static Decision decide(@Nullable CompanionRecord record, long itemGen, @Nonnull UUID holder,
                                   @Nullable CompanionAdmission.Refusal refusal) {
-        if (!follows || record == null) {
+        if (record == null) {
             return Decision.IGNORE;
         }
         if (record.location().kind() != LocationKind.ITEM || record.generation() != itemGen) {
