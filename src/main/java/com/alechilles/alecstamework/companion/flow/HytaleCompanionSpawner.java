@@ -2,12 +2,16 @@ package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionRespawn;
 import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentType;
@@ -54,19 +58,26 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     private final Function<UUID, CompanionRecord> currentRecord;
     private final CompanionSnapshots snapshots = CompanionSnapshots.production();
     private final Consumer<SnapshotEnvelope> queueSnapshot;
+    private final Consumer<UUID> deleteSnapshot;
+    private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
 
     /**
      * @param stampType     the registered companion stamp type
      * @param currentRecord reads the index's current record for a profile id (null when absent);
      *                      the world task re-checks the committed revision with it
      * @param queueSnapshot queues the snapshot taken of each restored body to the writer
+     * @param deleteSnapshot queues the deletion of a profile's snapshot; used after an unowned spawn,
+     *                      whose body is untracked and has no snapshot to keep
      */
     public HytaleCompanionSpawner(@Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                   @Nonnull Function<UUID, CompanionRecord> currentRecord,
-                                  @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
-        this.respawn = new CompanionRespawn(CompanionRespawn.Types.production(Objects.requireNonNull(stampType, "stampType")));
+                                  @Nonnull Consumer<SnapshotEnvelope> queueSnapshot,
+                                  @Nonnull Consumer<UUID> deleteSnapshot) {
+        this.stampType = Objects.requireNonNull(stampType, "stampType");
+        this.respawn = new CompanionRespawn(CompanionRespawn.Types.production(stampType));
         this.currentRecord = Objects.requireNonNull(currentRecord, "currentRecord");
         this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
+        this.deleteSnapshot = Objects.requireNonNull(deleteSnapshot, "deleteSnapshot");
     }
 
     @Nonnull
@@ -99,6 +110,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     private boolean spawnOnWorldThread(World world, CompanionRecord committed, SnapshotEnvelope snapshot,
                                        RestoreFlow.Destination destination, RestoreRules.Reason reason) {
         UUID profileId = committed.profileId();
+        boolean unowned = committed.location().kind() == LocationKind.RELEASED;
         Ref<EntityStore> ref = null;
         long worldGameTimeMs = 0L;
         try {
@@ -128,6 +140,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             respawn.prepare(holder, position, new Rotation3f(destination.pitch(), destination.yaw(), 0.0f),
                     npcUuid, profileId, committed.generation());
             repointAvatarFlightOrigin(holder, destination);
+            applyOwnership(holder, committed, unowned, stampType);
             ref = new Ref<>(store);
             if (store.addEntity(holder, ref, AddReason.LOAD) == null) {
                 warn(profileId, "the world rejected the respawned body", null);
@@ -141,8 +154,57 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
         }
         finishAddedBody(ref, ref.getStore(), committed, world.getName(), worldGameTimeMs, reason, snapshots,
-                queueSnapshot);
+                queueSnapshot, !unowned);
+        if (unowned) {
+            // The body is untracked: no later recall or Recover may restore this profile from a snapshot.
+            try {
+                deleteSnapshot.accept(profileId);
+            } catch (RuntimeException failure) {
+                warn(profileId, "the snapshot of an unowned spawn could not be queued for deletion", failure);
+            }
+        }
         return true;
+    }
+
+    /**
+     * Makes the decoded body match the committed record before it is added. An owned record
+     * writes its owner, tamed and command-link owner into the body, which is a no-op for recall
+     * and revive where they already match. An unowned release spawns without the owner component
+     * and stamp and with no command-link owner or tools; clearing the owner does not untame, so the
+     * snapshot's tamed flag is kept.
+     */
+    private static void applyOwnership(Holder<EntityStore> holder, CompanionRecord committed, boolean unowned,
+                                       ComponentType<EntityStore, TameworkCompanionComponent> stampType) {
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType == null ? null : holder.getComponent(linksType);
+        UUID owner = committed.ownerUuid();
+        if (unowned) {
+            if (ownerType != null) {
+                holder.tryRemoveComponent(ownerType);
+            }
+            holder.tryRemoveComponent(stampType);
+            if (links != null) {
+                holder.putComponent(linksType, new TameworkCommandLinksComponent(null, new String[0],
+                        links.getHomePosition()));
+            }
+            return;
+        }
+        if (owner == null) {
+            return;
+        }
+        if (ownerType != null) {
+            holder.putComponent(ownerType, new TameworkOwnerComponent(owner, committed.ownerName()));
+        }
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            holder.putComponent(tamedType, new TameworkTamedComponent(true));
+        }
+        if (links != null) {
+            holder.putComponent(linksType, new TameworkCommandLinksComponent(owner, links.getToolIds(),
+                    links.getHomePosition()));
+        }
     }
 
     /**
@@ -153,6 +215,14 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                                 @Nonnull CompanionRecord committed, @Nonnull String worldName,
                                 long worldGameTimeMs, @Nonnull RestoreRules.Reason reason, @Nonnull CompanionSnapshots snapshots,
                                 @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
+        finishAddedBody(ref, store, committed, worldName, worldGameTimeMs, reason, snapshots, queueSnapshot, true);
+    }
+
+    /** As above; {@code snapshotBody} is false for an unowned spawn, whose body is not tracked. */
+    static void finishAddedBody(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                @Nonnull CompanionRecord committed, @Nonnull String worldName,
+                                long worldGameTimeMs, @Nonnull RestoreRules.Reason reason, @Nonnull CompanionSnapshots snapshots,
+                                @Nonnull Consumer<SnapshotEnvelope> queueSnapshot, boolean snapshotBody) {
         UUID profileId = committed.profileId();
         try {
             CompanionSaves.markChanged(store, ref);
@@ -163,6 +233,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
         } catch (RuntimeException | LinkageError failure) {
             warn(profileId, "a step after the body was added failed", failure);
+        }
+        if (!snapshotBody) {
+            return;
         }
         // Snapshot the new body at once: after a revive the stored snapshot is the death one,
         // which no later recall or Recover may use. Runs after the revive reset so it is captured.

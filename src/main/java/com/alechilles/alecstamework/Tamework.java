@@ -1370,7 +1370,7 @@ public class Tamework extends JavaPlugin {
                 module::readSnapshot, CompanionSnapshots.production());
         HytaleCompanionSpawner spawner =
                 new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
-                        module.writer()::queueSnapshot);
+                        module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete);
         // The flow unregistered the old body at commit, so its removal raises no LOST transition.
         // A ref no longer valid means the body left its store; if its chunk loads it again, the
         // generation fence removes it.
