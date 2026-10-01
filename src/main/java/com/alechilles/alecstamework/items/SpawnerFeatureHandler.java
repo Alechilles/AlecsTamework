@@ -407,7 +407,8 @@ public final class SpawnerFeatureHandler {
             }
         }
         UUID busyKey = stampedId != null ? stampedId : facts.npcUuid();
-        if (!capturing.add(busyKey)) {
+        // This runs on the body's world thread, so only a capture still committing can overlap.
+        if (capturing.contains(busyKey)) {
             logCaptureChannelDiagnostic("terminal-denied reason=capture-in-flight");
             return false;
         }
@@ -415,7 +416,6 @@ public final class SpawnerFeatureHandler {
         SnapshotEnvelope snapshot = snapshots.capture(targetRef, store, busyKey, stampedGeneration,
                 world.getName(), CompanionWorldTime.gameTimeMs(store));
         if (snapshot == null) {
-            capturing.remove(busyKey);
             warn(player, "captureEvidenceFailed");
             return false;
         }
@@ -436,6 +436,10 @@ public final class SpawnerFeatureHandler {
                 facts.x(), facts.y(), facts.z(), particles, resolved.getCaptureSoundEvent());
         UUID playerUuid = player.getUuid();
         int slot = attempt.hotbarSlot();
+        if (!capturing.add(busyKey)) {
+            logCaptureChannelDiagnostic("terminal-denied reason=capture-in-flight");
+            return false;
+        }
         try {
             captureFlow.capture(new CaptureFlow.Capture<>(stampedId, stampedGeneration, targetRef, facts, owner,
                             ownerName, snapshotData))
