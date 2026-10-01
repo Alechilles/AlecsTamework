@@ -46,11 +46,14 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     (current.recallLostRemainingMs() + 999L) / 1_000L
             ));
         }
-        String reviveCaption = previous.deadRespawnRemainingMs() == current.deadRespawnRemainingMs()
-                ? null : LinkedNpcPanelStatusTextService.resolveReviveCaption(
-                        current, current.deadRespawnRemainingMs(), language);
-        if (reviveCaption != null) {
-            commands.set(selector + " #ReviveCountdown.Text", reviveCaption);
+        if (previous.deadRespawnRemainingMs() != current.deadRespawnRemainingMs()) {
+            String countdown = LinkedNpcPanelStatusTextService.resolveReviveCountdown(
+                    current, current.deadRespawnRemainingMs(), language);
+            if (countdown == null) {
+                commands.set(selector + " #ReviveCountdown.Visible", false);
+            } else {
+                commands.set(selector + " #ReviveCountdown #Value.Text", countdown);
+            }
         }
         refreshProgression(commands, selector, previous, current);
         if (previous.flightToggleAirborne() != current.flightToggleAirborne()) {

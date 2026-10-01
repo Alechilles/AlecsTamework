@@ -370,11 +370,12 @@ final class LinkedNpcPanelCardBinder {
         }
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
         commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
-        // Roster and bonded rows already report revival in #RosterTimer.
-        String reviveCaption = emblem == null || showInlineLocation || rosterLayout ? null
-                : LinkedNpcPanelStatusTextService.resolveReviveCaption(
+        // Roster and bonded rows already report revival in #RosterTimer; the removal menu
+        // places its buttons where the countdown would sit.
+        String reviveCountdown = emblem == null || showInlineLocation || rosterLayout || pendingUnlink
+                ? null : LinkedNpcPanelStatusTextService.resolveReviveCountdown(
                         entry, entry.deadRespawnRemainingMs(), language);
-        commandBuilder.set(entrySelector + " #ReviveCountdown.Visible", reviveCaption != null);
+        commandBuilder.set(entrySelector + " #ReviveCountdown.Visible", reviveCountdown != null);
         if (emblem != null && !showInlineLocation) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
@@ -391,10 +392,13 @@ final class LinkedNpcPanelCardBinder {
                     fixedAnchor(labelTop, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(lost ? labelTop + 18 : 98, statusLeft, statusWidth, 12));
-            if (reviveCaption != null) {
-                commandBuilder.set(entrySelector + " #ReviveCountdown.Text", reviveCaption);
+            if (reviveCountdown != null) {
+                // Right-aligned block 10 px left of the emblem, centered on it. Its left edge
+                // (>= 497) stays clear of the first action slot and caption (432..490).
+                int emblemLeft = statusLeft + (statusWidth - emblemSize) / 2;
+                commandBuilder.set(entrySelector + " #ReviveCountdown #Value.Text", reviveCountdown);
                 commandBuilder.setObject(entrySelector + " #ReviveCountdown.Anchor",
-                        fixedAnchor(labelTop + 16, statusLeft, statusWidth, 12));
+                        fixedAnchor(emblemTop + emblemSize / 2 - 18, emblemLeft - 120, 110, 36));
             }
         }
         commandBuilder.set(inlineLocationSelector + ".Visible", showInlineLocation);

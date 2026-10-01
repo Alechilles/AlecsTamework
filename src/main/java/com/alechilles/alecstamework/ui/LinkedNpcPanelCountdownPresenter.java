@@ -92,10 +92,15 @@ final class LinkedNpcPanelCountdownPresenter {
             commands.set(selector + " #HealthTooltip.TooltipText",
                     deadHealthTooltip(entry,
                             projected.deadRespawnRemainingMs(), language));
-            // Text only: the full render owns the caption's visibility and placement.
-            commands.set(selector + " #ReviveCountdown.Text",
-                    LinkedNpcPanelStatusTextService.resolveReviveCaption(entry,
-                            projected.deadRespawnRemainingMs(), language));
+            // The full render owns visibility and placement; at zero the countdown hides
+            // until the expiration refresh shows the Revive button.
+            String countdown = LinkedNpcPanelStatusTextService.resolveReviveCountdown(entry,
+                    projected.deadRespawnRemainingMs(), language);
+            if (countdown == null) {
+                commands.set(selector + " #ReviveCountdown.Visible", false);
+            } else {
+                commands.set(selector + " #ReviveCountdown #Value.Text", countdown);
+            }
         }
         if (entry.breedingCooldownKnown() || entry.harvestCooldownKnown()) {
             LinkedNpcPanelVitalsBinder.bindCooldowns(commands, selector, projected,

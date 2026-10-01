@@ -170,31 +170,47 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(readOnly, card + " #ActiveToggleInactiveButton.Visible", false);
     }
 
-    // Catches a dead card without its revive time, a countdown that stops at the first
-    // render, or a stale caption left on a reused live row.
+    // Catches a dead card without its revive time, a countdown that overlaps the emblem or the
+    // first action slot, one that stops at the first render or lingers beside the Revive
+    // button once ready, or a stale countdown left on a reused live row.
     @Test
-    void deadCardShowsALiveReviveCountdownAndLiveCardsHideIt() {
+    void deadCardShowsALiveReviveCountdownBesideItsEmblemAndLiveCardsHideIt() {
         UUID id = UUID.randomUUID();
         LinkedNpcEntry dead = new LinkedNpcEntry(id, "Duck", 0, 25,
                 0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
                 false, 125_000L, LinkedNpcTraitIndicator.EMPTY);
-        String caption = "#TameworkLinkedPanelList[0] #ReviveCountdown";
+        String card = "#TameworkLinkedPanelList[0]";
+        String countdown = card + " #ReviveCountdown";
         UICommandBuilder full = new UICommandBuilder();
         LinkedNpcPanelCardBinder.bind(full, new UIEventBuilder(), 0, dead, false, false,
                 LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
-        assertVisible(full, caption + ".Visible", true);
-        assertText(full, caption + ".Text", "Revive in "
-                + LinkedNpcPanelStatusTextService.formatRemainingTime(125_000L, "en-US"));
+        assertVisible(full, countdown + ".Visible", true);
+        assertText(full, countdown + " #Value.Text",
+                LinkedNpcPanelStatusTextService.formatRemainingTime(125_000L, "en-US"));
+        var block = anchor(full, countdown + ".Anchor");
+        var emblem = anchor(full, card + " #StatusEmblem.Anchor");
+        int blockLeft = block.getNumber("Left").intValue();
+        int blockTop = block.getNumber("Top").intValue();
+        org.junit.jupiter.api.Assertions.assertTrue(blockLeft > 490);
+        org.junit.jupiter.api.Assertions.assertTrue(blockLeft + block.getNumber("Width").intValue()
+                < emblem.getNumber("Left").intValue());
+        assertEquals(blockTop * 2 + block.getNumber("Height").intValue(),
+                emblem.getNumber("Top").intValue() * 2 + emblem.getNumber("Height").intValue());
 
         UICommandBuilder tick = new UICommandBuilder();
         LinkedNpcPanelCountdownPresenter.refresh(tick, new UIEventBuilder(),
+                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 65_000L, "en-US");
+        assertText(tick, countdown + " #Value.Text",
+                LinkedNpcPanelStatusTextService.formatRemainingTime(60_000L, "en-US"));
+        UICommandBuilder ready = new UICommandBuilder();
+        LinkedNpcPanelCountdownPresenter.refresh(ready, new UIEventBuilder(),
                 new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 125_000L, "en-US");
-        assertText(tick, caption + ".Text", "Ready to revive");
+        assertVisible(ready, countdown + ".Visible", false);
 
         UICommandBuilder live = new UICommandBuilder();
         LinkedNpcPanelCardBinder.bind(live, new UIEventBuilder(), 0, entryForIdentity(id), false, false,
                 LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
-        assertVisible(live, caption + ".Visible", false);
+        assertVisible(live, countdown + ".Visible", false);
     }
 
     private static void assertText(UICommandBuilder commands, String selector, String text) {
