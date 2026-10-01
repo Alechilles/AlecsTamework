@@ -4,14 +4,17 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.StoredReason;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SummonExpirySchedulerTest {
-    private final SummonExpiryScheduler scheduler = new SummonExpiryScheduler(id -> { });
+    private final SummonExpiryScheduler scheduler =
+            new SummonExpiryScheduler(id -> CompletableFuture.completedFuture(StoreFlow.Result.STORED));
 
     private static CompanionRecord live(UUID id, long summonedUntilMs) {
         return CompanionRecord.builder(id, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
@@ -57,17 +60,24 @@ class SummonExpirySchedulerTest {
     }
 
     @Test
-    void anUndoneStoreComesDueAgainOnlyAfterTheRetryDelay() {
+    void aStoreThatFailsWithoutChangingTheRecordIsRetriedOnlyAfterTheDelay() {
         UUID id = UUID.randomUUID();
-        CompanionRecord timed = live(id, 1_000L);
-        scheduler.onChange(null, timed);
-        assertEquals(List.of(id), scheduler.due(1_000L));
+        List<StoreFlow.Result> results = new ArrayList<>(
+                List.of(StoreFlow.Result.COMMIT_FAILED, StoreFlow.Result.STORED));
+        List<UUID> attempts = new ArrayList<>();
+        SummonExpiryScheduler retrying = new SummonExpiryScheduler(profileId -> {
+            attempts.add(profileId);
+            return CompletableFuture.completedFuture(results.remove(0));
+        });
+        retrying.onChange(null, live(id, 1_000L));
 
-        // A failed store reverts the record, which the listener sees as a change.
-        scheduler.onChange(timed, timed);
+        retrying.poll(1_000L);
+        retrying.poll(1_000L + SummonExpiryScheduler.RETRY_DELAY_MS - 1L);
+        assertEquals(List.of(id), attempts);
 
-        assertEquals(List.of(), scheduler.due(1_001L));
-        assertEquals(List.of(id), scheduler.due(1_000L + SummonExpiryScheduler.RETRY_DELAY_MS));
+        retrying.poll(1_000L + SummonExpiryScheduler.RETRY_DELAY_MS);
+        retrying.poll(1_000L + 10 * SummonExpiryScheduler.RETRY_DELAY_MS);
+        assertEquals(List.of(id, id), attempts);
     }
 
     @Test

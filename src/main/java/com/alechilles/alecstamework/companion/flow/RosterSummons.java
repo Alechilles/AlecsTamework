@@ -112,14 +112,19 @@ public final class RosterSummons {
 
     /**
      * The expiry scheduler's store action. Re-checks the record, since a re-summon may have moved
-     * the timer after the scheduler returned the id.
+     * the timer after the scheduler returned the id: NOT_FOUND without a record, NOT_LIVE when it
+     * has nothing due to store now (the index listener tracks its new timer).
      */
-    public void storeExpired(@Nonnull UUID profileId) {
+    @Nonnull
+    public CompletableFuture<StoreFlow.Result> storeExpired(@Nonnull UUID profileId) {
         CompanionRecord current = record.apply(profileId);
-        if (current == null || !timedLive(current) || current.summonedUntilMs() > clock.getAsLong()) {
-            return;
+        if (current == null) {
+            return CompletableFuture.completedFuture(StoreFlow.Result.NOT_FOUND);
         }
-        report(current, "expired", storeWithCooldown(current, StoredReason.TIMED));
+        if (!timedLive(current) || current.summonedUntilMs() > clock.getAsLong()) {
+            return CompletableFuture.completedFuture(StoreFlow.Result.NOT_LIVE);
+        }
+        return report(current, "expired", storeWithCooldown(current, StoredReason.TIMED));
     }
 
     /**
@@ -163,9 +168,13 @@ public final class RosterSummons {
         return current.location().kind() == LocationKind.LIVE && current.summonedUntilMs() != 0L;
     }
 
-    /** Auto-store has no player to answer; a failure is logged and retried on the record's next change. */
-    private static void report(CompanionRecord current, String cause, CompletableFuture<StoreFlow.Result> result) {
-        result.whenComplete((outcome, error) -> {
+    /**
+     * Auto-store has no player to answer, so a failure is logged. The record keeps its timer, so
+     * the expiry scheduler stores it when the timer runs out and retries a failed expiry store.
+     */
+    private static CompletableFuture<StoreFlow.Result> report(CompanionRecord current, String cause,
+                                                              CompletableFuture<StoreFlow.Result> result) {
+        return result.whenComplete((outcome, error) -> {
             if (error != null) {
                 LOGGER.at(Level.WARNING).withCause(error).log("Timed summon of companion %s was not stored (%s)",
                         current.profileId(), cause);
