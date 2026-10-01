@@ -17,6 +17,7 @@ import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -100,6 +101,28 @@ class CoopIntakeFlowTest {
         assertNull(loaded.get(live.profileId()));
         assertEquals(TameworkCoopSlotsComponent.Slot.companion(1, live.profileId(), 3), written.get(0));
         assertEquals(3, snapshots.get(0).generation());
+    }
+
+    @Test
+    void theProductionWatermarkCarriesAcrossAReleaseAndTheNextIntake() {
+        CompanionRecord live = insertLive(2);
+        UUID id = live.profileId();
+        CoopIntakeFlow<String> flow = flow(CompletableFuture.completedFuture(null));
+        flow.intakeLive(live(live)).join();
+        assertEquals(0L, written.get(0).producedUntilMs());
+
+        assertTrue(CoopProduction.save(index, id, 3, 5_000L));
+        assertFalse(CoopProduction.save(index, id, 2, 7_000L), "a stale entry does not write the record");
+
+        // The morning release commits LIVE; production may no longer write the record.
+        CompanionRecord inCoop = index.get(id);
+        index.update(id, inCoop.revision(), CompanionTransitions.restored(inCoop, "default", 0, 0, 0, UUID.randomUUID()));
+        assertFalse(CoopProduction.save(index, id, 3, 9_000L));
+        loaded.put(id, "body");
+
+        flow.intakeLive(live(index.get(id))).join();
+
+        assertEquals(5_000L, written.get(1).producedUntilMs());
     }
 
     @Test

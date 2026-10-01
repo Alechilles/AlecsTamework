@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent;
+import java.util.UUID;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 /** Guards the production watermark arithmetic on coop slot entries. */
@@ -24,6 +27,20 @@ class DirectLiveCoopProduceServiceTest {
         });
 
         assertEquals(5L * INTERVAL, next);
+    }
+
+    @Test
+    void unownedResidentWithoutWatermarkStartsOneIntervalBackSoAStayYieldsOneCycle() {
+        var unowned = TameworkCoopSlotsComponent.Slot.unowned(0,
+                new BsonDocument());
+        long now = 5L * INTERVAL;
+        long start = DirectLiveCoopProduceService.startingWatermark(unowned, now, INTERVAL);
+
+        assertEquals(1, DirectLiveCoopProduceService.cyclesDue(now, start, INTERVAL));
+        // A companion without a saved watermark starts from now instead.
+        assertEquals(0L, DirectLiveCoopProduceService.startingWatermark(
+                TameworkCoopSlotsComponent.Slot.companion(
+                        0, UUID.randomUUID(), 1L), now, INTERVAL));
     }
 
     @Test

@@ -29,7 +29,8 @@ import javax.annotation.Nullable;
  * Coop produce (spec 8.9) on the resident slot entries. While a coop's residents roam, each due
  * interval of a resident's active time adds its role's drops to the coop container. The watermark
  * ({@code producedUntilMs}, on the resident's active-time clock) lives in the slot entry; the
- * caller writes the changed entries back to the block. Rules: interval max(24, IntervalGameHours)
+ * caller writes the changed entries back to the block, and a companion's also to its record
+ * ({@code CoopProduction}), so it carries across stays. Rules: interval max(24, IntervalGameHours)
  * game hours, {@code ItemsPerTick} items per interval, drops by role, at most
  * {@value #MAX_CATCH_UP_CYCLES_PER_SWEEP} intervals per sweep. Call on the coop's world thread.
  */
@@ -50,8 +51,9 @@ public final class DirectLiveCoopProduceService {
     }
 
     /**
-     * Produces for each resident and returns the entries whose watermark changed. A resident with
-     * no watermark starts from its current active time, with no free first interval.
+     * Produces for each resident and returns the entries whose watermark changed. A companion with
+     * no watermark starts from its current active time, with no free first interval; an unowned
+     * resident see {@link #startingWatermark}.
      */
     @Nonnull
     public List<TameworkCoopSlotsComponent.Slot> produce(
@@ -89,7 +91,7 @@ public final class DirectLiveCoopProduceService {
             }
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
             long now = AnimalProgressionService.activeTimeMs(resident.lifeStage());
-            long next = advance(entry.producedUntilMs(), now, intervalMs,
+            long next = advance(startingWatermark(entry, now, intervalMs), now, intervalMs,
                     cycles -> produceCycles(container, dropId, cycles, itemsPerTick, random));
             if (next != entry.producedUntilMs()) {
                 changed.add(new TameworkCoopSlotsComponent.Slot(entry.slot(), entry.profileId(), entry.generation(),
@@ -97,6 +99,19 @@ public final class DirectLiveCoopProduceService {
             }
         }
         return changed;
+    }
+
+    /**
+     * The watermark production starts from. A companion's comes from its slot entry, which intake
+     * fills from the record, so it carries across stays. An unowned resident has no record and
+     * starts each stay without one: it starts one interval in the past, so it produces at most
+     * one cycle per stay. Returns 0 (none) for a companion without one.
+     */
+    static long startingWatermark(@Nonnull TameworkCoopSlotsComponent.Slot entry, long nowMs, long intervalMs) {
+        if (entry.producedUntilMs() != 0L || entry.unownedEntity() == null) {
+            return entry.producedUntilMs();
+        }
+        return Math.max(1L, nowMs - intervalMs);
     }
 
     /**

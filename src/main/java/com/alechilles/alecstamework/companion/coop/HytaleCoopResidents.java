@@ -48,6 +48,7 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final String COOP_BLOCK_CLASS = "com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock";
 
+    private final CompanionIndex index;
     private final RestoreFlow<Ref<EntityStore>> restoreFlow;
     private final HytaleCompanionSpawner spawner;
     private final CoopRelease release;
@@ -58,12 +59,14 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
                                @Nonnull HytaleCompanionSpawner spawner) {
         this.restoreFlow = Objects.requireNonNull(restoreFlow, "restoreFlow");
         this.spawner = Objects.requireNonNull(spawner, "spawner");
-        this.release = new CoopRelease(Objects.requireNonNull(index, "index")::get, this, System::currentTimeMillis);
+        this.index = Objects.requireNonNull(index, "index");
+        this.release = new CoopRelease(index::get, this, System::currentTimeMillis);
     }
 
     /**
-     * One sweep of a coop in its roam hours: produce for every resident, then release the first
-     * resident that may go now (one per sweep, as in 4.x).
+     * One sweep of a coop in its roam hours: produce for every resident, save changed watermarks
+     * on the block and on each companion's record, then release the first resident that may go
+     * now (one per sweep, as in 4.x).
      */
     public void roam(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop) {
         Vector3i b = coop.block();
@@ -84,6 +87,11 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         List<TameworkCoopSlotsComponent.Slot> changed = produce.produce(coop, residents,
                 BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(world.getEntityStore().getStore()));
         writeEntries(block, changed);
+        for (TameworkCoopSlotsComponent.Slot entry : changed) {
+            if (entry.profileId() != null) {
+                CoopProduction.save(index, entry.profileId(), entry.generation(), entry.producedUntilMs());
+            }
+        }
         for (DirectLiveCoopProduceService.Resident resident : residents) {
             if (release.releasableNow(at, resident.entry())) {
                 release.release(at, resident.entry(),
@@ -111,12 +119,18 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             if (!release.resident(at, entry)) {
                 continue;
             }
-            release.release(at, entry, destination(world, resident(entry).roleId(), block, 0, config))
+            String role = resident(entry).roleId();
+            release.release(at, entry, destination(world, role, block, 0, config))
                     .thenAccept(released -> {
-                        if (!released) {
-                            LOGGER.at(Level.WARNING).log("Could not release %s from broken coop slot %d at %s",
-                                    entry.profileId() == null ? "an unowned resident" : "companion " + entry.profileId(),
-                                    entry.slot(), at);
+                        if (released) {
+                            return;
+                        }
+                        if (entry.profileId() == null) {
+                            LOGGER.at(Level.WARNING).log("Lost an unowned %s resident from broken coop slot %d at %s:"
+                                    + " it could not be spawned", role, entry.slot(), at);
+                        } else {
+                            LOGGER.at(Level.WARNING).log("Could not release companion %s (%s) from broken coop slot %d"
+                                    + " at %s; it stays in the coop for Recover", entry.profileId(), role, entry.slot(), at);
                         }
                     });
         }
