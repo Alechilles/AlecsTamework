@@ -119,7 +119,8 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }
-            UUID npcUuid = committed.currentNpcUuid();
+            // An unowned tombstone carries no NPC UUID: the body is untracked, so it gets a fresh one.
+            UUID npcUuid = unowned ? UUID.randomUUID() : committed.currentNpcUuid();
             if (npcUuid == null) {
                 warn(profileId, "committed record has no NPC UUID", null);
                 return false;
