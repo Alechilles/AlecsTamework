@@ -1,11 +1,15 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -101,6 +105,41 @@ class OwnerPopulationCapServiceTest {
                 "an item counts in the world it was tamed in");
         assertEquals(2, OwnerPopulationCapService.countOwnedPopulation(
                 queries, TwGlobalConfig.PerPlayerLimitScope.GLOBAL, null, ownerId));
+    }
+
+    @Test
+    void litterThatWouldPassTheOwnedLimitIsRefusedAsAWhole() {
+        UUID ownerId = UUID.randomUUID();
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(3, false, role -> List.of());
+        List<CompanionRecord> owned = List.of(
+                record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
+                record(ownerId, CompanionLocation.item(), "alpha"));
+
+        OwnerPopulationCapService.Decision oneChild = OwnerPopulationCapService.evaluateBatch(
+                owned, List.of(record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
+        OwnerPopulationCapService.Decision twoChildren = OwnerPopulationCapService.evaluateBatch(
+                owned, List.of(
+                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
+                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
+
+        assertTrue(oneChild.allowed());
+        assertFalse(twoChildren.allowed());
+        assertEquals("owner-cap-reached", twoChildren.reason());
+    }
+
+    @Test
+    void litterThatWouldPassAGroupLimitIsRefusedWithTheGroupReason() {
+        UUID ownerId = UUID.randomUUID();
+        PopulationGroupPolicy group = new PopulationGroupPolicy("herd", PopulationGroupScope.GLOBAL, 1, 0, 1L);
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(0, false, role -> List.of(group));
+
+        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateBatch(
+                List.of(), List.of(
+                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
+                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
+
+        assertFalse(decision.allowed());
+        assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, decision.reason());
     }
 
     private static CompanionRecord record(UUID owner, CompanionLocation at, String homeWorld) {

@@ -1,20 +1,29 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -25,7 +34,8 @@ import org.joml.Vector3d;
  * Resolves and spawns a litter from current world state after the pairing animation.
  *
  * <p>Capacity is checked against the released SimpleClaims scan and the current
- * nearby same-type population immediately before the litter is spawned.
+ * nearby same-type population immediately before the litter is spawned. The litter is then
+ * admitted as a whole against the owner and population-group caps.
  */
 final class BreedingOffspringBirthService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
@@ -82,6 +92,9 @@ final class BreedingOffspringBirthService {
         BirthAllowance allowance = resolveAllowance(
                 store, liveContext, setup, plan.resolvedRoles().size(),
                 plan.resolvedRoles().getFirst()
+        );
+        allowance = admitLitter(
+                world, store, liveContext, setup, allowance, plan.resolvedRoles()
         );
         int spawnedCount = spawnChildren(
                 store, parents, liveContext, setup, allowance, plan.resolvedRoles()
@@ -186,6 +199,90 @@ final class BreedingOffspringBirthService {
                 : requested;
         count = limitByNearbyPopulation(store, setup, firstRole, count);
         return new BirthAllowance(Math.max(0, count), firstRole);
+    }
+
+    /**
+     * Admits the litter against the owner and population-group caps as a whole before any child
+     * spawns (spec 8.11). A refused litter is not born and the owner is told why. Only children
+     * that will be tamed with an owner count, as only they get a companion record. Each child's
+     * tame stamping still re-checks under the index lock.
+     */
+    @Nonnull
+    private BirthAllowance admitLitter(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull BreedingPairContext context,
+            @Nonnull SpawnSetup setup,
+            @Nonnull BirthAllowance allowance,
+            @Nonnull List<BreedingResolvedSpawnRole> roles
+    ) {
+        String worldName = world.getName();
+        if (allowance.count() <= 0 || worldName == null || worldName.isBlank()) {
+            return allowance;
+        }
+        Map<UUID, List<CompanionRecord>> candidatesByOwner = new LinkedHashMap<>();
+        for (int index = 0; index < allowance.count(); index++) {
+            BreedingResolvedSpawnRole role = roles.get(index);
+            UUID owner = role == null ? null : litterOwner(setup.config(), role, context);
+            if (owner == null) {
+                continue;
+            }
+            Vector3d at = setup.position();
+            candidatesByOwner.computeIfAbsent(owner, ignored -> new ArrayList<>()).add(
+                    CompanionRecord.builder(
+                                    UUID.randomUUID(), role.roleId(),
+                                    CompanionLocation.live(worldName, at.x, at.y, at.z))
+                            .ownerUuid(owner).homeWorld(worldName).build()
+            );
+        }
+        for (Map.Entry<UUID, List<CompanionRecord>> entry : candidatesByOwner.entrySet()) {
+            OwnerPopulationCapService.Decision decision =
+                    OwnerPopulationCapService.evaluateBatch(entry.getKey(), entry.getValue());
+            if (!decision.allowed()) {
+                logBlocked(context, decision.reason());
+                Player owner = resolveOnlinePlayer(world, store, entry.getKey());
+                if (owner != null) {
+                    OwnerMessageUtil.sendAcquisitionDenied(owner, decision);
+                }
+                return BirthAllowance.none();
+            }
+        }
+        return allowance;
+    }
+
+    /** The owner a child of {@code role} will be tamed for, or null when it will get no companion record. */
+    @Nullable
+    private static UUID litterOwner(
+            @Nullable TwBreedingConfig config,
+            @Nonnull BreedingResolvedSpawnRole role,
+            @Nonnull BreedingPairContext context
+    ) {
+        TwBreedingConfig.InheritanceSettings inheritance = config == null
+                ? null
+                : config.resolveInheritance(role.roleId());
+        boolean tamed = (inheritance == null || inheritance.isInheritTamed())
+                && (context.parentATamed() || context.parentBTamed());
+        return tamed
+                ? BreedingInheritedOwnerResolver.resolve(
+                        config, role.roleId(), context.parentAOwner(), context.parentBOwner()).ownerId()
+                : null;
+    }
+
+    @Nullable
+    private static Player resolveOnlinePlayer(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull UUID playerId
+    ) {
+        Ref<EntityStore> ref = world.getEntityRef(playerId);
+        if (ref == null || !ref.isValid()) {
+            return null;
+        }
+        try {
+            return store.getComponent(ref, Player.getComponentType());
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
     }
 
     private int limitByNearbyPopulation(

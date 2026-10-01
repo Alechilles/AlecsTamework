@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -51,6 +53,39 @@ public final class OwnerPopulationCapService {
                                                @Nullable String roleId) {
         return withGroupCaps(evaluateAcquisition(store, ownerId), admissionGate, ownerId, roleId,
                 resolveWorldName(store));
+    }
+
+    /**
+     * Pre-checks a whole litter (spec 8.11): would adding {@code candidates} to {@code ownerId}'s
+     * companions pass the owned limit or a group limit? A refusal has reason
+     * {@code owner-cap-reached} or {@link #REASON_GROUP_CAP}, as for {@link #evaluateAcquisition}.
+     * Allowed when there is no owner, no candidate, no gate or no index. Like the other pre-checks
+     * it is lock-free; each child's tame stamping still re-checks under the index lock.
+     */
+    @Nonnull
+    public static Decision evaluateBatch(@Nullable UUID ownerId, @Nonnull List<CompanionRecord> candidates) {
+        CompanionAdmissionGate gate = admissionGate;
+        CompanionQueries index = resolveQueries();
+        if (gate == null || index == null || ownerId == null || candidates.isEmpty()) {
+            return Decision.allowBatch();
+        }
+        return evaluateBatch(index.owned(ownerId), candidates, gate.rules());
+    }
+
+    @Nonnull
+    static Decision evaluateBatch(@Nonnull Collection<CompanionRecord> ownerRecords,
+                                  @Nonnull List<CompanionRecord> candidates,
+                                  @Nonnull CompanionAdmission.Rules rules) {
+        CompanionAdmission.Refusal refusal = CompanionAdmission.checkBatch(ownerRecords, candidates, rules);
+        if (refusal == null) {
+            return Decision.allowBatch();
+        }
+        TwGlobalConfig.PerPlayerLimitScope scope = rules.ownedPerWorld()
+                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
+                : TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
+        return refusal == CompanionAdmission.Refusal.OWNED
+                ? Decision.denyAtCap(rules.ownedLimit(), ownerRecords.size(), scope)
+                : new Decision(false, true, rules.ownedLimit(), ownerRecords.size(), 0, scope, REASON_GROUP_CAP);
     }
 
     @Nonnull
@@ -216,6 +251,14 @@ public final class OwnerPopulationCapService {
             return new Decision(
                     true, false, 0, 0, Integer.MAX_VALUE,
                     TwGlobalConfig.PerPlayerLimitScope.PER_WORLD, "owner-cap-no-owner"
+            );
+        }
+
+        @Nonnull
+        static Decision allowBatch() {
+            return new Decision(
+                    true, false, 0, 0, Integer.MAX_VALUE,
+                    TwGlobalConfig.PerPlayerLimitScope.PER_WORLD, "owner-batch-allow"
             );
         }
 

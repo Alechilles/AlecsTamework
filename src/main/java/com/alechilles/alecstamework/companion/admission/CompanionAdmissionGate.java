@@ -69,6 +69,12 @@ public final class CompanionAdmissionGate {
         return CompanionAdmission.check(index.fileRecords(owner), null, candidate, rules.get());
     }
 
+    /** The rules the gate checks with now, for callers that check a whole batch (a litter). */
+    @Nonnull
+    public CompanionAdmission.Rules rules() {
+        return rules.get();
+    }
+
     @Nonnull
     private static CompanionAdmission.Rules configuredRules(@Nullable PopulationGroupConfigIndex current) {
         TwGlobalConfig active = TwGlobalConfig.resolveActive();
