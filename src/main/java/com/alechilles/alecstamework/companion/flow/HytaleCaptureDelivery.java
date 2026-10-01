@@ -152,8 +152,13 @@ public final class HytaleCaptureDelivery {
         int slot = handover.hotbarSlot();
         if (hotbar != null && slot >= 0 && slot < hotbar.getCapacity()
                 && Objects.equals(hotbar.getItemStack((short) slot), handover.expectedSource())) {
-            hotbar.setItemStackForSlot((short) slot, item);
-            return null;
+            if (hotbar.setItemStackForSlot((short) slot, item).succeeded()) {
+                return null;
+            }
+            // A slot filter refused it (a player who may not hold this companion, spec 8.14). The
+            // source was spent on the capture, so take it; the item then goes to the inventory or
+            // is dropped at the body.
+            hotbar.replaceItemStackInSlot((short) slot, handover.expectedSource(), ItemStack.EMPTY);
         }
         ItemStackTransaction given = Player.giveItem(item, ref, store);
         ItemStack remainder = given == null ? item : given.getRemainder();

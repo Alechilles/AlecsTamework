@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Decision;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -22,10 +23,9 @@ import com.hypixel.hytale.server.core.inventory.container.filter.FilterActionTyp
 import com.hypixel.hytale.server.core.inventory.container.filter.SlotFilter;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -38,8 +38,9 @@ import javax.annotation.Nullable;
  * world thread. So {@link #test} reads only the lock-free index, the item config and the
  * {@link AdmissionCache}; it touches no ECS state and calls no admission rule. A refusal queues a
  * follow-up on the player's world (resolved there from the stored UUID) that evaluates a missing
- * decision, sends the throttled notice and marks the inventories dirty so the client drops a
- * predicted move. A refused add fires no change event, so nothing else would do this.</p>
+ * decision, sends the throttled notice and, at most once a second, marks the inventories dirty
+ * so the client drops a predicted move. A refused add fires no change event, so nothing else
+ * would do this.</p>
  */
 public final class CaptureItemPickupFilter implements SlotFilter {
     static final String PICKUP_BLOCKED_KEY = "tamework.ui.notifications.captureItem.pickupBlocked";
@@ -51,8 +52,11 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         private final ItemFeatureRegistry configs;
         private final AdmissionCache cache;
         private final TameworkUiMessageService messages;
-        /** At most one queued follow-up per player and profile; ground pickup retries 4 times a second. */
-        private final Set<Pending> pending = ConcurrentHashMap.newKeySet();
+        /** Whether any item config blocks, for the config map it was computed from. */
+        private volatile Blocking blocking;
+
+        private record Blocking(Map<String, ItemFeatureConfig> configs, boolean any) {
+        }
 
         Shared(@Nonnull CompanionIndex index, @Nonnull CompanionAdmissionGate gate,
                @Nonnull ItemFeatureRegistry configs, @Nonnull AdmissionCache cache,
@@ -63,9 +67,30 @@ public final class CaptureItemPickupFilter implements SlotFilter {
             this.cache = Objects.requireNonNull(cache, "cache");
             this.messages = Objects.requireNonNull(messages, "messages");
         }
-    }
 
-    private record Pending(@Nonnull UUID player, @Nonnull UUID profileId) {
+        /**
+         * True when at least one item config has {@code OwnershipFollowsHolder} and
+         * {@code BlockIneligibleHolders} on and capture keeps the owner, so filters are worth
+         * installing. Otherwise no filter is installed and another mod's slot filters are left
+         * alone. The config scan is redone after each item config reload (a new config map).
+         */
+        boolean anyBlocks() {
+            Map<String, ItemFeatureConfig> current = configs.snapshot();
+            Blocking known = blocking;
+            if (known == null || known.configs() != current) {
+                boolean any = false;
+                for (ItemFeatureConfig config : current.values()) {
+                    if (config != null && config.isCaptureOwnershipFollowsHolder()
+                            && config.isCaptureBlockIneligibleHolders()) {
+                        any = true;
+                        break;
+                    }
+                }
+                known = new Blocking(current, any);
+                blocking = known;
+            }
+            return known.any() && !TameworkRuntimeSettings.current().captureClearsOwner();
+        }
     }
 
     private final Shared shared;
@@ -94,11 +119,11 @@ public final class CaptureItemPickupFilter implements SlotFilter {
             if (CaptureItemOwnership.decide(record, item.generation(), player, null) != Decision.TRANSFER) {
                 return true;
             }
-            ItemFeatureConfig config = shared.configs.getForFilledOrEmpty(stack.getItemId());
-            if (!CaptureItemHolderSystems.Transfers.follows(config) || !config.isCaptureBlockIneligibleHolders()) {
+            if (shared.cache.get(player, AdmissionCache.family(record)) == AdmissionCache.Cached.ALLOW) {
                 return true;
             }
-            if (shared.cache.get(player, AdmissionCache.family(record)) == AdmissionCache.Cached.ALLOW) {
+            ItemFeatureConfig config = shared.configs.getForFilledOrEmpty(stack.getItemId());
+            if (!CaptureItemHolderSystems.Transfers.follows(config) || !config.isCaptureBlockIneligibleHolders()) {
                 return true;
             }
             queueFollowUp(item);
@@ -110,8 +135,8 @@ public final class CaptureItemPickupFilter implements SlotFilter {
     }
 
     private void queueFollowUp(CaptureItemKeys.Ref item) {
-        Pending key = new Pending(player, item.profileId());
-        if (!shared.pending.add(key)) {
+        // At most one queued per player and profile; ground pickup retries 4 times a second.
+        if (!shared.cache.followUpDue(player, item.profileId())) {
             return;
         }
         try {
@@ -119,11 +144,11 @@ public final class CaptureItemPickupFilter implements SlotFilter {
                 try {
                     followUp(item);
                 } finally {
-                    shared.pending.remove(key);
+                    shared.cache.followUpDone(player, item.profileId());
                 }
             });
         } catch (RuntimeException notQueued) {
-            shared.pending.remove(key);
+            shared.cache.followUpDone(player, item.profileId());
         }
     }
 
@@ -140,6 +165,9 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         }
         if (!admitted(item) && shared.cache.noticeDue(player, item.profileId())) {
             shared.messages.showKey(entity, NotificationStyle.Warning, PICKUP_BLOCKED_KEY);
+        }
+        if (!shared.cache.resyncDue(player, item.profileId())) {
+            return;
         }
         for (ComponentType<EntityStore, ? extends InventoryComponent> type
                 : CaptureItemHolderSystems.Transfers.holderInventories()) {

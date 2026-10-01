@@ -260,10 +260,14 @@ public final class CaptureItemHolderSystems {
         /**
          * Sets the ADD filter on every slot. Armor and Utility are not holder inventories, so they
          * keep their vanilla filters; Tool has none to replace. The engine skips an empty
-         * container; a resize replaces it and the new one is filtered on its first change.
+         * container; a resize replaces it and the new one is filtered on its first change. Nothing
+         * is installed while no item config blocks, so other mods' slot filters stay in place; a
+         * reload that turns blocking on applies to a container when it is next seen as new.
          */
         private void installFilter(UUID player, World world, ItemContainer container) {
-            ItemContainerUtil.trySetSlotFilters(container, new CaptureItemPickupFilter(filters, player, world));
+            if (filters.anyBlocks()) {
+                ItemContainerUtil.trySetSlotFilters(container, new CaptureItemPickupFilter(filters, player, world));
+            }
         }
 
         private void checkContainer(Player player, @Nullable ItemContainer container) {
@@ -285,7 +289,7 @@ public final class CaptureItemHolderSystems {
             UUID holder = player.getUuid();
             // Lock-free pre-check: only a current item owned by someone else can move or be refused.
             if (CaptureItemOwnership.decide(index.get(item.profileId()), item.generation(), holder, null)
-                    != Decision.TRANSFER || !follows(stack.getItemId())) {
+                    != Decision.TRANSFER || !follows(configs.getForFilledOrEmpty(stack.getItemId()))) {
                 return;
             }
             Attempt attempt = index.atomically(() -> {
@@ -318,10 +322,6 @@ public final class CaptureItemHolderSystems {
             String owner = record.ownerName() != null && !record.ownerName().isBlank()
                     ? record.ownerName() : LocalizedText.resolve(player, ANOTHER_PLAYER_KEY);
             messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, owner);
-        }
-
-        private boolean follows(@Nullable String itemId) {
-            return follows(configs.getForFilledOrEmpty(itemId));
         }
 
         /** {@code OwnershipFollowsHolder}, which applies only while capture keeps the owner. */

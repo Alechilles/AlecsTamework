@@ -28,15 +28,6 @@ class AdmissionCacheTest {
     }
 
     @Test
-    void invalidatePlayerDropsOnlyThatPlayer() {
-        cache.put(ALICE, "wolf", true);
-        cache.put(BOB, "wolf", true);
-        cache.invalidatePlayer(ALICE);
-        assertEquals(Cached.MISS, cache.get(ALICE, "wolf"));
-        assertEquals(Cached.ALLOW, cache.get(BOB, "wolf"));
-    }
-
-    @Test
     void noticeIsDueOncePerInterval() {
         UUID profile = UUID.randomUUID();
         assertTrue(cache.noticeDue(ALICE, profile));

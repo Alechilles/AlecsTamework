@@ -12,28 +12,36 @@ import javax.annotation.Nullable;
 
 /**
  * Thread-safe cached admission decisions for slot filters (spec 8.14), keyed by player and
- * profile family (see {@link #family}). Filters run under a container lock and may be off the
- * world thread, so they only read this cache; a miss is evaluated later on the world thread.
+ * profile family (see {@link #family}), and the per-player, per-profile throttles of what a
+ * refusal triggers. Filters run under a container lock and may be off the world thread, so they
+ * only read this cache; a miss is evaluated later on the world thread.
  *
  * <p>Owner: the plugin, one instance for all worlds. A decision is dropped after {@link #TTL_MS},
- * when the player's own records change ({@link #onRecordChanged}), on config reload
- * ({@link #clear}) and when the player leaves a world ({@link #forgetPlayer}).</p>
+ * when the player's own records change ({@link #onRecordChanged}), on config or settings reload
+ * ({@link #clear}) and when the player leaves a world ({@link #forgetPlayer}, which also drops
+ * the player's throttles).</p>
  */
 public final class AdmissionCache {
     public static final long TTL_MS = 30_000L;
     public static final long NOTICE_EVERY_MS = 10_000L;
+    /** Inventory resyncs after a refusal; ground pickup retries 4 times a second. */
+    public static final long RESYNC_EVERY_MS = 1_000L;
+    /** A queued follow-up that has not finished by then is assumed lost and may be queued again. */
+    public static final long FOLLOW_UP_RETRY_MS = 5_000L;
 
     public enum Cached { ALLOW, DENY, MISS }
 
     private record Decision(boolean allowed, long atMs) {
     }
 
-    private record NoticeKey(@Nonnull UUID player, @Nonnull UUID profileId) {
+    private record Key(@Nonnull UUID player, @Nonnull UUID profileId) {
     }
 
     private final LongSupplier clock;
     private final Map<UUID, Map<String, Decision>> decisions = new ConcurrentHashMap<>();
-    private final Map<NoticeKey, Long> notices = new ConcurrentHashMap<>();
+    private final Map<Key, Long> notices = new ConcurrentHashMap<>();
+    private final Map<Key, Long> resyncs = new ConcurrentHashMap<>();
+    private final Map<Key, Long> followUps = new ConcurrentHashMap<>();
 
     public AdmissionCache(@Nonnull LongSupplier clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -63,32 +71,40 @@ public final class AdmissionCache {
                 .put(family, new Decision(allowed, clock.getAsLong()));
     }
 
-    public void invalidatePlayer(@Nonnull UUID player) {
-        decisions.remove(player);
-    }
-
-    /** Drops the player's decisions and notice throttles; for a player leaving a world. */
+    /** Drops the player's decisions and throttles; for a player leaving a world. */
     public void forgetPlayer(@Nonnull UUID player) {
         decisions.remove(player);
         notices.keySet().removeIf(key -> key.player().equals(player));
+        resyncs.keySet().removeIf(key -> key.player().equals(player));
+        followUps.keySet().removeIf(key -> key.player().equals(player));
     }
 
+    /** Drops every decision (config or settings reload); throttles are kept. */
     public void clear() {
         decisions.clear();
     }
 
     /** True at most once per player and profile every {@link #NOTICE_EVERY_MS}. */
     public boolean noticeDue(@Nonnull UUID player, @Nonnull UUID profileId) {
-        long now = clock.getAsLong();
-        boolean[] due = {false};
-        notices.compute(new NoticeKey(player, profileId), (key, last) -> {
-            if (last != null && now - last < NOTICE_EVERY_MS) {
-                return last;
-            }
-            due[0] = true;
-            return now;
-        });
-        return due[0];
+        return due(notices, new Key(player, profileId), NOTICE_EVERY_MS);
+    }
+
+    /** True at most once per player and profile every {@link #RESYNC_EVERY_MS}. */
+    public boolean resyncDue(@Nonnull UUID player, @Nonnull UUID profileId) {
+        return due(resyncs, new Key(player, profileId), RESYNC_EVERY_MS);
+    }
+
+    /**
+     * Claims the one queued follow-up for this player and profile. False while another is queued,
+     * unless that one was claimed {@link #FOLLOW_UP_RETRY_MS} ago. Release it with
+     * {@link #followUpDone}.
+     */
+    public boolean followUpDue(@Nonnull UUID player, @Nonnull UUID profileId) {
+        return due(followUps, new Key(player, profileId), FOLLOW_UP_RETRY_MS);
+    }
+
+    public void followUpDone(@Nonnull UUID player, @Nonnull UUID profileId) {
+        followUps.remove(new Key(player, profileId));
     }
 
     /**
@@ -109,5 +125,18 @@ public final class AdmissionCache {
         if (after.ownerUuid() != null) {
             decisions.remove(after.ownerUuid());
         }
+    }
+
+    private boolean due(Map<Key, Long> stamps, Key key, long intervalMs) {
+        long now = clock.getAsLong();
+        boolean[] due = {false};
+        stamps.compute(key, (k, last) -> {
+            if (last != null && now - last < intervalMs) {
+                return last;
+            }
+            due[0] = true;
+            return now;
+        });
+        return due[0];
     }
 }
