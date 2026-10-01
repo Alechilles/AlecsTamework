@@ -101,7 +101,7 @@ final class CommandRelocationDispatchService {
             }
             CompanionRecord indexed = indexRecord(record);
             RecallRoute route = companions == null ? RecallRoute.LOAD_AND_MOVE
-                    : RecallRoute.decide(indexed, isLoadedIn(indexed, world), world.getName());
+                    : RecallRoute.decide(indexed, false, world.getName());
             if (route == RecallRoute.REFUSE) {
                 continue;
             }
@@ -169,14 +169,10 @@ final class CommandRelocationDispatchService {
         return indexed != null ? indexed : companions.byNpcUuid(record.npcUuid);
     }
 
-    private boolean isLoadedIn(@Nullable CompanionRecord indexed, World world) {
-        return indexed != null && companions != null && world.getName().equals(indexed.location().world())
-                && companions.loadedBody(indexed.profileId()) != null;
-    }
-
     /**
      * Starts a restore of the owner's companion at a placement frozen now, on the player's world
-     * thread. Returns whether the restore started; its result arrives later and is logged.
+     * thread. Returns whether the restore started; its result arrives later and is logged. A role
+     * with {@code Travel.CrossWorldRecallEnabled} off is not recalled across worlds.
      */
     private boolean restoreNearPlayer(Context context, @Nullable UUID ownerUuid, CompanionRecord indexed) {
         CompanionRestoreRecallSink restore = recallRestore;
@@ -185,6 +181,9 @@ final class CommandRelocationDispatchService {
         }
         TwCompanionConfig.EffectiveSettings settings =
                 TwCompanionConfig.resolveEffectiveForRole(indexed.roleId());
+        if (!settings.isCrossWorldRecallEnabled()) {
+            return false;
+        }
         double safeSpawnDistance = resolvePositiveDouble(
                 settings.getRecallSafeSpawnDistance(),
                 context.recallSafeSpawnDistance
@@ -194,7 +193,13 @@ final class CommandRelocationDispatchService {
         if (placement == null) {
             return false;
         }
-        restore.restoreNear(ownerUuid, indexed.profileId(), placement);
+        // An earlier relocation would keep leasing the old world's chunks and could move the old body.
+        relocationService.cancelPendingRelocation(indexed.currentNpcUuid());
+        try {
+            restore.restoreNear(indexed.profileId(), placement);
+        } catch (RuntimeException failed) {
+            return false;
+        }
         return true;
     }
 

@@ -20,7 +20,8 @@ import javax.annotation.Nullable;
  * Turns a recall that cannot move a body into a restore from the snapshot (spec 8.5): a LIVE
  * companion in another world, or one whose body never appeared before the relocation wait ran out.
  *
- * <p>Only the recalling owner's companion is restored. {@link RestoreFlow} rechecks the record and
+ * <p>Only the recalling owner's companion is restored: {@link #recover} checks the owner itself,
+ * and {@link #restoreNear}'s caller checks it first. {@link RestoreFlow} rechecks the record and
  * hands its entity work to the world threads itself, so both entry points may be called from any
  * thread. Results complete on whichever thread finishes the restore.
  */
@@ -38,16 +39,11 @@ public final class CompanionRestoreRecallSink implements ImportedRecallRecoveryS
 
     /**
      * Restores {@code profileId} at a placement already computed near its owner on the owner's
-     * world thread. Completes with {@link RestoreFlow.Result#NOT_ALLOWED} when {@code ownerUuid}
-     * no longer owns it.
+     * world thread. The caller has checked that the recalling player owns it.
      */
     @Nonnull
-    CompletableFuture<RestoreFlow.Result> restoreNear(@Nonnull UUID ownerUuid, @Nonnull UUID profileId,
+    CompletableFuture<RestoreFlow.Result> restoreNear(@Nonnull UUID profileId,
                                                       @Nonnull CompanionSpawnPlacement placement) {
-        CompanionRecord record = companions.get(profileId);
-        if (record == null || !ownerUuid.equals(record.ownerUuid())) {
-            return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_ALLOWED);
-        }
         return restore(profileId, new RestoreFlow.Destination(placement.worldKey(), placement.x(), placement.y(),
                 placement.z(), placement.yawRadians(), placement.pitchRadians()));
     }
