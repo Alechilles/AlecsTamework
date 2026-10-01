@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -14,19 +15,27 @@ import com.alechilles.alecstamework.companion.runtime.ThrottledWarnings;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -51,13 +60,18 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private final CompanionSummaries summaries;
     private final ThrottledWarnings warnings;
     private final LongSupplier clock;
+    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
 
-    /** {@code clock} is the wall clock used for death, revive and snapshot times. */
+    /**
+     * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
+     * checks a new record against the population caps under the index lock; null admits it.
+     */
     public CompanionBodyLifecycle(@Nonnull CompanionIndex index, @Nonnull CompanionWriter writer,
                                   @Nonnull LoadedBodies<Ref<EntityStore>> loaded,
                                   @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                   @Nonnull CompanionSnapshots snapshots, @Nonnull CompanionSummaries summaries,
-                                  @Nonnull ThrottledWarnings warnings, @Nonnull LongSupplier clock) {
+                                  @Nonnull ThrottledWarnings warnings, @Nonnull LongSupplier clock,
+                                  @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
         this.index = Objects.requireNonNull(index, "index");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
@@ -66,14 +80,22 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         this.summaries = Objects.requireNonNull(summaries, "summaries");
         this.warnings = Objects.requireNonNull(warnings, "warnings");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.admission = Objects.requireNonNull(admission, "admission");
     }
 
     /**
      * Spec 8.1: a newly owned and tamed body gets a profile, a record and a stamp. Stamping a live
      * entity does not reach the body system, so the body is registered here.
+     *
+     * <p>Spec 8.10: {@code enforceCaps} is true only for a live ownership assignment (owner or
+     * tamed state put on a loaded NPC). The tame sites check the caps first; this re-check under
+     * the index lock covers the race where another change filled the slot in between. A refused
+     * body loses its owner (it stays tamed, as an unowned release does) and the owner is told why.
+     * Bodies that arrive already owned (chunk loads, pre-rework bodies, the startup pass) pass
+     * false: they are registered without the caps and never lose their owner.
      */
     public void tame(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
-                     @Nonnull CommandBuffer<EntityStore> buffer) {
+                     @Nonnull CommandBuffer<EntityStore> buffer, boolean enforceCaps) {
         if (store.getComponent(ref, stampType) != null) {
             return;
         }
@@ -86,12 +108,38 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         UUID profileId = UUID.randomUUID();
-        if (!CompanionRegistration.register(index, loaded, CompanionTransitions.newLive(profileId, 0, body), ref)) {
+        CompanionRegistration.Outcome outcome = CompanionRegistration.register(index, loaded,
+                CompanionTransitions.newLive(profileId, 0, body), ref,
+                record -> enforceCaps ? admission.apply(null, record) : null);
+        if (outcome.refusal() != null) {
+            buffer.tryRemoveComponent(ref, TameworkOwnerComponent.getComponentType());
+            tellOwnerAtLimit(store.getExternalData().getWorld(), body.ownerUuid(), outcome.refusal());
+            return;
+        }
+        if (!outcome.registered()) {
             warn("tame-skipped", "A record already names NPC %s; the tame was not registered", body.npcUuid());
             return;
         }
         buffer.addComponent(ref, stampType, new TameworkCompanionComponent(profileId, 0));
         CompanionSaves.markChanged(buffer, ref);
+    }
+
+    /**
+     * Queues the limit notification for the owner, resolved in the owner's language. Runs as a
+     * world task so the ECS callback only queues it; the owner is looked up by UUID when it runs.
+     */
+    private static void tellOwnerAtLimit(@Nonnull World world, @Nonnull UUID owner,
+                                         @Nonnull CompanionAdmission.Refusal refusal) {
+        String key = refusal == CompanionAdmission.Refusal.OWNED
+                ? "tamework.ui.population.ownedLimit" : "tamework.ui.population.groupLimit";
+        world.execute(() -> {
+            Universe universe = Universe.get();
+            PlayerRef player = universe == null ? null : universe.getPlayer(owner);
+            if (player != null && player.getPacketHandler() != null) {
+                NotificationUtil.sendNotification(player.getPacketHandler(),
+                        Message.raw(LocalizedText.resolve(player, key)), NotificationStyle.Warning);
+            }
+        });
     }
 
     /** The owner component of a stamped body changed (for example the set-owner command). */

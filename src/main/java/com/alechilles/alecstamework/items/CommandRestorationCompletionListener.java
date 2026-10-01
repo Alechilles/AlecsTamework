@@ -31,13 +31,14 @@ public final class CommandRestorationCompletionListener
     /** The message key for one restore outcome. Only the success message takes the companion name. */
     @Nonnull
     static String keyFor(@Nonnull RestoreFlow.Result result) {
-        return PREFIX + switch (result) {
-            case RESTORED -> "respawn.success";
-            case COOLDOWN -> "shared.cooldown";
-            case NOT_ALLOWED, NOT_FOUND, STALE -> "respawn.notDeadOrLost";
-            case NO_SNAPSHOT, SPAWN_FAILED -> "respawn.recoverFailed";
-            // Task 9 gives the limit results their population keys.
-            case COMMIT_FAILED, CONFLICT, OWNED_LIMIT, GROUP_LIMIT -> "respawn.unavailable";
+        return switch (result) {
+            case RESTORED -> PREFIX + "respawn.success";
+            case COOLDOWN -> PREFIX + "shared.cooldown";
+            case NOT_ALLOWED, NOT_FOUND, STALE -> PREFIX + "respawn.notDeadOrLost";
+            case NO_SNAPSHOT, SPAWN_FAILED -> PREFIX + "respawn.recoverFailed";
+            case COMMIT_FAILED, CONFLICT -> PREFIX + "respawn.unavailable";
+            case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
+            case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
         };
     }
 

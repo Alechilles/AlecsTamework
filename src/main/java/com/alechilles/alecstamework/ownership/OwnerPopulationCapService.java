@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -12,11 +14,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Evaluates the released owner cap against currently loaded NPCs.
+ * Pre-checks the owner cap for the tame, set-owner and spawn sites against the owner's records in
+ * the companion index: every owned companion counts, loaded or not. The binding check is
+ * {@link com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate} under the index
+ * lock; this one only refuses early with a message.
  *
- * <p>The live index is process-local and updated by world ECS callbacks. Reads
- * never enter another world thread, block on futures, or create durable
- * reservations.
+ * <p>Reads are in-memory index reads. They never enter another world thread, block on futures,
+ * or create durable reservations.
  */
 public final class OwnerPopulationCapService {
     private OwnerPopulationCapService() {
@@ -39,7 +43,7 @@ public final class OwnerPopulationCapService {
                                         @Nullable UUID ownerId) {
         return evaluateAcquisition(
                 globalConfig,
-                resolveIndex(),
+                resolveQueries(),
                 resolveWorldName(store),
                 ownerId
         );
@@ -48,7 +52,7 @@ public final class OwnerPopulationCapService {
     @Nonnull
     static Decision evaluateAcquisition(
             @Nullable TwGlobalConfig globalConfig,
-            @Nullable OwnerPopulationLiveIndex index,
+            @Nullable CompanionQueries index,
             @Nullable String worldName,
             @Nullable UUID ownerId
     ) {
@@ -73,7 +77,7 @@ public final class OwnerPopulationCapService {
             return Decision.denyUnavailable(
                     limit,
                     scope,
-                    "owner-population-live-index-unavailable"
+                    "owner-population-index-unavailable"
             );
         }
         if (current < 0) {
@@ -108,30 +112,42 @@ public final class OwnerPopulationCapService {
                                            @Nullable Store<EntityStore> store,
                                            @Nonnull UUID ownerId) {
         return countOwnedPopulation(
-                resolveIndex(),
+                resolveQueries(),
                 scope,
                 resolveWorldName(store),
                 ownerId
         );
     }
 
-    static int countOwnedPopulation(@Nullable OwnerPopulationLiveIndex index,
+    /**
+     * Counts the owner's owned companions in scope; per world, a companion counts in the world it
+     * is in, else the world it was tamed in. Returns 0 without an index and -1 when a per-world
+     * count has no world.
+     */
+    static int countOwnedPopulation(@Nullable CompanionQueries index,
                                     @Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
                                     @Nullable String worldName,
                                     @Nonnull UUID ownerId) {
-        return index == null
-                ? 0
-                : index.count(
-                        ownerId,
-                        scope,
-                        worldName
-                );
+        if (index == null) {
+            return 0;
+        }
+        boolean global = scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
+        if (!global && worldName == null) {
+            return -1;
+        }
+        int count = 0;
+        for (CompanionRecord record : index.owned(ownerId)) {
+            if (global || CompanionAdmission.scopeWorld(record).equals(worldName)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Nullable
-    private static OwnerPopulationLiveIndex resolveIndex() {
+    private static CompanionQueries resolveQueries() {
         Tamework plugin = Tamework.getInstance();
-        return plugin == null ? null : plugin.getOwnerPopulationLiveIndex();
+        return plugin == null ? null : plugin.getCompanionQueries();
     }
 
     @Nullable

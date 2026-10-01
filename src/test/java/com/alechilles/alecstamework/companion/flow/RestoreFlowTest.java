@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
@@ -27,6 +29,7 @@ class RestoreFlowTest {
     private final LoadedBodies<String> loaded = new LoadedBodies<>();
     private final List<String> events = new ArrayList<>();
     private final RestoreFlow.Destination there = new RestoreFlow.Destination("other", 1, 2, 3, 0f, 0f);
+    private BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission = (b, a) -> null;
 
     private CompanionRecord insertLive() {
         CompanionRecord r = CompanionTransitions.newLive(UUID.randomUUID(), 0, new CompanionTransitions.BodyFacts(
@@ -53,7 +56,7 @@ class RestoreFlowTest {
                 (committed, snap, dest, reason) -> { events.add("spawn gen" + committed.generation());
                     return CompletableFuture.completedFuture(spawnOk); },
                 (id, body) -> events.add("remove " + body),
-                System::currentTimeMillis);
+                System::currentTimeMillis, admission);
     }
 
     @Test
@@ -121,6 +124,21 @@ class RestoreFlowTest {
     }
 
     @Test
+    void aRestorePastAPopulationLimitIsRefusedWithoutAnyChange() {
+        CompanionRecord live = insertLive();
+        loaded.put(live.profileId(), "old-body");
+        admission = (b, a) -> CompanionAdmission.Refusal.OWNED;
+
+        RestoreFlow.Result result = flow(CompletableFuture.completedFuture(null), true)
+                .restore(live.profileId(), RestoreRules.Reason.RECALL, there).join();
+
+        assertEquals(RestoreFlow.Result.OWNED_LIMIT, result);
+        assertTrue(events.isEmpty(), "no flush, no removal and no spawn");
+        assertEquals(live, index.get(live.profileId()));
+        assertEquals("old-body", loaded.get(live.profileId()), "the old body stays registered");
+    }
+
+    @Test
     void aFailedSpawnPutsTheRecordBack() {
         CompanionRecord live = insertLive();
 
@@ -163,7 +181,7 @@ class RestoreFlowTest {
                         : CompletableFuture.completedFuture(null); },
                 (committed, snap, dest, reason) -> { events.add("spawn"); return CompletableFuture.completedFuture(true); },
                 (id, body) -> events.add("remove " + body),
-                System::currentTimeMillis);
+                System::currentTimeMillis, (b, a) -> null);
 
         RestoreFlow.Result result = flow.restore(RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there)
                 .withOwner(new RestoreFlow.Owner(UUID.randomUUID(), "Bo"))).join();

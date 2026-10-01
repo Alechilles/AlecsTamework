@@ -57,7 +57,8 @@ public final class CompanionOwnershipSystems {
             if (!isTamed(store, ref)) {
                 return false;
             }
-            lifecycle.tame(ref, store, buffer);
+            // Already owned when it arrived: register it, never strip the owner over a cap.
+            lifecycle.tame(ref, store, buffer, false);
             return true;
         }
 
@@ -125,7 +126,7 @@ public final class CompanionOwnershipSystems {
             if (store.getComponent(ref, stampType) != null) {
                 lifecycle.ownerChanged(ref, store, owner.getOwnerId(), owner.getOwnerName());
             } else if (isTamed(store, ref)) {
-                lifecycle.tame(ref, store, buffer);
+                lifecycle.tame(ref, store, buffer, true);
             }
         }
     }
@@ -200,7 +201,7 @@ public final class CompanionOwnershipSystems {
         public void onComponentAdded(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkTamedComponent component,
                                      @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
             if (isTamed(store, ref)) {
-                lifecycle.tame(ref, store, buffer);
+                lifecycle.tame(ref, store, buffer, true);
             }
         }
 
@@ -209,7 +210,7 @@ public final class CompanionOwnershipSystems {
                                    @Nonnull TameworkTamedComponent newComponent, @Nonnull Store<EntityStore> store,
                                    @Nonnull CommandBuffer<EntityStore> buffer) {
             if (isTamed(store, ref)) {
-                lifecycle.tame(ref, store, buffer);
+                lifecycle.tame(ref, store, buffer, true);
             }
         }
 

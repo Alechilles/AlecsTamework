@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
@@ -10,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.function.LongSupplier;
@@ -115,6 +117,7 @@ public final class RestoreFlow<R> {
     private final Spawner spawner;
     private final BiConsumer<UUID, R> removeOldBody;
     private final LongSupplier clock;
+    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
 
     /**
      * @param snapshots     reads a profile's snapshot off the world thread; completes with null when there is none
@@ -122,11 +125,14 @@ public final class RestoreFlow<R> {
      * @param removeOldBody removes the old body from its world; called only after the commit is written,
      *                      or once a newer change replaced the commit and the old body is stale
      * @param clock         wall clock, used for the revive cooldown
+     * @param admission     population caps for the change from the current record to the committed
+     *                      one; returns null to admit. Called under the index lock.
      */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
                        @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> snapshots,
                        @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner, @Nonnull Spawner spawner,
-                       @Nonnull BiConsumer<UUID, R> removeOldBody, @Nonnull LongSupplier clock) {
+                       @Nonnull BiConsumer<UUID, R> removeOldBody, @Nonnull LongSupplier clock,
+                       @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
         this.index = Objects.requireNonNull(index, "index");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
@@ -134,6 +140,7 @@ public final class RestoreFlow<R> {
         this.spawner = Objects.requireNonNull(spawner, "spawner");
         this.removeOldBody = Objects.requireNonNull(removeOldBody, "removeOldBody");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.admission = Objects.requireNonNull(admission, "admission");
     }
 
     /** Never completes exceptionally for an expected failure; the {@link Result} says what happened. */
@@ -167,9 +174,16 @@ public final class RestoreFlow<R> {
         }
         UUID profileId = before.profileId();
         UUID newNpcUuid = UUID.randomUUID();
-        // The revision check makes a change made while the snapshot was read win.
+        UnaryOperator<CompanionRecord.Builder> change = commitChange(before, request, newNpcUuid);
+        CompanionAdmission.Refusal[] refused = new CompanionAdmission.Refusal[1];
+        // The revision check makes a change made while the snapshot was read win. The caps are
+        // checked in the same locked step, so no other change can fill the slot in between.
         Commit<R> commit = index.atomically(() -> {
-            CompanionIndex.Mutation m = index.update(profileId, before.revision(), commitChange(before, request, newNpcUuid));
+            refused[0] = admission.apply(before, change.apply(before.toBuilder()).build());
+            if (refused[0] != null) {
+                return null;
+            }
+            CompanionIndex.Mutation m = index.update(profileId, before.revision(), change);
             if (!m.applied()) {
                 return null;
             }
@@ -179,6 +193,10 @@ public final class RestoreFlow<R> {
             }
             return new Commit<>(m.after(), old);
         });
+        if (refused[0] != null) {
+            return CompletableFuture.completedFuture(
+                    refused[0] == CompanionAdmission.Refusal.OWNED ? Result.OWNED_LIMIT : Result.GROUP_LIMIT);
+        }
         if (commit == null) {
             return CompletableFuture.completedFuture(Result.CONFLICT);
         }

@@ -60,6 +60,10 @@ public final class OwnerMessageUtil {
         send(player, Message.raw(message));
     }
 
+    /**
+     * Tells the player the owned companion limit is reached, in the player's language. The count,
+     * limit and scope are not shown; they stay in the signature for the existing callers.
+     */
     public static void sendPopulationCapReached(Player player,
                                                 int currentCount,
                                                 int limit,
@@ -67,40 +71,26 @@ public final class OwnerMessageUtil {
         if (!canSend(player)) {
             return;
         }
-        int safeCurrent = Math.max(0, currentCount);
-        int safeLimit = Math.max(0, limit);
-        TwGlobalConfig.PerPlayerLimitScope safeScope = scope == null
-                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
-                : scope;
-        String scopeLabel = safeScope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
-                ? "across loaded worlds"
-                : "in this world";
-        notifyWarning(
-                player,
-                "You cannot tame more NPCs right now (" + safeCurrent + "/" + safeLimit
-                        + " owned " + scopeLabel + ")."
-        );
+        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning, "tamework.ui.population.ownedLimit");
     }
 
     public static void sendClaimPopulationCapReached(Player player, int currentCount, int limit) {
         if (!canSend(player)) {
             return;
         }
-        int safeCurrent = Math.max(0, currentCount);
-        int safeLimit = Math.max(0, limit);
-        notifyWarning(
-                player,
-                "You cannot tame more NPCs in this claim right now ("
-                        + safeCurrent + "/" + safeLimit + " owned in this claim)."
-        );
+        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning,
+                "tamework.ui.population.claimLimit", Math.max(0, currentCount), Math.max(0, limit));
     }
 
+    /**
+     * Tells the player the companion limits cannot be checked right now. {@code reason} is a
+     * diagnostic identifier for logs and is not shown.
+     */
     public static void sendPopulationUnavailable(Player player, String reason) {
         if (!canSend(player)) {
             return;
         }
-        String safeReason = reason == null || reason.isBlank() ? "policy unavailable" : reason.trim();
-        notifyWarning(player, "Companion admission is unavailable: " + safeReason + ".");
+        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning, "tamework.ui.population.unavailable");
     }
 
     private static boolean canSend(Player player) {
@@ -126,12 +116,5 @@ public final class OwnerMessageUtil {
         if (playerRef != null) {
             playerRef.sendMessage(message);
         }
-    }
-
-    private static void notifyWarning(Player player, String message) {
-        if (player == null || message == null || message.isBlank()) {
-            return;
-        }
-        new TameworkUiMessageService().show(player, message, NotificationStyle.Warning);
     }
 }

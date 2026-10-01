@@ -50,7 +50,7 @@ class RestoreAfterReviveTest {
                 owner -> CompletableFuture.completedFuture(null),
                 this::spawnWithProductionFinish,
                 (id, body) -> { },
-                System::currentTimeMillis);
+                System::currentTimeMillis, (b, a) -> null);
         RestoreFlow.Destination here = new RestoreFlow.Destination("default", 1, 2, 3, 0f, 0f);
 
         assertEquals(RestoreFlow.Result.RESTORED,

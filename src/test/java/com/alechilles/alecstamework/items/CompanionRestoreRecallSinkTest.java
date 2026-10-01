@@ -29,7 +29,7 @@ class CompanionRestoreRecallSinkTest {
             owner -> CompletableFuture.completedFuture(null),
             (committed, snap, dest, reason) -> CompletableFuture.completedFuture(true),
             (id, body) -> { },
-            System::currentTimeMillis), new CompanionQueries(index, loaded));
+            System::currentTimeMillis, (b, a) -> null), new CompanionQueries(index, loaded));
 
     private static SnapshotEnvelope snapshot(CompanionRecord r) {
         BsonDocument data = new BsonDocument("Entity", new BsonDocument("Components", new BsonDocument()))

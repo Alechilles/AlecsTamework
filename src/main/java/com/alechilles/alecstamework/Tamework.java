@@ -228,6 +228,7 @@ import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
@@ -656,9 +657,11 @@ public class Tamework extends JavaPlugin {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
             companionQueries = companionModule.queries();
-            restoreFlow = createRestoreFlow(companionModule);
+            CompanionAdmissionGate admissionGate =
+                    new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
+            restoreFlow = createRestoreFlow(companionModule, admissionGate);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
-            registerCompanionPersistenceRuntime();
+            registerCompanionPersistenceRuntime(admissionGate);
         } else if (companionModule != null) {
             registerCompanionPersistenceNotice(companionModule.state());
         }
@@ -1364,7 +1367,8 @@ public class Tamework extends JavaPlugin {
      * Builds the restore used by recall, world-change follow and the panel's Recover and Revive.
      * The snapshot is a fresh capture when the body is loaded, otherwise the stored one.
      */
-    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(CompanionPersistenceModule module) {
+    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(CompanionPersistenceModule module,
+                                                                   CompanionAdmissionGate admissionGate) {
         CompanionSnapshotSource snapshots = new CompanionSnapshotSource(
                 module.queries()::loadedBody, module.index()::get, module.writer()::queueSnapshot,
                 module::readSnapshot, CompanionSnapshots.production());
@@ -1376,18 +1380,18 @@ public class Tamework extends JavaPlugin {
         // generation fence removes it.
         return new RestoreFlow<>(module.index(), module.loaded(), snapshots::read,
                 module.writer()::flushNow, spawner, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
-                System::currentTimeMillis);
+                System::currentTimeMillis, admissionGate::refuse);
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */
-    private void registerCompanionPersistenceRuntime() {
+    private void registerCompanionPersistenceRuntime(CompanionAdmissionGate admissionGate) {
         CompanionPersistenceModule module = companionModule;
         CompanionBodyLifecycle lifecycle = new CompanionBodyLifecycle(
                 module.index(), module.writer(), module.loaded(),
                 TameworkCompanionComponent.getComponentType(),
                 CompanionSnapshots.production(),
                 new CompanionSummaries(new HytaleSummarySources()),
-                module.warnings(), System::currentTimeMillis);
+                module.warnings(), System::currentTimeMillis, admissionGate::refuse);
         CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
                 ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
                 lifecycle);
