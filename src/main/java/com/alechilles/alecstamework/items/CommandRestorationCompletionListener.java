@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionFailureFeedback;
 import com.alechilles.alecstamework.items.persistence.CompanionLifecycleAuthorResult;
 import com.alechilles.alecstamework.items.persistence.CompanionRestorationCompletionListener;
@@ -13,15 +14,51 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * Maps canonical restoration outcomes to released command-item player feedback.
+ * Maps restoration outcomes to command-item player feedback: {@link RestoreFlow} results for the
+ * panel's Revive and Recover buttons, and the old author's results until phase 8 removes it.
+ * Every method runs on the player's world thread.
  */
 public final class CommandRestorationCompletionListener
         implements CompanionRestorationCompletionListener {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    private static final String PREFIX = "tamework.ui.notifications.command.";
     private final CommandFeedbackService feedback =
             new CommandFeedbackService(new TameworkUiMessageService());
+
+    /** The message key for one restore outcome. Only the success message takes the companion name. */
+    @Nonnull
+    static String keyFor(@Nonnull RestoreFlow.Result result) {
+        return PREFIX + switch (result) {
+            case RESTORED -> "respawn.success";
+            case COOLDOWN -> "shared.cooldown";
+            case NOT_ALLOWED, NOT_FOUND -> "respawn.notDeadOrLost";
+            case NO_SNAPSHOT, SPAWN_FAILED -> "respawn.recoverFailed";
+            case COMMIT_FAILED, CONFLICT -> "respawn.unavailable";
+        };
+    }
+
+    /**
+     * Tells the player how a panel restore ended. {@code companionName} is the record's name;
+     * without one the localized default companion name is shown.
+     */
+    void complete(@Nonnull RestoreFlow.Result result, @Nonnull Player player, @Nullable String companionName) {
+        if (result != RestoreFlow.Result.RESTORED) {
+            feedback.showWarningKey(player, keyFor(result));
+            return;
+        }
+        String name = companionName != null && !companionName.isBlank()
+                ? companionName
+                : LocalizedText.resolve(player, PREFIX + "shared.defaultCompanionName");
+        feedback.showSuccessKey(player, keyFor(result), name);
+    }
+
+    /** Tells the player that revive is turned off for this companion. */
+    void reviveDisabled(@Nonnull Player player) {
+        feedback.showWarningKey(player, PREFIX + "respawn.disabled");
+    }
 
     @Override
     public void complete(

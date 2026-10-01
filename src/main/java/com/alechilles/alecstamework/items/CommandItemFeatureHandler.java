@@ -30,7 +30,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHoo
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
-import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -129,13 +129,13 @@ public final class CommandItemFeatureHandler {
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                      @Nullable PersistenceDomainFacades persistence,
-                                     @Nullable FreeCompanionRestorationAuthor restorationAuthor) {
+                                     @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow) {
         this(
                 registry,
                 relocationService,
                 stateSnapshotService,
                 persistence,
-                restorationAuthor,
+                restoreFlow,
                 (CommandTimedSummoningApi) null,
                 (PaidCommandRevivalApi) null,
                 (PopulationGroupApi) null
@@ -147,7 +147,7 @@ public final class CommandItemFeatureHandler {
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable CommandTimedSummoningApi timedSummoning,
             @Nullable PaidCommandRevivalApi paidRevival,
             @Nullable PopulationGroupApi populationGroups
@@ -157,7 +157,7 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 stateSnapshotService,
                 persistence,
-                restorationAuthor,
+                restoreFlow,
                 constant(timedSummoning),
                 constant(paidRevival),
                 constant(populationGroups)
@@ -169,14 +169,14 @@ public final class CommandItemFeatureHandler {
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups
     ) {
         this(
                 registry, relocationService, stateSnapshotService, persistence,
-                restorationAuthor, timedSummoning, paidRevival,
+                restoreFlow, timedSummoning, paidRevival,
                 populationGroups, null
         );
     }
@@ -186,27 +186,30 @@ public final class CommandItemFeatureHandler {
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions
     ) {
         this(registry, relocationService, stateSnapshotService, persistence,
-                restorationAuthor, timedSummoning, paidRevival, populationGroups,
+                restoreFlow, timedSummoning, paidRevival, populationGroups,
                 bondedCompanions, null, null, null);
     }
 
     /**
      * Full constructor. When {@code companions} is set, the panel, owned rows, owned actions,
-     * locate, release and cull read the companion index instead of {@code persistence}.
+     * locate, release and cull read the companion index instead of {@code persistence}. With
+     * {@code restoreFlow} and {@code companions}, the panel's Revive and Recover buttons and
+     * world-change follow restore through the flow; without them, those buttons report that
+     * tracking is unavailable and nothing follows across worlds.
      */
     public CommandItemFeatureHandler(
             CommandItemRegistry registry,
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups,
@@ -334,6 +337,7 @@ public final class CommandItemFeatureHandler {
                 profileActionResolver,
                 RECALL_SAFE_SPAWN_DISTANCE
         );
+        this.worldChangeTravel.useRestoreFlow(restoreFlow, companions);
         this.inventoryRepairService =
                 new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
         this.inventoryCanonicalizer = new CommandPlayerInventoryCanonicalizer(
@@ -351,14 +355,16 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 resolutionService,
                 stepExecutionService,
-                companionPlacementService
+                companionPlacementService,
+                companions
         );
         CommandCompanionRestorationService restorationService =
-                persistenceView != null && restorationAuthor != null
+                persistenceView != null && restoreFlow != null && companions != null
                 ? new CommandCompanionRestorationService(
                         companionPlacementService,
                         persistenceView,
-                        restorationAuthor
+                        restoreFlow,
+                        companions
                 )
                 : null;
         this.ownedActions = companions != null
@@ -628,6 +634,11 @@ public final class CommandItemFeatureHandler {
     /** Internal event observers share the command feature's bounded location cache. */
     public com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker() {
         return capturedItemTracker;
+    }
+
+    /** Sets where a recall of a companion in another world is restored; until then it is skipped. */
+    public void configureRecallRestore(@Nullable CompanionRestoreRecallSink recallRestore) {
+        relocationDispatchService.setRecallRestore(recallRestore);
     }
 
     /** Connects command menu opening to the live public provider registry. */
