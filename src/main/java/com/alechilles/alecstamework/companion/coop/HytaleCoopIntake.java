@@ -271,15 +271,17 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
             if (block == null) {
                 return false;
             }
-            put(world, block, site, entry);
+            put(block, entry);
+            playEffect(world, site);
             return true;
         });
     }
 
     /**
      * Re-checks the unowned body in the same world task (still valid, unstamped, unowned, not in
-     * use, and no capture made a record for it meanwhile), removes it and writes its entry, so the
-     * body and its inline copy never both exist.
+     * use, and no capture made a record for it meanwhile), writes its entry, then removes it, so the
+     * body and its inline copy never both exist. The entry goes first because the unowned NPC has no
+     * record: a failed write must leave the body in the world rather than lose it.
      */
     @Override
     @Nonnull
@@ -300,8 +302,9 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
             if (block == null) {
                 return false;
             }
+            put(block, entry);
             store.removeEntity(body, RemoveReason.REMOVE);
-            put(world, block, site, entry);
+            playEffect(world, site);
             return true;
         });
     }
@@ -353,11 +356,19 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
      * Puts the entry on the coop block and marks its chunk for saving (no forced save: a crash
      * before the chunk saves leaves the record COOP without an entry, which Recover handles).
      */
-    private void put(World world, Block block, CoopIntakeFlow.Site site, TameworkCoopSlotsComponent.Slot entry) {
+    private static void put(Block block, TameworkCoopSlotsComponent.Slot entry) {
         TameworkCoopSlotsComponent base = block.slots() == null ? new TameworkCoopSlotsComponent() : block.slots();
         block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(), base.with(entry));
         block.info().markNeedsSaving(block.store());
-        effects.play(world, site.x() + 0.5, site.y() + 0.5, site.z() + 0.5, site.coopId());
+    }
+
+    /** Effects are cosmetic: a failure is logged and never undoes an intake already written. */
+    private void playEffect(World world, CoopIntakeFlow.Site site) {
+        try {
+            effects.play(world, site.x() + 0.5, site.y() + 0.5, site.z() + 0.5, site.coopId());
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).withCause(failure).log("Coop intake effect failed at %s", site);
+        }
     }
 
     /** The loaded block entity at the position, or null. Call on the world thread. */
