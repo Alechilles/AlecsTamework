@@ -35,6 +35,7 @@ final class CommandCompanionRestorationService {
     enum RequestStatus {
         /** The completion listener answers the player. */
         STARTED,
+        REVIVE_DISABLED,
         UNAVAILABLE,
         INVALID_CONTEXT,
         NOT_DORMANT,
@@ -109,8 +110,7 @@ final class CommandCompanionRestorationService {
             case REVIVE -> reason = RestoreRules.Reason.REVIVE;
             case RECOVER -> reason = RestoreRules.Reason.RECOVER;
             case REVIVE_DISABLED -> {
-                listener.reviveDisabled(player);
-                return RequestStatus.STARTED;
+                return RequestStatus.REVIVE_DISABLED;
             }
             case NOT_DORMANT -> {
                 return RequestStatus.NOT_DORMANT;

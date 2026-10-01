@@ -106,6 +106,8 @@ final class CommandFeedbackService {
         return switch (status) {
             case NOT_DORMANT ->
                     "tamework.ui.notifications.command.respawn.notDeadOrLost";
+            case REVIVE_DISABLED ->
+                    "tamework.ui.notifications.command.respawn.disabled";
             case DESTINATION_NPCS_FROZEN ->
                     "tamework.ui.notifications.command.destination.npcsFrozen";
             case UNAVAILABLE, INVALID_CONTEXT ->

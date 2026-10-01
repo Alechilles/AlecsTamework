@@ -55,11 +55,6 @@ public final class CommandRestorationCompletionListener
         feedback.showSuccessKey(player, keyFor(result), name);
     }
 
-    /** Tells the player that revive is turned off for this companion. */
-    void reviveDisabled(@Nonnull Player player) {
-        feedback.showWarningKey(player, PREFIX + "respawn.disabled");
-    }
-
     @Override
     public void complete(
             @Nonnull CompanionLifecycleAuthorResult result,
