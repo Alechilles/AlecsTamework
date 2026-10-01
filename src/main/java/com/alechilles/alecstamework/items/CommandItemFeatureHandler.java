@@ -298,7 +298,8 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 linkPolicyService,
                 npcNameResolver,
-                stateSnapshotService
+                stateSnapshotService,
+                companions
         );
         this.toolInventoryService = new CommandToolInventoryService(
                 panelEntryService,
@@ -373,11 +374,12 @@ public final class CommandItemFeatureHandler {
                         RECALL_SAFE_SPAWN_DISTANCE
                 );
         this.ownerReleaseService = new CommandOwnerReleaseService(
-                linkPolicyService,
                 feedbackService,
-                npcNameResolver,
                 releaseFlow,
                 companions,
+                persistenceView,
+                toolInventoryService,
+                linkMutationService,
                 inventoryRepairService
         );
         this.ownerCullService = new CommandOwnerCullService(

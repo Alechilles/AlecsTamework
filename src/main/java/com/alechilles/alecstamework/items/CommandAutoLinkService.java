@@ -69,7 +69,8 @@ public final class CommandAutoLinkService {
                 new CommandLinkedNpcRecordStore(),
                 new CommandLinkPolicyService(),
                 new CommandNpcNameResolver(),
-                null
+                null,
+                plugin.getCompanionQueries()
         )).autoLinkNewlyTamedNpcInternal(player, npcRef, store);
     }
 
@@ -86,7 +87,8 @@ public final class CommandAutoLinkService {
                 new CommandLinkedNpcRecordStore(),
                 new CommandLinkPolicyService(),
                 new CommandNpcNameResolver(),
-                null
+                null,
+                plugin.getCompanionQueries()
         )).autoLinkNpcToPreferredToolInternal(player, npcRef, store, preferredToolId);
     }
 

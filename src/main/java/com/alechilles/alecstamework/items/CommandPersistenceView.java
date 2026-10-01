@@ -128,8 +128,15 @@ final class CommandPersistenceView {
 
     void close() { if (savedPanels != null) savedPanels.close(); }
 
-    /** Item records are caches; a known profile's durable links decide panel membership. */
+    /**
+     * Panel membership for one tool. On the companion index, item metadata decides: generic items
+     * keep their selection only there (commit 11106c9a4), so a record without the tool id still
+     * belongs. On the old projection, a known profile's durable links decide.
+     */
     List<LinkedNpcRecord> linkedRecordsForTool(List<LinkedNpcRecord> records, @Nullable String toolId) {
+        if (companions != null) {
+            return records;
+        }
         final UUID tool;
         try {
             tool = UUID.fromString(toolId);

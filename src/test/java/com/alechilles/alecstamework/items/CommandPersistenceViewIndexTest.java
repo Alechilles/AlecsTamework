@@ -100,17 +100,12 @@ class CommandPersistenceViewIndexTest {
     }
 
     @Test
-    void linkedRecordsForToolKeepsOnlyRecordsThatListTheTool() {
-        UUID tool = UUID.randomUUID();
-        UUID linkedNpc = UUID.randomUUID();
-        UUID otherNpc = UUID.randomUUID();
-        live(linkedNpc, List.of(tool.toString()));
-        live(otherNpc, List.of());
-        LinkedNpcRecord linked = record(linkedNpc, null);
-        LinkedNpcRecord other = record(otherNpc, null);
-        LinkedNpcRecord unknown = record(UUID.randomUUID(), null);
+    void aCompanionLinkedOnlyByItemMetadataStaysInThatItemsPanel() {
+        // Generic items keep their selection in item metadata only; the body and record carry no tool id.
+        UUID npc = UUID.randomUUID();
+        CompanionRecord companion = live(npc, List.of());
+        LinkedNpcRecord linked = record(npc, companion.profileId().toString());
 
-        assertEquals(List.of(linked, unknown),
-                view.linkedRecordsForTool(List.of(linked, other, unknown), tool.toString()));
+        assertEquals(List.of(linked), view.linkedRecordsForTool(List.of(linked), UUID.randomUUID().toString()));
     }
 }

@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.runtime.ThrottledWarnings;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -23,6 +24,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
@@ -101,6 +103,22 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         }
         update(stamp.getProfileId(), r -> !Objects.equals(r.ownerUuid(), owner) || !Objects.equals(r.ownerName(), ownerName),
                 r -> CompanionTransitions.ownerChanged(owner, ownerName));
+    }
+
+    /**
+     * The command links of a stamped body changed (linked, relinked or unlinked). The body is the
+     * authority for its tool links, so the record follows it; {@code links} is null on removal.
+     */
+    public void linksChanged(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                             @Nullable TameworkCommandLinksComponent links) {
+        TameworkCompanionComponent stamp = store.getComponent(ref, stampType);
+        if (stamp == null || stamp.getProfileId() == null || !ref.equals(loaded.get(stamp.getProfileId()))) {
+            return;
+        }
+        List<String> tools = CompanionBodyFacts.toolIds(links);
+        update(stamp.getProfileId(), r -> r.location().kind() == LocationKind.LIVE
+                        && !CompanionTransitions.sameTools(r.toolIds(), tools),
+                r -> CompanionTransitions.toolsChanged(tools));
     }
 
     /** Spec 8.6: record the death when DeathComponent is added, and drop the body from the loaded map. */

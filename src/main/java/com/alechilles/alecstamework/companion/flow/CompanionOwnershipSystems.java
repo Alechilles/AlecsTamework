@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.AddReason;
@@ -126,6 +127,52 @@ public final class CompanionOwnershipSystems {
             } else if (isTamed(store, ref)) {
                 lifecycle.tame(ref, store, buffer);
             }
+        }
+    }
+
+    /** Command links put on, changed on or removed from a stamped NPC: the record's tool links follow. */
+    public static final class LinksChanged extends RefChangeSystem<EntityStore, TameworkCommandLinksComponent> {
+        private final CompanionBodyLifecycle lifecycle;
+        private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType;
+        private final Query<EntityStore> query;
+
+        public LinksChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+                            @Nonnull ComponentType<EntityStore, TameworkCommandLinksComponent> links,
+                            @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
+            this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
+            this.linksType = Objects.requireNonNull(links, "links");
+            this.query = Query.and(npc, links, stamp);
+        }
+
+        @Override
+        @Nonnull
+        public ComponentType<EntityStore, TameworkCommandLinksComponent> componentType() {
+            return linksType;
+        }
+
+        @Override
+        public void onComponentAdded(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkCommandLinksComponent component,
+                                     @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+            lifecycle.linksChanged(ref, store, component);
+        }
+
+        @Override
+        public void onComponentSet(@Nonnull Ref<EntityStore> ref, @Nullable TameworkCommandLinksComponent oldComponent,
+                                   @Nonnull TameworkCommandLinksComponent newComponent, @Nonnull Store<EntityStore> store,
+                                   @Nonnull CommandBuffer<EntityStore> buffer) {
+            lifecycle.linksChanged(ref, store, newComponent);
+        }
+
+        @Override
+        public void onComponentRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkCommandLinksComponent component,
+                                       @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+            lifecycle.linksChanged(ref, store, null);
+        }
+
+        @Override
+        @Nonnull
+        public Query<EntityStore> getQuery() {
+            return query;
         }
     }
 

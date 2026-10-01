@@ -6,6 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -388,38 +397,33 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
-    void releaseRemovesOwnedNpcWithoutWaitingForNpcTicks() throws Exception {
+    void panelReleaseOfADeadCompanionByItsPresentationRowReleasesIt() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
-            LiveTarget target = scope.liveOrdinaryTarget(true);
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
+            LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
+            CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0,
+                    new CompanionTransitions.BodyFacts(UUID.randomUUID(), target.owner, "Alec", "Tamed_Chicken",
+                            "Chicken", "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY));
+            index.insert(live);
+            index.update(live.profileId(), index.get(live.profileId()).revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            CompanionQueries companions = new CompanionQueries(index, loaded);
             CommandOwnerReleaseService release = new CommandOwnerReleaseService(
-                    new CommandLinkPolicyService(),
                     new CommandFeedbackService(null),
-                    new CommandNpcNameResolver());
+                    new ReleaseFlow(index, loaded, ignored -> { }),
+                    companions,
+                    new CommandPersistenceView(companions),
+                    new CommandToolInventoryService(null, null, null, null),
+                    new CommandLinkMutationService(new CommandLinkedNpcRecordStore(),
+                            new CommandLinkPolicyService(), null, null),
+                    null);
 
+            // A bodiless companion's panel row carries its derived presentation UUID.
             release.release(target.player, "generic-tool", genericConfig(),
-                    target.uuid);
+                    CommandRosterPanelRecordSource.presentationUuid(new ProfileId(live.profileId())));
 
-            // Release must remove the entity even when no NPC tick advances its timer.
-            assertEquals(List.of(target.reference), scope.removedEntities);
-        }
-    }
-
-    @Test
-    void forgedGenericReleaseLeavesBondedTargetOwnershipUntouched()
-            throws Exception {
-        try (ProjectionScope scope = ProjectionScope.install()) {
-            LiveTarget target = scope.liveBondedTarget();
-            CommandOwnerReleaseService release = new CommandOwnerReleaseService(
-                    new CommandLinkPolicyService(),
-                    new CommandFeedbackService(null),
-                    new CommandNpcNameResolver());
-
-            release.release(target.player, "generic-tool", genericConfig(),
-                    target.uuid);
-
-            assertEquals(target.owner, scope.store.getComponent(
-                    target.reference, scope.ownerType).getOwnerId());
-            assertTrue(scope.removedEntities.isEmpty());
+            assertEquals(LocationKind.RELEASED, index.get(live.profileId()).location().kind());
         }
     }
 

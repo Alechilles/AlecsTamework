@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.live;
 import com.alechilles.alecstamework.items.CommandLinkedPanelCooldownSnapshotService;
 import com.alechilles.alecstamework.items.CommandLoadedNpcStatusSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcNameResolver;
+import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -21,7 +22,9 @@ public final class HytaleSummarySources implements CompanionSummaries.Sources {
     @Nullable
     @Override
     public String roleId(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
-        return CompanionRoleIdResolver.resolveRoleId(ref, store);
+        // A mounted or parked body reports Empty_Role; the summary keeps its real role instead.
+        String live = CompanionRoleIdResolver.resolveRoleId(ref, store);
+        return live == null ? null : MountedNpcSnapshotRoleResolver.durableRoleId(live, ref, store);
     }
 
     @Nullable

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -23,8 +24,6 @@ import org.joml.Vector3d;
 
 /** Reads what a loaded body tells the index. Call on the body's world thread. */
 public final class CompanionBodyFacts {
-    private static final String UNKNOWN_ROLE = "unknown";
-
     private CompanionBodyFacts() {
     }
 
@@ -46,14 +45,17 @@ public final class CompanionBodyFacts {
         TameworkOwnerComponent owner = get(store, ref, TameworkOwnerComponent.getComponentType());
         TameworkNpcNameComponent name = get(store, ref, TameworkNpcNameComponent.getComponentType());
         TameworkCommandLinksComponent links = get(store, ref, TameworkCommandLinksComponent.getComponentType());
-        String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
+        String liveRole = CompanionRoleIdResolver.resolveRoleId(ref, store);
+        // Mounting and avatar-flight parking swap the role to Empty_Role; record the real one.
+        String roleId = liveRole == null || liveRole.isBlank() ? CompanionTransitions.UNKNOWN_ROLE
+                : MountedNpcSnapshotRoleResolver.durableRoleId(liveRole, ref, store);
         String displayName = name == null ? null : name.getName();
         CompanionSummary summary = summaries.capture(ref, store, System.currentTimeMillis());
         return new CompanionTransitions.BodyFacts(
                 npcUuid,
                 owner == null ? null : owner.getOwnerId(),
                 owner == null ? null : owner.getOwnerName(),
-                roleId == null || roleId.isBlank() ? UNKNOWN_ROLE : roleId,
+                roleId,
                 displayName == null || displayName.isBlank() ? null : displayName,
                 world,
                 position.x, position.y, position.z,
@@ -69,7 +71,9 @@ public final class CompanionBodyFacts {
         return name == null || name.isBlank() ? null : name;
     }
 
-    private static List<String> toolIds(@Nullable TameworkCommandLinksComponent links) {
+    /** The non-blank tool ids of a body's command links; empty without links. */
+    @Nonnull
+    static List<String> toolIds(@Nullable TameworkCommandLinksComponent links) {
         String[] ids = links == null ? null : links.getToolIds();
         if (ids == null || ids.length == 0) {
             return List.of();

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,14 +26,20 @@ public final class CompanionTransitions {
     /** Position changes below this many blocks are not worth a record write. */
     private static final double MOVE_THRESHOLD = 2.0;
 
-    /** What a loaded body tells the index, read on its world thread. */
+    /** The role recorded when none is known, for example a body tamed while parked in Empty_Role. */
+    public static final String UNKNOWN_ROLE = "unknown";
+
+    /**
+     * What a loaded body tells the index, read on its world thread. {@code roleId} is null while
+     * the body is parked (mounted or in avatar flight) with no known original role; the record
+     * then keeps the role it has.
+     */
     public record BodyFacts(@Nonnull UUID npcUuid, @Nullable UUID ownerUuid, @Nullable String ownerName,
-                            @Nonnull String roleId, @Nullable String displayName, @Nonnull String world,
+                            @Nullable String roleId, @Nullable String displayName, @Nonnull String world,
                             double x, double y, double z, @Nonnull List<String> toolIds,
                             @Nonnull CompanionSummary summary) {
         public BodyFacts {
             Objects.requireNonNull(npcUuid, "npcUuid");
-            Objects.requireNonNull(roleId, "roleId");
             Objects.requireNonNull(world, "world");
             Objects.requireNonNull(summary, "summary");
             toolIds = List.copyOf(toolIds);
@@ -44,7 +51,7 @@ public final class CompanionTransitions {
 
     @Nonnull
     public static CompanionRecord newLive(@Nonnull UUID profileId, long generation, @Nonnull BodyFacts body) {
-        return CompanionRecord.builder(profileId, body.roleId(), live(body))
+        return CompanionRecord.builder(profileId, body.roleId() == null ? UNKNOWN_ROLE : body.roleId(), live(body))
                 .generation(generation)
                 .ownerUuid(body.ownerUuid())
                 .ownerName(body.ownerName())
@@ -62,8 +69,9 @@ public final class CompanionTransitions {
         return at.kind() != LocationKind.LIVE
                 || !body.world().equals(at.world())
                 || !body.npcUuid().equals(record.currentNpcUuid())
-                || !body.roleId().equals(record.roleId())
+                || body.roleId() != null && !body.roleId().equals(record.roleId())
                 || !Objects.equals(body.displayName(), record.displayName())
+                || !sameTools(record.toolIds(), body.toolIds())
                 || Math.abs(at.x() - body.x()) > MOVE_THRESHOLD
                 || Math.abs(at.y() - body.y()) > MOVE_THRESHOLD
                 || Math.abs(at.z() - body.z()) > MOVE_THRESHOLD;
@@ -71,9 +79,16 @@ public final class CompanionTransitions {
 
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> seenAt(@Nonnull BodyFacts body) {
-        // The body is the authority for its role and name (they change on growth and rename).
-        return b -> b.location(live(body)).currentNpcUuid(body.npcUuid())
-                .roleId(body.roleId()).displayName(body.displayName());
+        // The body is the authority for its role, name and tool links (they change on growth,
+        // rename and linking). An unknown role (parked body) keeps the record's role.
+        return b -> {
+            b.location(live(body)).currentNpcUuid(body.npcUuid())
+                    .displayName(body.displayName()).toolIds(body.toolIds());
+            if (body.roleId() != null) {
+                b.roleId(body.roleId());
+            }
+            return b;
+        };
     }
 
     /** A body newer than its record wins (spec 6.8): the record moves to LIVE at its generation. */
@@ -150,6 +165,17 @@ public final class CompanionTransitions {
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> ownerChanged(@Nullable UUID owner, @Nullable String ownerName) {
         return b -> b.ownerUuid(owner).ownerName(ownerName);
+    }
+
+    /** The command links of a live body changed; the body is the authority for them. */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> toolsChanged(@Nonnull List<String> toolIds) {
+        return b -> b.toolIds(toolIds);
+    }
+
+    /** Tool links compare as sets: their order carries no meaning. */
+    public static boolean sameTools(@Nonnull List<String> a, @Nonnull List<String> b) {
+        return new HashSet<>(a).equals(new HashSet<>(b));
     }
 
     private static CompanionLocation live(BodyFacts body) {

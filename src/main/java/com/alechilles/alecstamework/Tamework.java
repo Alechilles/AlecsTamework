@@ -3179,6 +3179,13 @@ public class Tamework extends JavaPlugin {
         return commandLinksComponentType;
     }
 
+    /** Companion index reads, or null while companion saving is paused (the module is not ready). */
+    @Nullable
+    public CompanionQueries getCompanionQueries() {
+        CompanionPersistenceModule module = companionModule;
+        return module != null && module.ready() ? module.queries() : null;
+    }
+
     public ComponentType<EntityStore, TameworkHappinessComponent> getHappinessComponentType() {
         return happinessComponentType;
     }

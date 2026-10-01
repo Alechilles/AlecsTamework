@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -7,6 +10,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
@@ -32,6 +36,8 @@ final class CommandLinkMutationService {
     private final CommandNpcNameResolver npcNameResolver;
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    @Nullable
+    private final CompanionQueries companions;
 
     CommandLinkMutationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                CommandLinkPolicyService linkPolicyService,
@@ -43,10 +49,20 @@ final class CommandLinkMutationService {
                                CommandLinkPolicyService linkPolicyService,
                                CommandNpcNameResolver npcNameResolver,
                                @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
+        this(linkedNpcRecordStore, linkPolicyService, npcNameResolver, stateSnapshotService, null);
+    }
+
+    /** {@code companions} lets new and refreshed links carry the companion profile id; null skips it. */
+    CommandLinkMutationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                               CommandLinkPolicyService linkPolicyService,
+                               CommandNpcNameResolver npcNameResolver,
+                               @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                               @Nullable CompanionQueries companions) {
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
         this.stateSnapshotService = stateSnapshotService;
+        this.companions = companions;
     }
 
     LinkToggleResult tryToggleLink(Player player,
@@ -134,6 +150,7 @@ final class CommandLinkMutationService {
                     ? links.getHomePosition() : null;
             updatedItem = linkedNpcRecordStore.upsert(
                     workingItem,
+                    resolveProfileId(targetRef, store, npcUuid),
                     npcUuid,
                     lastKnown,
                     resolveWorldName(store, player.getWorld()),
@@ -197,6 +214,8 @@ final class CommandLinkMutationService {
                                     String cachedRoleId) {
         return linkedNpcRecordStore.upsert(
                 stack,
+                missingProfileId(linkedNpcRecordStore.read(stack), npcUuid)
+                        ? resolveProfileId(null, null, npcUuid) : null,
                 npcUuid,
                 position,
                 lastKnownWorldName,
@@ -207,6 +226,31 @@ final class CommandLinkMutationService {
                 null,
                 null
         );
+    }
+
+    /**
+     * The companion profile of a linked NPC, so a dead or lost companion can still be matched
+     * from item metadata: its stamp, or its index record when the stamp is not applied yet (a
+     * tame and auto-link in the same tick). Null without either. World thread when a ref is given.
+     */
+    @Nullable
+    private String resolveProfileId(@Nullable Ref<EntityStore> ref, @Nullable Store<EntityStore> store,
+                                    @Nullable UUID npcUuid) {
+        ComponentType<EntityStore, TameworkCompanionComponent> stampType =
+                TameworkCompanionComponent.getComponentType();
+        TameworkCompanionComponent stamp = ref == null || !ref.isValid() || store == null || stampType == null
+                ? null : store.getComponent(ref, stampType);
+        if (stamp != null && stamp.getProfileId() != null) {
+            return stamp.getProfileId().toString();
+        }
+        CompanionRecord record = companions == null || npcUuid == null ? null : companions.byNpcUuid(npcUuid);
+        return record == null ? null : record.profileId().toString();
+    }
+
+    /** A refresh fills in a missing profile id but never replaces the one an item record already has. */
+    private boolean missingProfileId(List<LinkedNpcRecord> records, UUID npcUuid) {
+        LinkedNpcRecord existing = linkedNpcRecordStore.find(records, npcUuid);
+        return existing == null || existing.profileId == null;
     }
 
     ItemStack refreshLinkedNpcPositions(ItemStack stack, List<Candidate> recipients, Store<EntityStore> store) {
@@ -223,6 +267,7 @@ final class CommandLinkMutationService {
         Map<UUID, String> stateOverrides = commandStateOverrides != null
                 ? commandStateOverrides : Map.of();
         ItemStack updated = stack;
+        List<LinkedNpcRecord> known = linkedNpcRecordStore.read(stack);
         for (Candidate candidate : recipients) {
             if (candidate == null || candidate.ref == null || candidate.npc == null || candidate.npc.getUuid() == null) {
                 continue;
@@ -239,6 +284,8 @@ final class CommandLinkMutationService {
             String commandState = stateOverrides.get(candidate.npc.getUuid());
             updated = linkedNpcRecordStore.upsert(
                     updated,
+                    missingProfileId(known, candidate.npc.getUuid())
+                            ? resolveProfileId(candidate.ref, store, candidate.npc.getUuid()) : null,
                     candidate.npc.getUuid(),
                     position,
                     worldName,

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -257,7 +258,7 @@ public final class TameworkNpcCullService {
             );
         }
         return applyCull(
-                player, player.getUuid(), target, store, managedRewards
+                player, player.getUuid(), target, store, managedRewards, false
         );
     }
 
@@ -311,7 +312,7 @@ public final class TameworkNpcCullService {
                     LeaseBoundWorldDispatcher.execute(world, () ->
                             applyDeferredCull(
                                     world, ownerUuid, targetUuid,
-                                    managedRewards
+                                    managedRewards, false
                             ));
                 }
             }
@@ -339,7 +340,7 @@ public final class TameworkNpcCullService {
                     && (outcome == CullTerminalOwnerReleaseService.Outcome.RELEASED
                     || outcome == CullTerminalOwnerReleaseService.Outcome.NOT_TRACKED)) {
                 LeaseBoundWorldDispatcher.execute(world, () -> applyDeferredCull(
-                        world, actorUuid, targetUuid, managedRewards
+                        world, actorUuid, targetUuid, managedRewards, true
                 ));
             } else {
                 CommandUiCurrentWorldDispatcher.production().dispatch(actorUuid, (playerRef, store) -> {
@@ -357,7 +358,8 @@ public final class TameworkNpcCullService {
             World world,
             UUID ownerUuid,
             UUID targetUuid,
-            boolean managedRewards
+            boolean managedRewards,
+            boolean companionReleased
     ) {
         if (world.getEntityStore() == null) {
             return;
@@ -374,7 +376,7 @@ public final class TameworkNpcCullService {
         WorldPlayerResolver.ResolvedPlayer resolved =
                 WorldPlayerResolver.resolve(world, ownerUuid);
         Player player = resolved == null ? null : resolved.player();
-        applyCull(player, ownerUuid, target, store, managedRewards);
+        applyCull(player, ownerUuid, target, store, managedRewards, companionReleased);
     }
 
     @Nullable
@@ -394,7 +396,8 @@ public final class TameworkNpcCullService {
             @Nullable UUID ownerUuid,
             Ref<EntityStore> target,
             Store<EntityStore> store,
-            boolean managedRewards
+            boolean managedRewards,
+            boolean companionReleased
     ) {
         ComponentType<EntityStore, DeathComponent> deathType =
                 resolveDeathComponentType();
@@ -416,6 +419,9 @@ public final class TameworkNpcCullService {
                 : CullRewardService.Outcome.unavailable();
         unlinkCommandTarget(target, store);
         removeCommandToolRecords(player, npc == null ? null : npc.getUuid());
+        if (companionReleased) {
+            removeCompanionStamp(target, store);
+        }
         DeathComponent.tryAddComponent(
                 store,
                 target,
@@ -574,6 +580,20 @@ public final class TameworkNpcCullService {
      * companion. Removing it prevents culling from creating a revivable
      * dormant profile.</p>
      */
+    /**
+     * A culled companion's record is already RELEASED and its body unregistered, so the body is
+     * no longer a companion. Removing the stamp lets the cull death drop items: revivable drop
+     * suppression keys on the stamp and stays for real deaths (spec 8.6). World thread only.
+     */
+    private static void removeCompanionStamp(Ref<EntityStore> target,
+                                             Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkCompanionComponent> stampType =
+                TameworkCompanionComponent.getComponentType();
+        if (stampType != null && store.getComponent(target, stampType) != null) {
+            store.removeComponent(target, stampType);
+        }
+    }
+
     private void unlinkCommandTarget(Ref<EntityStore> target,
                                      Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
