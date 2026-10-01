@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.MemoryCompanionFileIo;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -100,6 +102,27 @@ class CompanionPersistenceModuleTest {
             assertEquals(queued, module.readSnapshot(profile).join(), "the file is not written yet");
         } finally {
             gate.countDown();
+            module.shutdown(System.currentTimeMillis() + 5_000L);
+        }
+    }
+
+    @Test
+    void theFolderSizeIsMeasuredInTheBackgroundAndThenServedFromMemory(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("owners"));
+        Files.write(root.resolve("owners").resolve(OWNER + ".json"), new byte[40]);
+        Files.write(root.resolve("meta.json"), new byte[2]);
+        CompanionPersistenceModule module = CompanionPersistenceModule.open(root, List.of(DATA), p -> false,
+                new MemoryCompanionFileIo(), System::currentTimeMillis, "test");
+        try {
+            long deadline = System.currentTimeMillis() + 5_000L;
+            while (module.folderBytes() != 42L && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10L);
+            }
+            assertEquals(42L, module.folderBytes());
+
+            Files.write(root.resolve("owners").resolve("later.json"), new byte[8]);
+            assertEquals(42L, module.folderBytes(), "a fresh measurement is reused, not read again");
+        } finally {
             module.shutdown(System.currentTimeMillis() + 5_000L);
         }
     }

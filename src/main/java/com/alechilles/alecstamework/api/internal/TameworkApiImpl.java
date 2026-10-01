@@ -28,7 +28,6 @@ import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
-import com.alechilles.alecstamework.api.ProfileDataOperationView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
@@ -124,10 +123,11 @@ public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
     static final String API_VERSION = "3.0.0";
-    private static final String SNAPSHOT_CAPTURE = "capture";
-    private static final String SNAPSHOT_DEATH = "death";
-    private static final String SNAPSHOT_LOST = "lost";
-    private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {SNAPSHOT_CAPTURE, SNAPSHOT_DEATH, SNAPSHOT_LOST};
+    private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {
+            CompanionRecordApiMapper.SNAPSHOT_CAPTURE,
+            CompanionRecordApiMapper.SNAPSHOT_DEATH,
+            CompanionRecordApiMapper.SNAPSHOT_LOST
+    };
 
     private final NpcProfilesApi profilesApi;
     private final ProfileDataApi profileDataApi;
@@ -146,7 +146,14 @@ public final class TameworkApiImpl
             new CapturedItemDisplayRegistry();
     private final BreedingCooldownResetService breedingCooldownResetService =
             new BreedingCooldownResetService();
-    private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
+    private final CommandLinksApi commandLinksApi = new CommandLinks();
+
+    /**
+     * A public named class, not an anonymous one: the NPC Debug Inspector looks methods up on the
+     * returned object's own class, and a method declared by a non-public class cannot be invoked
+     * from another mod.
+     */
+    public final class CommandLinks implements CommandLinksApi {
         @Override
         public Optional<CommandLinkView> getByProfileId(String profileId) {
             return getCommandLinkByProfileId(profileId);
@@ -171,8 +178,11 @@ public final class TameworkApiImpl
         public boolean hasHomePosition(String profileId) {
             return hasHomePositionInternal(profileId);
         }
-    };
-    private final ProgressionApi progressionApi = new ProgressionApi() {
+    }
+    private final ProgressionApi progressionApi = new Progression();
+
+    /** A public named class for the same reason as {@link CommandLinks}. */
+    public final class Progression implements ProgressionApi {
         @Override
         public Optional<ProgressionView> getByProfileId(String profileId) {
             return getProgressionByProfileId(profileId);
@@ -272,7 +282,7 @@ public final class TameworkApiImpl
         public ProgressionMutationResult syncStoredAttachments(UUID npcUuid) {
             return syncStoredAttachmentsByNpcUuid(npcUuid);
         }
-    };
+    }
     private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
             TameworkApiCapability.PROFILES,
             TameworkApiCapability.COMMAND_LINKS,
@@ -421,7 +431,10 @@ public final class TameworkApiImpl
         }
     }
 
-    /** Activates the API surface only after capture journal recovery has succeeded. */
+    /**
+     * Gives the config reads their capture item and capture policy registries and advertises
+     * {@link TameworkApiCapability#CAPTURE_POLICY}. Call it once capture is wired.
+     */
     public void activateCapturePolicyRuntime(@Nonnull ItemFeatureRegistry itemConfigs,
                                              @Nonnull CapturePolicyRegistry policyRegistry) {
         captureItemConfigs = Objects.requireNonNull(itemConfigs, "itemConfigs");
@@ -731,14 +744,6 @@ public final class TameworkApiImpl
             ProfileDataCompareAndSetRequest request
     ) {
         return profileDataApi.compareAndSet(request);
-    }
-
-    @Override
-    public CompletionStage<Optional<ProfileDataOperationView>> findOperation(
-            String namespace,
-            String idempotencyKey
-    ) {
-        return profileDataApi.findOperation(namespace, idempotencyKey);
     }
 
     @Override

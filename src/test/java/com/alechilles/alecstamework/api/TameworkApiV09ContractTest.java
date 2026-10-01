@@ -22,10 +22,7 @@ class TameworkApiV09ContractTest {
                 legacy.commandUi().registerRenderer("example:menu", null).status()
         );
 
-        assertEquals(
-                PopulationGroupReconciliationView.Readiness.UNAVAILABLE,
-                legacy.populationGroups().getReconciliationStatus().readiness()
-        );
+        assertTrue(legacy.populationGroups().getDefinition("example:group").isEmpty());
     }
 
     @Test

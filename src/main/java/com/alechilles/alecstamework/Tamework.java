@@ -15,7 +15,11 @@ import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
+import com.alechilles.alecstamework.api.internal.CompanionEventPublisher;
+import com.alechilles.alecstamework.api.internal.IndexDiagnosticsApi;
 import com.alechilles.alecstamework.api.internal.IndexNpcProfilesApi;
+import com.alechilles.alecstamework.api.internal.IndexPopulationGroupApi;
+import com.alechilles.alecstamework.api.internal.IndexProfileDataApi;
 import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
@@ -747,8 +751,13 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
         if (profilesApi != null) {
+            CompanionPersistenceModule apiModule = companionModule;
             IndexTameworkApi indexApi = new IndexTameworkApi(
                     profilesApi,
+                    new IndexProfileDataApi(apiModule.index(), apiModule.writer()::flushNow),
+                    new IndexDiagnosticsApi(apiModule.index(), apiModule.writer()::status,
+                            apiModule.root().toString(), apiModule::folderBytes, apiModule::unreadableCount),
+                    new IndexPopulationGroupApi(apiModule.index(), populationGroupConfigRegistry::snapshot),
                     apiEventBus,
                     commandLinkedNpcStateSnapshotService,
                     interactionExtensionRegistry,
@@ -760,6 +769,12 @@ public class Tamework extends JavaPlugin {
                     capturePolicyRegistry);
             ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
             api = indexApi;
+            // Companion events go out after the index lock is released, on the changing thread (spec 9).
+            apiModule.addAfterUnlockListener(new CompanionEventPublisher(
+                    apiEventBus,
+                    roleId -> populationGroupConfigRegistry.snapshot().resolvePoliciesForRole(roleId).stream()
+                            .map(policy -> policy.groupId()).toList(),
+                    System::currentTimeMillis));
         } else {
             // No public API without the companion index; activity producers and care credits
             // still need their runtime.
@@ -804,7 +819,7 @@ public class Tamework extends JavaPlugin {
                             module.writer()::flushNow, admissionGate::refuse),
                     restoreFlow, new HytaleCaptureDelivery(module.index()),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
-                    admissionGate, commandItemRegistry);
+                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);

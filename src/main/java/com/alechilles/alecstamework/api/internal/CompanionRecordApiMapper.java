@@ -10,8 +10,11 @@ import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.google.gson.JsonObject;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -120,8 +123,10 @@ public final class CompanionRecordApiMapper {
     }
 
     /**
-     * Builds the saved trait row from the record summary. Trait data is unavailable when the
-     * companion has no saved summary yet or its trait config no longer resolves.
+     * Builds the saved trait row from the record summary. Trait data is unavailable, and the
+     * row carries no values, when the companion has no saved summary yet, its trait config no
+     * longer resolves, or any saved trait has a blank id, a non-finite value or no definition in
+     * that config (ids match without regard to case).
      *
      * @param traitConfigs resolves a trait config id; may return null or throw for an unknown id
      */
@@ -140,7 +145,7 @@ public final class CompanionRecordApiMapper {
                 config = null;
             }
         }
-        boolean available = config != null;
+        boolean available = config != null && allDefined(summary.traits(), config);
         return new OwnedTraitSnapshot(
                 record.profileId().toString(),
                 record.roleId(),
@@ -152,6 +157,22 @@ public final class CompanionRecordApiMapper {
                 available,
                 Math.max(0L, summary.observedAtMs())
         );
+    }
+
+    private static boolean allDefined(@Nonnull Map<String, Double> traits, @Nonnull TwTraitConfig config) {
+        Set<String> defined = new HashSet<>();
+        for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
+            if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
+                defined.add(definition.getId().trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        for (Map.Entry<String, Double> trait : traits.entrySet()) {
+            if (trait.getKey().isBlank() || !Double.isFinite(trait.getValue())
+                    || !defined.contains(trait.getKey().trim().toLowerCase(Locale.ROOT))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Nonnull

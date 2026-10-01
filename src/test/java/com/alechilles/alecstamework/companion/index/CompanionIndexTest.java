@@ -185,4 +185,112 @@ class CompanionIndexTest {
         assertEquals(cap, admitted.get());
         assertEquals(cap, index.ownedCount(ALICE));
     }
+
+    @Test
+    void afterUnlockListenersGetEveryChangeOfTheOutermostSectionInOrderOnceItExits() {
+        List<String> delivered = new ArrayList<>();
+        index.addAfterUnlockListener((before, after) -> delivered.add(after.displayName()));
+        CompanionRecord r = live(ALICE);
+
+        index.atomically(() -> {
+            index.insert(r.toBuilder().displayName("a").build());
+            index.atomically(() -> index.update(r.profileId(), 0, b -> b.displayName("b")));
+            CompanionRecord previous = index.get(r.profileId());
+            index.update(r.profileId(), 1, b -> b.displayName("c"));
+            index.revert(r.profileId(), 2, previous);
+            // The under-lock listener has seen all four changes; nothing is delivered until the section exits.
+            assertEquals(4, changes.size());
+            assertTrue(delivered.isEmpty());
+            return null;
+        });
+
+        assertEquals(List.of("a", "b", "c", "b"), delivered);
+
+        index.update(r.profileId(), 3, b -> b.displayName("d"));
+
+        assertEquals(List.of("a", "b", "c", "b", "d"), delivered);
+    }
+
+    @Test
+    void afterUnlockListenersRunWithTheLockReleased() throws Exception {
+        CompanionRecord r = live(ALICE);
+        index.insert(r);
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        AtomicReference<Object> otherThreadWrite = new AtomicReference<>();
+        index.addAfterUnlockListener((before, after) -> {
+            if (!"first".equals(after.displayName())) {
+                return;
+            }
+            try {
+                // A write from another thread needs the lock; it would time out if this thread still held it.
+                otherThreadWrite.set(other.submit(
+                        () -> index.update(r.profileId(), after.revision(), b -> b.displayName("second")).status())
+                        .get(5, TimeUnit.SECONDS));
+            } catch (Exception failure) {
+                otherThreadWrite.set(failure);
+            }
+        });
+
+        index.atomically(() -> index.update(r.profileId(), 0, b -> b.displayName("first")));
+        other.shutdown();
+
+        assertEquals(CompanionIndex.Status.APPLIED, otherThreadWrite.get());
+        assertEquals("second", index.get(r.profileId()).displayName());
+    }
+
+    @Test
+    void aThrowingAfterUnlockListenerStopsNeitherTheOtherListenersNorLaterChanges() {
+        List<String> delivered = new ArrayList<>();
+        index.addAfterUnlockListener((before, after) -> {
+            throw new IllegalStateException("listener failure");
+        });
+        index.addAfterUnlockListener((before, after) -> delivered.add(after.displayName()));
+        CompanionRecord r = live(ALICE);
+
+        CompanionIndex.Mutation inserted = index.insert(r.toBuilder().displayName("a").build());
+        index.update(r.profileId(), 0, b -> b.displayName("b"));
+
+        assertTrue(inserted.applied());
+        assertEquals(List.of("a", "b"), delivered);
+    }
+
+    @Test
+    void anAfterUnlockListenerThatChangesTheIndexIsHeardAfterTheCurrentBatch() {
+        List<String> delivered = new ArrayList<>();
+        AtomicInteger depth = new AtomicInteger();
+        AtomicInteger deepest = new AtomicInteger();
+        CompanionRecord first = live(ALICE);
+        CompanionRecord second = live(BOB);
+        index.addAfterUnlockListener((before, after) -> {
+            deepest.accumulateAndGet(depth.incrementAndGet(), Math::max);
+            delivered.add(after.displayName());
+            if ("a1".equals(after.displayName())) {
+                // Reads see the whole committed section; the write is queued behind "b1".
+                assertEquals("b1", index.get(second.profileId()).displayName());
+                index.update(first.profileId(), 0, b -> b.displayName("a2"));
+            }
+            depth.decrementAndGet();
+        });
+
+        index.atomically(() -> {
+            index.insert(first.toBuilder().displayName("a1").build());
+            index.insert(second.toBuilder().displayName("b1").build());
+            return null;
+        });
+
+        assertEquals(List.of("a1", "b1", "a2"), delivered);
+        assertEquals(1, deepest.get());
+        assertEquals("a2", index.get(first.profileId()).displayName());
+    }
+
+    @Test
+    void loadingRecordsNotifiesNoAfterUnlockListener() {
+        List<String> delivered = new ArrayList<>();
+        index.addAfterUnlockListener((before, after) -> delivered.add(after.displayName()));
+
+        index.load(List.of(live(ALICE)));
+
+        assertTrue(delivered.isEmpty());
+        assertEquals(1, index.ownedCount(ALICE));
+    }
 }

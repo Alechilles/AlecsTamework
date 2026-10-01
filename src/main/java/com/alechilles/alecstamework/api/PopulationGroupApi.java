@@ -8,7 +8,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Read-only population-group definitions, counts, and reconciliation authority. */
+/** Read-only population-group definitions and counts. */
 public interface PopulationGroupApi {
     @Nonnull
     Optional<PopulationGroupDefinitionView> getDefinition(@Nonnull String groupId);
@@ -68,9 +68,6 @@ public interface PopulationGroupApi {
         return OptionalLong.empty();
     }
 
-    @Nonnull
-    PopulationGroupReconciliationView getReconciliationStatus();
-
     /** Compatibility fallback for implementations without group authority. */
     static PopulationGroupApi unavailable() {
         return UnavailableHolder.INSTANCE;
@@ -97,11 +94,6 @@ public interface PopulationGroupApi {
                 if (ownerUuid == null) throw new NullPointerException("ownerUuid");
                 if (groupId == null) throw new NullPointerException("groupId");
                 return Optional.empty();
-            }
-
-            @Override
-            public PopulationGroupReconciliationView getReconciliationStatus() {
-                return PopulationGroupReconciliationView.unavailable();
             }
         };
 

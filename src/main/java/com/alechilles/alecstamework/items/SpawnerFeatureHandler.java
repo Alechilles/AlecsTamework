@@ -1,10 +1,13 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
+import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptFormula;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
 import com.alechilles.alecstamework.companion.flow.CaptureFlow;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
@@ -70,6 +73,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -85,7 +89,9 @@ import org.bson.BsonDocument;
  * current world by UUID; no live component crosses a thread.
  *
  * <p>A TAME_AND_COMMAND_LINK capture tames the wild body in place for the capturing player and
- * registers it as a member of the item's command-family roster (record {@code rosterId}). Bonded
+ * registers it as a member of the item's command-family roster (record {@code rosterId}). A
+ * capture that succeeds, and a failed roll that spent its source, publish
+ * {@link CaptureAttemptResolvedEvent} on the body's world thread. Bonded
  * captures (phase 6) are refused. Items in the 2.x and 4.x formats are refused until their
  * migration.
  */
@@ -117,6 +123,7 @@ public final class SpawnerFeatureHandler {
     private final CompanionSummaries summaries;
     private final CompanionAdmissionGate admissionGate;
     private final CommandItemRegistry commandItems;
+    private final Consumer<CaptureAttemptResolvedEvent> captureResolved;
     /** Profiles (or unstamped NPC UUIDs) with a capture commit in flight. */
     private final Set<UUID> capturing = ConcurrentHashMap.newKeySet();
     /** Profiles with a release in flight. */
@@ -136,7 +143,8 @@ public final class SpawnerFeatureHandler {
             @Nonnull CompanionSnapshots snapshots,
             @Nonnull CompanionSummaries summaries,
             @Nonnull CompanionAdmissionGate admissionGate,
-            @Nonnull CommandItemRegistry commandItems
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull Consumer<CaptureAttemptResolvedEvent> captureResolved
     ) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.registry = Objects.requireNonNull(registry, "registry");
@@ -149,6 +157,7 @@ public final class SpawnerFeatureHandler {
         this.summaries = Objects.requireNonNull(summaries, "summaries");
         this.admissionGate = Objects.requireNonNull(admissionGate, "admissionGate");
         this.commandItems = Objects.requireNonNull(commandItems, "commandItems");
+        this.captureResolved = Objects.requireNonNull(captureResolved, "captureResolved");
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata = new SpawnerCaptureMetadataService(logger, registry);
@@ -354,14 +363,62 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.FAILED_ROLL) {
-            return failedRoll(player, targetRef, source, config, attempt, roll.terminal());
+            return failedRoll(player, targetRef, source, config, attempt, roll);
         }
+        UUID actor = player.getUuid();
+        String sourceItemId = source.getItemId();
+        Consumer<UUID> resolved = profileId -> publishResolved(actor, sourceItemId, roll, profileId);
         if (config.getCaptureMechanics().successDisposition() == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
             return tameAndLink(player, targetRef, config, attempt, prepared.targetRole(),
-                    captureParticleSystemOverride);
+                    captureParticleSystemOverride, resolved);
         }
         return captureIntoItem(player, targetRef, source, config, attempt, roll.roleId(),
-                captureParticleSystemOverride);
+                captureParticleSystemOverride, resolved);
+    }
+
+    /**
+     * Publishes the resolved attempt. The index has no operation ids, so the attempt id stands in
+     * for one, and there is no replay evidence. {@code profileId} is null for a failed roll on a
+     * body with no companion record. Never throws: a capture must not fail on its notification.
+     */
+    private void publishResolved(UUID actor, String sourceItemId, SpawnerCaptureRollService.Resolution roll,
+                                 @Nullable UUID profileId) {
+        CaptureAttemptResolution terminal = roll.terminal();
+        if (terminal == null) {
+            return;
+        }
+        try {
+            CaptureAttemptFormula formula = terminal.formula();
+            long now = System.currentTimeMillis();
+            captureResolved.accept(new CaptureAttemptResolvedEvent(
+                    terminal.attemptId(),
+                    terminal.attemptId(),
+                    actor,
+                    roll.targetUuid(),
+                    profileId == null ? null : profileId.toString(),
+                    terminal.targetRoleId(),
+                    sourceItemId,
+                    formula.itemConfigId(),
+                    formula.itemConfigRevision(),
+                    formula.policyConfigId(),
+                    formula.policyConfigId() == null ? -1L : formula.policyConfigRevision(),
+                    formula.itemPower(),
+                    formula.minimumPower(),
+                    terminal.currentHealth(),
+                    terminal.maximumHealth(),
+                    terminal.missingHealthFraction(),
+                    formula.missingHealthBonus(),
+                    terminal.effectiveChance(),
+                    terminal.guaranteed(),
+                    terminal.successful() ? CaptureAttemptOutcome.CAPTURED : CaptureAttemptOutcome.FAILED_ROLL,
+                    terminal.reason(),
+                    now,
+                    now,
+                    null));
+        } catch (RuntimeException | LinkageError failure) {
+            logger.at(Level.WARNING).withCause(failure).log(
+                    "The resolved capture attempt %s could not be published", terminal.attemptId());
+        }
     }
 
     @Nullable
@@ -581,11 +638,13 @@ public final class SpawnerFeatureHandler {
 
     /**
      * A failed roll plays the failure effects. Under {@code RESOLVED_ATTEMPT} consumption it also
-     * spends one source item at the recorded slot (best effort) and starts the failure cooldown.
+     * spends one source item at the recorded slot (best effort), starts the failure cooldown and
+     * publishes the resolved attempt.
      */
     private boolean failedRoll(Player player, Ref<EntityStore> targetRef, ItemStack source,
                                ItemFeatureConfig resolved, CaptureAttemptHandle attempt,
-                               @Nullable CaptureAttemptResolution terminal) {
+                               SpawnerCaptureRollService.Resolution roll) {
+        CaptureAttemptResolution terminal = roll.terminal();
         effects.playCaptureFailureEffects(player.getWorld(), targetRef, resolved.getCaptureMechanics());
         if (terminal == null) {
             return false;
@@ -603,6 +662,9 @@ public final class SpawnerFeatureHandler {
             cooldowns.record(player.getUuid(), resolutions.itemConfigId(source.getItemId()),
                     cooldownUntil, resolutions.nowMs());
         }
+        TameworkCompanionComponent stamp = targetRef.isValid()
+                ? targetRef.getStore().getComponent(targetRef, TameworkCompanionComponent.getComponentType()) : null;
+        publishResolved(player.getUuid(), source.getItemId(), roll, stamp == null ? null : stamp.getProfileId());
         return true;
     }
 
@@ -615,7 +677,7 @@ public final class SpawnerFeatureHandler {
      */
     private boolean tameAndLink(Player player, Ref<EntityStore> targetRef, ItemFeatureConfig resolved,
                                 CaptureAttemptHandle attempt, String targetRole,
-                                @Nullable String particleSystemOverride) {
+                                @Nullable String particleSystemOverride, Consumer<UUID> resolvedAttempt) {
         World world = player.getWorld();
         Store<EntityStore> store = world == null || world.getEntityStore() == null
                 ? null : world.getEntityStore().getStore();
@@ -663,6 +725,7 @@ public final class SpawnerFeatureHandler {
         }
         spend.commit();
         tameBody(targetRef, store, owner, ownerName, link, profileId, targetRole);
+        resolvedAttempt.accept(profileId);
         String particles = particleSystemOverride == null || particleSystemOverride.isBlank()
                 ? resolved.getCaptureParticleSystem() : particleSystemOverride;
         effects.playPublishedEffect(world, new SpawnerPublishedEffect(
@@ -720,7 +783,7 @@ public final class SpawnerFeatureHandler {
     /** Runs on the body's world thread: reads the body, snapshots it and starts the commit. */
     private boolean captureIntoItem(Player player, Ref<EntityStore> targetRef, ItemStack source,
                                     ItemFeatureConfig resolved, CaptureAttemptHandle attempt, String roleId,
-                                    @Nullable String particleSystemOverride) {
+                                    @Nullable String particleSystemOverride, Consumer<UUID> resolvedAttempt) {
         World world = player.getWorld();
         Store<EntityStore> store = world == null || world.getEntityStore() == null
                 ? null : world.getEntityStore().getStore();
@@ -782,7 +845,7 @@ public final class SpawnerFeatureHandler {
                             logger.at(Level.WARNING).withCause(error).log("Capture commit failed unexpectedly");
                         }
                         finishCapture(outcome, targetRef, stampedId, stampedGeneration,
-                                item, expectedSource, playerUuid, slot, effect, capturedAtMs);
+                                item, expectedSource, playerUuid, slot, effect, capturedAtMs, resolvedAttempt);
                     });
         } catch (RuntimeException failure) {
             capturing.remove(busyKey);
@@ -793,16 +856,23 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 
-    /** Runs on whichever thread completed the commit; hands live work to world threads. */
+    /**
+     * Runs on whichever thread completed the commit; hands live work to world threads. The resolved
+     * attempt is published from the hand-over, on the body's world thread, once the body is known
+     * to be there.
+     */
     private void finishCapture(@Nullable CaptureFlow.Outcome outcome, Ref<EntityStore> body,
                                @Nullable UUID stampedId, long stampedGeneration, ItemStack item,
                                @Nullable ItemStack expectedSource, UUID playerUuid, int slot,
-                               SpawnerPublishedEffect effect, long capturedAtMs) {
+                               SpawnerPublishedEffect effect, long capturedAtMs, Consumer<UUID> resolvedAttempt) {
         CaptureFlow.Result result = outcome == null ? CaptureFlow.Result.COMMIT_FAILED : outcome.result();
         switch (result) {
             case CAPTURED -> delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), item,
                     playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
-                    world -> effects.playPublishedEffect(world, effect), capturedAtMs));
+                    world -> {
+                        resolvedAttempt.accept(outcome.itemRef().profileId());
+                        effects.playPublishedEffect(world, effect);
+                    }, capturedAtMs));
             case CONFLICT -> {
                 // A newer change replaced the commit after the body was unregistered: its stamp is stale.
                 CompanionRecord now = stampedId == null ? null : index.get(stampedId);

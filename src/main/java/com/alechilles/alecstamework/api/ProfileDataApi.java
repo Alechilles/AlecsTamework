@@ -48,15 +48,4 @@ public interface ProfileDataApi {
         return compareAndSet(new ProfileDataCompareAndSetRequest(
                 profileId, namespace, key, expectedRevision, idempotencyKey, jsonPayload));
     }
-
-    /** Queries durable nonterminal or terminal state after a process/server restart. */
-    default CompletionStage<Optional<ProfileDataOperationView>> findOperation(
-            String namespace,
-            String idempotencyKey
-    ) {
-        ProfileDataValidation.requireText(namespace, "namespace", 128);
-        ProfileDataValidation.requireText(idempotencyKey, "idempotencyKey", 256);
-        return CompletableFuture.completedFuture(Optional.empty());
-    }
 }
-

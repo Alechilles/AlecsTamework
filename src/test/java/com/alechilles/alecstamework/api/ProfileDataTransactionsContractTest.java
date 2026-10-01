@@ -21,10 +21,6 @@ class ProfileDataTransactionsContractTest {
                 ProfileDataCompareAndSetResult.Status.UNAVAILABLE,
                 legacy.compareAndSet(request()).toCompletableFuture().join().status()
         );
-        assertEquals(
-                Optional.empty(),
-                legacy.findOperation("plugin", "attune:owner:fire:1").toCompletableFuture().join()
-        );
         assertThrows(NullPointerException.class, () -> legacy.compareAndSet(null));
     }
 

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.index;
 
 import java.util.ArrayList;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -8,11 +9,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -20,6 +23,11 @@ import javax.annotation.Nullable;
  * In-memory companion index (spec 6.7). Reads are lock-free map lookups and are safe
  * from any thread. Writes take one global lock, so cap checks, loaded-body checks and
  * record changes can be made atomic with {@link #atomically(Supplier)}.
+ *
+ * <p>Two kinds of listener see every applied change. The constructor's listener runs under the
+ * lock. Listeners added with {@link #addAfterUnlockListener} run after the lock is released
+ * (spec 9): the changes a thread makes are queued and delivered in order, on that thread, when
+ * its outermost locked section exits.
  */
 public final class CompanionIndex {
     /** Receives every applied change. Must be cheap and non-blocking; it runs under the index lock. */
@@ -35,7 +43,18 @@ public final class CompanionIndex {
         }
     }
 
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final UUID UNOWNED = new UUID(0L, 0L);
+
+    private record Change(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+    }
+
+    /** One thread's open locked sections and the changes they made that are not delivered yet. */
+    private static final class Pending {
+        private int depth;
+        private boolean draining;
+        private final List<Change> changes = new ArrayList<>();
+    }
 
     private final Map<UUID, CompanionRecord> records = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> profilesByOwner = new ConcurrentHashMap<>();
@@ -44,6 +63,8 @@ public final class CompanionIndex {
     private final Object lock = new Object();
     private final LongSupplier clock;
     private final ChangeListener listener;
+    private final List<ChangeListener> afterUnlock = new CopyOnWriteArrayList<>();
+    private final ThreadLocal<Pending> pending = ThreadLocal.withInitial(Pending::new);
 
     public CompanionIndex(@Nonnull LongSupplier clock, @Nonnull ChangeListener listener) {
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -127,16 +148,79 @@ public final class CompanionIndex {
         records.values().forEach(action);
     }
 
-    /** Runs {@code action} under the index lock. Nested inserts and updates are allowed. */
+    /**
+     * Adds a listener that receives every applied change after the index lock is released, on the
+     * thread that made the change. Changes arrive in the order they were applied, once the
+     * outermost locked section of that thread exits; a reverted change arrives followed by its
+     * compensating change. The listener may read and write the index: changes it makes are
+     * delivered after the ones already queued. A listener that throws is logged and skipped.
+     * {@link #load} notifies nobody.
+     */
+    public void addAfterUnlockListener(@Nonnull ChangeListener afterUnlockListener) {
+        afterUnlock.add(Objects.requireNonNull(afterUnlockListener, "afterUnlockListener"));
+    }
+
+    /**
+     * Runs {@code action} under the index lock. Nested inserts and updates are allowed. After-unlock
+     * listeners hear about the changes when the outermost call on this thread returns, also when
+     * {@code action} throws: the changes it applied stand.
+     */
     public <T> T atomically(@Nonnull Supplier<T> action) {
-        synchronized (lock) {
-            return action.get();
+        Pending section = pending.get();
+        section.depth++;
+        try {
+            synchronized (lock) {
+                return action.get();
+            }
+        } finally {
+            if (--section.depth == 0) {
+                deliver(section);
+            }
+        }
+    }
+
+    /** Under the lock: tells the under-lock listener and queues the change for after-unlock listeners. */
+    private void changed(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+        listener.onChanged(before, after);
+        if (!afterUnlock.isEmpty()) {
+            pending.get().changes.add(new Change(before, after));
+        }
+    }
+
+    /**
+     * Called with the lock released. Delivers this thread's queued changes one batch at a time. A
+     * listener that changes the index re-enters here with {@code draining} set, so its changes wait
+     * for the batch in progress and go out in the next loop pass instead of recursing.
+     */
+    private void deliver(Pending section) {
+        if (section.draining || section.changes.isEmpty()) {
+            return;
+        }
+        section.draining = true;
+        try {
+            while (!section.changes.isEmpty()) {
+                List<Change> batch = List.copyOf(section.changes);
+                section.changes.clear();
+                for (Change change : batch) {
+                    for (ChangeListener target : afterUnlock) {
+                        try {
+                            target.onChanged(change.before(), change.after());
+                        } catch (RuntimeException | LinkageError failure) {
+                            LOGGER.at(Level.WARNING).withCause(failure).log(
+                                    "A companion change listener failed for profile %s; the change stands",
+                                    change.after().profileId());
+                        }
+                    }
+                }
+            }
+        } finally {
+            section.draining = false;
         }
     }
 
     @Nonnull
     public Mutation insert(@Nonnull CompanionRecord record) {
-        synchronized (lock) {
+        return atomically(() -> {
             CompanionRecord existing = records.get(record.profileId());
             if (existing != null) {
                 return new Mutation(Status.DUPLICATE, existing, null);
@@ -148,9 +232,9 @@ public final class CompanionIndex {
             CompanionRecord stamped = record.toBuilder().updatedAtMs(clock.getAsLong()).build();
             records.put(stamped.profileId(), stamped);
             addToMaps(stamped);
-            listener.onChanged(null, stamped);
+            changed(null, stamped);
             return new Mutation(Status.APPLIED, null, stamped);
-        }
+        });
     }
 
     /**
@@ -160,7 +244,7 @@ public final class CompanionIndex {
     @Nonnull
     public Mutation update(@Nonnull UUID profileId, long expectedRevision,
                            @Nonnull UnaryOperator<CompanionRecord.Builder> change) {
-        synchronized (lock) {
+        return atomically(() -> {
             CompanionRecord before = records.get(profileId);
             if (before == null) {
                 return new Mutation(Status.NOT_FOUND, null, null);
@@ -185,9 +269,9 @@ public final class CompanionIndex {
                     .updatedAtMs(clock.getAsLong())
                     .build();
             replaceInMaps(before, after);
-            listener.onChanged(before, after);
+            changed(before, after);
             return new Mutation(Status.APPLIED, before, after);
-        }
+        });
     }
 
     /**
@@ -207,7 +291,7 @@ public final class CompanionIndex {
         if (!previous.profileId().equals(profileId)) {
             throw new IllegalArgumentException("previous belongs to another profile");
         }
-        synchronized (lock) {
+        return atomically(() -> {
             CompanionRecord before = records.get(profileId);
             if (before == null) {
                 return new Mutation(Status.NOT_FOUND, null, null);
@@ -225,9 +309,9 @@ public final class CompanionIndex {
                     .updatedAtMs(clock.getAsLong())
                     .build();
             replaceInMaps(before, after);
-            listener.onChanged(before, after);
+            changed(before, after);
             return new Mutation(Status.APPLIED, before, after);
-        }
+        });
     }
 
     /**

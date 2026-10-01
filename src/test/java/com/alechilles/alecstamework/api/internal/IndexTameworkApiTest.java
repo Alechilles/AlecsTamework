@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.companion.store.CompanionWriter;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +41,10 @@ class IndexTameworkApiTest {
                 new CompanionQueries(index, new LoadedBodies<>()), id -> null);
         return new IndexTameworkApi(
                 profiles,
+                new IndexProfileDataApi(index, owner -> CompletableFuture.completedFuture(null)),
+                new IndexDiagnosticsApi(index, () -> new CompanionWriter.Status(0, 0, null, 0L), "Companions",
+                        () -> 0L, () -> 0),
+                new IndexPopulationGroupApi(index, PopulationGroupConfigIndex::empty),
                 new TameworkEventBus(null),
                 null,
                 new InteractionExtensionRegistry(null),

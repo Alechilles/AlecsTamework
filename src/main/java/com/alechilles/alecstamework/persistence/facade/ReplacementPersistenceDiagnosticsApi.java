@@ -71,7 +71,6 @@ public final class ReplacementPersistenceDiagnosticsApi
         this.incidents = Objects.requireNonNull(incidents, "incidents");
     }
 
-    @Override
     @Nonnull
     public PersistenceResilienceView getPersistenceResilience() {
         PublicPersistenceOperationalStatus operational =
@@ -143,7 +142,6 @@ public final class ReplacementPersistenceDiagnosticsApi
         );
     }
 
-    @Override
     @Nonnull
     public PersistenceMutationAvailabilityView
     queryPersistenceAvailability(
@@ -161,7 +159,6 @@ public final class ReplacementPersistenceDiagnosticsApi
         }
     }
 
-    @Override
     @Nonnull
     public Optional<PersistenceIncidentSummaryView> findPersistenceIncident(
             @Nonnull String incidentIdOrUniquePrefix

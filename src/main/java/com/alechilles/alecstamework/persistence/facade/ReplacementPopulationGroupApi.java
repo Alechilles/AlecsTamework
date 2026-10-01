@@ -245,7 +245,6 @@ public final class ReplacementPopulationGroupApi
         ));
     }
 
-    @Override
     @Nonnull
     public PopulationGroupReconciliationView getReconciliationStatus() {
         PopulationGroupConfigIndex config = configs.snapshot();

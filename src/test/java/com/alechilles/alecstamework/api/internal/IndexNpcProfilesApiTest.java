@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,30 +122,67 @@ class IndexNpcProfilesApiTest {
 
     @Test
     void savedTraitsAreServedOnlyWhileTheirConfigResolves() throws Exception {
-        Map<String, Double> traits = new LinkedHashMap<>();
-        traits.put("size", 1.25);
-        CompanionSummary summary = new CompanionSummary(null, null, null, null,
-                0f, 0f, null, 0.0, null, 0.0, 0.0, false, false, 0L, 0L, 0L, 0L,
-                null, 0, 0.0, 0.0, 0, traits, 7_000L, 0L, 0L, "Sheep_Traits", null, null);
-        index.insert(CompanionRecord.builder(id(1), "Sheep", CompanionLocation.item())
-                .ownerUuid(ALICE).summary(summary).build());
-        Constructor<TwTraitConfig> constructor = TwTraitConfig.class.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        TwTraitConfig config = constructor.newInstance();
-        CompanionQueries queries = new CompanionQueries(index, new LoadedBodies<>());
+        insertWithTraits(id(1), "Size");
+        TwTraitConfig config = traitConfig("size");
 
-        OwnedTraitSnapshot resolved = new IndexNpcProfilesApi(queries, id -> "Sheep_Traits".equals(id) ? config : null)
-                .getOwnedTraitSnapshots(ALICE, 0, 10).toCompletableFuture().join().orElseThrow().get(0);
-        OwnedTraitSnapshot unresolved = profiles
-                .getOwnedTraitSnapshots(ALICE, 0, 10).toCompletableFuture().join().orElseThrow().get(0);
+        OwnedTraitSnapshot resolved = firstRow(id -> "Sheep_Traits".equals(id) ? config : null);
+        OwnedTraitSnapshot unresolved = firstRow(id -> null);
 
         assertTrue(resolved.traitDataAvailable());
-        assertEquals("size", resolved.traits().get(0).id());
+        assertEquals("Size", resolved.traits().get(0).id());
         assertEquals(1.25, resolved.traits().get(0).value());
         assertEquals(7_000L, resolved.snapshotCreatedAtMs());
         assertFalse(unresolved.traitDataAvailable());
         assertTrue(unresolved.traits().isEmpty());
         assertEquals("Sheep_Traits", unresolved.traitConfigId());
+    }
+
+    @Test
+    void aSavedTraitWithNoDefinitionMakesTheWholeRowUnavailable() throws Exception {
+        insertWithTraits(id(1), "size", "retired_trait");
+        TwTraitConfig config = traitConfig("size");
+
+        OwnedTraitSnapshot row = firstRow(id -> config);
+
+        assertFalse(row.traitDataAvailable());
+        assertTrue(row.traits().isEmpty());
+        assertEquals(7_000L, row.snapshotCreatedAtMs());
+    }
+
+    private void insertWithTraits(UUID profileId, String... traitIds) {
+        Map<String, Double> traits = new LinkedHashMap<>();
+        for (String traitId : traitIds) {
+            traits.put(traitId, 1.25);
+        }
+        CompanionSummary summary = new CompanionSummary(null, null, null, null,
+                0f, 0f, null, 0.0, null, 0.0, 0.0, false, false, 0L, 0L, 0L, 0L,
+                null, 0, 0.0, 0.0, 0, traits, 7_000L, 0L, 0L, "Sheep_Traits", null, null);
+        index.insert(CompanionRecord.builder(profileId, "Sheep", CompanionLocation.item())
+                .ownerUuid(ALICE).summary(summary).build());
+    }
+
+    private OwnedTraitSnapshot firstRow(java.util.function.Function<String, TwTraitConfig> traitConfigs) {
+        return new IndexNpcProfilesApi(new CompanionQueries(index, new LoadedBodies<>()), traitConfigs)
+                .getOwnedTraitSnapshots(ALICE, 0, 10).toCompletableFuture().join().orElseThrow().get(0);
+    }
+
+    private static TwTraitConfig traitConfig(String... traitIds) throws Exception {
+        Constructor<TwTraitConfig> constructor = TwTraitConfig.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        TwTraitConfig config = constructor.newInstance();
+        TwTraitConfig.TraitDefinition[] definitions = new TwTraitConfig.TraitDefinition[traitIds.length];
+        for (int i = 0; i < traitIds.length; i++) {
+            definitions[i] = new TwTraitConfig.TraitDefinition();
+            set(definitions[i], "id", traitIds[i]);
+        }
+        set(config, "traits", definitions);
+        return config;
+    }
+
+    private static void set(Object target, String field, Object value) throws Exception {
+        Field declared = target.getClass().getDeclaredField(field);
+        declared.setAccessible(true);
+        declared.set(target, value);
     }
 
     private List<String> page(UUID owner, int offset, int limit) {

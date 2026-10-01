@@ -11,6 +11,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
@@ -24,10 +25,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -44,6 +47,7 @@ public final class CompanionPersistenceModule {
     public static final long FLUSH_INTERVAL_MS = 250L;
     public static final long FLUSH_NOW_TIMEOUT_MS = 5_000L;
     private static final long WARNING_INTERVAL_MS = 60_000L;
+    private static final long FOLDER_SIZE_MAX_AGE_MS = 30_000L;
 
     private final State state;
     @Nullable private final String failure;
@@ -59,13 +63,18 @@ public final class CompanionPersistenceModule {
     private final Set<UUID> unreadable;
     private final LongSupplier clock;
     private final ThrottledWarnings warnings;
+    @Nullable private final Path root;
+    private final AtomicBoolean folderSizeRefreshing = new AtomicBoolean();
+    private volatile long folderBytes;
+    private volatile long folderBytesAtMs;
 
     private CompanionPersistenceModule(State state, @Nullable String failure,
                                        @Nullable CompanionStorage.LegacyKind legacyKind, @Nullable CompanionIndex index,
                                        @Nullable CompanionWriter writer, @Nullable CompanionStore store,
                                        List<CompanionIndex.ChangeListener> changeListeners,
-                                       Set<UUID> unreadable, LongSupplier clock) {
+                                       Set<UUID> unreadable, LongSupplier clock, @Nullable Path root) {
         this.state = state;
+        this.root = root;
         this.failure = failure;
         this.legacyKind = legacyKind;
         this.index = index;
@@ -161,13 +170,14 @@ public final class CompanionPersistenceModule {
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
         return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
-                result.unreadableIds(), clock);
+                result.unreadableIds(), clock, root);
     }
 
     private static CompanionPersistenceModule failed(State state, String failure,
                                                      @Nullable CompanionStorage.LegacyKind legacyKind,
                                                      LongSupplier clock) {
-        return new CompanionPersistenceModule(state, failure, legacyKind, null, null, null, List.of(), Set.of(), clock);
+        return new CompanionPersistenceModule(state, failure, legacyKind, null, null, null, List.of(), Set.of(), clock,
+                null);
     }
 
     @Nonnull public State state() { return state; }
@@ -186,6 +196,54 @@ public final class CompanionPersistenceModule {
     @Nonnull public LoadedBodies<Ref<EntityStore>> loaded() { return loaded; }
     /** True for profile ids whose record could not be decoded at load; their bodies must not be adopted. */
     @Nonnull public Predicate<UUID> unreadable() { return unreadable::contains; }
+    /** How many records could not be decoded at load. */
+    public int unreadableCount() { return unreadable.size(); }
+    /** The companion folder. @throws IllegalStateException when the module is not {@link State#READY}. */
+    @Nonnull public Path root() { return require(root); }
+
+    /**
+     * The size of the companion folder's files in bytes, as last measured; 0 until the first
+     * measurement finishes. Never reads files on the caller's thread: when the value is older
+     * than 30 s this starts one measurement on the {@code tamework-companion-reader} thread and
+     * returns the old value. Nothing runs unless someone asks.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    public long folderBytes() {
+        Path folder = require(root);
+        long now = clock.getAsLong();
+        if ((folderBytesAtMs == 0L || now - folderBytesAtMs >= FOLDER_SIZE_MAX_AGE_MS)
+                && folderSizeRefreshing.compareAndSet(false, true)) {
+            try {
+                require(reader).execute(() -> {
+                    try {
+                        folderBytes = measure(folder);
+                        folderBytesAtMs = Math.max(1L, clock.getAsLong());
+                    } finally {
+                        folderSizeRefreshing.set(false);
+                    }
+                });
+            } catch (RejectedExecutionException shutDown) {
+                folderSizeRefreshing.set(false);
+            }
+        }
+        return folderBytes;
+    }
+
+    /** Sums the regular files under {@code folder}; 0 when it cannot be listed. Blocks on file I/O. */
+    private static long measure(Path folder) {
+        try (Stream<Path> files = Files.walk(folder)) {
+            return files.mapToLong(file -> {
+                try {
+                    return Files.isRegularFile(file) ? Files.size(file) : 0L;
+                } catch (IOException | RuntimeException gone) {
+                    return 0L;
+                }
+            }).sum();
+        } catch (IOException | RuntimeException unavailable) {
+            return 0L;
+        }
+    }
     @Nonnull public ThrottledWarnings warnings() { return warnings; }
 
     /**
@@ -199,6 +257,18 @@ public final class CompanionPersistenceModule {
     public void addChangeListener(@Nonnull CompanionIndex.ChangeListener listener) {
         require(index);
         changeListeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /**
+     * Adds a listener called for every applied index change after the index lock is released, on
+     * the thread that made the change (spec 9), in the order the changes were applied. It may read
+     * and write the index. That thread is often a world thread, so the listener must not block and
+     * must not touch another world's entities.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    public void addAfterUnlockListener(@Nonnull CompanionIndex.ChangeListener listener) {
+        require(index).addAfterUnlockListener(listener);
     }
 
     /**
