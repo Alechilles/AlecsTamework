@@ -9,37 +9,33 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
  * Prepares one release from a filled capture item: the exact hotbar slot, the empty item that
- * replaces it, the placement and the spawn effect. Ownership access is checked against the
- * companion record's owner, which the caller reads; population caps are the restore's job.
+ * replaces it, the placement and the spawn effect. Who may release is the caller's decision
+ * (the capture item ownership mode); population caps are the restore's job.
  */
 final class SpawnerReleaseIntentFactory {
     private final SpawnerSpawnPositionService positions;
     private final SpawnerPlayerInventoryService inventory;
     private final SpawnerItemStackMetadataService itemMetadata;
-    private final SpawnerOwnershipPolicyService ownership;
 
     SpawnerReleaseIntentFactory(
             SpawnerSpawnPositionService positions,
             SpawnerPlayerInventoryService inventory,
-            SpawnerItemStackMetadataService itemMetadata,
-            SpawnerOwnershipPolicyService ownership
+            SpawnerItemStackMetadataService itemMetadata
     ) {
         this.positions = positions;
         this.inventory = inventory;
         this.itemMetadata = itemMetadata;
-        this.ownership = ownership;
     }
 
     /**
-     * Returns null when the release cannot start here: no exact slot, no position in range, no
-     * empty item id, or the record's owner does not allow this player to release it.
+     * Returns null when the release cannot start here: no exact slot, no position in range or no
+     * empty item id.
      */
     @Nullable
     PreparedRelease prepare(
@@ -47,8 +43,7 @@ final class SpawnerReleaseIntentFactory {
             @Nullable ItemStack source,
             @Nullable ItemFeatureConfig config,
             @Nullable Integer preferredSlot,
-            @Nullable String emptyItemIdOverride,
-            @Nullable UUID recordOwner
+            @Nullable String emptyItemIdOverride
     ) {
         World world = player == null ? null : player.getWorld();
         Store<EntityStore> store = world == null
@@ -67,9 +62,6 @@ final class SpawnerReleaseIntentFactory {
                 || !positions.isWithinSpawnDistance(
                         player, position, config
                 )) {
-            return null;
-        }
-        if (!ownership.isSpawnAllowed(player.getUuid(), recordOwner, config)) {
             return null;
         }
         String emptyItemId = emptyItemIdOverride;

@@ -793,7 +793,6 @@ public class Tamework extends JavaPlugin {
                 null,
                 restoreFlow,
                 null,
-                null,
                 companionProgressionSignalBus,
                 companionQueries,
                 releaseFlow,

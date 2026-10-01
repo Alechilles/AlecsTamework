@@ -137,6 +137,15 @@ public final class CaptureItemOwnership {
     }
 
     /**
+     * Whether a release must be refused with the item left filled: {@code OWNER_ONLY} binds only
+     * an item that still holds its companion. A stale copy is not refused, so it goes on to be
+     * emptied whoever holds it.
+     */
+    public static boolean releaseRefused(@Nonnull Release release, @Nullable CompanionRecord record, long itemGen) {
+        return release == Release.REFUSE_NOT_OWNER && !isStale(record, itemGen);
+    }
+
+    /**
      * True when an item at {@code itemGen} no longer holds its companion: the record is gone, is
      * not in an item, or moved on to another generation (Recall, Forget, a later capture).
      */

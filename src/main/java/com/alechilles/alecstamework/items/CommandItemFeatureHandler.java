@@ -7,7 +7,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -124,7 +123,7 @@ public final class CommandItemFeatureHandler {
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
-        this(registry, relocationService, stateSnapshotService, null, null, null, null, null, null, null,
+        this(registry, relocationService, stateSnapshotService, null, null, null, null, null, null,
                 null, null);
     }
 
@@ -144,7 +143,6 @@ public final class CommandItemFeatureHandler {
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
             @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
             @Nullable CompanionProgressionSignalBus progressionSignals,
             @Nullable CompanionQueries companions,

@@ -164,7 +164,7 @@ public final class SpawnerFeatureHandler {
         this.capturedItems = new SpawnerCapturedItemFactory(
                 captureMetadata, itemMetadata, displayMetadata, npcIdentity);
         this.releaseIntents = new SpawnerReleaseIntentFactory(
-                new SpawnerSpawnPositionService(logger), inventory, itemMetadata, ownership);
+                new SpawnerSpawnPositionService(logger), inventory, itemMetadata);
     }
 
     public boolean canCaptureInteraction(
@@ -333,32 +333,31 @@ public final class SpawnerFeatureHandler {
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String captureParticleSystemOverride
     ) {
-        ItemFeatureConfig resolved = config;
-        String denial = captureAdmissionDenial(player, targetRef, source, resolved, attempt);
+        String denial = captureAdmissionDenial(player, targetRef, source, config, attempt);
         if (denial != null) {
             logCaptureChannelDiagnostic("terminal-denied reason=" + denial
                     + " item=" + (source == null ? null : source.getItemId()));
             return false;
         }
-        PreRoll prepared = preRoll(player, targetRef, source, resolved);
+        PreRoll prepared = preRoll(player, targetRef, source, config);
         if (prepared == null) {
             return false;
         }
         SpawnerCaptureRollService.Resolution roll = captureRolls.evaluate(
-                player, targetRef, source, resolved, attempt);
+                player, targetRef, source, config, attempt);
         if (roll == null || roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.DENIED) {
             logCaptureChannelDiagnostic("terminal-denied reason=roll-unavailable-or-denied"
                     + " item=" + source.getItemId());
             return false;
         }
         if (roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.FAILED_ROLL) {
-            return failedRoll(player, targetRef, source, resolved, attempt, roll.terminal());
+            return failedRoll(player, targetRef, source, config, attempt, roll.terminal());
         }
-        if (resolved.getCaptureMechanics().successDisposition() == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
-            return tameAndLink(player, targetRef, resolved, attempt, prepared.targetRole(),
+        if (config.getCaptureMechanics().successDisposition() == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            return tameAndLink(player, targetRef, config, attempt, prepared.targetRole(),
                     captureParticleSystemOverride);
         }
-        return captureIntoItem(player, targetRef, source, resolved, attempt, roll.roleId(),
+        return captureIntoItem(player, targetRef, source, config, attempt, roll.roleId(),
                 captureParticleSystemOverride);
     }
 
@@ -818,8 +817,8 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
-     * Releases a 5.0 capture item through {@link RestoreFlow}. Ownership checks read the record,
-     * not the item. Returns true when the restore started.
+     * Releases a 5.0 capture item through {@link RestoreFlow}. The ownership mode decides who may
+     * release, read from the record, not the item. Returns true when the restore started.
      */
     private boolean release(
             Player player,
@@ -838,20 +837,20 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         CompanionRecord record = index.get(ref.profileId());
-        UUID recordOwner = record == null ? null : record.ownerUuid();
         CaptureItemOwnership.Release ownership = CaptureItemOwnership.release(
-                TameworkRuntimeSettings.current().captureItemOwnership(), recordOwner, player.getUuid());
-        if (ownership == CaptureItemOwnership.Release.REFUSE_NOT_OWNER) {
+                TameworkRuntimeSettings.current().captureItemOwnership(),
+                record == null ? null : record.ownerUuid(), player.getUuid());
+        if (CaptureItemOwnership.releaseRefused(ownership, record, ref.generation())) {
             // Bound to its owner: nothing changes, and the item stays filled.
             messages.showKey(player, NotificationStyle.Warning,
-                    "tamework.ui.notifications.captureItem.ownerOnlyRelease", ownerLabel(player, record));
+                    "tamework.ui.notifications.captureItem.ownerOnlyRelease",
+                    CaptureItemHolderSystems.Transfers.ownerLabel(player, record));
             return false;
         }
-        // When the mode gives the companion to the releasing player, the mode has decided who may
-        // release it; the item and server owner requirements would refuse every such release.
-        UUID gateOwner = ownership == CaptureItemOwnership.Release.ASSIGN_RELEASER ? null : recordOwner;
+        // The ownership mode alone decides who may release. A stale copy goes on to the restore,
+        // which answers STALE and empties it.
         SpawnerReleaseIntentFactory.PreparedRelease prepared =
-                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride, gateOwner);
+                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
         if (prepared == null) {
             return false;
         }
@@ -987,13 +986,6 @@ public final class SpawnerFeatureHandler {
                 }
             }
         }
-    }
-
-    /** The record owner's name for a notice, or the localized "another player". */
-    private static String ownerLabel(Player viewer, @Nullable CompanionRecord record) {
-        String name = record == null ? null : record.ownerName();
-        return name != null && !name.isBlank() ? name
-                : LocalizedText.resolve(viewer, "tamework.ui.notifications.captureItem.anotherPlayer");
     }
 
     private void showPopulationLimit(Player player, boolean owned) {

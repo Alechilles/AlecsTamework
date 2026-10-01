@@ -394,7 +394,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (parent.capture == null) {
             return;
         }
-        if (!nestedExplicitKeys.contains("ClearsOwner")) capture.clearsOwner = parent.capture.clearsOwner;
         if (!nestedExplicitKeys.contains("BlockIneligibleHolders")) capture.blockIneligibleHolders = parent.capture.blockIneligibleHolders;
         if (!nestedExplicitKeys.contains("RequireTamed")) capture.requireTamed = parent.capture.requireTamed;
         if (!nestedExplicitKeys.contains("TamesTarget")) capture.tamesTarget = parent.capture.tamesTarget;

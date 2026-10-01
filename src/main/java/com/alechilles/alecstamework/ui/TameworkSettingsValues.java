@@ -23,7 +23,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean invulnerableIfOwned,
                                      @Nonnull CaptureItemOwnershipMode captureItemOwnership,
                                      boolean captureRequiresOwner,
-                                     boolean spawnRequiresOwner,
                                      boolean interactionRequiresOwner,
                                      boolean linkingRequiresOwner,
                                      boolean needsEnabled,
@@ -53,7 +52,10 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean announcementsEnabled,
                                      int commandPanelCardsPerPage) {
 
-    /** Compatibility constructor for callers compiled before command-panel pagination settings. */
+    /**
+     * Compatibility constructor for callers compiled before command-panel pagination settings.
+     * {@code spawnRequiresOwner} is retired and ignored.
+     */
     public TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                   @Nonnull TwGlobalConfig.PerPlayerLimitScope populationPerPlayerLimitScope,
                                   boolean simpleClaimsEnabled,
@@ -100,7 +102,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
                 blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned,
                 CaptureItemOwnershipMode.fromLegacy(captureClearsOwner, spawnSetsOwner),
-                captureRequiresOwner, spawnRequiresOwner,
+                captureRequiresOwner,
                 interactionRequiresOwner, linkingRequiresOwner, needsEnabled, needsResourceMode,
                 needsDamageEnabled, needsTickPolicyMode, needsOwnerOfflineGraceHours,
                 needsOwnerOfflineDecayMultiplier, needsDamageModel, needsDamageDualNeedRule,
@@ -109,6 +111,17 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
                 recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled, animalAgingMode,
                 animalOldAgeDeathEnabled, announcementsEnabled, 50);
+    }
+
+    /**
+     * Retired with the capture item ownership mode, which alone decides who may release a
+     * captured companion: true when the mode is {@code OWNER_ONLY}.
+     *
+     * @deprecated use {@link #captureItemOwnership()}
+     */
+    @Deprecated
+    public boolean spawnRequiresOwner() {
+        return captureItemOwnership == CaptureItemOwnershipMode.OWNER_ONLY;
     }
 
     @Nonnull
@@ -126,7 +139,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 invulnerableIfOwned,
                 captureItemOwnership.toConfigValue(),
                 captureRequiresOwner,
-                spawnRequiresOwner,
+                spawnRequiresOwner(),
                 interactionRequiresOwner,
                 linkingRequiresOwner,
                 needsEnabled,
@@ -183,7 +196,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 invulnerableIfOwned,
                 captureItemOwnership,
                 captureRequiresOwner,
-                spawnRequiresOwner,
                 interactionRequiresOwner,
                 linkingRequiresOwner,
                 needsEnabled,
@@ -240,7 +252,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 settings.invulnerableIfOwned(),
                 settings.captureItemOwnershipMode(),
                 settings.captureRequiresOwner(),
-                settings.spawnRequiresOwner(),
                 settings.interactionRequiresOwner(),
                 settings.linkingRequiresOwner(),
                 settings.needsEnabled(),

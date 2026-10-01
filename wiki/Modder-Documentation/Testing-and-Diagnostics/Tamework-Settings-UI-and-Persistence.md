@@ -65,7 +65,7 @@ There is no claim-provider dropdown or QuestLines Claims fallback.
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,
-capture and spawn owner requirement, and needs-resource settings. Apply
+capture owner requirement, and needs-resource settings. Apply
 changes through the UI so validation and settings-file writes use one path.
 
 **Captured companion ownership** replaces the former "Capture Clears Owner" and
@@ -78,6 +78,11 @@ the old `captureClearsOwner` and `SpawnSetsOwner` values is mapped on load:
 cleared owner maps to `FOLLOWS_ITEM`, kept owner with assignment to
 `CHANGES_ON_RELEASE`, and kept owner without assignment to `OWNER_ONLY`. See
 the TwSpawnerConfig reference for the full rules.
+
+The "Spawn Requires Owner" toggle is retired: the ownership mode alone decides
+who may release a captured companion (`OWNER_ONLY` is the restriction). A saved
+`ownership.capture.spawnRequiresOwner` value still loads without error and is
+ignored for release.
 
 ## Welcome and announcements
 

@@ -136,8 +136,8 @@ both the item interaction and spawner success fields.
 
 ## Spawn settings
 Fields:
-- `OwnerRestricted` (default true). If true, only the owner can spawn.
-- `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
+- `OwnerRestricted` and `RequireOwner`. Retired. They still load and are ignored: the server's
+  captured companion ownership mode decides who may release (see below).
 - `ParticleSystem` (optional). Particle system to play on spawn.
 - `SoundEvent` (optional). Sound event to play on spawn.
 - `CooldownMs` (optional). Per item spawn cooldown.
@@ -149,8 +149,8 @@ Captured attachment IDs are stored on the spawner item and can be displayed with
 
 ## Captured companion ownership
 
-A captured companion always keeps an owner while it is in a capture item. A
-capture never clears the owner. A tamed animal without an owner, and a wild
+A capture never clears the owner: an owned companion keeps its owner while it
+is in a capture item. A tamed animal without an owner, and a wild
 animal caught by an item with `TamesTarget`, belong to the capturing player. A
 wild animal caught by an item that does not tame it stays an unowned wild
 capture and is released wild.
@@ -165,9 +165,13 @@ how the owner changes. It applies to every capture item.
 | `OWNER_ONLY` | The item is bound to its owner. Other players cannot pick it up, take it from a container or release it. |
 | `CHANGES_ON_RELEASE` | The 4.x rule. The owner stays the same while the companion is in the item, anyone can carry it, and whoever releases it becomes the owner if their limits allow. |
 
-When the mode gives a released companion to the releasing player, the spawn
-owner checks (`Spawn.OwnerRestricted`, `Spawn.RequireOwner` and the server's
-"Spawn requires owner" setting) do not block that release.
+The mode alone decides who may release a captured companion; `OWNER_ONLY` is
+the restriction. The former spawn owner checks (`Spawn.OwnerRestricted`,
+`Spawn.RequireOwner` and the "Spawn requires owner" server setting) are
+retired: the fields and the saved `spawnRequiresOwner` value still load without
+error and are ignored for release. A filled item that no longer matches its
+companion (after a Recall, a Forget or a later capture) turns into an empty
+item when anyone uses it, in every mode.
 
 A filled item shows its owner on the last tooltip line. The line follows the
 owner when the item changes hands in `FOLLOWS_ITEM`.
@@ -256,7 +260,6 @@ for generating the PNGs and shared config assets.
     "MaxDistance": 5
   },
   "Spawn": {
-    "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
     "CooldownMs": 500,

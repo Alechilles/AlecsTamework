@@ -400,7 +400,7 @@ public final class CaptureItemHolderSystems {
         }
 
         /** The record owner's name for a notice, or the localized "another player". */
-        static String ownerLabel(Player viewer, @Nullable CompanionRecord record) {
+        public static String ownerLabel(Player viewer, @Nullable CompanionRecord record) {
             String name = record == null ? null : record.ownerName();
             return name != null && !name.isBlank() ? name : LocalizedText.resolve(viewer, ANOTHER_PLAYER_KEY);
         }

@@ -12,16 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OwnershipRequirementPolicyTest {
 
     @Test
-    void spawnerCaptureAndSpawnUseGlobalDefaults() throws Exception {
+    void spawnerCaptureUsesGlobalDefault() throws Exception {
         assertFalse(SpawnerOwnershipPolicyService.resolveCaptureRequireOwnerDefault(null));
-        assertFalse(SpawnerOwnershipPolicyService.resolveSpawnRequireOwnerDefault(null));
 
         TwGlobalConfig globalConfig = TwGlobalConfig.defaultConfig();
         setField(globalConfig, "ownershipCaptureRequiresOwner", true);
-        setField(globalConfig, "ownershipSpawnRequiresOwner", false);
 
         assertTrue(SpawnerOwnershipPolicyService.resolveCaptureRequireOwnerDefault(globalConfig));
-        assertFalse(SpawnerOwnershipPolicyService.resolveSpawnRequireOwnerDefault(globalConfig));
     }
 
     @Test

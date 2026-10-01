@@ -1049,33 +1049,6 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 34);
 
-              Label #TwSettingsSpawnRequiresOwnerLabel {
-                Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: %server.tamework.ui.settings.label.spawnRequiresOwner;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
-              }
-
-              TextButton #TwSettingsSpawnRequiresOwnerTooltip {
-                Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "";
-                TooltipText: %server.tamework.ui.settings.tooltip.spawnRequiresOwner;
-                TextTooltipStyle: @SettingsLabelTooltipStyle;
-                Style: @SettingsLabelTooltipButtonStyle;
-              }
-
-              CheckBox #TwSettingsSpawnRequiresOwnerCheck {
-                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
-                Padding: (Full: 4);
-                Style: $C.@DefaultCheckBoxStyle;
-              }
-            }
-
-            Group {
-              Anchor: (Height: 34);
-
               Label #TwSettingsCaptureItemOwnershipLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.captureItemOwnership;

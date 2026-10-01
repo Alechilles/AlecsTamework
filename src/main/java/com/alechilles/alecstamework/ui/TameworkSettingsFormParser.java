@@ -155,7 +155,6 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.invulnerableIfOwned, current.invulnerableIfOwned()),
                 choices.captureItemOwnership(),
                 boolOrDefault(payload.captureRequiresOwner, current.captureRequiresOwner()),
-                boolOrDefault(payload.spawnRequiresOwner, current.spawnRequiresOwner()),
                 boolOrDefault(payload.interactionRequiresOwner, current.interactionRequiresOwner()),
                 boolOrDefault(payload.linkingRequiresOwner, current.linkingRequiresOwner()),
                 boolOrDefault(payload.needsEnabled, current.needsEnabled()),

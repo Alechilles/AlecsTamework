@@ -8,7 +8,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Evaluates owner-based capture/spawn access rules for spawner items.
+ * Evaluates owner-based capture access rules for spawner items. Who may release is decided by
+ * the capture item ownership mode.
  */
 final class SpawnerOwnershipPolicyService {
     boolean isCaptureAllowed(@Nullable UUID playerUuid, @Nullable UUID ownerUuid, @Nullable ItemFeatureConfig config) {
@@ -19,34 +20,15 @@ final class SpawnerOwnershipPolicyService {
         return isOwnershipAllowed(requireOwner, config.isCaptureOwnerRestricted(), playerUuid, ownerUuid);
     }
 
-    boolean isSpawnAllowed(@Nullable UUID playerUuid, @Nullable UUID ownerUuid, @Nullable ItemFeatureConfig config) {
-        if (config == null) {
-            return false;
-        }
-        boolean requireOwner = resolveSpawnRequireOwner(config);
-        return isOwnershipAllowed(requireOwner, config.isSpawnOwnerRestricted(), playerUuid, ownerUuid);
-    }
-
     private boolean resolveCaptureRequireOwner(@Nonnull ItemFeatureConfig config) {
         return config.getCaptureRequireOwnerOverride() != null
                 ? config.getCaptureRequireOwnerOverride()
                 : resolveCaptureRequireOwnerDefault(TwGlobalConfig.resolveActive());
     }
 
-    private boolean resolveSpawnRequireOwner(@Nonnull ItemFeatureConfig config) {
-        return config.getSpawnRequireOwnerOverride() != null
-                ? config.getSpawnRequireOwnerOverride()
-                : resolveSpawnRequireOwnerDefault(TwGlobalConfig.resolveActive());
-    }
-
     static boolean resolveCaptureRequireOwnerDefault(@Nullable TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
         return TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
-    }
-
-    static boolean resolveSpawnRequireOwnerDefault(@Nullable TwGlobalConfig globalConfig) {
-        TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
-        return TameworkRuntimeSettings.spawnRequiresOwner(resolved.isOwnershipSpawnRequiresOwner());
     }
 
     static boolean isOwnerRequirementSatisfied(boolean requireOwner,

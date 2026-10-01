@@ -152,8 +152,13 @@ public final class TameworkRuntimeSettings {
         return values.captureRequiresOwner();
     }
 
+    /**
+     * @deprecated retired; the capture item ownership mode alone decides who may release a
+     * captured companion. True when {@link #captureItemOwnership()} is {@code OWNER_ONLY}.
+     */
+    @Deprecated
     public boolean spawnRequiresOwner() {
-        return values.spawnRequiresOwner();
+        return resolvedCaptureItemOwnership == CaptureItemOwnershipMode.OWNER_ONLY;
     }
 
     public boolean interactionRequiresOwner() {
@@ -372,6 +377,8 @@ public final class TameworkRuntimeSettings {
         return settings != null ? settings.captureRequiresOwner() : configEnabled;
     }
 
+    /** @deprecated retired; see {@link #spawnRequiresOwner()}. */
+    @Deprecated
     public static boolean spawnRequiresOwner(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.spawnRequiresOwner() : configEnabled;

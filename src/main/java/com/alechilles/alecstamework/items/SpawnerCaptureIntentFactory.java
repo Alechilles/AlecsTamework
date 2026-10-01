@@ -439,7 +439,7 @@ final class SpawnerCaptureIntentFactory {
             );
         }
         artifact = itemMetadata.applyOwnerMetadata(
-                artifact, resultingOwner
+                artifact, resultingOwner, null
         );
         artifact = existingOwner == null
                 ? itemMetadata.clearMetadataKey(

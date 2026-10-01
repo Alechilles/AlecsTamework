@@ -999,6 +999,28 @@ public final class TameworkSettingsStore {
                     recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
                     "FREEZE_AT_PRIME", false);
         }
+
+        /**
+         * Retired with the capture item ownership mode: a capture never clears the owner.
+         *
+         * @deprecated use {@link #captureItemOwnership()}
+         */
+        @Deprecated
+        public boolean captureClearsOwner() {
+            return false;
+        }
+
+        /**
+         * Retired with the capture item ownership mode. True when a release by a player who is
+         * not the owner makes that player the owner (every mode except {@code OWNER_ONLY}).
+         *
+         * @deprecated use {@link #captureItemOwnership()}
+         */
+        @Deprecated
+        public boolean spawnSetsOwner() {
+            return CaptureItemOwnershipMode.fromConfigValue(captureItemOwnership)
+                    != CaptureItemOwnershipMode.OWNER_ONLY;
+        }
     }
 
     /**

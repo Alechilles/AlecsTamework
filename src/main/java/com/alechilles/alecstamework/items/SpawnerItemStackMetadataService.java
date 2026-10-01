@@ -127,10 +127,6 @@ final class SpawnerItemStackMetadataService {
         return null;
     }
 
-    ItemStack applyOwnerMetadata(ItemStack updated, UUID ownerUuid) {
-        return applyOwnerMetadata(updated, ownerUuid, null);
-    }
-
     /**
      * Writes the owner and the name the tooltip shows. No owner clears both; an owner without a
      * known name clears the name, so the tooltip has no owner line.

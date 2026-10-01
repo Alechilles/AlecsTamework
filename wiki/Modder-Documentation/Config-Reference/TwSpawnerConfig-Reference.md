@@ -135,8 +135,9 @@ do not author the same completion particle/sound in two paths.
 ### `Spawn`
 - `AssignsOwner`: retired. It still loads and is ignored; the server's captured
   companion ownership mode decides who owns a released companion.
-- `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
-- `RequireOwner`: explicit owner-presence requirement for this item flow.
+- `OwnerRestricted`, `RequireOwner`: retired. They still load and are ignored;
+  the server's captured companion ownership mode decides who may release
+  (`OWNER_ONLY` is the restriction).
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
@@ -144,7 +145,8 @@ do not author the same completion particle/sound in two paths.
 
 ### Captured companion ownership (server setting)
 
-A captured companion always keeps an owner while it is in a capture item. The
+A capture never clears the owner; only a wild animal caught by an item that
+does not tame it is an unowned capture. The
 server setting **Captured companion ownership** in `/tw settings`
 (`ownership.capture.captureItemOwnership`) decides how that owner changes, for
 every capture item:
@@ -157,8 +159,10 @@ every capture item:
 - `CHANGES_ON_RELEASE`: the 4.x rule. The owner stays the same while the
   companion is in the item; whoever releases it becomes the owner.
 
-When the mode gives a released companion to the releasing player, the `Spawn`
-owner checks do not block that release. `Capture.OwnershipFollowsHolder` was
+The mode alone decides who may release a captured companion. The former
+`Spawn` owner checks and the "Spawn requires owner" server setting are retired
+and ignored for release. A filled item that no longer matches its companion
+turns into an empty item when anyone uses it. `Capture.OwnershipFollowsHolder` was
 replaced by this setting before release. A filled item shows its owner on the
 last tooltip line.
 
@@ -212,9 +216,6 @@ Appearance header.
   },
   "Capture": {
     "RequireTamed": true
-  },
-  "Spawn": {
-    "OwnerRestricted": true
   }
 }
 ```
@@ -241,7 +242,6 @@ Appearance header.
     "MaxDistance": 5
   },
   "Spawn": {
-    "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
     "CooldownMs": 500,
@@ -253,9 +253,10 @@ Appearance header.
 
 ## Gotchas
 - `EmptyItemId` is the resolution key. If two active configs target the same item, selection becomes a config-resolution problem instead of an item-authoring problem.
-- `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
-- Use `/tw settings` for the global capture/spawn owner-transfer defaults.
-- Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
+- `Capture.RequireOwner` is an explicit override, not the same thing as `Capture.OwnerRestricted`.
+- Use `/tw settings` for the global capture owner requirement and the captured companion ownership mode.
+- An unset `Capture.RequireOwner` is not equivalent to `false`; it defers to the global capture owner requirement.
+- `Spawn.OwnerRestricted` and `Spawn.RequireOwner` no longer restrict release; use the `OWNER_ONLY` ownership mode.
 - Companion icon rules belong to `TwDynamicIconConfig`; update dependent packs together when migrating the removed inline icon maps.
 - `/tw config reload` is required after editing spawner configs during development.
 - Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied

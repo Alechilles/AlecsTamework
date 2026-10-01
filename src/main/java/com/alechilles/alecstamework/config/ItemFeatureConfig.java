@@ -141,6 +141,11 @@ public final class ItemFeatureConfig {
         return captureOwnerRestricted;
     }
 
+    /**
+     * @deprecated {@code Spawn.OwnerRestricted} is still parsed but ignored: the server's capture
+     * item ownership mode alone decides who may release a captured companion.
+     */
+    @Deprecated
     public boolean isSpawnOwnerRestricted() {
         return spawnOwnerRestricted;
     }
@@ -166,6 +171,11 @@ public final class ItemFeatureConfig {
         return captureRequireOwnerOverride;
     }
 
+    /**
+     * @deprecated {@code Spawn.RequireOwner} is still parsed but ignored: the server's capture
+     * item ownership mode alone decides who may release a captured companion.
+     */
+    @Deprecated
     public Boolean getSpawnRequireOwnerOverride() {
         return spawnRequireOwnerOverride;
     }

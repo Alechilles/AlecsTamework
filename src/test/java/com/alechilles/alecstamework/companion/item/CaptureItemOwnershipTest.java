@@ -151,6 +151,18 @@ class CaptureItemOwnershipTest {
     }
 
     @Test
+    void ownerOnlyRefusesAReleaseBySomeoneElseOnlyWhileTheItemStillHoldsItsCompanion() {
+        Release byOther = CaptureItemOwnership.release(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder);
+
+        assertTrue(CaptureItemOwnership.releaseRefused(byOther, inItem(2), 2));
+        // A stale copy is not refused, so the release goes on and empties it.
+        assertFalse(CaptureItemOwnership.releaseRefused(byOther, inItem(3), 2));
+        assertFalse(CaptureItemOwnership.releaseRefused(byOther,
+                inItem(2).toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build(), 2));
+        assertFalse(CaptureItemOwnership.releaseRefused(Release.KEEP_OWNER, inItem(2), 2));
+    }
+
+    @Test
     void onlyOwnerOnlyRefusesACaptureOfSomeoneElsesCompanion() {
         assertTrue(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder));
         assertFalse(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.OWNER_ONLY, owner, owner));

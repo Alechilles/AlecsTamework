@@ -66,7 +66,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_OWNERSHIP_INVULNERABLE_IF_OWNED = "@OwnershipInvulnerableIfOwned";
     private static final String KEY_CAPTURE_ITEM_OWNERSHIP = "@CaptureItemOwnership";
     private static final String KEY_CAPTURE_REQUIRES_OWNER = "@CaptureRequiresOwner";
-    private static final String KEY_SPAWN_REQUIRES_OWNER = "@SpawnRequiresOwner";
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
     private static final String KEY_LINKING_REQUIRES_OWNER = "@LinkingRequiresOwner";
     private static final String KEY_NEEDS_ENABLED = "@NeedsEnabled";
@@ -219,7 +218,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
                 .append(KEY_CAPTURE_ITEM_OWNERSHIP, "#TwSettingsCaptureItemOwnershipDropdown.Value")
                 .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
-                .append(KEY_SPAWN_REQUIRES_OWNER, "#TwSettingsSpawnRequiresOwnerCheck.Value")
                 .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
                 .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
                 .append(KEY_NEEDS_ENABLED, "#TwSettingsNeedsEnabledCheck.Value")
@@ -269,7 +267,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 currentValues.captureItemOwnership().toConfigValue());
         renderCaptureItemOwnershipNote(commandBuilder, currentValues.captureItemOwnership());
         commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner());
-        commandBuilder.set("#TwSettingsSpawnRequiresOwnerCheck.Value", currentValues.spawnRequiresOwner());
         commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
         commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner());
         commandBuilder.set("#TwSettingsNeedsEnabledCheck.Value", currentValues.needsEnabled());
@@ -638,7 +635,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.invulnerableIfOwned = v, x -> x.invulnerableIfOwned).add()
                 .<String>append(new KeyedCodec<>(KEY_CAPTURE_ITEM_OWNERSHIP, Codec.STRING), (x, v) -> x.captureItemOwnership = v, x -> x.captureItemOwnership).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.captureRequiresOwner = v, x -> x.captureRequiresOwner).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnRequiresOwner = v, x -> x.spawnRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_LINKING_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.linkingRequiresOwner = v, x -> x.linkingRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsEnabled = v, x -> x.needsEnabled).add()
@@ -681,7 +677,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean invulnerableIfOwned;
         String captureItemOwnership;
         Boolean captureRequiresOwner;
-        Boolean spawnRequiresOwner;
         Boolean interactionRequiresOwner;
         Boolean linkingRequiresOwner;
         Boolean needsEnabled;
