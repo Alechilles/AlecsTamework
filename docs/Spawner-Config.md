@@ -60,6 +60,17 @@ Fields:
 - `ChannelSoundEvent` (optional). A one-shot sound event played at the target when the `Begin` channel phase succeeds.
 - `TamedRoleOverrides` (optional map). Maps each capturable wild role to the role stored in the filled item. A mapped role is required when `TamesTarget` is enabled.
 - `OwnerRestricted` (default true). If true, only the owner can capture.
+- `OwnershipFollowsHolder` (default true). When capture keeps the owner, the
+  companion's owner changes to whoever gets the capture item into their
+  inventory (pickup, chest, `/give`), if their companion limits allow it.
+  Putting the item into a chest does not change the owner. Set it to `false`
+  for the 4.x behavior, where ownership changes only on release. Has no effect
+  when the owner is cleared on capture.
+- `BlockIneligibleHolders` (default true). A player who could not take
+  ownership (at their owned or group limit) cannot pick the item up or take it
+  from a chest; the item stays where it is and the player sees a message. It
+  uses inventory slot filters, so set it to `false` on every item config if
+  another mod sets its own filters on player inventory slots.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on capture.
 - `SoundEvent` (optional). Sound event to play on capture.

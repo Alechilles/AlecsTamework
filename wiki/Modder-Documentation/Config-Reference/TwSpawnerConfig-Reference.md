@@ -77,6 +77,13 @@ Fields:
 - `TamedRoleOverrides`: source-role to stored/tamed-role map used with
   `TamesTarget`.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
+- `OwnershipFollowsHolder` (default `true`): when capture keeps the owner, the
+  companion's owner becomes whoever gets the filled item into their inventory,
+  if their limits allow it. `false` keeps the 4.x rule (owner changes only on
+  release).
+- `BlockIneligibleHolders` (default `true`): a player at their companion limit
+  cannot pick up or take the filled item. Uses inventory slot filters; set it to
+  `false` on every item config if another mod filters player inventory slots.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
