@@ -11,3 +11,7 @@ npcRoles.Tamework_Example.name=Tamework Example
 npcRoles.Tamework_Example_Simple.name=Tamework Example (Simple)
 npcRoles.Tamework_Example_Vanilla.name=Tamework Example (Vanilla)
 npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Example (Simple, Vanilla)
+items.Spawner_Tamework_Roster_Example.name=Roster Lantern (Example)
+items.Spawner_Tamework_Roster_Example.description=Tames a wild sheep into the example roster. Keep the Roster Whistle in your inventory.
+items.Tamework_Command_Roster_Example.name=Roster Whistle (Example)
+items.Tamework_Command_Roster_Example.description=Opens the example roster. Summon, dismiss and revive its members.

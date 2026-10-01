@@ -1,0 +1,34 @@
+{
+  "$Comment": "Spawner item that tames a wild sheep and links it into the example command-family roster. It never becomes a filled item.",
+  "TranslationProperties": {
+    "Name": "server.items.Spawner_Tamework_Roster_Example.name",
+    "Description": "server.items.Spawner_Tamework_Roster_Example.description"
+  },
+  "Quality": "Tool",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkSpawn"
+        }
+      ]
+    }
+  },
+  "Model": "Items/Tamework/Lantern/Tamework_Soul_Lantern.blockymodel",
+  "Texture": "Items/Tamework/Lantern/Tamework_Soul_Lantern_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Tamework_Soul_Lantern_Empty.png",
+  "IconProperties": {
+    "Scale": 0.85,
+    "Translation": [
+      11.5,
+      8.5
+    ],
+    "Rotation": [
+      0,
+      215,
+      317.435
+    ]
+  },
+  "MaxStack": 1
+}

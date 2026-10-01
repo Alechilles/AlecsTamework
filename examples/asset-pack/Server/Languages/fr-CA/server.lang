@@ -11,3 +11,7 @@ npcRoles.Tamework_Example.name=Exemple Tamework
 npcRoles.Tamework_Example_Simple.name=Exemple Tamework (simple)
 npcRoles.Tamework_Example_Vanilla.name=Exemple Tamework (vanilla)
 npcRoles.Tamework_Example_Simple_Vanilla.name=Exemple Tamework (simple, vanilla)
+items.Spawner_Tamework_Roster_Example.name=Lanterne de liste (exemple)
+items.Spawner_Tamework_Roster_Example.description=Apprivoise un mouton sauvage et l'ajoute à la liste d'exemple. Gardez le sifflet de liste dans votre inventaire.
+items.Tamework_Command_Roster_Example.name=Sifflet de liste (exemple)
+items.Tamework_Command_Roster_Example.description=Ouvre la liste d'exemple. Invoquez, renvoyez et ranimez ses membres.

@@ -11,3 +11,7 @@ npcRoles.Tamework_Example.name=Tamework Beispiel
 npcRoles.Tamework_Example_Simple.name=Tamework Beispiel (Einfach)
 npcRoles.Tamework_Example_Vanilla.name=Tamework Beispiel (Vanilla)
 npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Beispiel (Einfach, Vanilla)
+items.Spawner_Tamework_Roster_Example.name=Rosterlaterne (Beispiel)
+items.Spawner_Tamework_Roster_Example.description=Zähmt ein wildes Schaf und nimmt es in die Beispiel-Liste auf. Behalte die Roster-Pfeife in deinem Inventar.
+items.Tamework_Command_Roster_Example.name=Roster-Pfeife (Beispiel)
+items.Tamework_Command_Roster_Example.description=Öffnet die Beispiel-Liste. Beschwöre, entlasse und belebe ihre Mitglieder wieder.
