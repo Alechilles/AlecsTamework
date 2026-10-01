@@ -73,4 +73,17 @@ class CompanionRespawnTest {
         assertFalse(stripped.getDocument("Components").getDocument("NPC").containsKey("PathManager"));
         assertEquals("Sheep", stripped.getDocument("Components").getDocument("NPC").getString("RoleName").getValue());
     }
+
+    @Test
+    void stripDocumentPutsBackTheMotionControllerARideReplaced() {
+        assertEquals("Walk", activeControllerAfterStrip("Walk"));
+        assertEquals("TameworkFly", activeControllerAfterStrip("  "));
+    }
+
+    private static String activeControllerAfterStrip(String previousController) {
+        BsonDocument components = new BsonDocument("NPC", new BsonDocument("ActiveMC", new BsonString("TameworkFly")))
+                .append("TameworkRideMount", new BsonDocument("PreviousMotionController", new BsonString(previousController)));
+        BsonDocument stripped = CompanionRespawn.stripDocument(new BsonDocument("Components", components));
+        return stripped.getDocument("Components").getDocument("NPC").getString("ActiveMC").getValue();
+    }
 }

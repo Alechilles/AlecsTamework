@@ -39,8 +39,10 @@ import org.joml.Vector3d;
  *
  * <p>Contract with {@link RestoreFlow}: the future completes false (never exceptionally) when no
  * body was added, and then none is added later. It completes only from the queued task or when
- * the task could not be queued, so a completed false is final. A world that stops after the task
- * was queued still runs it: World shutdown drains its task queue before it stops accepting tasks.
+ * the task could not be queued, so a completed false is final. If the world stops after the task
+ * was queued: a task offered after the world's last queue drain may never run, so the future
+ * stays pending and no body is added; a task drained after the chunk store shut down can add a
+ * body that is never saved (a later Recover still restores it).
  */
 public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -83,9 +85,15 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         return done;
     }
 
+    /**
+     * Returns true exactly when the new body is in the store. The ref is allocated before the add
+     * because {@code Store#addEntity} inserts the entity before it runs the on-add systems and
+     * consumes their buffer; a throw from those leaves a live body, which must report true.
+     */
     private boolean spawnOnWorldThread(World world, CompanionRecord committed, SnapshotEnvelope snapshot,
                                        RestoreFlow.Destination destination, RestoreRules.Reason reason) {
         UUID profileId = committed.profileId();
+        Ref<EntityStore> ref = null;
         try {
             CompanionRecord now = currentRecord.apply(profileId);
             if (now == null || now.revision() != committed.revision()) {
@@ -113,21 +121,34 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             respawn.prepare(holder, position, new Rotation3f(destination.pitch(), destination.yaw(), 0.0f),
                     npcUuid, profileId, committed.generation());
             repointAvatarFlightOrigin(holder, destination);
-            Ref<EntityStore> ref = store.addEntity(holder, AddReason.LOAD);
-            if (ref == null) {
+            ref = new Ref<>(store);
+            if (store.addEntity(holder, ref, AddReason.LOAD) == null) {
                 warn(profileId, "the world rejected the respawned body", null);
                 return false;
             }
+        } catch (RuntimeException | LinkageError failure) {
+            boolean added = ref != null && ref.isValid();
+            warn(profileId, added ? "an on-add step failed after the body was added" : "respawn failed", failure);
+            if (!added) {
+                return false;
+            }
+        }
+        finishAddedBody(ref, ref.getStore(), profileId, reason);
+        return true;
+    }
+
+    /** Steps after the add. A failure here is logged; the body is live, so the spawn still counts. */
+    private static void finishAddedBody(Ref<EntityStore> ref, Store<EntityStore> store, UUID profileId,
+                                        RestoreRules.Reason reason) {
+        try {
             CompanionSaves.markChanged(store, ref);
             if (reason == RestoreRules.Reason.REVIVE) {
                 // Trait modifiers first, so full health uses the modified maximum.
                 CompanionStatModifierService.applyTraitModifiers(ref, store);
                 CompanionHealthStateService.applyStoredHealthPercent(ref, store, 100.0);
             }
-            return true;
         } catch (RuntimeException | LinkageError failure) {
-            warn(profileId, "respawn failed", failure);
-            return false;
+            warn(profileId, "a step after the body was added failed", failure);
         }
     }
 
