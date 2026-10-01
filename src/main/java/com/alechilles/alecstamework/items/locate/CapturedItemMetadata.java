@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.transaction.*;
 import java.util.UUID;
@@ -10,11 +12,24 @@ import org.bson.BsonDocument;
 
 /** Capture identity parsing and a cheap gate before any inventory rescan. */
 public final class CapturedItemMetadata {
+    /** Prefix of the key part that stands in for a snapshot id on a 5.0 item. */
+    private static final String GENERATION_KEY_PREFIX = "generation:";
+
     private CapturedItemMetadata() { }
 
+    /**
+     * Reads either identity shape. A 5.0 item (profile id and generation, no snapshot id) is keyed
+     * by its generation where the older shapes use the snapshot id, so a recapture of the same
+     * companion is a different key.
+     */
     @Nullable
     public static CaptureKey read(@Nullable ItemStack stack) {
-        if (!marked(stack)) return null;
+        if (stack == null || stack.isEmpty()) return null;
+        CaptureItemKeys.Ref ref = CaptureItemKeys.read(stack);
+        if (ref != null && !has(stack, TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID)) {
+            return new CaptureKey(ref.profileId().toString(), GENERATION_KEY_PREFIX + ref.generation(), ref.profileId());
+        }
+        if (!has(stack, TameworkMetadataKeys.TARGET_UUID)) return null;
         BsonDocument metadata = stack.getMetadata();
         try {
             UUID alias = UUID.fromString(metadata.getString(TameworkMetadataKeys.TARGET_UUID).getValue());
@@ -29,9 +44,19 @@ public final class CapturedItemMetadata {
         }
     }
 
+    /** Cheap gate: a stack that carries either identity key. Reads two keys without copying the metadata. */
     private static boolean marked(@Nullable ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.getMetadata() != null
-                && stack.getMetadata().containsKey(TameworkMetadataKeys.TARGET_UUID);
+        return stack != null && !stack.isEmpty()
+                && (has(stack, TameworkMetadataKeys.TARGET_UUID) || has(stack, TameworkMetadataKeys.COMPANION_PROFILE_ID));
+    }
+
+    /** True when the key is present; a value of the wrong type still counts as present. */
+    private static boolean has(ItemStack stack, String key) {
+        try {
+            return stack.getFromMetadataOrNull(key, Codec.STRING) != null;
+        } catch (RuntimeException wrongType) {
+            return true;
+        }
     }
 
     /** Only affected stacks are inspected; ordinary item changes allocate nothing here. */

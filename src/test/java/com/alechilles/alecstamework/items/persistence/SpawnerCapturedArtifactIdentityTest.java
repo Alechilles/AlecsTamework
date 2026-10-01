@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import java.util.UUID;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
+import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
@@ -46,20 +47,30 @@ class SpawnerCapturedArtifactIdentityTest {
     }
 
     @Test
-    void rejectsMixedOrMissingIdentity() {
-        assertFalse(SpawnerCapturedArtifactIdentity.isSupported(stack(
+    void acceptsCompanionIndexIdentityWithoutASnapshotId() {
+        assertTrue(SpawnerCapturedArtifactIdentity.isSupported(stack(
                 new BsonDocument()
-        )));
-        assertFalse(SpawnerCapturedArtifactIdentity.isSupported(stack(
-                new BsonDocument()
-                        .append(
-                                TameworkMetadataKeys.TARGET_UUID,
-                                new BsonString(SOURCE)
-                        )
                         .append(
                                 TameworkMetadataKeys.COMPANION_PROFILE_ID,
                                 new BsonString(PROFILE)
                         )
+                        .append(
+                                TameworkMetadataKeys.COMPANION_GENERATION,
+                                new BsonInt64(3)
+                        )
+        )));
+        assertTrue(SpawnerCapturedArtifactIdentity.isSupported(stack(
+                new BsonDocument().append(
+                        TameworkMetadataKeys.COMPANION_PROFILE_ID,
+                        new BsonString(PROFILE)
+                )
+        )));
+    }
+
+    @Test
+    void rejectsMixedOrMissingIdentity() {
+        assertFalse(SpawnerCapturedArtifactIdentity.isSupported(stack(
+                new BsonDocument()
         )));
         assertFalse(SpawnerCapturedArtifactIdentity.isSupported(stack(
                 new BsonDocument()

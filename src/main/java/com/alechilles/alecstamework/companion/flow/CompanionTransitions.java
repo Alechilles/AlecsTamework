@@ -165,6 +165,43 @@ public final class CompanionTransitions {
                 .summonedUntilMs(0L);
     }
 
+    /**
+     * A live body captured into an item (spec 8.2): ITEM, one generation newer, no body. The
+     * owner is the one the item leaves the record with; null files the record unowned.
+     */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> capturedToItem(@Nonnull CompanionRecord before,
+                                                                       @Nonnull CompanionSummary summary,
+                                                                       @Nullable UUID owner, @Nullable String ownerName) {
+        long generation = before.generation() + 1;
+        return b -> b.generation(generation)
+                .location(CompanionLocation.item())
+                .currentNpcUuid(null)
+                .summary(summary)
+                .summonedUntilMs(0L)
+                .ownerUuid(owner)
+                .ownerName(ownerName);
+    }
+
+    /**
+     * The first record of a body that never had one, captured straight into an item at generation 0.
+     * It keeps the body's NPC UUID so a repeat capture of the same body is refused until a restore
+     * gives the companion a new one.
+     */
+    @Nonnull
+    public static CompanionRecord newItem(@Nonnull UUID profileId, @Nonnull BodyFacts body,
+                                          @Nullable UUID owner, @Nullable String ownerName) {
+        return CompanionRecord.builder(profileId, body.roleId() == null ? UNKNOWN_ROLE : body.roleId(),
+                        CompanionLocation.item())
+                .ownerUuid(owner)
+                .ownerName(ownerName)
+                .displayName(body.displayName())
+                .homeWorld(body.world())
+                .currentNpcUuid(body.npcUuid())
+                .summary(body.summary())
+                .build();
+    }
+
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> released(@Nonnull CompanionRecord before) {
         return released(before, null);

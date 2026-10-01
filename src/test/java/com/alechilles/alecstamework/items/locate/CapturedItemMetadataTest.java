@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -44,14 +45,42 @@ class CapturedItemMetadataTest {
         ItemStack legacy = new ItemStack("Test_Capture", 1)
                 .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.STRING, alias.toString());
         assertEquals(alias, CapturedItemMetadata.read(legacy).npcUuid());
-        ItemStack partial = legacy.withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID,
+        ItemStack snapshotOnly = legacy.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 Codec.STRING, UUID.randomUUID().toString());
-        assertNull(CapturedItemMetadata.read(partial));
-        ItemStack first = partial.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
+        assertNull(CapturedItemMetadata.read(snapshotOnly));
+        ItemStack profile = legacy.withMetadata(
+                TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, UUID.randomUUID().toString());
+        ItemStack first = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 Codec.STRING, UUID.randomUUID().toString());
-        ItemStack second = partial.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
+        ItemStack second = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 Codec.STRING, UUID.randomUUID().toString());
         assertNotEquals(CapturedItemMetadata.read(first), CapturedItemMetadata.read(second));
         assertNull(CapturedItemMetadata.read(new ItemStack("Test_Ordinary", 1)));
+    }
+
+    /** A 5.0 item has no alias or snapshot id; a recapture at a newer generation is a different capture. */
+    @Test void readsACompanionIndexItemByProfileAndGeneration() {
+        UUID profileId = UUID.randomUUID();
+        ItemStack item = CaptureItemKeys.write(new ItemStack("Test_Capture", 1), new CaptureItemKeys.Ref(profileId, 3));
+        ItemStack recaptured = CaptureItemKeys.write(item, new CaptureItemKeys.Ref(profileId, 4));
+
+        assertNotNull(CapturedItemMetadata.read(item));
+        assertNotEquals(CapturedItemMetadata.read(item), CapturedItemMetadata.read(recaptured));
+        assertEquals(CapturedItemMetadata.read(item), CapturedItemMetadata.read(
+                CaptureItemKeys.write(new ItemStack("Test_Capture", 1), new CaptureItemKeys.Ref(profileId, 3))));
+        var container = new SimpleItemContainer((short) 1);
+        container.setItemStackForSlot((short) 0, item);
+        assertTrue(CapturedItemMetadata.affectsCapture(container.removeItemStackFromSlot((short) 0, 1)));
+    }
+
+    /** Items made before generations existed read as generation 0. */
+    @Test void aMissingGenerationReadsAsZero() {
+        UUID profileId = UUID.randomUUID();
+        ItemStack item = new ItemStack("Test_Capture", 1)
+                .withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, profileId.toString());
+
+        assertEquals(new CaptureItemKeys.Ref(profileId, 0), CaptureItemKeys.read(item));
+        assertNull(CaptureItemKeys.read(new ItemStack("Test_Capture", 1)
+                .withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, "not-a-uuid")));
     }
 }

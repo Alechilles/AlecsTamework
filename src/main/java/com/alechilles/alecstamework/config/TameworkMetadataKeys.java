@@ -7,6 +7,8 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURED = "Tamework.Captured";
     /** Canonical durable companion identity; legacy items may only carry {@link #TARGET_UUID}. */
     public static final String COMPANION_PROFILE_ID = "Tamework.CompanionProfileId";
+    /** The record generation a capture item was made at; a missing key means 0. */
+    public static final String COMPANION_GENERATION = "Tamework.CompanionGeneration";
     public static final String TARGET_UUID = "Tamework.TargetUuid";
     public static final String TARGET_ENTITY_ID = "Tamework.TargetEntityId";
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";

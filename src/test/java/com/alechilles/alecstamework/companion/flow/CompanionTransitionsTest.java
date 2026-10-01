@@ -92,6 +92,29 @@ class CompanionTransitionsTest {
     }
 
     @Test
+    void captureRaisesTheGenerationAndLeavesNoBodyOrOwnerWhenTheOwnerIsCleared() {
+        CompanionRecord live = CompanionTransitions.newLive(PROFILE, 4, body("default", 10));
+
+        CompanionRecord item = apply(live, CompanionTransitions.capturedToItem(live, CompanionSummary.EMPTY, null, null));
+
+        assertEquals(LocationKind.ITEM, item.location().kind());
+        assertEquals(5, item.generation());
+        assertNull(item.currentNpcUuid());
+        assertNull(item.ownerUuid());
+    }
+
+    @Test
+    void aBodyWithoutARecordStartsItsRecordAsAnItemAtGenerationZero() {
+        CompanionRecord item = CompanionTransitions.newItem(PROFILE, body("default", 10), OWNER, "Alec");
+
+        assertEquals(LocationKind.ITEM, item.location().kind());
+        assertEquals(0, item.generation());
+        assertEquals("Tamed_Sheep", item.roleId());
+        assertEquals("Wooly", item.displayName());
+        assertEquals(OWNER, item.ownerUuid());
+    }
+
+    @Test
     void aReleaseKeepsItsCauseAndClearsTheSummonTimer() {
         CompanionRecord live = CompanionTransitions.newLive(PROFILE, 0, body("default", 10)).toBuilder()
                 .summonedUntilMs(9_000L).build();
