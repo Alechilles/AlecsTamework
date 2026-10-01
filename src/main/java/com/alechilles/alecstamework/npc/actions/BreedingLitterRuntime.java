@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
@@ -102,43 +101,16 @@ public final class BreedingLitterRuntime {
         }
     }
 
+    /**
+     * The companion index holds no reservation for a litter, so there is nothing to cancel. Births
+     * are checked as a whole by {@code OwnerPopulationCapService.evaluateBatch} when they spawn.
+     */
     CompletionStage<ManagedBatchSettlement> cancelManaged(
             PopulationAdmissionToken token
     ) {
-        ManagedBatchAdmissionAuthority authority = admissions.get();
-        if (!(authority instanceof PopulationAdmissionApi population)) {
-            return CompletableFuture.completedFuture(unavailable(
-                    "breeding_litter_cancel_unavailable"
-            ));
-        }
-        try {
-            CompletionStage<PopulationAdmissionDecision> result =
-                    population.cancel(token);
-            return result == null
-                    ? CompletableFuture.completedFuture(unavailable(
-                            "breeding_litter_cancel_unavailable"
-                    ))
-                    : result.thenApply(decision ->
-                            decision != null
-                                    && decision.status()
-                                    == PopulationAdmissionDecision.Status.CANCELED
-                                    ? new ManagedBatchSettlement(
-                                            ManagedBatchSettlement.Status.CANCELED,
-                                            decision.reason(),
-                                            1,
-                                            Set.of(),
-                                            Map.of()
-                                    )
-                                    : unavailable(
-                                            decision == null
-                                                    ? "breeding_litter_cancel_unavailable"
-                                                    : decision.reason()
-                                    ));
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(unavailable(
-                    "breeding_litter_cancel_failed"
-            ));
-        }
+        return CompletableFuture.completedFuture(unavailable(
+                "breeding_litter_cancel_unavailable"
+        ));
     }
 
     PublicOperationSubmission submitDurable(BreedingLitterOperation litter) {

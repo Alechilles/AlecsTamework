@@ -1733,7 +1733,6 @@ public class Tamework extends JavaPlugin {
                 this::closeRuntimeApiDependents,
                 this::closeApiComposition);
         simpleClaimsCapabilityRuntime.close();
-        api = null;
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;

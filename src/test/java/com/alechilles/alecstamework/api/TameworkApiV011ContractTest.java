@@ -217,14 +217,6 @@ class TameworkApiV011ContractTest {
 
     private static void assertAdmissionDefaultsUnavailable(PolicyApi policy)
             throws Exception {
-        assertEquals(
-                PopulationAdmissionDecision.Status.UNAVAILABLE,
-                policy.populationAdmissions()
-                        .tryAdmitV3(admissionRequest())
-                        .toCompletableFuture()
-                        .join()
-                        .status()
-        );
         AutoCloseable registration = policy.admissionProviders().register(
                 "provider:test",
                 1,

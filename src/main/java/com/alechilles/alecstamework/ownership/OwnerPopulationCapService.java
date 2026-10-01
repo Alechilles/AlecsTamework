@@ -134,7 +134,7 @@ public final class OwnerPopulationCapService {
     }
 
     @Nonnull
-    static Decision evaluateAcquisition(
+    public static Decision evaluateAcquisition(
             @Nullable TwGlobalConfig globalConfig,
             @Nullable CompanionQueries index,
             @Nullable String worldName,

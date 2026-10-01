@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
@@ -14,7 +13,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.codec.Codec;
@@ -35,7 +33,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 /** Applies one authorized companion cull on the current world thread. */
@@ -55,7 +52,6 @@ public final class TameworkNpcCullService {
     private final TameworkCullEligibility eligibility;
     private final CommandItemRegistry registry;
     private final CommandLinkMutationService linkMutationService;
-    private final CommandRosterCullUnlinkService rosterUnlinkService;
     private final CullTerminalOwnerReleaseService.Port terminalOwnerRelease;
 
     TameworkNpcCullService(TameworkCullEligibility eligibility,
@@ -70,31 +66,16 @@ public final class TameworkNpcCullService {
                            @Nullable ReleaseFlow releaseFlow,
                            @Nullable CompanionQueries companions) {
         this(eligibility, registry, linkMutationService,
-                () -> {
-                    Tamework plugin = Tamework.getInstance();
-                    return plugin == null ? null : plugin.getApi();
-                }, CullTerminalOwnerReleaseService.from(releaseFlow, companions));
+                CullTerminalOwnerReleaseService.from(releaseFlow, companions));
     }
 
     TameworkNpcCullService(TameworkCullEligibility eligibility,
                            @Nullable CommandItemRegistry registry,
                            CommandLinkMutationService linkMutationService,
-                           Supplier<TameworkApi> api) {
-        this(eligibility, registry, linkMutationService, api,
-                CullTerminalOwnerReleaseService.from(null, null));
-    }
-
-    TameworkNpcCullService(TameworkCullEligibility eligibility,
-                           @Nullable CommandItemRegistry registry,
-                           CommandLinkMutationService linkMutationService,
-                           @Nullable Supplier<TameworkApi> api,
                            CullTerminalOwnerReleaseService.Port terminalOwnerRelease) {
         this.eligibility = eligibility;
         this.registry = registry;
         this.linkMutationService = linkMutationService;
-        this.rosterUnlinkService = new CommandRosterCullUnlinkService(
-                registry, api
-        );
         this.terminalOwnerRelease = terminalOwnerRelease == null
                 ? CullTerminalOwnerReleaseService.from(null, null)
                 : terminalOwnerRelease;
@@ -237,18 +218,8 @@ public final class TameworkNpcCullService {
             return Outcome.UNAVAILABLE;
         }
         UUID targetOwnerUuid = targetOwnerUuid(target, store);
-        CommandRosterCullUnlinkService.Preparation rosterRemoval =
-                prepareRosterRemoval(player.getUuid(), target, store);
-        if (rosterRemoval.status()
-                == CommandRosterCullUnlinkService.PreparationStatus.UNAVAILABLE) {
-            return Outcome.UNAVAILABLE;
-        }
-        if (rosterRemoval.isReady()) {
-            return queueCullAfterRosterRemoval(
-                    player, targetUuid, targetOwnerUuid, managedRewards,
-                    rosterRemoval
-            );
-        }
+        // An owned target, roster member or not, has one companion record. Releasing it frees
+        // its population and roster place, so there is no separate roster row to unlink.
         if (targetOwnerUuid != null) {
             World world = player.getWorld();
             UUID actorUuid = player.getUuid();
@@ -260,64 +231,6 @@ public final class TameworkNpcCullService {
         return applyCull(
                 player, player.getUuid(), target, store, managedRewards, false
         );
-    }
-
-    private CommandRosterCullUnlinkService.Preparation prepareRosterRemoval(
-            UUID ownerUuid,
-            Ref<EntityStore> target,
-            Store<EntityStore> store
-    ) {
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> type =
-                TameworkProjectionIdentityComponent.getComponentType();
-        TameworkProjectionIdentityComponent marker = type == null ? null
-                : store.getComponent(target, type);
-        if (marker == null || !TameworkProjectionIdentityComponent
-                .KIND_COMMAND_ROSTER.equals(marker.getProjectionKind())) {
-            return new CommandRosterCullUnlinkService.Preparation(
-                    CommandRosterCullUnlinkService.PreparationStatus.NOT_ROSTER_MEMBER,
-                    null,
-                    null
-            );
-        }
-        return rosterUnlinkService.prepare(ownerUuid, marker.getProfileId());
-    }
-
-    private Outcome queueCullAfterRosterRemoval(
-            Player player,
-            @Nullable UUID targetUuid,
-            @Nullable UUID targetOwnerUuid,
-            boolean managedRewards,
-            CommandRosterCullUnlinkService.Preparation rosterRemoval
-    ) {
-        World world = player.getWorld();
-        UUID ownerUuid = player.getUuid();
-        if (world == null || !world.isAlive() || ownerUuid == null
-                || targetUuid == null) {
-            return Outcome.UNAVAILABLE;
-        }
-        CompletionStage<Boolean> stage = rosterUnlinkService.remove(
-                rosterRemoval
-        );
-        if (stage == null) {
-            return Outcome.UNAVAILABLE;
-        }
-        stage.whenComplete((removed, failure) -> {
-            if (failure == null && Boolean.TRUE.equals(removed)) {
-                if (targetOwnerUuid != null) {
-                    queueCullAfterTerminalRelease(
-                            world, ownerUuid, targetUuid, targetOwnerUuid,
-                            managedRewards
-                    );
-                } else {
-                    LeaseBoundWorldDispatcher.execute(world, () ->
-                            applyDeferredCull(
-                                    world, ownerUuid, targetUuid,
-                                    managedRewards, false
-                            ));
-                }
-            }
-        });
-        return Outcome.QUEUED;
     }
 
     private Outcome queueCullAfterTerminalRelease(

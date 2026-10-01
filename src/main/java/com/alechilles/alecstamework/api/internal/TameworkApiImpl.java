@@ -15,8 +15,11 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NameItemConfigView;
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
@@ -42,6 +45,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -1091,6 +1095,50 @@ public final class TameworkApiImpl
                 decision.scope() != null ? decision.scope().name() : null,
                 decision.reason()
         );
+    }
+
+    /**
+     * Answers from the owner's records in the companion index: every owned companion in the
+     * request's scope counts, loaded or not. The request names no role, so population-group limits
+     * are not part of this answer.
+     */
+    @Nonnull
+    @Override
+    public OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
+        Objects.requireNonNull(request, "request");
+        Tamework plugin = Tamework.getInstance();
+        CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
+        return ownerCapV2(request, companions != null, OwnerPopulationCapService.evaluateAcquisition(
+                TwGlobalConfig.resolveActive(), companions, request.worldName(), request.ownerUuid()));
+    }
+
+    /** Maps a one-slot owner cap decision to the answer for {@code request.requestedSlots()} slots. */
+    @Nonnull
+    static OwnerPopulationCapDecisionViewV2 ownerCapV2(@Nonnull OwnerPopulationCapRequestV2 request,
+                                                       boolean indexAvailable,
+                                                       @Nonnull OwnerPopulationCapService.Decision decision) {
+        boolean perWorld = decision.scope() == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD;
+        OwnerPopulationCapDecisionViewV2.Scope scope = perWorld
+                ? OwnerPopulationCapDecisionViewV2.Scope.PER_WORLD
+                : OwnerPopulationCapDecisionViewV2.Scope.GLOBAL;
+        boolean counted = indexAvailable && decision.currentCount() >= 0
+                && !(perWorld && request.worldName() == null);
+        if (!counted && decision.capEnabled()) {
+            return OwnerPopulationCapDecisionViewV2.unavailable(request, scope, decision.reason());
+        }
+        long count = counted ? decision.currentCount() : OwnerPopulationCapDecisionViewV2.UNKNOWN_COUNT;
+        long pending = counted ? 0L : OwnerPopulationCapDecisionViewV2.UNKNOWN_COUNT;
+        if (!decision.capEnabled()) {
+            return new OwnerPopulationCapDecisionViewV2(request.ownerUuid(), request.worldName(),
+                    request.requestedSlots(), true, false, counted, 0, count, pending, Integer.MAX_VALUE,
+                    scope, OwnerPopulationCapDecisionViewV2.Readiness.READY, decision.reason());
+        }
+        long headroom = Math.max(0L, (long) decision.limit() - count);
+        boolean allowed = request.requestedSlots() <= headroom;
+        return new OwnerPopulationCapDecisionViewV2(request.ownerUuid(), request.worldName(),
+                request.requestedSlots(), allowed, true, true, decision.limit(), count, 0L, headroom,
+                scope, OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                allowed ? "owner-cap-allow" : "owner-cap-reached");
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(

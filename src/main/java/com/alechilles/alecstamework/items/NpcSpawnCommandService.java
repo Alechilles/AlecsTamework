@@ -1,29 +1,16 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.PopulationAdmissionApi;
-import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
-import com.alechilles.alecstamework.api.PopulationAdmissionForcePolicy;
-import com.alechilles.alecstamework.api.PopulationAdmissionIdentity;
-import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
-import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
-import com.alechilles.alecstamework.api.PopulationAdmissionToken;
-import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcMarkedTargetAccess;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -34,14 +21,12 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.math.util.ChunkUtil;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -50,14 +35,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Spawns owned+tamed NPC batches for commands and optionally links them to the held command item.
+ * Every role, managed or not, is pre-checked against the owner and group caps before its body is
+ * spawned; the admission gate then checks again under the index lock when the tame is recorded.
  */
 public final class NpcSpawnCommandService {
     private static final double SPAWN_RING_RADIUS_STEP = 0.9;
@@ -69,25 +54,15 @@ public final class NpcSpawnCommandService {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final NpcSpawnAttachmentResolutionService attachmentResolutionService;
-    private final Tamework plugin;
-    @Nullable
-    private final PopulationAdmissionApi populationAdmissions;
-    @Nullable
-    private final CommandLinkedNpcStateSnapshotService profileSnapshots;
 
     public NpcSpawnCommandService(@Nonnull Tamework plugin) {
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(plugin, "plugin");
         this.spawnPositionService = new SpawnerSpawnPositionService(plugin.getLogger());
         this.attachmentService = new SpawnerAttachmentService(plugin.getLogger());
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.npcNameResolver = new CommandNpcNameResolver();
         this.linkPolicyService = new CommandLinkPolicyService();
         this.attachmentResolutionService = new NpcSpawnAttachmentResolutionService();
-        this.populationAdmissions = plugin.getApi() == null
-                || plugin.getApi().policies() == null
-                ? null : plugin.getApi().policies().populationAdmissions();
-        this.profileSnapshots =
-                plugin.getCommandLinkedNpcStateSnapshotService();
     }
 
     public void spawnTamedOwnedBatch(@Nonnull Player player,
@@ -153,20 +128,14 @@ public final class NpcSpawnCommandService {
             @Nullable Map<String, String> attachmentOverrides,
             BatchTracker tracker
     ) {
-        ManagedActivityConfigRegistry.RoleResolution managed = plugin
-                .getManagedActivityConfigRegistry()
-                .resolveRole(preparation.roleId())
-                .orElse(null);
-        if (managed == null) {
-            OwnerPopulationCapService.Decision cap =
-                    OwnerPopulationCapService.evaluateAcquisition(
-                            store, preparation.ownerId(), preparation.roleId()
-                    );
-            if (!cap.allowed()) {
-                OwnerMessageUtil.sendAcquisitionDenied(player, cap);
-                tracker.stop("Owner population cap reached.");
-                return false;
-            }
+        OwnerPopulationCapService.Decision cap =
+                OwnerPopulationCapService.evaluateAcquisition(
+                        store, preparation.ownerId(), preparation.roleId()
+                );
+        if (!cap.allowed()) {
+            OwnerMessageUtil.sendAcquisitionDenied(player, cap);
+            tracker.stop("Owner population cap reached.");
+            return false;
         }
         Rotation3f rotation = spawnPositionService.resolveSpawnRotation(
                 store, playerRef, position
@@ -177,19 +146,6 @@ public final class NpcSpawnCommandService {
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             tracker.stop("Spawn failed before completing the requested quantity.");
             return false;
-        }
-        if (managed != null) {
-            return prepareManagedSpawn(
-                    store,
-                    world,
-                    spawned.first(),
-                    spawned.second(),
-                    preparation,
-                    position,
-                    attachmentOverrides,
-                    tracker,
-                    managed
-            );
         }
         AppliedSpawn applied = applySpawnedState(
                 player,
@@ -205,7 +161,6 @@ public final class NpcSpawnCommandService {
             tracker.stop("Spawn failed while applying owned companion state.");
             return false;
         }
-        tracker.register(applied.attachments());
         tracker.applied(applied.linked(), applied.attachments());
         return true;
     }
@@ -243,368 +198,6 @@ public final class NpcSpawnCommandService {
             linked = false;
         }
         return new AppliedSpawn(linked, resolution);
-    }
-
-    private boolean prepareManagedSpawn(
-            Store<EntityStore> store,
-            World world,
-            Ref<EntityStore> npcRef,
-            NPCEntity npc,
-            SpawnPreparation preparation,
-            Vector3d position,
-            @Nullable Map<String, String> attachmentOverrides,
-            BatchTracker tracker,
-            ManagedActivityConfigRegistry.RoleResolution managed
-    ) {
-        UUID npcUuid = npc.getUuid();
-        var markerType = TameworkProjectionIdentityComponent.getComponentType();
-        if (populationAdmissions == null || profileSnapshots == null
-                || npcUuid == null || markerType == null
-                || world.getName() == null || world.getName().isBlank()) {
-            npc.setToDespawn();
-            tracker.stop("Managed population admission is unavailable.");
-            return false;
-        }
-        UUID commandSpawnId = UUID.randomUUID();
-        store.putComponent(
-                npcRef,
-                markerType,
-                new TameworkProjectionIdentityComponent(
-                        npcUuid.toString(),
-                        commandSpawnId.toString(),
-                        TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE,
-                        null,
-                        null,
-                        0L
-                )
-        );
-        tracker.register(null);
-        PopulationAdmissionRequestV3 request = managedRequest(
-                npcUuid,
-                commandSpawnId,
-                preparation,
-                world,
-                position,
-                managed
-        );
-        CompletionStage<PopulationAdmissionDecision> prepared;
-        try {
-            prepared = populationAdmissions.tryAdmitV3(request);
-        } catch (RuntimeException | LinkageError failure) {
-            npc.setToDespawn();
-            tracker.denied("Managed population admission failed.");
-            warnManagedSpawn("prepare_failed", npcUuid, failure);
-            return true;
-        }
-        if (prepared == null) {
-            npc.setToDespawn();
-            tracker.denied("Managed population admission failed.");
-            return true;
-        }
-        prepared.whenComplete((decision, failure) -> {
-            if (failure != null || decision == null
-                    || !decision.accepted() || decision.token() == null) {
-                finishManagedFailure(
-                        world,
-                        npcUuid,
-                        tracker,
-                        "Managed population admission was not accepted.",
-                        failure
-                );
-                return;
-            }
-            dispatchManagedApply(
-                    world,
-                    npcUuid,
-                    preparation.ownerId(),
-                    attachmentOverrides,
-                    tracker,
-                    decision.token()
-            );
-        });
-        return true;
-    }
-
-    private PopulationAdmissionRequestV3 managedRequest(
-            UUID npcUuid,
-            UUID commandSpawnId,
-            SpawnPreparation preparation,
-            World world,
-            Vector3d position,
-            ManagedActivityConfigRegistry.RoleResolution managed
-    ) {
-        PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
-                new PopulationAdmissionIdentity(
-                        null,
-                        npcUuid.toString(),
-                        "admin-spawn:" + commandSpawnId
-                ),
-                null,
-                PopulationAdmissionRequest.NEW_PROFILE_REVISION,
-                null,
-                preparation.ownerId(),
-                null,
-                new PopulationAdmissionLocation(
-                        world.getName(),
-                        ChunkUtil.chunkCoordinate((int) Math.floor(position.x)),
-                        ChunkUtil.chunkCoordinate((int) Math.floor(position.z))
-                ),
-                PopulationAdmissionOperation.ADMIN_FORCE,
-                1,
-                PopulationAdmissionForcePolicy.ADMIN_OVERRIDE,
-                PopulationCompanionLifecycle.ACTIVE
-        );
-        return new PopulationAdmissionRequestV3(
-                new PopulationAdmissionRequestV2(
-                        admission,
-                        preparation.roleId(),
-                        world.getName()
-                ),
-                managed.profile().profileId()
-        );
-    }
-
-    private void dispatchManagedApply(
-            World world,
-            UUID npcUuid,
-            UUID ownerId,
-            @Nullable Map<String, String> attachmentOverrides,
-            BatchTracker tracker,
-            PopulationAdmissionToken token
-    ) {
-        try {
-            world.execute(() -> {
-                World current = Universe.get().getWorld(world.getName());
-                if (current != world || !world.isAlive()
-                        || world.getEntityStore() == null) {
-                    tracker.abandonWithoutCompletion(
-                            "World closed during managed spawn admission."
-                    );
-                    return;
-                }
-                Store<EntityStore> currentStore =
-                        world.getEntityStore().getStore();
-                Ref<EntityStore> currentPlayerRef =
-                        world.getEntityRef(ownerId);
-                Player currentPlayer = currentPlayerRef == null
-                        ? null : currentStore.getComponent(
-                                currentPlayerRef, Player.getComponentType()
-                        );
-                Ref<EntityStore> currentRef = world.getEntityRef(npcUuid);
-                NPCEntity currentNpc = currentRef == null
-                        ? null : currentStore.getComponent(
-                                currentRef, NPCEntity.getComponentType()
-                        );
-                if (currentPlayerRef == null || !currentPlayerRef.isValid()
-                        || currentPlayer == null
-                        || currentRef == null || !currentRef.isValid()
-                        || currentNpc == null) {
-                    cancelUnused(token);
-                    tracker.denied("Spawned NPC was no longer available.");
-                    return;
-                }
-                PopulationAdmissionDecision claim =
-                        populationAdmissions.claimForApply(token);
-                if (claim.status()
-                        != PopulationAdmissionDecision.Status.APPLYING) {
-                    currentNpc.setToDespawn();
-                    cancelUnused(token);
-                    tracker.denied("Managed population admission could not be claimed.");
-                    return;
-                }
-                var markerType =
-                        TameworkProjectionIdentityComponent.getComponentType();
-                if (markerType != null) {
-                    currentStore.putComponent(
-                            currentRef,
-                            markerType,
-                            new TameworkProjectionIdentityComponent(
-                                    npcUuid.toString(),
-                                    token.operationId().toString(),
-                                    TameworkProjectionIdentityComponent
-                                            .KIND_ADMIN_FORCE,
-                                    null,
-                                    null,
-                                    0L
-                            )
-                    );
-                }
-                AppliedSpawn applied = applySpawnedState(
-                        currentPlayer,
-                        currentStore,
-                        currentPlayerRef,
-                        world,
-                        currentRef,
-                        currentNpc,
-                        ownerId,
-                        attachmentOverrides
-                );
-                if (applied == null) {
-                    currentNpc.setToDespawn();
-                    tracker.denied(
-                            "Spawn failed while applying owned companion state."
-                    );
-                    return;
-                }
-                publishAndCommitManagedSpawn(
-                        world,
-                        currentRef,
-                        currentStore,
-                        npcUuid,
-                        tracker,
-                        token,
-                        applied
-                );
-            });
-        } catch (RuntimeException | LinkageError failure) {
-            tracker.abandonWithoutCompletion(
-                    "World dispatch failed during managed spawn admission."
-            );
-            warnManagedSpawn("world_dispatch_failed", npcUuid, failure);
-        }
-    }
-
-    private void publishAndCommitManagedSpawn(
-            World world,
-            Ref<EntityStore> npcRef,
-            Store<EntityStore> store,
-            UUID npcUuid,
-            BatchTracker tracker,
-            PopulationAdmissionToken token,
-            AppliedSpawn applied
-    ) {
-        CompletionStage<Void> profile;
-        try {
-            profile = profileSnapshots.publishAdminSpawnProfile(npcRef, store);
-        } catch (RuntimeException | LinkageError failure) {
-            finishManagedFailure(
-                    world,
-                    npcUuid,
-                    tracker,
-                    "Managed profile publication failed.",
-                    failure
-            );
-            return;
-        }
-        profile.whenComplete((ignored, profileFailure) -> {
-            if (profileFailure != null) {
-                finishManagedFailure(
-                        world,
-                        npcUuid,
-                        tracker,
-                        "Managed profile publication failed.",
-                        profileFailure
-                );
-                return;
-            }
-            CompletionStage<PopulationAdmissionDecision> committed;
-            try {
-                committed = populationAdmissions.commit(token);
-            } catch (RuntimeException | LinkageError failure) {
-                finishManagedFailure(
-                        world,
-                        npcUuid,
-                        tracker,
-                        "Managed population admission did not commit.",
-                        failure
-                );
-                return;
-            }
-            committed.whenComplete((decision, commitFailure) -> {
-                if (commitFailure != null || decision == null
-                        || decision.status()
-                        != PopulationAdmissionDecision.Status.COMMITTED) {
-                    finishManagedFailure(
-                            world,
-                            npcUuid,
-                            tracker,
-                            "Managed population admission did not commit.",
-                            commitFailure != null ? commitFailure : new IllegalStateException(
-                                    decision == null ? "population_admission_result_missing" : decision.reason())
-                    );
-                    return;
-                }
-                finishManagedSuccess(world, tracker, applied);
-            });
-        });
-    }
-
-    private void finishManagedSuccess(
-            World world,
-            BatchTracker tracker,
-            AppliedSpawn applied
-    ) {
-        dispatchCompletion(world, tracker, () -> tracker.applied(
-                applied.linked(), applied.attachments()
-        ));
-    }
-
-    private void finishManagedFailure(
-            World world,
-            UUID npcUuid,
-            BatchTracker tracker,
-            String reason,
-            @Nullable Throwable failure
-    ) {
-        warnManagedSpawn("settlement_failed", npcUuid, failure);
-        dispatchCompletion(world, tracker, () -> {
-            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-            if (npcRef != null && npcRef.isValid()) {
-                NPCEntity npc = world.getEntityStore().getStore().getComponent(
-                        npcRef, NPCEntity.getComponentType()
-                );
-                if (npc != null) {
-                    npc.setToDespawn();
-                }
-            }
-            tracker.denied(reason);
-        });
-    }
-
-    private void dispatchCompletion(
-            World world,
-            BatchTracker tracker,
-            Runnable completion
-    ) {
-        try {
-            world.execute(() -> {
-                World current = Universe.get().getWorld(world.getName());
-                if (current != world || !world.isAlive()
-                        || world.getEntityStore() == null) {
-                    tracker.abandonWithoutCompletion(
-                            "World closed during managed spawn settlement."
-                    );
-                    return;
-                }
-                completion.run();
-            });
-        } catch (RuntimeException | LinkageError failure) {
-            tracker.abandonWithoutCompletion(
-                    "World dispatch failed during managed spawn settlement."
-            );
-        }
-    }
-
-    private void cancelUnused(PopulationAdmissionToken token) {
-        try {
-            populationAdmissions.cancel(token);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Expiry cleanup owns any unused token that cannot be canceled now.
-        }
-    }
-
-    private void warnManagedSpawn(
-            String detail,
-            UUID npcUuid,
-            @Nullable Throwable failure
-    ) {
-        String message = "Managed admin spawn " + detail + " (npc="
-                + npcUuid + ").";
-        if (failure == null) {
-            plugin.getLogger().at(Level.WARNING).log(message);
-        } else {
-            plugin.getLogger().at(Level.WARNING).withCause(failure).log(message);
-        }
     }
 
     @Nonnull
@@ -863,15 +456,13 @@ public final class NpcSpawnCommandService {
         );
     }
 
+    /** Collects the results of one batch. The whole batch runs on the caller's world thread. */
     final class BatchTracker {
         private final int requestedCount;
         private final boolean hadHeldCommandItem;
         private final Consumer<SpawnBatchResult> completion;
-        private int pendingCount;
         private int spawnedCount;
         private int linkedCount;
-        private boolean sealed;
-        private boolean completed;
         @Nullable
         private String stoppedReason;
         @Nullable
@@ -885,26 +476,13 @@ public final class NpcSpawnCommandService {
             this.completion = completion;
         }
 
-        synchronized void register(@Nullable AttachmentResolution resolution) {
-            pendingCount++;
-            if (attachmentResolution == null && resolution != null) {
-                attachmentResolution = resolution;
-            }
-        }
-
-        synchronized void stop(@Nonnull String reason) {
+        void stop(@Nonnull String reason) {
             if (stoppedReason == null) {
                 stoppedReason = reason;
             }
         }
 
-        synchronized void denied(@Nonnull String reason) {
-            stop(reason);
-            pendingCount = Math.max(0, pendingCount - 1);
-            finishIfReady();
-        }
-
-        synchronized void applied(boolean linked, @Nullable AttachmentResolution resolution) {
+        void applied(boolean linked, @Nullable AttachmentResolution resolution) {
             if (attachmentResolution == null && resolution != null) {
                 attachmentResolution = resolution;
             }
@@ -912,37 +490,9 @@ public final class NpcSpawnCommandService {
             if (linked) {
                 linkedCount++;
             }
-            pendingCount = Math.max(0, pendingCount - 1);
-            finishIfReady();
         }
 
-        synchronized void durabilityDegraded(@Nonnull String reason) {
-            if (!completed && stoppedReason == null) {
-                stoppedReason = "Ownership durability degraded: " + reason + ".";
-            }
-        }
-
-        /** Closes an abandoned world callback without invoking player-facing completion off-thread. */
-        synchronized void abandonWithoutCompletion(@Nonnull String reason) {
-            if (completed) {
-                return;
-            }
-            stop(reason);
-            pendingCount = 0;
-            sealed = true;
-            completed = true;
-        }
-
-        synchronized void seal() {
-            sealed = true;
-            finishIfReady();
-        }
-
-        private void finishIfReady() {
-            if (!sealed || pendingCount > 0 || completed) {
-                return;
-            }
-            completed = true;
+        void seal() {
             completion.accept(new SpawnBatchResult(
                     null,
                     requestedCount,
@@ -954,7 +504,6 @@ public final class NpcSpawnCommandService {
                     attachmentResolution == null ? List.of() : attachmentResolution.invalidSelections
             ));
         }
-
     }
 
     public static final class SpawnBatchResult {
@@ -1065,28 +614,6 @@ public final class NpcSpawnCommandService {
                         "tamework.commands.npcSpawnTamed.result.stopped.spawnFailed";
                 case "Spawn failed while applying owned companion state." ->
                         "tamework.commands.npcSpawnTamed.result.stopped.applyState";
-                case "Managed population admission is unavailable." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.admissionUnavailable";
-                case "Managed population admission failed." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.admissionFailed";
-                case "Managed population admission was not accepted." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.admissionRejected";
-                case "World closed during managed spawn admission." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.worldClosedAdmission";
-                case "Spawned NPC was no longer available." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.npcUnavailable";
-                case "Managed population admission could not be claimed." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.admissionClaim";
-                case "World dispatch failed during managed spawn admission." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.worldDispatchAdmission";
-                case "Managed profile publication failed." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.profilePublication";
-                case "Managed population admission did not commit." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.admissionCommit";
-                case "World closed during managed spawn settlement." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.worldClosedSettlement";
-                case "World dispatch failed during managed spawn settlement." ->
-                        "tamework.commands.npcSpawnTamed.result.stopped.worldDispatchSettlement";
                 default -> null;
             };
         }

@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.api.internal;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -13,7 +15,9 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -52,6 +56,27 @@ class TameworkApiImplTest {
             "30000000-0000-0000-0000-000000000004");
     @TempDir
     Path tempDir;
+
+    @Test
+    void ownerCapV2CountsEveryRequestedSlotAndNeedsAWorldForAPerWorldCap() {
+        OwnerPopulationCapService.Decision oneFree = OwnerPopulationCapService.evaluateResolved(
+                5, 4, TwGlobalConfig.PerPlayerLimitScope.PER_WORLD);
+
+        OwnerPopulationCapDecisionViewV2 one = TameworkApiImpl.ownerCapV2(
+                new OwnerPopulationCapRequestV2(OWNER_UUID, "world", 1), true, oneFree);
+        OwnerPopulationCapDecisionViewV2 two = TameworkApiImpl.ownerCapV2(
+                new OwnerPopulationCapRequestV2(OWNER_UUID, "world", 2), true, oneFree);
+        OwnerPopulationCapDecisionViewV2 noWorld = TameworkApiImpl.ownerCapV2(
+                new OwnerPopulationCapRequestV2(OWNER_UUID, null, 1), true, oneFree);
+
+        assertTrue(one.allowed());
+        assertEquals(4L, one.committedCount());
+        assertFalse(two.allowed());
+        assertTrue(two.authoritative());
+        assertEquals(1L, two.remainingHeadroom());
+        assertFalse(noWorld.allowed());
+        assertEquals(OwnerPopulationCapDecisionViewV2.Readiness.UNAVAILABLE, noWorld.readiness());
+    }
     @Test
     void replacementCompositionExposesStableReleasedApiContracts()
             throws Exception {

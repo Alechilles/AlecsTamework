@@ -24,8 +24,8 @@ public interface PolicyApi {
     /**
      * Evaluates an owner-only cap with explicit world and slot context.
      *
-     * <p>This remains informational; use {@link #populationAdmissions()} to bind a gameplay
-     * mutation to reserved capacity.</p>
+     * <p>This is informational. The binding check runs when the companion record changes, so a
+     * later change by the same owner can still be refused.</p>
      */
     @Nonnull
     default OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(
@@ -39,12 +39,6 @@ public interface PolicyApi {
                 OwnerPopulationCapDecisionViewV2.Scope.UNKNOWN,
                 "owner-population-v2-authority-unavailable"
         );
-    }
-
-    /** Returns the mutation-bound try/claim-for-apply/commit/cancel API. */
-    @Nonnull
-    default PopulationAdmissionApi populationAdmissions() {
-        return PopulationAdmissionApi.unavailable();
     }
 
     /** Returns the external population-admission provider registry when advertised. */

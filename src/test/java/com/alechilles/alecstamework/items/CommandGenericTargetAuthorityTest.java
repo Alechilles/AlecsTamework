@@ -289,7 +289,6 @@ class CommandGenericTargetAuthorityTest {
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
                             CullTerminalOwnerReleaseService.Outcome.RELEASED
                     ));
@@ -345,7 +344,6 @@ class CommandGenericTargetAuthorityTest {
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
                             terminalOutcome
                     ));
@@ -378,7 +376,6 @@ class CommandGenericTargetAuthorityTest {
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> {
                         releaseAttempted.set(true);
                         return CompletableFuture.completedFuture(
