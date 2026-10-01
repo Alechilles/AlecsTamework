@@ -141,11 +141,24 @@ final class CommandCompanionRestorationService {
             return RequestStatus.INVALID_CONTEXT;
         }
         UUID playerUuid = player.getUuid();
+        RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
+        String name = profile.displayName() != null && !profile.displayName().isBlank()
+                ? profile.displayName()
+                : profile.customName();
         List<ItemStack> paid = List.of();
         if (reason == RestoreRules.Reason.REVIVE) {
             TwCompanionReviveSettings revive = TwCompanionConfig.resolveEffectiveForRole(roleId).getRevive();
             var cost = revive.getCosts();
             if (cost.length > 0) {
+                // The flow would refuse these after payment; refuse them before charging instead.
+                RestoreRules.Verdict verdict = RestoreRules.forRecord(
+                        companions.get(profileId), reason, System.currentTimeMillis());
+                if (verdict != RestoreRules.Verdict.ALLOWED) {
+                    RestoreFlow.Result refused = refusal(verdict);
+                    completions.dispatch(placement.worldKey(), playerUuid,
+                            (currentWorld, currentStore, actorRef, actor) -> listener.complete(refused, actor, name));
+                    return RequestStatus.STARTED;
+                }
                 CommandReviveCostInventory.Charge charge = CommandReviveCostInventory.charge(store, playerRef, cost);
                 switch (charge.status()) {
                     case PAID -> paid = charge.paid();
@@ -159,10 +172,6 @@ final class CommandCompanionRestorationService {
                 }
             }
         }
-        RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
-        String name = profile.displayName() != null && !profile.displayName().isBlank()
-                ? profile.displayName()
-                : profile.customName();
         CompletableFuture<RestoreFlow.Result> restoring;
         try {
             restoring = restoreFlow.restore(profileId, reason, destination);
@@ -183,6 +192,18 @@ final class CommandCompanionRestorationService {
                     (currentWorld, currentStore, actorRef, actor) -> listener.complete(outcome, actor, name));
         });
         return RequestStatus.STARTED;
+    }
+
+    @Nonnull
+    private static RestoreFlow.Result refusal(@Nonnull RestoreRules.Verdict verdict) {
+        return switch (verdict) {
+            case NOT_FOUND -> RestoreFlow.Result.NOT_FOUND;
+            case NOT_ALLOWED -> RestoreFlow.Result.NOT_ALLOWED;
+            case NO_SNAPSHOT -> RestoreFlow.Result.NO_SNAPSHOT;
+            case COOLDOWN -> RestoreFlow.Result.COOLDOWN;
+            case STALE -> RestoreFlow.Result.STALE;
+            case ALLOWED -> RestoreFlow.Result.RESTORED;
+        };
     }
 
     /**

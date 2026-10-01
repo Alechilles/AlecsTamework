@@ -17,6 +17,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,7 +32,8 @@ import javax.annotation.Nullable;
  */
 final class CommandReviveCostInventory {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final int MAX_WORLD_HANDOFFS = 3;
+    private static final int MAX_REFUND_ATTEMPTS = 6;
+    private static final long REFUND_RETRY_DELAY_MS = 1_000L;
 
     private CommandReviveCostInventory() {
     }
@@ -93,21 +96,21 @@ final class CommandReviveCostInventory {
     /**
      * Gives paid items back to the player after a failed revive. Items that do not fit are dropped
      * at the player's position. The player is resolved by id inside the world's executor, in
-     * whichever world they are in now. A player who left the server cannot be refunded; that is
-     * logged with the item ids.
+     * whichever world they are in now. While the player is between worlds the refund is retried
+     * every second for a few seconds; a player still missing after that (for example one who left
+     * the server) cannot be refunded, and the item ids are logged.
      */
     static void refund(@Nonnull UUID playerUuid, @Nonnull List<ItemStack> paid) {
         if (paid.isEmpty()) {
             return;
         }
-        dispatchRefund(playerUuid, paid, 0);
+        dispatchRefund(playerUuid, paid, 1);
     }
 
-    private static void dispatchRefund(UUID playerUuid, List<ItemStack> paid, int handoffs) {
+    private static void dispatchRefund(UUID playerUuid, List<ItemStack> paid, int attempt) {
         World world = currentWorld(playerUuid);
         if (world == null) {
-            LOGGER.at(Level.WARNING).log("Revive refund lost: player " + playerUuid
-                    + " is not in a live world. Items: " + describe(paid));
+            retryOrGiveUp(playerUuid, paid, attempt);
             return;
         }
         try {
@@ -115,25 +118,25 @@ final class CommandReviveCostInventory {
                 Ref<EntityStore> ref = world.getEntityRef(playerUuid);
                 if (ref == null || !ref.isValid()) {
                     // The player changed world between lookup and execution.
-                    if (handoffs < MAX_WORLD_HANDOFFS) {
-                        dispatchRefund(playerUuid, paid, handoffs + 1);
-                    } else {
-                        LOGGER.at(Level.WARNING).log("Revive refund lost: player " + playerUuid
-                                + " kept changing world. Items: " + describe(paid));
-                    }
+                    retryOrGiveUp(playerUuid, paid, attempt);
                     return;
                 }
-                try {
-                    give(ref, ref.getStore(), paid);
-                } catch (RuntimeException failure) {
-                    LOGGER.at(Level.SEVERE).withCause(failure).log("Revive refund failed for player "
-                            + playerUuid + ". Items: " + describe(paid));
-                }
+                give(ref, ref.getStore(), paid);
             });
         } catch (RuntimeException failure) {
             LOGGER.at(Level.WARNING).withCause(failure).log("Revive refund could not be scheduled for player "
                     + playerUuid + ". Items: " + describe(paid));
         }
+    }
+
+    private static void retryOrGiveUp(UUID playerUuid, List<ItemStack> paid, int attempt) {
+        if (attempt < MAX_REFUND_ATTEMPTS) {
+            CompletableFuture.runAsync(() -> dispatchRefund(playerUuid, paid, attempt + 1),
+                    CompletableFuture.delayedExecutor(REFUND_RETRY_DELAY_MS, TimeUnit.MILLISECONDS));
+            return;
+        }
+        LOGGER.at(Level.WARNING).log("Revive refund lost: player " + playerUuid
+                + " was not in a live world for " + MAX_REFUND_ATTEMPTS + " attempts. Items: " + describe(paid));
     }
 
     @Nullable
@@ -151,9 +154,14 @@ final class CommandReviveCostInventory {
 
     private static void give(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor, List<ItemStack> stacks) {
         for (ItemStack stack : stacks) {
-            ItemStack remainder = Player.giveItem(stack, ref, accessor).getRemainder();
-            if (!ItemStack.isEmpty(remainder)) {
-                ItemUtils.dropItem(ref, remainder, accessor);
+            try {
+                ItemStack remainder = Player.giveItem(stack, ref, accessor).getRemainder();
+                if (!ItemStack.isEmpty(remainder)) {
+                    ItemUtils.dropItem(ref, remainder, accessor);
+                }
+            } catch (RuntimeException failure) {
+                LOGGER.at(Level.SEVERE).withCause(failure).log("Revive refund failed for item "
+                        + stack.getItemId() + " x" + stack.getQuantity() + ".");
             }
         }
     }
