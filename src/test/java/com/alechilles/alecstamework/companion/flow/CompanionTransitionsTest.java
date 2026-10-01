@@ -104,6 +104,21 @@ class CompanionTransitionsTest {
     }
 
     @Test
+    void storingRaisesTheGenerationClearsTheBodyAndSummonTimerAndSetsTheCooldown() {
+        CompanionRecord live = CompanionTransitions.newLive(PROFILE, 4, body("default", 10)).toBuilder()
+                .summonedUntilMs(9_000L).build();
+
+        CompanionRecord stored = apply(live, CompanionTransitions.stored(live,
+                com.alechilles.alecstamework.companion.index.StoredReason.TIMED, null, null, 12_000L));
+
+        assertEquals(LocationKind.STORED, stored.location().kind());
+        assertEquals(5, stored.generation());
+        assertNull(stored.currentNpcUuid());
+        assertEquals(0L, stored.summonedUntilMs());
+        assertEquals(12_000L, stored.summonCooldownUntilMs());
+    }
+
+    @Test
     void aBodyWithoutARecordStartsItsRecordAsAnItemAtGenerationZero() {
         CompanionRecord item = CompanionTransitions.newItem(PROFILE, body("default", 10), OWNER, "Alec");
 

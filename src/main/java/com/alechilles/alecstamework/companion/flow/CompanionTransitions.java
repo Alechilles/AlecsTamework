@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -163,6 +164,32 @@ public final class CompanionTransitions {
                 .diedAtMs(0L)
                 .reviveAvailableAtMs(0L)
                 .summonedUntilMs(0L);
+    }
+
+    /**
+     * A live companion put into storage (spec 8.4): STORED for {@code reason}, one generation newer,
+     * no body, no summon timer. {@code summary} and {@code snapshotAtMs} are null when the stored
+     * snapshot stands unchanged. {@code cooldownUntilMs} is a wall-clock time, 0 for none.
+     */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> stored(@Nonnull CompanionRecord before, @Nonnull StoredReason reason,
+                                                               @Nullable CompanionSummary summary, @Nullable Long snapshotAtMs,
+                                                               long cooldownUntilMs) {
+        long generation = before.generation() + 1;
+        return b -> {
+            b.generation(generation)
+                    .location(CompanionLocation.stored(reason))
+                    .currentNpcUuid(null)
+                    .summonedUntilMs(0L)
+                    .summonCooldownUntilMs(cooldownUntilMs);
+            if (summary != null) {
+                b.summary(summary);
+            }
+            if (snapshotAtMs != null) {
+                b.lastSnapshotAtMs(snapshotAtMs);
+            }
+            return b;
+        };
     }
 
     /**
