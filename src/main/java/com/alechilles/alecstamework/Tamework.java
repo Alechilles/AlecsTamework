@@ -327,6 +327,8 @@ public class Tamework extends JavaPlugin {
     /** Roster summon and store; null unless the companion module is ready and generic persistence is active. */
     private RosterSummons companionRosterSummons;
     private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bondedCompanionApi;
+    /** Summon aura, expiry warning and expiry fall protection of bonded companions; closed with the bonded API. */
+    private com.alechilles.alecstamework.companion.bonded.BondedSummonEffects bondedSummonEffects;
     private CompanionStartupAdmission companionStartupAdmission;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
@@ -718,8 +720,10 @@ public class Tamework extends JavaPlugin {
                     companionModule.writer()::queueSnapshotDelete, restoreFlow);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
             registerCompanionPersistenceRuntime(admissionGate, restoreFlow, bondedFamilies);
-            bondedCompanionApi = createBondedCompanionApi(companionModule, restoreFlow, bondedFamilies);
-            companionRosterSummons = startRosterSummons(companionModule, restoreFlow, bondedCompanionApi);
+            // One store flow serves the bonded API, roster dismiss, summon expiry and owner logout.
+            StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(companionModule);
+            bondedCompanionApi = createBondedCompanionApi(companionModule, restoreFlow, storeFlow, bondedFamilies);
+            companionRosterSummons = startRosterSummons(companionModule, restoreFlow, storeFlow, bondedCompanionApi);
         } else if (companionModule != null && companionModule.legacyKind() == null) {
             registerCompanionPersistenceFailedNotice();
         }
@@ -857,7 +861,11 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcStateSnapshotService,
                 null,
                 restoreFlow,
-                null,
+                // The bonded panel reads the index-backed API; after shutdown it reports unavailable.
+                bondedCompanionApi == null ? null : () -> {
+                    com.alechilles.alecstamework.api.BondedCompanionApi current = bondedCompanionApi;
+                    return current != null ? current : com.alechilles.alecstamework.api.BondedCompanionApi.unavailable();
+                },
                 companionProgressionSignalBus,
                 companionQueries,
                 releaseFlow,
@@ -1518,13 +1526,39 @@ public class Tamework extends JavaPlugin {
     /**
      * Builds the bonded companion API over the companion index (plan 6 task 9). Its change events
      * go out after the index lock is released. {@link #closeApiComposition} closes it.
+     *
+     * <p>Also starts the summon effects (plan 6 task 11): the summon aura plays once a restore
+     * has brought the body back, and the expiry warning runs on the companion module's timer
+     * thread, which the module stops at shutdown.
      */
-    private static com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi createBondedCompanionApi(
+    private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi createBondedCompanionApi(
             CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            StoreFlow<Ref<EntityStore>> storeFlow,
             com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
+        com.alechilles.alecstamework.companion.bonded.runtime.HytaleBondedBodies bondedBodies =
+                new com.alechilles.alecstamework.companion.bonded.runtime.HytaleBondedBodies(module.loaded()::get);
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects effects =
+                new com.alechilles.alecstamework.companion.bonded.BondedSummonEffects(
+                        module.index()::get, bondedFamilies, bondedBodies,
+                        (task, delayMs) -> {
+                            java.util.concurrent.ScheduledFuture<?> scheduled = module.timers().schedule(
+                                    task, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+                            return () -> scheduled.cancel(false);
+                        },
+                        System::currentTimeMillis);
+        bondedSummonEffects = effects;
+        module.addAfterUnlockListener(effects::onChanged);
+        effects.rebuild(module.index());
+        java.util.function.Function<RestoreFlow.Request,
+                java.util.concurrent.CompletableFuture<RestoreFlow.Result>> restore =
+                request -> restoreFlow.restore(request).whenComplete((result, failure) -> {
+                    if (result == RestoreFlow.Result.RESTORED) {
+                        effects.summoned(request.profileId());
+                    }
+                });
         com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded =
                 new com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi(
-                        module.index(), bondedFamilies, restoreFlow::restore, createStoreFlow(module)::store,
+                        module.index(), bondedFamilies, restore, storeFlow::store,
                         module.writer()::flushNow,
                         com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi.bodies(
                                 module.loaded(), CompanionBodies::removeOnOwnWorld),
@@ -1533,6 +1567,8 @@ public class Tamework extends JavaPlugin {
                                 module::readSnapshot),
                         System::currentTimeMillis);
         module.addAfterUnlockListener(bonded::onChanged);
+        bonded.useTalents(new com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates(
+                module.index(), module::readSnapshot, module.writer()::queueSnapshot, bondedBodies));
         return bonded;
     }
 
@@ -1624,15 +1660,23 @@ public class Tamework extends JavaPlugin {
     @Nullable
     private RosterSummons startRosterSummons(
             CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            StoreFlow<Ref<EntityStore>> storeFlow,
             com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded) {
         if (!runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
             return null;
         }
-        StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(module);
         RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
                 restoreFlow::restoreOutcome, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
                 System::currentTimeMillis, bonded::storeActive);
-        SummonExpiryScheduler expiry = new SummonExpiryScheduler(summons::storeExpired);
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects summonEffects = bondedSummonEffects;
+        SummonExpiryScheduler expiry = new SummonExpiryScheduler(profileId -> {
+            // A rider's fall protection is armed while the body is still there. Its world task is
+            // queued before the store's, so it runs first on the body's world thread.
+            if (summonEffects != null) {
+                summonEffects.expiring(profileId);
+            }
+            return summons.storeExpired(profileId);
+        });
         module.index().atomically(() -> {
             module.addChangeListener(expiry::onChange);
             expiry.rebuild(module.index());
@@ -1958,6 +2002,11 @@ public class Tamework extends JavaPlugin {
         bondedCompanionApi = null;
         if (closingBonded != null) {
             closingBonded.close();
+        }
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects closingEffects = bondedSummonEffects;
+        bondedSummonEffects = null;
+        if (closingEffects != null) {
+            closingEffects.close();
         }
         ProviderDecisionCache closingDecisions = providerDecisionCache;
         providerDecisionCache = null;

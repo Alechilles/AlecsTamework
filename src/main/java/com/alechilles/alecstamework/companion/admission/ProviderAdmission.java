@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.runtime.ThrottledWarnings;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -83,6 +84,11 @@ public final class ProviderAdmission {
     private final Function<PopulationAdmissionProviderRequest, CompletionStage<PopulationAdmissionProviderDecision>> providers;
     private final Supplier<List<String>> familyRoles;
     private final Supplier<Object> registrations;
+    /**
+     * One WARN a minute per provider (and claimed domain): the cached decisions are asked again
+     * every few seconds per owner and family, and a broken provider or config fails every time.
+     */
+    private final ThrottledWarnings warnings = new ThrottledWarnings(System::currentTimeMillis, 60_000L);
 
     /**
      * @param managedForRole the managed profile data of a role id, null when the role is not
@@ -223,16 +229,18 @@ public final class ProviderAdmission {
         try {
             decided = providers.apply(request(managed, before, after));
         } catch (RuntimeException failure) {
-            LOGGER.at(Level.WARNING).withCause(failure).log(
-                    "Admission provider %s could not be asked about companion %s", managed.providerId(),
-                    after.profileId());
+            if (warnings.shouldLog("ask " + managed.providerId())) {
+                LOGGER.at(Level.WARNING).withCause(failure).log(
+                        "Admission provider %s could not be asked about companion %s", managed.providerId(),
+                        after.profileId());
+            }
             return CompletableFuture.completedFuture(unavailable());
         }
         return decided.handle((decision, error) -> error != null || decision == null
                 ? unavailable() : outcome(managed, decision));
     }
 
-    private static Outcome outcome(Managed managed, PopulationAdmissionProviderDecision decision) {
+    private Outcome outcome(Managed managed, PopulationAdmissionProviderDecision decision) {
         return switch (decision.status()) {
             case DENY -> new Outcome(CompanionAdmission.Provided.none(), CompanionAdmission.Refusal.PROVIDER_DENIED,
                     decision.messageKey(), true);
@@ -250,9 +258,10 @@ public final class ProviderAdmission {
                     if (!decision.domainLimits().containsKey(claim.domainId())
                             || (claim.owned() && !buckets.add("owned " + claim.domainId()))
                             || (claim.deployable() && !buckets.add("deployed " + claim.domainId()))) {
-                        LOGGER.at(Level.WARNING).log(
-                                "Admission provider %s allowed with an unusable claim on domain %s; refused as unavailable",
-                                managed.providerId(), claim.domainId());
+                        if (warnings.shouldLog("claim " + managed.providerId() + " " + claim.domainId())) {
+                            LOGGER.at(Level.WARNING).log("Admission provider %s allowed with an unusable claim on "
+                                    + "domain %s; refused as unavailable", managed.providerId(), claim.domainId());
+                        }
                         yield unavailable();
                     }
                     claims.add(new DomainClaim(claim.domainId(), claim.weight(), claim.owned(), claim.deployable()));
@@ -270,7 +279,12 @@ public final class ProviderAdmission {
                 CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY, true);
     }
 
-    /** Contract v1 request: the old and new owner, where the companion is and where it will be. */
+    /**
+     * Contract v1 request: the old and new owner, where the companion is and where it will be.
+     * A record with no body (held in an item or stored) that changes owner is put to the provider
+     * as a new companion of the new owner, the request the decision cache also asks with: an
+     * owner transfer must name the current NPC, and such a record has none.
+     */
     private static PopulationAdmissionProviderRequest request(Managed managed, @Nullable CompanionRecord before,
                                                               CompanionRecord after) {
         UUID newOwner = after.ownerUuid();
@@ -278,7 +292,8 @@ public final class ProviderAdmission {
         String fallbackWorld = world(after, before == null ? "" : world(before, ""));
         PopulationAdmissionLocation destination = location(after, fallbackWorld);
         PopulationAdmissionRequest base;
-        if (before == null) {
+        boolean ownerChanges = oldOwner != null && !oldOwner.equals(newOwner);
+        if (before == null || ownerChanges && before.currentNpcUuid() == null) {
             base = new PopulationAdmissionRequest(
                     new PopulationAdmissionIdentity(null, after.profileId().toString(), null), after.currentNpcUuid(),
                     PopulationAdmissionRequest.NEW_PROFILE_REVISION, null, newOwner, null, destination,
@@ -286,8 +301,8 @@ public final class ProviderAdmission {
                     lifecycle(after));
         } else {
             PopulationAdmissionOperation operation = oldOwner == null ? PopulationAdmissionOperation.NEW_OWNERSHIP
-                    : oldOwner.equals(newOwner) ? PopulationAdmissionOperation.RESTORE
-                    : PopulationAdmissionOperation.OWNER_TRANSFER;
+                    : ownerChanges ? PopulationAdmissionOperation.OWNER_TRANSFER
+                    : PopulationAdmissionOperation.RESTORE;
             UUID npcUuid = before.currentNpcUuid() != null ? before.currentNpcUuid() : after.currentNpcUuid();
             base = new PopulationAdmissionRequest(
                     new PopulationAdmissionIdentity(after.profileId().toString(), null, null), npcUuid,

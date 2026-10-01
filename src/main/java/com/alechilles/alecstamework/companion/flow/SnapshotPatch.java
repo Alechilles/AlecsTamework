@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.codec.Codec;
@@ -20,7 +21,8 @@ import org.bson.BsonValue;
  * Tamework registrations: {@code DeathComponent} as "Death", {@code AlarmStore} as "AlarmStore",
  * {@code TameworkNeedsComponent} as "TameworkNeeds", {@code TameworkAlarmComponent} as
  * "TameworkAlarm", {@code TameworkBreedingComponent} as "TameworkBreeding" and
- * {@code TameworkLifeStageComponent} as "TameworkLifeStage", {@code TameworkTamedComponent} as "TameworkTamed".
+ * {@code TameworkLifeStageComponent} as "TameworkLifeStage", {@code TameworkTamedComponent} as "TameworkTamed"
+ * and {@code TameworkTalentsComponent} as "TameworkTalents".
  */
 public final class SnapshotPatch {
     static final String COMPONENTS = "Components";
@@ -31,6 +33,8 @@ public final class SnapshotPatch {
     static final String BREEDING = "TameworkBreeding";
     static final String LIFE_STAGE = "TameworkLifeStage";
     static final String TAMED = "TameworkTamed";
+    /** Public for readers of a stored companion's talents. */
+    public static final String TALENTS = "TameworkTalents";
     private static final String STATS = "EntityStats";
     private static final String STAT_VALUES = "Stats";
     private static final String HEALTH = "Health";
@@ -172,6 +176,22 @@ public final class SnapshotPatch {
         }
         copy.getDocument(COMPONENTS).put(TAMED,
                 TameworkTamedComponent.CODEC.encode(new TameworkTamedComponent(true), EmptyExtraInfo.EMPTY));
+        return copy;
+    }
+
+    /**
+     * Replaces the entity's talents (a talent bought or reset while the companion is stored). The
+     * component is encoded with its own codec, so the body that comes back from this snapshot has
+     * these talents; every other component is left as it is.
+     */
+    @Nonnull
+    public static BsonDocument withTalents(@Nonnull BsonDocument entity, @Nonnull TameworkTalentsComponent talents) {
+        BsonDocument copy = entity.clone();
+        if (!copy.isDocument(COMPONENTS)) {
+            copy.put(COMPONENTS, new BsonDocument());
+        }
+        copy.getDocument(COMPONENTS).put(TALENTS,
+                TameworkTalentsComponent.CODEC.encode(talents, EmptyExtraInfo.EMPTY));
         return copy;
     }
 }

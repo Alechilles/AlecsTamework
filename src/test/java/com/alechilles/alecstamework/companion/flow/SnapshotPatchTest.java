@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.EmptyExtraInfo;
@@ -128,5 +129,25 @@ class SnapshotPatchTest {
         assertTrue(decoded.isTamed());
         assertTrue(tamed.getDocument("Components").containsKey("NPC"));
         assertFalse(wild.getDocument("Components").containsKey("TameworkTamed"));
+    }
+
+    /** A talent bought while stored must be on the body the snapshot brings back. */
+    @Test
+    void storedTalentsAreReplacedForTheirCodecAndTheRestIsKept() {
+        BsonDocument before = entity(new BsonDocument("NPC", new BsonDocument()).append("TameworkTalents",
+                TameworkTalentsComponent.CODEC.encode(new TameworkTalentsComponent("tree", 0, new String[0], 3L),
+                        EmptyExtraInfo.EMPTY)));
+
+        BsonDocument after = SnapshotPatch.withTalents(before,
+                new TameworkTalentsComponent("tree", 2, new String[] {"swift", "mighty"}, 3L));
+
+        TameworkTalentsComponent decoded = TameworkTalentsComponent.CODEC.decode(
+                after.getDocument("Components").get("TameworkTalents"), EmptyExtraInfo.EMPTY);
+        assertEquals(2, decoded.getSpentPoints());
+        assertEquals(List.of("swift", "mighty"), List.of(decoded.getPurchasedTalentIds()));
+        assertEquals(3L, decoded.getAllocationRevision());
+        assertTrue(after.getDocument("Components").containsKey("NPC"));
+        assertEquals(0, TameworkTalentsComponent.CODEC.decode(
+                before.getDocument("Components").get("TameworkTalents"), EmptyExtraInfo.EMPTY).getSpentPoints());
     }
 }

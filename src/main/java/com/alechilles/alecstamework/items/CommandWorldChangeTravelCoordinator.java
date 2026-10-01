@@ -212,7 +212,9 @@ final class CommandWorldChangeTravelCoordinator {
         CompanionQueries queries = companions;
         if (flow == null || queries == null) return false;
         CompanionRecord companion = resolveCompanion(queries, record);
-        if (companion == null
+        // A bonded companion never follows: the same event stores it (RosterSummons.storeBondedOutside,
+        // plan 6 R18), and a follow would race that store.
+        if (companion == null || companion.bonded()
                 || !player.getUuid().equals(companion.ownerUuid())
                 || queuedProfileIds.contains(companion.profileId())) return false;
         UUID profileId = companion.profileId();

@@ -54,6 +54,8 @@ import javax.annotation.Nullable;
  */
 public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    /** Release cause of a companion that died of old age; an owner or admin release has none. */
+    public static final String CAUSE_OLD_AGE = "OLD_AGE";
 
     private final CompanionIndex index;
     private final CompanionWriter writer;
@@ -371,7 +373,8 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                     || current.generation() != record.generation()) {
                 return false;
             }
-            return index.update(profileId, current.revision(), CompanionTransitions.released(current)).applied();
+            return index.update(profileId, current.revision(),
+                    CompanionTransitions.released(current, CAUSE_OLD_AGE)).applied();
         });
         if (!released) {
             warn("death-skipped", "Companion record %s changed before its death was recorded", profileId);

@@ -23,8 +23,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.items.components
-        .TameworkBondedReviveEscrowComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
@@ -106,10 +104,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     new BondedCompanionPanelActionRouter(
                             new BondedCompanionPanelActionService(() -> api),
                             new CommandFeedbackService(null),
-                            new HytaleBondedCompanionActionContextFactory(
-                                    new ComponentType<EntityStore,
-                                            TameworkBondedReviveEscrowComponent>(),
-                                    null), (owner, roster) -> { },
+                            new HytaleBondedCompanionActionContextFactory(), (owner, roster) -> { },
                             (owner, currentRef, currentStore) -> player);
             CommandSelectionPageService service = new CommandSelectionPageService(
                     null, null, null, null, null, null, null, bonded);
@@ -160,7 +155,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             new BondedCompanionPanelActionService(
                                     () -> recordingApi(captured)),
                             new CommandFeedbackService(null),
-                            new HytaleBondedCompanionActionContextFactory(null, null),
+                            new HytaleBondedCompanionActionContextFactory(),
                             (owner, roster) -> { },
                             (owner, currentRef, currentStore) -> player);
             CommandSelectionPageService service = new CommandSelectionPageService(
@@ -464,7 +459,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
                     new BondedCompanionPanelActionService(() -> recordingApi(captured)),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    new HytaleBondedCompanionActionContextFactory(),
                     (owner, roster) -> { },
                     (owner, eventRef, eventStore) -> {
                         resolvedStore.set(eventStore);
@@ -599,7 +594,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     new BondedCompanionPanelActionService(
                             () -> rejectingApi(BondedCompanionResultCode.REVISION_CONFLICT)),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    new HytaleBondedCompanionActionContextFactory(),
                     (owner, roster) -> refreshed.set(owner + ":" + roster),
                     (owner, eventRef, eventStore) -> player);
 
@@ -632,10 +627,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
                     new BondedCompanionPanelActionService(() -> api),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(
-                            new ComponentType<EntityStore,
-                                    TameworkBondedReviveEscrowComponent>(),
-                            null), (owner, roster) -> { },
+                    new HytaleBondedCompanionActionContextFactory(), (owner, roster) -> { },
                     (owner, currentRef, currentStore) -> player);
             ItemStack horn = commandStack("test:horn", "horn-tool");
             installInventory(player, horn);

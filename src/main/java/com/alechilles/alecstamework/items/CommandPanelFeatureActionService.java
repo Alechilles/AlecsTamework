@@ -98,18 +98,20 @@ final class CommandPanelFeatureActionService {
         }
         UUID profileId = context.member().record().profileId();
         long generation = context.member().record().generation();
-        CompletableFuture<RestoreFlow.Result> started;
+        CompletableFuture<RestoreFlow.Outcome> started;
         try {
-            started = flow.summon(profileId, generation, RestoreFlow.Destination.of(placement));
+            started = flow.summonOutcome(profileId, generation, RestoreFlow.Destination.of(placement));
         } catch (RuntimeException failure) {
             started = CompletableFuture.failedFuture(failure);
         }
-        started.whenComplete((result, failure) -> {
+        started.whenComplete((outcome, failure) -> {
             if (failure != null) {
                 LOGGER.at(Level.WARNING).withCause(failure).log("Panel summon of companion %s failed", profileId);
             }
-            String key = summonFailureKey(failure != null || result == null
-                    ? RestoreFlow.Result.COMMIT_FAILED : result);
+            // A population refusal names its own message (a cap, a provider's denial or a domain limit).
+            String key = failure == null && outcome != null && outcome.messageKey() != null ? outcome.messageKey()
+                    : summonFailureKey(failure != null || outcome == null
+                            ? RestoreFlow.Result.COMMIT_FAILED : outcome.result());
             if (key != null) {
                 warnLater(context, key);
             }

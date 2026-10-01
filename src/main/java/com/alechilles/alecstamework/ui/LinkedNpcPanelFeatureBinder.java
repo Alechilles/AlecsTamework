@@ -119,11 +119,7 @@ final class LinkedNpcPanelFeatureBinder {
             String stateSelector, String detailSelector, String reasonSelector,
             String summonSelector, String dismissSelector, String language) {
         BondedCompanionStatusPresentation status = row.status();
-        builder.set(stateSelector + ".Text", switch (status.state()) {
-            case STORED -> "Stored";
-            case ACTIVE -> "Active";
-            case DEAD -> "Dead";
-        });
+        builder.set(stateSelector + ".Text", bondedStateText(status, language));
         builder.set(detailSelector + ".Text", bondedDetailText(row));
         builder.set(reasonSelector + ".Text", status.blockReason() == null
                 ? "" : BondedCompanionActionFeedbackMapper.resolve(
@@ -144,6 +140,15 @@ final class LinkedNpcPanelFeatureBinder {
                     dismissSelector, EventData.of(config.eventCommandId(),
                             config.dismissCommandPrefix() + cardUuid), false);
         }
+    }
+
+    /** The state caption of a bonded row, in the viewer's language; the roster state texts are shared. */
+    static String bondedStateText(BondedCompanionStatusPresentation status, String language) {
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state." + switch (status.state()) {
+            case STORED -> "stored";
+            case ACTIVE -> "active";
+            case DEAD -> "dead";
+        });
     }
 
     static String bondedDetailText(BondedCompanionPanelPresentation row) {

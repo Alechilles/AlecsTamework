@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
-import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
@@ -10,12 +9,9 @@ import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
-import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -33,11 +29,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Opens the shared talent page against a bonded profile's durable state.
+ * Opens the shared talent page for a bonded companion and sends its purchases and resets to the
+ * bonded API.
  *
- * <p>Unlike legacy linked companions, bonded profiles do not require a live
- * projection to inspect or spend their earned points. A successful durable
- * mutation is mirrored to a present projection as a convenience only.</p>
+ * <p>A bonded companion does not need a body to spend its points: the API changes an active
+ * companion on its body and any other one in its stored snapshot. A change the API cannot finish
+ * at once (it reads the stored snapshot off the world thread) is shown as saving; when it
+ * completes, this page's talent state is updated for the next refresh.</p>
  */
 final class BondedCompanionTalentPageService {
     private final Supplier<BondedCompanionApi> api;
@@ -180,6 +178,14 @@ final class BondedCompanionTalentPageService {
         BondedCompanionResult<BondedCompanionProfileView> result = future == null
                 ? null : future.getNow(null);
         if (result == null) {
+            if (future != null) {
+                // Completes on another thread. Only the page's own state object is touched.
+                future.thenAccept(late -> {
+                    if (late != null && late.successful() && late.value() != null) {
+                        state.apply(late.value());
+                    }
+                });
+            }
             return new ManagedMutation(false, true,
                     BondedCompanionResultCode.UNAVAILABLE,
                     LocalizedText.resolve(language,
@@ -193,30 +199,12 @@ final class BondedCompanionTalentPageService {
                                     : "tamework.ui.talents.mutation.bondedRefundFailed"));
         }
         state.apply(result.value());
-        if (player != null) applyLiveProjection(player, state);
         String message = LocalizedText.resolve(language,
                 action == BondedCompanionTalentActionRequest.Action.PURCHASE
                         ? "tamework.ui.talents.mutation.unlocked"
                         : "tamework.ui.talents.mutation.refunded");
         return new ManagedMutation(true, false,
                 BondedCompanionResultCode.SUCCESS, message);
-    }
-
-    private void applyLiveProjection(@Nonnull Player player, @Nonnull State state) {
-        UUID liveNpcUuid = state.liveNpcUuid;
-        World world = player.getWorld();
-        if (liveNpcUuid == null || world == null) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> npcRef = world.getEntityRef(liveNpcUuid);
-        ComponentType<EntityStore, TameworkTalentsComponent> type =
-                TameworkTalentsComponent.getComponentType();
-        if (store == null || npcRef == null || !npcRef.isValid() || type == null) {
-            return;
-        }
-        store.putComponent(npcRef, type, state.talents.clone());
-        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
     }
 
     @Nonnull
@@ -226,12 +214,14 @@ final class BondedCompanionTalentPageService {
     ) {
         TwTalentConfig config = resolveConfig(state.talents, state.roleId);
         int points = availablePoints(state);
+        String displayName = state.displayName != null ? state.displayName
+                : LocalizedText.resolve(language, "tamework.ui.talents.defaultCompanionName");
         String levelSummary = LocalizedText.format(language,
                 "tamework.ui.talents.levelSummary.max", state.level);
         String pointsSummary = LocalizedText.format(language,
                 "tamework.ui.talents.points.available", points);
         if (config == null || !config.isEnabled() || config.getTalents().length == 0) {
-            return new TameworkCompanionTalentsPage.PageData(state.displayName,
+            return new TameworkCompanionTalentsPage.PageData(displayName,
                     levelSummary, pointsSummary,
                     LocalizedText.resolve(language, "tamework.ui.talents.status.noTree"),
                     false, List.of());
@@ -268,7 +258,7 @@ final class BondedCompanionTalentPageService {
                     normalizeBranch(right.branchName()));
             return branch != 0 ? branch : Integer.compare(left.tier(), right.tier());
         });
-        return new TameworkCompanionTalentsPage.PageData(state.displayName,
+        return new TameworkCompanionTalentsPage.PageData(displayName,
                 levelSummary, pointsSummary, entries.isEmpty()
                 ? LocalizedText.resolve(language,
                         "tamework.ui.talents.status.noTalentsConfigured")
@@ -288,7 +278,8 @@ final class BondedCompanionTalentPageService {
                 talent.getDisplayName(), talent.getId());
         return new TameworkCompanionTalentsPage.TreeNodeEntry(
                 talent.getId(), LocalizedText.resolveConfigValue(language,
-                talent.getBranch(), "General"), talent.getTier(), state,
+                talent.getBranch(), LocalizedText.resolve(language,
+                        "tamework.ui.talents.branch.general")), talent.getTier(), state,
                 displayName, LocalizedText.resolveConfigValue(language,
                 talent.getDescription(), ""), LocalizedText.format(language,
                 "tamework.ui.talents.status.stateDetail", state, status),
@@ -397,14 +388,6 @@ final class BondedCompanionTalentPageService {
         return ref == null ? null : ref.getLanguage();
     }
 
-    private static UUID parseUuid(String raw) {
-        try {
-            return raw == null || raw.isBlank() ? null : UUID.fromString(raw.trim());
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
     private static int integer(Map<String, String> attributes, String key, int fallback) {
         try {
             return Math.max(0, Integer.parseInt(attributes.get(key)));
@@ -457,21 +440,22 @@ final class BondedCompanionTalentPageService {
         private final String rosterId;
         private final String profileId;
         private final String roleId;
-        private final String displayName;
+        /** Null for a companion with neither a name nor a species; the page then shows the default name. */
+        @Nullable private final String displayName;
         private final String levelingConfigId;
         private final int level;
-        private UUID liveNpcUuid;
-        private long revision;
-        private TameworkTalentsComponent talents;
+        // Written by apply, which a late API result calls on another thread.
+        private volatile long revision;
+        private volatile TameworkTalentsComponent talents;
 
         private State(UUID ownerUuid, String rosterId, String profileId,
                       String roleId, String displayName, String levelingConfigId,
                       int level, TameworkTalentsComponent talents,
-                      long revision, UUID liveNpcUuid) {
+                      long revision) {
             this.ownerUuid = ownerUuid; this.rosterId = rosterId; this.profileId = profileId;
             this.roleId = roleId; this.displayName = displayName;
             this.levelingConfigId = levelingConfigId; this.level = level;
-            this.talents = talents; this.revision = revision; this.liveNpcUuid = liveNpcUuid;
+            this.talents = talents; this.revision = revision;
         }
 
         private static State from(UUID owner, BondedCompanionPanelPresentation row) {
@@ -484,11 +468,10 @@ final class BondedCompanionTalentPageService {
                             : text(data, "talents").split("\\s*,\\s*"),
                     longInteger(data, "talentAllocationRevision", 0L));
             return new State(owner, row.rosterId(), row.profileId(), row.roleId(),
-                    displayName == null ? "Companion" : displayName,
+                    displayName,
                     text(data, "levelingConfigId"), Math.max(1,
                     integer(data, "level", 1)),
-                    talents, row.revision(), parseUuid(data.get(
-                            BondedCompanionPresentationAttributes.LIVE_NPC_UUID)));
+                    talents, row.revision());
         }
 
         private void apply(BondedCompanionProfileView view) {
@@ -499,8 +482,6 @@ final class BondedCompanionTalentPageService {
                     text(data, "talents") == null ? new String[0]
                             : text(data, "talents").split("\\s*,\\s*"),
                     longInteger(data, "talentAllocationRevision", 0L));
-            liveNpcUuid = view.activeLease() == null ? null
-                    : view.activeLease().liveNpcUuid();
         }
     }
 }

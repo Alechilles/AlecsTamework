@@ -81,7 +81,7 @@ public final class RestoreFlow<R> {
 
     /**
      * One restore. {@code expectedGeneration} is -1 for any; {@code owner} null keeps the record's
-     * owner; {@code summonedUntilMs} is a wall-clock expiry, 0 for none, used only by SUMMON.
+     * owner; {@code summonedUntilMs} is the wall-clock time the restored companion's summon timer runs out, 0 for none.
      */
     public record Request(@Nonnull UUID profileId, @Nonnull RestoreRules.Reason reason, @Nonnull Destination destination,
                           long expectedGeneration, @Nullable Owner owner, long summonedUntilMs) {
@@ -303,9 +303,8 @@ public final class RestoreFlow<R> {
             if (owner != null) {
                 b.ownerUuid(owner.uuid()).ownerName(owner.name());
             }
-            if (request.reason() == RestoreRules.Reason.SUMMON) {
-                b.summonedUntilMs(request.summonedUntilMs());
-            }
+            // The restored transition clears the timer, so 0 here leaves the companion untimed.
+            b.summonedUntilMs(request.summonedUntilMs());
             return b;
         };
     }

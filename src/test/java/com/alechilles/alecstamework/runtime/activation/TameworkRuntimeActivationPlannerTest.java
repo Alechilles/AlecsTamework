@@ -83,27 +83,18 @@ class TameworkRuntimeActivationPlannerTest {
         assertTrue(plan.isActive(TameworkRuntimeModule.DAMAGE_PROJECTILES));
     }
 
+    /** A bonded-only server still tracks, expires and stores its summoned bodies. */
     @Test
-    void bondedPersistenceDoesNotWakeGenericPersistence() {
-        TameworkRuntimeModuleCatalog catalog =
-                TameworkRuntimeModuleCatalog.standard();
+    void bondedPersistenceWakesGenericPersistence() {
         TameworkRuntimeActivationPlan plan =
-                new TameworkRuntimeActivationPlanner(catalog).plan(
+                new TameworkRuntimeActivationPlanner(TameworkRuntimeModuleCatalog.standard()).plan(
                         TameworkActivationEvidence.builder()
                                 .content(TameworkRuntimeModule.BONDED_PERSISTENCE,
                                         "bonded-profile")
                                 .build());
 
-        assertEquals(
-                Set.of(TameworkRuntimeModule.CORE_OWNERSHIP),
-                catalog.directDependencies(
-                        TameworkRuntimeModule.BONDED_PERSISTENCE)
-        );
         assertTrue(plan.isActive(TameworkRuntimeModule.BONDED_PERSISTENCE));
-        assertEquals(
-                TameworkRuntimeActivationPlan.ModuleState.DORMANT,
-                plan.state(TameworkRuntimeModule.GENERIC_PERSISTENCE)
-        );
+        assertTrue(plan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE));
     }
 
     @Test

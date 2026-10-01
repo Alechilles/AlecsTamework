@@ -6,9 +6,9 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
-import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.ExtensionEntries;
 import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import java.nio.charset.StandardCharsets;
@@ -130,54 +130,20 @@ public final class IndexProfileDataApi implements ProfileDataApi {
         if (!usable(request.namespace())) {
             return CompletableFuture.completedFuture(denied(request, NAMESPACE_REFUSED, 0L));
         }
-        String extensionKey = extensionKey(request.namespace(), request.key());
-        ExtensionEntry wanted = new ExtensionEntry(request.expectedRevision() + 1L, request.jsonPayload());
-        // One locked step: compare the value's revision and change the record.
-        Object outcome = index.atomically(() -> {
-            CompanionRecord record = record(request.profileId());
-            if (record == null) {
-                return denied(request, PROFILE_NOT_FOUND, 0L);
-            }
-            ExtensionEntry current = record.extensions().get(extensionKey);
-            if (wanted.equals(current)) {
-                // The same request again: the value it asked for is the current one, but its
-                // owner file may still be unwritten, so this caller waits for a flush too.
-                return new Applied(record, null, true);
-            }
-            if (revisionOf(current) != request.expectedRevision()) {
-                return denied(request, REVISION_MISMATCH, record.updatedAtMs());
-            }
-            CompanionIndex.Mutation applied = index.update(
-                    record.profileId(), record.revision(), b -> b.extension(extensionKey, wanted));
-            return applied.applied()
-                    ? new Applied(applied.after(), current, false)
-                    : denied(request, REVISION_MISMATCH, record.updatedAtMs());
-        });
-        if (!(outcome instanceof Applied applied)) {
-            return CompletableFuture.completedFuture((ProfileDataCompareAndSetResult) outcome);
+        CompanionRecord found = record(request.profileId());
+        if (found == null) {
+            return CompletableFuture.completedFuture(denied(request, PROFILE_NOT_FOUND, 0L));
         }
-        CompanionRecord after = applied.after();
-        return flush.apply(after.ownerUuid()).handle((ignored, failure) -> {
-            if (failure == null) {
-                return committed(request, after);
-            }
-            if (!applied.replay()) {
-                undo(after.profileId(), extensionKey, wanted, applied.previous());
-            }
-            return new ProfileDataCompareAndSetResult(
-                    ProfileDataCompareAndSetResult.Status.UNAVAILABLE, FLUSH_FAILED, null, null);
-        });
-    }
-
-    /** Puts {@code previous} back unless the value has changed again since {@code written}. */
-    private void undo(UUID profileId, String extensionKey, ExtensionEntry written, @Nullable ExtensionEntry previous) {
-        index.atomically(() -> {
-            CompanionRecord record = index.get(profileId);
-            if (record != null && written.equals(record.extensions().get(extensionKey))) {
-                index.update(profileId, record.revision(), b -> b.extension(extensionKey, previous));
-            }
-            return null;
-        });
+        return ExtensionEntries.compareAndSet(index, flush, found.profileId(),
+                extensionKey(request.namespace(), request.key()), request.expectedRevision(), request.jsonPayload(),
+                current -> current.location().kind() != LocationKind.RELEASED)
+                .thenApply(outcome -> switch (outcome.status()) {
+                    case WRITTEN -> committed(request, outcome.record());
+                    case NOT_FOUND -> denied(request, PROFILE_NOT_FOUND, 0L);
+                    case REVISION_MISMATCH -> denied(request, REVISION_MISMATCH, outcome.record().updatedAtMs());
+                    case FLUSH_FAILED -> new ProfileDataCompareAndSetResult(
+                            ProfileDataCompareAndSetResult.Status.UNAVAILABLE, FLUSH_FAILED, null, null);
+                });
     }
 
     private static ProfileDataCompareAndSetResult committed(ProfileDataCompareAndSetRequest request,
@@ -223,21 +189,21 @@ public final class IndexProfileDataApi implements ProfileDataApi {
 
     /** A stored value's revision is at least 1; 0 means "no value" in a compare-and-set. */
     private static long revisionOf(@Nullable ExtensionEntry entry) {
-        return entry == null ? 0L : Math.max(1L, entry.revision());
+        return ExtensionEntries.storedRevision(entry);
     }
 
     /** The one key layout record extensions use; bonded extension data shares it. */
     private static String extensionKey(String namespace, String key) {
-        return BondedRecords.extensionKey(namespace, key);
+        return ExtensionEntries.key(namespace, key);
     }
 
     /**
      * Tamework's own extension entries (for example bonded capture evidence) are not public data,
-     * and a namespace with "/" is refused; {@link BondedRecords#publicNamespace} owns the rule.
+     * and a namespace with "/" is refused; {@link ExtensionEntries#publicNamespace} owns the rule.
      * Keys may contain "/".
      */
     private static boolean usable(@Nullable String namespace) {
-        return BondedRecords.publicNamespace(namespace);
+        return ExtensionEntries.publicNamespace(namespace);
     }
 
     @Nullable
@@ -252,9 +218,5 @@ public final class IndexProfileDataApi implements ProfileDataApi {
             return null;
         }
         return record != null && record.location().kind() != LocationKind.RELEASED ? record : null;
-    }
-
-    /** @param replay the value was already current, so a failed write leaves it to the first caller */
-    private record Applied(CompanionRecord after, @Nullable ExtensionEntry previous, boolean replay) {
     }
 }

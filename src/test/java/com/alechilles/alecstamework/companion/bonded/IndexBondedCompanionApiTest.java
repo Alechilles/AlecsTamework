@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.flow.CaptureFlow;
+import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.StoreFlow;
@@ -72,6 +73,7 @@ class IndexBondedCompanionApiTest {
     private final Map<UUID, CompletableFuture<SnapshotEnvelope>> heldSnapshots = new HashMap<>();
     private long now = 1_000_000L;
     private boolean spawnOk = true;
+    private boolean releasedOnceSpawned;
     private CompletableFuture<Void> flush = CompletableFuture.completedFuture(null);
     private CompletableFuture<StoreFlow.CapturedBody> captured =
             CompletableFuture.completedFuture(new StoreFlow.CapturedBody(BODY, CompanionSummary.EMPTY));
@@ -100,6 +102,10 @@ class IndexBondedCompanionApiTest {
                 who -> flush,
                 (committed, snapshot, destination, reason) -> {
                     spawned.add(committed.profileId());
+                    if (releasedOnceSpawned) {
+                        index.update(committed.profileId(), committed.revision(),
+                                CompanionTransitions.released(committed));
+                    }
                     if (snapshot == null && spawnOk) {
                         // As the real spawner: a body built from the role is snapshotted once added.
                         spawnedFromRole.add(committed.roleId());
@@ -218,21 +224,6 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
-    void aDeathRecordedWhileASummonRunsWinsAndNothingSpawns() {
-        CompanionRecord stored = stored();
-        heldSnapshots.put(stored.profileId(), new CompletableFuture<>());
-        CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> summon = api.summon(action(stored));
-
-        index.update(stored.profileId(), stored.revision(),
-                CompanionTransitions.died(stored, CompanionSummary.EMPTY, now, now + 120_000L, "PLAYER", null));
-        heldSnapshots.get(stored.profileId()).complete(snapshot(stored.profileId()));
-
-        assertEquals(BondedCompanionResultCode.REVISION_CONFLICT, summon.join().code());
-        assertTrue(spawned.isEmpty());
-        assertEquals(LocationKind.DEAD, index.get(stored.profileId()).location().kind());
-    }
-
-    @Test
     void aDeathRecordedWhileAnActiveCompanionIsBeingStoredWins() {
         CompanionRecord live = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
         loaded.put(live.profileId(), "body");
@@ -341,6 +332,36 @@ class IndexBondedCompanionApiTest {
         assertEquals(BondedCompanionResultCode.WORLD_UNAVAILABLE, result.code());
         assertEquals(3, purse.gems);
         assertEquals(LocationKind.DEAD, index.get(dead.profileId()).location().kind());
+    }
+
+    @Test
+    void aReviveThatBroughtTheCompanionBackKeepsThePriceEvenWhenItsViewCannotBeBuilt() {
+        CompanionRecord dead = dead();
+        Purse purse = new Purse(3);
+        // The body is added, and an admin release lands before the result is put together.
+        releasedOnceSpawned = true;
+
+        BondedCompanionResult<BondedCompanionProfileView> result =
+                api.revive(new BondedCompanionReviveRequest(action(dead, purse), 7L)).join();
+
+        assertEquals(BondedCompanionResultCode.REVISION_CONFLICT, result.code());
+        assertEquals(List.of(dead.profileId()), spawned);
+        assertEquals(0, purse.gems, "the companion came back, so the price is not returned");
+    }
+
+    @Test
+    void anOldAgeDeathAndAReleaseOfAnActiveCompanionAreToldApart() {
+        CompanionRecord old = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
+        CompanionRecord culled = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
+        List<String> reasons = new ArrayList<>();
+        api.subscribe(event -> reasons.add(event.reason()));
+
+        index.update(old.profileId(), old.revision(),
+                CompanionTransitions.released(old, CompanionBodyLifecycle.CAUSE_OLD_AGE));
+        // An owner or admin release writes no cause.
+        index.update(culled.profileId(), culled.revision(), CompanionTransitions.released(culled));
+
+        assertEquals(List.of("old_age", "released"), reasons);
     }
 
     @Test
@@ -600,6 +621,10 @@ class IndexBondedCompanionApiTest {
                 new BondedCompanionExtensionDataKey(owner, stored.profileId().toString(), "hydragon");
 
         assertEquals(BondedCompanionResultCode.NOT_FOUND, api.getExtensionData(key).join().code());
+        assertEquals(BondedCompanionResultCode.VALIDATION_FAILED, api.compareAndSetExtensionData(
+                new BondedCompanionExtensionDataUpdate("hydragon", "op-0", key, "{\"xp\":",
+                        BondedCompanionExtensionDataUpdate.MISSING_REVISION)).join().code());
+        assertTrue(index.get(stored.profileId()).extensions().isEmpty(), "a payload that is not JSON is not stored");
 
         BondedCompanionExtensionData first = api.compareAndSetExtensionData(new BondedCompanionExtensionDataUpdate(
                 "hydragon", "op-1", key, "{\"xp\":1}", BondedCompanionExtensionDataUpdate.MISSING_REVISION))

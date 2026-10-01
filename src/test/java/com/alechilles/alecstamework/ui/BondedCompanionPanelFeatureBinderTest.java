@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +33,19 @@ class BondedCompanionPanelFeatureBinderTest {
                 CommandPanelFeaturePresentation.bonded(row), bindingConfig(), "en-US"));
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                 .anyMatch(command -> command.selector.endsWith(".Enabled")));
+    }
+
+    /** The state caption is text for the viewer, so it follows the viewer's language. */
+    @Test
+    void bondedStateCaptionIsShownInTheViewersLanguage() {
+        BondedCompanionStatusPresentation stored = new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.STORED, BondedCompanionStatusPresentation.Action.SUMMON, true, null, 0L);
+        BondedCompanionStatusPresentation dead = new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.DEAD, BondedCompanionStatusPresentation.Action.REVIVE, true, null, 0L);
+
+        assertEquals("Stored", LinkedNpcPanelFeatureBinder.bondedStateText(stored, "en-US"));
+        assertEquals("Gespeichert", LinkedNpcPanelFeatureBinder.bondedStateText(stored, "de-DE"));
+        assertEquals("Muerto", LinkedNpcPanelFeatureBinder.bondedStateText(dead, "es-ES"));
     }
 
     @Test

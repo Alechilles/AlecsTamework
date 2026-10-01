@@ -11,8 +11,6 @@ import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.npc.components
-        .TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
@@ -57,18 +55,14 @@ class BondedCompanionCommandRecipientSourceTest {
     @Test
     void selectsOnlyExactActiveOwnerRosterWorldLeaseWithoutGenericLinks() {
         BondedCompanionProfileView selected = active(
-                "profile-selected", OWNER, ROSTER, LIVE, WORLD,
-                "lease-selected", 0L);
+                profile(101), OWNER, ROSTER, LIVE, WORLD, "3", 0L);
         List<BondedCompanionProfileView> profiles = List.of(
                 selected,
-                stored("stored", OWNER, ROSTER),
-                dead("dead", OWNER, ROSTER),
-                active("wrong-owner", OTHER_OWNER, ROSTER, uuid(21), WORLD,
-                        "lease-owner", 0L),
-                active("wrong-roster", OWNER, "other:roster", uuid(22), WORLD,
-                        "lease-roster", 0L),
-                active("wrong-world", OWNER, ROSTER, uuid(23), "world-b",
-                        "lease-world", 0L));
+                stored(profile(102), OWNER, ROSTER),
+                dead(profile(103), OWNER, ROSTER),
+                active(profile(104), OTHER_OWNER, ROSTER, uuid(21), WORLD, "1", 0L),
+                active(profile(105), OWNER, "other:roster", uuid(22), WORLD, "1", 0L),
+                active(profile(106), OWNER, ROSTER, uuid(23), "world-b", "1", 0L));
         BondedCompanionCommandRecipientSource source = source(profiles);
         var projection = projection(selected, new Vector3d(3, 0, 0), "NordicDrake");
 
@@ -77,15 +71,14 @@ class BondedCompanionCommandRecipientSourceTest {
                 npcUuid -> LIVE.equals(npcUuid) ? projection : null);
 
         assertEquals(1, recipients.size());
-        assertEquals("profile-selected", recipients.getFirst().profileId);
+        assertEquals(profile(101), recipients.getFirst().profileId);
         assertEquals(LIVE, recipients.getFirst().npc.getUuid());
     }
 
     @Test
-    void rejectsExpiredAmbiguousAndMarkerMismatchedAuthority() {
+    void rejectsExpiredAmbiguousAndStampMismatchedAuthority() {
         BondedCompanionProfileView expired = active(
-                "expired", OWNER, ROSTER, LIVE, WORLD,
-                "lease-expired", NOW);
+                profile(201), OWNER, ROSTER, LIVE, WORLD, "2", NOW);
         BondedCompanionCommandRecipientSource expiredSource = source(List.of(expired));
         assertTrue(expiredSource.select(
                 request(config(), -1D, 25),
@@ -93,35 +86,29 @@ class BondedCompanionCommandRecipientSourceTest {
         ).isEmpty());
 
         BondedCompanionProfileView first = active(
-                "first", OWNER, ROSTER, LIVE, WORLD, "lease-first", 0L);
+                profile(202), OWNER, ROSTER, LIVE, WORLD, "2", 0L);
         BondedCompanionProfileView duplicate = active(
-                "duplicate", OWNER, ROSTER, LIVE, WORLD,
-                "lease-duplicate", 0L);
+                profile(203), OWNER, ROSTER, LIVE, WORLD, "2", 0L);
         assertTrue(source(List.of(first, duplicate)).select(
                 request(config(), -1D, 25),
                 ignored -> projection(first, new Vector3d(), "NordicDrake")
         ).isEmpty());
 
         BondedCompanionCommandRecipientSource exactSource = source(List.of(first));
+        // A body left over from an earlier summon carries an older generation.
         assertTrue(exactSource.select(
                 request(config(), -1D, 25),
                 ignored -> projection(first, new Vector3d(), "NordicDrake",
-                        TameworkProjectionIdentityComponent.bondedCompanion(
-                                first.profileId(), "wrong-token"))
+                        UUID.fromString(first.profileId()), 1L)
         ).isEmpty());
         assertTrue(exactSource.select(
                 request(config(), -1D, 25),
                 ignored -> projection(first, new Vector3d(), "NordicDrake",
-                        new TameworkProjectionIdentityComponent(
-                                first.profileId(), "lease-first",
-                                TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
-                                null, null, 0L))
+                        uuid(999), 2L)
         ).isEmpty());
         assertTrue(exactSource.select(
                 request(config(), -1D, 25),
-                ignored -> projection(first, new Vector3d(), "NordicDrake",
-                        TameworkProjectionIdentityComponent.bondedCompanion(
-                                "wrong-profile", "lease-first"))
+                ignored -> projection(first, new Vector3d(), "NordicDrake", null, 2L)
         ).isEmpty());
         var wrongUuid = projection(first, new Vector3d(), "NordicDrake");
         wrongUuid.npc().setLegacyUUID(uuid(99));
@@ -129,50 +116,21 @@ class BondedCompanionCommandRecipientSourceTest {
                 request(config(), -1D, 25), ignored -> wrongUuid).isEmpty());
 
         BondedCompanionProfileView missingUuid = active(
-                "missing-uuid", OWNER, ROSTER, null, WORLD,
-                "lease-missing", 0L);
+                profile(204), OWNER, ROSTER, null, WORLD, "2", 0L);
         assertTrue(source(List.of(missingUuid)).select(
                 request(config(), -1D, 25), ignored -> wrongUuid).isEmpty());
-    }
-
-    /** Regression: one durable lease must never authorize two physical projections. */
-    @Test
-    void rejectsExpectedProjectionWhenAnotherEntityCarriesTheSameExactMarker() {
-        BondedCompanionProfileView profile = active(
-                "profile-duplicate", OWNER, ROSTER, LIVE, WORLD,
-                "lease-duplicate", 0L);
-        var expected = projection(profile, new Vector3d(), "NordicDrake");
-        var duplicate = projection(profile, new Vector3d(2, 0, 0), "NordicDrake");
-        duplicate.npc().setLegacyUUID(OTHER_LIVE);
-        List<BondedCompanionCommandRecipientSource.LoadedProjection> physical =
-                List.of(expected, duplicate);
-
-        List<Candidate> recipients = source(List.of(profile)).select(
-                request(config(), -1D, 25),
-                uuid -> LIVE.equals(uuid) ? expected : null,
-                (profileId, leaseToken) -> physical.stream()
-                        .filter(projection -> projection.marker().matches(
-                                TameworkProjectionIdentityComponent
-                                        .KIND_BONDED_COMPANION,
-                                leaseToken, profileId))
-                        .count() == 1L);
-
-        assertTrue(recipients.isEmpty());
     }
 
     @Test
     void appliesRoleRadiusMaxTargetsAndStableOrderingAfterAuthority() {
         BondedCompanionProfileView near = active(
-                "profile-b", OWNER, ROSTER, LIVE, WORLD, "lease-b", 0L);
+                profile(302), OWNER, ROSTER, LIVE, WORLD, "1", 0L);
         BondedCompanionProfileView tied = active(
-                "profile-a", OWNER, ROSTER, OTHER_LIVE, WORLD,
-                "lease-a", 0L);
+                profile(301), OWNER, ROSTER, OTHER_LIVE, WORLD, "1", 0L);
         BondedCompanionProfileView denied = active(
-                "profile-denied", OWNER, ROSTER, uuid(13), WORLD,
-                "lease-denied", 0L);
+                profile(303), OWNER, ROSTER, uuid(13), WORLD, "1", 0L);
         BondedCompanionProfileView far = active(
-                "profile-far", OWNER, ROSTER, uuid(14), WORLD,
-                "lease-far", 0L);
+                profile(304), OWNER, ROSTER, uuid(14), WORLD, "1", 0L);
         Map<UUID, BondedCompanionCommandRecipientSource.LoadedProjection> live = Map.of(
                 LIVE, projection(near, new Vector3d(4, 0, 0), "NordicDrake"),
                 OTHER_LIVE, projection(tied, new Vector3d(-4, 0, 0), "NordicDrake"),
@@ -185,13 +143,13 @@ class BondedCompanionCommandRecipientSourceTest {
                 request(config("NordicDrake"), 25D, 1), live::get);
 
         assertEquals(1, recipients.size());
-        assertEquals("profile-a", recipients.getFirst().profileId);
+        assertEquals(profile(301), recipients.getFirst().profileId);
     }
 
     @Test
     void productionApiSourceFailsClosedForUnavailableFailedOrPendingReads() {
         var projection = projection(active(
-                "profile", OWNER, ROSTER, LIVE, WORLD, "lease", 0L),
+                profile(401), OWNER, ROSTER, LIVE, WORLD, "1", 0L),
                 new Vector3d(), "NordicDrake");
         assertTrue(BondedCompanionCommandRecipientSource.production(
                 BondedCompanionApi::unavailable,
@@ -212,7 +170,7 @@ class BondedCompanionCommandRecipientSourceTest {
                 request(config(), -1D, 25), ignored -> projection).isEmpty());
 
         BondedCompanionProfileView profile = active(
-                "profile", OWNER, ROSTER, LIVE, WORLD, "lease", 0L);
+                profile(401), OWNER, ROSTER, LIVE, WORLD, "1", 0L);
         CompletableFuture<BondedCompanionResult<List<BondedCompanionProfileView>>>
                 successful = CompletableFuture.completedFuture(
                         new BondedCompanionResult<>(
@@ -248,18 +206,19 @@ class BondedCompanionCommandRecipientSourceTest {
             BondedCompanionProfileView profile, Vector3d position,
             String roleId) {
         return projection(profile, position, roleId,
-                TameworkProjectionIdentityComponent.bondedCompanion(
-                        profile.profileId(), profile.activeLease().leaseToken()));
+                UUID.fromString(profile.profileId()),
+                Long.parseLong(profile.activeLease().leaseToken()));
     }
 
+    /** A loaded body whose companion stamp carries the given profile id and generation. */
     private BondedCompanionCommandRecipientSource.LoadedProjection projection(
             BondedCompanionProfileView profile, Vector3d position,
-            String roleId, TameworkProjectionIdentityComponent marker) {
+            String roleId, UUID stampProfileId, long stampGeneration) {
         Ref<EntityStore> ref = store.createReference();
         NPCEntity npc = new NPCEntity();
         npc.setLegacyUUID(profile.activeLease().liveNpcUuid());
         return new BondedCompanionCommandRecipientSource.LoadedProjection(
-                ref, npc, marker, position, roleId);
+                ref, npc, stampProfileId, stampGeneration, position, roleId);
     }
 
     private static BondedCompanionProfileView active(
@@ -308,6 +267,11 @@ class BondedCompanionCommandRecipientSourceTest {
 
     private static UUID uuid(long value) {
         return new UUID(0L, value);
+    }
+
+    /** A profile id as the bonded API reports it: the record's UUID as text. */
+    private static String profile(long value) {
+        return new UUID(7L, value).toString();
     }
 
     private static BondedCompanionApi api(

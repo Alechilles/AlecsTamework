@@ -88,6 +88,27 @@ class ProviderAdmissionTest {
     }
 
     @Test
+    void anotherOwnersCompanionHeldInAnItemIsPutToTheProviderAsANewCompanion() {
+        decision = allow(Set.of(), Map.of());
+        CompanionRecord theirs = CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.item())
+                .ownerUuid(UUID.randomUUID()).homeWorld("w").build();
+        CompanionRecord released = theirs.toBuilder().location(CompanionLocation.live("w", 0, 0, 0))
+                .ownerUuid(owner).currentNpcUuid(UUID.randomUUID()).build();
+        CompanionRecord pickedUp = theirs.toBuilder().ownerUuid(owner).build();
+
+        assertTrue(evaluate(theirs, released).admitted());
+        assertTrue(evaluate(theirs, pickedUp).admitted());
+
+        for (PopulationAdmissionProviderRequest request : asked) {
+            PopulationAdmissionRequest base = request.admission().request().request();
+            assertEquals(PopulationAdmissionOperation.NEW_OWNERSHIP, base.operation());
+            assertNull(base.oldOwnerUuid());
+            assertEquals(owner, base.newOwnerUuid());
+        }
+        assertEquals(2, asked.size());
+    }
+
+    @Test
     void aNewOwnerIsPutToTheProviderWithBothOwners() {
         decision = allow(Set.of(), Map.of());
         CompanionRecord theirs = cow(CompanionLocation.live("w", 0, 0, 0)).toBuilder().ownerUuid(UUID.randomUUID()).build();

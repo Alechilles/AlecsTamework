@@ -18,6 +18,9 @@ import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionReviveRequest;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
+import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
+import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
@@ -26,6 +29,7 @@ import com.alechilles.alecstamework.companion.flow.StoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.ExtensionEntries;
 import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.index.StoredReason;
@@ -33,6 +37,7 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -100,6 +105,12 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     static final String PROFILE_REVISION_CONFLICT = "bonded-profile-revision-conflict";
     static final String EXTENSION_REVISION_CONFLICT = "bonded-extension-revision-conflict";
     static final String CAPTURE_EVIDENCE_NOT_FOUND = "bonded-capture-evidence-not-found";
+    static final String TALENTS_UNAVAILABLE = "bonded-talent-updates-unavailable";
+    static final String TALENTS_DISABLED = "bonded-talents-disabled";
+    static final String TALENT_LEVEL_DATA_UNAVAILABLE = "bonded-level-data-unavailable";
+    static final String TALENT_PURCHASE_REJECTED = "bonded-talent-purchase-rejected";
+    static final String TALENT_RESET_REJECTED = "bonded-talent-reset-rejected";
+    static final String TALENT_BODY_UNAVAILABLE = "bonded-talent-body-unavailable";
     /** Release cause of an abandoned bonded companion's tombstone. */
     public static final String CAUSE_ABANDONED = "ABANDONED";
 
@@ -137,6 +148,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     private final LongSupplier clock;
     private final List<Consumer<BondedCompanionChangedEvent>> subscribers = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
+    @Nullable private volatile BondedTalentUpdates talents;
 
     /**
      * @param families       the roster family of a record's role; {@link BondedRecords#families}
@@ -613,8 +625,21 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                 if (receipt == null) {
                     return done(failure(BondedCompanionResultCode.POLICY_DENIED, PAYMENT_INSUFFICIENT));
                 }
-                return guarded(() -> restoreTimed(record, family, RestoreRules.Reason.REVIVE, placement))
-                        .thenCompose(result -> settle(receipt, result, record.profileId()));
+                UUID profileId = record.profileId();
+                CompletableFuture<RestoreFlow.Result> restored;
+                try {
+                    restored = restoreActive(record, family, RestoreRules.Reason.REVIVE, placement);
+                } catch (RuntimeException | LinkageError failure) {
+                    restored = CompletableFuture.failedFuture(failure);
+                }
+                // The charge follows the restore alone: once the companion is back the price is
+                // kept, whatever happens while the view is built. A restore that threw is null.
+                return restored.handle((result, failure) -> failure == null ? result : null)
+                        .thenCompose(result -> settle(receipt, result == RestoreFlow.Result.RESTORED, profileId)
+                                .thenApply(ignored -> result == null
+                                        ? IndexBondedCompanionApi.<BondedCompanionProfileView>failure(
+                                                BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED)
+                                        : restoreResult(result, profileId)));
             });
         });
     }
@@ -632,12 +657,12 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         }
     }
 
-    /** Keeps the charge of a revive that worked and returns the charge of one that did not. */
-    private <T> CompletableFuture<BondedCompanionResult<T>> settle(
-            BondedCompanionActionContext.ChargeReceipt receipt, BondedCompanionResult<T> result, UUID profileId) {
+    /** Keeps the charge of a revive that brought the companion back and returns the charge of one that did not. */
+    private CompletableFuture<Void> settle(BondedCompanionActionContext.ChargeReceipt receipt, boolean restored,
+                                           UUID profileId) {
         CompletionStage<Boolean> settled;
         try {
-            settled = result.successful() ? receipt.completeAsync() : receipt.refundAsync();
+            settled = restored ? receipt.completeAsync() : receipt.refundAsync();
         } catch (RuntimeException | LinkageError failure) {
             settled = CompletableFuture.failedFuture(failure);
         }
@@ -645,13 +670,102 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
             settled = CompletableFuture.completedFuture(false);
         }
         return settled.toCompletableFuture().handle((ok, failure) -> {
-            if (!result.successful() && (failure != null || !Boolean.TRUE.equals(ok))) {
+            if (!restored && (failure != null || !Boolean.TRUE.equals(ok))) {
                 LOGGER.at(Level.WARNING).withCause(failure).log(
-                        "The revive price of bonded companion %s was not refunded after a failed revive (%s)",
-                        profileId, result.reason());
+                        "The revive price of bonded companion %s was not refunded after a failed revive", profileId);
             }
-            return result;
+            return null;
         });
+    }
+
+    /** Gives this API its talent changes. Until then {@link #updateTalents} reports unavailable. */
+    public void useTalents(@Nullable BondedTalentUpdates talents) {
+        this.talents = talents;
+    }
+
+    /**
+     * Buys a talent for a companion or resets its talents. An active companion is changed on its
+     * body, on that body's world thread; any other companion in its stored snapshot
+     * ({@link BondedTalentUpdates}). The record itself does not change, so the view's revision
+     * stays the same. The returned view carries the new talents in its presentation data
+     * ({@code talentConfigId}, {@code talentSpentPoints}, {@code talentAllocationRevision},
+     * {@code talents}, {@code level}, {@code levelingConfigId}), and subscribers get a
+     * {@code talents-updated} change with the same old and new state.
+     *
+     * <p>A change the talent tree, the level or the points do not allow is
+     * {@code VALIDATION_FAILED}; so is a companion with no level data yet (one never summoned).
+     * An active companion whose body is not loaded is {@code WORLD_UNAVAILABLE}.</p>
+     */
+    @Override
+    @Nonnull
+    public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> updateTalents(
+            @Nonnull BondedCompanionTalentActionRequest request) {
+        Objects.requireNonNull(request, "request");
+        return guarded(() -> {
+            BondedTalentUpdates updates = talents;
+            if (updates == null) {
+                return done(BondedCompanionResult.unavailable(TALENTS_UNAVAILABLE));
+            }
+            CompanionRecord record = record(request.profileId());
+            if (record == null || !request.rosterId().equals(record.rosterId())) {
+                return done(failure(BondedCompanionResultCode.NOT_FOUND, NOT_FOUND));
+            }
+            if (!request.ownerUuid().equals(record.ownerUuid())) {
+                return done(failure(BondedCompanionResultCode.NOT_OWNER, NOT_OWNER));
+            }
+            if (record.generation() != request.expectedRevision()) {
+                return done(failure(BondedCompanionResultCode.REVISION_CONFLICT, PROFILE_REVISION_CONFLICT));
+            }
+            UUID profileId = record.profileId();
+            return updates.update(record, request).thenApply(outcome -> switch (outcome.status()) {
+                case APPLIED -> talentsUpdated(profileId, outcome);
+                case REJECTED -> failure(BondedCompanionResultCode.VALIDATION_FAILED,
+                        request.action() == BondedCompanionTalentActionRequest.Action.PURCHASE
+                                ? TALENT_PURCHASE_REJECTED : TALENT_RESET_REJECTED);
+                case DISABLED -> failure(BondedCompanionResultCode.VALIDATION_FAILED, TALENTS_DISABLED);
+                case NO_LEVEL_DATA ->
+                        failure(BondedCompanionResultCode.VALIDATION_FAILED, TALENT_LEVEL_DATA_UNAVAILABLE);
+                case CONFLICT -> failure(BondedCompanionResultCode.REVISION_CONFLICT, PROFILE_REVISION_CONFLICT);
+                case BODY_UNAVAILABLE ->
+                        failure(BondedCompanionResultCode.WORLD_UNAVAILABLE, TALENT_BODY_UNAVAILABLE);
+                case FAILED -> failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+            });
+        });
+    }
+
+    /** The view after a talent change, published to subscribers as {@code talents-updated}. */
+    private BondedCompanionResult<BondedCompanionProfileView> talentsUpdated(UUID profileId,
+                                                                             BondedTalentUpdates.Outcome outcome) {
+        LinkedHashMap<String, String> data = new LinkedHashMap<>();
+        if (outcome.talents().getConfigId() != null && !outcome.talents().getConfigId().isBlank()) {
+            data.put("talentConfigId", outcome.talents().getConfigId());
+        }
+        data.put("talentSpentPoints", Integer.toString(outcome.talents().getSpentPoints()));
+        data.put("talentAllocationRevision", Long.toString(outcome.talents().getAllocationRevision()));
+        // An empty list is a value too: it replaces the list a reset cleared.
+        data.put("talents", String.join(", ", outcome.talents().getPurchasedTalentIds()));
+        data.put("level", Integer.toString(outcome.level()));
+        if (outcome.levelingConfigId() != null && !outcome.levelingConfigId().isBlank()) {
+            data.put("levelingConfigId", outcome.levelingConfigId());
+        }
+        CompanionRecord record = index.get(profileId);
+        BondedCompanionProfileView view = record == null || record.ownerUuid() == null ? null
+                : BondedRecords.view(record, index.fileRecords(record.ownerUuid()), families, clock.getAsLong(), data);
+        if (view == null) {
+            // The change was made, but the companion left the roster before it could be reported.
+            return failure(BondedCompanionResultCode.REVISION_CONFLICT, PROFILE_REVISION_CONFLICT);
+        }
+        BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(view.profileId(), view.ownerUuid(),
+                view.rosterId(), view.state(), view.state(), view.revision(), "talents-updated");
+        for (Consumer<BondedCompanionChangedEvent> subscriber : subscribers) {
+            try {
+                subscriber.accept(event);
+            } catch (RuntimeException | LinkageError failure) {
+                LOGGER.at(Level.WARNING).withCause(failure)
+                        .log("A bonded companion subscriber failed for profile %s", profileId);
+            }
+        }
+        return success(view);
     }
 
     @Override
@@ -660,7 +774,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
             @Nonnull BondedCompanionExtensionDataKey key) {
         Objects.requireNonNull(key, "key");
         return guarded(() -> {
-            if (!BondedRecords.publicNamespace(key.namespace())) {
+            if (!ExtensionEntries.publicNamespace(key.namespace())) {
                 return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
             }
             CompanionRecord record = record(key.profileId());
@@ -678,7 +792,8 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
      * {@link BondedCompanionExtensionDataUpdate#MISSING_REVISION} expects no value; the first
      * value has revision 0 and each write adds one. Completes only after the owner file is
      * written and undoes the change when that write fails. Repeating a request whose value is
-     * already the current one succeeds, after the same wait for the owner file.
+     * already the current one succeeds, after the same wait for the owner file. A payload that
+     * is not valid JSON is refused.
      */
     @Override
     @Nonnull
@@ -687,60 +802,41 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         Objects.requireNonNull(update, "update");
         return guarded(() -> {
             BondedCompanionExtensionDataKey key = update.key();
-            if (!BondedRecords.publicNamespace(key.namespace())
-                    || update.expectedRevision() > Long.MAX_VALUE - 2L) {
+            if (!ExtensionEntries.publicNamespace(key.namespace())
+                    || update.expectedRevision() > Long.MAX_VALUE - 2L || !validPayload(update)) {
                 return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
             }
-            String extensionKey = extensionKey(key);
-            // A stored entry's revision is the public revision plus one: 0 is "no value" on disk.
-            ExtensionEntry wanted = new ExtensionEntry(update.expectedRevision() + 2L, update.jsonPayload());
-            Object outcome = index.atomically(() -> {
-                CompanionRecord record = record(key.profileId());
-                if (record == null || !key.ownerUuid().equals(record.ownerUuid())) {
-                    return failure(BondedCompanionResultCode.NOT_FOUND, NOT_FOUND);
-                }
-                ExtensionEntry current = record.extensions().get(extensionKey);
-                if (wanted.equals(current)) {
-                    // The same request again. Its owner file may still be unwritten, so this
-                    // caller waits for a flush too.
-                    return new Written(record, null, true);
-                }
-                if (publicRevision(current) != update.expectedRevision()) {
-                    return failure(BondedCompanionResultCode.REVISION_CONFLICT, EXTENSION_REVISION_CONFLICT);
-                }
-                CompanionIndex.Mutation applied =
-                        index.update(record.profileId(), record.revision(), b -> b.extension(extensionKey, wanted));
-                return applied.applied() ? new Written(applied.after(), current, false)
-                        : failure(BondedCompanionResultCode.REVISION_CONFLICT, EXTENSION_REVISION_CONFLICT);
-            });
-            if (!(outcome instanceof Written written)) {
-                @SuppressWarnings("unchecked")
-                BondedCompanionResult<BondedCompanionExtensionData> refused =
-                        (BondedCompanionResult<BondedCompanionExtensionData>) outcome;
-                return done(refused);
+            CompanionRecord found = record(key.profileId());
+            if (found == null) {
+                return done(failure(BondedCompanionResultCode.NOT_FOUND, NOT_FOUND));
             }
-            CompanionRecord after = written.after();
-            return flush.apply(after.ownerUuid()).handle((ignored, failure) -> {
-                if (failure == null) {
-                    return success(data(key, wanted, after));
-                }
-                if (!written.replay()) {
-                    undo(after.profileId(), extensionKey, wanted, written.previous());
-                }
-                return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
-            });
+            // A stored entry's revision is the public revision plus one: 0 is "no value" on disk.
+            return ExtensionEntries.compareAndSet(index, flush, found.profileId(), extensionKey(key),
+                    update.expectedRevision() + 1L, update.jsonPayload(),
+                    current -> BondedRecords.state(current) != null && key.ownerUuid().equals(current.ownerUuid()))
+                    .thenApply(outcome -> switch (outcome.status()) {
+                        case WRITTEN -> success(data(key, outcome.entry(), outcome.record()));
+                        case NOT_FOUND -> failure(BondedCompanionResultCode.NOT_FOUND, NOT_FOUND);
+                        case REVISION_MISMATCH ->
+                                failure(BondedCompanionResultCode.REVISION_CONFLICT, EXTENSION_REVISION_CONFLICT);
+                        case FLUSH_FAILED -> failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+                    });
         });
     }
 
-    /** Puts {@code previous} back unless the value has changed again since {@code written}. */
-    private void undo(UUID profileId, String extensionKey, ExtensionEntry written, @Nullable ExtensionEntry previous) {
-        index.atomically(() -> {
-            CompanionRecord record = index.get(profileId);
-            if (record != null && written.equals(record.extensions().get(extensionKey))) {
-                index.update(profileId, record.revision(), b -> b.extension(extensionKey, previous));
-            }
-            return null;
-        });
+    /**
+     * Whether the payload is JSON within the profile data limits. The profile data request owns
+     * that rule, so it is built here only for its validation; the payload is stored as sent,
+     * because callers compare the stored text with what they wrote.
+     */
+    private static boolean validPayload(BondedCompanionExtensionDataUpdate update) {
+        try {
+            new ProfileDataCompareAndSetRequest(update.key().profileId(), update.key().namespace(),
+                    BondedRecords.EXTENSION_DATA_KEY, 0L, update.idempotencyKey(), update.jsonPayload());
+            return true;
+        } catch (RuntimeException invalid) {
+            return false;
+        }
     }
 
     /**
@@ -785,7 +881,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
             }
             String cause = after.location().cause();
             reason = CAUSE_ABANDONED.equals(cause) ? "abandoned"
-                    : cause == null && before.location().kind() == LocationKind.LIVE ? "old_age" : "released";
+                    : CompanionBodyLifecycle.CAUSE_OLD_AGE.equals(cause) ? "old_age" : "released";
             newState = oldState;
         } else if (oldState == null) {
             reason = after.location().reason() == StoredReason.PROVISIONED ? "provisioned" : "stored";
@@ -827,43 +923,33 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     }
 
     /**
-     * Restores the companion at the placement as an active companion with the family's session
-     * timer. Only a SUMMON restore carries the timer in its commit; after a recover or a revive
-     * the timer is written once the companion is back.
+     * Restores the companion at the placement as an active companion. The family's session timer,
+     * with the companion's talent modifiers, is part of the restore's commit.
      */
-    private CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> restoreTimed(
+    private CompletableFuture<RestoreFlow.Result> restoreActive(
             CompanionRecord record, BondedCompanionPolicy family, RestoreRules.Reason reason,
             BondedCompanionPlacement placement) {
-        UUID profileId = record.profileId();
         RestoreFlow.Destination destination = new RestoreFlow.Destination(placement.worldKey(), placement.x(),
                 placement.y(), placement.z(), placement.yawRadians(), placement.pitchRadians());
         return adjustedTimers(record, family).thenCompose(adjusted -> {
             long sessionMs = BondedRecords.millis(adjusted.sessionDurationSeconds());
             long untilMs = sessionMs > 0L ? saturatedAdd(clock.getAsLong(), sessionMs) : 0L;
-            RestoreFlow.Request request = RestoreFlow.Request.of(profileId, reason, destination)
-                    .withGeneration(record.generation()).withSummonedUntil(untilMs);
-            return restore.apply(request).thenApply(result -> {
-                if (result != RestoreFlow.Result.RESTORED) {
-                    return restoreFailure(result);
-                }
-                if (reason != RestoreRules.Reason.SUMMON && untilMs != 0L) {
-                    startSession(profileId, record.generation() + 1L, untilMs);
-                }
-                return viewResult(profileId);
-            });
+            return restore.apply(RestoreFlow.Request.of(record.profileId(), reason, destination)
+                    .withGeneration(record.generation()).withSummonedUntil(untilMs));
         });
     }
 
-    /** Sets the session timer of the body just restored, unless the record has moved on. */
-    private void startSession(UUID profileId, long generation, long untilMs) {
-        index.atomically(() -> {
-            CompanionRecord current = index.get(profileId);
-            if (current != null && current.location().kind() == LocationKind.LIVE
-                    && current.generation() == generation) {
-                index.update(profileId, current.revision(), b -> b.summonedUntilMs(untilMs));
-            }
-            return null;
-        });
+    /** {@link #restoreActive} with its result as the companion's new view or the refusal. */
+    private CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> restoreTimed(
+            CompanionRecord record, BondedCompanionPolicy family, RestoreRules.Reason reason,
+            BondedCompanionPlacement placement) {
+        return restoreActive(record, family, reason, placement)
+                .thenApply(result -> restoreResult(result, record.profileId()));
+    }
+
+    private BondedCompanionResult<BondedCompanionProfileView> restoreResult(RestoreFlow.Result result,
+                                                                            UUID profileId) {
+        return result == RestoreFlow.Result.RESTORED ? viewResult(profileId) : restoreFailure(result);
     }
 
     private static <T> BondedCompanionResult<T> restoreFailure(RestoreFlow.Result result) {
@@ -941,13 +1027,12 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     }
 
     private static String extensionKey(BondedCompanionExtensionDataKey key) {
-        return BondedRecords.extensionKey(key.namespace(), BondedRecords.EXTENSION_DATA_KEY);
+        return ExtensionEntries.key(key.namespace(), BondedRecords.EXTENSION_DATA_KEY);
     }
 
     /** The public revision of a stored entry; {@code MISSING_REVISION} when there is none. */
     private static long publicRevision(@Nullable ExtensionEntry entry) {
-        return entry == null ? BondedCompanionExtensionDataUpdate.MISSING_REVISION
-                : Math.max(1L, entry.revision()) - 1L;
+        return ExtensionEntries.storedRevision(entry) - 1L;
     }
 
     private static BondedCompanionExtensionData data(BondedCompanionExtensionDataKey key, ExtensionEntry entry,
@@ -992,9 +1077,5 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
 
     /** A record this call inserted, as opposed to one an earlier request made. */
     private record Provisioned(CompanionRecord record) {
-    }
-
-    /** @param replay the value was already current, so a failed write leaves it to the first caller */
-    private record Written(CompanionRecord after, @Nullable ExtensionEntry previous, boolean replay) {
     }
 }
