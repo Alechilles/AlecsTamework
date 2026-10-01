@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -35,7 +36,8 @@ import javax.annotation.Nullable;
 public final class RestoreFlow<R> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED }
+    public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED,
+        STALE, OWNED_LIMIT, GROUP_LIMIT }
 
     /**
      * Where to restore. {@code world} is a world name; the production spawner resolves it.
@@ -51,6 +53,43 @@ public final class RestoreFlow<R> {
         public static Destination of(@Nonnull CompanionSpawnPlacement placement) {
             return new Destination(placement.worldKey(), placement.x(), placement.y(), placement.z(),
                     placement.yawRadians(), placement.pitchRadians());
+        }
+    }
+
+    /** An owner to set in the restore commit. A null uuid releases the companion unowned and untracked; it keeps its tamed state. */
+    public record Owner(@Nullable UUID uuid, @Nullable String name) {
+    }
+
+    /**
+     * One restore. {@code expectedGeneration} is -1 for any; {@code owner} null keeps the record's
+     * owner; {@code summonedUntilMs} is a wall-clock expiry, 0 for none, used only by SUMMON.
+     */
+    public record Request(@Nonnull UUID profileId, @Nonnull RestoreRules.Reason reason, @Nonnull Destination destination,
+                          long expectedGeneration, @Nullable Owner owner, long summonedUntilMs) {
+        public Request {
+            Objects.requireNonNull(profileId, "profileId");
+            Objects.requireNonNull(reason, "reason");
+            Objects.requireNonNull(destination, "destination");
+        }
+
+        @Nonnull
+        public static Request of(@Nonnull UUID profileId, @Nonnull RestoreRules.Reason reason, @Nonnull Destination destination) {
+            return new Request(profileId, reason, destination, -1L, null, 0L);
+        }
+
+        @Nonnull
+        public Request withGeneration(long generation) {
+            return new Request(profileId, reason, destination, generation, owner, summonedUntilMs);
+        }
+
+        @Nonnull
+        public Request withOwner(@Nonnull Owner newOwner) {
+            return new Request(profileId, reason, destination, expectedGeneration, newOwner, summonedUntilMs);
+        }
+
+        @Nonnull
+        public Request withSummonedUntil(long untilMs) {
+            return new Request(profileId, reason, destination, expectedGeneration, owner, untilMs);
         }
     }
 
@@ -101,17 +140,27 @@ public final class RestoreFlow<R> {
     @Nonnull
     public CompletableFuture<Result> restore(@Nonnull UUID profileId, @Nonnull RestoreRules.Reason reason,
                                              @Nonnull Destination destination) {
+        return restore(Request.of(profileId, reason, destination));
+    }
+
+    /** Never completes exceptionally for an expected failure; the {@link Result} says what happened. */
+    @Nonnull
+    public CompletableFuture<Result> restore(@Nonnull Request request) {
+        UUID profileId = request.profileId();
         CompanionRecord before = index.get(profileId);
-        RestoreRules.Verdict verdict = RestoreRules.forRecord(before, reason, clock.getAsLong());
+        RestoreRules.Verdict verdict = RestoreRules.forRecord(before, request.reason(), clock.getAsLong(),
+                request.expectedGeneration());
         if (verdict != RestoreRules.Verdict.ALLOWED) {
             return CompletableFuture.completedFuture(map(verdict));
         }
         return snapshots.apply(profileId).handle((snapshot, error) -> error == null ? snapshot : null)
-                .thenCompose(snapshot -> commitAndSpawn(before, snapshot, reason, destination));
+                .thenCompose(snapshot -> commitAndSpawn(before, snapshot, request));
     }
 
     private CompletableFuture<Result> commitAndSpawn(CompanionRecord before, @Nullable SnapshotEnvelope snapshot,
-                                                     RestoreRules.Reason reason, Destination destination) {
+                                                     Request request) {
+        RestoreRules.Reason reason = request.reason();
+        Destination destination = request.destination();
         RestoreRules.Verdict snapshotVerdict = RestoreRules.forSnapshot(before, snapshot, reason);
         if (snapshotVerdict != RestoreRules.Verdict.ALLOWED) {
             return CompletableFuture.completedFuture(map(snapshotVerdict));
@@ -120,8 +169,7 @@ public final class RestoreFlow<R> {
         UUID newNpcUuid = UUID.randomUUID();
         // The revision check makes a change made while the snapshot was read win.
         Commit<R> commit = index.atomically(() -> {
-            CompanionIndex.Mutation m = index.update(profileId, before.revision(), CompanionTransitions.restored(
-                    before, destination.world(), destination.x(), destination.y(), destination.z(), newNpcUuid));
+            CompanionIndex.Mutation m = index.update(profileId, before.revision(), commitChange(before, request, newNpcUuid));
             if (!m.applied()) {
                 return null;
             }
@@ -134,7 +182,7 @@ public final class RestoreFlow<R> {
         if (commit == null) {
             return CompletableFuture.completedFuture(Result.CONFLICT);
         }
-        return flushOwner.apply(commit.after().ownerUuid())
+        return flushOwners(before, commit.after())
                 .handle((ignored, error) -> error)
                 .thenCompose(error -> {
                     if (error != null) {
@@ -158,6 +206,39 @@ public final class RestoreFlow<R> {
                                 return Result.SPAWN_FAILED;
                             });
                 });
+    }
+
+    /** LIVE at the destination, or an unowned tombstone when the request leaves no owner. */
+    private static UnaryOperator<CompanionRecord.Builder> commitChange(CompanionRecord before, Request request,
+                                                                       UUID newNpcUuid) {
+        Destination d = request.destination();
+        Owner owner = request.owner();
+        if (owner != null && owner.uuid() == null) {
+            UnaryOperator<CompanionRecord.Builder> released =
+                    CompanionTransitions.released(before, CompanionTransitions.CAUSE_RELEASED_UNOWNED);
+            return b -> released.apply(b).ownerUuid(null).ownerName(null);
+        }
+        UnaryOperator<CompanionRecord.Builder> restored =
+                CompanionTransitions.restored(before, d.world(), d.x(), d.y(), d.z(), newNpcUuid);
+        return b -> {
+            restored.apply(b);
+            if (owner != null) {
+                b.ownerUuid(owner.uuid()).ownerName(owner.name());
+            }
+            if (request.reason() == RestoreRules.Reason.SUMMON) {
+                b.summonedUntilMs(request.summonedUntilMs());
+            }
+            return b;
+        };
+    }
+
+    /** An owner change writes the new owner's file first, then the old one's; either failure fails the commit. */
+    private CompletableFuture<Void> flushOwners(CompanionRecord before, CompanionRecord after) {
+        CompletableFuture<Void> first = flushOwner.apply(after.ownerUuid());
+        if (Objects.equals(before.ownerUuid(), after.ownerUuid())) {
+            return first;
+        }
+        return first.thenCompose(v -> flushOwner.apply(before.ownerUuid()));
     }
 
     private CompletableFuture<Boolean> spawnSafely(CompanionRecord committed, SnapshotEnvelope snapshot,
@@ -214,6 +295,7 @@ public final class RestoreFlow<R> {
             case NOT_ALLOWED -> Result.NOT_ALLOWED;
             case NO_SNAPSHOT -> Result.NO_SNAPSHOT;
             case COOLDOWN -> Result.COOLDOWN;
+            case STALE -> Result.STALE;
             case ALLOWED -> Result.RESTORED;
         };
     }

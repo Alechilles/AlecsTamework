@@ -23,6 +23,9 @@ public final class CompanionTransitions {
     public static final long SNAPSHOT_ON_UNLOAD_AFTER_MS = 5L * 60_000L;
     public static final String CAUSE_REMOVED = "REMOVED";
     public static final String CAUSE_WORLD_REMOVED = "WORLD_REMOVED";
+    public static final String CAUSE_ITEM_DESTROYED = "ITEM_DESTROYED";
+    public static final String CAUSE_FORGOTTEN = "FORGOTTEN";
+    public static final String CAUSE_RELEASED_UNOWNED = "RELEASED_UNOWNED";
     /** Position changes below this many blocks are not worth a record write. */
     private static final double MOVE_THRESHOLD = 2.0;
 
@@ -158,15 +161,21 @@ public final class CompanionTransitions {
                 .location(CompanionLocation.live(world, x, y, z))
                 .currentNpcUuid(newNpcUuid)
                 .diedAtMs(0L)
-                .reviveAvailableAtMs(0L);
+                .reviveAvailableAtMs(0L)
+                .summonedUntilMs(0L);
     }
 
-    /** Spec 8.12: a tombstone that keeps old bodies from being adopted. */
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> released(@Nonnull CompanionRecord before) {
+        return released(before, null);
+    }
+
+    /** Spec 8.12, 8.14: a tombstone that keeps old bodies from being adopted, with an optional cause. */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> released(@Nonnull CompanionRecord before, @Nullable String cause) {
         long generation = before.generation() + 1;
         return b -> b.generation(generation)
-                .location(CompanionLocation.released(null))
+                .location(CompanionLocation.released(cause))
                 .currentNpcUuid(null)
                 .extensions(Map.of())
                 .domainClaims(List.of())

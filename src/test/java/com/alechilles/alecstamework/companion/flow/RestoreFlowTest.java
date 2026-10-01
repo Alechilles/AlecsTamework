@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -128,5 +130,64 @@ class RestoreFlowTest {
         assertEquals(RestoreFlow.Result.SPAWN_FAILED, result);
         CompanionRecord after = index.get(live.profileId());
         assertEquals("default", after.location().world());
+    }
+
+    @Test
+    void aReleaseToANewOwnerMovesTheRecordAndKeepsTheTimerClear() {
+        CompanionRecord live = insertLive();
+        UUID releaser = UUID.randomUUID();
+        index.update(live.profileId(), live.revision(), b -> b.location(CompanionLocation.item()).generation(1).currentNpcUuid(null));
+        CompanionRecord item = index.get(live.profileId());
+
+        RestoreFlow.Result result = flow(CompletableFuture.completedFuture(null), true).restore(
+                RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there)
+                        .withGeneration(1).withOwner(new RestoreFlow.Owner(releaser, "Bo"))).join();
+
+        assertEquals(RestoreFlow.Result.RESTORED, result);
+        CompanionRecord after = index.get(item.profileId());
+        assertEquals(LocationKind.LIVE, after.location().kind());
+        assertEquals(releaser, after.ownerUuid());
+        assertEquals(2, after.generation());
+    }
+
+    @Test
+    void aStaleItemIsRefusedWithoutAnyLiveEffect() {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(), b -> b.location(CompanionLocation.item()).generation(3));
+
+        RestoreFlow.Result result = flow(CompletableFuture.completedFuture(null), true).restore(
+                RestoreFlow.Request.of(live.profileId(), RestoreRules.Reason.RELEASE, there).withGeneration(2)).join();
+
+        assertEquals(RestoreFlow.Result.STALE, result);
+        assertTrue(events.isEmpty());
+    }
+
+    @Test
+    void aRestoreThatLeavesNoOwnerSpawnsAnUntrackedBodyAndTombstonesTheRecord() {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(), b -> b.location(CompanionLocation.item()).generation(1));
+
+        RestoreFlow.Result result = flow(CompletableFuture.completedFuture(null), true).restore(
+                RestoreFlow.Request.of(live.profileId(), RestoreRules.Reason.RELEASE, there)
+                        .withOwner(new RestoreFlow.Owner(null, null))).join();
+
+        assertEquals(RestoreFlow.Result.RESTORED, result);
+        CompanionRecord after = index.get(live.profileId());
+        assertEquals(LocationKind.RELEASED, after.location().kind());
+        assertEquals(CompanionTransitions.CAUSE_RELEASED_UNOWNED, after.location().cause());
+        // The record moved from the owner's file to the unowned file: both are flushed before the spawn.
+        assertEquals(List.of("flush", "flush", "spawn gen2"), events);
+    }
+
+    @Test
+    void aTimedSummonCarriesItsTimer() {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(),
+                b -> b.location(CompanionLocation.stored(StoredReason.TIMED)).generation(1));
+
+        flow(CompletableFuture.completedFuture(null), true).restore(
+                RestoreFlow.Request.of(live.profileId(), RestoreRules.Reason.SUMMON, there).withSummonedUntil(5_000)).join();
+
+        assertEquals(5_000, index.get(live.profileId()).summonedUntilMs());
     }
 }

@@ -34,9 +34,10 @@ public final class CommandRestorationCompletionListener
         return PREFIX + switch (result) {
             case RESTORED -> "respawn.success";
             case COOLDOWN -> "shared.cooldown";
-            case NOT_ALLOWED, NOT_FOUND -> "respawn.notDeadOrLost";
+            case NOT_ALLOWED, NOT_FOUND, STALE -> "respawn.notDeadOrLost";
             case NO_SNAPSHOT, SPAWN_FAILED -> "respawn.recoverFailed";
-            case COMMIT_FAILED, CONFLICT -> "respawn.unavailable";
+            // Task 9 gives the limit results their population keys.
+            case COMMIT_FAILED, CONFLICT, OWNED_LIMIT, GROUP_LIMIT -> "respawn.unavailable";
         };
     }
 

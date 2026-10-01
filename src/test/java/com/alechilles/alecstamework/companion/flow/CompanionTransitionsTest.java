@@ -92,6 +92,18 @@ class CompanionTransitionsTest {
     }
 
     @Test
+    void aReleaseKeepsItsCauseAndClearsTheSummonTimer() {
+        CompanionRecord live = CompanionTransitions.newLive(PROFILE, 0, body("default", 10)).toBuilder()
+                .summonedUntilMs(9_000L).build();
+
+        CompanionRecord released = apply(live,
+                CompanionTransitions.released(live, CompanionTransitions.CAUSE_ITEM_DESTROYED));
+
+        assertEquals(CompanionTransitions.CAUSE_ITEM_DESTROYED, released.location().cause());
+        assertEquals(0L, released.summonedUntilMs());
+    }
+
+    @Test
     void aRestoreMakesTheRecordLiveOneGenerationNewerWithoutReviveTimers() {
         CompanionRecord live = CompanionTransitions.newLive(PROFILE, 3, body("default", 10));
         CompanionRecord dead = apply(live, CompanionTransitions.died(live, CompanionSummary.EMPTY,
@@ -106,6 +118,14 @@ class CompanionTransitionsTest {
         assertEquals(newNpc, restored.currentNpcUuid());
         assertEquals(0L, restored.reviveAvailableAtMs());
         assertEquals(0L, restored.diedAtMs());
+    }
+
+    @Test
+    void aRestoreClearsTheSummonTimer() {
+        CompanionRecord timed = CompanionTransitions.newLive(PROFILE, 0, body("default", 10)).toBuilder()
+                .summonedUntilMs(9_000L).build();
+
+        assertEquals(0L, apply(timed, CompanionTransitions.restored(timed, "w", 0, 0, 0, UUID.randomUUID())).summonedUntilMs());
     }
 
     @Test
