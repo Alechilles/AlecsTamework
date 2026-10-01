@@ -40,7 +40,7 @@ import org.joml.Vector3i;
  * <p>The scanner discovers only loaded block entities and live NPC entities. It never infers a
  * removed coop from an unloaded chunk and never reads captured items.</p>
  */
-final class HytaleDirectLiveCoopScanner {
+public final class HytaleDirectLiveCoopScanner {
     private static final String BLOCK_MODULE_CLASS =
             "com.hypixel.hytale.server.core.modules.block.BlockModule";
     private static final String ITEM_CONTAINER_BLOCK_CLASS =
@@ -57,7 +57,7 @@ final class HytaleDirectLiveCoopScanner {
     private volatile boolean componentTypesResolved;
     /** Returns one immutable view of currently loaded coops and live NPC candidates. */
     @Nullable
-    Scan scan(@Nonnull Store<ChunkStore> chunkStore) {
+    public Scan scan(@Nonnull Store<ChunkStore> chunkStore) {
         World world = chunkStore.getExternalData() == null
                 ? null : chunkStore.getExternalData().getWorld();
         if (world == null || world.getEntityStore() == null) {
@@ -439,7 +439,7 @@ final class HytaleDirectLiveCoopScanner {
         return null;
     }
 
-    record Scan(@Nonnull World world,
+    public record Scan(@Nonnull World world,
                 @Nonnull Store<ChunkStore> chunkStore,
                 @Nonnull Store<EntityStore> entityStore,
                 @Nonnull WorldTimeResource worldTime,
@@ -447,7 +447,7 @@ final class HytaleDirectLiveCoopScanner {
                 @Nonnull List<LiveNpc> liveNpcs) {
     }
 
-    record LoadedCoop(@Nonnull String worldKey,
+    public record LoadedCoop(@Nonnull String worldKey,
                       @Nonnull String coopId,
                       @Nonnull Vector3i block,
                       int rotationIndex,
@@ -477,7 +477,7 @@ final class HytaleDirectLiveCoopScanner {
         }
     }
 
-    record LiveNpc(@Nonnull Ref<EntityStore> reference,
+    public record LiveNpc(@Nonnull Ref<EntityStore> reference,
                    @Nonnull UUID alias,
                    @Nonnull String roleId,
                    @Nonnull Vector3d position,

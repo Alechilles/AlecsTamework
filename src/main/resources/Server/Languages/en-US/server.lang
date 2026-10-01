@@ -1235,6 +1235,7 @@ tamework.ui.notifications.spawner.placementFailed=No safe companion release loca
 tamework.ui.notifications.spawner.releaseUnavailable=Companion release is temporarily unavailable. Try again shortly.
 tamework.ui.notifications.spawner.captureUnavailable=Capture is temporarily unavailable. Try again shortly.
 tamework.ui.notifications.spawner.compensated=The action failed, and its changes were safely rolled back.
+tamework.ui.notifications.spawner.coopRejected=This coop cannot take this companion right now.
 tamework.ui.linkedLocation.copy=Copy coordinates
 tamework.ui.linkedLocation.copyHint=Select text to copy
 

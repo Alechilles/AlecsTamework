@@ -104,6 +104,21 @@ class CompanionTransitionsTest {
     }
 
     @Test
+    void coopIntakeRaisesTheGenerationAndRecordsTheBlockAndSlotWithoutABody() {
+        CompanionRecord live = CompanionTransitions.newLive(PROFILE, 4, body("default", 10));
+
+        CompanionRecord cooped = apply(live, CompanionTransitions.coopIntake(live, "default", 7, 64, -3, 2, null));
+
+        assertEquals(LocationKind.COOP, cooped.location().kind());
+        assertEquals(5, cooped.generation());
+        assertEquals(7, cooped.location().x());
+        assertEquals(-3, cooped.location().z());
+        assertEquals(2, cooped.location().slot());
+        assertNull(cooped.currentNpcUuid());
+        assertEquals(FenceAction.REMOVE, CompanionFence.decide(cooped, false, 4, true, false));
+    }
+
+    @Test
     void storingRaisesTheGenerationAndLeavesNoBody() {
         CompanionRecord live = CompanionTransitions.newLive(PROFILE, 4, body("default", 10));
 

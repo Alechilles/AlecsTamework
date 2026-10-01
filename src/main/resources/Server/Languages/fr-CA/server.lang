@@ -1228,6 +1228,7 @@ tamework.ui.notifications.spawner.placementFailed=Aucun emplacement sûr pour li
 tamework.ui.notifications.spawner.releaseUnavailable=La libération du compagnon est temporairement indisponible. Réessayez dans un instant.
 tamework.ui.notifications.spawner.captureUnavailable=La capture est temporairement indisponible. Réessayez dans un instant.
 tamework.ui.notifications.spawner.compensated=L'action a échoué et ses modifications ont été annulées en toute sécurité.
+tamework.ui.notifications.spawner.coopRejected=Cet enclos ne peut pas accueillir ce compagnon pour le moment.
 tamework.ui.talents.defaultCompanionName=Texte : Companion
 tamework.ui.talents.effect.points=Texte : {0} points
 tamework.ui.talents.mutation.companionNotLoaded=Texte : Companion is no longer loaded.

@@ -1081,6 +1081,7 @@ tamework.ui.notifications.spawner.captureInvalidContext=No había ningún compa�
 tamework.ui.notifications.spawner.captureProfileConflict=El registro del compañero cambió antes de que se completara la captura.
 tamework.ui.notifications.spawner.captureUnavailable=La captura no está disponible temporalmente. Vuelve a intentarlo en breve.
 tamework.ui.notifications.spawner.compensated=La acción falló y sus cambios se revirtieron de forma segura.
+tamework.ui.notifications.spawner.coopRejected=Este corral no puede acoger a este compañero ahora mismo.
 tamework.ui.notifications.spawner.placementFailed=No hay una ubicación segura disponible aquí para liberar al compañero.
 tamework.ui.notifications.spawner.profileReadFailed=No se pudo cargar el registro del compañero.
 tamework.ui.notifications.spawner.releaseEvidenceFailed=No se pudo verificar el estado del compañero almacenado.

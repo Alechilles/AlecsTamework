@@ -212,6 +212,26 @@ public final class CompanionTransitions {
     }
 
     /**
+     * A companion taken into a coop slot (spec 8.9), from a live body or a capture item: COOP at the
+     * block and slot, one generation newer, no body, no summon timer. {@code summary} is null when
+     * the stored snapshot stands unchanged (intake from an item).
+     */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> coopIntake(@Nonnull CompanionRecord before, @Nonnull String world,
+                                                                   int x, int y, int z, int slot,
+                                                                   @Nullable CompanionSummary summary) {
+        long generation = before.generation() + 1;
+        CompanionLocation location = CompanionLocation.coop(world, x, y, z, slot);
+        return b -> {
+            b.generation(generation).location(location).currentNpcUuid(null).summonedUntilMs(0L);
+            if (summary != null) {
+                b.summary(summary);
+            }
+            return b;
+        };
+    }
+
+    /**
      * The first record of a body that never had one, captured straight into an item at generation 0.
      * It keeps the body's NPC UUID (unlike the stamped path) because an unstamped body has no
      * generation to block a second capture or tame of the same NPC; a restore gives it a new UUID.
