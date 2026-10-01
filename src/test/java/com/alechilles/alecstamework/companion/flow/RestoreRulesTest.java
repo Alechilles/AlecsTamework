@@ -66,7 +66,8 @@ class RestoreRulesTest {
         assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(at(CompanionLocation.coop("w", 1, 2, 3, 0)), Reason.COOP_RELEASE, 0));
         assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(at(CompanionLocation.stored(StoredReason.ROSTER)), Reason.SUMMON, 0));
         assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(at(CompanionLocation.stored(StoredReason.TIMED)), Reason.SUMMON, 0));
-        assertEquals(Verdict.NOT_ALLOWED, RestoreRules.forRecord(at(CompanionLocation.stored(StoredReason.BONDED)), Reason.SUMMON, 0));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(at(CompanionLocation.stored(StoredReason.BONDED)), Reason.SUMMON, 0));
+        assertEquals(Verdict.NOT_ALLOWED, RestoreRules.forRecord(at(CompanionLocation.stored(StoredReason.PROVISIONED)), Reason.SUMMON, 0));
     }
 
     @Test
@@ -83,6 +84,9 @@ class RestoreRulesTest {
                 .summonCooldownUntilMs(1_000).build();
         assertEquals(Verdict.COOLDOWN, RestoreRules.forRecord(stored, Reason.SUMMON, 999));
         assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(stored, Reason.SUMMON, 1_000));
+        CompanionRecord bonded = stored.toBuilder().location(CompanionLocation.stored(StoredReason.BONDED)).build();
+        assertEquals(Verdict.COOLDOWN, RestoreRules.forRecord(bonded, Reason.SUMMON, 999));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(bonded, Reason.SUMMON, 1_000));
     }
 
     @Test

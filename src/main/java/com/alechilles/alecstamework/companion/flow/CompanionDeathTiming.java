@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
@@ -63,6 +64,23 @@ public final class CompanionDeathTiming {
     public static Timing resolve(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                                  @Nullable UUID npcUuid, @Nullable String roleId,
                                  @Nonnull DeathComponent death, long diedAtMs) {
+        return resolve(ref, store, npcUuid, roleId, death, diedAtMs, null);
+    }
+
+    /**
+     * As {@link #resolve(Ref, Store, UUID, String, DeathComponent, long)}, for a companion that
+     * may be bonded (plan 6 R18).
+     *
+     * @param bondedFamily the family policy of a bonded companion: its revive cooldown is the
+     *                     roster's {@code ReviveCooldownSeconds}, unscaled, as in 4.x. Null for
+     *                     an ordinary companion, and for a bonded one whose role resolves to no
+     *                     single family; both use the companion config cooldown.
+     */
+    @Nonnull
+    public static Timing resolve(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                 @Nullable UUID npcUuid, @Nullable String roleId,
+                                 @Nonnull DeathComponent death, long diedAtMs,
+                                 @Nullable BondedCompanionPolicy bondedFamily) {
         DamageTargetMemoryService.RecentAttackerSnapshot attacker =
                 DamageTargetMemoryService.getInstance().getRecentAttacker(npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs);
         DeathSnapshotV2Payload.DeathCauseKind needs =
@@ -72,10 +90,18 @@ public final class CompanionDeathTiming {
                 : attacker != null
                 ? attackerKind(attacker)
                 : persistedKind(death);
-        long cooldown = reviveCooldownMs(ref, store, roleId);
+        long cooldown = bondedFamily != null
+                ? bondedReviveCooldownMs(bondedFamily)
+                : reviveCooldownMs(ref, store, roleId);
         String attackerName = attacker == null ? null : attacker.attackerName();
         return new Timing(saturatingAdd(diedAtMs, cooldown), kind,
                 attackerName == null || attackerName.isBlank() ? null : attackerName);
+    }
+
+    /** The roster's revive cooldown; the summon talent timer modifiers do not touch it. */
+    static long bondedReviveCooldownMs(@Nonnull BondedCompanionPolicy family) {
+        long seconds = family.reviveCooldownSeconds();
+        return seconds > Long.MAX_VALUE / 1_000L ? Long.MAX_VALUE : seconds * 1_000L;
     }
 
     private static long reviveCooldownMs(@Nullable Ref<EntityStore> ref, Store<EntityStore> store,

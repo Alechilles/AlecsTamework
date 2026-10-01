@@ -26,8 +26,8 @@ public final class RestoreRules {
      * Whether the record's location allows this restore. {@code expectedGeneration} is the
      * generation an item or slot entry carries; -1 accepts any. RECALL needs LIVE; RECOVER needs
      * LOST, LIVE (no visible body), ITEM (the item may be gone) or COOP; REVIVE needs DEAD past
-     * its wall-clock cooldown; RELEASE needs ITEM; SUMMON needs STORED for ROSTER or TIMED past
-     * {@code summonCooldownUntilMs}; COOP_RELEASE needs COOP.
+     * its wall-clock cooldown; RELEASE needs ITEM; SUMMON needs STORED for ROSTER, TIMED or BONDED
+     * past {@code summonCooldownUntilMs}; COOP_RELEASE needs COOP.
      */
     @Nonnull
     public static Verdict forRecord(@Nullable CompanionRecord record, @Nonnull Reason reason, long nowMs,
@@ -53,9 +53,9 @@ public final class RestoreRules {
         return verdict;
     }
 
-    /** Bonded summons arrive with phase 6; provisioned companions are activated by their API. */
+    /** Provisioned companions are activated by their API. */
     private static boolean summonable(@Nullable StoredReason reason) {
-        return reason == StoredReason.ROSTER || reason == StoredReason.TIMED;
+        return reason == StoredReason.ROSTER || reason == StoredReason.TIMED || reason == StoredReason.BONDED;
     }
 
     /**
