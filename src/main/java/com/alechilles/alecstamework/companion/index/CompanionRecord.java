@@ -93,7 +93,6 @@ public record CompanionRecord(
         private String roleId;
         private String displayName;
         private CompanionLocation location;
-        private RecordScope scope = RecordScope.WORLD_BOUND;
         private String homeWorld;
         private UUID currentNpcUuid;
         private CompanionSummary summary = CompanionSummary.EMPTY;
@@ -127,7 +126,6 @@ public record CompanionRecord(
             roleId = r.roleId;
             displayName = r.displayName;
             location = r.location;
-            scope = r.scope;
             homeWorld = r.homeWorld;
             currentNpcUuid = r.currentNpcUuid;
             summary = r.summary;
@@ -154,7 +152,6 @@ public record CompanionRecord(
         public Builder roleId(@Nonnull String v) { roleId = v; return this; }
         public Builder displayName(@Nullable String v) { displayName = v; return this; }
         public Builder location(@Nonnull CompanionLocation v) { location = v; return this; }
-        public Builder scope(@Nonnull RecordScope v) { scope = v; return this; }
         public Builder homeWorld(@Nullable String v) { homeWorld = v; return this; }
         public Builder currentNpcUuid(@Nullable UUID v) { currentNpcUuid = v; return this; }
         public Builder summary(@Nonnull CompanionSummary v) { summary = v; return this; }
@@ -179,7 +176,7 @@ public record CompanionRecord(
         @Nonnull
         public CompanionRecord build() {
             return new CompanionRecord(profileId, revision, generation, ownerUuid, ownerName, roleId, displayName,
-                    location, scope, homeWorld, currentNpcUuid, summary, rosterId, rosterSlot, bonded,
+                    location, RecordScope.WORLD_BOUND, homeWorld, currentNpcUuid, summary, rosterId, rosterSlot, bonded,
                     summonedUntilMs, summonCooldownUntilMs, reviveAvailableAtMs, diedAtMs, lastSnapshotAtMs,
                     originNamespace, originKey, toolIds, extensions, domainClaims, updatedAtMs);
         }

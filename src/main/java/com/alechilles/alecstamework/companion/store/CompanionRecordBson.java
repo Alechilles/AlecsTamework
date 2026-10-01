@@ -95,8 +95,12 @@ public final class CompanionRecordBson {
             b.revision(getStrictLong(d, "Revision")).generation(getStrictLong(d, "Generation"));
             b.ownerUuid(getUuid(d, "Owner")).ownerName(getString(d, "OwnerName"));
             b.displayName(getString(d, "Name"));
+            // The scope is derived from the location; the stored value is still validated so a
+            // malformed or future value keeps the record unreadable and preserved.
             String scope = getStrictString(d, "Scope");
-            b.scope(scope == null ? RecordScope.WORLD_BOUND : RecordScope.valueOf(scope));
+            if (scope != null) {
+                RecordScope.valueOf(scope);
+            }
             b.homeWorld(getString(d, "HomeWorld")).currentNpcUuid(getUuid(d, "NpcUuid"));
             if (d.isDocument("Summary")) {
                 b.summary(decodeSummary(d.getDocument("Summary")));
