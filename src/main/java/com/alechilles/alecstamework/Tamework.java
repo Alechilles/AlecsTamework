@@ -229,6 +229,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.item.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
@@ -413,6 +414,10 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
             bondedReviveEscrowComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
+    /** Retired; the coop schedule system strips it from coop blocks. */
+    private ComponentType<ChunkStore,
+            com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent>
+            coopCaptureReceiptsComponentType;
     private ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -627,6 +632,7 @@ public class Tamework extends JavaPlugin {
                 components.inventoryOperationReceipts();
         bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
+        coopCaptureReceiptsComponentType = components.coopCaptureReceipts();
 
         spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
         deferPersistenceIndependentRuntimeParticipants();
@@ -757,7 +763,7 @@ public class Tamework extends JavaPlugin {
         if (restoreFlow != null) {
             CompanionPersistenceModule module = companionModule;
             spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, translationRegistry,
-                    capturePolicyRegistry, interactionExtensionRegistry, module.index(),
+                    capturePolicyRegistry, interactionExtensionRegistry, module.index(), module.loaded(),
                     new CaptureFlow<>(module.index(), module.loaded(),
                             (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
                             module.writer()::flushNow, admissionGate::refuse),
@@ -780,18 +786,24 @@ public class Tamework extends JavaPlugin {
                 null,
                 companionProgressionSignalBus,
                 companionQueries,
-                releaseFlow
+                releaseFlow,
+                () -> companionRosterSummons,
+                admissionGate
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
         commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
+        // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
+        CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null
+                : new CaptureItemHolderSystems.Transfers(companionModule.index(), companionModule.writer(),
+                        admissionGate, itemFeatureRegistry);
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
             var tracker = commandItemFeatureHandler.capturedItemTracker();
             tracker.start(runtimeDataDirectory.resolve("cache/captured-item-locations.json"));
-            return new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Lifecycle(tracker);
+            return new CaptureItemHolderSystems.Lifecycle(tracker, captureItemTransfers);
         });
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-inventory-locations",
-                () -> new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Changes(
-                        commandItemFeatureHandler.capturedItemTracker()));
+                () -> new CaptureItemHolderSystems.Changes(
+                        commandItemFeatureHandler.capturedItemTracker(), captureItemTransfers));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-dropped-locations",
                 () -> new com.alechilles.alecstamework.items.locate.CapturedItemDropSystem(
                         commandItemFeatureHandler.capturedItemTracker()));
@@ -1481,7 +1493,8 @@ public class Tamework extends JavaPlugin {
                         CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()));
         com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
         deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopschedulesystem",
-                () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake));
+                () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake,
+                        coopCaptureReceiptsComponentType));
         companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
                 TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
                 ownerComponentType, tamedComponentType);
@@ -1500,8 +1513,11 @@ public class Tamework extends JavaPlugin {
         );
         // After worlds shut down (-32) and before universe resources flush (-24). Nothing may
         // change the index after this flush; the writer drops later changes.
-        getEventRegistry().register((short) -28, ShutdownEvent.class,
-                event -> module.shutdown(System.currentTimeMillis() + 10_000L));
+        // Coop intake stops first so no intake commits after the flush.
+        getEventRegistry().register((short) -28, ShutdownEvent.class, event -> {
+            com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+            module.shutdown(System.currentTimeMillis() + 10_000L);
+        });
     }
 
     /** Tells admins on connect that companion saving is paused. The module logged the cause. */
@@ -1586,6 +1602,7 @@ public class Tamework extends JavaPlugin {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
         }
+        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
         if (companionModule != null) {
             // Returns the -28 ShutdownEvent flush result when that already ran.
             if (!companionModule.shutdown(System.currentTimeMillis() + 2_000L)) {
@@ -1596,7 +1613,6 @@ public class Tamework extends JavaPlugin {
         }
         OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;
-        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
         companionRosterSummons = null;
         companionStartupAdmission = null;
         if (diagnosticRuntime != null) {

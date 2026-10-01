@@ -41,6 +41,17 @@ public final class CompanionQueries {
         return index.fileRecords(owner).stream().filter(CompanionRecord::countsAsOwned).toList();
     }
 
+    /**
+     * The generic roster members of {@code owner}'s command family {@code familyId}: non-released
+     * records with that roster id. Bonded companions keep their own rosters and are excluded.
+     */
+    @Nonnull
+    public List<CompanionRecord> rosterMembers(@Nonnull UUID owner, @Nonnull String familyId) {
+        return index.fileRecords(owner).stream()
+                .filter(r -> familyId.equals(r.rosterId()) && !r.bonded() && r.countsAsOwned())
+                .toList();
+    }
+
     @Nullable
     public Ref<EntityStore> loadedBody(@Nonnull UUID profileId) {
         Ref<EntityStore> ref = loaded.get(profileId);

@@ -2,8 +2,12 @@ package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -54,5 +58,30 @@ class CompanionRegistrationTest {
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, outcome.refusal());
         assertNull(index.get(profile));
         assertNull(loaded.get(profile));
+    }
+    @Test
+    void aRosterMemberIsListedForItsFamilyButABondedCompanionWithTheSameRosterIdIsNot() {
+        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (before, after) -> { });
+        LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
+        UUID owner = UUID.randomUUID();
+        CompanionRecord member = CompanionTransitions.newLive(UUID.randomUUID(), 0, ownedBody(owner, UUID.randomUUID()))
+                .toBuilder().rosterId("dragons").rosterSlot(-1).build();
+        CompanionRecord bonded = CompanionTransitions.newLive(UUID.randomUUID(), 0, ownedBody(owner, UUID.randomUUID()))
+                .toBuilder().rosterId("dragons").bonded(true).build();
+        CompanionRecord otherFamily = CompanionTransitions.newLive(UUID.randomUUID(), 0,
+                ownedBody(owner, UUID.randomUUID())).toBuilder().rosterId("wolves").rosterSlot(-1).build();
+        for (CompanionRecord record : List.of(member, bonded, otherFamily)) {
+            assertTrue(CompanionRegistration.register(index, new LoadedBodies<String>(), record, "ref", r -> null)
+                    .registered());
+        }
+
+        List<CompanionRecord> members = new CompanionQueries(index, loaded).rosterMembers(owner, "dragons");
+
+        assertEquals(List.of(member.profileId()), members.stream().map(CompanionRecord::profileId).toList());
+    }
+
+    private static CompanionTransitions.BodyFacts ownedBody(UUID owner, UUID npc) {
+        return new CompanionTransitions.BodyFacts(npc, owner, "Alec", "Tamed_Dragon", null, "default",
+                0, 0, 0, List.of(), CompanionSummary.EMPTY);
     }
 }

@@ -1,441 +1,128 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
-import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
-import com.alechilles.alecstamework.api.CommandTimedSummoningResult;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
-import com.alechilles.alecstamework.api.CommandTimedSummoningView;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
-import com.alechilles.alecstamework.companion.command.CommandRosterActionView;
-import com.alechilles.alecstamework.companion.command.CommandRosterHome;
-import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
-import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.StoredReason;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Regression coverage for canonical owner/family command-panel sourcing. */
+/** Command-family roster rows and their Summon and Dismiss state, read from companion records. */
 class CommandRosterPanelRecordSourceTest {
-    private static final UUID OWNER_UUID =
-            UUID.fromString("30000000-0000-0000-0000-000000000001");
-    private static final UUID OTHER_OWNER_UUID =
-            UUID.fromString("30000000-0000-0000-0000-000000000002");
-    private static final String FAMILY_ID = "hydragon:dragon_horn";
+    private static final UUID OWNER = UUID.fromString("30000000-0000-0000-0000-000000000001");
+    private static final String FAMILY = "hydragon:dragon_horn";
+    private static final UUID LIVE_NPC = UUID.fromString("60000000-0000-0000-0000-000000000001");
 
+    private final CompanionRecord stored = member(1, CompanionLocation.stored(StoredReason.ROSTER), null);
+    private final CompanionRecord summoned = member(2, CompanionLocation.live("world-a", 1, 2, 3), LIVE_NPC);
+    private final CompanionRecord unloaded = member(3, CompanionLocation.live("world-a", 4, 5, 6),
+            UUID.fromString("60000000-0000-0000-0000-000000000003"));
+    private final CompanionRecord dead = member(4, CompanionLocation.dead("fall"), null);
+
+    /** Actions resolve a row back to its profile; records and members must name the same row. */
     @Test
-    void copiedPhysicalAccessItemsReadTheSameOwnerFamilyRoster() {
-        ProfileId later = profile(2);
-        ProfileId earlier = profile(1);
-        LinkedHashMap<ProfileId, CommandRosterActionView> snapshot =
-                new LinkedHashMap<>();
-        snapshot.put(later, action(
-                later, OWNER_UUID, FAMILY_ID, null, false, "sky",
-                LifecycleState.ROSTER_STORED
-        ));
-        snapshot.put(
-                profile(3),
-                action(
-                        profile(3), OWNER_UUID, "other-family", null,
-                        true, null, LifecycleState.ROSTER_STORED
-                )
-        );
-        snapshot.put(
-                profile(4),
-                action(
-                        profile(4), OTHER_OWNER_UUID, FAMILY_ID, null,
-                        true, null, LifecycleState.ROSTER_STORED
-                )
-        );
-        NpcAlias liveAlias = new NpcAlias(
-                UUID.fromString(
-                        "60000000-0000-0000-0000-000000000001"
-                )
-        );
-        snapshot.put(earlier, action(
-                earlier, OWNER_UUID, FAMILY_ID, liveAlias, true,
-                "favorites", LifecycleState.ACTIVE
-        ));
-        CommandRosterPanelRecordSource source =
-                new CommandRosterPanelRecordSource(() -> snapshot);
+    void aLiveMembersRowFollowsItsBodyAndOtherRowsFollowTheirProfile() {
+        CommandRosterPanelRecordSource source = source(List.of(summoned, stored), Set.of());
 
-        List<LinkedNpcRecord> firstCopy =
-                source.recordsFor(OWNER_UUID, FAMILY_ID);
-        List<LinkedNpcRecord> secondCopy =
-                source.recordsFor(OWNER_UUID, FAMILY_ID);
+        CommandRosterPanelRecordSource.PanelSnapshot snapshot = source.snapshotFor(OWNER, FAMILY);
 
-        assertEquals(2, firstCopy.size());
-        assertEquals(earlier.toString(), firstCopy.get(0).profileId);
-        assertEquals(liveAlias.value(), firstCopy.get(0).npcUuid);
-        assertTrue(firstCopy.get(0).active);
-        assertEquals("favorites", firstCopy.get(0).groupId);
-        assertEquals(later.toString(), firstCopy.get(1).profileId);
-        assertEquals(
-                CommandRosterPanelRecordSource.presentationUuid(later),
-                firstCopy.get(1).npcUuid
-        );
-        assertFalse(firstCopy.get(1).active);
-        assertEquals("sky", firstCopy.get(1).groupId);
-        assertEquals(firstCopy.get(0).npcUuid, secondCopy.get(0).npcUuid);
-        assertEquals(firstCopy.get(1).npcUuid, secondCopy.get(1).npcUuid);
+        assertEquals(List.of(stored.profileId().toString(), summoned.profileId().toString()),
+                snapshot.records().stream().map(record -> record.profileId).toList());
+        assertEquals(CommandRosterPanelRecordSource.presentationUuid(new ProfileId(stored.profileId())),
+                snapshot.records().get(0).npcUuid);
+        assertEquals(LIVE_NPC, snapshot.records().get(1).npcUuid);
+        assertEquals(snapshot.members().stream().map(CommandRosterPanelRecordSource.PanelMember::presentationUuid)
+                .toList(), snapshot.records().stream().map(record -> record.npcUuid).toList());
     }
 
     @Test
-    void recordCarriesCanonicalProfileRoleAndWorldQualifiedHome() {
-        ProfileId profileId = profile(5);
-        CommandRosterPanelRecordSource source =
-                new CommandRosterPanelRecordSource(() -> Map.of(
-                        profileId,
-                        action(
-                                profileId,
-                                OWNER_UUID,
-                                FAMILY_ID,
-                                null,
-                                true,
-                                "guardians",
-                                LifecycleState.ROSTER_STORED
-                        )
-                ));
+    void storedMembersCanBeSummonedAndSummonedOnesDismissed() throws Exception {
+        List<CompanionRecord> members = List.of(stored, summoned, unloaded, dead);
+        Map<UUID, CommandPanelFeaturePresentation> rows = presentations(
+                source(members, Set.of(summoned.profileId())), members, () -> null)
+                .snapshot(OWNER, "world-a", ownerFamilyConfig());
 
-        LinkedNpcRecord record =
-                source.recordsFor(OWNER_UUID, FAMILY_ID).get(0);
+        CommandRosterStatusPresentation storedRow = rows.get(row(stored)).roster();
+        assertEquals(CommandTimedSummoningState.ROSTER_STORED, storedRow.state());
+        assertTrue(storedRow.summonEnabled());
+        assertFalse(storedRow.dismissVisible());
 
-        assertEquals(profileId.toString(), record.profileId);
-        assertEquals("Dragon", record.cachedRoleId);
-        assertEquals("guardians", record.groupId);
-        assertEquals(10.5, record.homePosition.x);
-        assertEquals(-20.25, record.homePosition.y);
-        assertEquals(30.75, record.homePosition.z);
-        assertEquals("world-a", record.lastKnownWorldName);
-        assertNull(record.cachedCommandState);
+        CommandRosterStatusPresentation summonedRow = rows.get(LIVE_NPC).roster();
+        assertEquals(CommandTimedSummoningState.ACTIVE, summonedRow.state());
+        assertTrue(summonedRow.dismissEnabled());
+        assertFalse(summonedRow.summonVisible());
+
+        assertEquals(CommandTimedSummoningState.UNLOADED, rows.get(unloaded.currentNpcUuid()).roster().state());
+        assertTrue(rows.get(row(dead)).roster().paidRevivalState());
     }
 
     @Test
-    void snapshotUsesOneCanonicalMemberSetForRecordsAndFeatureRows() {
-        ProfileId profileId = profile(7);
-        CommandRosterPanelRecordSource source =
-                new CommandRosterPanelRecordSource(() -> Map.of(
-                        profileId,
-                        action(
-                                profileId,
-                                OWNER_UUID,
-                                FAMILY_ID,
-                                new NpcAlias(UUID.fromString(
-                                        "60000000-0000-0000-0000-000000000007"
-                                )),
-                                true,
-                                null,
-                                LifecycleState.ACTIVE
-                        )
-                ));
+    void aFullDeployedGroupDisablesSummon() throws Exception {
+        PopulationGroupPolicy dragons = new PopulationGroupPolicy("dragons", PopulationGroupScope.GLOBAL, 0, 1, 1);
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(0, false, role -> List.of(dragons));
 
-        CommandRosterPanelRecordSource.PanelSnapshot snapshot =
-                source.snapshotFor(OWNER_UUID, FAMILY_ID);
+        List<CompanionRecord> members = List.of(stored, summoned);
+        CommandRosterStatusPresentation storedRow = presentations(
+                source(members, Set.of(summoned.profileId())), members, () -> rules)
+                .snapshot(OWNER, "world-a", ownerFamilyConfig()).get(row(stored)).roster();
 
-        assertEquals(1, snapshot.members().size());
-        assertEquals(1, snapshot.records().size());
-        assertEquals(
-                snapshot.members().getFirst().presentationUuid(),
-                snapshot.records().getFirst().npcUuid
-        );
-        assertEquals(
-                snapshot.members().getFirst().profileId(),
-                snapshot.records().getFirst().profileId
-        );
+        assertEquals(1, storedRow.activeCount());
+        assertEquals(1, storedRow.activeLimit());
+        assertTrue(storedRow.summonVisible());
+        assertFalse(storedRow.summonEnabled());
     }
 
-    @Test
-    void missingIdentityOrProjectionFailureFailsClosed() {
-        CommandRosterPanelRecordSource source =
-                new CommandRosterPanelRecordSource(() -> {
-                    throw new IllegalStateException("projection unavailable");
-                });
-
-        assertTrue(source.recordsFor(null, FAMILY_ID).isEmpty());
-        assertTrue(source.recordsFor(OWNER_UUID, " ").isEmpty());
-        assertTrue(source.recordsFor(OWNER_UUID, FAMILY_ID).isEmpty());
+    private static CommandRosterPanelRecordSource source(List<CompanionRecord> members, Set<UUID> loaded) {
+        return new CommandRosterPanelRecordSource(
+                (owner, family) -> OWNER.equals(owner) && FAMILY.equals(family) ? members : List.of(),
+                loaded::contains);
     }
 
-    @Test
-    void featurePresentationObservesUnavailableToReadyApiTransition()
-            throws Exception {
-        ProfileId profileId = profile(6);
-        CommandRosterPanelRecordSource roster =
-                new CommandRosterPanelRecordSource(() -> Map.of(
-                        profileId,
-                        action(
-                                profileId,
-                                OWNER_UUID,
-                                FAMILY_ID,
-                                null,
-                                true,
-                                null,
-                                LifecycleState.ROSTER_STORED
-                        )
-                ));
-        AtomicReference<CommandTimedSummoningApi> timed =
-                new AtomicReference<>(
-                        CommandTimedSummoningApi.unavailable()
-                );
-        CommandPanelFeaturePresentationSource presentations =
-                new CommandPanelFeaturePresentationSource(
-                        roster,
-                        timed::get,
-                        PaidCommandRevivalApi::unavailable,
-                        PopulationGroupApi::unavailable,
-                        () -> 1_000L
-                );
-        TwCommandItemConfig config = ownerFamilyConfig(FAMILY_ID);
-
-        CommandPanelFeaturePresentation unavailable =
-                presentations.snapshot(OWNER_UUID, "world-a", config)
-                        .values().iterator().next();
-        assertEquals(
-                CommandTimedSummoningState.ROSTER_STORED,
-                unavailable.roster().state()
-        );
-
-        timed.set(readyTimedApi(profileId));
-        CommandPanelFeaturePresentation ready =
-                presentations.snapshot(OWNER_UUID, "world-a", config)
-                        .values().iterator().next();
-        assertEquals(
-                CommandTimedSummoningState.ACTIVE,
-                ready.roster().state()
-        );
-        assertEquals(2L, ready.roster().revision());
-        assertEquals(
-                Long.valueOf(5_000L), ready.roster().remainingMs()
-        );
+    private static CommandPanelFeaturePresentationSource presentations(
+            CommandRosterPanelRecordSource source, List<CompanionRecord> owned,
+            java.util.function.Supplier<CompanionAdmission.Rules> rules) {
+        return new CommandPanelFeaturePresentationSource(source, PaidCommandRevivalApi::unavailable,
+                owner -> owned, rules, () -> 1_000L);
     }
 
-    /**
-     * Protects quarantined profiles from appearing recallable when their
-     * lifecycle evidence cannot identify a safe live action target.
-     */
-    @Test
-    void unresolvedProfileIsUnavailableWithoutDismissControl()
-            throws Exception {
-        ProfileId profileId = profile(8);
-        CommandRosterPanelRecordSource roster =
-                new CommandRosterPanelRecordSource(() -> Map.of(
-                        profileId,
-                        action(
-                                profileId,
-                                OWNER_UUID,
-                                FAMILY_ID,
-                                null,
-                                true,
-                                null,
-                                LifecycleState.UNRESOLVED
-                        )
-                ));
-        CommandPanelFeaturePresentationSource presentations =
-                new CommandPanelFeaturePresentationSource(
-                        roster,
-                        CommandTimedSummoningApi::unavailable,
-                        PaidCommandRevivalApi::unavailable,
-                        PopulationGroupApi::unavailable,
-                        () -> 1_000L
-                );
-
-        CommandPanelFeaturePresentation row = presentations.snapshot(
-                OWNER_UUID,
-                "world-a",
-                ownerFamilyConfig(FAMILY_ID)
-        ).values().iterator().next();
-
-        assertEquals(
-                CommandTimedSummoningState.UNAVAILABLE,
-                row.roster().state()
-        );
-        assertFalse(row.roster().dismissVisible());
+    private static UUID row(CompanionRecord record) {
+        return CommandRosterPanelRecordSource.presentationUuid(new ProfileId(record.profileId()));
     }
 
-    private static CommandRosterActionView action(
-            ProfileId profileId,
-            UUID ownerUuid,
-            String familyId,
-            NpcAlias alias,
-            boolean activeForBulkCommands,
-            String groupId,
-            LifecycleState lifecycleState
-    ) {
-        OwnerId ownerId = new OwnerId(ownerUuid);
-        CommandRosterMembership membership = membership(
-                profileId,
-                ownerId,
-                familyId,
-                activeForBulkCommands,
-                groupId
-        );
-        CompanionLifecycle lifecycle = lifecycle(
-                profileId, ownerId, membership, lifecycleState
-        );
-        return new CommandRosterActionView(
-                membership, "Dragon", 1, alias, lifecycle
-        );
+    private static CompanionRecord member(int suffix, CompanionLocation at, UUID npc) {
+        return CompanionRecord.builder(
+                        UUID.fromString("20000000-0000-0000-0000-" + String.format("%012d", suffix)),
+                        "Dragon", at)
+                .ownerUuid(OWNER).homeWorld("world-a").currentNpcUuid(npc)
+                .rosterId(FAMILY).rosterSlot(-1).build();
     }
 
-    private static CommandRosterMembership membership(
-            ProfileId profileId,
-            OwnerId ownerId,
-            String familyId,
-            boolean activeForBulkCommands,
-            String groupId
-    ) {
-        return new CommandRosterMembership(
-                new CommandRosterSlotId(UUID.nameUUIDFromBytes(
-                        ("slot-" + profileId).getBytes(
-                                StandardCharsets.UTF_8
-                        )
-                )),
-                new CommandFamilyKey(ownerId, familyId),
-                profileId,
-                1,
-                groupId,
-                activeForBulkCommands,
-                new CommandRosterHome(
-                        "world-a", 10.5, -20.25, 30.75
-                ),
-                -200,
-                -100
-        );
-    }
-
-    private static CompanionLifecycle lifecycle(
-            ProfileId profileId,
-            OwnerId ownerId,
-            CommandRosterMembership membership,
-            LifecycleState lifecycleState
-    ) {
-        LifecycleLocation location = switch (lifecycleState) {
-            case ACTIVE -> LifecycleLocation.liveEntity(
-                    "entity-" + profileId, "world-a"
-            );
-            case UNRESOLVED -> LifecycleLocation.unresolved();
-            default -> LifecycleLocation.keyed(
-                    LifecycleLocationKind.COMMAND_ROSTER,
-                    membership.slotId().toString()
-            );
-        };
-        CompanionLifecycle lifecycle = new CompanionLifecycle(
-                profileId,
-                ownerId,
-                lifecycleState,
-                location,
-                new LifecycleRevision(1),
-                null,
-                -100,
-                ReconciliationGeneration.INITIAL,
-                null,
-                "world-a"
-        );
-        return lifecycle;
-    }
-
-    private static ProfileId profile(int suffix) {
-        return new ProfileId(UUID.fromString(
-                "20000000-0000-0000-0000-"
-                        + String.format("%012d", suffix)
-        ));
-    }
-
-    private static CommandTimedSummoningApi readyTimedApi(
-            ProfileId profileId
-    ) {
-        return new CommandTimedSummoningApi() {
-            @Override
-            public Optional<CommandTimedSummoningView> get(
-                    CommandTimedSummoningRequest identity
-            ) {
-                return Optional.of(new CommandTimedSummoningView(
-                        OWNER_UUID,
-                        FAMILY_ID,
-                        profileId.toString(),
-                        2L,
-                        CommandTimedSummoningState.ACTIVE,
-                        "session-1",
-                        5_000L,
-                        false,
-                        0L,
-                        1_000L
-                ));
-            }
-
-            @Override
-            public CompletionStage<CommandTimedSummoningResult> summon(
-                    CommandTimedSummoningRequest request
-            ) {
-                return CommandTimedSummoningApi.unavailable()
-                        .summon(request);
-            }
-
-            @Override
-            public CompletionStage<CommandTimedSummoningResult> dismiss(
-                    CommandTimedSummoningRequest request
-            ) {
-                return CommandTimedSummoningApi.unavailable()
-                        .dismiss(request);
-            }
-
-            @Override
-            public AutoCloseable subscribe(
-                    Consumer<CommandTimedSummoningChangedEvent> listener
-            ) {
-                return () -> {
-                };
-            }
-        };
-    }
-
-    private static TwCommandItemConfig ownerFamilyConfig(
-            String familyId
-    ) throws Exception {
-        var constructor =
-                TwCommandItemConfig.class.getDeclaredConstructor();
+    private static TwCommandItemConfig ownerFamilyConfig() throws Exception {
+        var constructor = TwCommandItemConfig.class.getDeclaredConstructor();
         constructor.setAccessible(true);
         TwCommandItemConfig config = constructor.newInstance();
-        setField(config, "commandFamilyId", familyId);
-        setField(
-                config,
-                "rosterStorage",
-                TwCommandItemConfig.RosterStorage.OwnerCommandFamily
-        );
+        setField(config, "commandFamilyId", FAMILY);
+        setField(config, "rosterStorage", TwCommandItemConfig.RosterStorage.OwnerCommandFamily);
         return config;
     }
 
-    private static void setField(
-            TwCommandItemConfig config,
-            String name,
-            Object value
-    ) throws Exception {
+    private static void setField(TwCommandItemConfig config, String name, Object value) throws Exception {
         Field field = TwCommandItemConfig.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(config, value);

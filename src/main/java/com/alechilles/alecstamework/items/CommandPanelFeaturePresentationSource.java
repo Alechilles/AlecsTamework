@@ -1,20 +1,17 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
-import com.alechilles.alecstamework.api.CommandTimedSummoningView;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalCostQuoteView;
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuoteRequest;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.api.PopulationGroupCountsView;
-import com.alechilles.alecstamework.api.PopulationGroupDefinitionView;
-import com.alechilles.alecstamework.api.PopulationGroupScope;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
 import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
@@ -24,64 +21,50 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Builds row-scoped command feature presentation exclusively from canonical
- * roster projections and replacement public APIs.
+ * Builds row-scoped command feature presentation for command-family roster members from their
+ * companion index records: state, summon timer and cooldown, and the tightest deployed group limit
+ * of the member's role. Paid revival quotes still come from the revival API.
  */
 final class CommandPanelFeaturePresentationSource {
     private static final long QUOTE_REFRESH_INTERVAL_MS = 750L;
-    private static final String QUERY_KEY = "command-panel-query";
 
     private final CommandRosterPanelRecordSource rosterSource;
-    private final Supplier<CommandTimedSummoningApi> timedSummoning;
     private final Supplier<PaidCommandRevivalApi> paidRevival;
-    private final Supplier<PopulationGroupApi> populationGroups;
+    private final Function<UUID, List<CompanionRecord>> ownedRecords;
+    private final Supplier<CompanionAdmission.Rules> admissionRules;
     private final LongSupplier clock;
     private final ConcurrentHashMap<QuoteKey, QuoteCache> quoteCache =
             new ConcurrentHashMap<>();
     private final ConcurrentHashMap<QuoteKey, Boolean> quotesInFlight =
             new ConcurrentHashMap<>();
 
+    /**
+     * @param paidRevival    the paid revival API; null or failing reads as unavailable
+     * @param ownedRecords   every non-released record of an owner, for the deployed group counts
+     * @param admissionRules the current population rules; a null or failing read shows no limit
+     */
     CommandPanelFeaturePresentationSource(
             @Nonnull CommandRosterPanelRecordSource rosterSource,
-            @Nonnull CommandTimedSummoningApi timedSummoning,
-            @Nonnull PaidCommandRevivalApi paidRevival,
-            @Nonnull PopulationGroupApi populationGroups,
-            @Nonnull LongSupplier clock
-    ) {
-        this(
-                rosterSource,
-                () -> timedSummoning,
-                () -> paidRevival,
-                () -> populationGroups,
-                clock
-        );
-    }
-
-    CommandPanelFeaturePresentationSource(
-            @Nonnull CommandRosterPanelRecordSource rosterSource,
-            @Nonnull Supplier<CommandTimedSummoningApi> timedSummoning,
             @Nonnull Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nonnull Supplier<PopulationGroupApi> populationGroups,
+            @Nonnull Function<UUID, List<CompanionRecord>> ownedRecords,
+            @Nonnull Supplier<CompanionAdmission.Rules> admissionRules,
             @Nonnull LongSupplier clock
     ) {
         this.rosterSource = Objects.requireNonNull(
                 rosterSource, "Roster source is required"
         );
-        this.timedSummoning = Objects.requireNonNull(
-                timedSummoning, "Timed summon API is required"
-        );
         this.paidRevival = Objects.requireNonNull(
                 paidRevival, "Paid revival API is required"
         );
-        this.populationGroups = Objects.requireNonNull(
-                populationGroups, "Population group API is required"
-        );
+        this.ownedRecords = Objects.requireNonNull(ownedRecords, "Owned records are required");
+        this.admissionRules = Objects.requireNonNull(admissionRules, "Admission rules are required");
         this.clock = Objects.requireNonNull(clock, "Clock is required");
     }
 
@@ -179,55 +162,55 @@ final class CommandPanelFeaturePresentationSource {
             CommandRosterPanelRecordSource.PanelMember member,
             long nowMs
     ) {
-        CommandTimedSummoningState state =
-                fallbackState(member.lifecycleState());
-        long revision = member.view().membership().membershipRevision();
-        Long remainingMs = null;
-        boolean unlimited = false;
-        long cooldownRemainingMs = 0L;
-        try {
-            CommandTimedSummoningRequest identity =
-                    new CommandTimedSummoningRequest(
-                            ownerUuid,
-                            familyId,
-                            member.profileId(),
-                            QUERY_KEY
-                    );
-            CommandTimedSummoningView timed =
-                    currentTimedSummoning().get(identity).orElse(null);
-            if (timed != null) {
-                state = timed.state();
-                revision = timed.revision();
-                remainingMs = timed.remainingMs();
-                unlimited = timed.unlimited();
-                cooldownRemainingMs = remaining(
-                        timed.cooldownUntilMs(), nowMs
-                );
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // The canonical lifecycle remains a safe read-only fallback.
-        }
-        long configuredDurationMs = TwCompanionConfig
-                .resolveEffectiveForRole(member.roleId())
-                .getSummon()
-                .getActiveDurationMs();
+        CompanionRecord record = member.record();
+        boolean summoned = record.location().kind() == LocationKind.LIVE;
+        Long remainingMs = summoned && record.summonedUntilMs() != 0L
+                ? remaining(record.summonedUntilMs(), nowMs) : null;
+        long configuredDurationMs = configuredDurationMs(member.roleId());
         Capacity capacity = capacity(
                 ownerUuid, ownershipWorldName, member.roleId()
         );
         return new CommandRosterStatusPresentation(
                 member.profileId(),
                 familyId,
-                state,
-                revision,
+                state(member),
+                record.revision(),
                 remainingMs,
                 configuredDurationMs,
-                unlimited || configuredDurationMs == 0L,
-                cooldownRemainingMs,
+                remainingMs == null && (summoned || configuredDurationMs == 0L),
+                remaining(record.summonCooldownUntilMs(), nowMs),
                 capacity.activeCount(),
                 capacity.activeLimit(),
                 capacity.blockingGroupId(),
                 capacity.blockingReason()
         );
+    }
+
+    /**
+     * LIVE with a loaded body is summoned and LIVE without one is unloaded; STORED is stored and
+     * DEAD is dead. A member in an item or a coop has no roster actions.
+     */
+    static CommandTimedSummoningState state(
+            CommandRosterPanelRecordSource.PanelMember member
+    ) {
+        return switch (member.record().location().kind()) {
+            case LIVE -> member.bodyLoaded()
+                    ? CommandTimedSummoningState.ACTIVE
+                    : CommandTimedSummoningState.UNLOADED;
+            case STORED -> CommandTimedSummoningState.ROSTER_STORED;
+            case DEAD -> CommandTimedSummoningState.DEAD_REVIVABLE;
+            case LOST -> CommandTimedSummoningState.LOST;
+            case ITEM, COOP, RELEASED -> CommandTimedSummoningState.UNAVAILABLE;
+        };
+    }
+
+    /** The role's timed summon duration; 0 when summons are untimed or the config cannot be read. */
+    private static long configuredDurationMs(String roleId) {
+        try {
+            return RosterSummons.Policy.forRole(roleId).durationMs();
+        } catch (RuntimeException | LinkageError ignored) {
+            return 0L;
+        }
     }
 
     @Nullable
@@ -324,6 +307,11 @@ final class CommandPanelFeaturePresentationSource {
         );
     }
 
+    /**
+     * The member role's deployed group with the least headroom, counted as {@link
+     * CompanionAdmission} counts it: the owner's LIVE records in that group, in the player's world
+     * for a per-world group. Groups without a deployed limit are skipped.
+     */
     private Capacity capacity(
             UUID ownerUuid,
             String ownershipWorldName,
@@ -334,33 +322,31 @@ final class CommandPanelFeaturePresentationSource {
         long smallestHeadroom = Long.MAX_VALUE;
         String selectedGroup = null;
         try {
-            PopulationGroupApi groups = currentPopulationGroups();
-            for (PopulationGroupDefinitionView definition
-                    : groups.resolveForRole(roleId)) {
-                String world = definition.scope()
-                        == PopulationGroupScope.PER_WORLD
-                        ? normalize(ownershipWorldName)
-                        : null;
-                if (definition.scope() == PopulationGroupScope.PER_WORLD
-                        && world == null) {
+            CompanionAdmission.Rules rules = admissionRules.get();
+            if (rules == null) {
+                return Capacity.unlimited();
+            }
+            List<CompanionRecord> owned = ownedRecords.apply(ownerUuid);
+            String world = normalize(ownershipWorldName);
+            for (PopulationGroupPolicy group : rules.groupsForRole().apply(roleId)) {
+                boolean perWorld = group.scope() == PopulationGroupScope.PER_WORLD;
+                if (group.maxActivePerOwner() <= 0 || perWorld && world == null) {
                     continue;
                 }
-                PopulationGroupCountsView counts =
-                        groups.getCounts(
-                                ownerUuid, definition.groupId(), world
-                        ).orElse(null);
-                if (counts == null || counts.maxActive() <= 0L) {
-                    continue;
+                long active = 0L;
+                for (CompanionRecord record : owned) {
+                    if (record.isDeployed() && record.countsAsOwned()
+                            && (!perWorld || world.equals(CompanionAdmission.scopeWorld(record)))
+                            && inGroup(rules, record, group.groupId())) {
+                        active++;
+                    }
                 }
-                long active = saturatedAdd(
-                        counts.committedActive(), counts.pendingActive()
-                );
-                long headroom = counts.maxActive() - active;
+                long headroom = group.maxActivePerOwner() - active;
                 if (headroom < smallestHeadroom) {
                     smallestHeadroom = headroom;
                     selectedActive = active;
-                    selectedLimit = counts.maxActive();
-                    selectedGroup = definition.groupId();
+                    selectedLimit = group.maxActivePerOwner();
+                    selectedGroup = group.groupId();
                 }
             }
         } catch (RuntimeException | LinkageError ignored) {
@@ -376,20 +362,13 @@ final class CommandPanelFeaturePresentationSource {
         );
     }
 
-    private static CommandTimedSummoningState fallbackState(
-            LifecycleState state
-    ) {
-        return switch (state) {
-            case ACTIVE -> CommandTimedSummoningState.ACTIVE;
-            case UNLOADED -> CommandTimedSummoningState.UNLOADED;
-            case ROSTER_STORED ->
-                    CommandTimedSummoningState.ROSTER_STORED;
-            case DEAD_REVIVABLE ->
-                    CommandTimedSummoningState.DEAD_REVIVABLE;
-            case LOST -> CommandTimedSummoningState.LOST;
-            case UNRESOLVED -> CommandTimedSummoningState.UNAVAILABLE;
-            default -> CommandTimedSummoningState.UNLOADED;
-        };
+    private static boolean inGroup(CompanionAdmission.Rules rules, CompanionRecord record, String groupId) {
+        for (PopulationGroupPolicy policy : rules.groupsForRole().apply(record.roleId())) {
+            if (policy.groupId().equals(groupId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static long remaining(long untilMs, long nowMs) {
@@ -403,32 +382,12 @@ final class CommandPanelFeaturePresentationSource {
         }
     }
 
-    private static long saturatedAdd(long left, long right) {
-        try {
-            return Math.addExact(left, right);
-        } catch (ArithmeticException overflow) {
-            return Long.MAX_VALUE;
-        }
-    }
-
     private static int saturatedInt(long value) {
         return (int) Math.min(Integer.MAX_VALUE, Math.max(0L, value));
     }
 
-    private CommandTimedSummoningApi currentTimedSummoning() {
-        return resolve(
-                timedSummoning, CommandTimedSummoningApi.unavailable()
-        );
-    }
-
     private PaidCommandRevivalApi currentPaidRevival() {
         return resolve(paidRevival, PaidCommandRevivalApi.unavailable());
-    }
-
-    private PopulationGroupApi currentPopulationGroups() {
-        return resolve(
-                populationGroups, PopulationGroupApi.unavailable()
-        );
     }
 
     private static <T> T resolve(Supplier<T> source, T unavailable) {

@@ -30,7 +30,9 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHoo
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -194,7 +196,7 @@ public final class CommandItemFeatureHandler {
     ) {
         this(registry, relocationService, stateSnapshotService, persistence,
                 restoreFlow, timedSummoning, paidRevival, populationGroups,
-                bondedCompanions, null, null, null);
+                bondedCompanions, null, null, null, null, null);
     }
 
     /**
@@ -202,7 +204,10 @@ public final class CommandItemFeatureHandler {
      * locate, release and cull read the companion index instead of {@code persistence}. With
      * {@code restoreFlow} and {@code companions}, the panel's Revive and Recover buttons and
      * world-change follow restore through the flow; without them, those buttons report that
-     * tracking is unavailable and nothing follows across worlds.
+     * tracking is unavailable and nothing follows across worlds. With {@code companions}, an
+     * owner command-family item's panel lists its roster members from the index; {@code
+     * rosterSummons} runs their Summon and Dismiss and {@code admissionGate} gives the deployed
+     * group limits shown on each row.
      */
     public CommandItemFeatureHandler(
             CommandItemRegistry registry,
@@ -216,7 +221,9 @@ public final class CommandItemFeatureHandler {
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
             @Nullable CompanionProgressionSignalBus progressionSignals,
             @Nullable CompanionQueries companions,
-            @Nullable ReleaseFlow releaseFlow
+            @Nullable ReleaseFlow releaseFlow,
+            @Nullable Supplier<RosterSummons> rosterSummons,
+            @Nullable CompanionAdmissionGate admissionGate
     ) {
         this.registry = registry;
         this.relocationService = relocationService;
@@ -235,21 +242,16 @@ public final class CommandItemFeatureHandler {
                 ? new CommandPersistenceView(persistence)
                 : null;
         CommandRosterPanelRecordSource rosterPanelRecordSource =
-                persistence != null
-                        ? new CommandRosterPanelRecordSource(
-                                persistence.queries()
-                        )
+                companions != null
+                        ? new CommandRosterPanelRecordSource(companions)
                         : null;
         CommandPanelFeaturePresentationSource featurePresentations =
                 rosterPanelRecordSource != null
-                        && timedSummoning != null
-                        && paidRevival != null
-                        && populationGroups != null
                         ? new CommandPanelFeaturePresentationSource(
                                 rosterPanelRecordSource,
-                                timedSummoning,
-                                paidRevival,
-                                populationGroups,
+                                paidRevival != null ? paidRevival : () -> null,
+                                companions::owned,
+                                admissionGate != null ? admissionGate::rules : () -> null,
                                 System::currentTimeMillis
                         )
                         : null;
@@ -455,8 +457,10 @@ public final class CommandItemFeatureHandler {
                         ? null
                         : new CommandPanelFeatureActionService(
                                 featurePresentations,
-                                timedSummoning,
-                                paidRevival,
+                                rosterSummons != null ? rosterSummons : () -> null,
+                                paidRevival != null ? paidRevival : () -> null,
+                                companionPlacementService,
+                                RECALL_SAFE_SPAWN_DISTANCE,
                                 feedbackService
                         );
         this.selectionPageService = new CommandSelectionPageService(
