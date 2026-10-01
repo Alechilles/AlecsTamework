@@ -57,12 +57,6 @@ public final class BondedCompanionChargeInventory implements BondedCompanionActi
         return charge(operationId, List.of(new BondedCompanionReviveCost(itemId, quantity)));
     }
 
-    @Override
-    public CompletionStage<BondedCompanionActionContext.ChargeReceipt> consumeExactAsync(
-            @Nonnull String operationId, @Nonnull String itemId, int quantity) {
-        return consumeExactAsync(operationId, List.of(new BondedCompanionReviveCost(itemId, quantity)));
-    }
-
     /** Takes the whole price or nothing. Completes with null when nothing was taken. */
     @Override
     public CompletionStage<BondedCompanionActionContext.ChargeReceipt> consumeExactAsync(

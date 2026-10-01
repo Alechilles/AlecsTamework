@@ -723,6 +723,9 @@ public class Tamework extends JavaPlugin {
             // One store flow serves the bonded API, roster dismiss, summon expiry and owner logout.
             StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(companionModule);
             bondedCompanionApi = createBondedCompanionApi(companionModule, restoreFlow, storeFlow, bondedFamilies);
+            // A provisioned bonded companion counts against the built-in owned caps, like a captured
+            // one. Remove this one call to count provisioned companions against family limits only.
+            bondedCompanionApi.useBuiltInCaps(admissionGate::deny);
             companionRosterSummons = startRosterSummons(companionModule, restoreFlow, storeFlow, bondedCompanionApi);
         } else if (companionModule != null && companionModule.legacyKind() == null) {
             registerCompanionPersistenceFailedNotice();

@@ -59,28 +59,42 @@ public final class RestoreRules {
     private static boolean summonable(CompanionRecord record) {
         StoredReason reason = record.location().reason();
         return reason == StoredReason.ROSTER || reason == StoredReason.TIMED || reason == StoredReason.BONDED
-                || firstSummon(record);
+                || reason == StoredReason.PROVISIONED && record.bonded();
     }
 
     /**
-     * True for a provisioned bonded companion that was never summoned: it is
-     * {@code STORED(PROVISIONED)} and has no snapshot, so its first summon builds the body from
-     * the record's role. Once summoned it is stored as BONDED with a snapshot, like any other.
+     * Whether this restore may build the body from the record's role when no snapshot was ever
+     * written: a SUMMON or RECOVER of a bonded companion that has an origin, that is, one that
+     * was provisioned (plan 6 R16). That is its first summon, and also a summon after a stop
+     * between the first summon's commit and its first snapshot, which left the record with no
+     * body and no snapshot.
      */
-    public static boolean firstSummon(@Nonnull CompanionRecord record) {
-        return record.bonded() && record.location().kind() == LocationKind.STORED
-                && record.location().reason() == StoredReason.PROVISIONED;
+    public static boolean respawnsFromRole(@Nonnull CompanionRecord record, @Nonnull Reason reason) {
+        return record.bonded() && record.originNamespace() != null
+                && (reason == Reason.SUMMON || reason == Reason.RECOVER);
     }
 
     /**
      * Whether this snapshot may restore the record: it must exist, use {@link CompanionSnapshots#FORMAT},
      * be no newer than the record, and hold an entity document. A snapshot taken at death serves
-     * only a revive. The one restore that needs no snapshot is the SUMMON of a
-     * {@link #firstSummon} record: with none stored it is allowed, and the spawner is handed null.
+     * only a revive.
      */
     @Nonnull
     public static Verdict forSnapshot(@Nonnull CompanionRecord record, @Nullable SnapshotEnvelope snapshot, @Nonnull Reason reason) {
-        if (snapshot == null && reason == Reason.SUMMON && firstSummon(record)) {
+        return forSnapshot(record, snapshot, reason, false);
+    }
+
+    /**
+     * As {@link #forSnapshot(CompanionRecord, SnapshotEnvelope, Reason)}. {@code neverWritten}
+     * says that the missing snapshot is known to be absent: no file, nothing queued and no loaded
+     * body to capture. Then, and only then, a {@link #respawnsFromRole} restore is allowed with no
+     * snapshot and the spawner is handed null. A snapshot that exists but could not be read is
+     * never treated as absent, because a body built from the role would lose its progression.
+     */
+    @Nonnull
+    public static Verdict forSnapshot(@Nonnull CompanionRecord record, @Nullable SnapshotEnvelope snapshot,
+                                      @Nonnull Reason reason, boolean neverWritten) {
+        if (snapshot == null && neverWritten && respawnsFromRole(record, reason)) {
             return Verdict.ALLOWED;
         }
         if (snapshot == null || snapshot.format() != CompanionSnapshots.FORMAT || snapshot.generation() > record.generation()

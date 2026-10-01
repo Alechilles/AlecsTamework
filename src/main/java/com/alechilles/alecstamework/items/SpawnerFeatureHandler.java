@@ -107,7 +107,8 @@ import org.bson.BsonString;
  *
  * <p>A STORE_BONDED_COMPANION capture gives no item: the body goes into the capturing player's
  * bonded roster as {@code STORED(BONDED)} through the same {@link CaptureFlow}, with the role the
- * roster family allows written into its snapshot, and one source item is spent. Its capture
+ * roster family allows written into its snapshot. One source item is spent on the world thread
+ * before the commit and given back when the commit does not go through. Its capture
  * evidence is kept on the record and published as {@link BondedCompanionCaptureResolvedEvent}.
  */
 public final class SpawnerFeatureHandler {
@@ -485,7 +486,8 @@ public final class SpawnerFeatureHandler {
      * capturing player's language on the world thread and only shown back to that player.
      */
     private record BondedCapture(@Nonnull String rosterId, @Nonnull String familyId, @Nonnull String roleId,
-                                 @Nullable String companionName, @Nullable String rosterItemName) {
+                                 long summonCooldownSeconds, @Nonnull String companionName,
+                                 @Nonnull String rosterItemName) {
     }
 
     /**
@@ -641,7 +643,9 @@ public final class SpawnerFeatureHandler {
         }
         String companionName = new SpawnerNpcIdentityService().resolveDisplayName(
                 targetRef, store, store.getComponent(targetRef, NPCEntity.getComponentType()));
-        return new PreRoll(null, new BondedCapture(rosterId, family.familyId(), roleId, companionName, rosterItemName));
+        // A body with no name of its own is called by its role.
+        return new PreRoll(null, new BondedCapture(rosterId, family.familyId(), roleId, family.summonCooldownSeconds(),
+                companionName == null || companionName.isBlank() ? roleId : companionName, rosterItemName));
     }
 
     /** A non-bonded member of a command-family roster, which a generic capture item may not take. */
@@ -936,7 +940,7 @@ public final class SpawnerFeatureHandler {
         ItemStack item = bonded != null ? null
                 : capturedItems.build(player, targetRef, store, source, resolved, roleId, owner, ownerName);
         CaptureFlow.BondedTarget target = bonded == null ? null
-                : bondedTarget(bonded, owner, facts, source, resolved, roll, capturedAtMs);
+                : bondedTarget(bonded, owner, stampedId, facts, source, resolved, roll, capturedAtMs, snapshot.data());
         ItemStack expectedSource = inventory.getHotbarItem(player, attempt.hotbarSlot());
         String particles = particleSystemOverride == null || particleSystemOverride.isBlank()
                 ? resolved.getCaptureParticleSystem() : particleSystemOverride;
@@ -948,6 +952,17 @@ public final class SpawnerFeatureHandler {
             logCaptureChannelDiagnostic("terminal-denied reason=capture-in-flight");
             return false;
         }
+        // A capture into storage gives no item back, so it takes its price now, on the world thread,
+        // where the stack is known to be there. Every outcome but CAPTURED gives it back. A capture
+        // into an item replaces the source with the filled item in the hand-over instead.
+        SpawnerSourceItemTransaction spend = bonded == null ? null : expectedSource == null || expectedSource.isEmpty()
+                ? null : new SpawnerSourceItemTransaction(inventory, world, playerUuid, slot, expectedSource, logger,
+                "capture-into-bonded-storage");
+        if (bonded != null && (spend == null || !spend.consumeOne())) {
+            capturing.remove(busyKey);
+            logCaptureChannelDiagnostic("terminal-denied reason=source-changed");
+            return false;
+        }
         try {
             captureFlow.capture(new CaptureFlow.Capture<>(stampedId, stampedGeneration, targetRef, facts, owner,
                             ownerName, snapshotData, target))
@@ -956,17 +971,41 @@ public final class SpawnerFeatureHandler {
                         if (error != null) {
                             logger.at(Level.WARNING).withCause(error).log("Capture commit failed unexpectedly");
                         }
+                        if (spend != null && refundsSource(outcome)) {
+                            refundLater(world, spend);
+                        }
                         finishCapture(outcome, targetRef, stampedId, stampedGeneration,
                                 item, expectedSource, playerUuid, slot, effect, capturedAtMs, resolvedAttempt,
                                 entityPatch, bonded);
                     });
         } catch (RuntimeException failure) {
             capturing.remove(busyKey);
+            if (spend != null) {
+                spend.compensate();
+            }
             logger.at(Level.WARNING).withCause(failure).log("Capture commit could not start");
             warn(player, "captureUnavailable");
             return false;
         }
         return true;
+    }
+
+    /** Whether a capture that spent its source before the commit gives it back: every result but CAPTURED. */
+    static boolean refundsSource(@Nullable CaptureFlow.Outcome outcome) {
+        return outcome == null || outcome.result() != CaptureFlow.Result.CAPTURED;
+    }
+
+    /**
+     * Gives the spent source back on the world thread it was taken on; the transaction resolves
+     * the player there by UUID. A player who left that world by then does not get it back, which
+     * the transaction logs.
+     */
+    private void refundLater(World world, SpawnerSourceItemTransaction spend) {
+        try {
+            world.execute(spend::compensate);
+        } catch (RuntimeException notAccepting) {
+            logger.at(Level.WARNING).log("A capture source item could not be given back; its world stopped");
+        }
     }
 
     /**
@@ -988,7 +1027,9 @@ public final class SpawnerFeatureHandler {
      * The entity document with {@code roleId} as its NPC role. The engine builds a loaded NPC's
      * role from the saved role name ({@code RoleBuilderSystem#onEntityAdd}), so the body comes
      * back in that role. The active motion controller belongs to the old role and is dropped; the
-     * new role starts with its own. Returns a new document; the input is not modified.
+     * new role starts with its own. The spawn role and environment are dropped too, as the
+     * engine's role change does when it detaches the NPC from its spawning. Returns a new
+     * document; the input is not modified.
      */
     @Nonnull
     static BsonDocument withRole(@Nonnull BsonDocument entity, @Nonnull String roleId) {
@@ -997,6 +1038,8 @@ public final class SpawnerFeatureHandler {
             BsonDocument npc = copy.getDocument("Components").getDocument("NPC");
             npc.put("RoleName", new BsonString(roleId));
             npc.remove("ActiveMC");
+            npc.remove("SpawnName");
+            npc.remove("Env");
         }
         return copy;
     }
@@ -1006,10 +1049,11 @@ public final class SpawnerFeatureHandler {
      * index has no operation ids, so the attempt id stands in for one, as in
      * {@link #publishResolved}.
      */
-    private CaptureFlow.BondedTarget bondedTarget(BondedCapture bonded, UUID owner,
+    private CaptureFlow.BondedTarget bondedTarget(BondedCapture bonded, UUID owner, @Nullable UUID stampedId,
                                                   CompanionTransitions.BodyFacts facts, ItemStack source,
                                                   ItemFeatureConfig resolved,
-                                                  SpawnerCaptureRollService.Resolution roll, long capturedAtMs) {
+                                                  SpawnerCaptureRollService.Resolution roll, long capturedAtMs,
+                                                  BsonDocument unpatchedSnapshot) {
         CaptureAttemptResolution terminal = roll.terminal();
         CaptureAttemptFormula formula = terminal == null ? null : terminal.formula();
         UUID attemptId = terminal == null ? UUID.randomUUID() : terminal.attemptId();
@@ -1020,19 +1064,24 @@ public final class SpawnerFeatureHandler {
         long policyConfigRevision = policyConfigId == null ? -1L : formula.policyConfigRevision();
         String reason = terminal == null || terminal.reason() == null || terminal.reason().isBlank()
                 ? "captured" : terminal.reason();
-        return new CaptureFlow.BondedTarget(bonded.rosterId(), bonded.roleId(),
-                profileId -> BondedCaptureEvidence.toJson(new BondedCompanionCaptureEvidenceView(
-                        attemptId, attemptId, owner, bonded.rosterId(), bonded.familyId(), facts.npcUuid(),
-                        profileId.toString(), bonded.roleId(), BondedRecords.TAMEWORK_NAMESPACE, attemptId.toString(),
-                        sourceItemId, itemConfigId, itemConfigRevision, policyConfigId, policyConfigRevision,
-                        resolved.getCaptureMechanics().sourceConsumption(),
-                        CaptureSuccessDisposition.STORE_BONDED_COMPANION, CaptureAttemptOutcome.CAPTURED, reason,
-                        facts.world(), capturedAtMs)));
+        // The stored evidence leaves the profile id out (the record supplies it), so an unstamped
+        // body, whose record does not exist yet, is described under a placeholder here.
+        String evidence = BondedCaptureEvidence.toJson(new BondedCompanionCaptureEvidenceView(
+                attemptId, attemptId, owner, bonded.rosterId(), bonded.familyId(), facts.npcUuid(),
+                stampedId == null ? "unassigned" : stampedId.toString(), bonded.roleId(),
+                BondedRecords.TAMEWORK_NAMESPACE, attemptId.toString(),
+                sourceItemId, itemConfigId, itemConfigRevision, policyConfigId, policyConfigRevision,
+                resolved.getCaptureMechanics().sourceConsumption(),
+                CaptureSuccessDisposition.STORE_BONDED_COMPANION, CaptureAttemptOutcome.CAPTURED, reason,
+                facts.world(), capturedAtMs));
+        long cooldownMs = BondedRecords.millis(bonded.summonCooldownSeconds());
+        return new CaptureFlow.BondedTarget(bonded.rosterId(), bonded.roleId(), evidence,
+                cooldownMs > 0L ? capturedAtMs + cooldownMs : 0L, unpatchedSnapshot);
     }
 
     /**
-     * After a capture into bonded storage, on the body's world thread: publishes the evidence the
-     * commit stored on the record. Never throws: a capture must not fail on its notification.
+     * After a capture into bonded storage: publishes the evidence the commit stored on the
+     * record. Touches no entity. Never throws: a capture must not fail on its notification.
      */
     private void publishBondedCapture(UUID profileId) {
         try {
@@ -1059,20 +1108,30 @@ public final class SpawnerFeatureHandler {
                                @Nullable UnaryOperator<BsonDocument> entityPatch, @Nullable BondedCapture bonded) {
         CaptureFlow.Result result = outcome == null ? CaptureFlow.Result.COMMIT_FAILED : outcome.result();
         switch (result) {
-            case CAPTURED -> delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), item,
-                    playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
-                    world -> {
-                        UUID profileId = outcome.itemRef().profileId();
-                        resolvedAttempt.accept(profileId);
-                        effects.playPublishedEffect(world, effect);
-                        if (bonded != null) {
+            case CAPTURED -> {
+                UUID profileId = outcome.itemRef().profileId();
+                if (bonded == null) {
+                    delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), item,
+                            playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
+                            world -> {
+                                resolvedAttempt.accept(profileId);
+                                effects.playPublishedEffect(world, effect);
+                            }, capturedAtMs, entityPatch, null));
+                    return;
+                }
+                // The capture is committed and paid for: its events and message go out even when the
+                // body has vanished; only the effect needs the body's world.
+                delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), null,
+                        playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
+                        world -> effects.playPublishedEffect(world, effect), capturedAtMs, entityPatch,
+                        () -> {
+                            resolvedAttempt.accept(profileId);
                             publishBondedCapture(profileId);
                             HytaleCaptureDelivery.onPlayerWorld(playerUuid, (playerWorld, store, ref, player) ->
                                     messages.showKey(player, NotificationStyle.Success, SPAWNER_KEYS + "bondedCaptured",
-                                            bonded.companionName() == null ? "" : bonded.companionName(),
-                                            bonded.rosterItemName() == null ? "" : bonded.rosterItemName()), null);
-                        }
-                    }, capturedAtMs, entityPatch));
+                                            bonded.companionName(), bonded.rosterItemName()), null);
+                        }));
+            }
             case CONFLICT -> {
                 // A newer change replaced the commit after the body was unregistered: its stamp is stale.
                 CompanionRecord now = stampedId == null ? null : index.get(stampedId);

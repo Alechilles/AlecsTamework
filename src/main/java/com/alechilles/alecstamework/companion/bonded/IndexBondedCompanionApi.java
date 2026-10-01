@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
@@ -29,6 +31,7 @@ import com.alechilles.alecstamework.companion.flow.StoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.ExtensionEntries;
 import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -78,7 +81,8 @@ import javax.annotation.Nullable;
  * <p>Owner: {@code Tamework} builds one per ready companion module and closes it with the public
  * API; {@link #close} drops every subscriber and makes later calls report unavailable.
  */
-public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCloseable {
+public final class IndexBondedCompanionApi
+        implements BondedCompanionApi, BondedTalentUpdates.StoredReader, AutoCloseable {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     static final String CLOSED = "bonded-companion-authority-closed";
@@ -149,6 +153,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     private final List<Consumer<BondedCompanionChangedEvent>> subscribers = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
     @Nullable private volatile BondedTalentUpdates talents;
+    @Nullable private volatile CompanionAdmissionGate.Check builtInCaps;
 
     /**
      * @param families       the roster family of a record's role; {@link BondedRecords#families}
@@ -178,6 +183,17 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    /**
+     * Makes {@link #provision} respect the population caps every other way of getting a companion
+     * respects, on top of the family's own owned limit: {@code caps} is the gate's check
+     * ({@code CompanionAdmissionGate::deny}), called under the index lock in the step that
+     * inserts the record. Without this call a provisioned companion counts only against its
+     * family's limit.
+     */
+    public void useBuiltInCaps(@Nonnull CompanionAdmissionGate.Check caps) {
+        this.builtInCaps = Objects.requireNonNull(caps, "caps");
+    }
+
     /** The production {@link Bodies}: {@code remove} takes a body out of its world on that world's thread. */
     @Nonnull
     public static <R> Bodies bodies(@Nonnull LoadedBodies<R> loaded, @Nonnull Consumer<R> remove) {
@@ -199,7 +215,11 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         return closed ? BondedCompanionAvailability.unavailable(CLOSED) : BondedCompanionAvailability.availableNow();
     }
 
-    /** Every listable bonded companion of the owner in the roster, in a stable order. */
+    /**
+     * Every listable bonded companion of the owner in the roster, in a stable order. Each view's
+     * presentation data comes from the record's summary ({@link #presentation}), so a stored or
+     * dead companion is listed with the level and vitals it had when it was last snapshotted.
+     */
     @Override
     @Nonnull
     public CompletableFuture<BondedCompanionResult<List<BondedCompanionProfileView>>> list(
@@ -216,7 +236,8 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                     continue;
                 }
                 try {
-                    BondedCompanionProfileView view = BondedRecords.view(record, owned, families, now, Map.of());
+                    BondedCompanionProfileView view =
+                            BondedRecords.view(record, owned, families, now, presentation(record));
                     if (view != null) {
                         views.add(view);
                     }
@@ -263,12 +284,15 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
      * snapshot until its first summon builds one from {@code roleId} (plan 6 R16). The request's
      * caller namespace and idempotency key are the record's origin, so a repeated request returns
      * the companion the first one made, for as long as that companion exists; after it was
-     * abandoned the same request makes a new one. The family's owned limit is checked under the index lock
-     * in the step that inserts the record (plan 6 R15). Completes once the owner file is
-     * written; when that write fails the record is withdrawn and the request can be repeated.
+     * abandoned the same request makes a new one. The family's owned limit, and the built-in
+     * caps when {@link #useBuiltInCaps} gave them, are checked under the index lock in the step
+     * that inserts the record (plan 6 R15). Completes once the owner file is written, also for a
+     * repeated request; when the first write fails the record is withdrawn and the request can
+     * be repeated.
      *
-     * <p>The request's species, gender and presentation data are not stored: the view of a
-     * companion reports what its body and record hold.
+     * <p>A request with no display name names the companion after its species. The request's
+     * gender and presentation data are not stored: the view of a companion reports what its
+     * body and record hold.
      */
     @Override
     @Nonnull
@@ -289,7 +313,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
             CompanionRecord fresh = CompanionRecord.builder(UUID.randomUUID(), request.roleId(),
                             CompanionLocation.stored(StoredReason.PROVISIONED))
                     .ownerUuid(request.ownerUuid())
-                    .displayName(request.displayName())
+                    .displayName(request.displayName() != null ? request.displayName() : request.species())
                     .bonded(true)
                     .rosterId(request.rosterId())
                     .origin(request.callerNamespace(), request.idempotencyKey())
@@ -309,12 +333,29 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                         == BondedAdmission.Refusal.OWNED_CAPACITY) {
                     return failure(BondedCompanionResultCode.POLICY_DENIED, OWNED_CAPACITY);
                 }
+                CompanionAdmissionGate.Check caps = builtInCaps;
+                CompanionAdmissionGate.Denial denied = caps == null ? null
+                        : caps.deny(null, fresh, CompanionAdmission.Provided.none());
+                if (denied != null) {
+                    return failure(BondedCompanionResultCode.POLICY_DENIED,
+                            denied.refusal() == CompanionAdmission.Refusal.OWNED
+                                    || denied.refusal() == CompanionAdmission.Refusal.GROUP_OWNED
+                                    ? OWNED_CAPACITY : POLICY_DENIED);
+                }
                 CompanionIndex.Mutation inserted = index.insert(fresh);
                 return inserted.applied() ? new Provisioned(inserted.after())
                         : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
             });
             if (outcome instanceof CompanionRecord existing) {
-                return done(repeated(existing, request));
+                if (!request.ownerUuid().equals(existing.ownerUuid())
+                        || !request.rosterId().equals(existing.rosterId())) {
+                    // The same key was used for another owner or roster: not this request's companion.
+                    return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
+                }
+                // The first request's owner file may still be unwritten, so this caller waits for a flush too.
+                return flush.apply(request.ownerUuid()).handle((ignored, failure) -> failure == null
+                        ? viewResult(existing.profileId())
+                        : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED));
             }
             if (!(outcome instanceof Provisioned provisioned)) {
                 @SuppressWarnings("unchecked")
@@ -333,16 +374,6 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                 return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
             });
         });
-    }
-
-    /** The answer to a request whose origin already has a record. */
-    private BondedCompanionResult<BondedCompanionProfileView> repeated(CompanionRecord existing,
-                                                                       BondedCompanionProvisionRequest request) {
-        if (!request.ownerUuid().equals(existing.ownerUuid()) || !request.rosterId().equals(existing.rosterId())) {
-            // The same key was used for another owner or roster: not this request's companion.
-            return failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID);
-        }
-        return viewResult(existing.profileId());
     }
 
     /**
@@ -364,6 +395,11 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
      * Summons a stored companion at the action context's placement. A companion whose body was
      * lost is listed as stored and comes back through a recover. The session timer comes from the
      * family's {@code SessionDurationSeconds} with the companion's talent modifiers.
+     *
+     * <p>A provisioned companion has no snapshot until it has been out once (plan 6 R16): the
+     * restore then hands the spawner none, and the spawner builds the body from the record's
+     * role, stamps it and snapshots it. When no body is added the restore puts the record back
+     * as it was, and it can be summoned again.
      */
     @Override
     @Nonnull
@@ -397,9 +433,6 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
             if (!family.features().summon()) {
                 return done(failure(BondedCompanionResultCode.POLICY_DENIED, FEATURE_DISABLED));
             }
-            if (record.location().reason() == StoredReason.PROVISIONED) {
-                return firstSummon(record, family, request, placement);
-            }
             if (clock.getAsLong() < record.summonCooldownUntilMs()) {
                 return done(failure(BondedCompanionResultCode.POLICY_DENIED, COOLDOWN_ACTIVE));
             }
@@ -411,24 +444,6 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                     ? RestoreRules.Reason.RECOVER : RestoreRules.Reason.SUMMON;
             return restoreTimed(record, family, reason, placement);
         });
-    }
-
-    /**
-     * A provisioned companion's first summon (plan 6 R16). The record has no snapshot, so the
-     * restore hands the spawner none and the spawner builds the body from the record's role,
-     * stamps it and snapshots it. When no body is added the restore puts the record back to
-     * {@code STORED(PROVISIONED)} at its old generation, and it can be summoned again.
-     */
-    private CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> firstSummon(
-            CompanionRecord record, BondedCompanionPolicy family, BondedCompanionActionRequest request,
-            BondedCompanionPlacement placement) {
-        if (clock.getAsLong() < record.summonCooldownUntilMs()) {
-            return done(failure(BondedCompanionResultCode.POLICY_DENIED, COOLDOWN_ACTIVE));
-        }
-        if (!activePlaceFree(record, family)) {
-            return done(failure(BondedCompanionResultCode.POLICY_DENIED, ACTIVE_CAPACITY));
-        }
-        return restoreTimed(record, family, RestoreRules.Reason.SUMMON, placement);
     }
 
     /** Stores an active companion as {@code STORED(BONDED)} with the family's summon cooldown. */
@@ -736,7 +751,8 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     /** The view after a talent change, published to subscribers as {@code talents-updated}. */
     private BondedCompanionResult<BondedCompanionProfileView> talentsUpdated(UUID profileId,
                                                                              BondedTalentUpdates.Outcome outcome) {
-        LinkedHashMap<String, String> data = new LinkedHashMap<>();
+        CompanionRecord record = index.get(profileId);
+        LinkedHashMap<String, String> data = new LinkedHashMap<>(record == null ? Map.of() : presentation(record));
         if (outcome.talents().getConfigId() != null && !outcome.talents().getConfigId().isBlank()) {
             data.put("talentConfigId", outcome.talents().getConfigId());
         }
@@ -748,24 +764,81 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         if (outcome.levelingConfigId() != null && !outcome.levelingConfigId().isBlank()) {
             data.put("levelingConfigId", outcome.levelingConfigId());
         }
-        CompanionRecord record = index.get(profileId);
         BondedCompanionProfileView view = record == null || record.ownerUuid() == null ? null
                 : BondedRecords.view(record, index.fileRecords(record.ownerUuid()), families, clock.getAsLong(), data);
         if (view == null) {
             // The change was made, but the companion left the roster before it could be reported.
             return failure(BondedCompanionResultCode.REVISION_CONFLICT, PROFILE_REVISION_CONFLICT);
         }
-        BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(view.profileId(), view.ownerUuid(),
-                view.rosterId(), view.state(), view.state(), view.revision(), "talents-updated");
+        publish(new BondedCompanionChangedEvent(view.profileId(), view.ownerUuid(),
+                view.rosterId(), view.state(), view.state(), view.revision(), "talents-updated"));
+        return success(view);
+    }
+
+    /**
+     * The level and talents of a companion that is not active, from its stored snapshot, for the
+     * talent page (the list's views carry no purchased talent ids). Completes with null when the
+     * companion is not this owner's in this roster, is active (its body holds its talents), or
+     * has no readable snapshot, as a provisioned companion before its first summon.
+     */
+    @Override
+    @Nonnull
+    public CompletableFuture<BondedTalentUpdates.Stored> storedTalents(@Nonnull UUID ownerUuid,
+                                                                       @Nonnull String rosterId,
+                                                                       @Nonnull String profileId) {
+        BondedTalentUpdates updates = talents;
+        CompanionRecord record = closed || updates == null ? null : record(profileId);
+        if (record == null || !ownerUuid.equals(record.ownerUuid()) || !rosterId.equals(record.rosterId())
+                || record.location().kind() == LocationKind.LIVE) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return updates.read(record);
+    }
+
+    /**
+     * Presentation entries of a record's summary, with the keys the 4.x views used: the role the
+     * body had, level, health, and happiness and needs when the companion has them. An empty
+     * summary (a provisioned companion never summoned) gives no entries. The purchased talent ids
+     * are not in a summary; {@link #storedTalents} reads them.
+     */
+    private static Map<String, String> presentation(CompanionRecord record) {
+        CompanionSummary summary = record.summary();
+        LinkedHashMap<String, String> data = new LinkedHashMap<>();
+        if (summary.roleId() != null && !summary.roleId().isBlank()) {
+            data.put("roleId", summary.roleId());
+        }
+        if (summary.levelingConfigId() != null) {
+            data.put("levelingConfigId", summary.levelingConfigId());
+            data.put("level", Integer.toString(summary.level()));
+            data.put("currentXp", Double.toString(summary.currentXp()));
+        }
+        if (summary.healthMax() > 0f) {
+            data.put("currentHealth", Double.toString(summary.healthCurrent()));
+            data.put("maxHealth", Double.toString(summary.healthMax()));
+        }
+        if (summary.happinessConfigId() != null) {
+            data.put("happiness", Double.toString(summary.happiness()));
+        }
+        if (summary.needsConfigId() != null) {
+            data.put("hunger", Double.toString(summary.hunger()));
+            data.put("thirst", Double.toString(summary.thirst()));
+        }
+        if (summary.talentsConfigId() != null) {
+            data.put("talentConfigId", summary.talentsConfigId());
+            data.put("talentSpentPoints", Integer.toString(summary.talentPointsSpent()));
+        }
+        return data;
+    }
+
+    private void publish(BondedCompanionChangedEvent event) {
         for (Consumer<BondedCompanionChangedEvent> subscriber : subscribers) {
             try {
                 subscriber.accept(event);
             } catch (RuntimeException | LinkageError failure) {
                 LOGGER.at(Level.WARNING).withCause(failure)
-                        .log("A bonded companion subscriber failed for profile %s", profileId);
+                        .log("A bonded companion subscriber failed for profile %s", event.profileId());
             }
         }
-        return success(view);
     }
 
     @Override
@@ -903,16 +976,8 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                 default -> "updated";
             };
         }
-        BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(after.profileId().toString(), owner,
-                rosterId, oldState, newState, after.generation(), reason);
-        for (Consumer<BondedCompanionChangedEvent> subscriber : subscribers) {
-            try {
-                subscriber.accept(event);
-            } catch (RuntimeException | LinkageError failure) {
-                LOGGER.at(Level.WARNING).withCause(failure)
-                        .log("A bonded companion subscriber failed for profile %s", after.profileId());
-            }
-        }
+        publish(new BondedCompanionChangedEvent(after.profileId().toString(), owner,
+                rosterId, oldState, newState, after.generation(), reason));
     }
 
     /** Drops every subscriber; later calls report the API as unavailable. */

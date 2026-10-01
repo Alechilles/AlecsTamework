@@ -429,7 +429,7 @@ class CaptureFlowTest {
         CompanionTransitions.BodyFacts wild = new CompanionTransitions.BodyFacts(npc, null, null, "NordicDrake",
                 null, "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY);
         return new CaptureFlow.Capture<>(null, 0, "wild", wild, owner, "Alec", DATA,
-                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, profileId -> "{\"profile\":\"" + profileId + "\"}"));
+                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, "{\"attempt\":7}", 90_000L, null));
     }
 
     private CaptureFlow<String> rosterFlow(BondedRecords.Families families) {
@@ -453,8 +453,10 @@ class CaptureFlowTest {
         assertEquals(ROSTER, stored.rosterId());
         assertEquals(TAMED_DRAKE, stored.roleId(), "the record has the role its roster family allows");
         assertEquals(owner, stored.ownerUuid());
-        assertEquals(new ExtensionEntry(1L, "{\"profile\":\"" + stored.profileId() + "\"}"),
+        assertEquals(new ExtensionEntry(1L, "{\"attempt\":7}"),
                 stored.extensions().get(BondedRecords.CAPTURE_EVIDENCE_KEY));
+        assertEquals(90_000L, stored.summonCooldownUntilMs(),
+                "not summonable before the family cooldown, so not while its body is being removed");
         assertEquals(List.of("snapshot", "flush"), events);
         assertEquals(stored.generation(), snapshots.get(0).generation());
     }
@@ -465,7 +467,7 @@ class CaptureFlowTest {
         index.update(live.profileId(), live.revision(), b -> b.toolIds(List.of("link")));
         CaptureFlow.Capture<String> capture = new CaptureFlow.Capture<>(live.profileId(), 2, "body",
                 facts(live.currentNpcUuid()), owner, "Alec", DATA,
-                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, profileId -> "{}"));
+                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, "{}", 0L, null));
 
         CaptureFlow.Outcome outcome = rosterFlow(drakes(0)).capture(capture).join();
 
@@ -504,6 +506,25 @@ class CaptureFlowTest {
 
         assertEquals(CaptureFlow.Result.COMMIT_FAILED, outcome.result());
         assertFalse(index.fileRecords(owner).stream().anyMatch(CompanionRecord::countsAsOwned));
+    }
+
+    @Test
+    void anUndoneBondedCaptureOfALiveCompanionPutsBackTheSnapshotOfTheRoleItStillHas() {
+        CompanionRecord live = insertLive(2);
+        BsonDocument asTaken = new BsonDocument("Entity", new BsonString("old role"));
+        CaptureFlow.Capture<String> capture = new CaptureFlow.Capture<>(live.profileId(), 2, "body",
+                facts(live.currentNpcUuid()), owner, "Alec", DATA,
+                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, "{}", 0L, asTaken));
+
+        CaptureFlow.Outcome outcome = flow(CompletableFuture.failedFuture(new IllegalStateException("disk full")))
+                .capture(capture).join();
+
+        assertEquals(CaptureFlow.Result.COMMIT_FAILED, outcome.result());
+        assertEquals(live.roleId(), index.get(live.profileId()).roleId());
+        assertEquals("body", loaded.get(live.profileId()));
+        SnapshotEnvelope requeued = snapshots.get(snapshots.size() - 1);
+        assertEquals(2, requeued.generation());
+        assertEquals(asTaken, requeued.data(), "the body lives on in its old role");
     }
 
     @Test

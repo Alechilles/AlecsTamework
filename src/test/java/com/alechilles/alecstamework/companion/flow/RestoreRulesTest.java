@@ -71,17 +71,24 @@ class RestoreRulesTest {
     }
 
     @Test
-    void onlyAProvisionedBondedCompanionIsSummonedWithNoSnapshot() {
+    void onlyAProvisionedBondedCompanionWhoseSnapshotWasNeverWrittenComesBackWithNone() {
         CompanionRecord provisioned = at(CompanionLocation.stored(StoredReason.PROVISIONED)).toBuilder()
-                .bonded(true).rosterId("hydragon:horn").ownerUuid(UUID.randomUUID()).build();
-        CompanionRecord storedBonded = provisioned.toBuilder()
+                .bonded(true).rosterId("hydragon:horn").ownerUuid(UUID.randomUUID())
+                .origin("hydragon", "soul-bond-1").build();
+        // A stop between the first summon's commit and its first snapshot leaves it like this.
+        CompanionRecord lostBeforeItsFirstSnapshot = provisioned.toBuilder()
+                .location(CompanionLocation.lost("REMOVED")).build();
+        CompanionRecord captured = provisioned.toBuilder().origin(null, null)
                 .location(CompanionLocation.stored(StoredReason.BONDED)).build();
 
         assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(provisioned, Reason.SUMMON, 0));
-        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(provisioned, null, Reason.SUMMON));
-        // Once it has been out and stored again it has a snapshot, and needs it like any other.
-        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(storedBonded, null, Reason.SUMMON));
-        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(provisioned, null, Reason.RECOVER));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(provisioned, null, Reason.SUMMON, true));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(lostBeforeItsFirstSnapshot, null, Reason.RECOVER, true));
+        // A snapshot that may exist but was not read is not "never written".
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(provisioned, null, Reason.SUMMON, false));
+        // A captured companion always had a snapshot; a revive never comes from the role.
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(captured, null, Reason.SUMMON, true));
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(provisioned, null, Reason.REVIVE, true));
     }
 
     @Test

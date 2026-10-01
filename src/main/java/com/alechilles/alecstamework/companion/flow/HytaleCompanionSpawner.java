@@ -41,9 +41,10 @@ import org.bson.BsonDocument;
 import org.joml.Vector3d;
 
 /**
- * Puts a committed companion back into its destination world from its snapshot (spec 6.5). The
- * first summon of a provisioned bonded companion has no snapshot: its body is built from the
- * record's role, stamped before it is added, and snapshotted once it is in the store (plan 6 R16).
+ * Puts a committed companion back into its destination world from its snapshot (spec 6.5). A
+ * provisioned bonded companion that never had a snapshot written is handed none: its body is
+ * built from the record's role, stamped before it is added, and snapshotted once it is in the
+ * store (plan 6 R16).
  *
  * <p>{@link #spawn} only resolves the world and queues one task, so it is safe to call from the
  * companion writer thread mid-flush. The entity work runs inside that task on the destination

@@ -23,7 +23,11 @@ public final class BondedCaptureEvidence {
     private BondedCaptureEvidence() {
     }
 
-    /** The JSON stored for {@code evidence}. */
+    /**
+     * The JSON stored for {@code evidence}. The profile id is not stored: the entry is on the
+     * companion's own record, and {@link #read} fills it from there, so the JSON can be built
+     * before an unstamped body's record exists.
+     */
     @Nonnull
     public static String toJson(@Nonnull BondedCompanionCaptureEvidenceView evidence) {
         BsonDocument doc = new BsonDocument()
@@ -33,7 +37,6 @@ public final class BondedCaptureEvidence {
                 .append("rosterId", new BsonString(evidence.rosterId()))
                 .append("familyId", new BsonString(evidence.familyId()))
                 .append("sourceNpcUuid", new BsonString(evidence.sourceNpcUuid().toString()))
-                .append("profileId", new BsonString(evidence.profileId()))
                 .append("roleId", new BsonString(evidence.roleId()))
                 .append("callerNamespace", new BsonString(evidence.callerNamespace()))
                 .append("idempotencyKey", new BsonString(evidence.idempotencyKey()))
@@ -63,7 +66,7 @@ public final class BondedCaptureEvidence {
             return new BondedCompanionCaptureEvidenceView(
                     uuid(doc, "operationId"), uuid(doc, "attemptId"), uuid(doc, "ownerUuid"),
                     text(doc, "rosterId"), text(doc, "familyId"), uuid(doc, "sourceNpcUuid"),
-                    text(doc, "profileId"), text(doc, "roleId"), text(doc, "callerNamespace"),
+                    record.profileId().toString(), text(doc, "roleId"), text(doc, "callerNamespace"),
                     text(doc, "idempotencyKey"), text(doc, "sourceItemId"), text(doc, "spawnerConfigId"),
                     number(doc, "spawnerConfigRevision"),
                     doc.containsKey("capturePolicyConfigId") ? text(doc, "capturePolicyConfigId") : null,

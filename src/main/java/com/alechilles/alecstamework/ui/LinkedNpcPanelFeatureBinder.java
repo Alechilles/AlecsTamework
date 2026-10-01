@@ -120,7 +120,7 @@ final class LinkedNpcPanelFeatureBinder {
             String summonSelector, String dismissSelector, String language) {
         BondedCompanionStatusPresentation status = row.status();
         builder.set(stateSelector + ".Text", bondedStateText(status, language));
-        builder.set(detailSelector + ".Text", bondedDetailText(row));
+        builder.set(detailSelector + ".Text", bondedDetailText(row, language));
         builder.set(reasonSelector + ".Text", status.blockReason() == null
                 ? "" : BondedCompanionActionFeedbackMapper.resolve(
                         language, status.blockReason()));
@@ -151,20 +151,42 @@ final class LinkedNpcPanelFeatureBinder {
         });
     }
 
-    static String bondedDetailText(BondedCompanionPanelPresentation row) {
+    /**
+     * The detail line of a bonded row for the viewer: species, role presentation, level and
+     * health. Every other attribute is either shown elsewhere on the card or is an internal key,
+     * and extension values are other mods' data, so none of them is printed.
+     */
+    static String bondedDetailText(BondedCompanionPanelPresentation row, String language) {
         java.util.ArrayList<String> details = new java.util.ArrayList<>();
         if (row.species() != null) details.add(row.species());
         if (row.rolePresentation() != null
                 && !row.rolePresentation().equalsIgnoreCase(row.species())) {
             details.add(row.rolePresentation());
         }
-        row.attributes().entrySet().stream()
-                .sorted(java.util.Map.Entry.comparingByKey())
-                .forEach(entry -> details.add(entry.getKey() + ": " + entry.getValue()));
-        row.extensions().entrySet().stream()
-                .sorted(java.util.Map.Entry.comparingByKey())
-                .forEach(entry -> details.add(entry.getKey() + ": " + entry.getValue()));
+        Long level = wholeNumber(row.attributes().get("level"));
+        if (level != null) {
+            details.add(LocalizedText.format(language, "tamework.ui.talents.requirement.level", level));
+        }
+        Long health = wholeNumber(row.attributes().get("currentHealth"));
+        Long maxHealth = wholeNumber(row.attributes().get("maxHealth"));
+        if (health != null && maxHealth != null && maxHealth > 0L) {
+            details.add(LocalizedText.format(language, "tamework.ui.commandTargetHud.health.value", health, maxHealth));
+        }
         return String.join(" | ", details);
+    }
+
+    /** A presentation value rounded to a whole number; null when it is absent or not a number. */
+    @Nullable
+    private static Long wholeNumber(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            double parsed = Double.parseDouble(value.trim());
+            return Double.isFinite(parsed) ? Math.round(parsed) : null;
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
     }
 
     private static String stateText(

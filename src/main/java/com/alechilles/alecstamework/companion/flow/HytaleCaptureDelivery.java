@@ -35,15 +35,16 @@ import org.joml.Vector3d;
 
 /**
  * Finishes a capture that {@link CaptureFlow} reported CAPTURED (spec 8.2 steps 5 and 6): removes
- * the body and hands the item to the player, or, for a capture into bonded storage, spends one
- * source item. Safe to call from any thread; only stable ids and immutable stacks cross threads,
- * and live state is resolved inside world tasks.
+ * the body and hands the item to the player. A capture into bonded storage gives no item; its
+ * caller spent the source item before the commit. Safe to call from any thread; only stable ids
+ * and immutable stacks cross threads, and live state is resolved inside world tasks.
  *
  * <p>On the body's world thread the record must still be ITEM (STORED for a capture into
  * storage) at the committed generation; when it is not, a newer change owns the companion: the
  * body (unregistered, and fenced by its stale generation) is removed and no item is handed over.
  * A body that vanished before the task ran moves an ITEM record to LOST; its snapshot is already
- * queued, so the owner can Recover it. A stored record needs no body and stays stored.
+ * queued, so the owner can Recover it. A stored record needs no body and stays stored, and its
+ * capture is still announced ({@link Handover#onCommitted}).
  *
  * <p>The snapshot the flow queued was taken before the commit, and the commit can wait on an
  * admission provider. So the body is snapshotted again here, in the task that removes it, and
@@ -58,17 +59,21 @@ public final class HytaleCaptureDelivery {
 
     /**
      * One capture to finish. {@code item} is the presentation item without identity keys, or null
-     * for a capture into bonded storage, which gives no item and spends one source item instead;
+     * for a capture into bonded storage, which gives no item;
      * {@code expectedSource} is the exact stack the player held in {@code hotbarSlot}.
      * {@code onCaptured} runs on the body's world thread just before the body is removed (effects).
      * {@code capturedAtMs} is the wall-clock time the snapshot was taken. {@code entityPatch} is
      * the change the caller made to the entity document of the snapshot it committed (null for
-     * none); it is applied again to the snapshot taken here.
+     * none); it is applied again to the snapshot taken here. {@code onCommitted} announces the
+     * capture (events, a message); it must touch no entity, because it runs on the body's world
+     * thread before {@code onCaptured}, or, when the body of a stored capture has vanished, on
+     * the calling thread.
      */
     public record Handover(@Nonnull Ref<EntityStore> body, @Nonnull CaptureItemKeys.Ref ref,
                            @Nullable ItemStack item, @Nonnull UUID playerUuid, int hotbarSlot,
                            @Nonnull ItemStack expectedSource, @Nullable Consumer<World> onCaptured,
-                           long capturedAtMs, @Nullable UnaryOperator<BsonDocument> entityPatch) {
+                           long capturedAtMs, @Nullable UnaryOperator<BsonDocument> entityPatch,
+                           @Nullable Runnable onCommitted) {
         public Handover {
             Objects.requireNonNull(body, "body");
             Objects.requireNonNull(ref, "ref");
@@ -162,6 +167,7 @@ public final class HytaleCaptureDelivery {
         TransformComponent transform = store.getComponent(body, TransformComponent.getComponentType());
         Vector3d dropAt = transform == null || transform.getPosition() == null
                 ? null : new Vector3d(transform.getPosition());
+        announce(handover);
         if (handover.onCaptured() != null) {
             try {
                 handover.onCaptured().accept(world);
@@ -172,9 +178,7 @@ public final class HytaleCaptureDelivery {
         // The flow unregistered the body at commit, so its removal raises no LOST transition.
         CompanionBodies.removeOnOwnWorld(body);
         if (handover.item() == null) {
-            // Stored, not handed over: the capture spends one source item. An offline player keeps it.
-            onPlayerWorld(handover.playerUuid(),
-                    (playerWorld, playerStore, playerRef, player) -> spendSource(player, handover), null);
+            // Stored, not handed over; the source item was spent before the commit.
             return;
         }
         ItemStack item = CaptureItemKeys.write(handover.item(), handover.ref());
@@ -214,18 +218,17 @@ public final class HytaleCaptureDelivery {
         }
     }
 
-    /** Takes one source item: from the recorded slot when it still holds the source, else from the inventory. */
-    private static void spendSource(Player player, Handover handover) {
-        ItemContainer hotbar = player.getInventory() == null ? null : player.getInventory().getHotbar();
-        int slot = handover.hotbarSlot();
-        if (hotbar != null && slot >= 0 && slot < hotbar.getCapacity()
-                && Objects.equals(hotbar.getItemStack((short) slot), handover.expectedSource())) {
-            var taken = hotbar.removeItemStackFromSlot((short) slot, 1);
-            if (taken != null && taken.succeeded()) {
-                return;
-            }
+    /** Runs {@link Handover#onCommitted}; a failure is logged and never stops the hand-over. */
+    private static void announce(Handover handover) {
+        if (handover.onCommitted() == null) {
+            return;
         }
-        takeMovedSource(player, handover.expectedSource(), handover.ref().profileId());
+        try {
+            handover.onCommitted().run();
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.at(Level.WARNING).withCause(failure).log("Captured companion %s could not be announced",
+                    handover.ref().profileId());
+        }
     }
 
     /**
@@ -304,8 +307,10 @@ public final class HytaleCaptureDelivery {
     private void markLost(Handover handover) {
         CaptureItemKeys.Ref ref = handover.ref();
         if (handover.item() == null) {
+            // The capture is committed and paid for; only its effects have no body to play on.
             LOGGER.at(Level.WARNING).log("The body of captured companion %s vanished before it was removed; "
-                    + "the companion stays stored and no source item was spent", ref.profileId());
+                    + "the companion stays stored", ref.profileId());
+            announce(handover);
             return;
         }
         boolean lost = index.atomically(() -> {

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.ExtensionEntries;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import java.util.ArrayList;
@@ -37,7 +38,7 @@ public final class BondedRecords {
     /** {@code roleId} of a listed record whose stored role id is blank; it resolves to no family. */
     public static final String UNKNOWN_ROLE_ID = "unknown";
     /** Tamework's own extension namespace. Public callers may not read or write it. */
-    public static final String TAMEWORK_NAMESPACE = "tamework";
+    public static final String TAMEWORK_NAMESPACE = ExtensionEntries.TAMEWORK_NAMESPACE;
     /** The one extension value a caller namespace keeps per bonded companion. */
     public static final String EXTENSION_DATA_KEY = "bonded";
     /** Extension key of the capture evidence written when a companion is captured into storage (plan 6 R17). */
@@ -80,7 +81,7 @@ public final class BondedRecords {
      */
     @Nonnull
     public static String extensionKey(@Nonnull String namespace, @Nonnull String key) {
-        return namespace.trim() + "/" + key.trim();
+        return ExtensionEntries.key(namespace, key);
     }
 
     /**
@@ -88,12 +89,7 @@ public final class BondedRecords {
      * and a namespace with "/" could not be told apart from a shorter namespace with a longer key.
      */
     public static boolean publicNamespace(@Nullable String namespace) {
-        if (namespace == null || namespace.isBlank()) {
-            return false;
-        }
-        String normalized = namespace.trim();
-        return !normalized.contains("/") && !normalized.equalsIgnoreCase(TAMEWORK_NAMESPACE)
-                && !normalized.equalsIgnoreCase("Alechilles:Tamework");
+        return ExtensionEntries.publicNamespace(namespace);
     }
 
     /**

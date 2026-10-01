@@ -3,12 +3,15 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.api.BondedCompanionPlacement;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.runtime.ThrottledWarnings;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.logging.Level;
 import javax.annotation.Nullable;
 
 /**
@@ -16,6 +19,8 @@ import javax.annotation.Nullable;
  * (plan 6 R19: charge, then refund on failure; no escrow). Call on the player's world thread.
  */
 final class HytaleBondedCompanionActionContextFactory {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    private static final ThrottledWarnings WARNINGS = new ThrottledWarnings(System::currentTimeMillis, 60_000L);
     private static final double DEFAULT_DISTANCE = 5D;
     private final CommandCompanionPlacementService placements =
             new CommandCompanionPlacementService();
@@ -45,6 +50,11 @@ final class HytaleBondedCompanionActionContextFactory {
             } catch (RuntimeException | LinkageError unavailable) {
                 // No placement: the panel shows the summon as unavailable here and the API
                 // refuses it, while the rest of the card (and the inventory) still works.
+                // The panel asks again on every refresh, so the warning is throttled.
+                if (WARNINGS.shouldLog("placement")) {
+                    LOGGER.at(Level.WARNING).withCause(unavailable).log(
+                            "No summon placement could be computed for a bonded companion of role %s", roleId);
+                }
             }
         }
         return new BondedCompanionActionContext(

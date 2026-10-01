@@ -1,16 +1,12 @@
 package com.alechilles.alecstamework.companion.bonded;
 
-import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
-import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
-import com.hypixel.hytale.codec.ExtraInfo;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
-import org.bson.BsonDocument;
 
 /**
  * A bonded family's session length and summon cooldown with a companion's purchased talents
@@ -21,8 +17,6 @@ import org.bson.BsonDocument;
  * no talents gets the family's own timers.</p>
  */
 public final class BondedTalentTimers {
-    private static final String COMPONENTS = "Components";
-    private static final String TALENTS = "TameworkTalents";
 
     private BondedTalentTimers() {
     }
@@ -54,13 +48,9 @@ public final class BondedTalentTimers {
     private static BondedCompanionPolicy adjust(BondedCompanionPolicy family, SnapshotEnvelope snapshot,
                                                 TwTalentConfig config) {
         try {
-            BsonDocument entity = CompanionSnapshots.entity(snapshot);
-            if (!entity.isDocument(COMPONENTS) || !entity.getDocument(COMPONENTS).isDocument(TALENTS)) {
-                return family;
-            }
-            TameworkTalentsComponent talents = TameworkTalentsComponent.CODEC.decode(
-                    entity.getDocument(COMPONENTS).getDocument(TALENTS), new ExtraInfo());
-            return BondedCompanionTalentTimerPolicyModifier.apply(family, talents, config);
+            BondedTalentUpdates.Stored state = BondedTalentUpdates.decode(snapshot);
+            return state == null || state.talents() == null ? family
+                    : BondedCompanionTalentTimerPolicyModifier.apply(family, state.talents(), config);
         } catch (RuntimeException | LinkageError unreadable) {
             return family;
         }

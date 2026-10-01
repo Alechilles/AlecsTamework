@@ -19,6 +19,8 @@ import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
 import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.flow.CaptureFlow;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
@@ -66,6 +68,8 @@ class IndexBondedCompanionApiTest {
     private final List<UUID> spawned = new ArrayList<>();
     /** Profiles with no stored snapshot, as a provisioned companion is before its first summon. */
     private final Set<UUID> noSnapshot = new HashSet<>();
+    /** Profiles whose snapshot exists but cannot be read. */
+    private final Set<UUID> unreadableSnapshot = new HashSet<>();
     /** Spawns that were handed no snapshot and so built the body from the record's role. */
     private final List<String> spawnedFromRole = new ArrayList<>();
     private final List<String> removed = new ArrayList<>();
@@ -98,6 +102,8 @@ class IndexBondedCompanionApiTest {
     private IndexBondedCompanionApi api() {
         RestoreFlow<String> restore = new RestoreFlow<>(index, loaded,
                 id -> heldSnapshots.containsKey(id) ? heldSnapshots.get(id)
+                        : unreadableSnapshot.contains(id)
+                        ? CompletableFuture.failedFuture(new java.io.IOException("unreadable snapshot"))
                         : CompletableFuture.completedFuture(noSnapshot.contains(id) ? null : snapshot(id)),
                 who -> flush,
                 (committed, snapshot, destination, reason) -> {
@@ -463,10 +469,68 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
+    void aCompanionLeftWithNoBodyAndNoSnapshotByAStopDuringItsFirstSummonIsBuiltFromItsRoleAgain() {
+        CompanionRecord provisioned = provisioned("soul-bond-1");
+        // The first summon was committed, then the server stopped before the first snapshot.
+        index.update(provisioned.profileId(), provisioned.revision(), b -> b.generation(1L)
+                .location(CompanionLocation.lost("REMOVED")));
+        CompanionRecord lost = index.get(provisioned.profileId());
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.summon(action(lost)).join().code());
+
+        assertEquals(List.of(DRAGON), spawnedFromRole);
+        assertEquals(LocationKind.LIVE, index.get(lost.profileId()).location().kind());
+    }
+
+    @Test
+    void aSnapshotThatCannotBeReadIsNeverReplacedByABodyFromTheRole() {
+        CompanionRecord provisioned = provisioned("soul-bond-1");
+        unreadableSnapshot.add(provisioned.profileId());
+
+        assertRefused(BondedCompanionResultCode.INTERNAL_FAILURE, "bonded-snapshot-invalid",
+                api.summon(action(provisioned)).join());
+
+        assertTrue(spawned.isEmpty());
+        assertEquals(provisioned, index.get(provisioned.profileId()));
+    }
+
+    @Test
+    void aProvisionedCompanionWithNoNameIsNamedAfterItsSpecies() {
+        BondedCompanionResult<BondedCompanionProfileView> result = api.provision(new BondedCompanionProvisionRequest(
+                "hydragon", "soul-bond-1", owner, ROSTER, DRAGON, null, "Miniwyvern", null, Map.of())).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, result.code());
+        assertEquals("Miniwyvern", result.value().displayName());
+    }
+
+    @Test
+    void aProvisionCountsAgainstTheBuiltInOwnedCapsOnceTheyAreGiven() {
+        CompanionAdmission.Refusal[] refusal = {CompanionAdmission.Refusal.OWNED};
+        api.useBuiltInCaps((before, after, provided) ->
+                refusal[0] == null ? null : CompanionAdmissionGate.Denial.of(refusal[0]));
+
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-owned_capacity_reached",
+                api.provision(provisionRequest("k1")).join());
+        refusal[0] = CompanionAdmission.Refusal.GROUP_OWNED;
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-owned_capacity_reached",
+                api.provision(provisionRequest("k1")).join());
+        assertTrue(index.fileRecords(owner).isEmpty());
+
+        refusal[0] = null;
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.provision(provisionRequest("k1")).join().code());
+    }
+
+    @Test
     void aRepeatedProvisionRequestReturnsTheCompanionTheFirstOneMade() {
         CompanionRecord first = provisioned("soul-bond-1");
+        flush = new CompletableFuture<>();
 
-        BondedCompanionResult<BondedCompanionProfileView> again = api.provision(provisionRequest("soul-bond-1")).join();
+        CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> repeated =
+                api.provision(provisionRequest("soul-bond-1"));
+
+        assertFalse(repeated.isDone(), "the repeat waits for the owner file like the first request");
+        flush.complete(null);
+        BondedCompanionResult<BondedCompanionProfileView> again = repeated.join();
 
         assertEquals(BondedCompanionResultCode.SUCCESS, again.code());
         assertEquals(first.profileId().toString(), again.value().profileId());
@@ -540,13 +604,13 @@ class IndexBondedCompanionApiTest {
                 "Dragon_Fire", null, WORLD, 0, 0, 0, List.of(), CompanionSummary.EMPTY);
 
         CaptureFlow.Outcome outcome = captures.capture(new CaptureFlow.Capture<>(null, 0L, "wild", wild, owner,
-                "Alec", BODY, new CaptureFlow.BondedTarget(ROSTER, DRAGON, profileId -> BondedCaptureEvidence.toJson(
+                "Alec", BODY, new CaptureFlow.BondedTarget(ROSTER, DRAGON, BondedCaptureEvidence.toJson(
                         new BondedCompanionCaptureEvidenceView(attempt, attempt, owner, ROSTER, "hydragon:fire_dragon",
-                                sourceNpc, profileId.toString(), DRAGON, "tamework", attempt.toString(),
+                                sourceNpc, "unassigned", DRAGON, "tamework", attempt.toString(),
                                 "Draconic_Stone", "HyDragonDraconicStone", 3L, null, -1L,
                                 CaptureSourceConsumption.RESOLVED_ATTEMPT,
                                 CaptureSuccessDisposition.STORE_BONDED_COMPANION, CaptureAttemptOutcome.CAPTURED,
-                                "captured", WORLD, now))))).join();
+                                "captured", WORLD, now)), now + 30_000L, null))).join();
 
         assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
         UUID profileId = outcome.itemRef().profileId();
@@ -561,7 +625,11 @@ class IndexBondedCompanionApiTest {
         assertEquals(now, found.value().committedAtMs());
         assertEquals(List.of(new BondedCompanionChangedEvent(profileId.toString(), owner, ROSTER, null,
                 BondedCompanionStateView.STORED, 0L, "stored")), events);
-        // The captured companion is an ordinary stored one: listed, and summoned from its snapshot.
+        // The captured companion is an ordinary stored one: listed, and summoned from its snapshot
+        // once the family cooldown its capture started has passed.
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-cooldown_active",
+                api.summon(action(index.get(profileId))).join());
+        now += 30_000L;
         assertEquals(BondedCompanionResultCode.SUCCESS, api.summon(action(index.get(profileId))).join().code());
         assertTrue(spawnedFromRole.isEmpty());
 
@@ -576,6 +644,21 @@ class IndexBondedCompanionApiTest {
         api.abandon(action(index.get(profileId))).join();
         assertRefused(BondedCompanionResultCode.NOT_FOUND, "bonded-capture-evidence-not-found",
                 api.findCapture(owner, ROSTER, sourceNpc).join());
+    }
+
+    @Test
+    void anAbandonThatLandsWhileASummonRunsWinsAndNothingSpawns() {
+        CompanionRecord stored = stored();
+        heldSnapshots.put(stored.profileId(), new CompletableFuture<>());
+        CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> summon = api.summon(action(stored));
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.abandon(action(stored)).join().code());
+        heldSnapshots.get(stored.profileId()).complete(snapshot(stored.profileId()));
+
+        assertEquals(BondedCompanionResultCode.REVISION_CONFLICT, summon.join().code());
+        assertTrue(spawned.isEmpty());
+        assertEquals(LocationKind.RELEASED, index.get(stored.profileId()).location().kind());
+        assertEquals(0, liveCount());
     }
 
     @Test

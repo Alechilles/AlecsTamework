@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -114,8 +115,9 @@ public final class RestoreFlow<R> {
 
     /**
      * Spawns the committed companion at the destination; completes true once the body is added.
-     * {@code snapshot} is null only for the first summon of a provisioned bonded companion
-     * ({@link RestoreRules#firstSummon}), whose body is built from the committed record's role.
+     * {@code snapshot} is null only for a provisioned bonded companion that never had a snapshot
+     * written ({@link RestoreRules#respawnsFromRole}); its body is built from the committed
+     * record's role.
      *
      * <p>Contract the flow relies on: completing false or exceptionally means no body of
      * {@code committed}'s generation was added and none will be. No late world task (for example
@@ -199,14 +201,19 @@ public final class RestoreFlow<R> {
         if (verdict != RestoreRules.Verdict.ALLOWED) {
             return done(map(verdict));
         }
-        return snapshots.apply(profileId).handle((snapshot, error) -> error == null ? snapshot : null)
-                .thenCompose(snapshot -> admitAndCommit(before, snapshot, request));
+        return snapshots.apply(profileId).handle((snapshot, error) -> {
+            // No snapshot is "never written" only when the read itself worked and no body is
+            // loaded: a failed read, or a loaded body whose capture failed, still has state to lose.
+            boolean neverWritten = error == null && snapshot == null && loaded.get(profileId) == null;
+            return admitAndCommit(before, error == null ? snapshot : null, neverWritten, request);
+        }).thenCompose(outcome -> outcome);
     }
 
     /** Asks the admission provider, off the index lock, then commits with what it allowed. */
     private CompletableFuture<Outcome> admitAndCommit(CompanionRecord before, @Nullable SnapshotEnvelope snapshot,
-                                                      Request request) {
-        RestoreRules.Verdict snapshotVerdict = RestoreRules.forSnapshot(before, snapshot, request.reason());
+                                                      boolean neverWritten, Request request) {
+        RestoreRules.Verdict snapshotVerdict =
+                RestoreRules.forSnapshot(before, snapshot, request.reason(), neverWritten);
         if (snapshotVerdict != RestoreRules.Verdict.ALLOWED) {
             return done(map(snapshotVerdict));
         }
@@ -303,8 +310,12 @@ public final class RestoreFlow<R> {
             if (owner != null) {
                 b.ownerUuid(owner.uuid()).ownerName(owner.name());
             }
-            // The restored transition clears the timer, so 0 here leaves the companion untimed.
-            b.summonedUntilMs(request.summonedUntilMs());
+            // The restored transition clears the timer. A request that names none keeps the timer
+            // of a body that was out (a recall, or a recover of a LIVE record), so a timed summon
+            // that follows its owner stays timed; from any other location 0 leaves it untimed.
+            long until = request.summonedUntilMs() != 0L ? request.summonedUntilMs()
+                    : before.location().kind() == LocationKind.LIVE ? before.summonedUntilMs() : 0L;
+            b.summonedUntilMs(until);
             return b;
         };
     }

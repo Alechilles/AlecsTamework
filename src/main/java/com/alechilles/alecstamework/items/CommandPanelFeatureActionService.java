@@ -109,9 +109,12 @@ final class CommandPanelFeatureActionService {
                 LOGGER.at(Level.WARNING).withCause(failure).log("Panel summon of companion %s failed", profileId);
             }
             // A population refusal names its own message (a cap, a provider's denial or a domain limit).
-            String key = failure == null && outcome != null && outcome.messageKey() != null ? outcome.messageKey()
-                    : summonFailureKey(failure != null || outcome == null
-                            ? RestoreFlow.Result.COMMIT_FAILED : outcome.result());
+            if (failure == null && outcome != null && outcome.messageKey() != null) {
+                warnPopulationLater(context, outcome.messageKey());
+                return;
+            }
+            String key = summonFailureKey(failure != null || outcome == null
+                    ? RestoreFlow.Result.COMMIT_FAILED : outcome.result());
             if (key != null) {
                 warnLater(context, key);
             }
@@ -253,6 +256,23 @@ final class CommandPanelFeatureActionService {
                 presentation,
                 resolved.world()
         );
+    }
+
+    /**
+     * As {@link #warnLater} for a population refusal, whose key may come from another mod's
+     * admission provider: a key with no translation is shown as the built-in provider denial,
+     * never as the key.
+     */
+    private void warnPopulationLater(ActionContext context, String key) {
+        context.world().execute(() -> {
+            WorldPlayerResolver.ResolvedPlayer live =
+                    WorldPlayerResolver.resolve(context.world(), context.ownerUuid());
+            if (live != null) {
+                Player player = live.player();
+                String language = player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage();
+                feedback.showWarning(player, SpawnerFeatureHandler.populationText(language, key));
+            }
+        });
     }
 
     /** Shows {@code key} to the owner on the panel's world thread, if the owner is still there. */

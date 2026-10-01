@@ -4,17 +4,16 @@ import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
 import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.hypixel.hytale.codec.ExtraInfo;
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -32,11 +31,11 @@ import org.bson.BsonDocument;
  * holds, patched ({@link SnapshotPatch#withTalents}) and queued for writing, so the next summon
  * comes back with the new talents.
  *
- * <p>The stored change is queued under the index lock, and only while the record is still at the
- * generation and location kind the caller saw. A summon bumps the generation under the same lock,
- * so a change is not queued behind a summon that has committed. A summon that read the snapshot
- * just before the change and commits just after it comes back without the change; the companion's
- * next store then writes the body's talents and the purchase is lost, with its points unspent.</p>
+ * <p>The stored change is fenced on the record revision the caller saw. Under the index lock the
+ * record's summary gets the new spent points and tree, at that revision, and the patched snapshot
+ * is queued only when that update applied. Every other change to the record moves its revision
+ * first: a summon that committed, or a second purchase prepared from the same snapshot, makes
+ * this one end {@link Status#CONFLICT} with nothing queued.</p>
  *
  * <p>The queued snapshot is written by the companion writer's next flush; this class does not
  * wait for it. May be called from any thread and never blocks.</p>
@@ -88,6 +87,15 @@ public final class BondedTalentUpdates {
         @Nullable
         CompletableFuture<Outcome> update(@Nonnull CompanionRecord record,
                                           @Nonnull BondedCompanionTalentActionRequest request);
+    }
+
+    /** Reads the stored talent state of one companion for the talent page; the bonded API implements it. */
+    @FunctionalInterface
+    public interface StoredReader {
+        /** @return the stored state, or null when there is none to show; never fails */
+        @Nonnull
+        CompletableFuture<Stored> storedTalents(@Nonnull UUID ownerUuid, @Nonnull String rosterId,
+                                                @Nonnull String profileId);
     }
 
     /** Finds the talent tree a change is checked against; null when there is none. */
@@ -144,40 +152,64 @@ public final class BondedTalentUpdates {
         return readSnapshot.apply(record.profileId()).thenApply(snapshot -> stored(record, request, snapshot));
     }
 
+    /**
+     * The level and talents a companion that is not active holds in its stored snapshot, or null
+     * when it has none that can be read (a provisioned companion never summoned). Never fails.
+     */
+    @Nonnull
+    public CompletableFuture<Stored> read(@Nonnull CompanionRecord record) {
+        CompletableFuture<SnapshotEnvelope> snapshot;
+        try {
+            snapshot = readSnapshot.apply(record.profileId());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return snapshot.handle((envelope, failure) -> failure != null || envelope == null ? null : decode(envelope));
+    }
+
+    /** The talent state in a stored snapshot. Either part is null when the snapshot has no such component. */
+    public record Stored(@Nullable TameworkLevelingComponent leveling, @Nullable TameworkTalentsComponent talents) {
+    }
+
+    /** Decodes the leveling and talents components of a snapshot; null when the snapshot cannot be read. */
+    @Nullable
+    public static Stored decode(@Nonnull SnapshotEnvelope snapshot) {
+        try {
+            BsonDocument entity = CompanionSnapshots.entity(snapshot);
+            BsonDocument components = entity.isDocument(COMPONENTS) ? entity.getDocument(COMPONENTS) : new BsonDocument();
+            return new Stored(
+                    components.isDocument(LEVELING)
+                            ? TameworkLevelingComponent.CODEC.decode(components.getDocument(LEVELING), new ExtraInfo())
+                            : null,
+                    components.isDocument(SnapshotPatch.TALENTS)
+                            ? TameworkTalentsComponent.CODEC.decode(components.getDocument(SnapshotPatch.TALENTS), new ExtraInfo())
+                            : null);
+        } catch (RuntimeException | LinkageError unreadable) {
+            return null;
+        }
+    }
+
     private Outcome stored(CompanionRecord record, BondedCompanionTalentActionRequest request,
                            @Nullable SnapshotEnvelope snapshot) {
-        if (snapshot == null) {
-            return Outcome.of(Status.NO_LEVEL_DATA);
-        }
-        BsonDocument entity;
-        TameworkLevelingComponent leveling;
-        TameworkTalentsComponent existing;
-        try {
-            entity = CompanionSnapshots.entity(snapshot);
-            BsonDocument components = entity.isDocument(COMPONENTS) ? entity.getDocument(COMPONENTS) : new BsonDocument();
-            leveling = components.isDocument(LEVELING)
-                    ? TameworkLevelingComponent.CODEC.decode(components.getDocument(LEVELING), new ExtraInfo()) : null;
-            existing = components.isDocument(SnapshotPatch.TALENTS)
-                    ? TameworkTalentsComponent.CODEC.decode(components.getDocument(SnapshotPatch.TALENTS), new ExtraInfo())
-                    : null;
-        } catch (RuntimeException | LinkageError unreadable) {
-            return Outcome.of(Status.NO_LEVEL_DATA);
-        }
+        Stored state = snapshot == null ? null : decode(snapshot);
+        TameworkLevelingComponent leveling = state == null ? null : state.leveling();
         if (leveling == null) {
             return Outcome.of(Status.NO_LEVEL_DATA);
         }
         TwTalentConfig config = configs.resolve(request.talentConfigId(), record.roleId());
-        TameworkTalentsComponent updated = changed(existing, leveling.getLevel(), leveling.getConfigId(), config, request);
+        TameworkTalentsComponent updated =
+                changed(state.talents(), leveling.getLevel(), leveling.getConfigId(), config, request);
         if (updated == null) {
             return Outcome.of(Status.REJECTED);
         }
         BsonDocument data = snapshot.data().clone();
-        data.put("Entity", SnapshotPatch.withTalents(entity, updated));
+        data.put("Entity", SnapshotPatch.withTalents(CompanionSnapshots.entity(snapshot), updated));
         SnapshotEnvelope patched = new SnapshotEnvelope(snapshot.profileId(), snapshot.format(), snapshot.generation(), data);
+        CompanionSummary summary = withTalents(record.summary(), updated);
         boolean queued = index.atomically(() -> {
-            CompanionRecord current = index.get(record.profileId());
-            if (current == null || current.generation() != record.generation()
-                    || current.location().kind() != record.location().kind()) {
+            // The fence is the revision the caller read, not the current one: any change since
+            // then (a summon, a store, another purchase) refuses this one.
+            if (!index.update(record.profileId(), record.revision(), b -> b.summary(summary)).applied()) {
                 return false;
             }
             queueSnapshot.accept(patched);
@@ -185,6 +217,16 @@ public final class BondedTalentUpdates {
         });
         return queued ? new Outcome(Status.APPLIED, updated, leveling.getLevel(), leveling.getConfigId())
                 : Outcome.of(Status.CONFLICT);
+    }
+
+    /** The summary with the spent points and tree of {@code talents}; stored companions are listed from it. */
+    private static CompanionSummary withTalents(CompanionSummary s, TameworkTalentsComponent talents) {
+        return new CompanionSummary(s.customName(), s.nameKey(), s.roleId(), s.iconId(), s.healthCurrent(),
+                s.healthMax(), s.happinessConfigId(), s.happiness(), s.needsConfigId(), s.hunger(), s.thirst(),
+                s.breedingPresent(), s.breedingEnabled(), s.breedingCooldownUntilMs(), s.breedingCooldownStartedAtMs(),
+                s.breedingCooldownDurationMs(), s.harvestAlarmUntilMs(), s.levelingConfigId(), s.level(), s.currentXp(),
+                s.totalXp(), talents.getSpentPoints(), s.traits(), s.observedAtMs(), s.harvestAlarmStartedAtMs(),
+                s.harvestAlarmDurationMs(), s.traitsConfigId(), talents.getConfigId(), s.progression());
     }
 
     /**
@@ -206,35 +248,11 @@ public final class BondedTalentUpdates {
             reset.setPurchasedTalentIds(new String[0]);
             return reset;
         }
-        if (config == null || !config.isEnabled()) {
-            return null;
-        }
-        TwTalentConfig.TalentDefinition talent = config.findTalent(request.talentId());
         // An allocation made under another tree or allocation revision is dropped first, as on a live body.
-        TameworkTalentsComponent updated = CompanionTalentService.reconcileAllocation(existing, config);
-        if (talent == null || updated == null || level < talent.getMinLevel()
-                || updated.hasPurchasedTalent(talent.getId())) {
-            return null;
-        }
-        for (String required : talent.getRequiresTalentIds()) {
-            if (required != null && !required.isBlank() && !updated.hasPurchasedTalent(required)) {
-                return null;
-            }
-        }
-        int available = CompanionLevelingService.resolveEarnedTalentPoints(level, levelingConfigId)
-                - updated.getSpentPoints();
-        if (available < talent.getPointCost()) {
-            return null;
-        }
-        updated = updated.clone();
-        LinkedHashSet<String> purchased = new LinkedHashSet<>();
-        for (String id : updated.getPurchasedTalentIds()) {
-            purchased.add(id);
-        }
-        purchased.add(talent.getId());
-        updated.setPurchasedTalentIds(purchased.toArray(new String[0]));
-        updated.setSpentPoints(updated.getSpentPoints() + talent.getPointCost());
-        return updated;
+        CompanionTalentService.PurchaseResult purchase = CompanionTalentService.purchase(
+                CompanionTalentService.reconcileAllocation(existing, config), config, level, levelingConfigId,
+                request.talentId());
+        return purchase.applied() ? purchase.component() : null;
     }
 
     /** The tree the panel showed when it names one that is enabled, else the role's tree. */

@@ -158,6 +158,18 @@ public final class TameworkCompanionTalentsPage
         navigateBackOnWorldThread();
     }
 
+    /**
+     * Shows {@code message} as the status line and redraws the page from its data supplier, for a
+     * change that finished after its click. Call on the viewing player's world thread; does
+     * nothing once the page is closed or navigating back.
+     */
+    public void refresh(@Nullable String message) {
+        if (message != null) {
+            statusMessage = message;
+        }
+        sendRefreshUpdate();
+    }
+
     private void sendRefreshUpdate() {
         if (handled || navigationPending) {
             return;

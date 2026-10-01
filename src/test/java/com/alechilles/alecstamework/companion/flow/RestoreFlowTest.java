@@ -243,6 +243,18 @@ class RestoreFlowTest {
         assertEquals(5_000, index.get(live.profileId()).summonedUntilMs());
     }
 
+    @Test
+    void aRecallOfATimedSummonKeepsItsTimer() {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(), b -> b.summonedUntilMs(9_000));
+
+        RestoreFlow.Result result = flow(CompletableFuture.completedFuture(null), true)
+                .restore(live.profileId(), RestoreRules.Reason.RECALL, there).join();
+
+        assertEquals(RestoreFlow.Result.RESTORED, result);
+        assertEquals(9_000, index.get(live.profileId()).summonedUntilMs());
+    }
+
     private static final String PASTURE = "runeteria:husbandry_deployable";
 
     private static PopulationAdmissionProviderDecision allowPasture(int weight, int limit) {

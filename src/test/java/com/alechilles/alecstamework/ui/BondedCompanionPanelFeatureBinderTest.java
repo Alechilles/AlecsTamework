@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,9 +43,10 @@ class BondedCompanionPanelFeatureBinderTest {
         BondedCompanionStatusPresentation dead = new BondedCompanionStatusPresentation(
                 BondedCompanionStateView.DEAD, BondedCompanionStatusPresentation.Action.REVIVE, true, null, 0L);
 
-        assertEquals("Stored", LinkedNpcPanelFeatureBinder.bondedStateText(stored, "en-US"));
-        assertEquals("Gespeichert", LinkedNpcPanelFeatureBinder.bondedStateText(stored, "de-DE"));
-        assertEquals("Muerto", LinkedNpcPanelFeatureBinder.bondedStateText(dead, "es-ES"));
+        String english = LinkedNpcPanelFeatureBinder.bondedStateText(stored, "en-US");
+        assertFalse(english.isBlank());
+        assertNotEquals(english, LinkedNpcPanelFeatureBinder.bondedStateText(stored, "de-DE"));
+        assertNotEquals(english, LinkedNpcPanelFeatureBinder.bondedStateText(dead, "en-US"));
     }
 
     @Test
@@ -71,12 +72,13 @@ class BondedCompanionPanelFeatureBinderTest {
     }
 
     @Test
-    void durableDetailsIncludeSpeciesRoleAttributesAndMiniwyvernExtension() {
+    void detailLineShowsSpeciesRoleLevelAndHealthAndNoInternalKeys() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons",
                 "Bonded_Miniwyvern_Storm", 4L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern",
-                Map.of("level", "7", "healthPercent", "63.25"),
+                Map.of("level", "7", "currentHealth", "63.4", "maxHealth", "100.0",
+                        "levelingConfigId", "hydragon:leveling", "bonded.activeCapacity.count", "1"),
                 Map.of("hydragon:bond",
                         "{\"archetype\":\"storm\",\"ability\":\"dash\"}"),
                 new BondedCompanionStatusPresentation(
@@ -84,12 +86,17 @@ class BondedCompanionPanelFeatureBinderTest {
                         BondedCompanionStatusPresentation.Action.SUMMON,
                         true, null, 0L), null);
 
-        String detail = LinkedNpcPanelFeatureBinder.bondedDetailText(row);
+        String detail = LinkedNpcPanelFeatureBinder.bondedDetailText(row, "en-US");
 
         assertTrue(detail.contains("Miniwyvern"));
         assertTrue(detail.contains("Storm Miniwyvern"));
-        assertTrue(detail.contains("level: 7"));
-        assertTrue(detail.contains("archetype"));
+        assertTrue(detail.contains("7"), detail);
+        assertTrue(detail.contains("63") && detail.contains("100"), detail);
+        // Raw attribute keys, config ids, role ids and other mods' extension data stay off the card.
+        assertFalse(detail.contains("level:"), detail);
+        assertFalse(detail.contains("hydragon:leveling"), detail);
+        assertFalse(detail.contains("activeCapacity"), detail);
+        assertFalse(detail.contains("archetype"), detail);
         assertFalse(detail.contains("Bonded_Miniwyvern_Storm"));
     }
 

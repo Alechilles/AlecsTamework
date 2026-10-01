@@ -76,17 +76,20 @@ public final class CaptureFlow<R> {
     /**
      * A capture into a bonded roster instead of an item: the record becomes {@code STORED(BONDED)},
      * bonded, in {@code rosterId}, with {@code roleId} as its role (the role the roster family
-     * allows, which the snapshot's body must have too). {@code evidence} builds the capture
-     * evidence JSON for the committed profile id; it is stored under
-     * {@link BondedRecords#CAPTURE_EVIDENCE_KEY} (plan 6 R17). It may run more than once and under
-     * the index lock, so it must be pure.
+     * allows, which the snapshot's body must have too). {@code evidenceJson} is the capture
+     * evidence, stored under {@link BondedRecords#CAPTURE_EVIDENCE_KEY} (plan 6 R17).
+     * {@code summonCooldownUntilMs} is the wall-clock time of the first summon (0 for none): the
+     * family's summon cooldown, so the companion is not summoned while its body is still being
+     * removed. {@code revertSnapshotData} is the snapshot as taken, before the caller's role
+     * patch; it is queued again when a stamped body's commit is undone, because that body lives
+     * on in its old role. Null uses the capture's snapshot data.
      */
-    public record BondedTarget(@Nonnull String rosterId, @Nonnull String roleId,
-                               @Nonnull Function<UUID, String> evidence) {
+    public record BondedTarget(@Nonnull String rosterId, @Nonnull String roleId, @Nonnull String evidenceJson,
+                               long summonCooldownUntilMs, @Nullable BsonDocument revertSnapshotData) {
         public BondedTarget {
             Objects.requireNonNull(rosterId, "rosterId");
             Objects.requireNonNull(roleId, "roleId");
-            Objects.requireNonNull(evidence, "evidence");
+            Objects.requireNonNull(evidenceJson, "evidenceJson");
         }
     }
 
@@ -262,36 +265,36 @@ public final class CaptureFlow<R> {
     private static CompanionRecord created(Capture<?> capture, UUID profileId) {
         CompanionRecord item = CompanionTransitions.newItem(profileId, capture.facts(), capture.owner(),
                 capture.ownerName());
-        return target(capture, profileId).apply(item.toBuilder()).build();
+        return target(capture).apply(item.toBuilder()).build();
     }
 
     /** The change of a stamped body's record: into an item, or into bonded storage. */
     private static UnaryOperator<CompanionRecord.Builder> captured(Capture<?> capture, CompanionRecord before) {
         UnaryOperator<CompanionRecord.Builder> toItem = CompanionTransitions.capturedToItem(
                 before, capture.facts().summary(), capture.owner(), capture.ownerName());
-        UnaryOperator<CompanionRecord.Builder> target = target(capture, before.profileId());
+        UnaryOperator<CompanionRecord.Builder> target = target(capture);
         return b -> target.apply(toItem.apply(b));
     }
 
     /**
      * What a {@link BondedTarget} changes on the item-capture record: STORED(BONDED) in the roster
-     * with the family's role, no command links, no summon cooldown, and the capture evidence.
-     * Nothing for a capture into an item.
+     * with the family's role, no command links, the target's summon cooldown, and the capture
+     * evidence. Nothing for a capture into an item.
      */
-    private static UnaryOperator<CompanionRecord.Builder> target(Capture<?> capture, UUID profileId) {
+    private static UnaryOperator<CompanionRecord.Builder> target(Capture<?> capture) {
         BondedTarget bonded = capture.bonded();
         if (bonded == null) {
             return UnaryOperator.identity();
         }
         // The first value of an extension entry has revision 1; 0 means "no value".
-        ExtensionEntry evidence = new ExtensionEntry(1L, bonded.evidence().apply(profileId));
+        ExtensionEntry evidence = new ExtensionEntry(1L, bonded.evidenceJson());
         return b -> b.location(CompanionLocation.stored(StoredReason.BONDED))
                 .bonded(true)
                 .rosterId(bonded.rosterId())
                 .rosterSlot(-1)
                 .roleId(bonded.roleId())
                 .toolIds(List.of())
-                .summonCooldownUntilMs(0L)
+                .summonCooldownUntilMs(bonded.summonCooldownUntilMs())
                 .extension(BondedRecords.CAPTURE_EVIDENCE_KEY, evidence);
     }
 
@@ -350,8 +353,10 @@ public final class CaptureFlow<R> {
                 if (commit.unregistered()) {
                     loaded.put(profileId, capture.body());
                 }
+                BondedTarget bonded = capture.bonded();
                 queueSnapshot.accept(profileId, new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT,
-                        before.generation(), capture.snapshotData()));
+                        before.generation(), bonded != null && bonded.revertSnapshotData() != null
+                        ? bonded.revertSnapshotData() : capture.snapshotData()));
             }
             return null;
         });
