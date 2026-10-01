@@ -131,7 +131,7 @@ class CaptureItemFlowsTest {
     }
 
     @Test
-    void onlyADestroyedItemAtTheRecordsGenerationTombstonesIt() {
+    void aDestroyedItemAtTheRecordsGenerationLeavesTheCompanionLostAndRecoverable() {
         CompanionRecord item = insertItem();
 
         assertEquals(false, flows.itemDestroyed(new CaptureItemKeys.Ref(item.profileId(), item.generation() + 5)));
@@ -139,8 +139,15 @@ class CaptureItemFlowsTest {
 
         assertEquals(true, flows.itemDestroyed(new CaptureItemKeys.Ref(item.profileId(), item.generation())));
         CompanionRecord after = index.get(item.profileId());
-        assertEquals(LocationKind.RELEASED, after.location().kind());
+        assertEquals(LocationKind.LOST, after.location().kind());
         assertEquals(CompanionTransitions.CAUSE_ITEM_DESTROYED, after.location().cause());
-        assertEquals(List.of(item.profileId()), deleted);
+        // The owner keeps the companion and its snapshot, and can recover it.
+        assertEquals(1, index.ownedCount(OWNER));
+        assertTrue(deleted.isEmpty());
+        assertEquals(RestoreRules.Verdict.ALLOWED,
+                RestoreRules.forRecord(after, RestoreRules.Reason.RECOVER, System.currentTimeMillis()));
+        // A copy of the vanished item can no longer release it.
+        assertNotEquals(RestoreRules.Verdict.ALLOWED, RestoreRules.forRecord(after, RestoreRules.Reason.RELEASE,
+                System.currentTimeMillis(), item.generation()));
     }
 }

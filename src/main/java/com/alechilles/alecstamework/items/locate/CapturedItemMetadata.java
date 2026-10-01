@@ -18,6 +18,15 @@ public final class CapturedItemMetadata {
     private CapturedItemMetadata() { }
 
     /**
+     * The key of a 5.0 item made for {@code profileId} at {@code generation}. A companion index
+     * record in an item looks its item up with its own profile id and generation, so both sides
+     * must build the key here.
+     */
+    public static CaptureKey indexKey(UUID profileId, long generation) {
+        return new CaptureKey(profileId.toString(), GENERATION_KEY_PREFIX + generation, profileId);
+    }
+
+    /**
      * Reads either identity shape. A 5.0 item (profile id and generation, no snapshot id) is keyed
      * by its generation where the older shapes use the snapshot id, so a recapture of the same
      * companion is a different key.
@@ -27,7 +36,7 @@ public final class CapturedItemMetadata {
         if (stack == null || stack.isEmpty()) return null;
         CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(stack);
         if (ref != null) {
-            return new CaptureKey(ref.profileId().toString(), GENERATION_KEY_PREFIX + ref.generation(), ref.profileId());
+            return indexKey(ref.profileId(), ref.generation());
         }
         if (!has(stack, TameworkMetadataKeys.TARGET_UUID)) return null;
         BsonDocument metadata = stack.getMetadata();

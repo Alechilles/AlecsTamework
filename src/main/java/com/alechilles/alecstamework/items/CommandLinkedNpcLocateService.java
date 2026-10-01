@@ -5,10 +5,12 @@ import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Sighting;
@@ -161,11 +163,60 @@ final class CommandLinkedNpcLocateService {
             case COOP -> showStatus(player, name, location.world(),
                     TameworkLinkedNpcLocationFormatter.formatCoordinates(location.x(), location.y(), location.z()),
                     LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.coop"));
-            // The index keeps no capture key, so the held item cannot be traced here.
-            case ITEM -> showStatus(player, name, "", "",
-                    LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.captureUnknown"));
+            case ITEM -> locateItem(player, name, companion);
             default -> feedbackService.showWarningKey(player, "tamework.ui.notifications.command.locate.unavailable");
         }
+    }
+
+    /**
+     * Verifies the one holder last seen with the record's capture item on that holder's world
+     * thread, then reports on the viewer's current world thread. Only the key and the name cross
+     * threads.
+     */
+    private void locateItem(Player player, String name, CompanionRecord companion) {
+        UUID viewer = player.getUuid();
+        UUID request = UUID.randomUUID();
+        if (viewer == null || itemTracker == null) {
+            showCapture(player, name, null);
+            return;
+        }
+        if (pending.size() >= 256 || pending.putIfAbsent(viewer, request) != null) return;
+        CaptureKey capture = CapturedItemMetadata.indexKey(companion.profileId(), companion.generation());
+        itemTracker.verify(capture).toCompletableFuture().orTimeout(5, TimeUnit.SECONDS).whenComplete((sighting, failure) -> {
+            boolean dispatched = CommandUiCurrentWorldDispatcher.production().dispatch(viewer, new CommandUiHostPage.WorldOperation() {
+                @Override public void run(Ref<EntityStore> ref, Store<EntityStore> store) {
+                    if (!pending.remove(viewer, request)) return;
+                    Player current = ref == null || !ref.isValid() ? null : store.getComponent(ref, Player.getComponentType());
+                    if (current == null) return;
+                    CompanionRecord latest = companions.get(companion.profileId());
+                    if (failure != null || latest == null || latest.location().kind() != LocationKind.ITEM
+                            || latest.generation() != companion.generation()) {
+                        feedbackService.showWarningKey(current, "tamework.ui.notifications.command.locate.unavailable");
+                        return;
+                    }
+                    showCapture(current, name, sighting == null ? null : sighting.orElse(null));
+                }
+                @Override public void unavailable() { pending.remove(viewer, request); }
+            });
+            if (!dispatched) pending.remove(viewer, request);
+        });
+    }
+
+    /** Names the capture item and its holder, or says the item's location is unknown. */
+    private void showCapture(Player player, String name, @Nullable Sighting sighting) {
+        if (sighting == null) {
+            showStatus(player, name, "", "",
+                    LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.captureUnknown"));
+            return;
+        }
+        var holder = sighting.holder();
+        String place = describeSighting(player, sighting);
+        String status = sighting.loaded() ? place : LocalizedText.format(player,
+                "tamework.ui.notifications.command.locate.lastSeen", place, Instant.ofEpochMilli(sighting.observedAtMs()).toString());
+        // Inventory location identifies the holder; old player coordinates would be misleading.
+        boolean carried = holder.kind() == Kind.PLAYER;
+        showStatus(player, name, carried ? "" : holder.worldName(), carried ? ""
+                : TameworkLinkedNpcLocationFormatter.formatCoordinates(holder.x(), holder.y(), holder.z()), status);
     }
 
     private void showLiveLocation(Player player, LinkedNpcRecord record) {
@@ -276,20 +327,8 @@ final class CommandLinkedNpcLocateService {
             coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(coop.x(), coop.y(), coop.z());
             status = LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.coop");
         } else if (profile.lifecycle().state() == LifecycleState.CAPTURED) {
-            Sighting sighting = result.sighting().orElse(null);
-            if (sighting == null) {
-                status = LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.captureUnknown");
-            } else {
-                var holder = sighting.holder();
-                String place = describeSighting(player, sighting);
-                status = sighting.loaded() ? place : LocalizedText.format(player,
-                        "tamework.ui.notifications.command.locate.lastSeen", place, Instant.ofEpochMilli(sighting.observedAtMs()).toString());
-                // Inventory location identifies the holder; old player coordinates would be misleading.
-                if (holder.kind() != Kind.PLAYER) {
-                    world = holder.worldName();
-                    coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(holder.x(), holder.y(), holder.z());
-                }
-            }
+            showCapture(player, name, result.sighting().orElse(null));
+            return;
         } else if (profile.lifecycle().state() == LifecycleState.ACTIVE || profile.lifecycle().state() == LifecycleState.UNLOADED) {
             LinkedNpcRecord current = new LinkedNpcRecord(
                     profile.currentAlias() == null ? record.npcUuid : profile.currentAlias().alias().value(),

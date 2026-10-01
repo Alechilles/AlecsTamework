@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.SummaryLifeStage;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
+import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -177,8 +178,9 @@ final class CommandSavedNpcPanelSnapshot {
      * Builds the unloaded panel from the index summary (spec 6.6) without decoding a snapshot.
      * The summary was captured from the live body, so its absent sections follow exact-checkpoint
      * semantics. A COOP record also carries its coop block from the record's location, even when
-     * the summary was never captured. Returns null otherwise when the summary was never captured.
-     * Capture item keys and restoration-snapshot talent editing are not carried by the summary.
+     * the summary was never captured, and an ITEM record carries the key of the capture item made
+     * at its generation. Returns null otherwise when the summary was never captured.
+     * Restoration-snapshot talent editing is not carried by the summary.
      */
     @Nullable
     static CommandSavedNpcPanelSnapshot fromSummary(CompanionRecord record) {
@@ -187,6 +189,10 @@ final class CommandSavedNpcPanelSnapshot {
         }
         CommandSavedNpcPanelSnapshot saved = fromSummaryFacts(record);
         CompanionLocation at = record.location();
+        if (at.kind() == LocationKind.ITEM) {
+            return new CommandSavedNpcPanelSnapshot(saved, new StoredLocation(null,
+                    CapturedItemMetadata.indexKey(record.profileId(), record.generation())));
+        }
         if (at.kind() != LocationKind.COOP || at.world() == null) {
             return saved;
         }

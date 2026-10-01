@@ -27,8 +27,9 @@ import javax.annotation.Nullable;
 /**
  * Tracks dropped captures at add/remove boundaries; movement is resolved only on Locate.
  *
- * <p>With {@code destroyedItems} set, it also ends the companion of a dropped capture item that
- * despawned or fell out of the world (spec 8.14). Only positive evidence counts: a REMOVE that is
+ * <p>With {@code destroyedItems} set, it also marks the companion of a dropped capture item that
+ * despawned or fell out of the world as lost, for its owner to recover (spec 8.14). Only positive
+ * evidence counts: a REMOVE that is
  * not a player pickup, not a pickup-animation copy and not a {@code Pickup} interaction, whose
  * despawn time has passed or whose position is below the world. Any other removal, for example an
  * NPC picking the item up, leaves the record in the item for the owner's Recall or Forget.</p>
@@ -83,7 +84,7 @@ public final class CapturedItemDropSystem extends RefSystem<EntityStore> {
         }
         if (!despawned(ref, store, buffer) && !belowWorld(ref, buffer)) return;
         if (destroyedItems.itemDestroyed(key)) {
-            LOGGER.at(Level.INFO).log("Capture item for companion %s was destroyed in world %s; the companion is gone",
+            LOGGER.at(Level.INFO).log("Capture item for companion %s was destroyed in world %s; the companion is now lost and can be recovered",
                     key.profileId(), store.getExternalData().getWorld().getName());
         }
     }

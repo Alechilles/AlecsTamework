@@ -16,7 +16,13 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
+import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
+import com.hypixel.hytale.assetstore.TestItemAssetStore;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -55,6 +61,34 @@ class CommandSavedNpcPanelSummaryTest {
 
         assertNotNull(saved);
         assertEquals(new CommandSavedNpcPanelSnapshot.CoopLocation("farm", 4, 64, -9), saved.storedLocation().coop());
+    }
+
+    /** The card finds a capture item's holder only if the record builds the key its item is tracked under. */
+    @Test
+    void itemRecordFindsTheTrackedLocationOfTheCaptureItemMadeAtItsGeneration() throws Exception {
+        Field itemStore = Item.class.getDeclaredField("ASSET_STORE");
+        itemStore.setAccessible(true);
+        Object previous = itemStore.get(null);
+        itemStore.set(null, new TestItemAssetStore(new DefaultAssetMap<>(Map.of("Soul_Lantern", new Item("Soul_Lantern")))));
+        try {
+            UUID profileId = UUID.randomUUID();
+            ItemStack lantern = CaptureItemKeys.write(new ItemStack("Soul_Lantern", 1), new CaptureItemKeys.Ref(profileId, 3));
+            CapturedItemLocationIndex locations = new CapturedItemLocationIndex();
+            CapturedItemLocationIndex.Holder chest = new CapturedItemLocationIndex.Holder(
+                    CapturedItemLocationIndex.Kind.CONTAINER, "farm", "4,64,-9", "Wooden_Chest", 4, 64, -9);
+            locations.observe(chest, Map.of(CapturedItemMetadata.read(lantern), lantern.getItemId()), 1L);
+
+            CompanionRecord held = CompanionRecord.builder(profileId, ROLE, CompanionLocation.item()).generation(3).build();
+            var sighting = locations.find(CommandSavedNpcPanelSnapshot.fromSummary(held).storedLocation().capture());
+            assertEquals(chest, sighting.orElseThrow().holder());
+            assertEquals("Soul_Lantern", sighting.orElseThrow().itemId());
+
+            // A recapture is tracked under its own generation; the old item's holder is not reported for it.
+            CompanionRecord recaptured = CompanionRecord.builder(profileId, ROLE, CompanionLocation.item()).generation(5).build();
+            assertTrue(locations.find(CommandSavedNpcPanelSnapshot.fromSummary(recaptured).storedLocation().capture()).isEmpty());
+        } finally {
+            itemStore.set(null, previous);
+        }
     }
 
     @Test

@@ -15,14 +15,16 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Ways out for a companion held by a capture item Tamework cannot see (spec 8.14). Forget and a
- * destroyed item make the record a RELEASED tombstone; Recall restores it from its snapshot. Each
- * raises the generation, so any surviving copy of the item is stale and empty on use. After a
- * successful Forget or Recall the held-item sweep is asked to empty the copies the record's owner
- * holds, so they do not keep their filled look until used; copies elsewhere still empty on use.
+ * Ways out for a companion held by a capture item Tamework cannot see (spec 8.14). Forget makes
+ * the record a RELEASED tombstone; Recall restores it from its snapshot; a destroyed item leaves
+ * the companion LOST, to be recovered by its owner. Each raises the generation, so any surviving
+ * copy of the item is stale and empty on use. After a successful Forget or Recall the held-item
+ * sweep is asked to empty the copies the record's owner holds, so they do not keep their filled
+ * look until used; copies elsewhere still empty on use.
  *
  * <p>{@link #forget} and {@link #itemDestroyed} only change the in-memory index and are safe from
- * any thread. The snapshot delete is queued after the tombstone, as in the release flow.</p>
+ * any thread. Forget queues the snapshot delete after the tombstone, as in the release flow; a
+ * destroyed item keeps the snapshot, which Recover restores from.</p>
  */
 public final class CaptureItemFlows {
     public enum Result { FORGOTTEN, NOT_FOUND, NOT_OWNER, NOT_IN_ITEM }
@@ -106,23 +108,21 @@ public final class CaptureItemFlows {
     }
 
     /**
-     * A dropped capture item despawned or fell out of the world. Tombstones the record only while it
-     * is still in an item at the item's generation; a stale or duplicated copy changes nothing.
+     * A dropped capture item despawned or fell out of the world. The record becomes LOST with cause
+     * ITEM_DESTROYED, one generation newer, only while it is still in an item at the item's
+     * generation; a stale or duplicated copy changes nothing. The owner and the snapshot are kept,
+     * so the companion still counts for its owner, who can Recover it.
      *
-     * @return true when the record became a tombstone
+     * @return true when the record became LOST
      */
     public boolean itemDestroyed(@Nonnull CaptureItemKeys.Ref item) {
         UUID profileId = item.profileId();
-        boolean released = index.atomically(() -> {
+        return index.atomically(() -> {
             CompanionRecord record = index.get(profileId);
             return record != null && record.location().kind() == LocationKind.ITEM
                     && record.generation() == item.generation()
-                    && index.update(profileId, record.revision(),
-                    CompanionTransitions.released(record, CompanionTransitions.CAUSE_ITEM_DESTROYED)).applied();
+                    && index.update(profileId, record.revision(), CompanionTransitions.lost(record, null,
+                    CompanionTransitions.CAUSE_ITEM_DESTROYED, null)).applied();
         });
-        if (released) {
-            deleteSnapshot.accept(profileId);
-        }
-        return released;
     }
 }
