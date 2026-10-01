@@ -13,14 +13,17 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -48,6 +51,8 @@ public final class CompanionPersistenceModule {
     @Nullable private final CompanionWriter writer;
     @Nullable private final CompanionStore store;
     @Nullable private final ExecutorService reader;
+    @Nullable private final ScheduledExecutorService timers;
+    private final List<CompanionIndex.ChangeListener> changeListeners;
     private final LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
     @Nullable private final CompanionQueries queries;
     private final Set<UUID> unreadable;
@@ -56,6 +61,7 @@ public final class CompanionPersistenceModule {
 
     private CompanionPersistenceModule(State state, @Nullable String failure, @Nullable CompanionIndex index,
                                        @Nullable CompanionWriter writer, @Nullable CompanionStore store,
+                                       List<CompanionIndex.ChangeListener> changeListeners,
                                        Set<UUID> unreadable, LongSupplier clock) {
         this.state = state;
         this.failure = failure;
@@ -69,6 +75,13 @@ public final class CompanionPersistenceModule {
             thread.setDaemon(true);
             return thread;
         });
+        // Timed companion work such as summon expiry. It only starts flows, which never block it.
+        this.timers = index == null ? null : Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "tamework-companion-timers");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.changeListeners = changeListeners;
         this.queries = index == null ? null : new CompanionQueries(index, loaded);
         this.unreadable = Set.copyOf(unreadable);
         this.clock = clock;
@@ -117,10 +130,14 @@ public final class CompanionPersistenceModule {
             }
         }
         AtomicReference<CompanionWriter> writerRef = new AtomicReference<>();
+        List<CompanionIndex.ChangeListener> listeners = new CopyOnWriteArrayList<>();
         CompanionIndex index = new CompanionIndex(clock, (before, after) -> {
             CompanionWriter w = writerRef.get();
             if (w != null) {
                 w.onRecordChanged(before, after);
+            }
+            for (CompanionIndex.ChangeListener listener : listeners) {
+                listener.onChanged(before, after);
             }
         });
         index.load(result.records());
@@ -136,11 +153,12 @@ public final class CompanionPersistenceModule {
             LOGGER.at(Level.WARNING).log("Companion store loaded with %d quarantined files and %d unreadable records",
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
-        return new CompanionPersistenceModule(State.READY, null, index, writer, store, result.unreadableIds(), clock);
+        return new CompanionPersistenceModule(State.READY, null, index, writer, store, listeners,
+                result.unreadableIds(), clock);
     }
 
     private static CompanionPersistenceModule failed(State state, String failure, LongSupplier clock) {
-        return new CompanionPersistenceModule(state, failure, null, null, null, Set.of(), clock);
+        return new CompanionPersistenceModule(state, failure, null, null, null, List.of(), Set.of(), clock);
     }
 
     @Nonnull public State state() { return state; }
@@ -158,6 +176,27 @@ public final class CompanionPersistenceModule {
     /** True for profile ids whose record could not be decoded at load; their bodies must not be adopted. */
     @Nonnull public Predicate<UUID> unreadable() { return unreadable::contains; }
     @Nonnull public ThrottledWarnings warnings() { return warnings; }
+
+    /**
+     * Adds a listener called after the writer for every applied index change. It runs under the
+     * index lock, so it must be cheap and must not block, do I/O or touch worlds. To add it and
+     * read the current records with no change missed in between, call this inside
+     * {@code index().atomically(...)}.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    public void addChangeListener(@Nonnull CompanionIndex.ChangeListener listener) {
+        require(index);
+        changeListeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /**
+     * The module's timer thread for companion timers (summon expiry). Its tasks must not block.
+     * {@link #shutdown} stops it before the final flush.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    @Nonnull public ScheduledExecutorService timers() { return require(timers); }
 
     /**
      * Reads a profile's latest snapshot without blocking the caller (spec 6.5): the snapshot the
@@ -198,6 +237,10 @@ public final class CompanionPersistenceModule {
      * Returns true when nothing was left unwritten, and always true when there is no writer.
      */
     public boolean shutdown(long deadlineMs) {
+        // No timer may start a store once the final flush begins.
+        if (timers != null) {
+            timers.shutdownNow();
+        }
         if (reader != null) {
             reader.shutdown();
         }
