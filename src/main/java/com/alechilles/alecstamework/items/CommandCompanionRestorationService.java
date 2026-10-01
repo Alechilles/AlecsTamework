@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -33,7 +34,8 @@ import javax.annotation.Nullable;
  * placement near the player and hands it to {@link RestoreFlow}. The flow re-checks the record and
  * hands its entity work to the world threads itself. Its outcome returns to the player on the
  * world thread the placement was taken in, through {@link CommandRestorationCompletionListener};
- * a player who left that world or disconnected gets no message.</p>
+ * a player who left that world or disconnected gets no message. The owner's open panels are then
+ * asked to refresh, so their cards show the restored companion.</p>
  *
  * <p>A revive with a configured item cost takes the exact items from the player's inventory on
  * that same world thread, before the flow starts. Any result other than RESTORED gives the items
@@ -70,6 +72,8 @@ final class CommandCompanionRestorationService {
     private final CommandRestorationCompletionListener listener = new CommandRestorationCompletionListener();
     @Nullable
     private volatile CaptureItemFlows captureItemFlows;
+    /** Asks the owner's open panels to rebuild their cards; must be safe from any thread. */
+    private volatile Consumer<UUID> panelRefresh = owner -> { };
 
     CommandCompanionRestorationService(
             @Nonnull CommandCompanionPlacementService placements,
@@ -85,6 +89,15 @@ final class CommandCompanionRestorationService {
         );
         this.restoreFlow = Objects.requireNonNull(restoreFlow, "Restore flow is required");
         this.companions = Objects.requireNonNull(companions, "Companion queries are required");
+    }
+
+    /**
+     * Sets what refreshes the owner's open panels when a restore ends. The click that starts a
+     * restore refreshes the page before the restore has run, so without this the old card (for
+     * example a captured companion on the Stored tab) stays until the next refresh.
+     */
+    void usePanelRefresh(@Nonnull Consumer<UUID> refresh) {
+        panelRefresh = Objects.requireNonNull(refresh, "refresh");
     }
 
     /** Lets a Recall of a captured companion empty the owner's held copies of its item. */
@@ -202,6 +215,13 @@ final class CommandCompanionRestorationService {
             }
             completions.dispatch(placement.worldKey(), playerUuid,
                     (currentWorld, currentStore, actorRef, actor) -> listener.complete(outcome, actor, name));
+            // The record has its final state now; a refusal can also change what the card shows.
+            try {
+                panelRefresh.accept(playerUuid);
+            } catch (RuntimeException failure) {
+                LOGGER.at(Level.WARNING).withCause(failure).log("Panel refresh after " + reason
+                        + " of profile=" + profileId + " failed.");
+            }
         });
         return RequestStatus.STARTED;
     }

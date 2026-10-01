@@ -4,14 +4,20 @@ import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
 import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
-/** Binds timed-roster and paid-revival presentation for one panel card. */
+/**
+ * Binds roster and paid-revival presentation for one panel card: a state caption, a bold line for a
+ * running timer or the revival status, and the active count of a roster with an active limit.
+ */
 final class LinkedNpcPanelFeatureBinder {
+    private static final String CARD_UI = "TameworkLinkedNpcPanelCard.ui";
+
     private LinkedNpcPanelFeatureBinder() {
     }
 
@@ -31,15 +37,18 @@ final class LinkedNpcPanelFeatureBinder {
         String dismissSelector =
                 entrySelector + " #RosterDismissButton";
         boolean visible = row != null && (row.roster() != null || row.bonded() != null);
-        builder.set(stateSelector + ".Visible", visible);
-        builder.set(timerSelector + ".Visible", visible);
-        builder.set(capacitySelector + ".Visible", visible);
         if (!visible) {
+            builder.set(stateSelector + ".Visible", false);
+            builder.set(timerSelector + ".Visible", false);
+            builder.set(capacitySelector + ".Visible", false);
             builder.set(summonSelector + ".Visible", false);
             builder.set(dismissSelector + ".Visible", false);
             return;
         }
         if (row.bonded() != null) {
+            builder.set(stateSelector + ".Visible", true);
+            builder.set(timerSelector + ".Visible", true);
+            builder.set(capacitySelector + ".Visible", true);
             bindBonded(builder, events, npcUuid, row.bonded(), config,
                     stateSelector, timerSelector, capacitySelector,
                     summonSelector, dismissSelector, language);
@@ -48,12 +57,24 @@ final class LinkedNpcPanelFeatureBinder {
         CommandRosterStatusPresentation roster = row.roster();
         builder.set(summonSelector + ".Visible", roster.summonVisible());
         builder.set(dismissSelector + ".Visible", roster.dismissVisible());
+        // The caption and bold line match the status text of generic cards (#InlineLocation). The
+        // styles and anchors are set here so bonded rows keep the defaults of the shared labels.
+        String status = statusLine(row, language);
+        String capacity = capacityLine(roster, language);
+        builder.set(stateSelector + ".Visible", true);
         builder.set(stateSelector + ".Text", stateText(roster, language));
-        builder.set(timerSelector + ".Text", timerText(row, language));
-        builder.set(
-                capacitySelector + ".Text",
-                capacityText(roster, language)
-        );
+        builder.set(stateSelector + ".Style", Value.ref(CARD_UI, "RosterCaption"));
+        builder.setObject(stateSelector + ".Anchor", LinkedNpcPanelCardBinder.fixedAnchor(32, 432, 284, 16));
+        builder.set(timerSelector + ".Visible", !status.isEmpty());
+        builder.set(timerSelector + ".Text", status);
+        builder.set(timerSelector + ".Style", Value.ref(CARD_UI, "RosterStatus"));
+        builder.setObject(timerSelector + ".Anchor", LinkedNpcPanelCardBinder.fixedAnchor(48, 432, 284, 18));
+        builder.set(capacitySelector + ".Visible", !capacity.isEmpty());
+        builder.set(capacitySelector + ".Text", capacity);
+        builder.set(capacitySelector + ".Style",
+                Value.ref(CARD_UI, roster.capBlocked() ? "RosterCapacityFull" : "RosterCapacity"));
+        builder.setObject(capacitySelector + ".Anchor",
+                LinkedNpcPanelCardBinder.fixedAnchor(status.isEmpty() ? 48 : 68, 432, 284, 14));
         if (roster.summonEnabled()) {
             events.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -155,17 +176,15 @@ final class LinkedNpcPanelFeatureBinder {
             case DEAD_REVIVABLE -> "dead";
             case LOST -> "lost";
         };
-        return LocalizedText.format(
-                language,
-                "tamework.ui.linkedPanel.roster.state",
-                LocalizedText.resolve(
-                        language,
-                        "tamework.ui.linkedPanel.roster.state." + stateKey
-                )
-        );
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state." + stateKey);
     }
 
-    private static String timerText(
+    /**
+     * The bold line under the state caption: the revival status of a dead or lost member, else the
+     * running summon time or summon cooldown. Empty when no timer is running; an untimed member
+     * shows only its state.
+     */
+    static String statusLine(
             CommandPanelFeaturePresentation row,
             String language
     ) {
@@ -196,19 +215,7 @@ final class LinkedNpcPanelFeatureBinder {
                     )
             );
         }
-        return LocalizedText.format(
-                language,
-                "tamework.ui.linkedPanel.roster.duration",
-                roster.unlimitedDuration()
-                        ? LocalizedText.resolve(
-                                language,
-                                "tamework.ui.linkedPanel.roster.unlimited"
-                        )
-                        : LinkedNpcPanelStatusTextService
-                        .formatRemainingTime(
-                                roster.configuredDurationMs(), language
-                        )
-        );
+        return "";
     }
 
     private static String revivalStatus(
@@ -248,21 +255,16 @@ final class LinkedNpcPanelFeatureBinder {
         };
     }
 
-    private static String capacityText(
+    /** The active count matters only for a roster with an active limit; without one this is empty. */
+    static String capacityLine(
             CommandRosterStatusPresentation roster,
             String language
     ) {
-        return roster.capUnlimited()
-                ? LocalizedText.format(
-                        language,
-                        "tamework.ui.linkedPanel.roster.capacityUnlimited",
-                        roster.activeCount()
-                )
-                : LocalizedText.format(
-                        language,
-                        "tamework.ui.linkedPanel.roster.capacity",
-                        roster.activeCount(),
-                        roster.activeLimit()
-                );
+        return roster.capUnlimited() ? "" : LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.roster.capacity",
+                roster.activeCount(),
+                roster.activeLimit()
+        );
     }
 }

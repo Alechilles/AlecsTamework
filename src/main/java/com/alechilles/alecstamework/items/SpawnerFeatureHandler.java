@@ -32,6 +32,9 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
+import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
+import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
+import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
@@ -953,7 +956,7 @@ public final class SpawnerFeatureHandler {
      * After a Recall or Forget (spec 8.14): empties the copies of the companion's capture item
      * that {@code playerUuid} holds, so they do not keep their filled look until used. Safe from
      * any thread; the player is resolved on their current world thread and an offline player is
-     * skipped. Copies in containers or with other players still turn empty on use.
+     * skipped. {@link #emptyLocatedCaptureItem} covers the copy the item locator last saw.
      */
     public void emptyHeldCaptureItems(@Nullable UUID playerUuid, @Nonnull UUID profileId) {
         if (playerUuid != null) {
@@ -962,9 +965,55 @@ public final class SpawnerFeatureHandler {
         }
     }
 
+    /**
+     * After a Recall or Forget: empties the item where the locator last saw it, when that is not
+     * {@code owner}'s inventory, which {@link #emptyHeldCaptureItems} covers. One lookup of the
+     * item made for {@code profileId} at {@code itemGeneration}: a block container or a dropped
+     * item is edited in place on its world thread, and another online player's inventory on that
+     * player's world thread. No chunk is loaded; an unknown, unloaded or offline holder is left
+     * alone, and its item still turns empty on use. Safe from any thread.
+     */
+    public void emptyLocatedCaptureItem(@Nonnull CapturedItemTracker tracker, @Nullable UUID owner,
+                                        @Nonnull UUID profileId, long itemGeneration) {
+        CapturedItemLocationIndex.Sighting sighting = tracker.index()
+                .find(CapturedItemMetadata.indexKey(profileId, itemGeneration)).orElse(null);
+        if (sighting == null) {
+            return;
+        }
+        CapturedItemLocationIndex.Holder holder = sighting.holder();
+        if (holder.kind() != CapturedItemLocationIndex.Kind.PLAYER) {
+            tracker.editStacks(holder, stack -> emptiedIfStale(stack, profileId));
+            return;
+        }
+        try {
+            UUID holderUuid = UUID.fromString(holder.id());
+            if (!holderUuid.equals(owner)) {
+                emptyHeldCaptureItems(holderUuid, profileId);
+            }
+        } catch (IllegalArgumentException notAPlayerUuid) {
+            // A sighting that names no player has nothing to sweep.
+        }
+    }
+
+    /**
+     * The emptied form of a stale copy of {@code profileId}'s capture item, or null when the stack
+     * is something else, has no empty form, or is still current for its record (captured again
+     * since), in which case it keeps its companion.
+     */
+    @Nullable
+    private ItemStack emptiedIfStale(@Nullable ItemStack stack, UUID profileId) {
+        CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(stack);
+        if (item == null || !item.profileId().equals(profileId)
+                || !CaptureItemOwnership.isStale(index.get(profileId), item.generation())) {
+            return null;
+        }
+        String emptyItemId = itemMetadata.resolveEmptyItemId(stack.getItemId());
+        return emptyItemId == null || emptyItemId.isBlank() ? null
+                : itemMetadata.clearCapturedMetadata(itemMetadata.swapItemId(stack, emptyItemId));
+    }
+
     /** World thread: Hotbar, Storage, Backpack and Tool, compare-then-replace per slot. */
     private void emptyStaleCaptureItems(Store<EntityStore> store, Ref<EntityStore> playerRef, UUID profileId) {
-        CompanionRecord record = index.get(profileId);
         for (var type : CaptureItemHolderSystems.Transfers.holderInventories()) {
             InventoryComponent inventory = store.getComponent(playerRef, type);
             ItemContainer container = inventory == null ? null : inventory.getInventory();
@@ -973,16 +1022,9 @@ public final class SpawnerFeatureHandler {
             }
             for (short slot = 0, capacity = container.getCapacity(); slot < capacity; slot++) {
                 ItemStack stack = container.getItemStack(slot);
-                CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(stack);
-                // A copy still current for its record (captured again since) keeps its companion.
-                if (item == null || !item.profileId().equals(profileId)
-                        || !CaptureItemOwnership.isStale(record, item.generation())) {
-                    continue;
-                }
-                String emptyItemId = itemMetadata.resolveEmptyItemId(stack.getItemId());
-                if (emptyItemId != null && !emptyItemId.isBlank()) {
-                    container.replaceItemStackInSlot(slot, stack,
-                            itemMetadata.clearCapturedMetadata(itemMetadata.swapItemId(stack, emptyItemId)));
+                ItemStack emptied = emptiedIfStale(stack, profileId);
+                if (emptied != null) {
+                    container.replaceItemStackInSlot(slot, stack, emptied);
                 }
             }
         }

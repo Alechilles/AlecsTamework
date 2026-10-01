@@ -415,6 +415,9 @@ public final class CommandItemFeatureHandler {
         if (persistenceView != null) {
             this.selectionPageService.configureSavedPanelSignals(persistenceView::savedPanelSignals);
         }
+        if (restorationService != null) {
+            restorationService.usePanelRefresh(this.selectionPageService::signalOwnerPanels);
+        }
         this.selectionPageService.configureShoulderRideAction(
                 new BondedCompanionShoulderRideActionService(
                         BondedCompanionPanelActionRouter::resolvePlayerFromEvent,

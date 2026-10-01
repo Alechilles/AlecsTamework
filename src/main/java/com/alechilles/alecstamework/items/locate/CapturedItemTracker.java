@@ -8,6 +8,7 @@ import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -105,6 +107,57 @@ public final class CapturedItemTracker implements AutoCloseable {
         } catch (RuntimeException failure) { index.unload(known.holder()); result.complete(index.find(capture)); }
         return result.completeOnTimeout(Optional.of(new Sighting(known.capture(), known.holder(),
                 known.observedAtMs(), false, known.itemId())), 3, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Rewrites the stacks of one block container or dropped item on its world thread, then observes
+     * that holder again. {@code edit} returns the replacement for a stack, or null to keep it; a
+     * container slot is replaced only while it still holds the stack that was read. Only what is in
+     * memory is touched: no chunk is loaded, and a holder that is gone or unloaded is left alone.
+     * A player holder is ignored here; a player's inventory is edited on the player's current world.
+     * Safe from any thread; one world task per call.
+     */
+    public void editStacks(Holder holder, UnaryOperator<ItemStack> edit) {
+        if (closed || holder.kind() == Kind.PLAYER) return;
+        World world = world(holder.worldName());
+        if (world == null) return;
+        try {
+            world.execute(() -> {
+                if (closed) return;
+                try {
+                    if (editLoaded(world, holder, edit)) refresh(world, holder);
+                } catch (RuntimeException unavailable) {
+                    LOGGER.warning("Capture item at " + sourceKey(holder) + " could not be emptied: " + unavailable);
+                }
+            });
+        } catch (RuntimeException ignored) { }
+    }
+
+    /** World thread. Returns false when the holder is not in memory. */
+    private static boolean editLoaded(World world, Holder holder, UnaryOperator<ItemStack> edit) {
+        if (holder.kind() == Kind.CONTAINER) {
+            var chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
+            var ref = chunk == null ? null : chunk.getBlockComponentEntity((int) holder.x(), (int) holder.y(), (int) holder.z());
+            var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
+                    .getComponent(ref, ItemContainerBlock.getComponentType());
+            ItemContainer container = block == null ? null : block.getItemContainer();
+            if (container == null) return false;
+            for (short slot = 0, capacity = container.getCapacity(); slot < capacity; slot++) {
+                ItemStack stack = container.getItemStack(slot);
+                ItemStack replacement = stack == null || stack.isEmpty() ? null : edit.apply(stack);
+                if (replacement != null) container.replaceItemStackInSlot(slot, stack, replacement);
+            }
+            return true;
+        }
+        var ref = world.getEntityRef(UUID.fromString(holder.id()));
+        var item = ref == null || !ref.isValid() ? null : world.getEntityStore().getStore()
+                .getComponent(ref, ItemComponent.getComponentType());
+        if (item == null) return false;
+        ItemStack stack = item.getItemStack();
+        ItemStack replacement = stack == null || stack.isEmpty() ? null : edit.apply(stack);
+        // The dropped item stays in the world as its emptied form.
+        if (replacement != null) item.setItemStack(replacement);
+        return true;
     }
 
     private void refresh(World world, Holder holder) {

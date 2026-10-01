@@ -103,9 +103,9 @@ class CaptureItemFlowsTest {
     }
 
     @Test
-    void aSuccessfulForgetOrRecallAsksToEmptyTheOwnersHeldCopiesOfTheItem() {
+    void aSuccessfulForgetOrRecallAsksToEmptyTheCopiesOfTheItemAtItsGeneration() {
         List<String> swept = new ArrayList<>();
-        flows.useHeldItemSweep((owner, profileId) -> swept.add(owner + ":" + profileId));
+        flows.useItemSweep((owner, profileId, itemGeneration) -> swept.add(owner + ":" + profileId + ":" + itemGeneration));
         CompanionRecord forgotten = insertItem();
         CompanionRecord recalled = insertItem();
 
@@ -113,13 +113,15 @@ class CaptureItemFlowsTest {
         flows.forget(forgotten.profileId(), null);
         flows.recall(recalled.profileId(), new RestoreFlow.Destination("default", 1, 2, 3, 0f, 0f)).join();
 
-        assertEquals(List.of(OWNER + ":" + forgotten.profileId(), OWNER + ":" + recalled.profileId()), swept);
+        // The locator finds the item by the generation it was made at, not the record's new one.
+        assertEquals(List.of(OWNER + ":" + forgotten.profileId() + ":" + forgotten.generation(),
+                OWNER + ":" + recalled.profileId() + ":" + recalled.generation()), swept);
     }
 
     @Test
     void aRefusedForgetAndARestoreOfACompanionOutsideAnItemSweepNothing() {
         List<UUID> swept = new ArrayList<>();
-        flows.useHeldItemSweep((owner, profileId) -> swept.add(profileId));
+        flows.useItemSweep((owner, profileId, itemGeneration) -> swept.add(profileId));
         CompanionRecord item = insertItem();
         CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0, body());
         index.insert(live);

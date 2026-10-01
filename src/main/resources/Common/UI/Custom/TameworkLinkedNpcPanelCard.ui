@@ -30,6 +30,10 @@ $C = "Common.ui";
 @StatusStripLabelMuted = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #b9beb8, VerticalAlignment: Center);
 @StatusStripPrimary = LabelStyle(FontSize: 18, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
 @StatusStripPrimaryMuted = LabelStyle(FontSize: 18, RenderBold: true, TextColor: #c0c5c0, VerticalAlignment: Center);
+@RosterCaption = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #a9b69f, VerticalAlignment: Center);
+@RosterStatus = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center);
+@RosterCapacity = LabelStyle(FontSize: 10, TextColor: #a9b69f, VerticalAlignment: Center);
+@RosterCapacityFull = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8c47e, VerticalAlignment: Center);
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @PortraitCompactStyle = ItemGridStyle(SlotSize: 48, SlotSpacing: 0, SlotIconSize: 48);
 
@@ -271,6 +275,7 @@ Group {
     Group #FlightModeAirborneIcon { Anchor: (Top: 0, Right: 24, Width: 24, Height: 24); Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Airborne.png"); Visible: false; }
     Group #ShoulderRideIcon { Anchor: (Top: 0, Right: 52, Width: 24, Height: 24); Background: (TexturePath: "Tamework/LinkedPanelIcons/ShoulderRide.png"); Visible: false; }
     // Roster lines sit where generic cards show their status text, above #CooldownRow; the action button is beside them.
+    // Command-family rosters restyle and place them at runtime (@RosterCaption, @RosterStatus, @RosterCapacity); bonded rows use these defaults.
     Label #RosterState { Anchor: (Top: 36, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #c4cbc3, VerticalAlignment: Center); Visible: false; }
     Label #RosterTimer { Anchor: (Top: 54, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #b3c9b9, VerticalAlignment: Center); Visible: false; }
     Label #RosterCapacity { Anchor: (Top: 72, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #f1c77c, VerticalAlignment: Center); Visible: false; }

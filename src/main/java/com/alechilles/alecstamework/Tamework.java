@@ -780,8 +780,6 @@ public class Tamework extends JavaPlugin {
                     restoreFlow, new HytaleCaptureDelivery(module.index()),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
                     admissionGate, commandItemRegistry);
-            // After a Recall or Forget the owner's held copies of the item turn empty at once.
-            captureItemFlows.useHeldItemSweep(spawnerFeatureHandler::emptyHeldCaptureItems);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -801,6 +799,16 @@ public class Tamework extends JavaPlugin {
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
         commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
+        if (captureItemFlows != null && spawnerFeatureHandler != null) {
+            // After a Recall or Forget the item turns empty at once in its owner's inventory and
+            // where the item locator last saw it (a container, a dropped item or another player).
+            SpawnerFeatureHandler spawner = spawnerFeatureHandler;
+            var itemTracker = commandItemFeatureHandler.capturedItemTracker();
+            captureItemFlows.useItemSweep((owner, profileId, itemGeneration) -> {
+                spawner.emptyHeldCaptureItems(owner, profileId);
+                spawner.emptyLocatedCaptureItem(itemTracker, owner, profileId, itemGeneration);
+            });
+        }
         commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
         // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
         CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null

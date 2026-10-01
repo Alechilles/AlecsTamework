@@ -1285,6 +1285,7 @@ final class CommandSelectionPageService {
 
     private java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> savedPanelSignals =
             ignored -> LinkedPanelRefreshSignalSource.none();
+    private final CommandPanelOwnerSignals ownerSignals = new CommandPanelOwnerSignals();
 
     void configureSavedPanelSignals(java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> signals) {
         savedPanelSignals = signals;
@@ -1300,7 +1301,16 @@ final class CommandSelectionPageService {
         return ownerUuid != null && config != null && config.usesBondedCompanionRoster()
                 && bondedRefreshSignals != null
                 ? bondedRefreshSignals.forRoster(ownerUuid, config.getBondedRosterId())
-                : savedPanelSignals == null ? LinkedPanelRefreshSignalSource.none() : savedPanelSignals.apply(ownerUuid);
+                : ownerSignals.forOwner(ownerUuid, savedPanelSignals == null
+                        ? LinkedPanelRefreshSignalSource.none() : savedPanelSignals.apply(ownerUuid));
+    }
+
+    /**
+     * Refreshes the open generic and command-family panels of {@code ownerUuid} after a change that
+     * finished outside a panel click, such as a completed restore. Safe from any thread.
+     */
+    void signalOwnerPanels(UUID ownerUuid) {
+        ownerSignals.changed(ownerUuid);
     }
 
     private TameworkCommandSelectionPage createSelectionPage(
