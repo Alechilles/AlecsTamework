@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
+import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
@@ -10,7 +10,9 @@ import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwItemCostComponent;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
 import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
 import java.lang.reflect.Field;
 import java.util.List;
@@ -28,6 +30,9 @@ class CommandRosterPanelRecordSourceTest {
     private static final UUID OWNER = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final String FAMILY = "hydragon:dragon_horn";
     private static final UUID LIVE_NPC = UUID.fromString("60000000-0000-0000-0000-000000000001");
+    private static final CommandPanelFeaturePresentationSource.ReviveTerms REVIVE_TERMS =
+            new CommandPanelFeaturePresentationSource.ReviveTerms(true,
+                    List.of(new TwItemCostComponent("Ingredient_Life_Essence", 3)));
 
     private final CompanionRecord stored = member(1, CompanionLocation.stored(StoredReason.ROSTER), null);
     private final CompanionRecord summoned = member(2, CompanionLocation.live("world-a", 1, 2, 3), LIVE_NPC);
@@ -88,6 +93,43 @@ class CommandRosterPanelRecordSourceTest {
         assertFalse(storedRow.summonEnabled());
     }
 
+    /** The clock of these presentations reads 1000 ms. */
+    @Test
+    void aDeadMembersReviveRowFollowsItsCooldownThenItsCost() {
+        CompanionRecord cooling = dead.toBuilder().reviveAvailableAtMs(4_000L).build();
+        CommandReviveCostPresentation waiting = reviveRow(cooling, item -> 3);
+        assertEquals(PaidCommandRevivalQuote.Status.COOLDOWN, waiting.status());
+        assertEquals(3_000L, waiting.cooldownRemainingMs());
+        assertFalse(waiting.confirmEnabled());
+
+        CompanionRecord due = dead.toBuilder().reviveAvailableAtMs(1_000L).build();
+        CommandReviveCostPresentation shortOfItems = reviveRow(due, item -> 2);
+        assertEquals(PaidCommandRevivalQuote.Status.INSUFFICIENT_COST, shortOfItems.status());
+        assertEquals(List.of(new CommandReviveCostPresentation.CostLine(
+                        "Ingredient_Life_Essence", "Ingredient_Life_Essence", null, 2, 3)),
+                shortOfItems.costs());
+
+        assertTrue(reviveRow(due, item -> 3).confirmEnabled());
+    }
+
+    @Test
+    void aLostMemberRecoversForFree() {
+        CompanionRecord lost = member(5, CompanionLocation.lost(null), null);
+
+        CommandReviveCostPresentation row = reviveRow(lost, null);
+
+        assertTrue(row.confirmEnabled());
+        assertTrue(row.costs().isEmpty());
+    }
+
+    private static CommandReviveCostPresentation reviveRow(
+            CompanionRecord record, java.util.function.ToIntFunction<String> held) {
+        CommandRosterPanelRecordSource source = source(List.of(record), Set.of());
+        return presentations(source, List.of(record), () -> null)
+                .snapshotForMembers(OWNER, "world-a", FAMILY, source.membersFor(OWNER, FAMILY), held)
+                .get(row(record)).revival();
+    }
+
     private static CommandRosterPanelRecordSource source(List<CompanionRecord> members, Set<UUID> loaded) {
         return new CommandRosterPanelRecordSource(
                 (owner, family) -> OWNER.equals(owner) && FAMILY.equals(family) ? members : List.of(),
@@ -97,7 +139,7 @@ class CommandRosterPanelRecordSourceTest {
     private static CommandPanelFeaturePresentationSource presentations(
             CommandRosterPanelRecordSource source, List<CompanionRecord> owned,
             java.util.function.Supplier<CompanionAdmission.Rules> rules) {
-        return new CommandPanelFeaturePresentationSource(source, PaidCommandRevivalApi::unavailable,
+        return new CommandPanelFeaturePresentationSource(source, role -> REVIVE_TERMS,
                 owner -> owned, rules, () -> 1_000L);
     }
 

@@ -149,4 +149,13 @@ class CaptureItemOwnershipTest {
                 inItem(2).toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build(), 2));
         assertTrue(CaptureItemOwnership.isStale(null, 2));
     }
+
+    @Test
+    void onlyOwnerOnlyRefusesACaptureOfSomeoneElsesCompanion() {
+        assertTrue(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder));
+        assertFalse(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.OWNER_ONLY, owner, owner));
+        assertFalse(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.OWNER_ONLY, null, holder));
+        assertFalse(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.FOLLOWS_ITEM, owner, holder));
+        assertFalse(CaptureItemOwnership.captureRefused(CaptureItemOwnershipMode.CHANGES_ON_RELEASE, owner, holder));
+    }
 }

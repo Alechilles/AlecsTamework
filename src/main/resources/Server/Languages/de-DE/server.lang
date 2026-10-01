@@ -1227,6 +1227,7 @@ tamework.ui.notifications.captureItem.pickupBlocked=Du kannst keine weiteren Beg
 tamework.ui.notifications.captureItem.anotherPlayer=einem anderen Spieler
 tamework.ui.notifications.captureItem.ownerOnlyPickup=Dieses Fangobjekt gehört {0}.
 tamework.ui.notifications.captureItem.ownerOnlyRelease=Dieser Begleiter kann nur von {0} freigelassen werden.
+tamework.ui.notifications.captureItem.ownerOnlyCapture=Dieser Begleiter kann nur von {0} gefangen werden.
 tamework.ui.population.groupLimit=Du hast dein Limit für diese Art von Begleiter erreicht.
 tamework.ui.population.claimLimit=Du kannst in diesem Gebiet gerade keine weiteren Begleiter zähmen ({0}/{1} eigene in diesem Gebiet).
 tamework.ui.population.unavailable=Begleiterlimits können gerade nicht geprüft werden. Versuche es gleich noch einmal.

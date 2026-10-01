@@ -1,8 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
-import com.alechilles.alecstamework.api.PaidCommandRevivalRequest;
-import com.alechilles.alecstamework.api.PaidCommandRevivalResult;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RosterSummons;
 import com.alechilles.alecstamework.companion.flow.StoreFlow;
@@ -22,7 +19,7 @@ import javax.annotation.Nullable;
 
 /**
  * Runs the command panel's roster actions: Summon and Dismiss through {@link RosterSummons} on the
- * companion index, and paid revival through the revival API.
+ * companion index, and Revive and Recover through {@link CommandCompanionRestorationService}.
  *
  * <p>Every entry point runs on the player's world thread. Summon places the companion near the
  * player as Recover does; flow outcomes come back on another thread and are shown on the panel's
@@ -30,15 +27,14 @@ import javax.annotation.Nullable;
  */
 final class CommandPanelFeatureActionService {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final String PAID_REVIVAL_CALLER =
-            "Alechilles:Tamework:CommandPanel";
     private static final String AUTHORITY_NOT_READY =
             "tamework.ui.notifications.persistence.authorityNotReady";
     private static final String ROSTER_KEYS = "tamework.ui.notifications.command.roster.";
 
     private final CommandPanelFeaturePresentationSource presentations;
     private final Supplier<RosterSummons> summons;
-    private final Supplier<PaidCommandRevivalApi> paidRevival;
+    @Nullable
+    private final CommandCompanionRestorationService restoration;
     private final CommandCompanionPlacementService placements;
     private final double safeSpawnDistance;
     private final CommandFeedbackService feedback;
@@ -46,12 +42,14 @@ final class CommandPanelFeatureActionService {
     /**
      * @param summons           the roster summon flow; null (or a null supply) when the companion
      *                          index is not ready, and Summon and Dismiss then report that
-     * @param safeSpawnDistance how far from the player a summoned companion may be placed
+     * @param restoration       the index restore behind Revive and Recover; null when the
+     *                          companion index is not ready, and Revive then reports that
+     * @param safeSpawnDistance how far from the player a summoned or revived companion may be placed
      */
     CommandPanelFeatureActionService(
             @Nonnull CommandPanelFeaturePresentationSource presentations,
             @Nonnull Supplier<RosterSummons> summons,
-            @Nonnull Supplier<PaidCommandRevivalApi> paidRevival,
+            @Nullable CommandCompanionRestorationService restoration,
             @Nonnull CommandCompanionPlacementService placements,
             double safeSpawnDistance,
             @Nonnull CommandFeedbackService feedback
@@ -60,9 +58,7 @@ final class CommandPanelFeatureActionService {
                 presentations, "Presentation source is required"
         );
         this.summons = Objects.requireNonNull(summons, "Roster summons are required");
-        this.paidRevival = Objects.requireNonNull(
-                paidRevival, "Paid revival API is required"
-        );
+        this.restoration = restoration;
         this.placements = Objects.requireNonNull(placements, "Placement service is required");
         this.safeSpawnDistance = safeSpawnDistance;
         this.feedback = Objects.requireNonNull(
@@ -165,40 +161,31 @@ final class CommandPanelFeatureActionService {
         };
     }
 
+    /**
+     * Revives a dead member, or recovers a lost one, next to the player. The restoration service
+     * checks the owner, the cooldown and the item cost, charges the cost and reports the outcome.
+     */
     void revive(
             @Nullable Player player,
             @Nullable TwCommandItemConfig config,
             @Nullable UUID presentationUuid
     ) {
-        ActionContext context = context(
-                player, config, presentationUuid
-        );
-        if (context == null
-                || !context.presentation().managesPaidRevival()
-                || context.presentation().revival() == null
-                || !context.presentation().revival().confirmEnabled()) {
+        WorldPlayerResolver.ResolvedPlayer resolved = player == null
+                ? null : WorldPlayerResolver.resolveCurrent(player);
+        ActionContext context = context(resolved, config, presentationUuid);
+        if (context == null || !context.presentation().managesPaidRevival()) {
             warn(player);
             return;
         }
-        PaidCommandRevivalRequest request =
-                new PaidCommandRevivalRequest(
-                        PAID_REVIVAL_CALLER,
-                        revivalIdempotencyKey(context),
-                        context.ownerUuid(),
-                        context.member().profileId(),
-                        context.familyId()
-                );
-        try {
-            var stage = currentPaidRevival().revive(request);
-            if (stage == null) {
-                warn(player);
-                return;
-            }
-            stage.whenComplete((result, failure) ->
-                    reportRevival(context, result, failure));
-        } catch (RuntimeException | LinkageError failure) {
-            warn(player);
+        if (restoration == null) {
+            feedback.showWarningKey(resolved.player(),
+                    "tamework.ui.notifications.command.respawn.trackingUnavailable");
+            return;
         }
+        // The restoration service only needs a non-blank tool id; a roster row has its family.
+        feedback.emitRestorationRequestFeedback(resolved.player(), restoration.request(
+                resolved.player(), resolved.ref(), resolved.store(), context.familyId(),
+                CommandRosterPanelRecordSource.toRecord(context.member()), safeSpawnDistance));
     }
 
     @Nullable
@@ -261,40 +248,6 @@ final class CommandPanelFeatureActionService {
                 presentation,
                 resolved.world()
         );
-    }
-
-    private void reportRevival(
-            ActionContext context,
-            PaidCommandRevivalResult result,
-            Throwable failure
-    ) {
-        if (failure != null || result == null || !result.succeeded()) {
-            warn(context);
-        }
-    }
-
-    private String revivalIdempotencyKey(ActionContext context) {
-        return "command-panel:revive:"
-                + context.member().profileId() + ":"
-                + context.presentation().roster().revision() + ":"
-                + context.presentation().revival().configRevision();
-    }
-
-    private PaidCommandRevivalApi currentPaidRevival() {
-        return resolve(paidRevival, PaidCommandRevivalApi.unavailable());
-    }
-
-    private static <T> T resolve(Supplier<T> source, T unavailable) {
-        try {
-            T resolved = source.get();
-            return resolved == null ? unavailable : resolved;
-        } catch (RuntimeException | LinkageError ignored) {
-            return unavailable;
-        }
-    }
-
-    private void warn(ActionContext context) {
-        warnLater(context, AUTHORITY_NOT_READY);
     }
 
     /** Shows {@code key} to the owner on the panel's world thread, if the owner is still there. */

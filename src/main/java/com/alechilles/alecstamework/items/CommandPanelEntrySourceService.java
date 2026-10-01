@@ -206,11 +206,21 @@ final class CommandPanelEntrySourceService {
                         player.getUuid(),
                         worldName,
                         config.getCommandFamilyId(),
-                        rosterSnapshot.members()
+                        rosterSnapshot.members(),
+                        heldItemCounter(player, store)
                 );
         return new CommandPanelSnapshot(
                 entries, CommandPanelFeatureRemapper.remap(features, rosterEntries)
         );
+    }
+
+    /** Counts the player's held items for the revive cost lines; read at once, on the world thread. */
+    @Nullable
+    private static java.util.function.ToIntFunction<String> heldItemCounter(
+            Player player, @Nullable Store<EntityStore> store) {
+        Ref<EntityStore> ref = player.getReference();
+        return store == null || ref == null || !ref.isValid() ? null
+                : itemId -> CommandReviveCostInventory.count(store, ref, itemId);
     }
 
     @Nullable

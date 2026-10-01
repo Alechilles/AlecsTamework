@@ -1227,6 +1227,7 @@ tamework.ui.notifications.captureItem.pickupBlocked=You can't own more companion
 tamework.ui.notifications.captureItem.anotherPlayer=another player
 tamework.ui.notifications.captureItem.ownerOnlyPickup=This capture item belongs to {0}.
 tamework.ui.notifications.captureItem.ownerOnlyRelease=Only {0} can release this companion.
+tamework.ui.notifications.captureItem.ownerOnlyCapture=Only {0} can capture this companion.
 tamework.ui.population.groupLimit=You have reached your limit for this kind of companion.
 tamework.ui.population.claimLimit=You cannot tame more companions in this claim right now ({0}/{1} owned in this claim).
 tamework.ui.population.unavailable=Companion limits cannot be checked right now. Try again shortly.

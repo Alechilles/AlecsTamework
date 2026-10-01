@@ -1220,6 +1220,7 @@ tamework.ui.notifications.captureItem.pickupBlocked=Vous ne pouvez pas posséder
 tamework.ui.notifications.captureItem.anotherPlayer=un autre joueur
 tamework.ui.notifications.captureItem.ownerOnlyPickup=Cet objet de capture appartient à {0}.
 tamework.ui.notifications.captureItem.ownerOnlyRelease=Ce compagnon ne peut être libéré que par {0}.
+tamework.ui.notifications.captureItem.ownerOnlyCapture=Ce compagnon ne peut être capturé que par {0}.
 tamework.ui.population.groupLimit=Vous avez atteint votre limite pour ce type de compagnon.
 tamework.ui.population.claimLimit=Vous ne pouvez pas apprivoiser plus de compagnons dans cette zone revendiquée pour le moment ({0}/{1} possédés dans cette zone).
 tamework.ui.population.unavailable=Les limites de compagnons ne peuvent pas être vérifiées pour le moment. Réessayez dans un instant.

@@ -176,7 +176,7 @@ public final class CommandItemFeatureHandler {
                 rosterPanelRecordSource != null
                         ? new CommandPanelFeaturePresentationSource(
                                 rosterPanelRecordSource,
-                                paidRevival != null ? paidRevival : () -> null,
+                                CommandPanelFeaturePresentationSource.ReviveTerms::forRole,
                                 companions::owned,
                                 admissionGate != null ? admissionGate::rules : () -> null,
                                 System::currentTimeMillis
@@ -385,7 +385,7 @@ public final class CommandItemFeatureHandler {
                         : new CommandPanelFeatureActionService(
                                 featurePresentations,
                                 rosterSummons != null ? rosterSummons : () -> null,
-                                paidRevival != null ? paidRevival : () -> null,
+                                restorationService,
                                 companionPlacementService,
                                 RECALL_SAFE_SPAWN_DISTANCE,
                                 feedbackService

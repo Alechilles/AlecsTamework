@@ -93,6 +93,29 @@ final class CommandReviveCostInventory {
         return new Charge(Charge.Status.PAID, List.copyOf(paid));
     }
 
+    /** How many of {@code itemId} the player holds where {@link #charge} looks; 0 when unreadable. */
+    static int count(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> playerRef,
+            @Nonnull String itemId
+    ) {
+        CombinedItemContainer inventory = InventoryComponent.BACKPACK_STORAGE_HOTBAR == null
+                ? null
+                : InventoryComponent.getCombined(
+                        store, playerRef, InventoryComponent.BACKPACK_STORAGE_HOTBAR);
+        if (inventory == null) {
+            return 0;
+        }
+        long held = 0L;
+        for (short slot = 0; slot < inventory.getCapacity(); slot++) {
+            ItemStack stack = inventory.getItemStack(slot);
+            if (!ItemStack.isEmpty(stack) && itemId.equals(stack.getItemId())) {
+                held += stack.getQuantity();
+            }
+        }
+        return (int) Math.min(Integer.MAX_VALUE, held);
+    }
+
     /**
      * Gives paid items back to the player after a failed revive. Items that do not fit are dropped
      * at the player's position. The player is resolved by id inside the world's executor, in

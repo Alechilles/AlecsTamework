@@ -116,7 +116,7 @@ final class CommandRosterPanelRecordSource {
     }
 
     @Nonnull
-    private static LinkedNpcRecord toRecord(@Nonnull PanelMember member) {
+    static LinkedNpcRecord toRecord(@Nonnull PanelMember member) {
         CompanionRecord record = member.record();
         CompanionLocation at = record.location();
         boolean placed = at.world() != null;

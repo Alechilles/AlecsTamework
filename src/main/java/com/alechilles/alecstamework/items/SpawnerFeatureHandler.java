@@ -398,7 +398,8 @@ public final class SpawnerFeatureHandler {
 
     /**
      * Checks that must pass before the roll, since a failed roll may spend the source: a capture
-     * into an item refuses a command-family roster member and checks the caps for a capture that
+     * into an item refuses a command-family roster member and, while capture items are bound to
+     * their owner, another player's companion; it checks the caps for a capture that
      * gives the companion a new owner or whose item would move it to the capturer; a tame-and-link
      * capture checks the target body, the tamed role, the command item gates and the caps. Returns
      * null when refused; the player is told why. World thread.
@@ -428,6 +429,16 @@ public final class SpawnerFeatureHandler {
             }
             UUID owner = CaptureItemOwnership.captureOwner(facts.ownerUuid(),
                     TamedStateResolver.isTamed(targetRef, store), resolved.isCaptureTamesTarget(), player.getUuid());
+            if (CaptureItemOwnership.captureRefused(TameworkRuntimeSettings.current().captureItemOwnership(),
+                    owner, player.getUuid())) {
+                // The capturer could not hold the filled item, so it would drop at the body.
+                String ownerName = facts.ownerName();
+                messages.showKey(player, NotificationStyle.Warning,
+                        "tamework.ui.notifications.captureItem.ownerOnlyCapture",
+                        ownerName != null && !ownerName.isBlank() ? ownerName : LocalizedText.resolve(player,
+                                "tamework.ui.notifications.captureItem.anotherPlayer"));
+                return null;
+            }
             String role = sourceRole == null ? facts.roleId() : sourceRole;
             if (owner != null && facts.ownerUuid() == null
                     && refusedByCaps(player, owner, role, world.getName(), false)) {

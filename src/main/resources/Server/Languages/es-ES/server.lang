@@ -1115,6 +1115,7 @@ tamework.ui.notifications.captureItem.pickupBlocked=No puedes tener más compañ
 tamework.ui.notifications.captureItem.anotherPlayer=otro jugador
 tamework.ui.notifications.captureItem.ownerOnlyPickup=Este objeto de captura pertenece a {0}.
 tamework.ui.notifications.captureItem.ownerOnlyRelease=Solo {0} puede liberar a este compañero.
+tamework.ui.notifications.captureItem.ownerOnlyCapture=Solo {0} puede capturar a este compañero.
 tamework.ui.population.groupLimit=Has alcanzado tu límite para este tipo de compañero.
 tamework.ui.population.claimLimit=No puedes domar más compañeros en este reclamo ahora mismo ({0}/{1} propios en este reclamo).
 tamework.ui.population.unavailable=No se pueden comprobar los límites de compañeros en este momento. Inténtalo de nuevo en breve.

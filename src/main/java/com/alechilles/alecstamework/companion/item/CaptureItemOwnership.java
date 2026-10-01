@@ -113,6 +113,16 @@ public final class CaptureItemOwnership {
         return bodyTamed || tamesTarget ? capturingPlayer : null;
     }
 
+    /**
+     * {@code OWNER_ONLY}: whether a capture by {@code capturingPlayer} must be refused because the
+     * filled item would belong to someone else, who alone may hold it. {@code owner} is the
+     * {@link #captureOwner} of the capture; an unowned capture is never refused.
+     */
+    public static boolean captureRefused(@Nonnull CaptureItemOwnershipMode mode, @Nullable UUID owner,
+                                         @Nonnull UUID capturingPlayer) {
+        return mode == CaptureItemOwnershipMode.OWNER_ONLY && owner != null && !owner.equals(capturingPlayer);
+    }
+
     /** What a release by {@code releaser} does with the owner of a record owned by {@code recordOwner}. */
     @Nonnull
     public static Release release(@Nonnull CaptureItemOwnershipMode mode, @Nullable UUID recordOwner,
