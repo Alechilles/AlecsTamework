@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperati
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.item.CaptureItemFlows;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import java.util.function.Consumer;
@@ -151,5 +152,13 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkSettingsCommand());
         addSubCommand(new TameworkNewsCommand());
         addSubCommand(new TameworkRuntimeCommand());
+    }
+
+    /**
+     * Adds {@code /tw companions forget|restore} (spec 8.14). Called once before registration;
+     * {@code flows} and {@code companions} are null when the companion index is not ready.
+     */
+    public void addCompanionCommands(@Nullable CaptureItemFlows flows, @Nullable CompanionQueries companions) {
+        addSubCommand(new TameworkCompanionsCommandGroup(flows, companions));
     }
 }

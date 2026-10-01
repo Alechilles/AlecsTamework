@@ -20,7 +20,7 @@ class CommandCompanionRestorationServiceTest {
         assertEquals(Decision.RECOVER, decide(LifecycleState.LOST, false, false));
         assertEquals(Decision.RECOVER, decide(LifecycleState.ACTIVE, false, true));
         assertEquals(Decision.NOT_DORMANT, decide(LifecycleState.ACTIVE, true, true));
-        assertEquals(Decision.NOT_DORMANT, decide(LifecycleState.CAPTURED, false, true));
+        assertEquals(Decision.RECOVER, decide(LifecycleState.CAPTURED, false, true));
         assertEquals(Decision.UNAVAILABLE, decide(LifecycleState.RELEASED, false, true));
     }
 

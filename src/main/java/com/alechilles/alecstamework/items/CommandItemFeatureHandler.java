@@ -566,6 +566,14 @@ public final class CommandItemFeatureHandler {
         return capturedItemTracker;
     }
 
+    /**
+     * Lets the panel's release forget a companion in a capture item (spec 8.14); until then that
+     * release reports it is unavailable.
+     */
+    public void configureCaptureItemFlows(@Nullable com.alechilles.alecstamework.companion.item.CaptureItemFlows flows) {
+        ownerReleaseService.useCaptureItemFlows(flows);
+    }
+
     /** Sets where a recall of a companion in another world is restored; until then it is skipped. */
     public void configureRecallRestore(@Nullable CompanionRestoreRecallSink recallRestore) {
         relocationDispatchService.setRecallRestore(recallRestore);

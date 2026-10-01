@@ -223,7 +223,8 @@ final class CommandCompanionRestorationService {
         if (profile.dead()) {
             return reviveEnabled ? Decision.REVIVE : Decision.REVIVE_DISABLED;
         }
-        if (profile.lost()
+        // A captured companion is recovered from its snapshot when its item is out of reach (spec 8.14).
+        if (profile.lost() || profile.captured()
                 || profile.lifecycleState() == LifecycleState.ACTIVE && !bodyLoaded) {
             return Decision.RECOVER;
         }

@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.item.CaptureItemFlows;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -25,6 +27,8 @@ final class CommandOwnerReleaseService {
     private final CommandToolInventoryService inventory;
     private final CommandLinkMutationService links;
     @Nullable private final CommandLinkedNpcInventoryRepairService inventoryRepair;
+    /** Forgets a companion in a capture item; null until configured or without a ready index. */
+    @Nullable private volatile CaptureItemFlows captureItemFlows;
 
     /**
      * A null flow or null queries means companion saving is paused (the module is not READY);
@@ -48,6 +52,10 @@ final class CommandOwnerReleaseService {
         this.inventoryRepair = inventoryRepair;
     }
 
+    void useCaptureItemFlows(@Nullable CaptureItemFlows flows) {
+        captureItemFlows = flows;
+    }
+
     void release(Player player,
                  String toolId,
                  TwCommandItemConfig config,
@@ -69,6 +77,10 @@ final class CommandOwnerReleaseService {
             warn(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
+        if (record.location().kind() == LocationKind.ITEM) {
+            forget(player, ownerUuid, record);
+            return;
+        }
         UUID bodyUuid = record.currentNpcUuid();
         ReleaseFlow.Outcome outcome = releaseFlow.release(record.profileId(), ownerUuid);
         switch (outcome.result()) {
@@ -81,17 +93,35 @@ final class CommandOwnerReleaseService {
                 if (inventoryRepair != null) {
                     inventoryRepair.canonicalize(player);
                 }
-                String displayName = record.displayName();
-                feedbackService.showSuccessKey(
-                        player,
-                        "tamework.ui.notifications.command.release.success",
-                        displayName == null || displayName.isBlank()
-                                ? LocalizedText.resolve(player,
-                                "tamework.ui.notifications.command.shared.defaultMobName")
-                                : displayName
-                );
+                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.release.success",
+                        displayName(player, record));
             }
         }
+    }
+
+    /**
+     * The panel's Forget for a companion in a capture item (spec 8.14): the record becomes a
+     * FORGOTTEN tombstone, the owner's slot is freed and any surviving copy of the item turns empty.
+     */
+    private void forget(Player player, UUID ownerUuid, CompanionRecord record) {
+        CaptureItemFlows flows = captureItemFlows;
+        if (flows == null) {
+            warn(player, "tamework.ui.notifications.command.release.unavailable");
+            return;
+        }
+        switch (flows.forget(record.profileId(), ownerUuid)) {
+            case FORGOTTEN -> feedbackService.showSuccessKey(player,
+                    "tamework.ui.notifications.command.forget.success", displayName(player, record));
+            case NOT_OWNER -> warn(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
+            case NOT_FOUND, NOT_IN_ITEM -> warn(player, "tamework.ui.notifications.command.release.unavailable");
+        }
+    }
+
+    private static String displayName(Player player, CompanionRecord record) {
+        String displayName = record.displayName();
+        return displayName == null || displayName.isBlank()
+                ? LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName")
+                : displayName;
     }
 
     /**

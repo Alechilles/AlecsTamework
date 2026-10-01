@@ -958,8 +958,10 @@ public final class TameworkCommandSelectionPage
         }
         if (commandId.startsWith(RELEASE_COMMAND_PREFIX)) {
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
-            openRemovalConfirmation(npcUuid,
-                    LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE);
+            // The release slot is Forget for a companion in a capture item (spec 8.14).
+            openRemovalConfirmation(npcUuid, genericForgetAvailable(npcUuid)
+                    ? LinkedNpcPanelRemovalConfirmOverlayState.Action.FORGET
+                    : LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE);
             return;
         }
         if (commandId.startsWith(CULL_COMMAND_PREFIX)) {
@@ -1019,12 +1021,15 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (commandId.startsWith(RECALL_COMMAND_PREFIX)) {
-            if (recallCallback == null) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RECALL_COMMAND_PREFIX);
+            // A captured companion is recalled by restoring it next to the player, the Recover path
+            // (spec 8.14); this raises its generation, so a surviving capture item turns empty.
+            Consumer<UUID> recall = capturedEntry(npcUuid) ? respawnCallback : recallCallback;
+            if (recall == null) {
                 return;
             }
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RECALL_COMMAND_PREFIX);
             if (npcUuid != null) {
-                recallCallback.accept(npcUuid);
+                recall.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -1199,6 +1204,13 @@ public final class TameworkCommandSelectionPage
                 && genericCullAvailable(npcUuid)) {
             cullCallback.accept(npcUuid);
             completed = true;
+        } else if (action == LinkedNpcPanelRemovalConfirmOverlayState.Action.FORGET
+                && releaseCallback != null
+                && isPendingUnlink(npcUuid)
+                && genericForgetAvailable(npcUuid)) {
+            // The release action forgets a record that is in a capture item.
+            releaseCallback.accept(npcUuid);
+            completed = true;
         }
         if (completed) {
             pendingRemovals.hide(npcUuid);
@@ -1231,9 +1243,11 @@ public final class TameworkCommandSelectionPage
         if (!isPendingUnlink(npcUuid)) {
             return;
         }
-        boolean available = action == LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE
-                ? releaseCallback != null && genericReleaseAvailable(npcUuid)
-                : cullCallback != null && genericCullAvailable(npcUuid);
+        boolean available = switch (action) {
+            case RELEASE -> releaseCallback != null && genericReleaseAvailable(npcUuid);
+            case FORGET -> releaseCallback != null && genericForgetAvailable(npcUuid);
+            case CULL -> cullCallback != null && genericCullAvailable(npcUuid);
+        };
         if (!available) {
             return;
         }
@@ -1257,6 +1271,16 @@ public final class TameworkCommandSelectionPage
     private boolean genericReleaseAvailable(@Nullable UUID npcUuid) {
         LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
         return entry != null && !entry.captured() && !entry.inCoop();
+    }
+
+    private boolean genericForgetAvailable(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && entry.captured() && (entry.linked() || entry.ownedActions());
+    }
+
+    private boolean capturedEntry(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
+        return entry != null && entry.captured();
     }
 
     private boolean genericCullAvailable(@Nullable UUID npcUuid) {

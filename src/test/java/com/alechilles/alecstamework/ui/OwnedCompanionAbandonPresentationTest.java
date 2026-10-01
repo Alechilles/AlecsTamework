@@ -16,7 +16,8 @@ class OwnedCompanionAbandonPresentationTest {
         assertValue(commands, "LocateButton.Visible", "true");
         assertValue(commands, "SetHomeButton.Visible", "false");
         assertValue(render(entry(false), false), "RecallButton.Visible", "false");
-        assertValue(render(entry(true).withOwnedActions(), false), "RecallButton.Visible", "false");
+        // An owned captured companion is recalled from its snapshot (spec 8.14).
+        assertValue(render(entry(true).withOwnedActions(), false), "RecallButton.Visible", "true");
         assertValue(render(entry(true).withOwnedActions(), false), "LocateButton.Visible", "true");
         var cooped = render(entry(false, false, false, 0L, true).withOwnedActions(), false);
         assertValue(cooped, "LocateButton.Visible", "true");
@@ -60,6 +61,15 @@ class OwnedCompanionAbandonPresentationTest {
         UICommandBuilder commands = render(entry(true), true);
         assertValue(commands, "ReleaseButton.Visible", "false");
         assertValue(commands, "ReleaseButtonDisabled.Visible", "true");
+    }
+
+    /** An owned companion in a capture item is forgotten through the release slot (spec 8.14). */
+    @Test
+    void ownedCapturedAnimalOffersForgetInTheRemovalMenu() {
+        UICommandBuilder commands = render(entry(true).withOwnedActions(), true);
+        assertValue(commands, "ReleaseButton.Visible", "true");
+        assertValue(commands, "ReleaseButton.Text", "Forget");
+        assertValue(commands, "ReleaseButtonDisabled.Visible", "false");
     }
 
     /** Generic items must not release a companion governed by a managed roster. */

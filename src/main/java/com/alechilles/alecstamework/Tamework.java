@@ -233,6 +233,7 @@ import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.item.AdmissionCache;
+import com.alechilles.alecstamework.companion.item.CaptureItemFlows;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
 import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
@@ -301,6 +302,9 @@ public class Tamework extends JavaPlugin {
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
     private ReleaseFlow companionReleaseFlow;
+    /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */
+    @Nullable
+    private CaptureItemFlows captureItemFlows;
     /** Roster summon and store; null unless the companion module is ready and generic persistence is active. */
     private RosterSummons companionRosterSummons;
     private CompanionStartupAdmission companionStartupAdmission;
@@ -680,6 +684,8 @@ public class Tamework extends JavaPlugin {
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
             restoreFlow = createRestoreFlow(companionModule, admissionGate);
+            captureItemFlows = new CaptureItemFlows(companionModule.index(),
+                    companionModule.writer()::queueSnapshotDelete, restoreFlow);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
             registerCompanionPersistenceRuntime(admissionGate, restoreFlow);
             companionRosterSummons = startRosterSummons(companionModule, restoreFlow);
@@ -792,6 +798,7 @@ public class Tamework extends JavaPlugin {
                 admissionGate
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
+        commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
         commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
         // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
         CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null
@@ -804,9 +811,10 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-inventory-locations",
                 () -> new CaptureItemHolderSystems.Changes(
                         commandItemFeatureHandler.capturedItemTracker(), captureItemTransfers));
+        CaptureItemFlows destroyedCaptureItems = captureItemFlows;
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-dropped-locations",
                 () -> new com.alechilles.alecstamework.items.locate.CapturedItemDropSystem(
-                        commandItemFeatureHandler.capturedItemTracker()));
+                        commandItemFeatureHandler.capturedItemTracker(), destroyedCaptureItems));
         deferChunkSystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-container-locations",
                 () -> new com.alechilles.alecstamework.items.locate.CapturedItemContainerSystem(
                         commandItemFeatureHandler.capturedItemTracker()));
@@ -1341,14 +1349,17 @@ public class Tamework extends JavaPlugin {
 
     private void registerCommandRoot() {
         if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(TameworkCommandRootFactory.create(
+            CompanionQueries companions = companionModule != null && companionModule.ready()
+                    ? companionModule.queries() : null;
+            var root = TameworkCommandRootFactory.create(
                     spawnBeaconVisualizationService,
                     diagnosticRuntime == null
                             ? null : diagnosticRuntime.failureSink(),
                     companionReleaseFlow,
-                    companionModule != null && companionModule.ready()
-                            ? companionModule.queries() : null
-            ));
+                    companions
+            );
+            root.addCompanionCommands(captureItemFlows, companions);
+            getCommandRegistry().registerCommand(root);
         }
     }
 
@@ -1634,6 +1645,7 @@ public class Tamework extends JavaPlugin {
         }
         OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;
+        captureItemFlows = null;
         companionRosterSummons = null;
         companionStartupAdmission = null;
         if (diagnosticRuntime != null) {
@@ -1858,6 +1870,11 @@ public class Tamework extends JavaPlugin {
     /** Refreshes runtime-backed API settings without exposing its implementation. */
     public void onRuntimeSettingsChanged() {
         CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
+        AdmissionCache admissionCache = captureAdmissionCache;
+        if (admissionCache != null) {
+            // Limits, limit scope and ClearsOwner decide the cached pickup admissions.
+            admissionCache.clear();
+        }
     }
 
     @Nullable

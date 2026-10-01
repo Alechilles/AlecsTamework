@@ -16,6 +16,11 @@ final class LinkedNpcPanelRemovalConfirmOverlayState {
         CULL(
                 "tamework.ui.linkedPanel.card.button.cull",
                 "tamework.ui.linkedPanel.card.tooltip.cull"
+        ),
+        /** A companion in a capture item Tamework cannot reach (spec 8.14). */
+        FORGET(
+                "tamework.ui.linkedPanel.card.button.forget",
+                "tamework.ui.linkedPanel.card.tooltip.forget"
         );
 
         private final String captionKey;

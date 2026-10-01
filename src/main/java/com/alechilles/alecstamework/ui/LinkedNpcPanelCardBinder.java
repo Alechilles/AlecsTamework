@@ -189,13 +189,14 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         boolean showLocate = !showInlineLocation && genericLinkedOrOwned
                 && !entry.dead() && !entry.lost() && !pendingUnlink;
+        // A captured companion's Recall restores it from its snapshot (spec 8.14), so it does not
+        // depend on the recall-teleport setting.
         boolean showRecall = genericLinkedOrOwned
-                && config.recallActionEnabled()
-                && !entry.dead()
-                && !entry.captured()
-                && !entry.inCoop()
-                && !entry.lost()
-                && !pendingUnlink;
+                && !pendingUnlink
+                && (entry.captured() || config.recallActionEnabled()
+                        && !entry.dead()
+                        && !entry.inCoop()
+                        && !entry.lost());
         boolean showSetHome = genericLinkedOrOwned
                 && entry.loaded()
                 && !entry.dead()
@@ -214,13 +215,15 @@ final class LinkedNpcPanelCardBinder {
         boolean removalMenuAvailable = !managedRoster;
         boolean canRelease = removalMenuAvailable && !entry.captured() && !entry.inCoop();
         boolean canCull = canRelease && entry.loaded() && !entry.dead() && !entry.lost();
+        // The release slot becomes Forget for a companion in a capture item; the page picks the action.
+        boolean canForget = removalMenuAvailable && genericLinkedOrOwned && entry.captured();
         boolean showLink = !entry.ownedActions() && !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
         boolean showRemovalMenu = removalMenuAvailable && pendingUnlink;
         boolean showUnlink = showRemovalMenu && legacyLinked && !entry.ownedActions();
         boolean showUnlinkDisabled = showRemovalMenu && !legacyLinked && !entry.ownedActions();
-        boolean showRelease = showRemovalMenu && canRelease;
-        boolean showReleaseDisabled = showRemovalMenu && !canRelease;
+        boolean showRelease = showRemovalMenu && (canRelease || canForget);
+        boolean showReleaseDisabled = showRemovalMenu && !canRelease && !canForget;
         boolean showCull = showRemovalMenu && canCull;
         boolean showActiveToggleActive = genericLinkedOrOwned && entry.active();
         boolean showActiveToggleInactive = genericLinkedOrOwned && !entry.active();
@@ -477,8 +480,10 @@ final class LinkedNpcPanelCardBinder {
         }
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseSelector, showRelease);
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseDisabledSelector, showReleaseDisabled);
-        commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.card.button.release"));
+        commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language, canForget
+                ? "tamework.ui.linkedPanel.card.button.forget" : "tamework.ui.linkedPanel.card.button.release"));
+        commandBuilder.set(releaseSelector + ".TooltipText", LocalizedText.resolve(language, canForget
+                ? "tamework.ui.linkedPanel.card.tooltip.forget" : "tamework.ui.linkedPanel.card.tooltip.release"));
         LinkedNpcPanelIconStyles.visible(commandBuilder, cullSelector, showCull);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
 
