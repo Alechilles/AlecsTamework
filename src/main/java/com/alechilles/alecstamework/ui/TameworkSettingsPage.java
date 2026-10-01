@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -29,6 +30,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -62,8 +64,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE = "@OwnershipBlockOwnerDamage";
     private static final String KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED = "@OwnershipBlockAllDamageIfOwned";
     private static final String KEY_OWNERSHIP_INVULNERABLE_IF_OWNED = "@OwnershipInvulnerableIfOwned";
-    private static final String KEY_CAPTURE_CLEARS_OWNER = "@CaptureClearsOwner";
-    private static final String KEY_SPAWN_SETS_OWNER = "@SpawnSetsOwner";
+    private static final String KEY_CAPTURE_ITEM_OWNERSHIP = "@CaptureItemOwnership";
     private static final String KEY_CAPTURE_REQUIRES_OWNER = "@CaptureRequiresOwner";
     private static final String KEY_SPAWN_REQUIRES_OWNER = "@SpawnRequiresOwner";
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
@@ -216,8 +217,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, "#TwSettingsBlockOwnerDamageCheck.Value")
                 .append(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, "#TwSettingsBlockAllDamageIfOwnedCheck.Value")
                 .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
-                .append(KEY_CAPTURE_CLEARS_OWNER, "#TwSettingsCaptureClearsOwnerCheck.Value")
-                .append(KEY_SPAWN_SETS_OWNER, "#TwSettingsSpawnSetsOwnerCheck.Value")
+                .append(KEY_CAPTURE_ITEM_OWNERSHIP, "#TwSettingsCaptureItemOwnershipDropdown.Value")
                 .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
                 .append(KEY_SPAWN_REQUIRES_OWNER, "#TwSettingsSpawnRequiresOwnerCheck.Value")
                 .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
@@ -264,8 +264,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsBlockOwnerDamageCheck.Value", currentValues.blockOwnerDamage());
         commandBuilder.set("#TwSettingsBlockAllDamageIfOwnedCheck.Value", currentValues.blockAllPlayerDamageIfOwned());
         commandBuilder.set("#TwSettingsInvulnerableIfOwnedCheck.Value", currentValues.invulnerableIfOwned());
-        commandBuilder.set("#TwSettingsCaptureClearsOwnerCheck.Value", currentValues.captureClearsOwner());
-        commandBuilder.set("#TwSettingsSpawnSetsOwnerCheck.Value", currentValues.spawnSetsOwner());
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Entries", captureItemOwnershipEntries());
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Value",
+                currentValues.captureItemOwnership().toConfigValue());
+        renderCaptureItemOwnershipNote(commandBuilder, currentValues.captureItemOwnership());
         commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner());
         commandBuilder.set("#TwSettingsSpawnRequiresOwnerCheck.Value", currentValues.spawnRequiresOwner());
         commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
@@ -331,6 +333,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                     : TameworkSettingsPreset.CUSTOM;
             // A changed form must allow selecting the previous preset again.
             commandBuilder.set("#TwSettingsPresetDropdown.Value", preset.value());
+            // The note under the ownership choice describes the mode selected in the form.
+            renderCaptureItemOwnershipNote(commandBuilder, CaptureItemOwnershipMode.fromConfigValue(
+                    draftPayload.captureItemOwnership == null
+                            ? currentValues.captureItemOwnership().toConfigValue()
+                            : draftPayload.captureItemOwnership));
         }
         sendUpdate(commandBuilder, null, false);
     }
@@ -492,6 +499,33 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
     }
 
+    private List<DropdownEntryInfo> captureItemOwnershipEntries() {
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        for (CaptureItemOwnershipMode mode : CaptureItemOwnershipMode.values()) {
+            entries.add(new DropdownEntryInfo(
+                    LocalizableString.fromString(resolveText(captureItemOwnershipKey(mode))),
+                    mode.toConfigValue()
+            ));
+        }
+        return entries;
+    }
+
+    /** The one-line description of {@code mode}, shown under the ownership choice. */
+    private void renderCaptureItemOwnershipNote(@Nonnull UICommandBuilder commandBuilder,
+                                                @Nonnull CaptureItemOwnershipMode mode) {
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipNoteLabel.Text",
+                resolveText(captureItemOwnershipKey(mode) + ".description"));
+    }
+
+    @Nonnull
+    private static String captureItemOwnershipKey(@Nonnull CaptureItemOwnershipMode mode) {
+        return "tamework.ui.settings.captureItemOwnership." + switch (mode) {
+            case FOLLOWS_ITEM -> "followsItem";
+            case OWNER_ONLY -> "ownerOnly";
+            case CHANGES_ON_RELEASE -> "changesOnRelease";
+        };
+    }
+
     private List<DropdownEntryInfo> animalAgingModeEntries() {
         return List.of(
                 new DropdownEntryInfo(
@@ -602,8 +636,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, Codec.BOOLEAN), (x, v) -> x.blockOwnerDamage = v, x -> x.blockOwnerDamage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.blockAllDamageIfOwned = v, x -> x.blockAllDamageIfOwned).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.invulnerableIfOwned = v, x -> x.invulnerableIfOwned).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_CLEARS_OWNER, Codec.BOOLEAN), (x, v) -> x.captureClearsOwner = v, x -> x.captureClearsOwner).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_SETS_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnSetsOwner = v, x -> x.spawnSetsOwner).add()
+                .<String>append(new KeyedCodec<>(KEY_CAPTURE_ITEM_OWNERSHIP, Codec.STRING), (x, v) -> x.captureItemOwnership = v, x -> x.captureItemOwnership).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.captureRequiresOwner = v, x -> x.captureRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnRequiresOwner = v, x -> x.spawnRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
@@ -646,8 +679,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean blockOwnerDamage;
         Boolean blockAllDamageIfOwned;
         Boolean invulnerableIfOwned;
-        Boolean captureClearsOwner;
-        Boolean spawnSetsOwner;
+        String captureItemOwnership;
         Boolean captureRequiresOwner;
         Boolean spawnRequiresOwner;
         Boolean interactionRequiresOwner;

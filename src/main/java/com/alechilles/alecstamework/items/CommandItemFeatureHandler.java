@@ -103,6 +103,8 @@ public final class CommandItemFeatureHandler {
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
+    @Nullable
+    private final CommandCompanionRestorationService restorationService;
     private final com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker =
             new com.alechilles.alecstamework.items.locate.CapturedItemTracker();
     private final CommandOwnedActionService ownedActions;
@@ -286,7 +288,7 @@ public final class CommandItemFeatureHandler {
                 companionPlacementService,
                 companions
         );
-        CommandCompanionRestorationService restorationService =
+        CommandCompanionRestorationService restorationService = this.restorationService =
                 persistenceView != null && restoreFlow != null && companions != null
                 ? new CommandCompanionRestorationService(
                         companionPlacementService,
@@ -572,6 +574,9 @@ public final class CommandItemFeatureHandler {
      */
     public void configureCaptureItemFlows(@Nullable com.alechilles.alecstamework.companion.item.CaptureItemFlows flows) {
         ownerReleaseService.useCaptureItemFlows(flows);
+        if (restorationService != null) {
+            restorationService.useCaptureItemFlows(flows);
+        }
     }
 
     /** Sets where a recall of a companion in another world is restored; until then it is skipped. */

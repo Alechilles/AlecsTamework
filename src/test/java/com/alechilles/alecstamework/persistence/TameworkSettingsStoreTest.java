@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence;
 
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkSettingsStoreTest {
@@ -35,8 +37,7 @@ class TameworkSettingsStoreTest {
                 true,
                 false,
                 true,
-                false,
-                true,
+                "OWNER_ONLY",
                 true,
                 false,
                 false,
@@ -82,8 +83,9 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.blockOwnerDamage());
         assertEquals(false, overrides.blockAllPlayerDamageIfOwned());
         assertEquals(true, overrides.invulnerableIfOwned());
-        assertEquals(false, overrides.captureClearsOwner());
-        assertEquals(true, overrides.spawnSetsOwner());
+        assertEquals("OWNER_ONLY", overrides.captureItemOwnership());
+        assertNull(overrides.captureClearsOwner());
+        assertNull(overrides.spawnSetsOwner());
         assertEquals(true, overrides.captureRequiresOwner());
         assertEquals(false, overrides.spawnRequiresOwner());
         assertEquals(false, overrides.interactionRequiresOwner());
@@ -120,8 +122,7 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"ownership\""));
         assertTrue(raw.contains("\"damageProtection\""));
         assertTrue(raw.contains("\"capture\""));
-        assertTrue(raw.contains("\"captureClearsOwner\""));
-        assertTrue(raw.contains("\"SpawnSetsOwner\""));
+        assertTrue(raw.contains("\"captureItemOwnership\""));
         assertTrue(raw.contains("\"interactionRequiresOwner\""));
         assertTrue(raw.contains("\"linkingRequiresOwner\""));
         assertTrue(raw.contains("\"needs\""));
@@ -144,6 +145,39 @@ class TameworkSettingsStoreTest {
     }
 
     @Test
+    void aFileWithOnlyTheRetiredCaptureSettingsMapsThemToAnOwnershipMode() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        String[][] cases = {
+                {"true", "true", "FOLLOWS_ITEM"},
+                {"true", "false", "FOLLOWS_ITEM"},
+                {"false", "true", "CHANGES_ON_RELEASE"},
+                {"false", "false", "OWNER_ONLY"},
+        };
+        for (String[] legacy : cases) {
+            Files.writeString(settingsFile, "{\"version\":2,\"ownership\":{\"capture\":{\"captureClearsOwner\":"
+                    + legacy[0] + ",\"SpawnSetsOwner\":" + legacy[1] + "}}}");
+            TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+
+            ResolvedTameworkSettings settings = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+            assertEquals(legacy[2], settings.captureItemOwnership(), legacy[0] + "/" + legacy[1]);
+        }
+        // An explicit mode wins over the retired values, and saving drops them.
+        Files.writeString(settingsFile, "{\"version\":2,\"ownership\":{\"capture\":{\"captureClearsOwner\":true,"
+                + "\"SpawnSetsOwner\":true,\"captureItemOwnership\":\"OWNER_ONLY\"}}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings explicit = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals("OWNER_ONLY", explicit.captureItemOwnership());
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, explicit.toSnapshot(), null));
+        TameworkSettingsStore.GlobalOverrides saved = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals("OWNER_ONLY", saved.captureItemOwnership());
+        assertNull(saved.captureClearsOwner());
+        assertNull(saved.spawnSetsOwner());
+    }
+
+    @Test
     void loadGlobalOverridesCreatesDefaultDocumentWhenFileMissing() {
         Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
         Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
@@ -163,8 +197,7 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.blockOwnerDamage());
         assertEquals(false, overrides.blockAllPlayerDamageIfOwned());
         assertEquals(false, overrides.invulnerableIfOwned());
-        assertEquals(true, overrides.captureClearsOwner());
-        assertEquals(true, overrides.spawnSetsOwner());
+        assertEquals("FOLLOWS_ITEM", overrides.captureItemOwnership());
         assertEquals(true, overrides.captureRequiresOwner());
         assertEquals(true, overrides.spawnRequiresOwner());
         assertEquals(true, overrides.interactionRequiresOwner());
@@ -207,8 +240,7 @@ class TameworkSettingsStoreTest {
         assertEquals(0, settings.populationLimitPerPlayerOwnedTotal());
         assertEquals("PerWorld", settings.populationPerPlayerLimitScope());
         assertEquals(false, settings.simpleClaimsEnabled());
-        assertEquals(true, settings.captureClearsOwner());
-        assertEquals(true, settings.spawnSetsOwner());
+        assertEquals(CaptureItemOwnershipMode.FOLLOWS_ITEM, settings.captureItemOwnershipMode());
         assertEquals(true, settings.captureRequiresOwner());
         assertEquals(true, settings.spawnRequiresOwner());
         assertEquals(true, settings.interactionRequiresOwner());

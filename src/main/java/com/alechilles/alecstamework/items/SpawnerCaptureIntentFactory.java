@@ -340,11 +340,9 @@ final class SpawnerCaptureIntentFactory {
                         targetRef,
                         npcIdentity::resolveDisplayName
                 );
-        UUID resultingOwner = resolveCapturedOwnerMetadata(
-                existingOwner, config.isCaptureClearsOwner()
-        );
-        if (resultingOwner == null && !config.isCaptureClearsOwner()
-                && config.isCaptureTamesTarget()) {
+        // A capture never clears the owner.
+        UUID resultingOwner = existingOwner;
+        if (resultingOwner == null && config.isCaptureTamesTarget()) {
             resultingOwner = player.getUuid();
         }
         String resultingOwnerName = resultingOwner == null
@@ -423,7 +421,7 @@ final class SpawnerCaptureIntentFactory {
                 .withMetadata(
                         TameworkMetadataKeys.CAPTURE_OWNER_CLEARED,
                         Codec.BOOLEAN,
-                        config.isCaptureClearsOwner()
+                        false
                 );
         if (info.attachmentsJson() != null) {
             artifact = artifact.withMetadata(
@@ -531,13 +529,5 @@ final class SpawnerCaptureIntentFactory {
                 particleSystem,
                 soundEvent
         );
-    }
-
-    @Nullable
-    private UUID resolveCapturedOwnerMetadata(
-            @Nullable UUID existingOwner,
-            boolean captureClearsOwner
-    ) {
-        return captureClearsOwner ? null : existingOwner;
     }
 }

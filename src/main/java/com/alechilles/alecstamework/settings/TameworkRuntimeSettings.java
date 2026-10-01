@@ -19,6 +19,7 @@ public final class TameworkRuntimeSettings {
     private final TwNeedsConfig.TickPolicySettings resolvedNeedsTickPolicy;
     private final TwNeedsConfig.DamageSettings resolvedNeedsDamage;
     private final AnimalAgingMode resolvedAnimalAgingMode;
+    private final CaptureItemOwnershipMode resolvedCaptureItemOwnership;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
         this.values = values;
@@ -37,6 +38,7 @@ public final class TameworkRuntimeSettings {
                 values.needsDamageLethal()
         );
         this.resolvedAnimalAgingMode = AnimalAgingMode.fromConfigValue(values.animalAgingMode());
+        this.resolvedCaptureItemOwnership = values.captureItemOwnershipMode();
     }
 
     @Nonnull
@@ -128,10 +130,20 @@ public final class TameworkRuntimeSettings {
         return values.invulnerableIfOwned();
     }
 
+    /** How a companion held by a capture item changes owner. */
+    @Nonnull
+    public CaptureItemOwnershipMode captureItemOwnership() {
+        return resolvedCaptureItemOwnership;
+    }
+
+    /** @deprecated retired; always false. Use {@link #captureItemOwnership()}. */
+    @Deprecated
     public boolean captureClearsOwner() {
         return values.captureClearsOwner();
     }
 
+    /** @deprecated retired; derived from {@link #captureItemOwnership()}. */
+    @Deprecated
     public boolean spawnSetsOwner() {
         return values.spawnSetsOwner();
     }

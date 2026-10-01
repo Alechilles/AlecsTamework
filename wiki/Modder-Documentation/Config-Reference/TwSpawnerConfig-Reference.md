@@ -63,8 +63,8 @@ Fields:
 - `Denylist`
 
 ### `Capture`
-- `ClearsOwner`: legacy/configurable owner-clear behavior; server runtime
-  policy may own the effective value.
+- `ClearsOwner`: retired. It still loads and is ignored: a capture never
+  clears the owner.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
 - `TamesTarget`: allows an eligible wild, unowned target to become the actor's
   owned tamed companion on successful capture.
@@ -77,11 +77,8 @@ Fields:
 - `TamedRoleOverrides`: source-role to stored/tamed-role map used with
   `TamesTarget`.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
-- `OwnershipFollowsHolder` (default `true`): when capture keeps the owner, the
-  companion's owner becomes whoever gets the filled item into their inventory,
-  if their limits allow it. `false` keeps the 4.x rule (owner changes only on
-  release).
-- `BlockIneligibleHolders` (default `true`): a player at their companion limit
+- `BlockIneligibleHolders` (default `true`): while the server's captured
+  companion ownership mode is `FOLLOWS_ITEM`, a player at their companion limit
   cannot pick up or take the filled item. Uses inventory slot filters; set it to
   `false` on every item config if another mod filters player inventory slots.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
@@ -136,12 +133,34 @@ Completion feedback is dispatched only after the durable result publishes;
 do not author the same completion particle/sound in two paths.
 
 ### `Spawn`
+- `AssignsOwner`: retired. It still loads and is ignored; the server's captured
+  companion ownership mode decides who owns a released companion.
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
 - `MaxDistance`
+
+### Captured companion ownership (server setting)
+
+A captured companion always keeps an owner while it is in a capture item. The
+server setting **Captured companion ownership** in `/tw settings`
+(`ownership.capture.captureItemOwnership`) decides how that owner changes, for
+every capture item:
+
+- `FOLLOWS_ITEM` (default): the owner becomes whoever gets the filled item into
+  their inventory, if their limits allow it. `BlockIneligibleHolders` applies
+  in this mode. A holder who is not the owner becomes the owner on release, if
+  their limits allow.
+- `OWNER_ONLY`: other players cannot pick up, take or release the item.
+- `CHANGES_ON_RELEASE`: the 4.x rule. The owner stays the same while the
+  companion is in the item; whoever releases it becomes the owner.
+
+When the mode gives a released companion to the releasing player, the `Spawn`
+owner checks do not block that release. `Capture.OwnershipFollowsHolder` was
+replaced by this setting before release. A filled item shows its owner on the
+last tooltip line.
 
 ### Companion appearance icons
 

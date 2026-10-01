@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 
 /**
  * Builds the filled capture item a 5.0 capture hands over (spec 12.4). It carries presentation
- * only: the filled item id, the captured flag, role, name, icon and model, the owner, and the
+ * only: the filled item id, the captured flag, role, name, icon and model, the owner and its name, and the
  * level, traits and gender its tooltip shows. The companion's state lives in the snapshot store;
  * the caller adds the identity with {@code CaptureItemKeys.write}. Call on the body's world thread.
  */
@@ -44,7 +44,7 @@ final class SpawnerCapturedItemFactory {
     @Nonnull
     ItemStack build(@Nonnull Player player, @Nonnull Ref<EntityStore> body, @Nonnull Store<EntityStore> store,
                     @Nonnull ItemStack source, @Nonnull ItemFeatureConfig config, @Nonnull String roleId,
-                    @Nullable UUID owner) {
+                    @Nullable UUID owner, @Nullable String ownerName) {
         SpawnerCaptureMetadataService.CaptureInfo info =
                 captureMetadata.buildCaptureInfo(player, body, npcIdentity::resolveDisplayName);
         String fullItemIcon = captureMetadata.resolveFullItemIcon(
@@ -56,7 +56,7 @@ final class SpawnerCapturedItemFactory {
             // The model's attachments pick the full item icon and the tooltip's appearance lines.
             item = item.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, info.attachmentsJson());
         }
-        item = itemMetadata.applyOwnerMetadata(item, owner);
+        item = itemMetadata.applyOwnerMetadata(item, owner, ownerName);
         item = captureMetadata.applyCaptureNameKeyMetadata(item, info);
         item = captureMetadata.applyCapturedMetadata(item, info, fullItemIcon);
         item = captureMetadata.applyCapturedModelMetadata(item, info);

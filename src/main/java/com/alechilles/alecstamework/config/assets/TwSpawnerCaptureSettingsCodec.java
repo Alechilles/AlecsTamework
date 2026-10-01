@@ -16,13 +16,10 @@ final class TwSpawnerCaptureSettingsCodec {
             TwSpawnerConfig.CaptureSettings.class, TwSpawnerConfig.CaptureSettings::new)
         .<Boolean>append(new KeyedCodec<>("ClearsOwner", Codec.BOOLEAN),
             (settings, value) -> settings.clearsOwner = value, settings -> settings.clearsOwner)
-        .documentation("Clear owner data when capturing.").add()
-        .<Boolean>append(new KeyedCodec<>("OwnershipFollowsHolder", Codec.BOOLEAN),
-            (settings, value) -> settings.ownershipFollowsHolder = value, settings -> settings.ownershipFollowsHolder)
-        .documentation("When capture keeps the owner, a player who obtains the filled item becomes its companion's owner if their limits allow. Default true.").add()
+        .documentation("Retired and ignored: a capture never clears the owner. The server setting captureItemOwnership in /tw settings decides how the owner changes.").add()
         .<Boolean>append(new KeyedCodec<>("BlockIneligibleHolders", Codec.BOOLEAN),
             (settings, value) -> settings.blockIneligibleHolders = value, settings -> settings.blockIneligibleHolders)
-        .documentation("When OwnershipFollowsHolder applies, a player who could not take ownership cannot pick up the filled item. Default true.").add()
+        .documentation("While the server setting captureItemOwnership is FOLLOWS_ITEM, a player who could not take ownership cannot pick up the filled item. Default true.").add()
         .<Boolean>append(new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
             (settings, value) -> settings.requireTamed = value, settings -> settings.requireTamed)
         .documentation("Require the target NPC to be tamed.").add()

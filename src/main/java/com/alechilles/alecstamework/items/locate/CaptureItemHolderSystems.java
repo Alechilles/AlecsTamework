@@ -10,12 +10,12 @@ import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Decision;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Kind;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
@@ -49,9 +49,10 @@ import javax.annotation.Nullable;
 /**
  * Player inventory systems for capture items, all on the player's world thread. They keep the
  * captured-item locator current (player sightings on add and on capture-related changes, no tick
- * or player-list scan) and, when the companion index is ready, move a capture item's companion to
- * the player now holding it and keeps the pickup filters ({@link CaptureItemPickupFilter}) on
- * the player's current containers (spec 8.14).
+ * or player-list scan) and, when the companion index is ready, apply the server's capture item
+ * ownership mode: move a capture item's companion to the player now holding it
+ * ({@code FOLLOWS_ITEM}) and keep the pickup filters ({@link CaptureItemPickupFilter}) on the
+ * player's current containers (spec 8.14).
  */
 public final class CaptureItemHolderSystems {
     private CaptureItemHolderSystems() {
@@ -145,11 +146,22 @@ public final class CaptureItemHolderSystems {
     }
 
     /**
-     * Ownership follows the holder (spec 8.14). One instance serves every world; each method runs
+     * Writes a new owner on a filled capture item: the owner id, the owner name and the tooltip
+     * that shows it. Called on the holder's world thread.
+     */
+    @FunctionalInterface
+    public interface OwnerStamp {
+        @Nonnull
+        ItemStack apply(@Nonnull ItemStack stack, @Nonnull UUID owner, @Nullable String ownerName);
+    }
+
+    /**
+     * Ownership follows the holder (spec 8.14) while the server's capture item ownership mode is
+     * {@code FOLLOWS_ITEM}; the other modes move nothing here. One instance serves every world; each method runs
      * on the calling player's world thread, and the shared maps are concurrent because players in
      * different worlds are handled on different threads. Per-player entries are dropped when the
      * player leaves the world. It also installs the pickup filters on each container that does
-     * not have them yet, while an item config blocks pickup: when the container is first seen or
+     * not have them yet, while the mode and the item configs block pickup: when the container is first seen or
      * replaced, on its next change, and for every tracked player when a settings change or config
      * reload turns blocking on ({@link #refreshFilters()}).
      */
@@ -183,21 +195,25 @@ public final class CaptureItemHolderSystems {
         private final CompanionIndex index;
         private final CompanionWriter writer;
         private final CompanionAdmissionGate gate;
-        private final ItemFeatureRegistry configs;
         private final AdmissionCache cache;
+        private final OwnerStamp ownerStamp;
         private final TameworkUiMessageService messages = new TameworkUiMessageService();
         private final CaptureItemPickupFilter.Shared filters;
         private final Map<UUID, Held> held = new ConcurrentHashMap<>();
 
-        /** {@code cache} also throttles the refusal notices; its owner clears it on config reload. */
+        /**
+         * {@code cache} also throttles the refusal notices; its owner clears it on config reload.
+         * {@code ownerStamp} rewrites a transferred item for its new owner.
+         */
         public Transfers(@Nonnull CompanionIndex index, @Nonnull CompanionWriter writer,
                          @Nonnull CompanionAdmissionGate gate, @Nonnull ItemFeatureRegistry configs,
-                         @Nonnull AdmissionCache cache) {
+                         @Nonnull AdmissionCache cache, @Nonnull OwnerStamp ownerStamp) {
             this.index = Objects.requireNonNull(index, "index");
             this.writer = Objects.requireNonNull(writer, "writer");
             this.gate = Objects.requireNonNull(gate, "gate");
-            this.configs = Objects.requireNonNull(configs, "configs");
+            Objects.requireNonNull(configs, "configs");
             this.cache = Objects.requireNonNull(cache, "cache");
+            this.ownerStamp = Objects.requireNonNull(ownerStamp, "ownerStamp");
             this.filters = new CaptureItemPickupFilter.Shared(index, gate, configs, cache, messages);
         }
 
@@ -337,16 +353,18 @@ public final class CaptureItemHolderSystems {
         private void take(Player player, @Nullable String name, ItemContainer container, short slot,
                           ItemStack stack, CaptureItemKeys.Ref item) {
             UUID holder = player.getUuid();
-            // Lock-free pre-check: only a current item owned by someone else can move or be refused.
-            if (CaptureItemOwnership.decide(index.get(item.profileId()), item.generation(), holder, null)
-                    != Decision.TRANSFER || !follows(configs.getForFilledOrEmpty(stack.getItemId()))) {
+            CaptureItemOwnershipMode mode = TameworkRuntimeSettings.current().captureItemOwnership();
+            // Lock-free pre-check: only a current item owned by someone else can move or be refused,
+            // and only while the owner follows the item.
+            if (CaptureItemOwnership.decide(mode, index.get(item.profileId()), item.generation(), holder, null)
+                    != Decision.TRANSFER) {
                 return;
             }
             Attempt attempt = index.atomically(() -> {
                 CompanionRecord record = index.get(item.profileId());
                 CompanionAdmission.Refusal refusal = record == null
                         ? null : gate.refuse(record, CaptureItemOwnership.asOwnedBy(record, holder, name));
-                Decision decided = CaptureItemOwnership.decide(record, item.generation(), holder, refusal);
+                Decision decided = CaptureItemOwnership.decide(mode, record, item.generation(), holder, refusal);
                 if (decided == Decision.TRANSFER && !index.update(item.profileId(), record.revision(),
                         CompanionTransitions.ownerChanged(holder, name)).applied()) {
                     return new Attempt(Decision.IGNORE, record);
@@ -354,9 +372,9 @@ public final class CaptureItemHolderSystems {
                 return new Attempt(decided, record);
             });
             if (attempt.decision() == Decision.TRANSFER) {
-                // The rewrite fires another change event, which finds the holder already the owner.
-                container.replaceItemStackInSlot(slot, stack,
-                        stack.withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING, holder));
+                // One write for the owner id, the owner name and the tooltip. It fires another change
+                // event, which finds the holder already the owner.
+                container.replaceItemStackInSlot(slot, stack, stampOwner(stack, holder, name));
                 // The writer writes the old owner's file only after the new owner's (spec 7).
                 writer.flushNow(holder);
                 writer.flushNow(attempt.before().ownerUuid());
@@ -365,19 +383,26 @@ public final class CaptureItemHolderSystems {
             }
         }
 
+        /** The stamped item, or the owner id alone when the stamp fails, so the transfer still shows. */
+        private ItemStack stampOwner(ItemStack stack, UUID holder, @Nullable String name) {
+            try {
+                return ownerStamp.apply(stack, holder, name);
+            } catch (RuntimeException failed) {
+                return stack.withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING, holder);
+            }
+        }
+
         private void noticeRefused(Player player, UUID profileId, CompanionRecord record) {
             if (!cache.noticeDue(player.getUuid(), profileId)) {
                 return;
             }
-            String owner = record.ownerName() != null && !record.ownerName().isBlank()
-                    ? record.ownerName() : LocalizedText.resolve(player, ANOTHER_PLAYER_KEY);
-            messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, owner);
+            messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, ownerLabel(player, record));
         }
 
-        /** {@code OwnershipFollowsHolder}, which applies only while capture keeps the owner. */
-        static boolean follows(@Nullable ItemFeatureConfig config) {
-            return config != null && config.isCaptureOwnershipFollowsHolder()
-                    && !TameworkRuntimeSettings.current().captureClearsOwner();
+        /** The record owner's name for a notice, or the localized "another player". */
+        static String ownerLabel(Player viewer, @Nullable CompanionRecord record) {
+            String name = record == null ? null : record.ownerName();
+            return name != null && !name.isBlank() ? name : LocalizedText.resolve(viewer, ANOTHER_PLAYER_KEY);
         }
 
         /**
@@ -385,7 +410,7 @@ public final class CaptureItemHolderSystems {
          * use, after the entity module registered the types; a racing first use builds equal arrays.
          */
         @SuppressWarnings("unchecked")
-        static ComponentType<EntityStore, ? extends InventoryComponent>[] holderInventories() {
+        public static ComponentType<EntityStore, ? extends InventoryComponent>[] holderInventories() {
             ComponentType<EntityStore, ? extends InventoryComponent>[] types = holderTypes;
             if (types == null) {
                 types = new ComponentType[]{InventoryComponent.Hotbar.getComponentType(),

@@ -60,17 +60,13 @@ Fields:
 - `ChannelSoundEvent` (optional). A one-shot sound event played at the target when the `Begin` channel phase succeeds.
 - `TamedRoleOverrides` (optional map). Maps each capturable wild role to the role stored in the filled item. A mapped role is required when `TamesTarget` is enabled.
 - `OwnerRestricted` (default true). If true, only the owner can capture.
-- `OwnershipFollowsHolder` (default true). When capture keeps the owner, the
-  companion's owner changes to whoever gets the capture item into their
-  inventory (pickup, chest, `/give`), if their companion limits allow it.
-  Putting the item into a chest does not change the owner. Set it to `false`
-  for the 4.x behavior, where ownership changes only on release. Has no effect
-  when the owner is cleared on capture.
-- `BlockIneligibleHolders` (default true). A player who could not take
-  ownership (at their owned or group limit) cannot pick the item up or take it
-  from a chest; the item stays where it is and the player sees a message. It
-  uses inventory slot filters, so set it to `false` on every item config if
-  another mod sets its own filters on player inventory slots.
+- `BlockIneligibleHolders` (default true). Applies while the server setting
+  `captureItemOwnership` is `FOLLOWS_ITEM` (see "Captured companion ownership"
+  below). A player who could not take ownership (at their owned or group limit)
+  cannot pick the item up or take it from a chest; the item stays where it is
+  and the player sees a message. It uses inventory slot filters, so set it to
+  `false` on every item config if another mod sets its own filters on player
+  inventory slots.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on capture.
 - `SoundEvent` (optional). Sound event to play on capture.
@@ -151,7 +147,47 @@ Captured Tamework NPC names are stored on the spawner item and restored on spawn
 Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
 `TwAttachmentDisplayConfig`.
 
-`Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
+## Captured companion ownership
+
+A captured companion always keeps an owner while it is in a capture item. A
+capture never clears the owner. A tamed animal without an owner, and a wild
+animal caught by an item with `TamesTarget`, belong to the capturing player. A
+wild animal caught by an item that does not tame it stays an unowned wild
+capture and is released wild.
+
+The server setting **Captured companion ownership** in `/tw settings`
+(`ownership.capture.captureItemOwnership` in `tamework-settings.json`) decides
+how the owner changes. It applies to every capture item.
+
+| Mode | Behavior |
+| --- | --- |
+| `FOLLOWS_ITEM` (default) | The owner becomes whoever gets the filled item into their inventory (pickup, chest, `/give`), if their companion limits allow it. Putting the item into a chest does not change the owner. `BlockIneligibleHolders` stops a player at their limit from picking it up. A player who still holds an item they do not own becomes the owner when they release it, if their limits allow. |
+| `OWNER_ONLY` | The item is bound to its owner. Other players cannot pick it up, take it from a container or release it. |
+| `CHANGES_ON_RELEASE` | The 4.x rule. The owner stays the same while the companion is in the item, anyone can carry it, and whoever releases it becomes the owner if their limits allow. |
+
+When the mode gives a released companion to the releasing player, the spawn
+owner checks (`Spawn.OwnerRestricted`, `Spawn.RequireOwner` and the server's
+"Spawn requires owner" setting) do not block that release.
+
+A filled item shows its owner on the last tooltip line. The line follows the
+owner when the item changes hands in `FOLLOWS_ITEM`.
+
+Retired fields: `Capture.ClearsOwner`, `Spawn.AssignsOwner` and the
+interaction-level `SpawnAssignsOwner` still load without error and are ignored.
+`Capture.OwnershipFollowsHolder` was replaced by the server setting before
+release. The old `captureClearsOwner` and `SpawnSetsOwner` values in
+`tamework-settings.json` are read only when the file has no
+`captureItemOwnership` value:
+
+| Old `captureClearsOwner` | Old `SpawnSetsOwner` | Mode |
+| --- | --- | --- |
+| true | true | `FOLLOWS_ITEM` |
+| true | false | `FOLLOWS_ITEM` |
+| false | true | `CHANGES_ON_RELEASE` |
+| false | false | `OWNER_ONLY` |
+
+A missing old value counts as `true`. With neither present the mode is
+`FOLLOWS_ITEM`. Saving `/tw settings` writes the mode and drops the old values.
 
 Releasing a filled spawner recreates the stored NPC through the canonical
 captured-spawner release operation and consumes the filled item only after the

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -128,7 +129,11 @@ final class TameworkSettingsFormParser {
                 NeedsResourceMode.fromConfigValue(resourceMode).toConfigValue(),
                 TwNeedsConfig.DamageModel.fromConfigValue(damageModel),
                 TwNeedsConfig.DualNeedRule.fromConfigValue(dualNeedRule),
-                AnimalAgingMode.fromConfigValue(agingMode)
+                AnimalAgingMode.fromConfigValue(agingMode),
+                CaptureItemOwnershipMode.fromConfigValue(fallback(
+                        payload.captureItemOwnership,
+                        currentValues.captureItemOwnership().toConfigValue()
+                ))
         ));
     }
 
@@ -148,8 +153,7 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.blockOwnerDamage, current.blockOwnerDamage()),
                 boolOrDefault(payload.blockAllDamageIfOwned, current.blockAllPlayerDamageIfOwned()),
                 boolOrDefault(payload.invulnerableIfOwned, current.invulnerableIfOwned()),
-                boolOrDefault(payload.captureClearsOwner, current.captureClearsOwner()),
-                boolOrDefault(payload.spawnSetsOwner, current.spawnSetsOwner()),
+                choices.captureItemOwnership(),
                 boolOrDefault(payload.captureRequiresOwner, current.captureRequiresOwner()),
                 boolOrDefault(payload.spawnRequiresOwner, current.spawnRequiresOwner()),
                 boolOrDefault(payload.interactionRequiresOwner, current.interactionRequiresOwner()),
@@ -301,7 +305,8 @@ final class TameworkSettingsFormParser {
                                 @Nonnull String needsResourceMode,
                                 @Nonnull TwNeedsConfig.DamageModel damageModel,
                                 @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule,
-                                @Nonnull AnimalAgingMode animalAgingMode) {
+                                @Nonnull AnimalAgingMode animalAgingMode,
+                                @Nonnull CaptureItemOwnershipMode captureItemOwnership) {
     }
 
     private record ChoiceResult(boolean success, @Nonnull String message, @Nullable ChoiceValues values) {

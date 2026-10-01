@@ -7,8 +7,10 @@ import com.alechilles.alecstamework.companion.item.AdmissionCache;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Decision;
+import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Pickup;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.ComponentType;
@@ -30,9 +32,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The ADD filter on one player's Hotbar, Storage, Backpack and Tool slots (spec 8.14,
- * {@code Capture.BlockIneligibleHolders}): refuses a capture item whose companion would move to
- * this player when the player could not take ownership of it.
+ * The ADD filter on one player's Hotbar, Storage, Backpack and Tool slots (spec 8.14). While the
+ * server's capture item ownership mode is {@code FOLLOWS_ITEM} it refuses a capture item whose
+ * companion would move to this player when the player could not take ownership of it
+ * ({@code Capture.BlockIneligibleHolders}); while it is {@code OWNER_ONLY} it refuses every
+ * capture item owned by someone else. {@code CHANGES_ON_RELEASE} refuses nothing.
  *
  * <p>The engine runs filters under the container's write lock, usually but not always on the
  * world thread. So {@link #test} reads only the lock-free index, the item config and the
@@ -44,6 +48,7 @@ import javax.annotation.Nullable;
  */
 public final class CaptureItemPickupFilter implements SlotFilter {
     static final String PICKUP_BLOCKED_KEY = "tamework.ui.notifications.captureItem.pickupBlocked";
+    static final String OWNER_ONLY_PICKUP_KEY = "tamework.ui.notifications.captureItem.ownerOnlyPickup";
 
     /** State shared by every player's filter; owned by {@link CaptureItemHolderSystems.Transfers}. */
     static final class Shared {
@@ -69,19 +74,22 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         }
 
         /**
-         * True when at least one item config has {@code OwnershipFollowsHolder} and
-         * {@code BlockIneligibleHolders} on and capture keeps the owner, so filters are worth
-         * installing. Otherwise no filter is installed and another mod's slot filters are left
-         * alone. The config scan is redone after each item config reload (a new config map).
+         * True when filters are worth installing: the mode is {@code OWNER_ONLY}, or it is
+         * {@code FOLLOWS_ITEM} and at least one item config has {@code BlockIneligibleHolders} on.
+         * Otherwise no filter is installed and another mod's slot filters are left alone. The
+         * config scan is redone after each item config reload (a new config map).
          */
         boolean anyBlocks() {
+            CaptureItemOwnershipMode mode = TameworkRuntimeSettings.current().captureItemOwnership();
+            if (mode != CaptureItemOwnershipMode.FOLLOWS_ITEM) {
+                return mode == CaptureItemOwnershipMode.OWNER_ONLY;
+            }
             Map<String, ItemFeatureConfig> current = configs.snapshot();
             Blocking known = blocking;
             if (known == null || known.configs() != current) {
                 boolean any = false;
                 for (ItemFeatureConfig config : current.values()) {
-                    if (config != null && config.isCaptureOwnershipFollowsHolder()
-                            && config.isCaptureBlockIneligibleHolders()) {
+                    if (config != null && config.isCaptureBlockIneligibleHolders()) {
                         any = true;
                         break;
                     }
@@ -89,7 +97,7 @@ public final class CaptureItemPickupFilter implements SlotFilter {
                 known = new Blocking(current, any);
                 blocking = known;
             }
-            return known.any() && !TameworkRuntimeSettings.current().captureClearsOwner();
+            return known.any();
         }
     }
 
@@ -116,14 +124,11 @@ public final class CaptureItemPickupFilter implements SlotFilter {
             }
             // A stale copy, the owner's own item and an unowned capture move nothing, so they pass.
             CompanionRecord record = shared.index.get(item.profileId());
-            if (CaptureItemOwnership.decide(record, item.generation(), player, null) != Decision.TRANSFER) {
-                return true;
-            }
-            if (shared.cache.get(player, AdmissionCache.family(record)) == AdmissionCache.Cached.ALLOW) {
-                return true;
-            }
             ItemFeatureConfig config = shared.configs.getForFilledOrEmpty(stack.getItemId());
-            if (!CaptureItemHolderSystems.Transfers.follows(config) || !config.isCaptureBlockIneligibleHolders()) {
+            Pickup pickup = CaptureItemOwnership.pickup(TameworkRuntimeSettings.current().captureItemOwnership(),
+                    record, item.generation(), player, config != null && config.isCaptureBlockIneligibleHolders());
+            if (pickup == Pickup.ALLOW || pickup == Pickup.CHECK_LIMITS
+                    && shared.cache.get(player, AdmissionCache.family(record)) == AdmissionCache.Cached.ALLOW) {
                 return true;
             }
             queueFollowUp(item);
@@ -163,7 +168,16 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         if (entity == null) {
             return;
         }
-        if (!admitted(item) && shared.cache.noticeDue(player, item.profileId())) {
+        CompanionRecord record = shared.index.get(item.profileId());
+        // The limits do not matter here, so the item flag is passed as on.
+        Pickup pickup = CaptureItemOwnership.pickup(TameworkRuntimeSettings.current().captureItemOwnership(),
+                record, item.generation(), player, true);
+        if (pickup == Pickup.REFUSE_NOT_OWNER) {
+            if (shared.cache.noticeDue(player, item.profileId())) {
+                shared.messages.showKey(entity, NotificationStyle.Warning, OWNER_ONLY_PICKUP_KEY,
+                        CaptureItemHolderSystems.Transfers.ownerLabel(entity, record));
+            }
+        } else if (!admitted(item) && shared.cache.noticeDue(player, item.profileId())) {
             shared.messages.showKey(entity, NotificationStyle.Warning, PICKUP_BLOCKED_KEY);
         }
         if (!shared.cache.resyncDue(player, item.profileId())) {

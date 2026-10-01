@@ -23,6 +23,8 @@ public final class TameworkMetadataKeys {
             "Tamework.CaptureReleaseReceipt";
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
+    /** Presentation only: the owner name a filled capture item's tooltip shows. */
+    public static final String OWNER_NAME = "Tamework.OwnerName";
     public static final String CAPTURE_SOURCE_OWNER_UUID = "Tamework.CaptureSourceOwnerUuid";
     /** Immutable capture outcome; unlike the source owner this remains valid before configs load. */
     public static final String CAPTURE_OWNER_CLEARED = "Tamework.CaptureOwnerCleared";

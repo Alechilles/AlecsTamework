@@ -780,6 +780,8 @@ public class Tamework extends JavaPlugin {
                     restoreFlow, new HytaleCaptureDelivery(module.index()),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
                     admissionGate, commandItemRegistry);
+            // After a Recall or Forget the owner's held copies of the item turn empty at once.
+            captureItemFlows.useHeldItemSweep(spawnerFeatureHandler::emptyHeldCaptureItems);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1453,7 +1455,9 @@ public class Tamework extends JavaPlugin {
         companionModule.addChangeListener(admissionCache::onRecordChanged);
         captureAdmissionCache = admissionCache;
         CaptureItemHolderSystems.Transfers transfers = new CaptureItemHolderSystems.Transfers(
-                companionModule.index(), companionModule.writer(), admissionGate, itemFeatureRegistry, admissionCache);
+                companionModule.index(), companionModule.writer(), admissionGate, itemFeatureRegistry, admissionCache,
+                // The handler exists whenever the admission gate does; a failed stamp keeps the owner id.
+                (stack, owner, ownerName) -> spawnerFeatureHandler.withCaptureOwner(stack, owner, ownerName));
         captureItemTransfers = transfers;
         return transfers;
     }
@@ -1878,7 +1882,7 @@ public class Tamework extends JavaPlugin {
         CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         AdmissionCache admissionCache = captureAdmissionCache;
         if (admissionCache != null) {
-            // Limits, limit scope and ClearsOwner decide the cached pickup admissions.
+            // Limits, limit scope and the capture item ownership mode decide the cached pickup admissions.
             admissionCache.clear();
         }
         refreshCapturePickupFilters();

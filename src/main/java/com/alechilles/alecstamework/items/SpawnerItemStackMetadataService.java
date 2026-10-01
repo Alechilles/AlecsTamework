@@ -91,6 +91,7 @@ final class SpawnerItemStackMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_RELEASE_RECEIPT);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_NAME);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_OWNER_CLEARED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
@@ -127,13 +128,25 @@ final class SpawnerItemStackMetadataService {
     }
 
     ItemStack applyOwnerMetadata(ItemStack updated, UUID ownerUuid) {
+        return applyOwnerMetadata(updated, ownerUuid, null);
+    }
+
+    /**
+     * Writes the owner and the name the tooltip shows. No owner clears both; an owner without a
+     * known name clears the name, so the tooltip has no owner line.
+     */
+    ItemStack applyOwnerMetadata(ItemStack updated, UUID ownerUuid, String ownerName) {
         if (updated == null) {
             return null;
         }
         if (ownerUuid == null) {
-            return clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
+            return clearMetadataKey(clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID),
+                    TameworkMetadataKeys.OWNER_NAME);
         }
-        return updated.withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING, ownerUuid);
+        ItemStack owned = updated.withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING, ownerUuid);
+        return ownerName == null || ownerName.isBlank()
+                ? clearMetadataKey(owned, TameworkMetadataKeys.OWNER_NAME)
+                : owned.withMetadata(TameworkMetadataKeys.OWNER_NAME, Codec.STRING, ownerName);
     }
 
     ItemStack clearMetadataKey(ItemStack stack, String key) {

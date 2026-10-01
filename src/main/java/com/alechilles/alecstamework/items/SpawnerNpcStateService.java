@@ -1,16 +1,13 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
-import com.alechilles.alecstamework.npc.compat.NpcMarkedTargetAccess;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
-import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -19,68 +16,12 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.Role;
 import java.util.UUID;
 
 /**
  * Applies and resolves owner/tamed/name state on NPC entities during spawner flows.
  */
 final class SpawnerNpcStateService {
-
-    void applyOwner(ItemFeatureConfig config,
-                    Ref<EntityStore> npcRef,
-                    NPCEntity npc,
-                    Ref<EntityStore> playerRef,
-                    UUID ownerUuid,
-                    World world) {
-        if (npc == null) {
-            return;
-        }
-        if (world != null && npcRef != null && npcRef.isValid()) {
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-            if (type != null) {
-                String ownerName = null;
-                if (ownerUuid != null) {
-                    Player ownerPlayer = null;
-                    if (playerRef != null) {
-                        ownerPlayer = store.getComponent(playerRef, Player.getComponentType());
-                    }
-                    if (ownerPlayer != null && ownerUuid.equals(ownerPlayer.getUuid())) {
-                        ownerName = OwnerNameUtil.resolve(ownerPlayer);
-                    } else {
-                        Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
-                        if (ownerRef != null) {
-                            Player resolvedOwner = store.getComponent(ownerRef, Player.getComponentType());
-                            if (resolvedOwner != null) {
-                                ownerName = OwnerNameUtil.resolve(resolvedOwner);
-                            }
-                        }
-                    }
-                }
-                store.putComponent(npcRef, type, new TameworkOwnerComponent(ownerUuid, ownerName));
-            }
-        }
-        if (config == null || !config.isSpawnAssignsOwner()) {
-            return;
-        }
-        Role role = npc.getRole();
-        if (role == null) {
-            return;
-        }
-        Ref<EntityStore> ownerRef = playerRef;
-        if (ownerUuid != null && world != null) {
-            Ref<EntityStore> resolved = world.getEntityRef(ownerUuid);
-            if (resolved != null) {
-                ownerRef = resolved;
-            }
-        }
-        if (ownerRef != null) {
-            NpcMarkedTargetAccess.set(role, npcRef, world.getEntityStore().getStore(),
-                    "MasterTarget", ownerRef);
-        }
-    }
 
     void applyTamed(Ref<EntityStore> npcRef, boolean tamed, World world) {
         if (npcRef == null || !npcRef.isValid() || world == null) {

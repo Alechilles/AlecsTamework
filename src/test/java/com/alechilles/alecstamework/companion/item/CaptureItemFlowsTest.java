@@ -103,6 +103,34 @@ class CaptureItemFlowsTest {
     }
 
     @Test
+    void aSuccessfulForgetOrRecallAsksToEmptyTheOwnersHeldCopiesOfTheItem() {
+        List<String> swept = new ArrayList<>();
+        flows.useHeldItemSweep((owner, profileId) -> swept.add(owner + ":" + profileId));
+        CompanionRecord forgotten = insertItem();
+        CompanionRecord recalled = insertItem();
+
+        // An admin forget (no acting owner) still sweeps the record owner.
+        flows.forget(forgotten.profileId(), null);
+        flows.recall(recalled.profileId(), new RestoreFlow.Destination("default", 1, 2, 3, 0f, 0f)).join();
+
+        assertEquals(List.of(OWNER + ":" + forgotten.profileId(), OWNER + ":" + recalled.profileId()), swept);
+    }
+
+    @Test
+    void aRefusedForgetAndARestoreOfACompanionOutsideAnItemSweepNothing() {
+        List<UUID> swept = new ArrayList<>();
+        flows.useHeldItemSweep((owner, profileId) -> swept.add(profileId));
+        CompanionRecord item = insertItem();
+        CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0, body());
+        index.insert(live);
+
+        flows.forget(item.profileId(), UUID.randomUUID());
+        flows.recall(live.profileId(), new RestoreFlow.Destination("default", 1, 2, 3, 0f, 0f)).join();
+
+        assertTrue(swept.isEmpty());
+    }
+
+    @Test
     void onlyADestroyedItemAtTheRecordsGenerationTombstonesIt() {
         CompanionRecord item = insertItem();
 

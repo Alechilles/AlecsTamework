@@ -48,7 +48,7 @@ public final class CaptureFlow<R> {
     /**
      * One capture. {@code stampedProfileId} null means an unstamped body (wild or owned but never
      * stamped): it gets a fresh record at generation 0. {@code owner} is the record owner after
-     * capture (null when {@code ClearsOwner}).
+     * capture (null only for an unowned wild capture).
      */
     public record Capture<R>(@Nullable UUID stampedProfileId, long stampedGeneration, @Nonnull R body,
                              @Nonnull CompanionTransitions.BodyFacts facts, @Nullable UUID owner,

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
@@ -192,8 +193,9 @@ public final class TameworkSettingsStore {
         document.ownership.capture = new OwnershipCaptureSection();
         document.ownership.capture.captureRequiresOwner = snapshot.captureRequiresOwner();
         document.ownership.capture.spawnRequiresOwner = snapshot.spawnRequiresOwner();
-        document.ownership.capture.captureClearsOwner = snapshot.captureClearsOwner();
-        document.ownership.capture.spawnSetsOwner = snapshot.spawnSetsOwner();
+        // The retired captureClearsOwner and SpawnSetsOwner values are not written back.
+        document.ownership.capture.captureItemOwnership =
+                CaptureItemOwnershipMode.fromConfigValue(snapshot.captureItemOwnership()).toConfigValue();
         document.ownership.interactionRequiresOwner = snapshot.interactionRequiresOwner();
         document.ownership.linkingRequiresOwner = snapshot.linkingRequiresOwner();
 
@@ -407,8 +409,7 @@ public final class TameworkSettingsStore {
         document.ownership.capture = new OwnershipCaptureSection();
         document.ownership.capture.captureRequiresOwner = true;
         document.ownership.capture.spawnRequiresOwner = true;
-        document.ownership.capture.captureClearsOwner = true;
-        document.ownership.capture.spawnSetsOwner = true;
+        document.ownership.capture.captureItemOwnership = CaptureItemOwnershipMode.FOLLOWS_ITEM.toConfigValue();
         document.ownership.interactionRequiresOwner = true;
         document.ownership.linkingRequiresOwner = true;
 
@@ -646,7 +647,8 @@ public final class TameworkSettingsStore {
                 telemetry != null ? telemetry.breadcrumbsEnabled : null,
                 animalProgression != null ? trimToNull(animalProgression.agingMode) : null,
                 animalProgression != null ? animalProgression.oldAgeDeathEnabled : null,
-                commandPanel != null ? commandPanel.cardsPerPage : null
+                commandPanel != null ? commandPanel.cardsPerPage : null,
+                ownershipCapture != null ? trimToNull(ownershipCapture.captureItemOwnership) : null
         );
     }
 
@@ -772,8 +774,7 @@ public final class TameworkSettingsStore {
                                          boolean blockOwnerDamage,
                                          boolean blockAllPlayerDamageIfOwned,
                                          boolean invulnerableIfOwned,
-                                         boolean captureClearsOwner,
-                                         boolean spawnSetsOwner,
+                                         @Nonnull String captureItemOwnership,
                                           boolean captureRequiresOwner,
                                           boolean spawnRequiresOwner,
                                           boolean interactionRequiresOwner,
@@ -803,6 +804,90 @@ public final class TameworkSettingsStore {
                                           @Nonnull String animalAgingMode,
                                           boolean animalOldAgeDeathEnabled,
                                           int commandPanelCardsPerPage) {
+        /** Compatibility constructor for callers compiled before the capture item ownership mode. */
+        public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                      @Nonnull String populationPerPlayerLimitScope,
+                                      boolean simpleClaimsEnabled,
+                                      int simpleClaimsLimitPerClaimChunk,
+                                      int simpleClaimsLimitPerClaimTotal,
+                                      boolean simpleClaimsBreedingRequiresClaim,
+                                      boolean simpleClaimsProtectTamedFromNonMembers,
+                                      boolean blockOwnerDamage,
+                                      boolean blockAllPlayerDamageIfOwned,
+                                      boolean invulnerableIfOwned,
+                                      boolean captureClearsOwner,
+                                      boolean spawnSetsOwner,
+                                      boolean captureRequiresOwner,
+                                      boolean spawnRequiresOwner,
+                                      boolean interactionRequiresOwner,
+                                      boolean linkingRequiresOwner,
+                                      boolean needsEnabled,
+                                      @Nonnull String needsResourceMode,
+                                      @Nonnull String needsTickPolicyMode,
+                                      double needsOwnerOfflineGraceHours,
+                                      double needsOwnerOfflineDecayMultiplier,
+                                      boolean needsDamageEnabled,
+                                      @Nonnull String needsDamageModel,
+                                      @Nonnull String needsDamageDualNeedRule,
+                                      double needsStarvationDamagePerMinute,
+                                      double needsDehydrationDamagePerMinute,
+                                      boolean needsDamageLethal,
+                                      boolean happinessEnabled,
+                                      boolean passiveBreedingEnabled,
+                                      boolean breedingRequiresHappiness,
+                                      boolean breedingGenderEnabled,
+                                      boolean traitsEnabled,
+                                      boolean levelingEnabled,
+                                      boolean talentsEnabled,
+                                      boolean reviveSystemEnabled,
+                                      boolean recallTeleportingEnabled,
+                                      boolean telemetryEnabled,
+                                      boolean telemetryBreadcrumbsEnabled,
+                                      @Nonnull String animalAgingMode,
+                                      boolean animalOldAgeDeathEnabled,
+                                      int commandPanelCardsPerPage) {
+            this(populationLimitPerPlayerOwnedTotal,
+                    populationPerPlayerLimitScope,
+                    simpleClaimsEnabled,
+                    simpleClaimsLimitPerClaimChunk,
+                    simpleClaimsLimitPerClaimTotal,
+                    simpleClaimsBreedingRequiresClaim,
+                    simpleClaimsProtectTamedFromNonMembers,
+                    blockOwnerDamage,
+                    blockAllPlayerDamageIfOwned,
+                    invulnerableIfOwned,
+                    CaptureItemOwnershipMode.fromLegacy(captureClearsOwner, spawnSetsOwner).toConfigValue(),
+                    captureRequiresOwner,
+                    spawnRequiresOwner,
+                    interactionRequiresOwner,
+                    linkingRequiresOwner,
+                    needsEnabled,
+                    needsResourceMode,
+                    needsTickPolicyMode,
+                    needsOwnerOfflineGraceHours,
+                    needsOwnerOfflineDecayMultiplier,
+                    needsDamageEnabled,
+                    needsDamageModel,
+                    needsDamageDualNeedRule,
+                    needsStarvationDamagePerMinute,
+                    needsDehydrationDamagePerMinute,
+                    needsDamageLethal,
+                    happinessEnabled,
+                    passiveBreedingEnabled,
+                    breedingRequiresHappiness,
+                    breedingGenderEnabled,
+                    traitsEnabled,
+                    levelingEnabled,
+                    talentsEnabled,
+                    reviveSystemEnabled,
+                    recallTeleportingEnabled,
+                    telemetryEnabled,
+                    telemetryBreadcrumbsEnabled,
+                    animalAgingMode,
+                    animalOldAgeDeathEnabled,
+                    commandPanelCardsPerPage);
+        }
+
         /** Compatibility constructor for callers compiled before command-panel pagination settings. */
         public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
                                       @Nonnull String populationPerPlayerLimitScope,
@@ -848,7 +933,8 @@ public final class TameworkSettingsStore {
                     simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
                     simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
                     blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned,
-                    captureClearsOwner, spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner,
+                    CaptureItemOwnershipMode.fromLegacy(captureClearsOwner, spawnSetsOwner).toConfigValue(),
+                    captureRequiresOwner, spawnRequiresOwner,
                     interactionRequiresOwner, linkingRequiresOwner, needsEnabled, needsResourceMode,
                     needsTickPolicyMode, needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
                     needsDamageEnabled, needsDamageModel, needsDamageDualNeedRule,
@@ -902,7 +988,8 @@ public final class TameworkSettingsStore {
                     simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
                     simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
                     blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned,
-                    captureClearsOwner, spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner,
+                    captureClearsOwner, spawnSetsOwner,
+                    captureRequiresOwner, spawnRequiresOwner,
                     interactionRequiresOwner, linkingRequiresOwner, needsEnabled, needsResourceMode,
                     needsTickPolicyMode, needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
                     needsDamageEnabled, needsDamageModel, needsDamageDualNeedRule,
@@ -915,7 +1002,9 @@ public final class TameworkSettingsStore {
     }
 
     /**
-     * Optional override values loaded from the JSON settings document.
+     * Optional override values loaded from the JSON settings document. {@code captureClearsOwner}
+     * and {@code spawnSetsOwner} are retired: they are read only so a file without
+     * {@code captureItemOwnership} maps to a {@link CaptureItemOwnershipMode}.
      */
     public record GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
                                   @Nullable String populationPerPlayerLimitScope,
@@ -957,7 +1046,94 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean telemetryBreadcrumbsEnabled,
                                    @Nullable String animalAgingMode,
                                    @Nullable Boolean animalOldAgeDeathEnabled,
-                                   @Nullable Integer commandPanelCardsPerPage) {
+                                   @Nullable Integer commandPanelCardsPerPage,
+                                   @Nullable String captureItemOwnership) {
+        /** Compatibility constructor for callers compiled before the capture item ownership mode. */
+        public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
+                               @Nullable String populationPerPlayerLimitScope,
+                               @Nullable Boolean simpleClaimsEnabled,
+                               @Nullable Integer simpleClaimsLimitPerClaimChunk,
+                               @Nullable Integer simpleClaimsLimitPerClaimTotal,
+                               @Nullable Boolean simpleClaimsBreedingRequiresClaim,
+                               @Nullable Boolean simpleClaimsProtectTamedFromNonMembers,
+                               @Nullable Boolean blockOwnerDamage,
+                               @Nullable Boolean blockAllPlayerDamageIfOwned,
+                               @Nullable Boolean invulnerableIfOwned,
+                               @Nullable Boolean captureClearsOwner,
+                               @Nullable Boolean spawnSetsOwner,
+                               @Nullable Boolean captureRequiresOwner,
+                               @Nullable Boolean spawnRequiresOwner,
+                               @Nullable Boolean interactionRequiresOwner,
+                               @Nullable Boolean linkingRequiresOwner,
+                               @Nullable Boolean needsEnabled,
+                               @Nullable String needsResourceMode,
+                               @Nullable String needsTickPolicyMode,
+                               @Nullable Double needsOwnerOfflineGraceHours,
+                               @Nullable Double needsOwnerOfflineDecayMultiplier,
+                               @Nullable Boolean needsDamageEnabled,
+                               @Nullable String needsDamageModel,
+                               @Nullable String needsDamageDualNeedRule,
+                               @Nullable Double needsStarvationDamagePerMinute,
+                               @Nullable Double needsDehydrationDamagePerMinute,
+                               @Nullable Boolean needsDamageLethal,
+                               @Nullable Boolean happinessEnabled,
+                               @Nullable Boolean passiveBreedingEnabled,
+                               @Nullable Boolean breedingRequiresHappiness,
+                               @Nullable Boolean breedingGenderEnabled,
+                               @Nullable Boolean traitsEnabled,
+                               @Nullable Boolean levelingEnabled,
+                               @Nullable Boolean talentsEnabled,
+                               @Nullable Boolean reviveSystemEnabled,
+                               @Nullable Boolean recallTeleportingEnabled,
+                               @Nullable Boolean telemetryEnabled,
+                               @Nullable Boolean telemetryBreadcrumbsEnabled,
+                               @Nullable String animalAgingMode,
+                               @Nullable Boolean animalOldAgeDeathEnabled,
+                               @Nullable Integer commandPanelCardsPerPage) {
+            this(populationLimitPerPlayerOwnedTotal,
+                    populationPerPlayerLimitScope,
+                    simpleClaimsEnabled,
+                    simpleClaimsLimitPerClaimChunk,
+                    simpleClaimsLimitPerClaimTotal,
+                    simpleClaimsBreedingRequiresClaim,
+                    simpleClaimsProtectTamedFromNonMembers,
+                    blockOwnerDamage,
+                    blockAllPlayerDamageIfOwned,
+                    invulnerableIfOwned,
+                    captureClearsOwner,
+                    spawnSetsOwner,
+                    captureRequiresOwner,
+                    spawnRequiresOwner,
+                    interactionRequiresOwner,
+                    linkingRequiresOwner,
+                    needsEnabled,
+                    needsResourceMode,
+                    needsTickPolicyMode,
+                    needsOwnerOfflineGraceHours,
+                    needsOwnerOfflineDecayMultiplier,
+                    needsDamageEnabled,
+                    needsDamageModel,
+                    needsDamageDualNeedRule,
+                    needsStarvationDamagePerMinute,
+                    needsDehydrationDamagePerMinute,
+                    needsDamageLethal,
+                    happinessEnabled,
+                    passiveBreedingEnabled,
+                    breedingRequiresHappiness,
+                    breedingGenderEnabled,
+                    traitsEnabled,
+                    levelingEnabled,
+                    talentsEnabled,
+                    reviveSystemEnabled,
+                    recallTeleportingEnabled,
+                    telemetryEnabled,
+                    telemetryBreadcrumbsEnabled,
+                    animalAgingMode,
+                    animalOldAgeDeathEnabled,
+                    commandPanelCardsPerPage,
+                    null);
+        }
+
         /** Compatibility constructor for callers compiled before command-panel pagination settings. */
         public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
                                @Nullable String populationPerPlayerLimitScope,
@@ -1011,7 +1187,7 @@ public final class TameworkSettingsStore {
                     happinessEnabled, passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
                     traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
                     recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
-                    animalAgingMode, animalOldAgeDeathEnabled, null);
+                    animalAgingMode, animalOldAgeDeathEnabled, null, null);
         }
     }
 
@@ -1109,7 +1285,11 @@ public final class TameworkSettingsStore {
     private static final class OwnershipCaptureSection {
         private Boolean captureRequiresOwner;
         private Boolean spawnRequiresOwner;
+        /** A {@link CaptureItemOwnershipMode} config value. */
+        private String captureItemOwnership;
+        /** Retired: read only to map a file without {@code captureItemOwnership}; never written. */
         private Boolean captureClearsOwner;
+        /** Retired: read only to map a file without {@code captureItemOwnership}; never written. */
         @SerializedName(value = "SpawnSetsOwner", alternate = {"spawnSetsOwner"})
         private Boolean spawnSetsOwner;
     }

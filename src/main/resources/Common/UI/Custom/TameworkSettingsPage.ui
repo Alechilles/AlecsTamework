@@ -1076,72 +1076,35 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 34);
 
-              Label #TwSettingsCaptureClearsOwnerLabel {
+              Label #TwSettingsCaptureItemOwnershipLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: %server.tamework.ui.settings.label.captureClearsOwner;
+                Text: %server.tamework.ui.settings.label.captureItemOwnership;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
-              TextButton #TwSettingsCaptureClearsOwnerTooltip {
+              TextButton #TwSettingsCaptureItemOwnershipTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: %server.tamework.ui.settings.tooltip.captureClearsOwner;
+                TooltipText: %server.tamework.ui.settings.tooltip.captureItemOwnership;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
 
-              CheckBox #TwSettingsCaptureClearsOwnerCheck {
-                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
-                Padding: (Full: 4);
-                Style: $C.@DefaultCheckBoxStyle;
-              }
-            }
-
-            Group {
-              Anchor: (Height: 34);
-
-              Label #TwSettingsSpawnSetsOwnerLabel {
-                Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: %server.tamework.ui.settings.label.spawnSetsOwner;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
-              }
-
-              TextButton #TwSettingsSpawnSetsOwnerTooltip {
-                Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "";
-                TooltipText: %server.tamework.ui.settings.tooltip.spawnSetsOwner;
-                TextTooltipStyle: @SettingsLabelTooltipStyle;
-                Style: @SettingsLabelTooltipButtonStyle;
-              }
-
-              CheckBox #TwSettingsSpawnSetsOwnerCheck {
-                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
-                Padding: (Full: 4);
-                Style: $C.@DefaultCheckBoxStyle;
+              DropdownBox #TwSettingsCaptureItemOwnershipDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: %server.tamework.ui.settings.noItems.captureItemOwnership;
               }
             }
 
             Group {
               Anchor: (Height: 18);
 
-              Label #TwSettingsCaptureTradeNoteLabel {
+              Label #TwSettingsCaptureItemOwnershipNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: %server.tamework.ui.settings.note.captureTrade;
+                Text: %server.tamework.ui.settings.captureItemOwnership.followsItem.description;
                 Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
-              }
-
-              TextButton #TwSettingsOwnershipTradingNoteTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "";
-                TooltipText: %server.tamework.ui.settings.tooltip.captureTrade;
-                TextTooltipStyle: @SettingsLabelTooltipStyle;
-                Style: @SettingsLabelTooltipButtonStyle;
               }
             }
 

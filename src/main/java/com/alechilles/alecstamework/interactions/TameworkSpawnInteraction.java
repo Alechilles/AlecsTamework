@@ -53,6 +53,7 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
             .build();
 
     private String emptyItemId;
+    /** Retired: still parsed so old interaction assets load, never read. */
     private Boolean spawnAssignsOwner;
     private final HytaleCapturedItemCoopInteractionService coopIntake =
             new HytaleCapturedItemCoopInteractionService();
@@ -166,8 +167,7 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
                 player,
                 heldItem,
                 (int) context.getHeldItemSlot(),
-                emptyItemId,
-                spawnAssignsOwner
+                emptyItemId
         ));
         if (debugLag) {
             logSlowInteraction(plugin, startedNs, "spawn", player, heldItem, null);

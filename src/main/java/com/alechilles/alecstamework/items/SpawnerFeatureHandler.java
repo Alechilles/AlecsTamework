@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
@@ -30,23 +31,29 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
+import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.spawning.CompanionSpawnAuthorityService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -93,6 +100,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCaptureFailureCooldowns cooldowns = new SpawnerCaptureFailureCooldowns();
     private final SpawnerCaptureRollService captureRolls;
     private final SpawnerCapturedItemFactory capturedItems;
+    private final SpawnerItemDisplayMetadataService displayMetadata;
     private final SpawnerReleaseIntentFactory releaseIntents;
     private final SpawnerEffectService effects = new SpawnerEffectService();
     private final SpawnerCaptureChannelService channels = new SpawnerCaptureChannelService();
@@ -152,8 +160,9 @@ public final class SpawnerFeatureHandler {
                 Objects.requireNonNull(capturePolicies, "capturePolicies"),
                 Objects.requireNonNull(captureRequirements, "captureRequirements"),
                 capturePolicy, roles, resolutions, cooldowns);
+        this.displayMetadata = new SpawnerItemDisplayMetadataService(translations);
         this.capturedItems = new SpawnerCapturedItemFactory(
-                captureMetadata, itemMetadata, new SpawnerItemDisplayMetadataService(translations), npcIdentity);
+                captureMetadata, itemMetadata, displayMetadata, npcIdentity);
         this.releaseIntents = new SpawnerReleaseIntentFactory(
                 new SpawnerSpawnPositionService(logger), inventory, itemMetadata, ownership);
     }
@@ -254,7 +263,7 @@ public final class SpawnerFeatureHandler {
      * items pass so the release can tell the player why it refuses them.
      */
     public boolean canSpawnInteraction(ItemStack source) {
-        ItemFeatureConfig config = buildSpawnerConfigForInteraction(resolveConfigForItem(source), null);
+        ItemFeatureConfig config = resolveConfigForItem(source);
         if (source == null || source.isEmpty() || config == null
                 || !config.isSpawnerEnabled()
                 || source.getItemId() == null || !itemMetadata.isAlreadyCaptured(source)) {
@@ -296,11 +305,9 @@ public final class SpawnerFeatureHandler {
             Player player,
             ItemStack source,
             @Nullable Integer hotbarSlot,
-            String emptyItemIdOverride,
-            Boolean spawnAssignsOwnerOverride
+            String emptyItemIdOverride
     ) {
-        ItemFeatureConfig config = buildSpawnerConfigForInteraction(
-                resolveConfigForItem(source), spawnAssignsOwnerOverride);
+        ItemFeatureConfig config = resolveConfigForItem(source);
         return config != null && release(player, source, config, hotbarSlot, emptyItemIdOverride);
     }
 
@@ -326,7 +333,7 @@ public final class SpawnerFeatureHandler {
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String captureParticleSystemOverride
     ) {
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
+        ItemFeatureConfig resolved = config;
         String denial = captureAdmissionDenial(player, targetRef, source, resolved, attempt);
         if (denial != null) {
             logCaptureChannelDiagnostic("terminal-denied reason=" + denial
@@ -419,8 +426,8 @@ public final class SpawnerFeatureHandler {
                 warn(player, "captureFailed");
                 return null;
             }
-            UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
-                    resolved.isCaptureTamesTarget(), player.getUuid());
+            UUID owner = CaptureItemOwnership.captureOwner(facts.ownerUuid(),
+                    TamedStateResolver.isTamed(targetRef, store), resolved.isCaptureTamesTarget(), player.getUuid());
             String role = sourceRole == null ? facts.roleId() : sourceRole;
             if (owner != null && facts.ownerUuid() == null
                     && refusedByCaps(player, owner, role, world.getName(), false)) {
@@ -472,9 +479,9 @@ public final class SpawnerFeatureHandler {
         return record != null && record.rosterId() != null && !record.bonded();
     }
 
-    /** {@code OwnershipFollowsHolder} with {@code BlockIneligibleHolders}, while capture keeps the owner. */
+    /** {@code BlockIneligibleHolders} while the owner follows the item. */
     private static boolean blocksIneligibleHolders(ItemFeatureConfig resolved) {
-        return resolved.isCaptureOwnershipFollowsHolder() && !resolved.isCaptureClearsOwner()
+        return TameworkRuntimeSettings.current().captureItemOwnership() == CaptureItemOwnershipMode.FOLLOWS_ITEM
                 && resolved.isCaptureBlockIneligibleHolders();
     }
 
@@ -717,8 +724,8 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         // preRoll checked the caps for a new owner; CaptureFlow checks them again under the index lock.
-        UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
-                resolved.isCaptureTamesTarget(), player.getUuid());
+        UUID owner = CaptureItemOwnership.captureOwner(facts.ownerUuid(),
+                TamedStateResolver.isTamed(targetRef, store), resolved.isCaptureTamesTarget(), player.getUuid());
         UUID busyKey = stampedId != null ? stampedId : facts.npcUuid();
         // This runs on the body's world thread, so only a capture still committing can overlap.
         if (capturing.contains(busyKey)) {
@@ -734,14 +741,14 @@ public final class SpawnerFeatureHandler {
         }
         BsonDocument snapshotData = snapshot.data();
         if (resolved.isCaptureTamesTarget()) {
-            // TamesTarget means the result is tamed, owned or not (ClearsOwner never untames).
+            // TamesTarget means the result is tamed and owned by the capturing player.
             snapshotData = new BsonDocument();
             snapshotData.putAll(snapshot.data());
             snapshotData.put("Entity", SnapshotPatch.withTamed(CompanionSnapshots.entity(snapshot)));
         }
         String ownerName = owner == null ? null
                 : owner.equals(facts.ownerUuid()) ? facts.ownerName() : OwnerNameUtil.resolve(player);
-        ItemStack item = capturedItems.build(player, targetRef, store, source, resolved, roleId, owner);
+        ItemStack item = capturedItems.build(player, targetRef, store, source, resolved, roleId, owner, ownerName);
         ItemStack expectedSource = inventory.getHotbarItem(player, attempt.hotbarSlot());
         String particles = particleSystemOverride == null || particleSystemOverride.isBlank()
                 ? resolved.getCaptureParticleSystem() : particleSystemOverride;
@@ -821,15 +828,25 @@ public final class SpawnerFeatureHandler {
         }
         CompanionRecord record = index.get(ref.profileId());
         UUID recordOwner = record == null ? null : record.ownerUuid();
+        CaptureItemOwnership.Release ownership = CaptureItemOwnership.release(
+                TameworkRuntimeSettings.current().captureItemOwnership(), recordOwner, player.getUuid());
+        if (ownership == CaptureItemOwnership.Release.REFUSE_NOT_OWNER) {
+            // Bound to its owner: nothing changes, and the item stays filled.
+            messages.showKey(player, NotificationStyle.Warning,
+                    "tamework.ui.notifications.captureItem.ownerOnlyRelease", ownerLabel(player, record));
+            return false;
+        }
+        // When the mode gives the companion to the releasing player, the mode has decided who may
+        // release it; the item and server owner requirements would refuse every such release.
+        UUID gateOwner = ownership == CaptureItemOwnership.Release.ASSIGN_RELEASER ? null : recordOwner;
         SpawnerReleaseIntentFactory.PreparedRelease prepared =
-                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride, recordOwner);
+                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride, gateOwner);
         if (prepared == null) {
             return false;
         }
         RestoreFlow.Request request = RestoreFlow.Request.of(ref.profileId(), RestoreRules.Reason.RELEASE,
                 RestoreFlow.Destination.of(prepared.placement())).withGeneration(ref.generation());
-        RestoreFlow.Owner owner = releaseOwner(recordOwner, config.isSpawnAssignsOwner(), player.getUuid(),
-                OwnerNameUtil.resolve(player));
+        RestoreFlow.Owner owner = releaseOwner(ownership, player.getUuid(), OwnerNameUtil.resolve(player));
         if (owner != null) {
             request = request.withOwner(owner);
         }
@@ -896,33 +913,76 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
-     * The record owner after a capture: none when {@code ClearsOwner}, otherwise the body's owner;
-     * an unowned body captured by an item that tames it gets the capturing player.
+     * The owner a release asks the restore for (spec 8.14): none for the owner's own release (null:
+     * no change), the releasing player when the mode gives the companion to them (the restore's
+     * caps still apply), and no owner for an unowned wild capture.
      */
     @Nullable
-    static UUID captureOwner(@Nullable UUID bodyOwner, boolean clearsOwner, boolean tamesTarget,
-                             @Nonnull UUID capturingPlayer) {
-        if (clearsOwner) {
-            return null;
-        }
-        if (bodyOwner == null && tamesTarget) {
-            return capturingPlayer;
-        }
-        return bodyOwner;
+    static RestoreFlow.Owner releaseOwner(@Nonnull CaptureItemOwnership.Release ownership,
+                                          @Nonnull UUID releaser, @Nullable String releaserName) {
+        return switch (ownership) {
+            case UNOWNED -> new RestoreFlow.Owner(null, null);
+            case ASSIGN_RELEASER -> new RestoreFlow.Owner(releaser, releaserName);
+            case KEEP_OWNER, REFUSE_NOT_OWNER -> null;
+        };
     }
 
     /**
-     * The owner a release asks for (spec 8.14). An item that assigns owners gives the companion to
-     * the releaser, also when someone else owned it; the restore's caps still apply. Otherwise an
-     * owned record keeps its owner (null: no change) and an unowned one comes back unowned.
+     * The filled capture item as {@code owner} owns it: the owner id, the owner name and the
+     * tooltip built from them, for the write that moves a companion to the player holding its
+     * item. Call on a world thread.
      */
-    @Nullable
-    static RestoreFlow.Owner releaseOwner(@Nullable UUID recordOwner, boolean assignsOwner,
-                                          @Nonnull UUID releaser, @Nullable String releaserName) {
-        if (assignsOwner) {
-            return new RestoreFlow.Owner(releaser, releaserName);
+    @Nonnull
+    public ItemStack withCaptureOwner(@Nonnull ItemStack stack, @Nonnull UUID owner, @Nullable String ownerName) {
+        ItemStack owned = itemMetadata.applyOwnerMetadata(stack, owner, ownerName);
+        ItemStack displayed = displayMetadata.applyCapturedDisplayMetadata(owned, resolveConfigForItem(owned));
+        return displayed == null ? owned : displayed;
+    }
+
+    /**
+     * After a Recall or Forget (spec 8.14): empties the copies of the companion's capture item
+     * that {@code playerUuid} holds, so they do not keep their filled look until used. Safe from
+     * any thread; the player is resolved on their current world thread and an offline player is
+     * skipped. Copies in containers or with other players still turn empty on use.
+     */
+    public void emptyHeldCaptureItems(@Nullable UUID playerUuid, @Nonnull UUID profileId) {
+        if (playerUuid != null) {
+            HytaleCaptureDelivery.onPlayerWorld(playerUuid,
+                    (world, store, ref, player) -> emptyStaleCaptureItems(store, ref, profileId), null);
         }
-        return recordOwner != null ? null : new RestoreFlow.Owner(null, null);
+    }
+
+    /** World thread: Hotbar, Storage, Backpack and Tool, compare-then-replace per slot. */
+    private void emptyStaleCaptureItems(Store<EntityStore> store, Ref<EntityStore> playerRef, UUID profileId) {
+        CompanionRecord record = index.get(profileId);
+        for (var type : CaptureItemHolderSystems.Transfers.holderInventories()) {
+            InventoryComponent inventory = store.getComponent(playerRef, type);
+            ItemContainer container = inventory == null ? null : inventory.getInventory();
+            if (container == null) {
+                continue;
+            }
+            for (short slot = 0, capacity = container.getCapacity(); slot < capacity; slot++) {
+                ItemStack stack = container.getItemStack(slot);
+                CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(stack);
+                // A copy still current for its record (captured again since) keeps its companion.
+                if (item == null || !item.profileId().equals(profileId)
+                        || !CaptureItemOwnership.isStale(record, item.generation())) {
+                    continue;
+                }
+                String emptyItemId = itemMetadata.resolveEmptyItemId(stack.getItemId());
+                if (emptyItemId != null && !emptyItemId.isBlank()) {
+                    container.replaceItemStackInSlot(slot, stack,
+                            itemMetadata.clearCapturedMetadata(itemMetadata.swapItemId(stack, emptyItemId)));
+                }
+            }
+        }
+    }
+
+    /** The record owner's name for a notice, or the localized "another player". */
+    private static String ownerLabel(Player viewer, @Nullable CompanionRecord record) {
+        String name = record == null ? null : record.ownerName();
+        return name != null && !name.isBlank() ? name
+                : LocalizedText.resolve(viewer, "tamework.ui.notifications.captureItem.anotherPlayer");
     }
 
     private void showPopulationLimit(Player player, boolean owned) {
@@ -936,14 +996,6 @@ public final class SpawnerFeatureHandler {
             return null;
         }
         return registry.getForFilledOrEmpty(source.getItemId());
-    }
-
-    @Nullable
-    private static ItemFeatureConfig buildSpawnerConfigForInteraction(
-            @Nullable ItemFeatureConfig baseConfig,
-            @Nullable Boolean spawnAssignsOwnerOverride
-    ) {
-        return SpawnerInteractionConfigResolver.resolve(baseConfig, spawnAssignsOwnerOverride);
     }
 
     private boolean sourceMatches(Player player, CaptureAttemptHandle attempt) {

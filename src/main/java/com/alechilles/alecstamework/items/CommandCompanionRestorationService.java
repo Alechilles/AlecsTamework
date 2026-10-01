@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
+import com.alechilles.alecstamework.companion.item.CaptureItemFlows;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -67,6 +68,8 @@ final class CommandCompanionRestorationService {
     private final CompanionQueries companions;
     private final HytaleUuidCompletionDispatcher completions = new HytaleUuidCompletionDispatcher();
     private final CommandRestorationCompletionListener listener = new CommandRestorationCompletionListener();
+    @Nullable
+    private volatile CaptureItemFlows captureItemFlows;
 
     CommandCompanionRestorationService(
             @Nonnull CommandCompanionPlacementService placements,
@@ -82,6 +85,11 @@ final class CommandCompanionRestorationService {
         );
         this.restoreFlow = Objects.requireNonNull(restoreFlow, "Restore flow is required");
         this.companions = Objects.requireNonNull(companions, "Companion queries are required");
+    }
+
+    /** Lets a Recall of a captured companion empty the owner's held copies of its item. */
+    void useCaptureItemFlows(@Nullable CaptureItemFlows flows) {
+        captureItemFlows = flows;
     }
 
     @Nonnull
@@ -174,7 +182,11 @@ final class CommandCompanionRestorationService {
         }
         CompletableFuture<RestoreFlow.Result> restoring;
         try {
-            restoring = restoreFlow.restore(profileId, reason, destination);
+            CaptureItemFlows flows = captureItemFlows;
+            // Recall of a captured companion also empties the owner's held copies of its item.
+            restoring = reason == RestoreRules.Reason.RECOVER && flows != null
+                    ? flows.recall(profileId, destination)
+                    : restoreFlow.restore(profileId, reason, destination);
         } catch (RuntimeException failure) {
             restoring = CompletableFuture.failedFuture(failure);
         }

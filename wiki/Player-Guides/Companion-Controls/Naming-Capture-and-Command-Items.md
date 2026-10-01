@@ -64,10 +64,11 @@ command item and acquisition method.
   belong to several groups or none; left-clicking a group selects its members for the
   current flute without changing memberships. Right-click adds a group while keeping
   the animals already selected.
-- When a capture item clears ownership, its old owner's flute can keep a read-only
-  stored card while the item is carried or already tracked. If another player
-  releases that traded companion with owner reassignment, the former owner's old
-  flute link and card are removed.
+- A captured companion keeps its owner while it is in a capture item, and the
+  item's tooltip names that owner. Your server chooses how the owner changes:
+  it follows whoever holds the item (the default), the item is bound to its
+  owner, or the owner changes when someone else releases the companion. When
+  the owner changes, the former owner's flute link and card are removed.
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
 - A supported managed-coop interaction can place an eligible canonical filled
