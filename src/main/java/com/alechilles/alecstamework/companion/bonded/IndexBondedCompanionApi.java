@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionAvailability;
+import com.alechilles.alecstamework.api.BondedCompanionCaptureEvidenceView;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionData;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
@@ -23,6 +24,7 @@ import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.flow.RosterSummons;
 import com.alechilles.alecstamework.companion.flow.StoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -42,6 +44,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -57,6 +60,11 @@ import javax.annotation.Nullable;
  * and only then does a body appear or go. The family's active limit is checked before the flow
  * for a clear reason, and again under the index lock by the restore's admission check
  * ({@link BondedAdmission#withFamilyCaps}), so two summons at once cannot both pass it.
+ *
+ * <p>A companion comes into a roster by {@link #provision} (a record with no body and no
+ * snapshot, whose first summon builds the body from its role, plan 6 R16) or by a capture into
+ * storage ({@code CaptureFlow} with a bonded target), which leaves the evidence
+ * {@link #findCapture} reads.
  *
  * <p>Every method returns at once and may be called from any thread. Futures complete on the
  * thread that finishes the flow (usually the companion writer thread); nothing here touches a
@@ -91,9 +99,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     static final String PAYMENT_INSUFFICIENT = "bonded-revive-payment-insufficient";
     static final String PROFILE_REVISION_CONFLICT = "bonded-profile-revision-conflict";
     static final String EXTENSION_REVISION_CONFLICT = "bonded-extension-revision-conflict";
-    static final String PROVISIONING_UNAVAILABLE = "bonded-provisioning-unavailable";
-    /** A provisioned companion has no snapshot yet; its first summon spawns from its role (plan 6 R16, task 10). */
-    public static final String FIRST_SUMMON_UNAVAILABLE = "bonded-first-summon-unavailable";
+    static final String CAPTURE_EVIDENCE_NOT_FOUND = "bonded-capture-evidence-not-found";
     /** Release cause of an abandoned bonded companion's tombstone. */
     public static final String CAUSE_ABANDONED = "ABANDONED";
 
@@ -213,13 +219,133 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
         });
     }
 
-    /** Task 10 implements provisioning; until then it reports unavailable and changes nothing. */
+    /**
+     * The evidence of the capture that stored {@code sourceNpcUuid} in the owner's roster (plan 6
+     * R17). It is kept on the companion's record, so it is found for as long as the companion
+     * exists and not after it was abandoned.
+     */
+    @Override
+    @Nonnull
+    public CompletableFuture<BondedCompanionResult<BondedCompanionCaptureEvidenceView>> findCapture(
+            @Nonnull UUID ownerUuid, @Nonnull String rosterId, @Nonnull UUID sourceNpcUuid) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(rosterId, "rosterId");
+        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        return guarded(() -> {
+            String roster = rosterId.trim();
+            for (CompanionRecord record : index.fileRecords(ownerUuid)) {
+                if (!record.bonded() || !roster.equals(record.rosterId())) {
+                    continue;
+                }
+                BondedCompanionCaptureEvidenceView evidence = BondedCaptureEvidence.read(record);
+                if (evidence != null && sourceNpcUuid.equals(evidence.sourceNpcUuid())) {
+                    return done(success(evidence));
+                }
+            }
+            return done(failure(BondedCompanionResultCode.NOT_FOUND, CAPTURE_EVIDENCE_NOT_FOUND));
+        });
+    }
+
+    /**
+     * Adds a companion to the owner's roster as {@code STORED(PROVISIONED)}: no body and no
+     * snapshot until its first summon builds one from {@code roleId} (plan 6 R16). The request's
+     * caller namespace and idempotency key are the record's origin, so a repeated request returns
+     * the companion the first one made, for as long as that companion exists; after it was
+     * abandoned the same request makes a new one. The family's owned limit is checked under the index lock
+     * in the step that inserts the record (plan 6 R15). Completes once the owner file is
+     * written; when that write fails the record is withdrawn and the request can be repeated.
+     *
+     * <p>The request's species, gender and presentation data are not stored: the view of a
+     * companion reports what its body and record hold.
+     */
     @Override
     @Nonnull
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> provision(
             @Nonnull BondedCompanionProvisionRequest request) {
         Objects.requireNonNull(request, "request");
-        return done(BondedCompanionResult.unavailable(closed ? CLOSED : PROVISIONING_UNAVAILABLE));
+        return guarded(() -> {
+            if (!BondedRecords.publicNamespace(request.callerNamespace())) {
+                return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
+            }
+            BondedCompanionPolicy family = families.resolve(request.rosterId(), request.roleId());
+            if (family == null || request.familyId() != null && !request.familyId().equals(family.familyId())) {
+                return done(failure(BondedCompanionResultCode.POLICY_DENIED, ROLE_NOT_ALLOWED));
+            }
+            if (!family.features().provision()) {
+                return done(failure(BondedCompanionResultCode.POLICY_DENIED, FEATURE_DISABLED));
+            }
+            CompanionRecord fresh = CompanionRecord.builder(UUID.randomUUID(), request.roleId(),
+                            CompanionLocation.stored(StoredReason.PROVISIONED))
+                    .ownerUuid(request.ownerUuid())
+                    .displayName(request.displayName())
+                    .bonded(true)
+                    .rosterId(request.rosterId())
+                    .origin(request.callerNamespace(), request.idempotencyKey())
+                    .build();
+            Object outcome = index.atomically(() -> {
+                CompanionRecord existing = index.byOrigin(request.callerNamespace(), request.idempotencyKey());
+                if (existing != null && existing.countsAsOwned()) {
+                    return existing;
+                }
+                // The tombstone of an abandoned or released companion still holds the origin. It
+                // gives it up here, so the same request provisions a new companion.
+                if (existing != null && !index.update(existing.profileId(), existing.revision(),
+                        b -> b.origin(null, null)).applied()) {
+                    return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+                }
+                if (BondedAdmission.check(index.fileRecords(request.ownerUuid()), null, fresh, families)
+                        == BondedAdmission.Refusal.OWNED_CAPACITY) {
+                    return failure(BondedCompanionResultCode.POLICY_DENIED, OWNED_CAPACITY);
+                }
+                CompanionIndex.Mutation inserted = index.insert(fresh);
+                return inserted.applied() ? new Provisioned(inserted.after())
+                        : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+            });
+            if (outcome instanceof CompanionRecord existing) {
+                return done(repeated(existing, request));
+            }
+            if (!(outcome instanceof Provisioned provisioned)) {
+                @SuppressWarnings("unchecked")
+                BondedCompanionResult<BondedCompanionProfileView> refused =
+                        (BondedCompanionResult<BondedCompanionProfileView>) outcome;
+                return done(refused);
+            }
+            CompanionRecord inserted = provisioned.record();
+            return flush.apply(request.ownerUuid()).handle((ignored, failure) -> {
+                if (failure == null) {
+                    return viewResult(inserted.profileId());
+                }
+                LOGGER.at(Level.WARNING).withCause(failure).log(
+                        "Provisioned bonded companion %s was not written; it is withdrawn", inserted.profileId());
+                withdraw(inserted);
+                return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+            });
+        });
+    }
+
+    /** The answer to a request whose origin already has a record. */
+    private BondedCompanionResult<BondedCompanionProfileView> repeated(CompanionRecord existing,
+                                                                       BondedCompanionProvisionRequest request) {
+        if (!request.ownerUuid().equals(existing.ownerUuid()) || !request.rosterId().equals(existing.rosterId())) {
+            // The same key was used for another owner or roster: not this request's companion.
+            return failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID);
+        }
+        return viewResult(existing.profileId());
+    }
+
+    /**
+     * Takes back a provisioned record whose owner file was not written. The tombstone gives up the
+     * origin, so the same request can be made again. Changes nothing when the record has changed.
+     */
+    private void withdraw(CompanionRecord inserted) {
+        index.atomically(() -> {
+            CompanionRecord current = index.get(inserted.profileId());
+            if (current != null && current.revision() == inserted.revision()) {
+                UnaryOperator<CompanionRecord.Builder> released = CompanionTransitions.released(current);
+                index.update(current.profileId(), current.revision(), b -> released.apply(b).origin(null, null));
+            }
+            return null;
+        });
     }
 
     /**
@@ -276,15 +402,21 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     }
 
     /**
-     * The seam for a provisioned companion's first summon (plan 6 R16). Such a record has no
-     * snapshot, and {@link RestoreRules} refuses it until task 10 lets the restore spawn it from
-     * its role. Task 10 replaces this body with the cooldown and capacity checks and
-     * {@code restoreTimed(record, family, RestoreRules.Reason.SUMMON, placement)}.
+     * A provisioned companion's first summon (plan 6 R16). The record has no snapshot, so the
+     * restore hands the spawner none and the spawner builds the body from the record's role,
+     * stamps it and snapshots it. When no body is added the restore puts the record back to
+     * {@code STORED(PROVISIONED)} at its old generation, and it can be summoned again.
      */
     private CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> firstSummon(
             CompanionRecord record, BondedCompanionPolicy family, BondedCompanionActionRequest request,
             BondedCompanionPlacement placement) {
-        return done(BondedCompanionResult.unavailable(FIRST_SUMMON_UNAVAILABLE));
+        if (clock.getAsLong() < record.summonCooldownUntilMs()) {
+            return done(failure(BondedCompanionResultCode.POLICY_DENIED, COOLDOWN_ACTIVE));
+        }
+        if (!activePlaceFree(record, family)) {
+            return done(failure(BondedCompanionResultCode.POLICY_DENIED, ACTIVE_CAPACITY));
+        }
+        return restoreTimed(record, family, RestoreRules.Reason.SUMMON, placement);
     }
 
     /** Stores an active companion as {@code STORED(BONDED)} with the family's summon cooldown. */
@@ -632,7 +764,8 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
      * {@code CompanionPersistenceModule.addAfterUnlockListener}. Position refreshes of a live
      * body are not reported. Reasons: {@code provisioned}, {@code summoned}, {@code revived},
      * {@code stored}, {@code lost}, {@code died}, {@code abandoned}, {@code old_age},
-     * {@code released} and {@code updated}.
+     * {@code released} and {@code updated}. A companion that enters a roster is {@code provisioned}
+     * when it was provisioned and {@code stored} when it was captured into storage.
      */
     public void onChanged(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
         if (subscribers.isEmpty()) {
@@ -655,7 +788,7 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
                     : cause == null && before.location().kind() == LocationKind.LIVE ? "old_age" : "released";
             newState = oldState;
         } else if (oldState == null) {
-            reason = "provisioned";
+            reason = after.location().reason() == StoredReason.PROVISIONED ? "provisioned" : "stored";
         } else if (before.generation() == after.generation() && before.location().kind() == after.location().kind()) {
             if (before.summonedUntilMs() == after.summonedUntilMs()
                     && before.summonCooldownUntilMs() == after.summonCooldownUntilMs()
@@ -855,6 +988,10 @@ public final class IndexBondedCompanionApi implements BondedCompanionApi, AutoCl
     /** {@code deltaMs} is positive; a sum past the end of time stays at the end. */
     private static long saturatedAdd(long nowMs, long deltaMs) {
         return nowMs > Long.MAX_VALUE - deltaMs ? Long.MAX_VALUE : nowMs + deltaMs;
+    }
+
+    /** A record this call inserted, as opposed to one an earlier request made. */
+    private record Provisioned(CompanionRecord record) {
     }
 
     /** @param replay the value was already current, so a failed write leaves it to the first caller */

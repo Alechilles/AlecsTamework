@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.item.AdmissionCache;
@@ -177,7 +179,7 @@ public final class CaptureItemPickupFilter implements SlotFilter {
                 shared.messages.showKey(entity, NotificationStyle.Warning, OWNER_ONLY_PICKUP_KEY,
                         CaptureItemHolderSystems.Transfers.ownerLabel(entity, record));
             }
-        } else if (!admitted(item) && shared.cache.noticeDue(player, item.profileId())) {
+        } else if (check(item) == Check.REFUSED && shared.cache.noticeDue(player, item.profileId())) {
             shared.messages.showKey(entity, NotificationStyle.Warning, PICKUP_BLOCKED_KEY);
         }
         if (!shared.cache.resyncDue(player, item.profileId())) {
@@ -192,13 +194,21 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         }
     }
 
+    /** {@code PENDING}: the admission provider's decision is being fetched; a later attempt finds it. */
+    private enum Check { ADMITTED, REFUSED, PENDING }
+
     /**
      * The cached decision, or a new one taken under the index lock and cached there, so an index
-     * change cannot invalidate the player between the count and the put. True when the item no
-     * longer moves its companion to this player.
+     * change cannot invalidate the player between the count and the put. Admitted when the item
+     * no longer moves its companion to this player.
+     *
+     * <p>The gate reads the admission provider's cached decision for a managed role. A provider
+     * that gave no decision (still being fetched, or unavailable) is not cached here: the
+     * {@link ProviderDecisionCache} asks again within seconds, and this cache would hold the
+     * refusal for its whole life.</p>
      */
-    private boolean admitted(CaptureItemKeys.Ref item) {
-        Boolean allowed = shared.index.atomically(() -> {
+    private Check check(CaptureItemKeys.Ref item) {
+        Check checked = shared.index.atomically(() -> {
             CompanionRecord record = shared.index.get(item.profileId());
             if (CaptureItemOwnership.decide(record, item.generation(), player, null) != Decision.TRANSFER) {
                 return null;
@@ -206,12 +216,17 @@ public final class CaptureItemPickupFilter implements SlotFilter {
             String family = AdmissionCache.family(record);
             AdmissionCache.Cached cached = shared.cache.get(player, family);
             if (cached != AdmissionCache.Cached.MISS) {
-                return cached == AdmissionCache.Cached.ALLOW;
+                return cached == AdmissionCache.Cached.ALLOW ? Check.ADMITTED : Check.REFUSED;
             }
-            boolean ok = shared.gate.refuse(record, CaptureItemOwnership.asOwnedBy(record, player, null)) == null;
-            shared.cache.put(player, family, ok);
-            return ok;
+            CompanionAdmissionGate.Denial denial =
+                    shared.gate.admit(record, CaptureItemOwnership.asOwnedBy(record, player, null)).denial();
+            if (denial != null && denial.refusal() == CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE) {
+                return ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(denial.messageKey())
+                        ? Check.PENDING : Check.REFUSED;
+            }
+            shared.cache.put(player, family, denial == null);
+            return denial == null ? Check.ADMITTED : Check.REFUSED;
         });
-        return allowed == null || allowed;
+        return checked == null ? Check.ADMITTED : checked;
     }
 }

@@ -71,6 +71,20 @@ class RestoreRulesTest {
     }
 
     @Test
+    void onlyAProvisionedBondedCompanionIsSummonedWithNoSnapshot() {
+        CompanionRecord provisioned = at(CompanionLocation.stored(StoredReason.PROVISIONED)).toBuilder()
+                .bonded(true).rosterId("hydragon:horn").ownerUuid(UUID.randomUUID()).build();
+        CompanionRecord storedBonded = provisioned.toBuilder()
+                .location(CompanionLocation.stored(StoredReason.BONDED)).build();
+
+        assertEquals(Verdict.ALLOWED, RestoreRules.forRecord(provisioned, Reason.SUMMON, 0));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(provisioned, null, Reason.SUMMON));
+        // Once it has been out and stored again it has a snapshot, and needs it like any other.
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(storedBonded, null, Reason.SUMMON));
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(provisioned, null, Reason.RECOVER));
+    }
+
+    @Test
     void anItemFromAnOlderGenerationIsStale() {
         CompanionRecord item = CompanionRecord.builder(UUID.randomUUID(), "r", CompanionLocation.item()).generation(4).build();
         assertEquals(Verdict.STALE, RestoreRules.forRecord(item, Reason.RELEASE, 0, 3));

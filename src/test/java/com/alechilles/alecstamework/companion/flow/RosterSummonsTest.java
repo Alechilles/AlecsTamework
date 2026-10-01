@@ -33,7 +33,8 @@ class RosterSummonsTest {
                 who -> records.values().stream().filter(r -> who.equals(r.ownerUuid())).toList(),
                 request -> {
                     restores.add(request);
-                    return CompletableFuture.completedFuture(RestoreFlow.Result.RESTORED);
+                    return CompletableFuture.completedFuture(
+                            new RestoreFlow.Outcome(RestoreFlow.Result.RESTORED, null));
                 },
                 (id, reason, cooldownUntilMs) -> {
                     stores.add(id + ":" + reason + ":" + cooldownUntilMs);

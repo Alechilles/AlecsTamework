@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.spawning.CompanionSpawnAuthorityService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -17,12 +19,15 @@ import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -36,7 +41,9 @@ import org.bson.BsonDocument;
 import org.joml.Vector3d;
 
 /**
- * Puts a committed companion back into its destination world from its snapshot (spec 6.5).
+ * Puts a committed companion back into its destination world from its snapshot (spec 6.5). The
+ * first summon of a provisioned bonded companion has no snapshot: its body is built from the
+ * record's role, stamped before it is added, and snapshotted once it is in the store (plan 6 R16).
  *
  * <p>{@link #spawn} only resolves the world and queues one task, so it is safe to call from the
  * companion writer thread mid-flush. The entity work runs inside that task on the destination
@@ -82,7 +89,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
 
     @Nonnull
     @Override
-    public CompletableFuture<Boolean> spawn(@Nonnull CompanionRecord committed, @Nonnull SnapshotEnvelope snapshot,
+    public CompletableFuture<Boolean> spawn(@Nonnull CompanionRecord committed, @Nullable SnapshotEnvelope snapshot,
                                             @Nonnull RestoreFlow.Destination destination,
                                             @Nonnull RestoreRules.Reason reason) {
         CompletableFuture<Boolean> done = new CompletableFuture<>();
@@ -93,7 +100,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             return done;
         }
         try {
-            world.execute(() -> done.complete(spawnOnWorldThread(world, committed, snapshot, destination, reason)));
+            world.execute(() -> done.complete(snapshot == null
+                    ? spawnFromRoleOnWorldThread(world, committed, destination, reason)
+                    : spawnOnWorldThread(world, committed, snapshot, destination, reason)));
         } catch (RuntimeException notAccepting) {
             // World#execute throws when the world no longer accepts tasks; the task was not queued.
             warn(committed.profileId(), "world " + destination.world() + " is not accepting tasks", notAccepting);
@@ -242,6 +251,82 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
         }
         return true;
+    }
+
+    /**
+     * Builds the first body of a provisioned bonded companion from the committed record's role.
+     * The NPC UUID, the stamp, the owner and the tamed flag are written in the engine's pre-add
+     * callback, so the body is never in the store without them and the tame and adoption systems
+     * see a stamped body. Returns true exactly when that stamped body is in the store. A body
+     * that reached the store without its stamp is removed again, so a failure leaves nothing
+     * behind and {@link RestoreFlow} puts the record back to {@code STORED(PROVISIONED)}.
+     */
+    private boolean spawnFromRoleOnWorldThread(World world, CompanionRecord committed,
+                                               RestoreFlow.Destination destination, RestoreRules.Reason reason) {
+        UUID profileId = committed.profileId();
+        UUID npcUuid = committed.currentNpcUuid();
+        Ref<EntityStore> ref = null;
+        long worldGameTimeMs = 0L;
+        boolean[] stamped = new boolean[1];
+        try {
+            CompanionRecord now = currentRecord.apply(profileId);
+            if (now == null || now.revision() != committed.revision()) {
+                // A newer change to the record won after the commit; it owns the outcome.
+                return false;
+            }
+            NPCPlugin plugin = NPCPlugin.get();
+            int roleIndex = plugin == null ? -1 : plugin.getIndex(committed.roleId());
+            if (npcUuid == null || committed.ownerUuid() == null || roleIndex < 0) {
+                warn(profileId, "a first summon needs an owner, an NPC UUID and a loaded role ("
+                        + committed.roleId() + ")", null);
+                return false;
+            }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            worldGameTimeMs = CompanionWorldTime.gameTimeMs(store);
+            Vector3d position = new Vector3d(destination.x(), destination.y(), destination.z());
+            Rotation3f rotation = new Rotation3f(destination.pitch(), destination.yaw(), 0.0f);
+            var spawned = plugin.spawnEntity(store, roleIndex, position, rotation, null, (npc, holder, into) -> {
+                holder.putComponent(UUIDComponent.getComponentType(), new UUIDComponent(npcUuid));
+                npc.setLegacyUUID(npcUuid);
+                holder.putComponent(stampType, new TameworkCompanionComponent(profileId, committed.generation()));
+                applyOwnership(holder, committed, false, stampType);
+                stamped[0] = true;
+            }, null);
+            ref = spawned == null ? null : spawned.first();
+        } catch (RuntimeException | LinkageError failure) {
+            // The engine adds the entity before its on-add systems run, so a throw from those can
+            // leave the body in the store; it is found by the NPC UUID written before the add.
+            ref = npcUuid == null ? null : world.getEntityRef(npcUuid);
+            boolean added = ref != null && ref.isValid();
+            warn(profileId, added ? "an on-add step failed after the first body was added"
+                    : "first summon from role " + committed.roleId() + " failed", failure);
+        }
+        if (ref == null || !ref.isValid()) {
+            return false;
+        }
+        Store<EntityStore> store = ref.getStore();
+        if (!stamped[0]) {
+            removeUnstamped(ref, store, profileId);
+            return false;
+        }
+        try {
+            CompanionSpawnAuthorityService.detach(ref, store);
+            CompanionProgressionBootstrapService.ensureProgressionComponents(ref, store, committed.roleId());
+        } catch (RuntimeException | LinkageError failure) {
+            warn(profileId, "a step after the first body was added failed", failure);
+        }
+        // The snapshot taken here is the one every later summon restores from.
+        finishAddedBody(ref, store, committed, world.getName(), worldGameTimeMs, reason, snapshots, queueSnapshot, true);
+        return true;
+    }
+
+    /** World thread, between ticks: takes out a first body that never got its stamp. */
+    private static void removeUnstamped(Ref<EntityStore> ref, Store<EntityStore> store, UUID profileId) {
+        try {
+            store.removeEntity(ref, RemoveReason.REMOVE);
+        } catch (RuntimeException | LinkageError failure) {
+            warn(profileId, "an unstamped first body could not be removed", failure);
+        }
     }
 
     /**

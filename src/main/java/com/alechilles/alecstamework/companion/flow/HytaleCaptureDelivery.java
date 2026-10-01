@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
@@ -24,21 +26,29 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonDocument;
 import org.joml.Vector3d;
 
 /**
  * Finishes a capture that {@link CaptureFlow} reported CAPTURED (spec 8.2 steps 5 and 6): removes
- * the body and hands the item to the player. Safe to call from any thread; only stable ids and
- * immutable stacks cross threads, and live state is resolved inside world tasks.
+ * the body and hands the item to the player, or, for a capture into bonded storage, spends one
+ * source item. Safe to call from any thread; only stable ids and immutable stacks cross threads,
+ * and live state is resolved inside world tasks.
  *
- * <p>On the body's world thread the record must still be ITEM at the item's generation; when it
- * is not, a newer change owns the companion: the body (unregistered, and fenced by its stale
- * generation) is removed and no item is handed over. A body
- * that vanished before the task ran moves the record to LOST; its snapshot is already queued, so
- * the owner can Recover it.
+ * <p>On the body's world thread the record must still be ITEM (STORED for a capture into
+ * storage) at the committed generation; when it is not, a newer change owns the companion: the
+ * body (unregistered, and fenced by its stale generation) is removed and no item is handed over.
+ * A body that vanished before the task ran moves an ITEM record to LOST; its snapshot is already
+ * queued, so the owner can Recover it. A stored record needs no body and stays stored.
+ *
+ * <p>The snapshot the flow queued was taken before the commit, and the commit can wait on an
+ * admission provider. So the body is snapshotted again here, in the task that removes it, and
+ * that snapshot replaces the first at the same generation: whatever left the body in between
+ * (an item taken out of its inventory, say) is not stored twice.
  *
  * <p>The item goes into the recorded hotbar slot when that slot still holds the exact source
  * stack, otherwise into the player's inventory, otherwise it is dropped where the body stood.
@@ -47,21 +57,29 @@ public final class HytaleCaptureDelivery {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     /**
-     * One capture to finish. {@code item} is the presentation item without identity keys;
+     * One capture to finish. {@code item} is the presentation item without identity keys, or null
+     * for a capture into bonded storage, which gives no item and spends one source item instead;
      * {@code expectedSource} is the exact stack the player held in {@code hotbarSlot}.
      * {@code onCaptured} runs on the body's world thread just before the body is removed (effects).
-     * {@code capturedAtMs} is the wall-clock time the snapshot was taken.
+     * {@code capturedAtMs} is the wall-clock time the snapshot was taken. {@code entityPatch} is
+     * the change the caller made to the entity document of the snapshot it committed (null for
+     * none); it is applied again to the snapshot taken here.
      */
     public record Handover(@Nonnull Ref<EntityStore> body, @Nonnull CaptureItemKeys.Ref ref,
-                           @Nonnull ItemStack item, @Nonnull UUID playerUuid, int hotbarSlot,
+                           @Nullable ItemStack item, @Nonnull UUID playerUuid, int hotbarSlot,
                            @Nonnull ItemStack expectedSource, @Nullable Consumer<World> onCaptured,
-                           long capturedAtMs) {
+                           long capturedAtMs, @Nullable UnaryOperator<BsonDocument> entityPatch) {
         public Handover {
             Objects.requireNonNull(body, "body");
             Objects.requireNonNull(ref, "ref");
-            Objects.requireNonNull(item, "item");
             Objects.requireNonNull(playerUuid, "playerUuid");
             Objects.requireNonNull(expectedSource, "expectedSource");
+        }
+
+        /** The record location this capture committed. */
+        @Nonnull
+        LocationKind committedKind() {
+            return item == null ? LocationKind.STORED : LocationKind.ITEM;
         }
     }
 
@@ -73,9 +91,34 @@ public final class HytaleCaptureDelivery {
     }
 
     private final CompanionIndex index;
+    private final CompanionSnapshots snapshots;
+    private final Consumer<SnapshotEnvelope> queueSnapshot;
 
-    public HytaleCaptureDelivery(@Nonnull CompanionIndex index) {
+    /**
+     * @param snapshots     takes the snapshot of the body just before it is removed
+     * @param queueSnapshot queues a snapshot write; {@code CompanionWriter::queueSnapshot}
+     */
+    public HytaleCaptureDelivery(@Nonnull CompanionIndex index, @Nonnull CompanionSnapshots snapshots,
+                                 @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
         this.index = Objects.requireNonNull(index, "index");
+        this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
+        this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
+    }
+
+    /**
+     * The snapshot data with {@code entityPatch} applied to its entity document; the snapshot's
+     * own data when there is no patch. The input is not modified.
+     */
+    @Nonnull
+    public static BsonDocument patched(@Nonnull SnapshotEnvelope snapshot,
+                                       @Nullable UnaryOperator<BsonDocument> entityPatch) {
+        if (entityPatch == null) {
+            return snapshot.data();
+        }
+        BsonDocument data = new BsonDocument();
+        data.putAll(snapshot.data());
+        data.put("Entity", entityPatch.apply(CompanionSnapshots.entity(snapshot)));
+        return data;
     }
 
     public void deliver(@Nonnull Handover handover) {
@@ -108,13 +151,14 @@ public final class HytaleCaptureDelivery {
         }
         UUID profileId = handover.ref().profileId();
         CompanionRecord record = index.get(profileId);
-        if (record == null || record.location().kind() != LocationKind.ITEM
+        if (record == null || record.location().kind() != handover.committedKind()
                 || record.generation() != handover.ref().generation()) {
             LOGGER.at(Level.WARNING).log("Companion %s changed before its capture was handed over; no item was given",
                     profileId);
             CompanionBodies.removeOnOwnWorld(body);
             return;
         }
+        refreshSnapshot(world, store, handover);
         TransformComponent transform = store.getComponent(body, TransformComponent.getComponentType());
         Vector3d dropAt = transform == null || transform.getPosition() == null
                 ? null : new Vector3d(transform.getPosition());
@@ -127,6 +171,12 @@ public final class HytaleCaptureDelivery {
         }
         // The flow unregistered the body at commit, so its removal raises no LOST transition.
         CompanionBodies.removeOnOwnWorld(body);
+        if (handover.item() == null) {
+            // Stored, not handed over: the capture spends one source item. An offline player keeps it.
+            onPlayerWorld(handover.playerUuid(),
+                    (playerWorld, playerStore, playerRef, player) -> spendSource(player, handover), null);
+            return;
+        }
         ItemStack item = CaptureItemKeys.write(handover.item(), handover.ref());
         boolean scheduled = onPlayerWorld(handover.playerUuid(),
                 (playerWorld, playerStore, playerRef, player) -> {
@@ -139,6 +189,43 @@ public final class HytaleCaptureDelivery {
         if (!scheduled) {
             drop(world, dropAt, item, profileId);
         }
+    }
+
+    /**
+     * Snapshots the body again and queues that snapshot at the committed generation, in place of
+     * the one taken before the commit. Runs in the world task that removes the body, so nothing
+     * can change the body in between. When it fails, the earlier snapshot stands.
+     */
+    private void refreshSnapshot(World world, Store<EntityStore> store, Handover handover) {
+        UUID profileId = handover.ref().profileId();
+        try {
+            SnapshotEnvelope fresh = snapshots.capture(handover.body(), store, profileId, handover.ref().generation(),
+                    world.getName(), CompanionWorldTime.gameTimeMs(store));
+            if (fresh == null) {
+                LOGGER.at(Level.WARNING).log(
+                        "Captured companion %s could not be snapshotted again; its earlier snapshot stands", profileId);
+                return;
+            }
+            queueSnapshot.accept(new SnapshotEnvelope(profileId, fresh.format(), fresh.generation(),
+                    patched(fresh, handover.entityPatch())));
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.at(Level.WARNING).withCause(failure).log(
+                    "Captured companion %s could not be snapshotted again; its earlier snapshot stands", profileId);
+        }
+    }
+
+    /** Takes one source item: from the recorded slot when it still holds the source, else from the inventory. */
+    private static void spendSource(Player player, Handover handover) {
+        ItemContainer hotbar = player.getInventory() == null ? null : player.getInventory().getHotbar();
+        int slot = handover.hotbarSlot();
+        if (hotbar != null && slot >= 0 && slot < hotbar.getCapacity()
+                && Objects.equals(hotbar.getItemStack((short) slot), handover.expectedSource())) {
+            var taken = hotbar.removeItemStackFromSlot((short) slot, 1);
+            if (taken != null && taken.succeeded()) {
+                return;
+            }
+        }
+        takeMovedSource(player, handover.expectedSource(), handover.ref().profileId());
     }
 
     /**
@@ -216,6 +303,11 @@ public final class HytaleCaptureDelivery {
      */
     private void markLost(Handover handover) {
         CaptureItemKeys.Ref ref = handover.ref();
+        if (handover.item() == null) {
+            LOGGER.at(Level.WARNING).log("The body of captured companion %s vanished before it was removed; "
+                    + "the companion stays stored and no source item was spent", ref.profileId());
+            return;
+        }
         boolean lost = index.atomically(() -> {
             CompanionRecord current = index.get(ref.profileId());
             return current != null && current.location().kind() == LocationKind.ITEM

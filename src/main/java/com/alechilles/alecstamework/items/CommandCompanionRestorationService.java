@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionReviveSettings;
 import com.alechilles.alecstamework.items.persistence.HytaleUuidCompletionDispatcher;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -34,8 +35,10 @@ import javax.annotation.Nullable;
  * placement near the player and hands it to {@link RestoreFlow}. The flow re-checks the record and
  * hands its entity work to the world threads itself. Its outcome returns to the player on the
  * world thread the placement was taken in, through {@link CommandRestorationCompletionListener};
- * a player who left that world or disconnected gets no message. The owner's open panels are then
- * asked to refresh, so their cards show the restored companion.</p>
+ * a population refusal that names its own message (an admission provider's denial, a domain
+ * limit) shows that message instead. A player who left that world or disconnected gets no
+ * message. The owner's open panels are then asked to refresh, so their cards show the restored
+ * companion.</p>
  *
  * <p>A revive with a configured item cost takes the exact items from the player's inventory on
  * that same world thread, before the flow starts. Any result other than RESTORED gives the items
@@ -70,6 +73,7 @@ final class CommandCompanionRestorationService {
     private final CompanionQueries companions;
     private final HytaleUuidCompletionDispatcher completions = new HytaleUuidCompletionDispatcher();
     private final CommandRestorationCompletionListener listener = new CommandRestorationCompletionListener();
+    private final CommandFeedbackService feedback = new CommandFeedbackService(new TameworkUiMessageService());
     @Nullable
     private volatile CaptureItemFlows captureItemFlows;
     /** Asks the owner's open panels to rebuild their cards; must be safe from any thread. */
@@ -193,13 +197,13 @@ final class CommandCompanionRestorationService {
                 }
             }
         }
-        CompletableFuture<RestoreFlow.Result> restoring;
+        CompletableFuture<RestoreFlow.Outcome> restoring;
         try {
             CaptureItemFlows flows = captureItemFlows;
             // Recall of a captured companion also empties the owner's held copies of its item.
             restoring = reason == RestoreRules.Reason.RECOVER && flows != null
-                    ? flows.recall(profileId, destination)
-                    : restoreFlow.restore(profileId, reason, destination);
+                    ? flows.recallOutcome(profileId, destination)
+                    : restoreFlow.restoreOutcome(RestoreFlow.Request.of(profileId, reason, destination));
         } catch (RuntimeException failure) {
             restoring = CompletableFuture.failedFuture(failure);
         }
@@ -209,12 +213,19 @@ final class CommandCompanionRestorationService {
                 LOGGER.at(Level.WARNING).withCause(error).log("Panel " + reason + " of profile=" + profileId
                         + " failed unexpectedly.");
             }
-            RestoreFlow.Result outcome = error != null || result == null ? RestoreFlow.Result.COMMIT_FAILED : result;
+            RestoreFlow.Result outcome = error != null || result == null
+                    ? RestoreFlow.Result.COMMIT_FAILED : result.result();
+            String refusalKey = error != null || result == null ? null : result.messageKey();
             if (outcome != RestoreFlow.Result.RESTORED) {
                 CommandReviveCostInventory.refund(playerUuid, charged);
             }
-            completions.dispatch(placement.worldKey(), playerUuid,
-                    (currentWorld, currentStore, actorRef, actor) -> listener.complete(outcome, actor, name));
+            completions.dispatch(placement.worldKey(), playerUuid, (currentWorld, currentStore, actorRef, actor) -> {
+                if (outcome != RestoreFlow.Result.RESTORED && refusalKey != null) {
+                    feedback.showWarningKey(actor, refusalKey);
+                } else {
+                    listener.complete(outcome, actor, name);
+                }
+            });
             // The record has its final state now; a refusal can also change what the card shows.
             try {
                 panelRefresh.accept(playerUuid);

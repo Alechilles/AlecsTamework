@@ -362,11 +362,14 @@ public final class CaptureItemHolderSystems {
             }
             Attempt attempt = index.atomically(() -> {
                 CompanionRecord record = index.get(item.profileId());
-                CompanionAdmission.Refusal refusal = record == null
-                        ? null : gate.refuse(record, CaptureItemOwnership.asOwnedBy(record, holder, name));
+                CompanionAdmissionGate.Admission admission = record == null
+                        ? null : gate.admit(record, CaptureItemOwnership.asOwnedBy(record, holder, name));
+                CompanionAdmission.Refusal refusal = admission == null ? null : admission.refusal();
                 Decision decided = CaptureItemOwnership.decide(mode, record, item.generation(), holder, refusal);
+                // The admitted record carries the claims an admission provider allowed for the new owner.
                 if (decided == Decision.TRANSFER && !index.update(item.profileId(), record.revision(),
-                        CompanionTransitions.ownerChanged(holder, name)).applied()) {
+                        builder -> CompanionTransitions.ownerChanged(holder, name).apply(builder)
+                                .domainClaims(admission.record().domainClaims())).applied()) {
                     return new Attempt(Decision.IGNORE, record);
                 }
                 return new Attempt(decided, record);

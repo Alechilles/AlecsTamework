@@ -10,7 +10,6 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -19,15 +18,21 @@ import javax.annotation.Nullable;
 /**
  * Pre-checks the owner cap, and with a role id the population-group caps, for the tame, set-owner
  * and spawn sites against the owner's records in the companion index: every owned companion
- * counts, loaded or not. The binding check is {@link CompanionAdmissionGate#refuse} under the
+ * counts, loaded or not. The binding check is {@link CompanionAdmissionGate#admit} under the
  * index lock; this one only refuses early with a message, before food is spent or effects play.
  *
  * <p>Reads are in-memory index reads. They never enter another world thread, block on futures,
- * or create durable reservations.
+ * or create durable reservations. A role managed by an admission provider is checked against the
+ * provider's cached decision; while that decision is being fetched the acquisition is refused
+ * with the "checking requirements" message.
  */
 public final class OwnerPopulationCapService {
     /** Reason of a {@link Decision} refused by a population-group cap. */
     public static final String REASON_GROUP_CAP = "owner-group-cap-reached";
+    /** Reason of a {@link Decision} refused by an admission provider or one of its domain limits. */
+    public static final String REASON_PROVIDER_DENIED = "owner-provider-denied";
+    /** Reason of a {@link Decision} refused because the admission provider gave no decision (yet). */
+    public static final String REASON_PROVIDER_UNAVAILABLE = "owner-provider-unavailable";
 
     private static volatile CompanionAdmissionGate admissionGate;
 
@@ -45,9 +50,11 @@ public final class OwnerPopulationCapService {
     /**
      * The owner cap and the population-group caps for a new companion of {@code roleId} in the
      * store's world, in one admission pre-check. An owned refusal has reason
-     * {@code owner-cap-reached} and a group refusal {@link #REASON_GROUP_CAP}. This check does not
-     * count the owner's companions, so {@code currentCount} is -1. Without a gate, owner or role
-     * it falls back to {@link #evaluateAcquisition(Store, UUID)}, the owner cap only.
+     * {@code owner-cap-reached}, a group refusal {@link #REASON_GROUP_CAP} and a provider refusal
+     * {@link #REASON_PROVIDER_DENIED} or {@link #REASON_PROVIDER_UNAVAILABLE}; a refused decision
+     * carries the message key to show. This check does not count the owner's companions, so
+     * {@code currentCount} is -1. Without a gate, owner or role it falls back to
+     * {@link #evaluateAcquisition(Store, UUID)}, the owner cap only.
      */
     @Nonnull
     public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store,
@@ -57,30 +64,47 @@ public final class OwnerPopulationCapService {
         if (gate == null || ownerId == null || roleId == null || roleId.isBlank()) {
             return evaluateAcquisition(store, ownerId);
         }
-        return fromPrecheck(gate.precheck(ownerId, roleId, resolveWorldName(store)), gate.rules());
+        String world = resolveWorldName(store);
+        return fromPrecheck(gate.precheckDenial(ownerId, roleId, world, world != null), gate.rules());
     }
 
     /** Maps an admission pre-check result to a {@link Decision}; the owner's companions are not counted. */
     @Nonnull
-    static Decision fromPrecheck(@Nullable CompanionAdmission.Refusal refusal,
+    static Decision fromPrecheck(@Nullable CompanionAdmissionGate.Denial denial,
                                  @Nonnull CompanionAdmission.Rules rules) {
         int limit = rules.ownedLimit();
-        TwGlobalConfig.PerPlayerLimitScope scope = rules.ownedPerWorld()
+        if (denial == null) {
+            return limit <= 0
+                    ? new Decision(true, false, 0, -1, Integer.MAX_VALUE, scope(rules), "owner-cap-disabled")
+                    : new Decision(true, true, limit, -1, 1, scope(rules), "owner-cap-allow");
+        }
+        return refused(denial, rules, -1);
+    }
+
+    /** A refused decision with the reason and message key of {@code denial}. */
+    @Nonnull
+    static Decision refused(@Nonnull CompanionAdmissionGate.Denial denial, @Nonnull CompanionAdmission.Rules rules,
+                            int currentCount) {
+        String reason = switch (denial.refusal()) {
+            case OWNED -> "owner-cap-reached";
+            case GROUP_OWNED, GROUP_DEPLOYED -> REASON_GROUP_CAP;
+            case PROVIDER_DENIED -> REASON_PROVIDER_DENIED;
+            case PROVIDER_UNAVAILABLE -> REASON_PROVIDER_UNAVAILABLE;
+        };
+        return new Decision(false, true, rules.ownedLimit(), currentCount, 0, scope(rules), reason,
+                denial.messageKey());
+    }
+
+    private static TwGlobalConfig.PerPlayerLimitScope scope(CompanionAdmission.Rules rules) {
+        return rules.ownedPerWorld()
                 ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
                 : TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
-        if (refusal == null) {
-            return limit <= 0
-                    ? new Decision(true, false, 0, -1, Integer.MAX_VALUE, scope, "owner-cap-disabled")
-                    : new Decision(true, true, limit, -1, 1, scope, "owner-cap-allow");
-        }
-        return new Decision(false, true, limit, -1, 0, scope,
-                refusal == CompanionAdmission.Refusal.OWNED ? "owner-cap-reached" : REASON_GROUP_CAP);
     }
 
     /**
      * Pre-checks a whole litter (spec 8.11): would adding {@code candidates} to {@code ownerId}'s
-     * companions pass the owned limit or a group limit? A refusal has reason
-     * {@code owner-cap-reached} or {@link #REASON_GROUP_CAP}, as for {@link #evaluateAcquisition}.
+     * companions pass the owned limit, a group limit or, for a managed role, the cached provider
+     * decision and its domain limits? A refusal has the reasons of {@link #evaluateAcquisition}.
      * Allowed when there is no owner, no candidate, no gate or no index. Like the other pre-checks
      * it is lock-free; each child's tame stamping still re-checks under the index lock.
      */
@@ -91,23 +115,8 @@ public final class OwnerPopulationCapService {
         if (gate == null || index == null || ownerId == null || candidates.isEmpty()) {
             return Decision.allowBatch();
         }
-        return evaluateBatch(index.owned(ownerId), candidates, gate.rules());
-    }
-
-    @Nonnull
-    static Decision evaluateBatch(@Nonnull Collection<CompanionRecord> ownerRecords,
-                                  @Nonnull List<CompanionRecord> candidates,
-                                  @Nonnull CompanionAdmission.Rules rules) {
-        CompanionAdmission.Refusal refusal = CompanionAdmission.checkBatch(ownerRecords, candidates, rules);
-        if (refusal == null) {
-            return Decision.allowBatch();
-        }
-        TwGlobalConfig.PerPlayerLimitScope scope = rules.ownedPerWorld()
-                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
-                : TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
-        return refusal == CompanionAdmission.Refusal.OWNED
-                ? Decision.denyAtCap(rules.ownedLimit(), ownerRecords.size(), scope)
-                : new Decision(false, true, rules.ownedLimit(), ownerRecords.size(), 0, scope, REASON_GROUP_CAP);
+        CompanionAdmissionGate.Denial denial = gate.denyBatch(ownerId, candidates);
+        return denial == null ? Decision.allowBatch() : refused(denial, gate.rules(), index.owned(ownerId).size());
     }
 
     @Nonnull
@@ -235,13 +244,24 @@ public final class OwnerPopulationCapService {
         return world.getName().trim();
     }
 
+    /**
+     * {@code messageKey} is the translation key to show for a refusal that names one (a provider's
+     * own key, a domain limit, or "checking requirements"); null means the message of
+     * {@code reason}.
+     */
     public record Decision(boolean allowed,
                            boolean capEnabled,
                            int limit,
                            int currentCount,
                            int remainingHeadroom,
                            TwGlobalConfig.PerPlayerLimitScope scope,
-                           @Nonnull String reason) {
+                           @Nonnull String reason,
+                           @Nullable String messageKey) {
+        public Decision(boolean allowed, boolean capEnabled, int limit, int currentCount, int remainingHeadroom,
+                        TwGlobalConfig.PerPlayerLimitScope scope, @Nonnull String reason) {
+            this(allowed, capEnabled, limit, currentCount, remainingHeadroom, scope, reason, null);
+        }
+
         @Nonnull
         static Decision allowNoOwner() {
             return new Decision(

@@ -63,7 +63,7 @@ public final class RosterSummons {
 
     private final Function<UUID, CompanionRecord> record;
     private final Function<UUID, List<CompanionRecord>> owned;
-    private final Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore;
+    private final Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Outcome>> restore;
     private final Store store;
     private final Function<UUID, CompletableFuture<Void>> flush;
     private final Function<String, Policy> policies;
@@ -73,7 +73,7 @@ public final class RosterSummons {
     /** Roster summons with no bonded store path: bonded companions are left alone. */
     public RosterSummons(@Nonnull Function<UUID, CompanionRecord> record,
                          @Nonnull Function<UUID, List<CompanionRecord>> owned,
-                         @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore,
+                         @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Outcome>> restore,
                          @Nonnull Store store, @Nonnull Function<UUID, CompletableFuture<Void>> flush,
                          @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock) {
         this(record, owned, restore, store, flush, policies, clock, null);
@@ -82,7 +82,7 @@ public final class RosterSummons {
     /**
      * @param record   a profile's current record, or null
      * @param owned    every non-released record of an owner
-     * @param restore  {@link RestoreFlow#restore(RestoreFlow.Request)}
+     * @param restore  {@link RestoreFlow#restoreOutcome(RestoreFlow.Request)}
      * @param flush    writes an owner's file to disk; {@code CompanionWriter::flushNow} in production
      * @param policies the summon policy of a role id; {@link Policy#forRole} in production
      * @param clock    wall clock
@@ -92,7 +92,7 @@ public final class RosterSummons {
      */
     public RosterSummons(@Nonnull Function<UUID, CompanionRecord> record,
                          @Nonnull Function<UUID, List<CompanionRecord>> owned,
-                         @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore,
+                         @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Outcome>> restore,
                          @Nonnull Store store, @Nonnull Function<UUID, CompletableFuture<Void>> flush,
                          @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock,
                          @Nullable Function<CompanionRecord, CompletableFuture<StoreFlow.Result>> bondedStore) {
@@ -108,8 +108,9 @@ public final class RosterSummons {
 
     /**
      * Summons a stored roster companion to {@code destination}, timed when its role has a summon
-     * duration. COOLDOWN, OWNED_LIMIT and GROUP_LIMIT come back from the restore as they are.
-     * A bonded companion is NOT_ALLOWED: the bonded API summons it with its roster's timers.
+     * duration. COOLDOWN, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED and PROVIDER_UNAVAILABLE come
+     * back from the restore as they are. A bonded companion is NOT_ALLOWED: the bonded API summons
+     * it with its roster's timers.
      */
     @Nonnull
     public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId,
@@ -124,12 +125,22 @@ public final class RosterSummons {
     @Nonnull
     public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId, long expectedGeneration,
                                                         @Nonnull RestoreFlow.Destination destination) {
+        return summonOutcome(profileId, expectedGeneration, destination).thenApply(RestoreFlow.Outcome::result);
+    }
+
+    /**
+     * As {@link #summon(UUID, long, RestoreFlow.Destination)}, with the message key of a population
+     * refusal (a cap, an admission provider's denial or a domain limit).
+     */
+    @Nonnull
+    public CompletableFuture<RestoreFlow.Outcome> summonOutcome(@Nonnull UUID profileId, long expectedGeneration,
+                                                                @Nonnull RestoreFlow.Destination destination) {
         CompanionRecord current = record.apply(profileId);
         if (current == null) {
-            return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_FOUND);
+            return CompletableFuture.completedFuture(new RestoreFlow.Outcome(RestoreFlow.Result.NOT_FOUND, null));
         }
         if (current.bonded()) {
-            return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_ALLOWED);
+            return CompletableFuture.completedFuture(new RestoreFlow.Outcome(RestoreFlow.Result.NOT_ALLOWED, null));
         }
         long durationMs = policy(current).durationMs();
         RestoreFlow.Request request = RestoreFlow.Request.of(profileId, RestoreRules.Reason.SUMMON, destination)

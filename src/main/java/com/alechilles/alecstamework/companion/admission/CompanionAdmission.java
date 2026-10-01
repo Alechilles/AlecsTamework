@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -145,21 +144,6 @@ public final class CompanionAdmission {
                     && claim.weight() + claimed(ownerRecords, after, claim.domainId(), true) > limit) {
                 return new DomainRefusal(claim.domainId(), DEPLOYED_LIMIT_MESSAGE_KEY);
             }
-        }
-        return null;
-    }
-
-    /** Spec 8.11: a litter is admitted as a whole or not at all. */
-    @Nullable
-    public static Refusal checkBatch(@Nonnull Collection<CompanionRecord> ownerRecords,
-                                     @Nonnull List<CompanionRecord> candidates, @Nonnull Rules rules) {
-        List<CompanionRecord> working = new ArrayList<>(ownerRecords);
-        for (CompanionRecord candidate : candidates) {
-            Refusal refusal = check(working, null, candidate, rules, Provided.none());
-            if (refusal != null) {
-                return refusal;
-            }
-            working.add(candidate);
         }
         return null;
     }

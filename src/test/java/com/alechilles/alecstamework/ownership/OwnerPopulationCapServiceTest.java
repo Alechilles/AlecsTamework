@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -107,41 +108,6 @@ class OwnerPopulationCapServiceTest {
                 queries, TwGlobalConfig.PerPlayerLimitScope.GLOBAL, null, ownerId));
     }
 
-    @Test
-    void litterThatWouldPassTheOwnedLimitIsRefusedAsAWhole() {
-        UUID ownerId = UUID.randomUUID();
-        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(3, false, role -> List.of());
-        List<CompanionRecord> owned = List.of(
-                record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
-                record(ownerId, CompanionLocation.item(), "alpha"));
-
-        OwnerPopulationCapService.Decision oneChild = OwnerPopulationCapService.evaluateBatch(
-                owned, List.of(record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
-        OwnerPopulationCapService.Decision twoChildren = OwnerPopulationCapService.evaluateBatch(
-                owned, List.of(
-                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
-                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
-
-        assertTrue(oneChild.allowed());
-        assertFalse(twoChildren.allowed());
-        assertEquals("owner-cap-reached", twoChildren.reason());
-    }
-
-    @Test
-    void litterThatWouldPassAGroupLimitIsRefusedWithTheGroupReason() {
-        UUID ownerId = UUID.randomUUID();
-        PopulationGroupPolicy group = new PopulationGroupPolicy("herd", PopulationGroupScope.GLOBAL, 1, 0, 1L);
-        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(0, false, role -> List.of(group));
-
-        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateBatch(
-                List.of(), List.of(
-                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"),
-                        record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha")), rules);
-
-        assertFalse(decision.allowed());
-        assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, decision.reason());
-    }
-
     /** A role-aware pre-check maps owned and group refusals to the reasons that pick the player message. */
     @Test
     void preCheckRefusalsKeepTheirMessageReasons() {
@@ -154,17 +120,48 @@ class OwnerPopulationCapServiceTest {
         CompanionAdmission.Rules roomy = new CompanionAdmission.Rules(5, false, role -> List.of());
 
         OwnerPopulationCapService.Decision group = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, groupFull, CompanionAdmission.Provided.none()), groupFull);
+                denial(CompanionAdmission.check(owned, null, candidate, groupFull, CompanionAdmission.Provided.none())),
+                groupFull);
         OwnerPopulationCapService.Decision ownedLimit = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, ownedFull, CompanionAdmission.Provided.none()), ownedFull);
+                denial(CompanionAdmission.check(owned, null, candidate, ownedFull, CompanionAdmission.Provided.none())),
+                ownedFull);
         OwnerPopulationCapService.Decision allowed = OwnerPopulationCapService.fromPrecheck(
-                CompanionAdmission.check(owned, null, candidate, roomy, CompanionAdmission.Provided.none()), roomy);
+                denial(CompanionAdmission.check(owned, null, candidate, roomy, CompanionAdmission.Provided.none())),
+                roomy);
 
         assertFalse(group.allowed());
         assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, group.reason());
+        assertEquals("tamework.ui.population.groupLimit", OwnerMessageUtil.acquisitionDeniedKey(group));
         assertFalse(ownedLimit.allowed());
         assertEquals("owner-cap-reached", ownedLimit.reason());
+        assertEquals("tamework.ui.population.ownedLimit", OwnerMessageUtil.acquisitionDeniedKey(ownedLimit));
         assertTrue(allowed.allowed());
+    }
+
+    /** A provider refusal is not a group limit: it has its own reason and shows its own message. */
+    @Test
+    void providerRefusalsHaveTheirOwnReasonAndShowTheirOwnMessage() {
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(5, false, role -> List.of());
+
+        OwnerPopulationCapService.Decision denied = OwnerPopulationCapService.fromPrecheck(
+                new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,
+                        "runeteria.husbandry.locked"), rules);
+        OwnerPopulationCapService.Decision checking = OwnerPopulationCapService.fromPrecheck(
+                new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE,
+                        "tamework.ui.population.checkingRequirements"), rules);
+        OwnerPopulationCapService.Decision unavailable = OwnerPopulationCapService.fromPrecheck(
+                CompanionAdmissionGate.Denial.of(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE), rules);
+
+        assertFalse(denied.allowed());
+        assertEquals(OwnerPopulationCapService.REASON_PROVIDER_DENIED, denied.reason());
+        assertEquals("runeteria.husbandry.locked", OwnerMessageUtil.acquisitionDeniedKey(denied));
+        assertEquals(OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE, checking.reason());
+        assertEquals("tamework.ui.population.checkingRequirements", OwnerMessageUtil.acquisitionDeniedKey(checking));
+        assertEquals("tamework.ui.population.providerUnavailable", OwnerMessageUtil.acquisitionDeniedKey(unavailable));
+    }
+
+    private static CompanionAdmissionGate.Denial denial(CompanionAdmission.Refusal refusal) {
+        return refusal == null ? null : CompanionAdmissionGate.Denial.of(refusal);
     }
 
     private static CompanionRecord record(UUID owner, CompanionLocation at, String homeWorld) {

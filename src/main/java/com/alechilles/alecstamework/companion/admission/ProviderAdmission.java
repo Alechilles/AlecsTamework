@@ -26,7 +26,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,7 +48,7 @@ public final class ProviderAdmission {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     /** Hytale chunks are 32 blocks wide. */
     private static final int CHUNK_SHIFT = 5;
-    private static final Outcome NOT_ASKED = new Outcome(CompanionAdmission.Provided.none(), null, null, false);
+    static final Outcome NOT_ASKED = new Outcome(CompanionAdmission.Provided.none(), null, null, false);
     private static final ProviderAdmission NONE =
             new ProviderAdmission(roleId -> null, request -> CompletableFuture.completedFuture(
                     PopulationAdmissionProviderDecision.unavailable("provider-not-ready")));
@@ -55,6 +57,12 @@ public final class ProviderAdmission {
     public record Managed(@Nonnull String providerId, int contractVersion, @Nonnull String managedProfileId,
                           @Nonnull String familyGroupId, @Nonnull Set<String> groupIds, @Nonnull String gateKey,
                           int weight, long configRevision) {
+        /**
+         * A role that is managed, but whose managed config is stale (it no longer matches the
+         * population groups). It is compared by identity; {@link #evaluate} refuses it as
+         * unavailable without asking a provider.
+         */
+        public static final Managed STALE = new Managed("", 0, "", "", Set.of(), "", 0, -1L);
     }
 
     /**
@@ -73,30 +81,74 @@ public final class ProviderAdmission {
 
     private final Function<String, Managed> managedForRole;
     private final Function<PopulationAdmissionProviderRequest, CompletionStage<PopulationAdmissionProviderDecision>> providers;
+    private final Supplier<List<String>> familyRoles;
+    private final Supplier<Object> registrations;
 
     /**
-     * @param managedForRole the managed profile data of a role id, or null when the role is not managed
+     * @param managedForRole the managed profile data of a role id, null when the role is not
+     *                       managed, or {@link Managed#STALE}
      * @param providers      evaluates one request without blocking; fails closed to UNAVAILABLE
      */
     public ProviderAdmission(@Nonnull Function<String, Managed> managedForRole,
                              @Nonnull Function<PopulationAdmissionProviderRequest,
                                      CompletionStage<PopulationAdmissionProviderDecision>> providers) {
-        this.managedForRole = Objects.requireNonNull(managedForRole, "managedForRole");
-        this.providers = Objects.requireNonNull(providers, "providers");
+        this(managedForRole, providers, List::of, () -> "");
     }
 
-    /** The production stage: managed profiles from config, decisions from the provider registry. */
+    /**
+     * @param familyRoles   one role id of each managed family, for warming cached decisions
+     * @param registrations a value that changes (by {@code equals}) when a provider registers or
+     *                      unregisters
+     */
+    public ProviderAdmission(@Nonnull Function<String, Managed> managedForRole,
+                             @Nonnull Function<PopulationAdmissionProviderRequest,
+                                     CompletionStage<PopulationAdmissionProviderDecision>> providers,
+                             @Nonnull Supplier<List<String>> familyRoles, @Nonnull Supplier<Object> registrations) {
+        this.managedForRole = Objects.requireNonNull(managedForRole, "managedForRole");
+        this.providers = Objects.requireNonNull(providers, "providers");
+        this.familyRoles = Objects.requireNonNull(familyRoles, "familyRoles");
+        this.registrations = Objects.requireNonNull(registrations, "registrations");
+    }
+
+    /**
+     * The production stage: managed profiles from config, decisions from the provider registry.
+     * A role of a stale managed config is refused as unavailable. A managed profile whose
+     * provider is not registered (or has another contract version) is logged once, and again
+     * only after the provider was usable in between.
+     */
     @Nonnull
     public static ProviderAdmission of(@Nonnull ManagedActivityConfigRegistry managed,
                                        @Nonnull AdmissionProviderRegistry registry) {
         Objects.requireNonNull(managed, "managed");
         Objects.requireNonNull(registry, "registry");
+        Set<String> warned = ConcurrentHashMap.newKeySet();
         return new ProviderAdmission(
                 roleId -> managed.resolveRole(roleId).map(r -> new Managed(r.profile().providerId(),
-                        r.profile().providerContractVersion(), r.profile().profileId(), r.family().groupId(),
-                        r.profile().families().keySet(), r.family().gateKey(), r.family().weight(),
-                        r.profile().configRevision())).orElse(null),
-                registry::evaluate);
+                                r.profile().providerContractVersion(), r.profile().profileId(), r.family().groupId(),
+                                r.profile().families().keySet(), r.family().gateKey(), r.family().weight(),
+                                r.profile().configRevision()))
+                        .orElseGet(() -> managed.isStaleManagedRole(roleId) ? Managed.STALE : null),
+                request -> {
+                    AdmissionProviderRegistry.ProviderReadiness ready =
+                            registry.readiness(request.providerId(), request.contractVersion());
+                    if (ready.available()) {
+                        warned.remove(ready.providerId());
+                    } else if (warned.add(ready.providerId())) {
+                        LOGGER.at(Level.WARNING).log(
+                                "Managed profile %s needs admission provider %s (contract %d), which is not usable: %s."
+                                        + " Its roles are refused until the provider registers.",
+                                request.admission().managedProfileId(), ready.providerId(),
+                                request.contractVersion(), ready.detail());
+                    }
+                    return registry.evaluate(request);
+                },
+                () -> {
+                    List<String> roles = new ArrayList<>();
+                    managed.snapshot().profiles().values().forEach(profile -> profile.families().values().forEach(
+                            family -> family.roleIds().stream().findFirst().ifPresent(roles::add)));
+                    return roles;
+                },
+                registry::snapshot);
     }
 
     /** A stage with no managed roles: every change passes without claims. */
@@ -110,6 +162,31 @@ public final class ProviderAdmission {
     public String managedProfileId(@Nonnull String roleId) {
         Managed managed = managedForRole.apply(roleId);
         return managed == null ? null : managed.managedProfileId();
+    }
+
+    /**
+     * The managed profile, family and config revision of a role, as one key for cached decisions,
+     * or null when the role is not managed. The family is part of it because a provider gates and
+     * weighs each family on its own; the revision, so a decision made against replaced managed
+     * config is not reused.
+     */
+    @Nullable
+    public String familyKey(@Nonnull String roleId) {
+        Managed managed = managedForRole.apply(roleId);
+        return managed == null ? null
+                : managed.managedProfileId() + '/' + managed.familyGroupId() + '@' + managed.configRevision();
+    }
+
+    /** One role id of each managed family in the loaded config. */
+    @Nonnull
+    public List<String> familyRoles() {
+        return familyRoles.get();
+    }
+
+    /** A value that changes (by {@code equals}) when a provider registers or unregisters. */
+    @Nonnull
+    public Object registrations() {
+        return registrations.get();
     }
 
     /**
@@ -138,6 +215,9 @@ public final class ProviderAdmission {
         Managed managed = managedForRole.apply(after.roleId());
         if (managed == null) {
             return CompletableFuture.completedFuture(NOT_ASKED);
+        }
+        if (managed == Managed.STALE) {
+            return CompletableFuture.completedFuture(unavailable());
         }
         CompletionStage<PopulationAdmissionProviderDecision> decided;
         try {

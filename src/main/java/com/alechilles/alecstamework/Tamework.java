@@ -240,6 +240,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
@@ -315,6 +316,9 @@ public class Tamework extends JavaPlugin {
     private CompanionPersistenceModule companionModule;
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
+    /** Cached admission provider decisions for the synchronous sites; closed in {@link #closeApiComposition}. */
+    @Nullable
+    private volatile ProviderDecisionCache providerDecisionCache;
     private volatile CaptureItemHolderSystems.Transfers captureItemTransfers;
     private ReleaseFlow companionReleaseFlow;
     /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */
@@ -700,10 +704,12 @@ public class Tamework extends JavaPlugin {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
             companionQueries = companionModule.queries();
-            admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
-            OwnerPopulationCapService.useAdmissionGate(admissionGate);
             admissionProviderRegistry = new AdmissionProviderRegistry();
             providerAdmission = ProviderAdmission.of(managedActivityConfigRegistry, admissionProviderRegistry);
+            ProviderDecisionCache providerDecisions = startProviderDecisionCache(providerAdmission);
+            admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot,
+                    providerDecisions);
+            OwnerPopulationCapService.useAdmissionGate(admissionGate);
             // Bonded families come from the roster config on every call, so a reload applies at once.
             com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies =
                     com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
@@ -827,14 +833,20 @@ public class Tamework extends JavaPlugin {
         // index it is not built, and capture and spawner interactions fail before changing anything.
         if (restoreFlow != null) {
             CompanionPersistenceModule module = companionModule;
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families captureFamilies =
+                    com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
             spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, translationRegistry,
                     capturePolicyRegistry, interactionExtensionRegistry, module.index(), module.loaded(),
                     new CaptureFlow<>(module.index(), module.loaded(),
                             (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
-                            module.writer()::flushNow, providerAdmission, admissionGate::deny),
-                    restoreFlow, new HytaleCaptureDelivery(module.index()),
+                            module.writer()::flushNow, providerAdmission,
+                            // A capture into bonded storage re-checks the family's owned limit under the index lock.
+                            com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
+                                    admissionGate::deny, module.index()::fileRecords, captureFamilies)),
+                    restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.production(),
+                            module.writer()::queueSnapshot),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
-                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent);
+                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, captureFamilies);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1538,6 +1550,54 @@ public class Tamework extends JavaPlugin {
     }
 
     /**
+     * The admission provider decisions the synchronous sites read (plan 6 R11). An owner's are
+     * dropped when the owner's counts change (index listener, after the lock) and on disconnect,
+     * all on config reload and on shutdown; they are warmed when a player enters a world. The
+     * listeners only pass the player id and the world name on; the provider is asked on the
+     * provider registry's threads.
+     */
+    private ProviderDecisionCache startProviderDecisionCache(ProviderAdmission providerAdmission) {
+        ProviderDecisionCache cache = new ProviderDecisionCache(providerAdmission, System::currentTimeMillis);
+        providerDecisionCache = cache;
+        companionModule.addAfterUnlockListener(cache::onRecordChanged);
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "admission-provider-decision-warm",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        event -> {
+                            if (event == null || event.getWorld() == null || event.getHolder() == null) {
+                                return;
+                            }
+                            PlayerRef player = event.getHolder().getComponent(PlayerRef.getComponentType());
+                            String world = event.getWorld().getName();
+                            if (player != null && player.getUuid() != null && world != null && !world.isBlank()) {
+                                cache.warm(player.getUuid(), world);
+                            }
+                        },
+                        "admission provider decision warm-up"
+                )
+        );
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "admission-provider-decision-disconnect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            PlayerRef player = event == null ? null : event.getPlayerRef();
+                            if (player != null && player.getUuid() != null) {
+                                cache.forgetOwner(player.getUuid());
+                            }
+                        },
+                        "admission provider decision cleanup"
+                )
+        );
+        return cache;
+    }
+
+    /**
      * Capture item ownership follows the holder, and ineligible players cannot pick the item up
      * (spec 8.14). The pickup filters read cached admission decisions: a player's are dropped when
      * their counts change (index listener) and all on config reload.
@@ -1570,7 +1630,7 @@ public class Tamework extends JavaPlugin {
         }
         StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(module);
         RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
-                restoreFlow::restore, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
+                restoreFlow::restoreOutcome, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
                 System::currentTimeMillis, bonded::storeActive);
         SummonExpiryScheduler expiry = new SummonExpiryScheduler(summons::storeExpired);
         module.index().atomically(() -> {
@@ -1629,7 +1689,7 @@ public class Tamework extends JavaPlugin {
                 TameworkCompanionComponent.getComponentType(),
                 CompanionSnapshots.production(),
                 new CompanionSummaries(new HytaleSummarySources()),
-                module.warnings(), System::currentTimeMillis, admissionGate::refuse, bondedFamilies);
+                module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies);
         CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
                 ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
                 lifecycle);
@@ -1899,6 +1959,11 @@ public class Tamework extends JavaPlugin {
         if (closingBonded != null) {
             closingBonded.close();
         }
+        ProviderDecisionCache closingDecisions = providerDecisionCache;
+        providerDecisionCache = null;
+        if (closingDecisions != null) {
+            closingDecisions.close();
+        }
         AdmissionProviderRegistry closingProviders = admissionProviderRegistry;
         admissionProviderRegistry = null;
         if (closingProviders != null) {
@@ -2059,6 +2124,10 @@ public class Tamework extends JavaPlugin {
         if (admissionCache != null) {
             // Limits, limit scope and the capture item ownership mode decide the cached pickup admissions.
             admissionCache.clear();
+        }
+        ProviderDecisionCache providerDecisions = providerDecisionCache;
+        if (providerDecisions != null) {
+            providerDecisions.clear();
         }
         refreshCapturePickupFilters();
     }
@@ -3213,6 +3282,11 @@ public class Tamework extends JavaPlugin {
         if (admissionCache != null) {
             // Every config reload, so a changed limit or population group applies to pickup filters at once.
             admissionCache.clear();
+        }
+        ProviderDecisionCache providerDecisions = providerDecisionCache;
+        if (providerDecisions != null) {
+            // A provider decided against the config that was loaded; a reload asks again.
+            providerDecisions.clear();
         }
         refreshCapturePickupFilters();
         if (apiEventBus == null || changedIds == null) {

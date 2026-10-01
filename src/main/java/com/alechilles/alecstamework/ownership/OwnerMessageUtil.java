@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
@@ -62,19 +63,30 @@ public final class OwnerMessageUtil {
 
     /**
      * Tells the player why {@link OwnerPopulationCapService} refused an acquisition, in the
-     * player's language: the owned limit, a population-group limit, or that the limits cannot be
-     * checked right now.
+     * player's language: the decision's own message key when it has one (a provider's key, a
+     * domain limit, "checking requirements"), else the owned limit, a population-group limit, a
+     * provider refusal, or that the limits cannot be checked right now.
      */
     public static void sendAcquisitionDenied(Player player, OwnerPopulationCapService.Decision decision) {
         if (decision == null || decision.allowed() || !canSend(player)) {
             return;
         }
-        String key = switch (decision.reason()) {
+        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning, acquisitionDeniedKey(decision));
+    }
+
+    /** The translation key {@link #sendAcquisitionDenied} shows for a refused decision. */
+    static String acquisitionDeniedKey(OwnerPopulationCapService.Decision decision) {
+        if (decision.messageKey() != null && !decision.messageKey().isBlank()) {
+            return decision.messageKey();
+        }
+        return switch (decision.reason()) {
             case "owner-cap-reached" -> "tamework.ui.population.ownedLimit";
             case OwnerPopulationCapService.REASON_GROUP_CAP -> "tamework.ui.population.groupLimit";
+            case OwnerPopulationCapService.REASON_PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
+            case OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE ->
+                    CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
             default -> "tamework.ui.population.unavailable";
         };
-        new TameworkUiMessageService().showKey(player, NotificationStyle.Warning, key);
     }
 
     /**

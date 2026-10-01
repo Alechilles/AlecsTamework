@@ -91,16 +91,26 @@ public final class CaptureItemFlows {
     @Nonnull
     public CompletableFuture<RestoreFlow.Result> recall(@Nonnull UUID profileId,
                                                         @Nonnull RestoreFlow.Destination destination) {
+        return recallOutcome(profileId, destination).thenApply(RestoreFlow.Outcome::result);
+    }
+
+    /**
+     * As {@link #recall}, with the message key of a population refusal (a cap, an admission
+     * provider's denial or a domain limit).
+     */
+    @Nonnull
+    public CompletableFuture<RestoreFlow.Outcome> recallOutcome(@Nonnull UUID profileId,
+                                                                @Nonnull RestoreFlow.Destination destination) {
         CompanionRecord before = index.get(profileId);
-        CompletableFuture<RestoreFlow.Result> restored =
-                restoreFlow.restore(RestoreFlow.Request.of(profileId, RestoreRules.Reason.RECOVER, destination));
+        CompletableFuture<RestoreFlow.Outcome> restored = restoreFlow.restoreOutcome(
+                RestoreFlow.Request.of(profileId, RestoreRules.Reason.RECOVER, destination));
         if (before == null || before.location().kind() != LocationKind.ITEM) {
             return restored;
         }
         UUID owner = before.ownerUuid();
         long itemGeneration = before.generation();
-        return restored.whenComplete((result, error) -> {
-            if (result == RestoreFlow.Result.RESTORED) {
+        return restored.whenComplete((outcome, error) -> {
+            if (outcome != null && outcome.result() == RestoreFlow.Result.RESTORED) {
                 sweepItems(owner, profileId, itemGeneration);
             }
         });

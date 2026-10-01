@@ -2,19 +2,25 @@ package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
+import com.alechilles.alecstamework.api.BondedCompanionCaptureEvidenceView;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionData;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
 import com.alechilles.alecstamework.api.BondedCompanionPlacement;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionReviveRequest;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.flow.CaptureFlow;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.StoreFlow;
@@ -29,6 +35,7 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,6 +63,10 @@ class IndexBondedCompanionApiTest {
     private final UUID owner = UUID.randomUUID();
     private final LoadedBodies<String> loaded = new LoadedBodies<>();
     private final List<UUID> spawned = new ArrayList<>();
+    /** Profiles with no stored snapshot, as a provisioned companion is before its first summon. */
+    private final Set<UUID> noSnapshot = new HashSet<>();
+    /** Spawns that were handed no snapshot and so built the body from the record's role. */
+    private final List<String> spawnedFromRole = new ArrayList<>();
     private final List<String> removed = new ArrayList<>();
     private final List<UUID> snapshotDeletes = new ArrayList<>();
     private final Map<UUID, CompletableFuture<SnapshotEnvelope>> heldSnapshots = new HashMap<>();
@@ -85,10 +96,15 @@ class IndexBondedCompanionApiTest {
     private IndexBondedCompanionApi api() {
         RestoreFlow<String> restore = new RestoreFlow<>(index, loaded,
                 id -> heldSnapshots.containsKey(id) ? heldSnapshots.get(id)
-                        : CompletableFuture.completedFuture(snapshot(id)),
+                        : CompletableFuture.completedFuture(noSnapshot.contains(id) ? null : snapshot(id)),
                 who -> flush,
                 (committed, snapshot, destination, reason) -> {
                     spawned.add(committed.profileId());
+                    if (snapshot == null && spawnOk) {
+                        // As the real spawner: a body built from the role is snapshotted once added.
+                        spawnedFromRole.add(committed.roleId());
+                        noSnapshot.remove(committed.profileId());
+                    }
                     return CompletableFuture.completedFuture(spawnOk);
                 },
                 (id, body) -> removed.add(body), () -> now, ProviderAdmission.none(),
@@ -252,7 +268,6 @@ class IndexBondedCompanionApiTest {
     void aSummonIsRefusedWithTheReasonThePanelMaps() {
         CompanionRecord cooling = insert(DRAGON, CompanionLocation.stored(StoredReason.BONDED));
         index.update(cooling.profileId(), cooling.revision(), b -> b.summonCooldownUntilMs(now + 1L));
-        CompanionRecord provisioned = insert(DRAGON, CompanionLocation.stored(StoredReason.PROVISIONED));
         CompanionRecord otherRole = insert("Tamed_Sheep", CompanionLocation.stored(StoredReason.BONDED));
         CompanionRecord ready = stored();
         CompanionRecord live = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
@@ -266,8 +281,6 @@ class IndexBondedCompanionApiTest {
 
         assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-cooldown_active",
                 api.summon(action(index.get(cooling.profileId()))).join());
-        assertRefused(BondedCompanionResultCode.UNAVAILABLE, IndexBondedCompanionApi.FIRST_SUMMON_UNAVAILABLE,
-                api.summon(action(provisioned)).join());
         assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-role_not_allowed",
                 api.summon(action(otherRole)).join());
         assertRefused(BondedCompanionResultCode.INVALID_STATE, "bonded-summon-already-live",
@@ -358,6 +371,190 @@ class IndexBondedCompanionApiTest {
 
         assertRefused(BondedCompanionResultCode.POLICY_DENIED, IndexBondedCompanionApi.ACTIVE_CAPACITY, result);
         assertEquals(3, purse.gems);
+    }
+
+    private static BondedCompanionPolicy dragons(int maximumOwned, BondedCompanionPolicy.FeatureFlags features) {
+        return new BondedCompanionPolicy(7L, ROSTER, "hydragon:fire_dragon", Set.of(DRAGON), maximumOwned, 0,
+                600L, 30L, 120L, null, null, null, features);
+    }
+
+    private BondedCompanionProvisionRequest provisionRequest(String key) {
+        return new BondedCompanionProvisionRequest("hydragon", key, owner, ROSTER, DRAGON, "Ember", "Dragon", null,
+                Map.of(), "hydragon:fire_dragon");
+    }
+
+    /** A provisioned companion, with no snapshot stored for it. */
+    private CompanionRecord provisioned(String key) {
+        BondedCompanionResult<BondedCompanionProfileView> result = api.provision(provisionRequest(key)).join();
+        assertEquals(BondedCompanionResultCode.SUCCESS, result.code());
+        UUID id = UUID.fromString(result.value().profileId());
+        noSnapshot.add(id);
+        return index.get(id);
+    }
+
+    @Test
+    void aProvisionedCompanionGetsItsBodyFromItsRoleOnceAndFromItsSnapshotAfterThat() {
+        List<BondedCompanionChangedEvent> events = new ArrayList<>();
+        api.subscribe(events::add);
+
+        CompanionRecord provisioned = provisioned("soul-bond-1");
+
+        assertEquals(StoredReason.PROVISIONED, provisioned.location().reason());
+        assertEquals(List.of(new BondedCompanionChangedEvent(provisioned.profileId().toString(), owner, ROSTER,
+                null, BondedCompanionStateView.STORED, 0L, "provisioned")), events);
+        assertTrue(api.list(owner, ROSTER).join().value().get(0).summonAvailable());
+
+        BondedCompanionResult<BondedCompanionProfileView> first = api.summon(action(provisioned)).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, first.code());
+        assertEquals(BondedCompanionStateView.ACTIVE, first.value().state());
+        assertEquals(now + 600_000L, first.value().activeLease().expiresAtMs());
+        assertEquals(List.of(DRAGON), spawnedFromRole);
+
+        loaded.put(provisioned.profileId(), "body");
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.store(action(index.get(provisioned.profileId()))).join().code());
+        assertEquals(StoredReason.BONDED, index.get(provisioned.profileId()).location().reason());
+        now += 30_000L;
+
+        assertEquals(BondedCompanionResultCode.SUCCESS,
+                api.summon(action(index.get(provisioned.profileId()))).join().code());
+        assertEquals(List.of(DRAGON), spawnedFromRole, "the second summon restores the snapshot");
+        assertEquals(2, spawned.size());
+    }
+
+    @Test
+    void aFirstSummonWhoseBodyIsNotAddedLeavesTheCompanionProvisionedAndSummonableAgain() {
+        CompanionRecord provisioned = provisioned("soul-bond-1");
+        spawnOk = false;
+
+        assertRefused(BondedCompanionResultCode.WORLD_UNAVAILABLE, "bonded-projection-placement-unavailable",
+                api.summon(action(provisioned)).join());
+
+        CompanionRecord after = index.get(provisioned.profileId());
+        assertEquals(StoredReason.PROVISIONED, after.location().reason());
+        assertEquals(provisioned.generation(), after.generation());
+        assertNull(after.currentNpcUuid());
+        assertEquals(0, liveCount());
+
+        spawnOk = true;
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.summon(action(after)).join().code());
+        assertEquals(List.of(DRAGON), spawnedFromRole);
+    }
+
+    @Test
+    void aRepeatedProvisionRequestReturnsTheCompanionTheFirstOneMade() {
+        CompanionRecord first = provisioned("soul-bond-1");
+
+        BondedCompanionResult<BondedCompanionProfileView> again = api.provision(provisionRequest("soul-bond-1")).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, again.code());
+        assertEquals(first.profileId().toString(), again.value().profileId());
+        assertEquals(1, index.fileRecords(owner).size());
+        assertEquals("Ember", again.value().displayName());
+    }
+
+    @Test
+    void theSameProvisionRequestAfterAnAbandonMakesANewCompanion() {
+        CompanionRecord first = provisioned("soul-bond-1");
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.abandon(action(first)).join().code());
+
+        BondedCompanionResult<BondedCompanionProfileView> again = api.provision(provisionRequest("soul-bond-1")).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, again.code());
+        assertFalse(first.profileId().toString().equals(again.value().profileId()));
+        assertEquals(BondedCompanionStateView.STORED, again.value().state());
+        assertEquals(1, api.list(owner, ROSTER).join().value().size());
+        // And that new companion is the one a further repeat returns.
+        assertEquals(again.value().profileId(), api.provision(provisionRequest("soul-bond-1")).join().value().profileId());
+    }
+
+    @Test
+    void aProvisionIsRefusedWithItsReasonAndAddsNothing() {
+        policy = dragons(1, ALL);
+        stored();
+
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-owned_capacity_reached",
+                api.provision(provisionRequest("k1")).join());
+
+        policy = dragons(0, new BondedCompanionPolicy.FeatureFlags(true, false, true, true, true));
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-feature_disabled",
+                api.provision(provisionRequest("k2")).join());
+
+        policy = dragons(0, ALL);
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-role_not_allowed",
+                api.provision(new BondedCompanionProvisionRequest("hydragon", "k3", owner, ROSTER, "Tamed_Sheep",
+                        null, null, null, Map.of())).join());
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, "bonded-transition-role_not_allowed",
+                api.provision(new BondedCompanionProvisionRequest("hydragon", "k4", owner, ROSTER, DRAGON,
+                        null, null, null, Map.of(), "hydragon:other_family")).join());
+        assertRefused(BondedCompanionResultCode.VALIDATION_FAILED, "bonded-request-invalid",
+                api.provision(new BondedCompanionProvisionRequest("tamework", "k5", owner, ROSTER, DRAGON,
+                        null, null, null, Map.of())).join());
+        assertEquals(1, index.fileRecords(owner).size());
+    }
+
+    @Test
+    void aProvisionThatIsNotWrittenIsWithdrawnAndCanBeRepeated() {
+        flush = CompletableFuture.failedFuture(new IllegalStateException("disk full"));
+
+        assertRefused(BondedCompanionResultCode.INTERNAL_FAILURE, "bonded-operation-failed",
+                api.provision(provisionRequest("soul-bond-1")).join());
+        assertTrue(api.list(owner, ROSTER).join().value().isEmpty());
+
+        flush = CompletableFuture.completedFuture(null);
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.provision(provisionRequest("soul-bond-1")).join().code());
+        assertEquals(1, api.list(owner, ROSTER).join().value().size());
+    }
+
+    @Test
+    void theEvidenceOfACaptureIntoStorageIsFoundByItsSourceNpcUntilTheCompanionIsAbandoned() {
+        UUID sourceNpc = UUID.randomUUID();
+        UUID attempt = UUID.randomUUID();
+        List<BondedCompanionChangedEvent> events = new ArrayList<>();
+        api.subscribe(events::add);
+        CaptureFlow<String> captures = new CaptureFlow<>(index, loaded, (id, envelope) -> { }, who -> flush,
+                ProviderAdmission.none(),
+                BondedAdmission.withFamilyCaps((before, after, provided) -> null, index::fileRecords, families));
+        CompanionTransitions.BodyFacts wild = new CompanionTransitions.BodyFacts(sourceNpc, null, null,
+                "Dragon_Fire", null, WORLD, 0, 0, 0, List.of(), CompanionSummary.EMPTY);
+
+        CaptureFlow.Outcome outcome = captures.capture(new CaptureFlow.Capture<>(null, 0L, "wild", wild, owner,
+                "Alec", BODY, new CaptureFlow.BondedTarget(ROSTER, DRAGON, profileId -> BondedCaptureEvidence.toJson(
+                        new BondedCompanionCaptureEvidenceView(attempt, attempt, owner, ROSTER, "hydragon:fire_dragon",
+                                sourceNpc, profileId.toString(), DRAGON, "tamework", attempt.toString(),
+                                "Draconic_Stone", "HyDragonDraconicStone", 3L, null, -1L,
+                                CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                                CaptureSuccessDisposition.STORE_BONDED_COMPANION, CaptureAttemptOutcome.CAPTURED,
+                                "captured", WORLD, now))))).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        UUID profileId = outcome.itemRef().profileId();
+        BondedCompanionResult<BondedCompanionCaptureEvidenceView> found =
+                api.findCapture(owner, ROSTER, sourceNpc).join();
+        assertEquals(BondedCompanionResultCode.SUCCESS, found.code());
+        assertEquals(profileId.toString(), found.value().profileId());
+        assertEquals(attempt, found.value().attemptId());
+        assertEquals("HyDragonDraconicStone", found.value().spawnerConfigId());
+        assertEquals(3L, found.value().spawnerConfigRevision());
+        assertNull(found.value().capturePolicyConfigId());
+        assertEquals(now, found.value().committedAtMs());
+        assertEquals(List.of(new BondedCompanionChangedEvent(profileId.toString(), owner, ROSTER, null,
+                BondedCompanionStateView.STORED, 0L, "stored")), events);
+        // The captured companion is an ordinary stored one: listed, and summoned from its snapshot.
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.summon(action(index.get(profileId))).join().code());
+        assertTrue(spawnedFromRole.isEmpty());
+
+        assertRefused(BondedCompanionResultCode.NOT_FOUND, "bonded-capture-evidence-not-found",
+                api.findCapture(owner, ROSTER, UUID.randomUUID()).join());
+        assertRefused(BondedCompanionResultCode.NOT_FOUND, "bonded-capture-evidence-not-found",
+                api.findCapture(UUID.randomUUID(), ROSTER, sourceNpc).join());
+        // The evidence is Tamework's own entry: a public caller cannot read it as extension data.
+        assertRefused(BondedCompanionResultCode.VALIDATION_FAILED, "bonded-request-invalid",
+                api.getExtensionData(new BondedCompanionExtensionDataKey(owner, profileId.toString(), "tamework")).join());
+
+        api.abandon(action(index.get(profileId))).join();
+        assertRefused(BondedCompanionResultCode.NOT_FOUND, "bonded-capture-evidence-not-found",
+                api.findCapture(owner, ROSTER, sourceNpc).join());
     }
 
     @Test

@@ -161,12 +161,4 @@ class CompanionAdmissionTest {
         CompanionRecord wild = CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.live("w", 0, 0, 0)).build();
         assertNull(CompanionAdmission.check(List.of(), null, wild, rules(0, false), NONE));
     }
-
-    @Test
-    void aBatchIsCheckedAsAWhole() {
-        List<CompanionRecord> mine = List.of(rec("Sheep", CompanionLocation.item()));
-        List<CompanionRecord> litter = List.of(rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rec("Sheep", CompanionLocation.live("w", 0, 0, 0)));
-        assertEquals(CompanionAdmission.Refusal.OWNED, CompanionAdmission.checkBatch(mine, litter, rules(2, false)));
-        assertNull(CompanionAdmission.checkBatch(mine, litter, rules(3, false)));
-    }
 }

@@ -105,6 +105,24 @@ public final class ManagedActivityConfigRegistry {
         return Optional.ofNullable(snapshot.rolesById().get(roleId.trim()));
     }
 
+    /**
+     * True when {@code roleId} is managed by the last valid snapshot but that
+     * snapshot no longer matches the population groups, so {@link #resolveRole}
+     * returns empty for it. Such a role is still managed: an admission must be
+     * refused as unavailable, not passed as unmanaged. A role first managed by
+     * the rejected candidate is not known here.
+     */
+    public boolean isStaleManagedRole(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        Snapshot snapshot = current.get();
+        return snapshot.revision() > 0L
+                && snapshot.populationGroupRevision()
+                != populationGroups.snapshot().revision()
+                && snapshot.rolesById().containsKey(roleId.trim());
+    }
+
     /** Returns explicit content readiness for one profile identity. */
     @Nonnull
     public Readiness readiness(@Nullable String profileId) {

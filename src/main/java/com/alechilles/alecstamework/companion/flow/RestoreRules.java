@@ -8,7 +8,10 @@ import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Pure checks for bringing a companion back from its snapshot (spec 8.5, 8.6). */
+/**
+ * Pure checks for bringing a companion back from its snapshot (spec 8.5, 8.6), or, for a
+ * provisioned bonded companion's first summon, from its role (plan 6 R16).
+ */
 public final class RestoreRules {
     public enum Reason { RECALL, RECOVER, REVIVE, RELEASE, SUMMON, COOP_RELEASE }
 
@@ -26,8 +29,8 @@ public final class RestoreRules {
      * Whether the record's location allows this restore. {@code expectedGeneration} is the
      * generation an item or slot entry carries; -1 accepts any. RECALL needs LIVE; RECOVER needs
      * LOST, LIVE (no visible body), ITEM (the item may be gone) or COOP; REVIVE needs DEAD past
-     * its wall-clock cooldown; RELEASE needs ITEM; SUMMON needs STORED for ROSTER, TIMED or BONDED
-     * past {@code summonCooldownUntilMs}; COOP_RELEASE needs COOP.
+     * its wall-clock cooldown; RELEASE needs ITEM; SUMMON needs STORED for ROSTER, TIMED or BONDED,
+     * or PROVISIONED on a bonded record, past {@code summonCooldownUntilMs}; COOP_RELEASE needs COOP.
      */
     @Nonnull
     public static Verdict forRecord(@Nullable CompanionRecord record, @Nonnull Reason reason, long nowMs,
@@ -43,7 +46,7 @@ public final class RestoreRules {
             case REVIVE -> kind != LocationKind.DEAD ? Verdict.NOT_ALLOWED
                     : nowMs < record.reviveAvailableAtMs() ? Verdict.COOLDOWN : Verdict.ALLOWED;
             case RELEASE -> kind == LocationKind.ITEM ? Verdict.ALLOWED : Verdict.NOT_ALLOWED;
-            case SUMMON -> kind != LocationKind.STORED || !summonable(record.location().reason()) ? Verdict.NOT_ALLOWED
+            case SUMMON -> kind != LocationKind.STORED || !summonable(record) ? Verdict.NOT_ALLOWED
                     : nowMs < record.summonCooldownUntilMs() ? Verdict.COOLDOWN : Verdict.ALLOWED;
             case COOP_RELEASE -> kind == LocationKind.COOP ? Verdict.ALLOWED : Verdict.NOT_ALLOWED;
         };
@@ -53,18 +56,33 @@ public final class RestoreRules {
         return verdict;
     }
 
-    /** Provisioned companions are activated by their API. */
-    private static boolean summonable(@Nullable StoredReason reason) {
-        return reason == StoredReason.ROSTER || reason == StoredReason.TIMED || reason == StoredReason.BONDED;
+    private static boolean summonable(CompanionRecord record) {
+        StoredReason reason = record.location().reason();
+        return reason == StoredReason.ROSTER || reason == StoredReason.TIMED || reason == StoredReason.BONDED
+                || firstSummon(record);
+    }
+
+    /**
+     * True for a provisioned bonded companion that was never summoned: it is
+     * {@code STORED(PROVISIONED)} and has no snapshot, so its first summon builds the body from
+     * the record's role. Once summoned it is stored as BONDED with a snapshot, like any other.
+     */
+    public static boolean firstSummon(@Nonnull CompanionRecord record) {
+        return record.bonded() && record.location().kind() == LocationKind.STORED
+                && record.location().reason() == StoredReason.PROVISIONED;
     }
 
     /**
      * Whether this snapshot may restore the record: it must exist, use {@link CompanionSnapshots#FORMAT},
      * be no newer than the record, and hold an entity document. A snapshot taken at death serves
-     * only a revive.
+     * only a revive. The one restore that needs no snapshot is the SUMMON of a
+     * {@link #firstSummon} record: with none stored it is allowed, and the spawner is handed null.
      */
     @Nonnull
     public static Verdict forSnapshot(@Nonnull CompanionRecord record, @Nullable SnapshotEnvelope snapshot, @Nonnull Reason reason) {
+        if (snapshot == null && reason == Reason.SUMMON && firstSummon(record)) {
+            return Verdict.ALLOWED;
+        }
         if (snapshot == null || snapshot.format() != CompanionSnapshots.FORMAT || snapshot.generation() > record.generation()
                 || !snapshot.data().isDocument("Entity")) {
             return Verdict.NO_SNAPSHOT;

@@ -1229,6 +1229,7 @@ tamework.ui.population.familyLocked=Your Husbandry level is too low to {0} this 
 tamework.ui.population.familyUnknown=This companion family is not configured for Husbandry.
 tamework.ui.population.providerUnavailable=Husbandry requirements are temporarily unavailable. Try again shortly.
 tamework.ui.population.providerDenied=You do not meet the Husbandry requirements for this companion.
+tamework.ui.population.checkingRequirements=Checking Husbandry requirements. Try again in a moment.
 tamework.ui.notifications.spawner.captureFailed=Capture could not be completed.
 tamework.ui.notifications.spawner.commandItemRequired=You need {0} in your inventory to capture with this item.
 tamework.ui.notifications.spawner.releaseFailed=Companion release could not be completed.
@@ -1247,6 +1248,7 @@ tamework.ui.notifications.spawner.releaseUnavailable=Companion release is tempor
 tamework.ui.notifications.spawner.captureUnavailable=Capture is temporarily unavailable. Try again shortly.
 tamework.ui.notifications.spawner.compensated=The action failed, and its changes were safely rolled back.
 tamework.ui.notifications.spawner.coopRejected=This coop cannot take this companion right now.
+tamework.ui.notifications.spawner.bondedCaptured={0} was added to your {1}.
 tamework.ui.linkedLocation.copy=Copy coordinates
 tamework.ui.linkedLocation.copyHint=Select text to copy
 

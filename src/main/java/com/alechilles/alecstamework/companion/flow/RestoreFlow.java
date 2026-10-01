@@ -114,6 +114,8 @@ public final class RestoreFlow<R> {
 
     /**
      * Spawns the committed companion at the destination; completes true once the body is added.
+     * {@code snapshot} is null only for the first summon of a provisioned bonded companion
+     * ({@link RestoreRules#firstSummon}), whose body is built from the committed record's role.
      *
      * <p>Contract the flow relies on: completing false or exceptionally means no body of
      * {@code committed}'s generation was added and none will be. No late world task (for example
@@ -123,7 +125,7 @@ public final class RestoreFlow<R> {
      */
     public interface Spawner {
         @Nonnull
-        CompletableFuture<Boolean> spawn(@Nonnull CompanionRecord committed, @Nonnull SnapshotEnvelope snapshot,
+        CompletableFuture<Boolean> spawn(@Nonnull CompanionRecord committed, @Nullable SnapshotEnvelope snapshot,
                                          @Nonnull Destination destination, @Nonnull RestoreRules.Reason reason);
     }
 

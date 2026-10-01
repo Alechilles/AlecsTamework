@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.ExtensionEntry;
@@ -225,22 +226,18 @@ public final class IndexProfileDataApi implements ProfileDataApi {
         return entry == null ? 0L : Math.max(1L, entry.revision());
     }
 
+    /** The one key layout record extensions use; bonded extension data shares it. */
     private static String extensionKey(String namespace, String key) {
-        return namespace.trim() + "/" + key.trim();
+        return BondedRecords.extensionKey(namespace, key);
     }
 
     /**
-     * Tamework's own extension entries (for example bonded capture evidence) are not public data.
-     * A namespace with "/" is refused because the stored key is {@code namespace + "/" + key}:
-     * it could not be told apart from a shorter namespace with a longer key. Keys may contain "/".
+     * Tamework's own extension entries (for example bonded capture evidence) are not public data,
+     * and a namespace with "/" is refused; {@link BondedRecords#publicNamespace} owns the rule.
+     * Keys may contain "/".
      */
     private static boolean usable(@Nullable String namespace) {
-        if (namespace == null || namespace.isBlank()) {
-            return false;
-        }
-        String normalized = namespace.trim();
-        return !normalized.contains("/")
-                && !normalized.equalsIgnoreCase("tamework") && !normalized.equalsIgnoreCase("Alechilles:Tamework");
+        return BondedRecords.publicNamespace(namespace);
     }
 
     @Nullable

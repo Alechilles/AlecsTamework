@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
-import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
@@ -63,12 +63,13 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private final CompanionSummaries summaries;
     private final ThrottledWarnings warnings;
     private final LongSupplier clock;
-    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
+    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmissionGate.Admission> admission;
     private final BondedRecords.Families bondedFamilies;
 
     /**
      * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
-     * checks a new record against the population caps under the index lock; null admits it.
+     * checks a new record against the population caps and the cached admission provider decision
+     * under the index lock ({@link CompanionAdmissionGate#admit}); a null answer admits it.
      * {@code bondedFamilies} gives a bonded companion's roster family, whose revive cooldown its
      * death uses (plan 6 R18).
      */
@@ -77,7 +78,8 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                                   @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                   @Nonnull CompanionSnapshots snapshots, @Nonnull CompanionSummaries summaries,
                                   @Nonnull ThrottledWarnings warnings, @Nonnull LongSupplier clock,
-                                  @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission,
+                                  @Nonnull BiFunction<CompanionRecord, CompanionRecord,
+                                          CompanionAdmissionGate.Admission> admission,
                                   @Nonnull BondedRecords.Families bondedFamilies) {
         this.index = Objects.requireNonNull(index, "index");
         this.writer = Objects.requireNonNull(writer, "writer");
@@ -118,14 +120,16 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         UUID profileId = UUID.randomUUID();
-        CompanionRegistration.Outcome outcome = CompanionRegistration.register(index, loaded,
+        CompanionRegistration.Outcome outcome = CompanionRegistration.registerAdmitted(index, loaded,
                 CompanionTransitions.newLive(profileId, 0, body), ref,
                 record -> enforceCaps ? admission.apply(null, record) : null);
         if (outcome.refusal() != null) {
             buffer.tryRemoveComponent(ref, TameworkOwnerComponent.getComponentType());
             buffer.tryRemoveComponent(ref, TameworkTamedComponent.getComponentType());
             buffer.tryRemoveComponent(ref, TameworkCommandLinksComponent.getComponentType());
-            tellOwnerAtLimit(store.getExternalData().getWorld(), body.ownerUuid(), outcome.refusal());
+            tellOwnerAtLimit(store.getExternalData().getWorld(), body.ownerUuid(),
+                    outcome.messageKey() != null ? outcome.messageKey()
+                            : CompanionAdmissionGate.Denial.of(outcome.refusal()).messageKey());
             return;
         }
         if (!outcome.registered()) {
@@ -137,13 +141,12 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     }
 
     /**
-     * Queues the limit notification for the owner, resolved in the owner's language. Runs as a
-     * world task so the ECS callback only queues it; the owner is looked up by UUID when it runs.
+     * Queues the refusal notification for the owner, resolved in the owner's language: {@code key}
+     * is the refusal's message key (a limit, a provider's answer, or "checking requirements").
+     * Runs as a world task so the ECS callback only queues it; the owner is looked up by UUID when
+     * it runs.
      */
-    private static void tellOwnerAtLimit(@Nonnull World world, @Nonnull UUID owner,
-                                         @Nonnull CompanionAdmission.Refusal refusal) {
-        String key = refusal == CompanionAdmission.Refusal.OWNED
-                ? "tamework.ui.population.ownedLimit" : "tamework.ui.population.groupLimit";
+    private static void tellOwnerAtLimit(@Nonnull World world, @Nonnull UUID owner, @Nonnull String key) {
         world.execute(() -> {
             Universe universe = Universe.get();
             PlayerRef player = universe == null ? null : universe.getPlayer(owner);

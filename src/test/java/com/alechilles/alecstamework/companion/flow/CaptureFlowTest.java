@@ -6,12 +6,17 @@ import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.bonded.BondedAdmission;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -27,6 +32,7 @@ import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -388,5 +394,129 @@ class CaptureFlowTest {
         assertEquals(CaptureFlow.Result.CONFLICT, pending.join().result());
         assertEquals(third, index.get(live.profileId()).ownerUuid());
         assertEquals(LocationKind.LIVE, index.get(live.profileId()).location().kind());
+    }
+
+    @Test
+    void aRoleChangeWhileTheProviderWasAskedMakesTheCaptureAConflict() {
+        CompanionRecord live = insertLive(1);
+        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(stamped(live, UUID.randomUUID()));
+        // The body grew up: the claims the provider allows were computed for the old role.
+        index.update(live.profileId(), live.revision(), b -> b.roleId("Tamed_Ram"));
+
+        decision.complete(allowBarn(5));
+
+        assertEquals(CaptureFlow.Result.CONFLICT, pending.join().result());
+        CompanionRecord after = index.get(live.profileId());
+        assertEquals(LocationKind.LIVE, after.location().kind());
+        assertEquals(List.of(), after.domainClaims());
+        assertEquals("body", loaded.get(live.profileId()));
+    }
+
+    private static final String ROSTER = "hydragon:horn";
+    private static final String TAMED_DRAKE = "Tamed_NordicDrake";
+
+    /** One family of {@link #ROSTER} that allows {@link #TAMED_DRAKE}. */
+    private static BondedRecords.Families drakes(int maximumOwned) {
+        BondedCompanionPolicy family = new BondedCompanionPolicy(1L, ROSTER, "hydragon:full_dragons",
+                Set.of(TAMED_DRAKE), maximumOwned, 0, 0L, 0L, 0L, null, null, null,
+                new BondedCompanionPolicy.FeatureFlags(true, true, true, true, true));
+        return (rosterId, roleId) -> ROSTER.equals(rosterId) && TAMED_DRAKE.equals(roleId) ? family : null;
+    }
+
+    /** A wild body captured into the capturer's bonded roster as the tamed role. */
+    private CaptureFlow.Capture<String> wildIntoRoster(UUID npc) {
+        CompanionTransitions.BodyFacts wild = new CompanionTransitions.BodyFacts(npc, null, null, "NordicDrake",
+                null, "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY);
+        return new CaptureFlow.Capture<>(null, 0, "wild", wild, owner, "Alec", DATA,
+                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, profileId -> "{\"profile\":\"" + profileId + "\"}"));
+    }
+
+    private CaptureFlow<String> rosterFlow(BondedRecords.Families families) {
+        return new CaptureFlow<>(index, loaded, (id, envelope) -> { events.add("snapshot"); snapshots.add(envelope); },
+                who -> { events.add("flush"); return CompletableFuture.completedFuture(null); },
+                ProviderAdmission.none(),
+                BondedAdmission.withFamilyCaps((before, after, provided) -> null, index::fileRecords, families));
+    }
+
+    @Test
+    void aCaptureIntoABondedRosterStoresTheCompanionWithItsEvidenceAndNoItemLocation() {
+        UUID npc = UUID.randomUUID();
+
+        CaptureFlow.Outcome outcome = rosterFlow(drakes(0)).capture(wildIntoRoster(npc)).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        CompanionRecord stored = index.get(outcome.itemRef().profileId());
+        assertEquals(LocationKind.STORED, stored.location().kind());
+        assertEquals(StoredReason.BONDED, stored.location().reason());
+        assertTrue(stored.bonded());
+        assertEquals(ROSTER, stored.rosterId());
+        assertEquals(TAMED_DRAKE, stored.roleId(), "the record has the role its roster family allows");
+        assertEquals(owner, stored.ownerUuid());
+        assertEquals(new ExtensionEntry(1L, "{\"profile\":\"" + stored.profileId() + "\"}"),
+                stored.extensions().get(BondedRecords.CAPTURE_EVIDENCE_KEY));
+        assertEquals(List.of("snapshot", "flush"), events);
+        assertEquals(stored.generation(), snapshots.get(0).generation());
+    }
+
+    @Test
+    void aCompanionOfTheOwnerCapturedIntoARosterLeavesItsBodyRegistrationAndLinks() {
+        CompanionRecord live = insertLive(2);
+        index.update(live.profileId(), live.revision(), b -> b.toolIds(List.of("link")));
+        CaptureFlow.Capture<String> capture = new CaptureFlow.Capture<>(live.profileId(), 2, "body",
+                facts(live.currentNpcUuid()), owner, "Alec", DATA,
+                new CaptureFlow.BondedTarget(ROSTER, TAMED_DRAKE, profileId -> "{}"));
+
+        CaptureFlow.Outcome outcome = rosterFlow(drakes(0)).capture(capture).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        CompanionRecord stored = index.get(live.profileId());
+        assertEquals(StoredReason.BONDED, stored.location().reason());
+        assertEquals(3, stored.generation());
+        assertTrue(stored.bonded());
+        assertEquals(List.of(), stored.toolIds());
+        assertNull(loaded.get(live.profileId()));
+    }
+
+    @Test
+    void aFullFamilyRefusesACaptureIntoItsRosterUnderTheLockAndNothingChanges() {
+        index.insert(CompanionRecord.builder(UUID.randomUUID(), TAMED_DRAKE, CompanionLocation.stored(StoredReason.BONDED))
+                .ownerUuid(owner).bonded(true).rosterId(ROSTER).build());
+        UUID npc = UUID.randomUUID();
+
+        CaptureFlow.Outcome outcome = rosterFlow(drakes(1)).capture(wildIntoRoster(npc)).join();
+
+        assertEquals(CaptureFlow.Result.OWNED_LIMIT, outcome.result());
+        assertEquals(CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY, outcome.messageKey());
+        assertNull(index.byNpcUuid(npc));
+        assertEquals(1, index.fileRecords(owner).size());
+        assertTrue(events.isEmpty(), "no snapshot queued and no flush");
+    }
+
+    @Test
+    void aBondedCaptureThatIsNotWrittenLeavesNoCompanionInTheRoster() {
+        UUID npc = UUID.randomUUID();
+        CaptureFlow<String> failing = new CaptureFlow<>(index, loaded, (id, envelope) -> { },
+                who -> CompletableFuture.failedFuture(new IllegalStateException("disk full")),
+                ProviderAdmission.none(), (before, after, provided) -> null);
+
+        CaptureFlow.Outcome outcome = failing.capture(wildIntoRoster(npc)).join();
+
+        assertEquals(CaptureFlow.Result.COMMIT_FAILED, outcome.result());
+        assertFalse(index.fileRecords(owner).stream().anyMatch(CompanionRecord::countsAsOwned));
+    }
+
+    @Test
+    void aBondedCaptureOfAManagedRoleAsksTheProviderAndStoresItsClaims() {
+        UUID npc = UUID.randomUUID();
+
+        CaptureFlow.Outcome outcome = managedFlow(CompletableFuture.completedFuture(allowBarn(1)))
+                .capture(wildIntoRoster(npc)).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        CompanionRecord stored = index.get(outcome.itemRef().profileId());
+        assertEquals(StoredReason.BONDED, stored.location().reason());
+        assertEquals(List.of(new DomainClaim(BARN, 1, true, false)), stored.domainClaims());
+        assertEquals(List.of("provider", "snapshot", "flush"), events);
     }
 }

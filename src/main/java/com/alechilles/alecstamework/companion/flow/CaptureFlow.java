@@ -3,14 +3,19 @@ package com.alechilles.alecstamework.companion.flow;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.ExtensionEntry;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.hypixel.hytale.logger.HytaleLogger;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -24,9 +29,10 @@ import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 
 /**
- * Commit-first capture into an item (spec 8.2). The caller has taken the snapshot on the body's
- * world thread; this flow commits ITEM, flushes, and only then lets the caller remove the body
- * and hand over the item. A flush failure reverts the record and re-registers the body.
+ * Commit-first capture into an item (spec 8.2) or into bonded storage (plan 6 task 10). The
+ * caller has taken the snapshot on the body's world thread; this flow commits ITEM, or
+ * STORED(BONDED) for a {@link BondedTarget}, flushes, and only then lets the caller remove the
+ * body and hand over the item. A flush failure reverts the record and re-registers the body.
  *
  * <p>The caller removes the body and gives the item only on {@link Result#CAPTURED}. After any
  * other result the body stays in the world. When a newer change replaced the commit
@@ -56,7 +62,8 @@ public final class CaptureFlow<R> {
         PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
 
     /**
-     * {@code itemRef} is what to write on the item; null unless CAPTURED. {@code messageKey} is the
+     * {@code itemRef} is the committed profile and generation, which a capture into an item writes
+     * on the item; null unless CAPTURED. {@code messageKey} is the
      * translation key of a population refusal (a cap, a provider's denial or a domain limit); null
      * for every other result.
      */
@@ -67,17 +74,46 @@ public final class CaptureFlow<R> {
     }
 
     /**
+     * A capture into a bonded roster instead of an item: the record becomes {@code STORED(BONDED)},
+     * bonded, in {@code rosterId}, with {@code roleId} as its role (the role the roster family
+     * allows, which the snapshot's body must have too). {@code evidence} builds the capture
+     * evidence JSON for the committed profile id; it is stored under
+     * {@link BondedRecords#CAPTURE_EVIDENCE_KEY} (plan 6 R17). It may run more than once and under
+     * the index lock, so it must be pure.
+     */
+    public record BondedTarget(@Nonnull String rosterId, @Nonnull String roleId,
+                               @Nonnull Function<UUID, String> evidence) {
+        public BondedTarget {
+            Objects.requireNonNull(rosterId, "rosterId");
+            Objects.requireNonNull(roleId, "roleId");
+            Objects.requireNonNull(evidence, "evidence");
+        }
+    }
+
+    /**
      * One capture. {@code stampedProfileId} null means an unstamped body (wild or owned but never
      * stamped): it gets a fresh record at generation 0. {@code owner} is the record owner after
-     * capture (null only for an unowned wild capture).
+     * capture (null only for an unowned wild capture into an item). {@code bonded} null captures
+     * into an item.
      */
     public record Capture<R>(@Nullable UUID stampedProfileId, long stampedGeneration, @Nonnull R body,
                              @Nonnull CompanionTransitions.BodyFacts facts, @Nullable UUID owner,
-                             @Nullable String ownerName, @Nonnull BsonDocument snapshotData) {
+                             @Nullable String ownerName, @Nonnull BsonDocument snapshotData,
+                             @Nullable BondedTarget bonded) {
         public Capture {
             Objects.requireNonNull(body, "body");
             Objects.requireNonNull(facts, "facts");
             Objects.requireNonNull(snapshotData, "snapshotData");
+            if (bonded != null) {
+                Objects.requireNonNull(owner, "a bonded capture needs an owner");
+            }
+        }
+
+        /** A capture into an item. */
+        public Capture(@Nullable UUID stampedProfileId, long stampedGeneration, @Nonnull R body,
+                       @Nonnull CompanionTransitions.BodyFacts facts, @Nullable UUID owner,
+                       @Nullable String ownerName, @Nonnull BsonDocument snapshotData) {
+            this(stampedProfileId, stampedGeneration, body, facts, owner, ownerName, snapshotData, null);
         }
     }
 
@@ -125,11 +161,8 @@ public final class CaptureFlow<R> {
         if (stamped != null && seen == null) {
             return CompletableFuture.completedFuture(new Outcome(Result.NOT_CAPTURABLE, null));
         }
-        CompanionRecord created = stamped != null ? null
-                : CompanionTransitions.newItem(UUID.randomUUID(), capture.facts(), capture.owner(), capture.ownerName());
-        CompanionRecord preview = created != null ? created
-                : CompanionTransitions.capturedToItem(seen, capture.facts().summary(), capture.owner(),
-                        capture.ownerName()).apply(seen.toBuilder()).build();
+        CompanionRecord created = stamped != null ? null : created(capture, UUID.randomUUID());
+        CompanionRecord preview = created != null ? created : captured(capture, seen).apply(seen.toBuilder()).build();
         return providers.evaluate(seen, preview).toCompletableFuture().thenCompose(provider -> provider.admitted()
                 ? commitAndFlush(capture, seen, created, provider)
                 : CompletableFuture.completedFuture(
@@ -164,7 +197,7 @@ public final class CaptureFlow<R> {
                     }
                     // A change that kept the item holder (a rename, say) does not undo the capture.
                     CompanionRecord now = index.get(profileId);
-                    if (now == null || now.location().kind() != LocationKind.ITEM
+                    if (now == null || now.location().kind() != after.location().kind()
                             || now.generation() != after.generation()) {
                         return new Outcome(Result.CONFLICT, null);
                     }
@@ -193,12 +226,12 @@ public final class CaptureFlow<R> {
                 // Another body holds this profile; capturing this one would strand the registered one.
                 return Commit.refused(Result.NOT_CAPTURABLE);
             }
-            if (!Objects.equals(before.ownerUuid(), seen.ownerUuid())) {
-                // The owner changed while the provider was asked; its answer is for another change.
+            if (!Objects.equals(before.ownerUuid(), seen.ownerUuid()) || !before.roleId().equals(seen.roleId())) {
+                // The owner or the role changed while the provider was asked; its answer, and the
+                // claims it allowed, are for another change.
                 return Commit.refused(Result.CONFLICT);
             }
-            UnaryOperator<CompanionRecord.Builder> captured =
-                    CompanionTransitions.capturedToItem(before, facts.summary(), capture.owner(), capture.ownerName());
+            UnaryOperator<CompanionRecord.Builder> captured = captured(capture, before);
             UnaryOperator<CompanionRecord.Builder> change = !provider.asked() ? captured
                     : b -> captured.apply(b).domainClaims(provided.claims());
             Commit capped = capped(before, change.apply(before.toBuilder()).build(), provided);
@@ -223,6 +256,43 @@ public final class CaptureFlow<R> {
         }
         CompanionIndex.Mutation m = index.insert(claimed);
         return m.applied() ? new Commit(null, null, null, m.after(), false) : Commit.refused(Result.CONFLICT);
+    }
+
+    /** The first record of an unstamped body: in an item, or in bonded storage. */
+    private static CompanionRecord created(Capture<?> capture, UUID profileId) {
+        CompanionRecord item = CompanionTransitions.newItem(profileId, capture.facts(), capture.owner(),
+                capture.ownerName());
+        return target(capture, profileId).apply(item.toBuilder()).build();
+    }
+
+    /** The change of a stamped body's record: into an item, or into bonded storage. */
+    private static UnaryOperator<CompanionRecord.Builder> captured(Capture<?> capture, CompanionRecord before) {
+        UnaryOperator<CompanionRecord.Builder> toItem = CompanionTransitions.capturedToItem(
+                before, capture.facts().summary(), capture.owner(), capture.ownerName());
+        UnaryOperator<CompanionRecord.Builder> target = target(capture, before.profileId());
+        return b -> target.apply(toItem.apply(b));
+    }
+
+    /**
+     * What a {@link BondedTarget} changes on the item-capture record: STORED(BONDED) in the roster
+     * with the family's role, no command links, no summon cooldown, and the capture evidence.
+     * Nothing for a capture into an item.
+     */
+    private static UnaryOperator<CompanionRecord.Builder> target(Capture<?> capture, UUID profileId) {
+        BondedTarget bonded = capture.bonded();
+        if (bonded == null) {
+            return UnaryOperator.identity();
+        }
+        // The first value of an extension entry has revision 1; 0 means "no value".
+        ExtensionEntry evidence = new ExtensionEntry(1L, bonded.evidence().apply(profileId));
+        return b -> b.location(CompanionLocation.stored(StoredReason.BONDED))
+                .bonded(true)
+                .rosterId(bonded.rosterId())
+                .rosterSlot(-1)
+                .roleId(bonded.roleId())
+                .toolIds(List.of())
+                .summonCooldownUntilMs(0L)
+                .extension(BondedRecords.CAPTURE_EVIDENCE_KEY, evidence);
     }
 
     /** The refused commit when a cap or a provider domain limit refuses the change; null when admitted. */
