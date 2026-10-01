@@ -80,7 +80,10 @@ public final class CompanionDeathTiming {
 
     private static long reviveCooldownMs(@Nullable Ref<EntityStore> ref, Store<EntityStore> store,
                                          @Nullable String roleId) {
-        long configured = Math.max(0L, TwCompanionConfig.resolveEffectiveForRole(roleId).getDeadRespawnCooldownMs());
+        // Revive.GameplayCooldownMs is authoritative; a legacy DeadRespawnCooldown value flows into it
+        // when the config has no explicit Revive block.
+        long configured = Math.max(0L,
+                TwCompanionConfig.resolveEffectiveForRole(roleId).getRevive().getGameplayCooldownMs());
         double multiplier = ref == null
                 ? 1.0
                 : CompanionProgressionModifierService.resolveMultiplier(ref, store, REVIVE_COOLDOWN_MULTIPLIER, 1.0);
