@@ -114,8 +114,11 @@ final class LinkedNpcPanelVitalsBinder {
             }
             commandBuilder.set(healthFillSelector + ".Visible", true);
             commandBuilder.set(healthFillSelector + ".Background", muted ? MUTED_FILL_COLOR : "#6fc576");
+            // A dead companion keeps its saved maximum health, but its tooltip still shows the revive countdown.
+            String tooltip = entry.dead()
+                    ? LinkedNpcPanelStatusTextService.resolveDeadHealthTooltip(entry, language) : healthText;
             commandBuilder.set(healthTooltipSelector + ".TooltipText",
-                    LinkedNpcPanelStatusTextService.appendLastKnownTooltip(healthText, entry, language));
+                    LinkedNpcPanelStatusTextService.appendLastKnownTooltip(tooltip, entry, language));
             Anchor healthFill = LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(
                     entry.dead() ? 0.0 : entry.healthRatio(), healthFillMaxWidth);
             healthFill.setHeight(Value.of(healthFillHeight));
