@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  * its outermost locked section exits.
  */
 public final class CompanionIndex {
-    /** Receives every applied change. Must be cheap and non-blocking; it runs under the index lock. */
+    /** Receives every applied change. Must be cheap and non-blocking; the main listener runs under the index lock. */
     public interface ChangeListener {
         void onChanged(@Nullable CompanionRecord before, @Nonnull CompanionRecord after);
     }
@@ -181,10 +181,11 @@ public final class CompanionIndex {
 
     /** Under the lock: tells the under-lock listener and queues the change for after-unlock listeners. */
     private void changed(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
-        listener.onChanged(before, after);
+        // Queue first: the change is already visible, so a throwing listener must not lose the event.
         if (!afterUnlock.isEmpty()) {
             pending.get().changes.add(new Change(before, after));
         }
+        listener.onChanged(before, after);
     }
 
     /**

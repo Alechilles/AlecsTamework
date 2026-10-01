@@ -152,6 +152,9 @@ public final class CompanionEventPublisher implements CompanionIndex.ChangeListe
     private void publishRosterMembership(@Nullable CompanionRecord before, CompanionRecord after, long now) {
         boolean was = isMember(before);
         boolean is = isMember(after);
+        if (!was && !is) {
+            return;
+        }
         if (was && is && before.ownerUuid().equals(after.ownerUuid()) && before.rosterId().equals(after.rosterId())) {
             return;
         }
