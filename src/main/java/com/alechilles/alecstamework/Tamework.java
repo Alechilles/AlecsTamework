@@ -229,6 +229,14 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
+import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.items.CompanionRestoreRecallSink;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
+import com.hypixel.hytale.component.Store;
+import java.util.UUID;
 import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
@@ -644,10 +652,14 @@ public class Tamework extends JavaPlugin {
         openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
         CompanionQueries companionQueries = null;
+        RestoreFlow<Ref<EntityStore>> restoreFlow = null;
+        CompanionRestoreRecallSink recallRestore = null;
         if (companionModule != null && companionModule.ready()) {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
             companionQueries = companionModule.queries();
+            restoreFlow = createRestoreFlow(companionModule);
+            recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
             registerCompanionPersistenceRuntime();
         } else if (companionModule != null) {
             registerCompanionPersistenceNotice(companionModule.state());
@@ -663,7 +675,9 @@ public class Tamework extends JavaPlugin {
                     )
             );
         }
-        commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
+        commandNpcRelocationService = recallRestore != null
+                ? new CommandNpcRelocationService(getLogger(), recallRestore)
+                : new CommandNpcRelocationService(getLogger());
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService();
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
@@ -735,7 +749,7 @@ public class Tamework extends JavaPlugin {
                 commandNpcRelocationService,
                 commandLinkedNpcStateSnapshotService,
                 null,
-                null,
+                restoreFlow,
                 null,
                 null,
                 null,
@@ -744,6 +758,7 @@ public class Tamework extends JavaPlugin {
                 companionQueries,
                 releaseFlow
         );
+        commandItemFeatureHandler.configureRecallRestore(recallRestore);
         commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
             var tracker = commandItemFeatureHandler.capturedItemTracker();
@@ -1345,6 +1360,43 @@ public class Tamework extends JavaPlugin {
             return;
         }
         admission.admitLoadedWorlds(universe.getWorlds().values());
+    }
+
+    /**
+     * Builds the restore used by recall, world-change follow and the panel's Recover and Revive.
+     * The snapshot is a fresh capture when the body is loaded, otherwise the stored one.
+     */
+    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(CompanionPersistenceModule module) {
+        CompanionSnapshotSource snapshots = new CompanionSnapshotSource(
+                module.queries()::loadedBody, module.index()::get, module.writer()::queueSnapshot,
+                module::readSnapshot, CompanionSnapshots.production());
+        HytaleCompanionSpawner spawner =
+                new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get);
+        return new RestoreFlow<>(module.index(), module.loaded(), snapshots::read,
+                module.writer()::flushNow, spawner, Tamework::removeRestoredOldBody, System::currentTimeMillis);
+    }
+
+    /**
+     * Removes a restored companion's old body on its world thread. The flow already unregistered
+     * it, so its removal raises no LOST transition. A ref that is no longer valid means the body
+     * left the store (unload or removal); if its chunk loads it again, the generation fence
+     * removes it. When the world no longer accepts tasks, the fence covers it the same way.
+     */
+    private static void removeRestoredOldBody(UUID profileId, Ref<EntityStore> body) {
+        Store<EntityStore> store = body.getStore();
+        World world = store == null || store.getExternalData() == null ? null : store.getExternalData().getWorld();
+        if (world == null || !world.isAlive()) {
+            return;
+        }
+        try {
+            world.execute(() -> {
+                if (body.isValid()) {
+                    body.getStore().removeEntity(body, RemoveReason.REMOVE);
+                }
+            });
+        } catch (RuntimeException notAccepting) {
+            // World#execute throws when the world no longer accepts tasks.
+        }
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */

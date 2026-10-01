@@ -32,7 +32,10 @@ import javax.annotation.Nullable;
 public final class RestoreFlow<R> {
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED }
 
-    /** Where to restore. {@code world} is a world name; the production spawner resolves it. */
+    /**
+     * Where to restore. {@code world} is a world name; the production spawner resolves it.
+     * {@code yaw} and {@code pitch} are in radians, as {@code Rotation3f} expects.
+     */
     public record Destination(@Nonnull String world, double x, double y, double z, float yaw, float pitch) {
         public Destination {
             Objects.requireNonNull(world, "world");
