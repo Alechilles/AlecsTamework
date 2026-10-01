@@ -152,4 +152,36 @@ class SpawnerCaptureResolutionFactoryTest {
 
         assertNull(result.failureCooldownUntilMs());
     }
+
+    @Test
+    void failedRollUnderSuccessOnlyConsumptionHasNoTerminalResolution() {
+        SpawnerCaptureResolutionFactory factory =
+                new SpawnerCaptureResolutionFactory(new ItemFeatureRegistry(), () -> 0L);
+        ItemFeatureConfig.CaptureItemMechanics successOnly =
+                new ItemFeatureConfig.CaptureItemMechanics(
+                        CaptureChanceMode.PROBABILITY, 1, 0.2D, 0.1D, 0.05D, 0.9D, 500, null, null,
+                        CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
+                        null, null, false
+                );
+
+        CaptureAttemptResolution result = factory.create(
+                new CaptureAttemptHandle(UUID.randomUUID(), null, null, 0, "source"),
+                "capture-device",
+                "chicken",
+                successOnly,
+                null,
+                new SpawnerCaptureChanceService.Evaluation(
+                        SpawnerCaptureChanceService.Outcome.FAILED_ROLL,
+                        "capture-probability-failure",
+                        0.2D,
+                        false,
+                        0.0D,
+                        0.9D
+                ),
+                0L,
+                null
+        );
+
+        assertNull(result);
+    }
 }

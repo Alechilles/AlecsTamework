@@ -1,37 +1,41 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.CaptureRequirementContext;
-import com.alechilles.alecstamework.api.CaptureRequirementDecision;
-import com.alechilles.alecstamework.api.CaptureRequirementSpec;
-import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
+import com.alechilles.alecstamework.companion.flow.CaptureFlow;
+import com.alechilles.alecstamework.companion.flow.CompanionBodies;
+import com.alechilles.alecstamework.companion.flow.CompanionBodyFacts;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.flow.CompanionWorldTime;
+import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.RestoreRules;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.live.CompanionSummaries;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
-import com.alechilles.alecstamework.config.CommandItemRegistry;
-import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
-import com.alechilles.alecstamework.items.persistence.SpawnerCaptureAuthor;
-import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
-import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseAuthor;
-import com.alechilles.alecstamework.items.persistence
-        .SpawnerTameAndLinkEvidenceSource;
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.hypixel.hytale.codec.Codec;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.server.core.entity.Entity;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -39,280 +43,80 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Thin gameplay orchestrator for canonical spawner capture and captured-artifact release.
+ * Capture into a capture item and release from one (spec 8.2, 8.3), over the companion index.
  *
- * <p>Only immutable attempt handles and active channel handoffs are process-local. A successful
- * roll is submitted to the canonical persistence operation; failed rolls create no durable
- * journal, recovery row, or second lifecycle authority.</p>
+ * <p>Capture rolls on the body's world thread (the interaction or NPC action callback), takes the
+ * snapshot there, and hands the commit to {@link CaptureFlow}; {@link HytaleCaptureDelivery}
+ * removes the body and gives the item once the commit is written. Release reads the record for
+ * ownership and runs {@link RestoreFlow} with reason RELEASE. Feedback returns to the player's
+ * current world by UUID; no live component crosses a thread.
+ *
+ * <p>Only CAPTURED_ITEM captures run here. Bonded captures (phase 6) and tame-and-link captures
+ * are refused. Items in the 2.x and 4.x formats are refused until their migration.
  */
 public final class SpawnerFeatureHandler {
+    private static final String SPAWNER_KEYS = "tamework.ui.notifications.spawner.";
+
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
     private final SpawnerRolePolicyService roles;
     private final SpawnerItemStackMetadataService itemMetadata;
     private final SpawnerPlayerInventoryService inventory;
     private final SpawnerCapturePolicyService capturePolicy;
+    private final SpawnerCaptureResolutionFactory resolutions;
+    private final SpawnerCaptureFailureCooldowns cooldowns = new SpawnerCaptureFailureCooldowns();
     private final SpawnerCaptureRollService captureRolls;
-    private final SpawnerCaptureIntentFactory captureIntents;
+    private final SpawnerCapturedItemFactory capturedItems;
     private final SpawnerReleaseIntentFactory releaseIntents;
-    private final SpawnerEffectService effects;
-    @Nullable
-    private final SpawnerCaptureAuthor captureAuthor;
-    @Nullable
-    private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
-    private final SpawnerCaptureChannelService channels;
-    private final BondedCompanionCaptureRoute bondedCaptureRoute;
+    private final SpawnerEffectService effects = new SpawnerEffectService();
+    private final SpawnerCaptureChannelService channels = new SpawnerCaptureChannelService();
+    private final TameworkUiMessageService messages = new TameworkUiMessageService();
+    private final CompanionIndex index;
+    private final CaptureFlow<Ref<EntityStore>> captureFlow;
+    private final RestoreFlow<Ref<EntityStore>> restoreFlow;
+    private final HytaleCaptureDelivery delivery;
+    private final CompanionSnapshots snapshots;
+    private final CompanionSummaries summaries;
 
-    /** Creates the released spawner composition over the canonical operation authors. */
     public SpawnerFeatureHandler(
             @Nonnull HytaleLogger logger,
             @Nonnull ItemFeatureRegistry registry,
             @Nullable TranslationRegistry translations,
-            @Nonnull SpawnerCaptureAuthor captureAuthor,
-            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
-            @Nonnull CapturePolicyRegistry capturePolicies,
-            @Nonnull CaptureRequirementRuntime captureRequirements
-    ) {
-        this(
-                logger,
-                registry,
-                translations,
-                captureAuthor,
-                releaseAuthor,
-                capturePolicies,
-                captureRequirements,
-                SpawnerTameAndLinkEvidenceSource.unavailable(),
-                null, null, null
-        );
-    }
-
-    /** Creates the canonical spawner composition with tame/link evidence. */
-    public SpawnerFeatureHandler(
-            @Nonnull HytaleLogger logger,
-            @Nonnull ItemFeatureRegistry registry,
-            @Nullable TranslationRegistry translations,
-            @Nonnull SpawnerCaptureAuthor captureAuthor,
-            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             @Nonnull CapturePolicyRegistry capturePolicies,
             @Nonnull CaptureRequirementRuntime captureRequirements,
-            @Nonnull SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence
+            @Nonnull CompanionIndex index,
+            @Nonnull CaptureFlow<Ref<EntityStore>> captureFlow,
+            @Nonnull RestoreFlow<Ref<EntityStore>> restoreFlow,
+            @Nonnull HytaleCaptureDelivery delivery,
+            @Nonnull CompanionSnapshots snapshots,
+            @Nonnull CompanionSummaries summaries
     ) {
-        this(
-                logger,
-                registry,
-                translations,
-                Objects.requireNonNull(captureAuthor, "captureAuthor"),
-                Objects.requireNonNull(releaseAuthor, "releaseAuthor"),
-                Objects.requireNonNull(capturePolicies, "capturePolicies"),
-                Objects.requireNonNull(
-                        captureRequirements, "captureRequirements"
-                ),
-                Objects.requireNonNull(
-                        tameAndLinkEvidence, "tameAndLinkEvidence"
-                ),
-                null, null, null,
-                true
-        );
-    }
-
-    /** Creates the canonical composition with the isolated bonded capture route. */
-    public SpawnerFeatureHandler(
-            @Nonnull HytaleLogger logger,
-            @Nonnull ItemFeatureRegistry registry,
-            @Nullable TranslationRegistry translations,
-            @Nonnull SpawnerCaptureAuthor captureAuthor,
-            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
-            @Nonnull CapturePolicyRegistry capturePolicies,
-            @Nonnull CaptureRequirementRuntime captureRequirements,
-            @Nonnull SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
-            @Nonnull BondedCompanionCaptureAuthor bondedCaptureAuthor,
-            @Nonnull BondedCompanionRosterRegistry bondedRosters,
-            @Nonnull CommandItemRegistry commandItems
-    ) {
-        this(logger, registry, translations, captureAuthor, releaseAuthor,
-                capturePolicies, captureRequirements, tameAndLinkEvidence,
-                bondedCaptureAuthor, bondedRosters, commandItems, true);
-    }
-
-    private SpawnerFeatureHandler(
-            HytaleLogger logger,
-            ItemFeatureRegistry registry,
-            TranslationRegistry translations,
-            SpawnerCaptureAuthor captureAuthor,
-            SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
-            CapturePolicyRegistry capturePolicies,
-            CaptureRequirementRuntime captureRequirements,
-            SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
-            BondedCompanionCaptureAuthor bondedCaptureAuthor,
-            BondedCompanionRosterRegistry bondedRosters,
-            CommandItemRegistry commandItems,
-            boolean canonicalComposition
-    ) {
-        this.logger = logger;
-        this.registry = registry;
-        this.captureAuthor = captureAuthor;
-        this.releaseAuthor = releaseAuthor;
+        this.logger = Objects.requireNonNull(logger, "logger");
+        this.registry = Objects.requireNonNull(registry, "registry");
+        this.index = Objects.requireNonNull(index, "index");
+        this.captureFlow = Objects.requireNonNull(captureFlow, "captureFlow");
+        this.restoreFlow = Objects.requireNonNull(restoreFlow, "restoreFlow");
+        this.delivery = Objects.requireNonNull(delivery, "delivery");
+        this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
+        this.summaries = Objects.requireNonNull(summaries, "summaries");
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
-        SpawnerCaptureMetadataService captureMetadata =
-                new SpawnerCaptureMetadataService(logger, registry);
-        SpawnerNpcProgressionMetadataService progression =
-                new SpawnerNpcProgressionMetadataService();
+        SpawnerCaptureMetadataService captureMetadata = new SpawnerCaptureMetadataService(logger, registry);
         this.itemMetadata = new SpawnerItemStackMetadataService(
-                registry, captureMetadata, progression
-        );
-        SpawnerNpcStateService npcState = new SpawnerNpcStateService();
-        SpawnerNpcIdentityService npcIdentity =
-                new SpawnerNpcIdentityService();
-        SpawnerOwnershipPolicyService ownership =
-                new SpawnerOwnershipPolicyService();
+                registry, captureMetadata, new SpawnerNpcProgressionMetadataService());
+        SpawnerNpcIdentityService npcIdentity = new SpawnerNpcIdentityService();
+        SpawnerOwnershipPolicyService ownership = new SpawnerOwnershipPolicyService();
         this.capturePolicy = new SpawnerCapturePolicyService(
-                logger,
-                roles,
-                npcState,
-                ownership,
-                npcIdentity
-        );
-        BondedCompanionCaptureAdmissionService bondedAdmission =
-                new BondedCompanionCaptureAdmissionService(
-                capturePolicy, commandItems, bondedRosters);
+                logger, roles, new SpawnerNpcStateService(), ownership, npcIdentity);
+        this.resolutions = new SpawnerCaptureResolutionFactory(registry, System::currentTimeMillis);
         this.captureRolls = new SpawnerCaptureRollService(
-                capturePolicies,
-                captureRequirements,
-                capturePolicy,
-                roles,
-                new SpawnerCaptureResolutionFactory(
-                        registry == null
-                                ? new ItemFeatureRegistry()
-                                : registry,
-                        System::currentTimeMillis
-                ),
-                (actorUuid, itemConfigId, attemptId, nowMs) ->
-                        captureAuthor != null
-                                && captureAuthor.failureCooldownActive(
-                                        actorUuid,
-                                        itemConfigId,
-                                        attemptId,
-                                        nowMs
-                                )
-        );
-        this.captureIntents = new SpawnerCaptureIntentFactory(
-                captureMetadata,
-                progression,
-                itemMetadata,
-                new SpawnerItemDisplayMetadataService(translations),
-                npcState,
-                npcIdentity,
-                tameAndLinkEvidence
-        );
-        this.bondedCaptureRoute = new BondedCompanionCaptureRoute(
-                bondedCaptureAuthor, bondedRosters, bondedAdmission,
-                captureRolls, captureIntents,
-                new BondedCompanionCaptureReplayIntentFactory(roles));
-        SpawnerSpawnPositionService positions =
-                new SpawnerSpawnPositionService(logger);
+                Objects.requireNonNull(capturePolicies, "capturePolicies"),
+                Objects.requireNonNull(captureRequirements, "captureRequirements"),
+                capturePolicy, roles, resolutions, cooldowns);
+        this.capturedItems = new SpawnerCapturedItemFactory(
+                captureMetadata, itemMetadata, new SpawnerItemDisplayMetadataService(translations), npcIdentity);
         this.releaseIntents = new SpawnerReleaseIntentFactory(
-                positions, inventory, itemMetadata, ownership
-        );
-        this.effects = new SpawnerEffectService();
-        this.channels = new SpawnerCaptureChannelService();
-    }
-
-    /** Focused package test seam for pure config resolution. */
-    SpawnerFeatureHandler(
-            HytaleLogger logger,
-            ItemFeatureRegistry registry,
-            TranslationRegistry translations
-    ) {
-        this(
-                logger,
-                registry,
-                translations,
-                null,
-                null,
-                new CapturePolicyRegistry(),
-                NoCaptureRequirements.INSTANCE,
-                SpawnerTameAndLinkEvidenceSource.unavailable(),
-                null, null, null,
-                false
-        );
-    }
-
-    /** Routes a direct interaction to capture or release. */
-    public boolean handle(PlayerInteractEvent event, ItemFeatureConfig config) {
-        if (event == null || config == null || !config.isSpawnerEnabled()) {
-            return false;
-        }
-        ItemStack source = event.getItemInHand();
-        if (source == null || source.isEmpty()
-                || (event.getActionType() != InteractionType.Primary
-                && event.getActionType() != InteractionType.Use)) {
-            return false;
-        }
-        Entity target = event.getTargetEntity();
-        if (target instanceof NPCEntity npc) {
-            Ref<EntityStore> targetRef = npc.getReference();
-            CaptureAttemptHandle attempt = prepareCaptureAttempt(
-                    event.getPlayer(), source, null
-            );
-            return targetRef != null && attempt != null
-                    && captureFromNpcAction(
-                            event.getPlayer(),
-                            targetRef,
-                            source,
-                            config,
-                            attempt
-                    );
-        }
-        return spawnFromItem(
-                event.getPlayer(), source, config, null, null
-        );
-    }
-
-    /** Routes a packet interaction after re-reading the exact hotbar slot. */
-    public void handlePacket(
-            Player player,
-            String itemId,
-            int activeHotbarSlot,
-            int targetEntityId,
-            InteractionType interactionType,
-            ItemFeatureConfig config
-    ) {
-        if (player == null || itemId == null || activeHotbarSlot < 0
-                || (interactionType != InteractionType.Primary
-                && interactionType != InteractionType.Use)) {
-            return;
-        }
-        ItemStack source = inventory.getHotbarItem(
-                player, activeHotbarSlot
-        );
-        ItemFeatureConfig resolved = source == null
-                ? null
-                : resolveConfigForItem(source);
-        if (resolved == null) {
-            resolved = config;
-        }
-        if (source == null || source.isEmpty() || resolved == null
-                || !resolved.isSpawnerEnabled()) {
-            return;
-        }
-        if (targetEntityId > 0) {
-            Ref<EntityStore> target = inventory.resolveEntityRef(
-                    player, targetEntityId, null
-            );
-            CaptureAttemptHandle attempt = prepareCaptureAttempt(
-                    player, source, activeHotbarSlot
-            );
-            if (target != null && attempt != null) {
-                captureFromNpcAction(
-                        player, target, source, resolved, attempt
-                );
-            }
-            return;
-        }
-        spawnFromItem(
-                player, source, resolved, activeHotbarSlot, null
-        );
+                new SpawnerSpawnPositionService(logger), inventory, itemMetadata, ownership);
     }
 
     public boolean canCaptureInteraction(
@@ -323,9 +127,7 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig config = resolveConfigForItem(source);
         return config != null && config.isSpawnerEnabled()
                 && !itemMetadata.isAlreadyCaptured(source)
-                && capturePolicy.canCapture(
-                        player, targetRef, config, source
-                );
+                && capturePolicy.canCapture(player, targetRef, config, source);
     }
 
     public boolean canBeginCaptureChannelInteraction(
@@ -336,9 +138,7 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig config = resolveConfigForItem(source);
         return config != null && config.isSpawnerEnabled()
                 && !itemMetadata.isAlreadyCaptured(source)
-                && capturePolicy.canBeginCaptureChannel(
-                        player, targetRef, config, source
-                );
+                && capturePolicy.canBeginCaptureChannel(player, targetRef, config, source);
     }
 
     public boolean beginCaptureChannel(
@@ -357,34 +157,23 @@ public final class SpawnerFeatureHandler {
         ItemStack liveSource = sourceHotbarSlot < 0
                 ? null : inventory.getHotbarItem(player, sourceHotbarSlot);
         if (liveSource == null || liveSource.isEmpty()
-                || source == null || !Objects.equals(
-                source.getItemId(), liveSource.getItemId()
-        )) {
-            logCaptureChannelDiagnostic(
-                    "begin-denied reason=live-source-slot-mismatch"
-            );
+                || source == null || !Objects.equals(source.getItemId(), liveSource.getItemId())) {
+            logCaptureChannelDiagnostic("begin-denied reason=live-source-slot-mismatch");
             return false;
         }
-        if (!canBeginCaptureChannelInteraction(
-                player, targetRef, liveSource
-        )) {
+        if (!canBeginCaptureChannelInteraction(player, targetRef, liveSource)) {
             logCaptureChannelDiagnostic("begin-denied reason=eligibility");
             return false;
         }
-        CaptureAttemptHandle attempt = prepareCaptureAttempt(
-                player, liveSource, sourceHotbarSlot
-        );
+        CaptureAttemptHandle attempt = prepareCaptureAttempt(player, liveSource, sourceHotbarSlot);
         if (attempt == null) {
-            logCaptureChannelDiagnostic(
-                    "begin-denied reason=source-not-in-exact-hotbar-slot"
-            );
+            logCaptureChannelDiagnostic("begin-denied reason=source-not-in-exact-hotbar-slot");
             return false;
         }
-        ItemFeatureConfig config = resolveConfigForItem(liveSource);
         boolean started = channels.start(
                 player,
                 targetRef,
-                config,
+                resolveConfigForItem(liveSource),
                 attempt,
                 beamParticleSystem,
                 beamNativeLength,
@@ -395,9 +184,7 @@ public final class SpawnerFeatureHandler {
                 homingProjectileSettings
         );
         if (!started) {
-            logCaptureChannelDiagnostic(
-                    "begin-denied reason=channel-session-unavailable"
-            );
+            logCaptureChannelDiagnostic("begin-denied reason=channel-session-unavailable");
         }
         return started;
     }
@@ -407,8 +194,7 @@ public final class SpawnerFeatureHandler {
             Ref<EntityStore> targetRef,
             ItemStack source
     ) {
-        ItemFeatureConfig config = resolveConfigForItem(source);
-        channels.end(player, targetRef, config);
+        channels.end(player, targetRef, resolveConfigForItem(source));
     }
 
     public boolean completeCaptureChannel(
@@ -419,16 +205,17 @@ public final class SpawnerFeatureHandler {
     ) {
         CaptureAttemptHandle attempt = channels.take(player);
         endCaptureChannel(player, targetRef, source);
-        return attempt != null && captureFromItemInteraction(
-                player, source, targetRef,
-                captureBurstParticleSystem, attempt
-        );
+        ItemFeatureConfig config = resolveConfigForItem(source);
+        return attempt != null && config != null
+                && capture(player, targetRef, source, config, attempt, captureBurstParticleSystem);
     }
 
+    /**
+     * Whether the held item is a filled capture item this handler may try to release. Old-format
+     * items pass so the release can tell the player why it refuses them.
+     */
     public boolean canSpawnInteraction(ItemStack source) {
-        ItemFeatureConfig config = buildSpawnerConfigForInteraction(
-                resolveConfigForItem(source), null
-        );
+        ItemFeatureConfig config = buildSpawnerConfigForInteraction(resolveConfigForItem(source), null);
         if (source == null || source.isEmpty() || config == null
                 || !config.isSpawnerEnabled()
                 || source.getItemId() == null || !itemMetadata.isAlreadyCaptured(source)) {
@@ -445,68 +232,25 @@ public final class SpawnerFeatureHandler {
             Ref<EntityStore> targetRef,
             @Nonnull CaptureAttemptHandle attempt
     ) {
-        return captureFromItemInteraction(
-                player, source, targetRef, null, attempt
-        );
-    }
-
-    private boolean captureFromItemInteraction(
-            Player player,
-            ItemStack source,
-            Ref<EntityStore> targetRef,
-            @Nullable String captureBurstParticleSystem,
-            CaptureAttemptHandle attempt
-    ) {
         ItemFeatureConfig config = resolveConfigForItem(source);
-        return config != null && captureFromNpcActionInternal(
-                player,
-                targetRef,
-                source,
-                config,
-                attempt,
-                captureBurstParticleSystem
-        );
+        return config != null && capture(player, targetRef, source, config, attempt, null);
     }
 
+    /** Records the exact hotbar slot and source stack at the start of an interaction. */
     @Nullable
     public CaptureAttemptHandle prepareCaptureAttempt(
             Player player,
             ItemStack source,
             @Nullable Integer hotbarSlot
     ) {
-        return prepareCaptureAttemptInternal(
-                player, source, hotbarSlot, null, null
-        );
-    }
-
-    @Nullable
-    private CaptureAttemptHandle prepareCaptureAttemptInternal(
-            Player player,
-            ItemStack source,
-            @Nullable Integer hotbarSlot,
-            @Nullable String callerNamespace,
-            @Nullable String idempotencyKey
-    ) {
-        Integer exactSlot = inventory.resolveExactHotbarSlot(
-                player, source, hotbarSlot
-        );
+        Integer exactSlot = inventory.resolveExactHotbarSlot(player, source, hotbarSlot);
         if (exactSlot == null) {
             return null;
         }
         ItemStack exactSource = inventory.getHotbarItem(player, exactSlot);
-        if (exactSource == null || exactSource.isEmpty()) {
-            return null;
-        }
-        return callerNamespace == null
-                ? CaptureAttemptHandle.forDispatch(
-                        exactSlot, exactSource
-                )
-                : CaptureAttemptHandle.forCaller(
-                        callerNamespace,
-                        idempotencyKey,
-                        exactSlot,
-                        exactSource
-                );
+        return exactSource == null || exactSource.isEmpty()
+                ? null
+                : CaptureAttemptHandle.forDispatch(exactSlot, exactSource);
     }
 
     public boolean spawnFromItemInteraction(
@@ -517,13 +261,8 @@ public final class SpawnerFeatureHandler {
             Boolean spawnAssignsOwnerOverride
     ) {
         ItemFeatureConfig config = buildSpawnerConfigForInteraction(
-                resolveConfigForItem(source),
-                spawnAssignsOwnerOverride
-        );
-        return config != null && spawnFromItem(
-                player, source, config, hotbarSlot,
-                emptyItemIdOverride
-        );
+                resolveConfigForItem(source), spawnAssignsOwnerOverride);
+        return config != null && release(player, source, config, hotbarSlot, emptyItemIdOverride);
     }
 
     public boolean captureFromNpcAction(
@@ -533,12 +272,14 @@ public final class SpawnerFeatureHandler {
             ItemFeatureConfig config,
             @Nonnull CaptureAttemptHandle attempt
     ) {
-        return captureFromNpcActionInternal(
-                player, targetRef, source, config, attempt, null
-        );
+        return capture(player, targetRef, source, config, attempt, null);
     }
 
-    private boolean captureFromNpcActionInternal(
+    /**
+     * Rolls and, on success, starts the commit. Returns true when the attempt resolved (a capture
+     * started, or a failed roll spent its source); false when nothing changed.
+     */
+    private boolean capture(
             Player player,
             Ref<EntityStore> targetRef,
             ItemStack source,
@@ -546,66 +287,25 @@ public final class SpawnerFeatureHandler {
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String captureParticleSystemOverride
     ) {
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(
-                config, null
-        );
-        if (bondedDisposition(resolved)) {
-            boolean sourceEligible = player != null
-                    && source != null && !source.isEmpty()
-                    && sourceMatches(player, attempt)
-                    && !itemMetadata.isAlreadyCaptured(source);
-            return bondedCaptureRoute.capture(
-                    player, targetRef, source, resolved, attempt,
-                    sourceEligible, captureParticleSystemOverride
-            );
-        }
-        String denial = captureAdmissionDenial(
-                player, targetRef, source, resolved, attempt
-        );
+        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
+        String denial = captureAdmissionDenial(player, targetRef, source, resolved, attempt);
         if (denial != null) {
             logCaptureChannelDiagnostic("terminal-denied reason=" + denial
-                    + " item=" + (source == null ? null : source.getItemId())
-                    + " expectedFingerprint=" + attempt.sourceFingerprint()
-                    + " actualFingerprint=" + currentSourceFingerprint(player, attempt));
+                    + " item=" + (source == null ? null : source.getItemId()));
             return false;
         }
         SpawnerCaptureRollService.Resolution roll = captureRolls.evaluate(
-                player, targetRef, source, resolved, attempt
-        );
-        if (roll == null || roll.evaluation().outcome()
-                == SpawnerCaptureChanceService.Outcome.DENIED) {
+                player, targetRef, source, resolved, attempt);
+        if (roll == null || roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.DENIED) {
             logCaptureChannelDiagnostic("terminal-denied reason=roll-unavailable-or-denied"
                     + " item=" + source.getItemId());
             return false;
         }
-        if (roll.evaluation().outcome()
-                == SpawnerCaptureChanceService.Outcome.FAILED_ROLL
-                && resolved.getCaptureMechanics().sourceConsumption()
-                != CaptureSourceConsumption.RESOLVED_ATTEMPT) {
-            effects.playCaptureFailureEffects(
-                    player.getWorld(),
-                    targetRef,
-                    resolved.getCaptureMechanics()
-            );
-            return false;
+        if (roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.FAILED_ROLL) {
+            return failedRoll(player, targetRef, source, resolved, attempt, roll.terminal());
         }
-        SpawnerCaptureIntent intent = captureIntents.create(
-                player,
-                targetRef,
-                source,
-                resolved,
-                attempt,
-                roll,
-                captureParticleSystemOverride
-        );
-        if (intent == null) {
-            logCaptureChannelDiagnostic("terminal-denied reason=intent-unavailable"
-                    + " item=" + source.getItemId()
-                    + " evidence=" + captureIntents.lastEvidenceFailureReason());
-            return false;
-        }
-        captureAuthor.capture(intent);
-        return true;
+        return captureIntoItem(player, targetRef, source, resolved, attempt, roll.roleId(),
+                captureParticleSystemOverride);
     }
 
     @Nullable
@@ -616,16 +316,16 @@ public final class SpawnerFeatureHandler {
             @Nullable ItemFeatureConfig resolved,
             @Nonnull CaptureAttemptHandle attempt
     ) {
-        if (captureAuthor == null) return "capture-author-unavailable";
         if (player == null) return "player-unavailable";
         if (targetRef == null || !targetRef.isValid()) return "target-unavailable";
         if (source == null || source.isEmpty()) return "source-unavailable";
         if (resolved == null) return "item-config-unavailable";
-        if (source.getQuantity() != 1
-                && resolved.getCaptureMechanics().successDisposition()
-                == CaptureSuccessDisposition.CAPTURED_ITEM) {
-            return "stacked-captured-item-source";
+        CaptureSuccessDisposition disposition = resolved.getCaptureMechanics().successDisposition();
+        if (disposition != CaptureSuccessDisposition.CAPTURED_ITEM) {
+            // Bonded captures arrive with phase 6; tame-and-link captures are not wired yet.
+            return "disposition-unavailable-" + disposition;
         }
+        if (source.getQuantity() != 1) return "stacked-captured-item-source";
         if (itemMetadata.isAlreadyCaptured(source)) return "source-already-captured";
         if (!sourceMatches(player, attempt)) return "source-fingerprint-mismatch";
         if (!capturePolicy.canCapture(player, targetRef, resolved, source)) {
@@ -634,135 +334,258 @@ public final class SpawnerFeatureHandler {
         return null;
     }
 
-    private boolean bondedDisposition(ItemFeatureConfig config) {
-        return config != null && config.getCaptureMechanics()
-                .successDisposition()
-                == CaptureSuccessDisposition.STORE_BONDED_COMPANION;
+    /**
+     * A failed roll plays the failure effects. Under {@code RESOLVED_ATTEMPT} consumption it also
+     * spends one source item at the recorded slot (best effort) and starts the failure cooldown.
+     */
+    private boolean failedRoll(Player player, Ref<EntityStore> targetRef, ItemStack source,
+                               ItemFeatureConfig resolved, CaptureAttemptHandle attempt,
+                               @Nullable CaptureAttemptResolution terminal) {
+        effects.playCaptureFailureEffects(player.getWorld(), targetRef, resolved.getCaptureMechanics());
+        if (terminal == null) {
+            return false;
+        }
+        ItemStack current = inventory.getHotbarItem(player, attempt.hotbarSlot());
+        if (current != null && !current.isEmpty()) {
+            SpawnerSourceItemTransaction spend = new SpawnerSourceItemTransaction(
+                    inventory, player, attempt.hotbarSlot(), current, logger, "capture-failed-roll");
+            if (spend.consumeOne()) {
+                spend.commit();
+            }
+        }
+        Long cooldownUntil = terminal.failureCooldownUntilMs();
+        if (cooldownUntil != null) {
+            cooldowns.record(player.getUuid(), resolutions.itemConfigId(source.getItemId()),
+                    cooldownUntil, resolutions.nowMs());
+        }
+        return true;
     }
 
-    private boolean spawnFromItem(
+    /** Runs on the body's world thread: reads the body, snapshots it and starts the commit. */
+    private boolean captureIntoItem(Player player, Ref<EntityStore> targetRef, ItemStack source,
+                                    ItemFeatureConfig resolved, CaptureAttemptHandle attempt, String roleId,
+                                    @Nullable String particleSystemOverride) {
+        World world = player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        if (store == null || targetRef.getStore() != store) {
+            logCaptureChannelDiagnostic("terminal-denied reason=target-in-other-world");
+            return false;
+        }
+        TameworkCompanionComponent stamp = store.getComponent(targetRef, TameworkCompanionComponent.getComponentType());
+        UUID stampedId = stamp == null ? null : stamp.getProfileId();
+        long stampedGeneration = stampedId == null ? 0L : stamp.getGeneration();
+        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(targetRef, store, summaries);
+        SnapshotEnvelope snapshot = facts == null ? null : snapshots.capture(targetRef, store,
+                stampedId != null ? stampedId : facts.npcUuid(), stampedGeneration, world.getName(),
+                CompanionWorldTime.gameTimeMs(store));
+        if (snapshot == null) {
+            warn(player, "captureEvidenceFailed");
+            return false;
+        }
+        UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
+                resolved.isCaptureTamesTarget(), player.getUuid());
+        String ownerName = owner == null ? null
+                : owner.equals(facts.ownerUuid()) ? facts.ownerName() : OwnerNameUtil.resolve(player);
+        ItemStack item = capturedItems.build(player, targetRef, store, source, resolved, roleId, owner);
+        ItemStack expectedSource = inventory.getHotbarItem(player, attempt.hotbarSlot());
+        String particles = particleSystemOverride == null || particleSystemOverride.isBlank()
+                ? resolved.getCaptureParticleSystem() : particleSystemOverride;
+        SpawnerPublishedEffect effect = new SpawnerPublishedEffect(
+                facts.x(), facts.y(), facts.z(), particles, resolved.getCaptureSoundEvent());
+        UUID playerUuid = player.getUuid();
+        int slot = attempt.hotbarSlot();
+        try {
+            captureFlow.capture(new CaptureFlow.Capture<>(stampedId, stampedGeneration, targetRef, facts, owner,
+                            ownerName, snapshot.data()))
+                    .whenComplete((outcome, error) -> {
+                        if (error != null) {
+                            logger.at(Level.WARNING).withCause(error).log("Capture commit failed unexpectedly");
+                        }
+                        finishCapture(outcome, targetRef, stampedId, stampedGeneration,
+                                item, expectedSource, playerUuid, slot, effect);
+                    });
+        } catch (RuntimeException failure) {
+            logger.at(Level.WARNING).withCause(failure).log("Capture commit could not start");
+            warn(player, "captureUnavailable");
+            return false;
+        }
+        return true;
+    }
+
+    /** Runs on whichever thread completed the commit; hands live work to world threads. */
+    private void finishCapture(@Nullable CaptureFlow.Outcome outcome, Ref<EntityStore> body,
+                               @Nullable UUID stampedId, long stampedGeneration, ItemStack item,
+                               @Nullable ItemStack expectedSource, UUID playerUuid, int slot,
+                               SpawnerPublishedEffect effect) {
+        CaptureFlow.Result result = outcome == null ? CaptureFlow.Result.COMMIT_FAILED : outcome.result();
+        switch (result) {
+            case CAPTURED -> delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), item,
+                    playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
+                    world -> effects.playPublishedEffect(world, effect)));
+            case CONFLICT -> {
+                // A newer change replaced the commit after the body was unregistered: its stamp is stale.
+                CompanionRecord now = stampedId == null ? null : index.get(stampedId);
+                if (stampedId != null && (now == null || now.generation() > stampedGeneration)) {
+                    CompanionBodies.removeOnOwnWorld(body);
+                }
+                warnLater(playerUuid, "captureProfileConflict");
+            }
+            case NOT_CAPTURABLE -> warnLater(playerUuid, "captureProfileConflict");
+            case COMMIT_FAILED -> warnLater(playerUuid, "captureUnavailable");
+        }
+    }
+
+    /**
+     * Releases a 5.0 capture item through {@link RestoreFlow}. Ownership checks read the record,
+     * not the item. Returns true when the restore started.
+     */
+    private boolean release(
             Player player,
             ItemStack source,
             ItemFeatureConfig config,
             @Nullable Integer hotbarSlot,
             @Nullable String emptyItemIdOverride
     ) {
-        if (releaseAuthor == null || !canSpawnInteraction(source)) {
+        if (!canSpawnInteraction(source)) {
             return false;
         }
+        CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(source);
+        if (ref == null) {
+            // 2.x and 4.x items are migrated in phase 7; until then they cannot be released.
+            warn(player, "releaseInvalidContext");
+            return false;
+        }
+        CompanionRecord record = index.get(ref.profileId());
+        UUID recordOwner = record == null ? null : record.ownerUuid();
         SpawnerReleaseIntentFactory.PreparedRelease prepared =
-                releaseIntents.prepare(
-                        player,
-                        source,
-                        config,
-                        hotbarSlot,
-                        emptyItemIdOverride
-                );
+                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride, recordOwner);
         if (prepared == null) {
             return false;
         }
-        releaseAuthor.release(
-                prepared.intent(),
-                ignored -> prepared.placement()
-        );
+        RestoreFlow.Request request = RestoreFlow.Request.of(ref.profileId(), RestoreRules.Reason.RELEASE,
+                RestoreFlow.Destination.of(prepared.placement())).withGeneration(ref.generation());
+        RestoreFlow.Owner owner = releaseOwner(recordOwner, config.isSpawnAssignsOwner(), player.getUuid(),
+                OwnerNameUtil.resolve(player));
+        if (owner != null) {
+            request = request.withOwner(owner);
+        }
+        UUID playerUuid = player.getUuid();
+        restoreFlow.restore(request).whenComplete((result, error) -> {
+            if (error != null) {
+                logger.at(Level.WARNING).withCause(error).log("Release of companion %s failed unexpectedly",
+                        ref.profileId());
+            }
+            RestoreFlow.Result outcome = error != null || result == null ? RestoreFlow.Result.COMMIT_FAILED : result;
+            HytaleCaptureDelivery.onPlayerWorld(playerUuid,
+                    (world, store, actorRef, actor) -> finishRelease(outcome, world, actor, ref, prepared),
+                    null);
+        });
         return true;
+    }
+
+    /** Runs on the player's current world thread. */
+    private void finishRelease(RestoreFlow.Result result, World world, Player player, CaptureItemKeys.Ref ref,
+                               SpawnerReleaseIntentFactory.PreparedRelease prepared) {
+        switch (result) {
+            case RESTORED -> {
+                emptyHeldCapture(player, ref, prepared);
+                if (world.getName().equals(prepared.placement().worldKey())) {
+                    effects.playPublishedEffect(world, prepared.effect());
+                }
+            }
+            case STALE, NOT_ALLOWED -> {
+                // The item no longer matches its record; it becomes an empty capture item and
+                // never changes who owns the companion.
+                emptyHeldCapture(player, ref, prepared);
+                warn(player, "releaseProfileConflict");
+            }
+            case NOT_FOUND -> warn(player, "releaseProfileConflict");
+            case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
+            case OWNED_LIMIT -> messages.showKey(player, NotificationStyle.Warning, "tamework.ui.population.ownedLimit");
+            case GROUP_LIMIT -> messages.showKey(player, NotificationStyle.Warning, "tamework.ui.population.groupLimit");
+            default -> warn(player, "releaseFailed");
+        }
+    }
+
+    /** Compare-then-replace: only a slot still holding this profile at this generation is emptied. */
+    private void emptyHeldCapture(Player player, CaptureItemKeys.Ref ref,
+                                  SpawnerReleaseIntentFactory.PreparedRelease prepared) {
+        ItemStack current = inventory.getHotbarItem(player, prepared.slot());
+        if (ref.equals(CaptureItemKeys.readIndexItem(current))) {
+            inventory.updateHotbarSlot(player, prepared.slot(), prepared.receipt());
+        }
+    }
+
+    /**
+     * The record owner after a capture: none when {@code ClearsOwner}, otherwise the body's owner;
+     * an unowned body captured by an item that tames it gets the capturing player.
+     */
+    @Nullable
+    static UUID captureOwner(@Nullable UUID bodyOwner, boolean clearsOwner, boolean tamesTarget,
+                             @Nonnull UUID capturingPlayer) {
+        if (clearsOwner) {
+            return null;
+        }
+        if (bodyOwner == null && tamesTarget) {
+            return capturingPlayer;
+        }
+        return bodyOwner;
+    }
+
+    /**
+     * The owner a release asks for. An owned record keeps its owner (null: no change). An unowned
+     * one goes to the releaser when the item assigns owners, otherwise it comes back unowned.
+     */
+    @Nullable
+    static RestoreFlow.Owner releaseOwner(@Nullable UUID recordOwner, boolean assignsOwner,
+                                          @Nonnull UUID releaser, @Nullable String releaserName) {
+        if (recordOwner != null) {
+            return null;
+        }
+        return assignsOwner ? new RestoreFlow.Owner(releaser, releaserName) : new RestoreFlow.Owner(null, null);
     }
 
     @Nullable
     private ItemFeatureConfig resolveConfigForItem(ItemStack source) {
-        if (registry == null || source == null
-                || source.getItemId() == null) {
+        if (source == null || source.getItemId() == null) {
             return null;
         }
         ItemFeatureConfig direct = registry.get(source.getItemId());
         if (direct != null) {
             return direct;
         }
-        String emptyItemId = itemMetadata.resolveEmptyItemId(
-                source.getItemId()
-        );
+        String emptyItemId = itemMetadata.resolveEmptyItemId(source.getItemId());
         return emptyItemId == null ? null : registry.get(emptyItemId);
     }
 
-    private ItemFeatureConfig buildSpawnerConfigForInteraction(
-            ItemFeatureConfig baseConfig,
-            Boolean spawnAssignsOwnerOverride
-    ) {
-        return SpawnerInteractionConfigResolver.resolve(
-                baseConfig, spawnAssignsOwnerOverride
-        );
-    }
-
-    private boolean sourceMatches(
-            Player player,
-            CaptureAttemptHandle attempt
-    ) {
-        ItemStack current = inventory.getHotbarItem(
-                player, attempt.hotbarSlot()
-        );
-        return current != null && !current.isEmpty()
-                && attempt.sourceFingerprint().equals(
-                        SpawnerSourceFingerprint.of(current)
-                );
-    }
-
     @Nullable
-    private String currentSourceFingerprint(
-            @Nullable Player player,
-            @Nonnull CaptureAttemptHandle attempt
+    private static ItemFeatureConfig buildSpawnerConfigForInteraction(
+            @Nullable ItemFeatureConfig baseConfig,
+            @Nullable Boolean spawnAssignsOwnerOverride
     ) {
-        if (player == null) return null;
+        return SpawnerInteractionConfigResolver.resolve(baseConfig, spawnAssignsOwnerOverride);
+    }
+
+    private boolean sourceMatches(Player player, CaptureAttemptHandle attempt) {
         ItemStack current = inventory.getHotbarItem(player, attempt.hotbarSlot());
-        return current == null || current.isEmpty()
-                ? null
-                : SpawnerSourceFingerprint.of(current);
+        return current != null && !current.isEmpty()
+                && attempt.sourceFingerprint().equals(SpawnerSourceFingerprint.of(current));
+    }
+
+    /** Shows a spawner warning now. Call on the player's world thread. */
+    private void warn(Player player, String key) {
+        messages.showKey(player, NotificationStyle.Warning, SPAWNER_KEYS + key);
+    }
+
+    /** Shows a spawner warning from any thread, on the player's current world. */
+    private void warnLater(UUID playerUuid, String key) {
+        HytaleCaptureDelivery.onPlayerWorld(playerUuid, (world, store, ref, player) -> warn(player, key), null);
     }
 
     public void logCaptureChannelDiagnostic(String message) {
         Tamework plugin = Tamework.getInstance();
-        log(plugin != null && plugin.isDebugSpawnerEnabled() ? Level.INFO : Level.FINE,
-                "Spawner capture channel: " + message);
-    }
-
-    private void log(Level level, String message) {
-        if (logger != null) {
-            logger.at(level).log(message);
-        }
-    }
-
-    private void logSpawnerFlowDebug(String message) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.isDebugSpawnerEnabled()) {
-            log(Level.INFO, "Spawner flow debug: " + message);
-        }
-    }
-
-    @Nullable
-    static UUID resolveCapturedOwnerMetadata(
-            @Nullable UUID existingOwner,
-            boolean captureClearsOwner
-    ) {
-        return captureClearsOwner ? null : existingOwner;
-    }
-
-    private enum NoCaptureRequirements
-            implements CaptureRequirementRuntime {
-        INSTANCE;
-
-        @Override
-        public long captureRequirementGeneration() {
-            return 0L;
-        }
-
-        @Override
-        public CaptureRequirementDecision evaluateCaptureRequirement(
-                CaptureRequirementSpec spec,
-                CaptureRequirementContext context,
-                long expectedGeneration
-        ) {
-            return CaptureRequirementDecision.deny(
-                    "capture-requirement-runtime-unavailable"
-            );
-        }
+        logger.at(plugin != null && plugin.isDebugSpawnerEnabled() ? Level.INFO : Level.FINE)
+                .log("Spawner capture channel: " + message);
     }
 }

@@ -229,11 +229,19 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
 import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
+import com.alechilles.alecstamework.companion.flow.CaptureFlow;
+import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.CompanionOwnerDeathSystem;
+import com.alechilles.alecstamework.companion.flow.HytaleStoreCapture;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
+import com.alechilles.alecstamework.companion.flow.StoreFlow;
+import com.alechilles.alecstamework.companion.flow.SummonExpiryScheduler;
 import com.alechilles.alecstamework.items.CompanionRestoreRecallSink;
 import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
@@ -289,6 +297,8 @@ public class Tamework extends JavaPlugin {
     private TameworkApi api;
     private CompanionPersistenceModule companionModule;
     private ReleaseFlow companionReleaseFlow;
+    /** Roster summon and store; null until the companion module is ready. */
+    private RosterSummons companionRosterSummons;
     private CompanionStartupAdmission companionStartupAdmission;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
@@ -659,9 +669,11 @@ public class Tamework extends JavaPlugin {
             companionQueries = companionModule.queries();
             CompanionAdmissionGate admissionGate =
                     new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot);
+            OwnerPopulationCapService.useAdmissionGate(admissionGate);
             restoreFlow = createRestoreFlow(companionModule, admissionGate);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
             registerCompanionPersistenceRuntime(admissionGate);
+            companionRosterSummons = startRosterSummons(companionModule, restoreFlow);
         } else if (companionModule != null) {
             registerCompanionPersistenceNotice(companionModule.state());
         }
@@ -740,8 +752,18 @@ public class Tamework extends JavaPlugin {
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
         NameplateBuilderBridgeLoader.initialize(this);
 
-        // SpawnerFeatureHandler (capture and spawn) is not built until capture moves to the
-        // companion index; capture and spawner interactions fail before changing anything.
+        // Capture into an item and release from one (spec 8.2, 8.3). Without a ready companion
+        // index it is not built, and capture and spawner interactions fail before changing anything.
+        if (restoreFlow != null) {
+            CompanionPersistenceModule module = companionModule;
+            spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, translationRegistry,
+                    capturePolicyRegistry, interactionExtensionRegistry, module.index(),
+                    new CaptureFlow<>(module.index(), module.loaded(),
+                            (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
+                            module.writer()::flushNow),
+                    restoreFlow, new HytaleCaptureDelivery(module.index(), System::currentTimeMillis),
+                    CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()));
+        }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
@@ -1383,6 +1405,60 @@ public class Tamework extends JavaPlugin {
                 System::currentTimeMillis, admissionGate::refuse);
     }
 
+    /**
+     * Builds the store used by the panel's dismiss, summon expiry and owner logout or death. A
+     * loaded body is captured on its world thread; otherwise the stored snapshot stands.
+     */
+    private static StoreFlow<Ref<EntityStore>> createStoreFlow(CompanionPersistenceModule module) {
+        return new StoreFlow<>(module.index(), module.loaded(),
+                new HytaleStoreCapture(CompanionSnapshots.production(),
+                        new CompanionSummaries(new HytaleSummarySources())),
+                module::readSnapshot, (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
+                module.writer()::flushNow, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
+                System::currentTimeMillis);
+    }
+
+    /**
+     * Builds roster summon and store and starts timed-summon expiry on the module's timer thread,
+     * which the module stops before its final flush. Timed summons are also stored when their
+     * owner logs out or dies (spec 8.4). The expiry listener is added and filled in one index
+     * step, so no change is missed between them.
+     */
+    private RosterSummons startRosterSummons(CompanionPersistenceModule module,
+                                             RestoreFlow<Ref<EntityStore>> restoreFlow) {
+        StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(module);
+        RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
+                restoreFlow::restore, storeFlow::store, RosterSummons.Policy::forRole, System::currentTimeMillis);
+        if (!runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return summons;
+        }
+        SummonExpiryScheduler expiry = new SummonExpiryScheduler(summons::storeExpired);
+        module.index().atomically(() -> {
+            module.addChangeListener(expiry::onChange);
+            expiry.rebuild(module.index());
+            return null;
+        });
+        expiry.start(module.timers(), System::currentTimeMillis);
+        deferGlobalListener(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "companion-timed-summon-logout",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            PlayerRef player = event == null ? null : event.getPlayerRef();
+                            if (player != null && player.getUuid() != null) {
+                                summons.storeTimedSummons(player.getUuid(), true);
+                            }
+                        },
+                        "companion timed summon logout auto-store"
+                )
+        );
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companion-timed-summon-owner-death",
+                () -> new CompanionOwnerDeathSystem(owner -> summons.storeTimedSummons(owner, false)));
+        return summons;
+    }
+
     /** Registers the companion index systems, world-removal listener and final flush. */
     private void registerCompanionPersistenceRuntime(CompanionAdmissionGate admissionGate) {
         CompanionPersistenceModule module = companionModule;
@@ -1508,7 +1584,9 @@ public class Tamework extends JavaPlugin {
             }
             companionModule = null;
         }
+        OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;
+        companionRosterSummons = null;
         companionStartupAdmission = null;
         if (diagnosticRuntime != null) {
             diagnosticRuntime.close();

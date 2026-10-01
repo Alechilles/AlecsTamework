@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -14,31 +14,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SpawnerFeatureHandlerTest {
 
     @Test
-    void interactionSpawnAssignsOwnerOverrideWinsOverGlobalDefault() throws Exception {
+    void interactionSpawnAssignsOwnerOverrideWinsOverGlobalDefault() {
         ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
                 .spawnerEnabled(true)
                 .spawnAssignsOwner(true)
                 .build();
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, false);
+        ItemFeatureConfig resolved = SpawnerInteractionConfigResolver.resolve(baseConfig, false);
 
         assertFalse(resolved.isSpawnAssignsOwner());
     }
 
     @Test
-    void missingInteractionSpawnAssignsOwnerOverrideUsesRuntimeDefault() throws Exception {
+    void missingInteractionSpawnAssignsOwnerOverrideUsesRuntimeDefault() {
         ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
                 .spawnerEnabled(true)
                 .spawnAssignsOwner(false)
                 .build();
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
+        ItemFeatureConfig resolved = SpawnerInteractionConfigResolver.resolve(baseConfig, null);
 
         assertTrue(resolved.isSpawnAssignsOwner());
     }
 
     @Test
-    void interactionResolverPreservesWildCaptureContract() throws Exception {
+    void interactionResolverPreservesWildCaptureContract() {
         ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
                 .spawnerEnabled(true)
                 .captureRequireTamed(false)
@@ -49,7 +49,7 @@ class SpawnerFeatureHandlerTest {
                 .captureTamedRoleOverrides(Map.of("Wild", "Tamed"))
                 .build();
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
+        ItemFeatureConfig resolved = SpawnerInteractionConfigResolver.resolve(baseConfig, null);
 
         assertTrue(resolved.isCaptureTamesTarget());
         assertEquals(20.0d, resolved.getCaptureMaxHealthPercent());
@@ -59,62 +59,43 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void wildCaptureDoesNotInventAnOwnerWhenPreservingOwnership() {
-        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(null, false));
+    void captureOwnerFollowsClearsOwnerThenTheBodyThenTamesTarget() {
+        UUID bodyOwner = UUID.randomUUID();
+        UUID player = UUID.randomUUID();
+
+        assertNull(SpawnerFeatureHandler.captureOwner(bodyOwner, true, true, player));
+        assertNull(SpawnerFeatureHandler.captureOwner(null, true, true, player));
+        assertEquals(bodyOwner, SpawnerFeatureHandler.captureOwner(bodyOwner, false, true, player));
+        assertEquals(player, SpawnerFeatureHandler.captureOwner(null, false, true, player));
+        assertNull(SpawnerFeatureHandler.captureOwner(null, false, false, player));
     }
 
     @Test
-    void captureOwnerMetadataPreservesOrClearsTheExistingOwnerExactly() {
-        UUID owner = UUID.randomUUID();
+    void releaseOfAnUnownedCompanionAssignsTheReleaserOrStaysUnowned() {
+        UUID releaser = UUID.randomUUID();
 
-        assertEquals(owner, SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, false));
-        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, true));
+        assertEquals(new RestoreFlow.Owner(releaser, "Releaser"),
+                SpawnerFeatureHandler.releaseOwner(null, true, releaser, "Releaser"));
+        assertEquals(new RestoreFlow.Owner(null, null),
+                SpawnerFeatureHandler.releaseOwner(null, false, releaser, "Releaser"));
     }
 
     @Test
     void captureClearAndSpawnAssignmentMatrixProducesTheExactOwnerTransition() {
         UUID currentOwner = UUID.randomUUID();
-        UUID spawningPlayer = UUID.randomUUID();
+        UUID player = UUID.randomUUID();
 
-        for (boolean captureClearsOwner : new boolean[]{false, true}) {
-            for (boolean spawnAssignsOwner : new boolean[]{false, true}) {
-                ItemFeatureConfig config = ItemFeatureConfig.builder()
-                        .spawnerEnabled(true)
-                        .captureClearsOwner(captureClearsOwner)
-                        .spawnAssignsOwner(spawnAssignsOwner)
-                        .build();
-                UUID itemOwner = SpawnerFeatureHandler.resolveCapturedOwnerMetadata(
-                        currentOwner, captureClearsOwner
-                );
-                UUID resolvedOwner = SpawnerOwnershipPolicyService.resolveSpawnOwner(
-                        itemOwner, spawningPlayer, config
-                );
-                UUID expectedOwner = captureClearsOwner
-                        ? (spawnAssignsOwner ? spawningPlayer : null)
-                        : currentOwner;
+        for (boolean clearsOwner : new boolean[]{false, true}) {
+            for (boolean assignsOwner : new boolean[]{false, true}) {
+                UUID recordOwner = SpawnerFeatureHandler.captureOwner(currentOwner, clearsOwner, false, player);
+                RestoreFlow.Owner requested =
+                        SpawnerFeatureHandler.releaseOwner(recordOwner, assignsOwner, player, "Player");
+                UUID releasedOwner = requested == null ? recordOwner : requested.uuid();
+                UUID expected = clearsOwner ? (assignsOwner ? player : null) : currentOwner;
 
-                assertEquals(
-                        expectedOwner,
-                        resolvedOwner,
-                        "captureClearsOwner=" + captureClearsOwner
-                                + ", spawnAssignsOwner=" + spawnAssignsOwner
-                );
+                assertEquals(expected, releasedOwner,
+                        "clearsOwner=" + clearsOwner + ", assignsOwner=" + assignsOwner);
             }
         }
-    }
-
-    private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
-                                                                      Boolean spawnAssignsOwnerOverride)
-            throws Exception {
-        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(
-                null, null, null
-        );
-        Method method = SpawnerFeatureHandler.class.getDeclaredMethod(
-                "buildSpawnerConfigForInteraction",
-                ItemFeatureConfig.class,
-                Boolean.class
-        );
-        method.setAccessible(true);
-        return (ItemFeatureConfig) method.invoke(handler, baseConfig, spawnAssignsOwnerOverride);
     }
 }
