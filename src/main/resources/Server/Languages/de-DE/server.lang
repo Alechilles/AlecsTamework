@@ -1226,6 +1226,7 @@ tamework.ui.population.familyLocked=Deine Tierhaltungsstufe ist zu niedrig, um d
 tamework.ui.population.familyUnknown=Diese Begleiterfamilie ist nicht für Tierhaltung konfiguriert.
 tamework.ui.population.providerUnavailable=Anforderungen für Tierhaltung sind vorübergehend nicht verfügbar. Versuche es gleich erneut.
 tamework.ui.notifications.spawner.captureFailed=Das Fangen konnte nicht abgeschlossen werden.
+tamework.ui.notifications.spawner.commandItemRequired=Du brauchst {0} in deinem Inventar, um mit diesem Gegenstand einzufangen.
 tamework.ui.notifications.spawner.releaseFailed=Das Freilassen des Begleiters konnte nicht abgeschlossen werden.
 tamework.ui.notifications.spawner.releaseInvalidContext=Dieses Fangobjekt enthält keinen gültigen Begleiter.
 tamework.ui.notifications.spawner.captureInvalidContext=Es war kein gültiger Begleiter zum Fangen verfügbar.

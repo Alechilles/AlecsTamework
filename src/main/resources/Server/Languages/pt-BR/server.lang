@@ -1226,6 +1226,7 @@ tamework.ui.population.familyLocked=Seu nível de Criação é baixo demais para
 tamework.ui.population.familyUnknown=Esta família de companheiros não está configurada para Criação.
 tamework.ui.population.providerUnavailable=Os requisitos de Criação estão temporariamente indisponíveis. Tente novamente em breve.
 tamework.ui.notifications.spawner.captureFailed=Não foi possível concluir a captura.
+tamework.ui.notifications.spawner.commandItemRequired=Você precisa de {0} no inventário para capturar com este item.
 tamework.ui.notifications.spawner.releaseFailed=Não foi possível concluir a liberação do companheiro.
 tamework.ui.notifications.spawner.releaseInvalidContext=Este item de captura não contém um companheiro válido.
 tamework.ui.notifications.spawner.captureInvalidContext=Nenhum companheiro válido estava disponível para captura.

@@ -181,6 +181,33 @@ class CommandOwnedPanelRecordSourceTest {
         for (var record : visible) assertTrue(source.profileForRow(owner, record.npcUuid).isEmpty());
     }
 
+    /** A command-family roster member's actions belong to its family item; a generic item shows it read-only. */
+    @Test
+    void indexRosterMembersAreReadOnlyOnGenericItems() {
+        UUID owner = UUID.randomUUID();
+        var index = new com.alechilles.alecstamework.companion.index.CompanionIndex(
+                System::currentTimeMillis, (before, after) -> { });
+        var member = indexRecord(owner, "dragons", false);
+        var bonded = indexRecord(owner, "dragons", true);
+        var ordinary = indexRecord(owner, null, false);
+        for (var record : java.util.List.of(member, bonded, ordinary)) assertTrue(index.insert(record).applied());
+        var source = new CommandOwnedPanelRecordSource(new com.alechilles.alecstamework.companion.runtime
+                .CompanionQueries(index, new com.alechilles.alecstamework.companion.live.LoadedBodies<>()));
+
+        var features = source.managedFeatures(owner, java.util.List.of());
+
+        assertTrue(features.get(member.currentNpcUuid()).managesRosterRow());
+        assertFalse(features.containsKey(bonded.currentNpcUuid()));
+        assertFalse(features.containsKey(ordinary.currentNpcUuid()));
+    }
+
+    private static com.alechilles.alecstamework.companion.index.CompanionRecord indexRecord(
+            UUID owner, String rosterId, boolean bonded) {
+        return com.alechilles.alecstamework.companion.index.CompanionRecord.builder(UUID.randomUUID(), "Cow",
+                        com.alechilles.alecstamework.companion.index.CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(owner).currentNpcUuid(UUID.randomUUID()).rosterId(rosterId).bonded(bonded).build();
+    }
+
     private static CompanionProfileProjectionState profile(UUID owner, LifecycleState state,
             UUID alias, Set<UUID> links) {
         return new CompanionProfileProjectionState(new ProfileId(UUID.randomUUID()),

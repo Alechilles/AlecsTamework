@@ -1080,6 +1080,7 @@ tamework.ui.notifications.spawner.adoptionFailed=No se pudo añadir el compañer
 tamework.ui.notifications.spawner.adoptionRejected=Este compañero no se puede añadir a la propiedad administrada.
 tamework.ui.notifications.spawner.captureEvidenceFailed=No se pudo verificar el estado del compañero para la captura.
 tamework.ui.notifications.spawner.captureFailed=No se pudo completar la captura.
+tamework.ui.notifications.spawner.commandItemRequired=Necesitas {0} en tu inventario para capturar con este objeto.
 tamework.ui.notifications.spawner.captureInvalidContext=No había ningún compañero válido disponible para capturar.
 tamework.ui.notifications.spawner.captureProfileConflict=El registro del compañero cambió antes de que se completara la captura.
 tamework.ui.notifications.spawner.captureUnavailable=La captura no está disponible temporalmente. Vuelve a intentarlo en breve.

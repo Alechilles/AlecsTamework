@@ -337,7 +337,7 @@ final class CommandPanelFeaturePresentationSource {
                 for (CompanionRecord record : owned) {
                     if (record.isDeployed() && record.countsAsOwned()
                             && (!perWorld || world.equals(CompanionAdmission.scopeWorld(record)))
-                            && inGroup(rules, record, group.groupId())) {
+                            && CompanionAdmission.inGroup(rules, record, group.groupId())) {
                         active++;
                     }
                 }
@@ -360,15 +360,6 @@ final class CommandPanelFeaturePresentationSource {
                         ? "active-cap-reached"
                         : null
         );
-    }
-
-    private static boolean inGroup(CompanionAdmission.Rules rules, CompanionRecord record, String groupId) {
-        for (PopulationGroupPolicy policy : rules.groupsForRole().apply(record.roleId())) {
-            if (policy.groupId().equals(groupId)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static long remaining(long untilMs, long nowMs) {

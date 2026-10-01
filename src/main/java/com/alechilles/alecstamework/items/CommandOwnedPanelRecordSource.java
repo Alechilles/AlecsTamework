@@ -20,7 +20,8 @@ import java.util.function.Supplier;
 final class CommandOwnedPanelRecordSource {
     /** Candidate profiles for one owner; a null owner asks for the unowned captured profiles. */
     private final Function<UUID, Collection<ProfileSnapshot>> profiles;
-    private final Supplier<java.util.Set<ProfileId>> managedProfiles;
+    /** Profiles an owner's generic items show read-only, because another authority manages them. */
+    private final Function<UUID, java.util.Set<ProfileId>> managedProfiles;
 
     CommandOwnedPanelRecordSource(
             Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles) {
@@ -31,17 +32,22 @@ final class CommandOwnedPanelRecordSource {
             Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles,
             Supplier<java.util.Set<ProfileId>> managedProfiles) {
         this.profiles = ignoredOwner -> profiles.get().values().stream().map(ProfileSnapshot::from).toList();
-        this.managedProfiles = managedProfiles;
+        this.managedProfiles = ignoredOwner -> managedProfiles.get();
     }
 
     /**
      * Owned rows from the companion index. The index lists records by owner only, so unowned
-     * captured rows and roster-managed features are absent from this source.
+     * captured rows are absent from this source. Command-family roster members (a roster id, not
+     * bonded) are read-only here: their family item's panel owns their actions.
      */
     CommandOwnedPanelRecordSource(CompanionQueries companions) {
         this.profiles = owner -> owner == null ? List.of()
                 : companions.owned(owner).stream().map(CommandPersistenceView::from).toList();
-        this.managedProfiles = java.util.Set::of;
+        this.managedProfiles = owner -> owner == null ? java.util.Set.of()
+                : companions.owned(owner).stream()
+                        .filter(record -> record.rosterId() != null && !record.bonded())
+                        .map(record -> new ProfileId(record.profileId()))
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /** One refresh owns this immutable display snapshot; action handlers still read current authority. */
@@ -51,7 +57,7 @@ final class CommandOwnedPanelRecordSource {
 
     Snapshot snapshot(UUID ownerUuid, List<LinkedNpcRecord> linkedRecords,
                       java.util.Set<String> carriedProfiles) {
-        var managed = managedProfiles.get();
+        var managed = managedProfiles.apply(ownerUuid);
         var linkedByProfile = new HashMap<String, LinkedNpcRecord>();
         var linkedByAlias = new HashMap<UUID, LinkedNpcRecord>();
         var firstByProfile = new HashMap<String, IndexedRecord>();

@@ -88,12 +88,23 @@ public final class RosterSummons {
     @Nonnull
     public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId,
                                                         @Nonnull RestoreFlow.Destination destination) {
+        return summon(profileId, -1L, destination);
+    }
+
+    /**
+     * As {@link #summon(UUID, RestoreFlow.Destination)}, bound to the record generation the caller
+     * checked: a record changed since then ends STALE. {@code expectedGeneration} -1 accepts any.
+     */
+    @Nonnull
+    public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId, long expectedGeneration,
+                                                        @Nonnull RestoreFlow.Destination destination) {
         CompanionRecord current = record.apply(profileId);
         if (current == null) {
             return CompletableFuture.completedFuture(RestoreFlow.Result.NOT_FOUND);
         }
         long durationMs = policy(current).durationMs();
-        RestoreFlow.Request request = RestoreFlow.Request.of(profileId, RestoreRules.Reason.SUMMON, destination);
+        RestoreFlow.Request request = RestoreFlow.Request.of(profileId, RestoreRules.Reason.SUMMON, destination)
+                .withGeneration(expectedGeneration);
         if (durationMs > 0L) {
             request = request.withSummonedUntil(saturatedAdd(clock.getAsLong(), durationMs));
         }

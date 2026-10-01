@@ -98,7 +98,8 @@ public final class CompanionAdmission {
         return r -> scopeWorld(r).equals(world);
     }
 
-    private static boolean inGroup(Rules rules, CompanionRecord record, String groupId) {
+    /** True when {@code record}'s role belongs to population group {@code groupId}. */
+    public static boolean inGroup(@Nonnull Rules rules, @Nonnull CompanionRecord record, @Nonnull String groupId) {
         for (PopulationGroupPolicy policy : rules.groupsForRole().apply(record.roleId())) {
             if (policy.groupId().equals(groupId)) {
                 return true;

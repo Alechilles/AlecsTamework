@@ -232,6 +232,7 @@ import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.item.AdmissionCache;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
 import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
@@ -297,6 +298,8 @@ public class Tamework extends JavaPlugin {
     /** Null until the public API moves to the companion index; {@link #getApi()} callers handle null. */
     private TameworkApi api;
     private CompanionPersistenceModule companionModule;
+    @Nullable
+    private volatile AdmissionCache captureAdmissionCache;
     private ReleaseFlow companionReleaseFlow;
     /** Roster summon and store; null unless the companion module is ready and generic persistence is active. */
     private RosterSummons companionRosterSummons;
@@ -678,7 +681,7 @@ public class Tamework extends JavaPlugin {
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
             restoreFlow = createRestoreFlow(companionModule, admissionGate);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
-            registerCompanionPersistenceRuntime(admissionGate);
+            registerCompanionPersistenceRuntime(admissionGate, restoreFlow);
             companionRosterSummons = startRosterSummons(companionModule, restoreFlow);
         } else if (companionModule != null) {
             registerCompanionPersistenceNotice(companionModule.state());
@@ -769,7 +772,7 @@ public class Tamework extends JavaPlugin {
                             module.writer()::flushNow, admissionGate::refuse),
                     restoreFlow, new HytaleCaptureDelivery(module.index()),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
-                    admissionGate);
+                    admissionGate, commandItemRegistry);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -782,8 +785,6 @@ public class Tamework extends JavaPlugin {
                 restoreFlow,
                 null,
                 null,
-                null,
-                null,
                 companionProgressionSignalBus,
                 companionQueries,
                 releaseFlow,
@@ -794,8 +795,7 @@ public class Tamework extends JavaPlugin {
         commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
         // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
         CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null
-                : new CaptureItemHolderSystems.Transfers(companionModule.index(), companionModule.writer(),
-                        admissionGate, itemFeatureRegistry);
+                : createCaptureItemTransfers(admissionGate);
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
             var tracker = commandItemFeatureHandler.capturedItemTracker();
             tracker.start(runtimeDataDirectory.resolve("cache/captured-item-locations.json"));
@@ -1432,6 +1432,19 @@ public class Tamework extends JavaPlugin {
     }
 
     /**
+     * Capture item ownership follows the holder, and ineligible players cannot pick the item up
+     * (spec 8.14). The pickup filters read cached admission decisions: a player's are dropped when
+     * their counts change (index listener) and all on config reload.
+     */
+    private CaptureItemHolderSystems.Transfers createCaptureItemTransfers(CompanionAdmissionGate admissionGate) {
+        AdmissionCache admissionCache = new AdmissionCache(System::currentTimeMillis);
+        companionModule.addChangeListener(admissionCache::onRecordChanged);
+        captureAdmissionCache = admissionCache;
+        return new CaptureItemHolderSystems.Transfers(companionModule.index(), companionModule.writer(),
+                admissionGate, itemFeatureRegistry, admissionCache);
+    }
+
+    /**
      * Builds roster summon and store and starts timed-summon expiry on the module's timer thread,
      * which the module stops before its final flush. Timed summons are also stored when their
      * owner logs out or dies (spec 8.4). The expiry listener is added and filled in one index
@@ -1475,7 +1488,8 @@ public class Tamework extends JavaPlugin {
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */
-    private void registerCompanionPersistenceRuntime(CompanionAdmissionGate admissionGate) {
+    private void registerCompanionPersistenceRuntime(CompanionAdmissionGate admissionGate,
+                                                     RestoreFlow<Ref<EntityStore>> restoreFlow) {
         CompanionPersistenceModule module = companionModule;
         CompanionBodyLifecycle lifecycle = new CompanionBodyLifecycle(
                 module.index(), module.writer(), module.loaded(),
@@ -1492,9 +1506,16 @@ public class Tamework extends JavaPlugin {
                         (profileId, snapshot) -> module.writer().queueSnapshot(snapshot), module.writer()::flushNow,
                         CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()));
         com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
+        com.alechilles.alecstamework.companion.coop.HytaleCoopResidents coopResidents =
+                new com.alechilles.alecstamework.companion.coop.HytaleCoopResidents(module.index(), restoreFlow,
+                        new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
+                                module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete));
         deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopschedulesystem",
-                () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake,
+                () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake, coopResidents,
                         coopCaptureReceiptsComponentType));
+        deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopbreaksystem",
+                () -> new com.alechilles.alecstamework.companion.coop.CoopBreakSystem(coopResidents,
+                        com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.getComponentType()));
         companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
                 TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
                 ownerComponentType, tamedComponentType);
@@ -2977,6 +2998,11 @@ public class Tamework extends JavaPlugin {
     }
 
     private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
+        AdmissionCache admissionCache = captureAdmissionCache;
+        if (admissionCache != null) {
+            // Every config reload, so a changed limit or population group applies to pickup filters at once.
+            admissionCache.clear();
+        }
         if (apiEventBus == null || changedIds == null) {
             return;
         }

@@ -100,9 +100,10 @@ final class CommandPanelFeatureActionService {
             return;
         }
         UUID profileId = context.member().record().profileId();
+        long generation = context.member().record().generation();
         CompletableFuture<RestoreFlow.Result> started;
         try {
-            started = flow.summon(profileId, RestoreFlow.Destination.of(placement));
+            started = flow.summon(profileId, generation, RestoreFlow.Destination.of(placement));
         } catch (RuntimeException failure) {
             started = CompletableFuture.failedFuture(failure);
         }
@@ -142,17 +143,21 @@ final class CommandPanelFeatureActionService {
             if (failure != null) {
                 LOGGER.at(Level.WARNING).withCause(failure).log("Panel dismiss of companion %s failed", profileId);
             }
-            if (failure != null || result != StoreFlow.Result.STORED) {
+            // CONFLICT: another store of this companion won (a double click); nothing to report.
+            if (failure != null || result != StoreFlow.Result.STORED && result != StoreFlow.Result.CONFLICT) {
                 warnLater(context, ROSTER_KEYS + "dismissFailed");
             }
         });
     }
 
-    /** The warning for a summon outcome; null when it succeeded. */
+    /**
+     * The warning for a summon outcome; null when it succeeded or lost to a concurrent summon of the
+     * same companion (CONFLICT, for example a double click).
+     */
     @Nullable
     static String summonFailureKey(@Nonnull RestoreFlow.Result result) {
         return switch (result) {
-            case RESTORED -> null;
+            case RESTORED, CONFLICT -> null;
             case COOLDOWN -> "tamework.ui.notifications.command.shared.cooldown";
             case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";

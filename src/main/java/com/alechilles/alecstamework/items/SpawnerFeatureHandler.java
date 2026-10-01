@@ -25,8 +25,10 @@ import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
@@ -46,6 +48,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -102,6 +105,7 @@ public final class SpawnerFeatureHandler {
     private final CompanionSnapshots snapshots;
     private final CompanionSummaries summaries;
     private final CompanionAdmissionGate admissionGate;
+    private final CommandItemRegistry commandItems;
     /** Profiles (or unstamped NPC UUIDs) with a capture commit in flight. */
     private final Set<UUID> capturing = ConcurrentHashMap.newKeySet();
     /** Profiles with a release in flight. */
@@ -120,7 +124,8 @@ public final class SpawnerFeatureHandler {
             @Nonnull HytaleCaptureDelivery delivery,
             @Nonnull CompanionSnapshots snapshots,
             @Nonnull CompanionSummaries summaries,
-            @Nonnull CompanionAdmissionGate admissionGate
+            @Nonnull CompanionAdmissionGate admissionGate,
+            @Nonnull CommandItemRegistry commandItems
     ) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.registry = Objects.requireNonNull(registry, "registry");
@@ -132,6 +137,7 @@ public final class SpawnerFeatureHandler {
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.summaries = Objects.requireNonNull(summaries, "summaries");
         this.admissionGate = Objects.requireNonNull(admissionGate, "admissionGate");
+        this.commandItems = Objects.requireNonNull(commandItems, "commandItems");
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata = new SpawnerCaptureMetadataService(logger, registry);
@@ -327,6 +333,10 @@ public final class SpawnerFeatureHandler {
                     + " item=" + (source == null ? null : source.getItemId()));
             return false;
         }
+        PreRoll prepared = preRoll(player, targetRef, source, resolved);
+        if (prepared == null) {
+            return false;
+        }
         SpawnerCaptureRollService.Resolution roll = captureRolls.evaluate(
                 player, targetRef, source, resolved, attempt);
         if (roll == null || roll.evaluation().outcome() == SpawnerCaptureChanceService.Outcome.DENIED) {
@@ -338,7 +348,8 @@ public final class SpawnerFeatureHandler {
             return failedRoll(player, targetRef, source, resolved, attempt, roll.terminal());
         }
         if (resolved.getCaptureMechanics().successDisposition() == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
-            return tameAndLink(player, targetRef, resolved, attempt, roll.roleId(), captureParticleSystemOverride);
+            return tameAndLink(player, targetRef, resolved, attempt, prepared.targetRole(),
+                    captureParticleSystemOverride);
         }
         return captureIntoItem(player, targetRef, source, resolved, attempt, roll.roleId(),
                 captureParticleSystemOverride);
@@ -374,6 +385,144 @@ public final class SpawnerFeatureHandler {
         return null;
     }
 
+    /** What {@link #preRoll} resolved: the tamed role of a tame-and-link capture, else null. */
+    private record PreRoll(@Nullable String targetRole) {
+    }
+
+    /**
+     * Checks that must pass before the roll, since a failed roll may spend the source: the caps for
+     * a capture that gives the companion a new owner, and for a tame-and-link capture the target
+     * body, the tamed role, the command item gates and the caps. Returns null when refused; the
+     * player is told why. World thread.
+     */
+    @Nullable
+    private PreRoll preRoll(Player player, Ref<EntityStore> targetRef, ItemStack source,
+                            ItemFeatureConfig resolved) {
+        World world = player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        if (store == null || targetRef.getStore() != store) {
+            logCaptureChannelDiagnostic("terminal-denied reason=target-in-other-world");
+            return null;
+        }
+        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(targetRef, store, summaries);
+        if (facts == null) {
+            warn(player, "captureEvidenceFailed");
+            return null;
+        }
+        String sourceRole = roles.resolveRoleIdFromNpc(store.getComponent(targetRef, NPCEntity.getComponentType()));
+        ItemFeatureConfig.CaptureItemMechanics mechanics = resolved.getCaptureMechanics();
+        if (mechanics.successDisposition() != CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
+                    resolved.isCaptureTamesTarget(), player.getUuid());
+            if (owner != null && facts.ownerUuid() == null && refusedByCaps(player, owner,
+                    sourceRole == null ? facts.roleId() : sourceRole, world.getName(), false)) {
+                return null;
+            }
+            return new PreRoll(null);
+        }
+        if (facts.ownerUuid() != null
+                || store.getComponent(targetRef, TameworkCompanionComponent.getComponentType()) != null) {
+            warn(player, "captureProfileConflict");
+            return null;
+        }
+        String tamedRole = sourceRole == null ? null : resolved.resolveCaptureTamedRole(sourceRole);
+        String targetRole = tamedRole == null ? sourceRole : tamedRole;
+        NPCPlugin plugin = NPCPlugin.get();
+        if (targetRole == null || plugin == null || plugin.getIndex(targetRole) < 0) {
+            refuseMisconfigured(player, source, "tamed-role-missing", mechanics, targetRole);
+            return null;
+        }
+        String denial = commandAccessDenial(mechanics, targetRole);
+        if (denial != null) {
+            refuseMisconfigured(player, source, denial, mechanics, targetRole);
+            return null;
+        }
+        TwCommandItemConfig command = commandItems.getByConfigId(mechanics.requiredCommandConfigId());
+        if (!holdsCommandItem(player, command, source)) {
+            messages.showKey(player, NotificationStyle.Warning, SPAWNER_KEYS + "commandItemRequired",
+                    new CommandItemDisplayResolver().resolveItemDisplayName(player, firstItemId(command)));
+            return null;
+        }
+        if (refusedByCaps(player, player.getUuid(), targetRole, world.getName(), true)) {
+            return null;
+        }
+        return new PreRoll(targetRole);
+    }
+
+    private boolean refusedByCaps(Player player, UUID owner, String roleId, String world, boolean deployed) {
+        CompanionAdmission.Refusal refusal = admissionGate.precheck(owner, roleId, world, deployed);
+        if (refusal != null) {
+            showPopulationLimit(player, refusal == CompanionAdmission.Refusal.OWNED);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The tame-and-link command gates of the old spawner flow: the item requires a command access
+     * item and names its command config; that config exists, is enabled with linking on, uses the
+     * owner command-family roster, requires an owner, belongs to the item's family and its
+     * {@code AllowedRoles} admit the tamed role. Returns the failed gate, or null.
+     */
+    @Nullable
+    private String commandAccessDenial(ItemFeatureConfig.CaptureItemMechanics mechanics, String targetRole) {
+        if (!mechanics.requireCommandAccessItem() || mechanics.requiredCommandConfigId() == null) {
+            return "command-access-item-not-required";
+        }
+        String denial = commandItems.validateOwnerFamilyAccess(mechanics.commandFamilyId(),
+                mechanics.requiredCommandConfigId(), null, targetRole);
+        if (denial != null) {
+            return denial;
+        }
+        TwCommandItemConfig command = commandItems.getByConfigId(mechanics.requiredCommandConfigId());
+        if (!command.isLinkEnabled()) {
+            return "command-config-link-disabled";
+        }
+        return command.isRequireOwner() ? null : "command-config-owner-not-required";
+    }
+
+    /**
+     * Whether the player carries an item of {@code command} besides the capture source itself (an
+     * access item that is also the source is spent by the capture).
+     */
+    private boolean holdsCommandItem(Player player, @Nullable TwCommandItemConfig command, ItemStack source) {
+        ItemContainer items = command == null || player.getInventory() == null ? null
+                : player.getInventory().getCombinedBackpackStorageHotbarFirst();
+        if (items == null) {
+            return false;
+        }
+        long quantity = commandItems.get(source.getItemId()) == command ? -1L : 0L;
+        for (short slot = 0; slot < items.getCapacity(); slot++) {
+            ItemStack stack = items.getItemStack(slot);
+            if (!ItemStack.isEmpty(stack) && commandItems.get(stack.getItemId()) == command) {
+                quantity += stack.getQuantity();
+            }
+        }
+        return quantity > 0L;
+    }
+
+    @Nullable
+    private static String firstItemId(@Nullable TwCommandItemConfig command) {
+        if (command != null) {
+            for (String itemId : command.getItemIds()) {
+                if (itemId != null && !itemId.isBlank()) {
+                    return itemId;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** A tame-and-link item whose setup cannot work: the server log names the cause, the player sees a failure. */
+    private void refuseMisconfigured(Player player, ItemStack source, String reason,
+                                     ItemFeatureConfig.CaptureItemMechanics mechanics, @Nullable String targetRole) {
+        logger.at(Level.WARNING).log("Tame-and-link capture with %s refused: %s (command config %s, family %s, role %s)",
+                source.getItemId(), reason, mechanics.requiredCommandConfigId(), mechanics.commandFamilyId(),
+                targetRole);
+        warn(player, "captureFailed");
+    }
+
     /**
      * A failed roll plays the failure effects. Under {@code RESOLVED_ATTEMPT} consumption it also
      * spends one source item at the recorded slot (best effort) and starts the failure cooldown.
@@ -404,11 +553,12 @@ public final class SpawnerFeatureHandler {
     /**
      * TAME_AND_COMMAND_LINK on the body's world thread: tames the wild body in place for the
      * capturing player, links it to the item's command family and registers it as a roster member.
-     * The caps are checked before the source is spent; the record is registered and stamped before
-     * the ownership components are written, so the tame systems see a stamped body and skip it.
+     * {@link #preRoll} checked the command item, the tamed role and the caps before the roll; the
+     * record is registered (caps checked again under the index lock) and stamped before the
+     * ownership components are written, so the tame systems see a stamped body and skip it.
      */
     private boolean tameAndLink(Player player, Ref<EntityStore> targetRef, ItemFeatureConfig resolved,
-                                CaptureAttemptHandle attempt, String roleId,
+                                CaptureAttemptHandle attempt, String targetRole,
                                 @Nullable String particleSystemOverride) {
         World world = player.getWorld();
         Store<EntityStore> store = world == null || world.getEntityStore() == null
@@ -427,14 +577,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         String familyId = resolved.getCaptureMechanics().commandFamilyId();
-        String tamedRole = resolved.resolveCaptureTamedRole(roleId);
-        String targetRole = tamedRole == null ? roleId : tamedRole;
         UUID owner = player.getUuid();
-        CompanionAdmission.Refusal refusal = admissionGate.precheck(owner, targetRole, world.getName(), true);
-        if (refusal != null) {
-            showPopulationLimit(player, refusal == CompanionAdmission.Refusal.OWNED);
-            return false;
-        }
         ItemStack current = inventory.getHotbarItem(player, attempt.hotbarSlot());
         SpawnerSourceItemTransaction spend = current == null || current.isEmpty() ? null
                 : new SpawnerSourceItemTransaction(inventory, player, attempt.hotbarSlot(), current, logger,
@@ -473,28 +616,42 @@ public final class SpawnerFeatureHandler {
 
     /**
      * Writes the stamp first, then tamed, owner and the roster link, and requests the tamed role.
-     * World thread, in the capture callback (as the old tame and set-owner actions write).
+     * World thread.
+     *
+     * <p>No command buffer reaches this point. The interaction path runs inside the interaction's
+     * {@code commandBuffer.run} consumer, which hands over the store once the buffer is applied;
+     * the NPC-action path ({@code ActionTameworkCaptureWild}) gets only the store from the role's
+     * action call. Both may write the store directly: the consumer runs outside any system
+     * iteration, and the engine runs the role tick after the chunk pass, so a direct write there
+     * (as {@code ActionTameworkSetOwner} does) does not disturb an iteration. The engine removes an
+     * NPC whose role tick throws, so a failure here is logged and not rethrown: the record is
+     * already registered and the body stays, possibly without all of its ownership components.
      */
-    private static void tameBody(Ref<EntityStore> ref, Store<EntityStore> store, UUID owner, String ownerName,
-                                 String link, UUID profileId, String targetRole) {
-        store.putComponent(ref, TameworkCompanionComponent.getComponentType(),
-                new TameworkCompanionComponent(profileId, 0));
-        TameworkEntityEffectService.removeEffect(ref, TRANQUILIZER_EFFECT_ID, store);
-        store.putComponent(ref, TameworkTamedComponent.getComponentType(), new TameworkTamedComponent(true));
-        store.putComponent(ref, TameworkOwnerComponent.getComponentType(),
-                new TameworkOwnerComponent(owner, ownerName));
-        store.putComponent(ref, TameworkCommandLinksComponent.getComponentType(),
-                new TameworkCommandLinksComponent(owner, new String[]{link}));
-        CompanionSpawnAuthorityService.detach(ref, store);
-        CompanionProgressionBootstrapService.ensureProgressionComponents(ref, store, targetRole);
-        NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
-        String currentRole = npc == null || npc.getRole() == null ? null : npc.getRole().getRoleName();
-        NPCPlugin plugin = NPCPlugin.get();
-        int roleIndex = plugin == null ? -1 : plugin.getIndex(targetRole);
-        if (npc != null && npc.getRole() != null && roleIndex >= 0 && !targetRole.equals(currentRole)) {
-            RoleChangeSystem.requestRoleChange(ref, npc.getRole(), roleIndex, false, null, null, true, store);
+    private void tameBody(Ref<EntityStore> ref, Store<EntityStore> store, UUID owner, String ownerName,
+                          String link, UUID profileId, String targetRole) {
+        try {
+            store.putComponent(ref, TameworkCompanionComponent.getComponentType(),
+                    new TameworkCompanionComponent(profileId, 0));
+            TameworkEntityEffectService.removeEffect(ref, TRANQUILIZER_EFFECT_ID, store);
+            store.putComponent(ref, TameworkTamedComponent.getComponentType(), new TameworkTamedComponent(true));
+            store.putComponent(ref, TameworkOwnerComponent.getComponentType(),
+                    new TameworkOwnerComponent(owner, ownerName));
+            store.putComponent(ref, TameworkCommandLinksComponent.getComponentType(),
+                    new TameworkCommandLinksComponent(owner, new String[]{link}));
+            CompanionSpawnAuthorityService.detach(ref, store);
+            CompanionProgressionBootstrapService.ensureProgressionComponents(ref, store, targetRole);
+            NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+            String currentRole = npc == null || npc.getRole() == null ? null : npc.getRole().getRoleName();
+            NPCPlugin plugin = NPCPlugin.get();
+            int roleIndex = plugin == null ? -1 : plugin.getIndex(targetRole);
+            if (npc != null && npc.getRole() != null && roleIndex >= 0 && !targetRole.equals(currentRole)) {
+                RoleChangeSystem.requestRoleChange(ref, npc.getRole(), roleIndex, false, null, null, true, store);
+            }
+            CompanionSaves.markChanged(store, ref);
+        } catch (RuntimeException failure) {
+            logger.at(Level.WARNING).withCause(failure).log(
+                    "Tame-and-link of companion %s registered, but its body could not be fully tamed", profileId);
         }
-        CompanionSaves.markChanged(store, ref);
     }
 
     /** The command link a tame-and-link roster member carries for its owner's command family. */
@@ -523,18 +680,9 @@ public final class SpawnerFeatureHandler {
             warn(player, "captureEvidenceFailed");
             return false;
         }
+        // preRoll checked the caps for a new owner; CaptureFlow checks them again under the index lock.
         UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
                 resolved.isCaptureTamesTarget(), player.getUuid());
-        if (owner != null && facts.ownerUuid() == null) {
-            // A taming capture gives the companion a new owner: refuse it before anything is spent.
-            // CaptureFlow checks the caps again under the index lock.
-            CompanionAdmission.Refusal refusal = admissionGate.precheck(owner,
-                    facts.roleId() == null ? roleId : facts.roleId(), world.getName(), false);
-            if (refusal != null) {
-                showPopulationLimit(player, refusal == CompanionAdmission.Refusal.OWNED);
-                return false;
-            }
-        }
         UUID busyKey = stampedId != null ? stampedId : facts.npcUuid();
         // This runs on the body's world thread, so only a capture still committing can overlap.
         if (capturing.contains(busyKey)) {

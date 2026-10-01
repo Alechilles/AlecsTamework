@@ -7,9 +7,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -124,79 +122,8 @@ public final class CommandItemFeatureHandler {
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
-        this(registry, relocationService, stateSnapshotService, null, null);
-    }
-
-    public CommandItemFeatureHandler(CommandItemRegistry registry,
-                                     CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable PersistenceDomainFacades persistence,
-                                     @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow) {
-        this(
-                registry,
-                relocationService,
-                stateSnapshotService,
-                persistence,
-                restoreFlow,
-                (CommandTimedSummoningApi) null,
-                (PaidCommandRevivalApi) null,
-                (PopulationGroupApi) null
-        );
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-            @Nullable CommandTimedSummoningApi timedSummoning,
-            @Nullable PaidCommandRevivalApi paidRevival,
-            @Nullable PopulationGroupApi populationGroups
-    ) {
-        this(
-                registry,
-                relocationService,
-                stateSnapshotService,
-                persistence,
-                restoreFlow,
-                constant(timedSummoning),
-                constant(paidRevival),
-                constant(populationGroups)
-        );
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups
-    ) {
-        this(
-                registry, relocationService, stateSnapshotService, persistence,
-                restoreFlow, timedSummoning, paidRevival,
-                populationGroups, null
-        );
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups,
-            @Nullable Supplier<BondedCompanionApi> bondedCompanions
-    ) {
-        this(registry, relocationService, stateSnapshotService, persistence,
-                restoreFlow, timedSummoning, paidRevival, populationGroups,
-                bondedCompanions, null, null, null, null, null);
+        this(registry, relocationService, stateSnapshotService, null, null, null, null, null, null, null,
+                null, null);
     }
 
     /**
@@ -215,9 +142,7 @@ public final class CommandItemFeatureHandler {
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
             @Nullable PersistenceDomainFacades persistence,
             @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
             @Nullable CompanionProgressionSignalBus progressionSignals,
             @Nullable CompanionQueries companions,
@@ -1119,11 +1044,5 @@ public final class CommandItemFeatureHandler {
     private double resolveFiniteDouble(double configured, double fallback) {
         return Double.isFinite(configured) ? configured : fallback;
     }
-
-    @Nullable
-    private static <T> Supplier<T> constant(@Nullable T value) {
-        return value == null ? null : () -> value;
-    }
-
 }
 
