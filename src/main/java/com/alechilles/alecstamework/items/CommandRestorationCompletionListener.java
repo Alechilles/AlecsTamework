@@ -43,6 +43,16 @@ public final class CommandRestorationCompletionListener
     }
 
     /**
+     * Tells the player a paid revive was refused for missing items. {@code configuredMessage} is
+     * the role's optional InsufficientCostMessage language key; without one the default is shown.
+     */
+    void cannotAfford(@Nonnull Player player, @Nullable String configuredMessage) {
+        String language = player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage();
+        feedback.showWarning(player, LocalizedText.resolveConfigValue(
+                language, configuredMessage, LocalizedText.resolve(language, PREFIX + "respawn.cannotAfford")));
+    }
+
+    /**
      * Tells the player how a panel restore ended. {@code companionName} is the record's name;
      * without one the localized default companion name is shown.
      */

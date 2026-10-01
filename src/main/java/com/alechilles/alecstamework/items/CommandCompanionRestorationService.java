@@ -5,15 +5,20 @@ import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionReviveSettings;
 import com.alechilles.alecstamework.items.persistence.HytaleUuidCompletionDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -28,6 +33,11 @@ import javax.annotation.Nullable;
  * hands its entity work to the world threads itself. Its outcome returns to the player on the
  * world thread the placement was taken in, through {@link CommandRestorationCompletionListener};
  * a player who left that world or disconnected gets no message.</p>
+ *
+ * <p>A revive with a configured item cost takes the exact items from the player's inventory on
+ * that same world thread, before the flow starts. Any result other than RESTORED gives the items
+ * back (see {@link CommandReviveCostInventory}), so the refund does not depend on the message
+ * reaching the player. A revive with no cost, and every recover, skips payment and refund.</p>
  */
 final class CommandCompanionRestorationService {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -130,17 +140,45 @@ final class CommandCompanionRestorationService {
         if (placement == null) {
             return RequestStatus.INVALID_CONTEXT;
         }
+        UUID playerUuid = player.getUuid();
+        List<ItemStack> paid = List.of();
+        if (reason == RestoreRules.Reason.REVIVE) {
+            TwCompanionReviveSettings revive = TwCompanionConfig.resolveEffectiveForRole(roleId).getRevive();
+            var cost = revive.getCosts();
+            if (cost.length > 0) {
+                CommandReviveCostInventory.Charge charge = CommandReviveCostInventory.charge(store, playerRef, cost);
+                switch (charge.status()) {
+                    case PAID -> paid = charge.paid();
+                    case INSUFFICIENT -> {
+                        listener.cannotAfford(player, revive.getInsufficientCostMessage());
+                        return RequestStatus.STARTED;
+                    }
+                    case UNAVAILABLE -> {
+                        return RequestStatus.UNAVAILABLE;
+                    }
+                }
+            }
+        }
         RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
         String name = profile.displayName() != null && !profile.displayName().isBlank()
                 ? profile.displayName()
                 : profile.customName();
-        UUID playerUuid = player.getUuid();
-        restoreFlow.restore(profileId, reason, destination).whenComplete((result, error) -> {
+        CompletableFuture<RestoreFlow.Result> restoring;
+        try {
+            restoring = restoreFlow.restore(profileId, reason, destination);
+        } catch (RuntimeException failure) {
+            restoring = CompletableFuture.failedFuture(failure);
+        }
+        List<ItemStack> charged = paid;
+        restoring.whenComplete((result, error) -> {
             if (error != null) {
                 LOGGER.at(Level.WARNING).withCause(error).log("Panel " + reason + " of profile=" + profileId
                         + " failed unexpectedly.");
             }
             RestoreFlow.Result outcome = error != null || result == null ? RestoreFlow.Result.COMMIT_FAILED : result;
+            if (outcome != RestoreFlow.Result.RESTORED) {
+                CommandReviveCostInventory.refund(playerUuid, charged);
+            }
             completions.dispatch(placement.worldKey(), playerUuid,
                     (currentWorld, currentStore, actorRef, actor) -> listener.complete(outcome, actor, name));
         });
