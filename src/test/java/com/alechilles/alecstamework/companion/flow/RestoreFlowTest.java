@@ -133,7 +133,7 @@ class RestoreFlowTest {
     }
 
     @Test
-    void aReleaseToANewOwnerMovesTheRecordAndKeepsTheTimerClear() {
+    void aReleaseToANewOwnerMovesTheRecord() {
         CompanionRecord live = insertLive();
         UUID releaser = UUID.randomUUID();
         index.update(live.profileId(), live.revision(), b -> b.location(CompanionLocation.item()).generation(1).currentNpcUuid(null));
@@ -148,6 +148,32 @@ class RestoreFlowTest {
         assertEquals(LocationKind.LIVE, after.location().kind());
         assertEquals(releaser, after.ownerUuid());
         assertEquals(2, after.generation());
+    }
+
+    @Test
+    void aFailedFlushOfTheOldOwnerRevertsTheOwnerChange() {
+        CompanionRecord live = insertLive();
+        UUID oldOwner = live.ownerUuid();
+        index.update(live.profileId(), live.revision(), b -> b.location(CompanionLocation.item()).generation(1).currentNpcUuid(null));
+        CompanionRecord item = index.get(live.profileId());
+        RestoreFlow<String> flow = new RestoreFlow<>(index, loaded,
+                id -> CompletableFuture.completedFuture(snapshot(index.get(id))),
+                owner -> { events.add("flush"); return owner != null && owner.equals(oldOwner)
+                        ? CompletableFuture.failedFuture(new RuntimeException("disk"))
+                        : CompletableFuture.completedFuture(null); },
+                (committed, snap, dest, reason) -> { events.add("spawn"); return CompletableFuture.completedFuture(true); },
+                (id, body) -> events.add("remove " + body),
+                System::currentTimeMillis);
+
+        RestoreFlow.Result result = flow.restore(RestoreFlow.Request.of(item.profileId(), RestoreRules.Reason.RELEASE, there)
+                .withOwner(new RestoreFlow.Owner(UUID.randomUUID(), "Bo"))).join();
+
+        assertEquals(RestoreFlow.Result.COMMIT_FAILED, result);
+        assertEquals(List.of("flush", "flush"), events, "no live effect after a failed flush");
+        CompanionRecord after = index.get(item.profileId());
+        assertEquals(oldOwner, after.ownerUuid());
+        assertEquals(1, after.generation());
+        assertEquals(LocationKind.ITEM, after.location().kind());
     }
 
     @Test
