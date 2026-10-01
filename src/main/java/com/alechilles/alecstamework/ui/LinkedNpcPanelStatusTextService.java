@@ -47,16 +47,6 @@ final class LinkedNpcPanelStatusTextService {
         return primary + "\n" + entry.deathCauseHint();
     }
 
-    /**
-     * Returns the revive duration shown beside the DEAD emblem, or {@code null} when it is
-     * hidden: the companion is not dead, revival is disabled (negative), or it is ready (zero),
-     * where the card's Revive button takes over.
-     */
-    static String resolveReviveCountdown(LinkedNpcEntry entry, long remainingMs, String language) {
-        if (entry == null || !entry.dead() || remainingMs <= 0L) return null;
-        return formatRemainingTime(remainingMs, language);
-    }
-
     /** Uses the same lifecycle precedence as the status label; recovery holds keep their own text. */
     static String resolveAvailabilityEmblem(LinkedNpcEntry entry) {
         if (entry == null || entry.recoveryHeld()) return null;

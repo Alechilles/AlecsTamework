@@ -299,6 +299,7 @@ final class CommandLinkedPanelEntryService {
             boolean inCoop = false;
             boolean lost = false;
             long deadRespawnRemainingMs = 0L;
+            long deadRespawnTotalMs = 0L;
             String deathCauseHint = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
@@ -395,6 +396,7 @@ final class CommandLinkedPanelEntryService {
                             canonicalProfile.restorationAvailableAtMs(),
                             System.currentTimeMillis()
                     );
+                    deadRespawnTotalMs = canonicalProfile.restorationCooldownMs();
                 }
             }
             if (!dead && !captured && !inCoop && world != null) {
@@ -475,7 +477,8 @@ final class CommandLinkedPanelEntryService {
             ).withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                     customName, speciesRoleId, record.cachedNameKey))
                     .withPortraitIcon(TwDynamicIconConfig.resolveIcon(
-                            speciesRoleId, null));
+                            speciesRoleId, null))
+                    .withDeadRespawnTotalMs(deadRespawnTotalMs);
             CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null : persistenceView.savedPanel(record, player.getUuid());
             if (saved != null) {
                 // Use the current world's configured clock when this animal belongs to it.

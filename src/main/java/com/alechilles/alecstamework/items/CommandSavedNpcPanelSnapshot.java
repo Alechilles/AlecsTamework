@@ -295,7 +295,8 @@ final class CommandSavedNpcPanelSnapshot {
                 .withBreedingHappinessRatio(juvenile ? -1.0 : base.breedingHappinessRatio())
                 .withFlightToggle(base.flightToggleAvailable(), base.flightToggleAirborne())
                 .withShoulderRide(base.shoulderRideAvailable(), base.shoulderRideMounted())
-                .withTraitValues(traitValues(facts.traits, effectiveRole));
+                .withTraitValues(traitValues(facts.traits, effectiveRole))
+                .withDeadRespawnTotalMs(base.deadRespawnTotalMs());
         if (base.ownedActions()) {
             applied = applied.withOwnedActions();
         }

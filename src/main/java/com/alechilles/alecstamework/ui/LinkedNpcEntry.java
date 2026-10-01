@@ -44,7 +44,18 @@ public final class LinkedNpcEntry {
     private String companionKey;
     private boolean selectionSupported = true;
     private boolean nearby;
+    private long deadRespawnTotalMs;
     public boolean nearby() { return nearby; }
+
+    /** Full revive cooldown of the current death, or 0 when unknown (the progress bar then hides). */
+    public long deadRespawnTotalMs() { return deadRespawnTotalMs; }
+
+    /** Returns a copy carrying the full revive cooldown; non-positive values mean unknown. */
+    public LinkedNpcEntry withDeadRespawnTotalMs(long totalMs) {
+        LinkedNpcEntry copy = new LinkedNpcEntry(this, ownedActions);
+        copy.deadRespawnTotalMs = Math.max(0L, totalMs);
+        return copy;
+    }
     public LinkedNpcEntry withNearby(boolean value) {
         LinkedNpcEntry copy = new LinkedNpcEntry(this, ownedActions);
         copy.nearby = value;
@@ -1114,6 +1125,7 @@ public final class LinkedNpcEntry {
         this.lost = source.lost;
         this.hasHome = source.hasHome;
         this.deadRespawnRemainingMs = deadRespawnRemainingMs;
+        this.deadRespawnTotalMs = source.deadRespawnTotalMs;
         this.deathCauseHint = source.deathCauseHint;
         this.speciesId = source.speciesId;
         this.speciesLabel = source.speciesLabel;
@@ -1221,6 +1233,7 @@ public final class LinkedNpcEntry {
                 && lost == other.lost
                 && hasHome == other.hasHome
                 && deadRespawnRemainingMs == other.deadRespawnRemainingMs
+                && deadRespawnTotalMs == other.deadRespawnTotalMs
                 && breedingEnabled == other.breedingEnabled
                 && breedingAvailable == other.breedingAvailable
                 && breedingCooldownActive == other.breedingCooldownActive

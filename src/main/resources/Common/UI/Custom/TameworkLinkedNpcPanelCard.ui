@@ -24,8 +24,12 @@ $C = "Common.ui";
 @LifecycleSeniorLabel = LabelStyle(FontSize: 9, TextColor: #d9a86f);
 @InlineRecallCountdown = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #ffcf6e, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
 @RecallCountdown = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center);
-@ReviveCountdownHeading = LabelStyle(FontSize: 11, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center);
-@ReviveCountdownValue = LabelStyle(FontSize: 16, RenderBold: true, TextColor: #f5e5c1, HorizontalAlignment: End, VerticalAlignment: Center);
+@StatusStripLabelDead = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e3a197, VerticalAlignment: Center);
+@StatusStripLabelReady = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #8fd197, VerticalAlignment: Center);
+@StatusStripLabelLost = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8c47e, VerticalAlignment: Center);
+@StatusStripLabelMuted = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #b9beb8, VerticalAlignment: Center);
+@StatusStripPrimary = LabelStyle(FontSize: 18, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+@StatusStripPrimaryMuted = LabelStyle(FontSize: 18, RenderBold: true, TextColor: #c0c5c0, VerticalAlignment: Center);
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @PortraitCompactStyle = ItemGridStyle(SlotSize: 48, SlotSpacing: 0, SlotIconSize: 48);
 
@@ -58,6 +62,18 @@ Group {
     Label #RoleSubtitle { Anchor: (Top: 37, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }
+    // Dead/lost status strip for generic cards; drawn before the actions so the Revive/Recover button sits on top.
+    Group #StatusStrip { Anchor: (Top: 36, Left: 432, Width: 414, Height: 64); Background: #6b4141; HitTestVisible: false; Visible: false;
+        Group #Fill { Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1); Background: #2c2224; }
+        Group #Icon { Anchor: (Top: 14, Left: 14, Width: 36, Height: 36); Background: (TexturePath: "Tamework/StatusEmblems/Dead.png", Color: #f5e5c1); }
+        Group #Text { Anchor: (Top: 9, Left: 62, Width: 280, Height: 36);
+            Label #State { Anchor: (Top: 0, Left: 0, Right: 0, Height: 14); Text: ""; Style: @StatusStripLabelDead; }
+            Label #Primary { Anchor: (Top: 14, Left: 0, Right: 0, Height: 22); Text: ""; Style: @StatusStripPrimary; }
+        }
+        Group #Bar { Anchor: (Top: 50, Left: 62, Width: 280, Height: 4); Background: #161a18;
+            Group #BarFill { Anchor: (Top: 0, Left: 0, Width: 0, Height: 4); Background: #c97a6e; }
+        }
+    }
     TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
     Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); Visible: true; HitTestVisible: false; }
 
@@ -104,10 +120,6 @@ Group {
     Label #StatusConfirm { Anchor: (Top: 30, Left: 432, Width: 414, Height: 16); Text: %server.tamework.ui.linkedPanel.card.confirmRemove; Style: (FontSize: 11, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #StatusInactive { Anchor: (Top: 43, Left: 48, Width: 96, Height: 18); Text: %server.tamework.ui.linkedPanel.card.inactive; Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #RecallCountdown { Anchor: (Top: 72, Left: 568, Width: 270, Height: 20); Text: %server.tamework.ui.linkedPanel.card.recallCountdown.default; Style: (FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Group #ReviveCountdown { Anchor: (Top: 40, Left: 497, Width: 110, Height: 36); HitTestVisible: false; Visible: false;
-        Label #Heading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 14); Text: %server.tamework.ui.linkedPanel.status.reviveInLabel; Style: @ReviveCountdownHeading; }
-        Label #Value { Anchor: (Top: 14, Left: 0, Right: 0, Height: 22); Text: ""; Style: @ReviveCountdownValue; }
-    }
     Group #InlineLocation { Anchor: (Top: 32, Left: 432, Width: 414, Height: 74); Visible: false;
         Label #Heading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #a9b69f, VerticalAlignment: Center); }
         Label #Status { Anchor: (Top: 14, Left: 0, Right: 0, Height: 14); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center); Visible: false; }

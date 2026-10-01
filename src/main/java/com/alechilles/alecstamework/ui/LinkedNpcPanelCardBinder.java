@@ -346,6 +346,11 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
+        String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
+        // Roster and bonded rows keep the emblem and report revival in #RosterTimer; the removal
+        // menu keeps the emblem because its buttons occupy the strip's area.
+        boolean showStatusStrip = emblem != null && !showInlineLocation && !rosterLayout
+                && !pendingUnlink && LinkedNpcPanelStatusStrip.applies(entry);
         int actionLeft = showInlineLocation ? 736 : 432;
         String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
                 showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
@@ -354,7 +359,8 @@ final class LinkedNpcPanelCardBinder {
                 unlinkSelector, unlinkDisabledSelector, cullSelector};
         boolean[] actionVisible = {showShoulderRide, showFlightToggle,
                 showBreedingToggleEnabled || showBreedingToggleDisabled,
-                showRespawn, showLocate, showRecall, showSetHome, showReturnHome,
+                // The strip places its own Revive/Recover button.
+                showRespawn && !showStatusStrip, showLocate, showRecall, showSetHome, showReturnHome,
                 showRelease, showReleaseDisabled, showUnlink, showUnlinkDisabled, showCull};
         for (int actionIndex = 0; actionIndex < actionSelectors.length; actionIndex++) {
             if (actionVisible[actionIndex]) {
@@ -368,15 +374,14 @@ final class LinkedNpcPanelCardBinder {
                 actionLeft += 60;
             }
         }
-        String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
-        // Roster and bonded rows already report revival in #RosterTimer; the removal menu
-        // places its buttons where the countdown would sit.
-        String reviveCountdown = emblem == null || showInlineLocation || rosterLayout || pendingUnlink
-                ? null : LinkedNpcPanelStatusTextService.resolveReviveCountdown(
-                        entry, entry.deadRespawnRemainingMs(), language);
-        commandBuilder.set(entrySelector + " #ReviveCountdown.Visible", reviveCountdown != null);
-        if (emblem != null && !showInlineLocation) {
+        commandBuilder.set(entrySelector + " #StatusStrip.Visible", false);
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible",
+                emblem != null && !showInlineLocation && !showStatusStrip);
+        if (showStatusStrip) {
+            commandBuilder.set(statusUnloadedSelector + ".Visible", false);
+            LinkedNpcPanelStatusStrip.bind(commandBuilder, entrySelector, entry, emblem,
+                    respawnSelector, showRespawn, language);
+        } else if (emblem != null && !showInlineLocation) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
@@ -392,14 +397,6 @@ final class LinkedNpcPanelCardBinder {
                     fixedAnchor(labelTop, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(lost ? labelTop + 18 : 98, statusLeft, statusWidth, 12));
-            if (reviveCountdown != null) {
-                // Right-aligned block 10 px left of the emblem, centered on it. Its left edge
-                // (>= 497) stays clear of the first action slot and caption (432..490).
-                int emblemLeft = statusLeft + (statusWidth - emblemSize) / 2;
-                commandBuilder.set(entrySelector + " #ReviveCountdown #Value.Text", reviveCountdown);
-                commandBuilder.setObject(entrySelector + " #ReviveCountdown.Anchor",
-                        fixedAnchor(emblemTop + emblemSize / 2 - 18, emblemLeft - 120, 110, 36));
-            }
         }
         commandBuilder.set(inlineLocationSelector + ".Visible", showInlineLocation);
         if (showInlineLocation) {
@@ -796,7 +793,7 @@ final class LinkedNpcPanelCardBinder {
                 activeTop, 48, portrait && compact ? 56 : 96, 20));
     }
 
-    private static Anchor fixedAnchor(int top, int left, int width, int height) {
+    static Anchor fixedAnchor(int top, int left, int width, int height) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(top));
         anchor.setLeft(Value.of(left));

@@ -906,7 +906,7 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void availabilityEmblemsPreserveSavedHealthAndRemainVisibleDuringRemoval() throws Exception {
+    void availabilityEmblemsPreserveSavedHealthAndUseTheStatusStripOutsideRemoval() throws Exception {
         String[] states = {"Dead", "Unloaded", "Lost", "Captured", "InCoop", "Live"};
         for (String state : states) {
             for (boolean removing : new boolean[] {false, true}) {
@@ -926,10 +926,16 @@ class TameworkCommandSelectionPageRefreshTest {
                 page.build(null, commands, events, null);
                 CapturedUpdate update = new CapturedUpdate(commands, events);
                 String card = "#TameworkLinkedPanelList[0]";
-                assertCommand(update, card + " #StatusEmblem.Visible", Boolean.toString(!state.equals("Live")));
+                // Dead and lost cards show their emblem inside the status strip, except in the
+                // removal menu, whose buttons use the strip's area.
+                boolean strip = !removing && (dead || state.equals("Lost"));
+                String emblem = card + (strip ? " #StatusStrip #Icon" : " #StatusEmblem");
+                assertCommand(update, card + " #StatusEmblem.Visible",
+                        Boolean.toString(!state.equals("Live") && !strip));
+                assertCommand(update, card + " #StatusStrip.Visible", Boolean.toString(strip));
                 if (!state.equals("Live")) {
-                    assertCommand(update, card + " #StatusEmblem.Background", "Tamework/StatusEmblems/" + state + ".png");
-                    assertCommand(update, card + " #StatusUnloaded.Visible", "true");
+                    assertCommand(update, emblem + ".Background", "Tamework/StatusEmblems/" + state + ".png");
+                    assertCommand(update, card + " #StatusUnloaded.Visible", Boolean.toString(!strip));
                 }
                 assertCommand(update, card + " #HealthText.Text", dead ? "0/100" : "75/100");
                 page.onDismiss(null, null);

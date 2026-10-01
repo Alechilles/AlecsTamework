@@ -249,7 +249,7 @@ final class CommandPersistenceView {
         }
         return new ProfileSnapshot(new ProfileId(record.profileId()), record.currentNpcUuid(), record.ownerUuid(),
                 record.roleId(), record.displayName(), record.summary().customName(), tools,
-                lifecycleState(record.location()), record.reviveAvailableAtMs());
+                lifecycleState(record.location()), record.reviveAvailableAtMs(), record.diedAtMs());
     }
 
     @Nonnull
@@ -289,7 +289,8 @@ final class CommandPersistenceView {
             @Nullable String customName,
             @Nonnull Set<UUID> toolIds,
             @Nonnull LifecycleState lifecycleState,
-            long restorationAvailableAtMs
+            long restorationAvailableAtMs,
+            long diedAtMs
     ) {
         ProfileSnapshot {
             Objects.requireNonNull(profileId, "Profile ID is required");
@@ -323,6 +324,12 @@ final class CommandPersistenceView {
             return dead() || lost();
         }
 
+        /** Full revive cooldown of the current death (wall clock), or 0 when the death time is unknown. */
+        long restorationCooldownMs() {
+            return dead() && diedAtMs > 0L && restorationAvailableAtMs >= diedAtMs
+                    ? restorationAvailableAtMs - diedAtMs : 0L;
+        }
+
         boolean blocksLiveAction() {
             return lifecycleState != LifecycleState.ACTIVE
                     && lifecycleState != LifecycleState.UNLOADED;
@@ -345,7 +352,9 @@ final class CommandPersistenceView {
                     projection.customName(),
                     projection.toolIds(),
                     projection.lifecycleState(),
-                    projection.restorationAvailableAtMs()
+                    projection.restorationAvailableAtMs(),
+                    // The legacy projection carries no death time, so the revive bar stays hidden.
+                    0L
             );
         }
     }

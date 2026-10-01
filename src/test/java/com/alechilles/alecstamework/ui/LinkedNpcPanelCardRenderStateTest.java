@@ -170,47 +170,67 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(readOnly, card + " #ActiveToggleInactiveButton.Visible", false);
     }
 
-    // Catches a dead card without its revive time, a countdown that overlaps the emblem or the
-    // first action slot, one that stops at the first render or lingers beside the Revive
-    // button once ready, or a stale countdown left on a reused live row.
+    // Catches a dead card without its countdown or progress, a countdown that stops at the first
+    // render, a Revive/Recover button left outside the strip or shown twice, and a stale strip on
+    // a reused live row.
     @Test
-    void deadCardShowsALiveReviveCountdownBesideItsEmblemAndLiveCardsHideIt() {
+    void statusStripShowsReviveProgressThenMovesTheRestoreButtonInside() {
         UUID id = UUID.randomUUID();
         LinkedNpcEntry dead = new LinkedNpcEntry(id, "Duck", 0, 25,
                 0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
-                false, 125_000L, LinkedNpcTraitIndicator.EMPTY);
+                false, 1_800_000L, LinkedNpcTraitIndicator.EMPTY).withDeadRespawnTotalMs(3_600_000L);
         String card = "#TameworkLinkedPanelList[0]";
-        String countdown = card + " #ReviveCountdown";
-        UICommandBuilder full = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bind(full, new UIEventBuilder(), 0, dead, false, false,
-                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
-        assertVisible(full, countdown + ".Visible", true);
-        assertText(full, countdown + " #Value.Text",
-                LinkedNpcPanelStatusTextService.formatRemainingTime(125_000L, "en-US"));
-        var block = anchor(full, countdown + ".Anchor");
-        var emblem = anchor(full, card + " #StatusEmblem.Anchor");
-        int blockLeft = block.getNumber("Left").intValue();
-        int blockTop = block.getNumber("Top").intValue();
-        org.junit.jupiter.api.Assertions.assertTrue(blockLeft > 490);
-        org.junit.jupiter.api.Assertions.assertTrue(blockLeft + block.getNumber("Width").intValue()
-                < emblem.getNumber("Left").intValue());
-        assertEquals(blockTop * 2 + block.getNumber("Height").intValue(),
-                emblem.getNumber("Top").intValue() * 2 + emblem.getNumber("Height").intValue());
+        String strip = card + " #StatusStrip";
+        UICommandBuilder counting = bindCard(dead);
+        assertVisible(counting, strip + ".Visible", true);
+        assertText(counting, strip + " #Text #Primary.Text", "Revives in "
+                + LinkedNpcPanelStatusTextService.formatRemainingTime(1_800_000L, "en-US"));
+        assertEquals(140, anchor(counting, strip + " #Bar #BarFill.Anchor").getNumber("Width").intValue());
+        assertVisible(counting, card + " #RespawnButton.Visible", false);
 
         UICommandBuilder tick = new UICommandBuilder();
         LinkedNpcPanelCountdownPresenter.refresh(tick, new UIEventBuilder(),
-                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 65_000L, "en-US");
-        assertText(tick, countdown + " #Value.Text",
-                LinkedNpcPanelStatusTextService.formatRemainingTime(60_000L, "en-US"));
-        UICommandBuilder ready = new UICommandBuilder();
-        LinkedNpcPanelCountdownPresenter.refresh(ready, new UIEventBuilder(),
-                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 125_000L, "en-US");
-        assertVisible(ready, countdown + ".Visible", false);
+                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 900_000L, "en-US");
+        assertText(tick, strip + " #Text #Primary.Text", "Revives in "
+                + LinkedNpcPanelStatusTextService.formatRemainingTime(900_000L, "en-US"));
+        assertEquals(210, anchor(tick, strip + " #Bar #BarFill.Anchor").getNumber("Width").intValue());
 
-        UICommandBuilder live = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bind(live, new UIEventBuilder(), 0, entryForIdentity(id), false, false,
+        LinkedNpcEntry ready = new LinkedNpcEntry(id, "Duck", 0, 25,
+                0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY).withDeadRespawnTotalMs(3_600_000L);
+        UICommandBuilder readyCard = bindCard(ready);
+        assertText(readyCard, strip + " #Text #Primary.Text", "Ready to revive");
+        assertRestoreButtonInsideStrip(readyCard, card);
+
+        LinkedNpcEntry lost = new LinkedNpcEntry(id, "Duck", 0, 0,
+                0, 0, "", 0, 0, 0, 0, false, false, false, false, false,
+                true, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder lostCard = bindCard(lost);
+        assertText(lostCard, strip + " #Text #State.Text", "LOST");
+        assertText(lostCard, strip + " #Text #Primary.Text", "Ready to recover");
+        assertRestoreButtonInsideStrip(lostCard, card);
+
+        assertVisible(bindCard(entryForIdentity(id)), strip + ".Visible", false);
+    }
+
+    private static UICommandBuilder bindCard(LinkedNpcEntry entry) {
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, entry, false, false,
                 LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
-        assertVisible(live, countdown + ".Visible", false);
+        return commands;
+    }
+
+    private static void assertRestoreButtonInsideStrip(UICommandBuilder commands, String card) {
+        assertVisible(commands, card + " #RespawnButton.Visible", true);
+        assertVisible(commands, card + " #RespawnButtonCaption.Visible", false);
+        var button = anchor(commands, card + " #RespawnButton.Anchor");
+        int left = button.getNumber("Left").intValue();
+        int top = button.getNumber("Top").intValue();
+        // Strip spans x 432..846 and y 36..100; its text ends at x 774.
+        org.junit.jupiter.api.Assertions.assertTrue(left >= 774
+                && left + button.getNumber("Width").intValue() <= 846);
+        org.junit.jupiter.api.Assertions.assertTrue(top >= 36
+                && top + button.getNumber("Height").intValue() <= 100);
     }
 
     private static void assertText(UICommandBuilder commands, String selector, String text) {
