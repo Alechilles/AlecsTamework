@@ -10,15 +10,20 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -27,8 +32,9 @@ import org.joml.Vector3i;
 /**
  * Coop schedule (spec 8.9), replacing the never-registered {@code CommandDirectLiveCoopSystem}.
  * Once a second per world it scans the loaded managed coops; outside a coop's roam hours each coop
- * that captures in range takes in the nearest accepted NPC into its first free slot. Morning
- * release and production arrive with the coop release work.
+ * that captures in range takes in the nearest accepted NPC into its first free slot. Inside its
+ * roam hours each coop produces for its residents and releases one resident per sweep, as in 4.x
+ * ({@link HytaleCoopResidents#roam}).
  *
  * <p>Why a tick: intake depends on the time of day and on NPCs wandering into range, for which
  * there is no event. Scope and cost match the old sweep: one scan of loaded coop blocks per world
@@ -37,21 +43,25 @@ import org.joml.Vector3i;
  * {@link TameworkCoopSlotsComponent}.
  *
  * <p>The tick only reads. The intake itself is queued to the world thread by
- * {@link HytaleCoopIntake}; the retired receipts component is stripped through the iteration's
- * command buffer. State is per store, since worlds tick this one instance concurrently.
+ * {@link HytaleCoopIntake}; production, release and the produce-ready block state run in one
+ * {@code world.execute} task per sweep; the retired receipts component is stripped through the
+ * iteration's command buffer. State is per store, since worlds tick this one instance concurrently.
  */
 public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final long SWEEP_INTERVAL_MS = 1_000L;
 
     private final HytaleCoopIntake intake;
+    private final HytaleCoopResidents residents;
     @Nullable private final ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> retiredReceipts;
     private final HytaleDirectLiveCoopScanner scanner = new HytaleDirectLiveCoopScanner();
     private final StoreScopedState<TickState> tickStates = new StoreScopedState<>(TickState::new);
 
     /** {@code retiredReceipts} is the registered retired receipts type, stripped from blocks. */
-    public CoopScheduleSystem(@Nonnull HytaleCoopIntake intake,
+    public CoopScheduleSystem(@Nonnull HytaleCoopIntake intake, @Nonnull HytaleCoopResidents residents,
                               @Nullable ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> retiredReceipts) {
         this.intake = Objects.requireNonNull(intake, "intake");
+        this.residents = Objects.requireNonNull(residents, "residents");
         this.retiredReceipts = retiredReceipts;
     }
 
@@ -65,15 +75,45 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
         state.nextSweepAtMs = now + SWEEP_INTERVAL_MS;
         stripRetiredReceipts(chunkStore);
         intake.pruneSnapshotFailures();
+        residents.pruneFailures();
         HytaleDirectLiveCoopScanner.Scan scan = scanner.scan(chunkStore, CoopScheduleSystem::takesInNow);
         if (scan == null) {
             return;
         }
         Set<UUID> chosen = new HashSet<>();
+        List<HytaleDirectLiveCoopScanner.LoadedCoop> roamingCoops = new ArrayList<>();
         for (HytaleDirectLiveCoopScanner.LoadedCoop coop : scan.coops()) {
             if (takesInNow(coop, scan.worldTime())) {
                 takeInNearest(scan, coop, coop.config(), chosen);
+            } else if (coop.config() != null && roaming(scan.worldTime(), coop.config())) {
+                roamingCoops.add(coop);
             }
+        }
+        queueResidentWork(scan.world(), roamingCoops, scan.coops());
+    }
+
+    /** Production and release for roaming coops, and the produce-ready state of every coop, on the world thread. */
+    private void queueResidentWork(World world, List<HytaleDirectLiveCoopScanner.LoadedCoop> roamingCoops,
+                                   List<HytaleDirectLiveCoopScanner.LoadedCoop> coops) {
+        if (coops.isEmpty()) {
+            return;
+        }
+        try {
+            world.execute(() -> {
+                for (HytaleDirectLiveCoopScanner.LoadedCoop coop : roamingCoops) {
+                    try {
+                        residents.roam(world, coop);
+                    } catch (RuntimeException | LinkageError failure) {
+                        LOGGER.at(Level.WARNING).withCause(failure).log("Coop resident sweep failed at %s",
+                                coop.block());
+                    }
+                }
+                for (HytaleDirectLiveCoopScanner.LoadedCoop coop : coops) {
+                    residents.syncInteractionState(world, coop);
+                }
+            });
+        } catch (RuntimeException notAccepting) {
+            // World#execute throws when the world no longer accepts tasks; the next sweep retries.
         }
     }
 

@@ -3,8 +3,11 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.live.SummaryLifeStage;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -69,8 +72,17 @@ final class CommandSavedNpcPanelSnapshot {
     private final boolean savedTalentsEditable;
     private final StoredLocation storedLocation;
 
-    record StoredLocation(CoopSlotKey coop,
-                          CaptureKey capture) { }
+    /** Where a stored companion is: its coop block (world and block position) or its capture item key. */
+    record StoredLocation(@Nullable CoopLocation coop,
+                          @Nullable CaptureKey capture) { }
+
+    /** A coop block's world and position. */
+    record CoopLocation(String world, int x, int y, int z) {
+        @Nullable
+        static CoopLocation of(@Nullable CoopSlotKey slot) {
+            return slot == null ? null : new CoopLocation(slot.worldKey(), slot.x(), slot.y(), slot.z());
+        }
+    }
 
     StoredLocation storedLocation() { return storedLocation; }
 
@@ -155,7 +167,7 @@ final class CommandSavedNpcPanelSnapshot {
     ) {
         if (profile == null) return null;
         var state = decodeState(profile, checkpointJson);
-        var coop = profile.currentCoopSlot() == null ? null : profile.currentCoopSlot().key();
+        var coop = CoopLocation.of(profile.currentCoopSlot() == null ? null : profile.currentCoopSlot().key());
         var capture = CommandLinkedNpcLocateService.captureKey(profile, profile.identity().profileId().value());
         return coop == null && capture == null ? state
                 : new CommandSavedNpcPanelSnapshot(state, new StoredLocation(coop, capture));
@@ -164,12 +176,27 @@ final class CommandSavedNpcPanelSnapshot {
     /**
      * Builds the unloaded panel from the index summary (spec 6.6) without decoding a snapshot.
      * The summary was captured from the live body, so its absent sections follow exact-checkpoint
-     * semantics. Returns null when the summary was never captured. Stored locations and
-     * restoration-snapshot talent editing are not carried by the summary.
+     * semantics. A COOP record also carries its coop block from the record's location, even when
+     * the summary was never captured. Returns null otherwise when the summary was never captured.
+     * Capture item keys and restoration-snapshot talent editing are not carried by the summary.
      */
     @Nullable
     static CommandSavedNpcPanelSnapshot fromSummary(CompanionRecord record) {
-        CompanionSummary s = record == null ? null : record.summary();
+        if (record == null) {
+            return null;
+        }
+        CommandSavedNpcPanelSnapshot saved = fromSummaryFacts(record);
+        CompanionLocation at = record.location();
+        if (at.kind() != LocationKind.COOP || at.world() == null) {
+            return saved;
+        }
+        return new CommandSavedNpcPanelSnapshot(saved, new StoredLocation(
+                new CoopLocation(at.world(), (int) at.x(), (int) at.y(), (int) at.z()), null));
+    }
+
+    @Nullable
+    private static CommandSavedNpcPanelSnapshot fromSummaryFacts(CompanionRecord record) {
+        CompanionSummary s = record.summary();
         if (s == null || s.observedAtMs() == 0L) {
             return null;
         }
@@ -192,32 +219,8 @@ final class CommandSavedNpcPanelSnapshot {
                         s.harvestAlarmUntilMs(), s.harvestAlarmStartedAtMs(), s.harvestAlarmDurationMs())));
         return new CommandSavedNpcPanelSnapshot(s.observedAtMs(), firstNonBlank(s.roleId(), record.roleId()),
                 new Facts(health, happiness, needs, breeding, leveling, traits, talents, harvest,
-                        lifeStage(s.progression())),
+                        SummaryLifeStage.of(s.progression())),
                 new Appearance(null, Map.of(), s.iconId()), true);
-    }
-
-    /** A detached component holding the summary's progression values, for the shared apply math. */
-    @Nullable
-    private static TameworkLifeStageComponent lifeStage(@Nullable CompanionSummary.Progression p) {
-        if (p == null) {
-            return null;
-        }
-        TameworkLifeStageComponent state = new TameworkLifeStageComponent();
-        state.setStage(p.stage());
-        state.setBornAtMs(p.bornAtMs());
-        state.setAdolescentAtMs(p.adolescentAtMs());
-        state.setAdultAtMs(p.adultAtMs());
-        state.setGrowthScalingEnabled(p.growthScalingEnabled());
-        state.setAgeProgressMs(p.ageProgressMs());
-        state.setProgressionOwnerId(p.progressionOwnerId());
-        state.setProgressionClockMs(p.progressionClockMs());
-        state.setProgressionInitialized(p.progressionInitialized());
-        state.setLastProgressionWorldMs(p.lastProgressionWorldMs());
-        state.setLifecycleNowMs(p.lifecycleNowMs());
-        state.setJuvenileClockInitialized(p.juvenileClockInitialized());
-        state.setStoredProgressionPaused(p.progressionPaused());
-        state.setActiveProgressMs(p.activeProgressMs());
-        return state;
     }
 
     private static CommandSavedNpcPanelSnapshot decodeState(

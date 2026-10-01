@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopCompletionTracker;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
-import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
@@ -103,15 +102,9 @@ public final class CommandDirectLiveCoopSystem
             loadedPhysical.add(coop.physicalKey());
             boolean roaming = roaming(scan.worldTime(), coop.config());
             if (roaming) {
-                boolean readyForRelease = produce.produceWhileRoaming(
-                        coop, occupancies, profiles, projections.productionState(),
-                        BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(
-                                scan.world().getEntityStore().getStore()
-                        )
-                );
-                if (readyForRelease) {
-                    releaseFirstResident(scan, coop, occupancies, profiles);
-                }
+                // Production moved to the coop slot entries (companion.coop.CoopScheduleSystem);
+                // this never-registered 4.x system no longer produces.
+                releaseFirstResident(scan, coop, occupancies, profiles);
             } else {
                 captureNearest(
                         scan,

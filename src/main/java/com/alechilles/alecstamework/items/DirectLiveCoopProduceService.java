@@ -1,11 +1,10 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
-import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
-import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
-import com.alechilles.alecstamework.items.coop.DirectLiveCoopProductionState;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
@@ -18,36 +17,56 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.IntUnaryOperator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Retains the released coop produce behavior without participating in persistence authority. */
-final class DirectLiveCoopProduceService {
+/**
+ * Coop produce (spec 8.9) on the resident slot entries. While a coop's residents roam, each due
+ * interval of a resident's active time adds its role's drops to the coop container. The watermark
+ * ({@code producedUntilMs}, on the resident's active-time clock) lives in the slot entry; the
+ * caller writes the changed entries back to the block. Rules: interval max(24, IntervalGameHours)
+ * game hours, {@code ItemsPerTick} items per interval, drops by role, at most
+ * {@value #MAX_CATCH_UP_CYCLES_PER_SWEEP} intervals per sweep. Call on the coop's world thread.
+ */
+public final class DirectLiveCoopProduceService {
     private static final long GAME_MILLIS_PER_HOUR = 3_600_000L;
     private static final int MAX_CATCH_UP_CYCLES_PER_SWEEP = 32;
     private static final String DEFAULT_INTERACTION_STATE = "default";
     private static final String PRODUCE_READY_INTERACTION_STATE =
             "Produce_Ready";
 
-    boolean produceWhileRoaming(
+    /**
+     * A current resident: its slot entry, role and life stage. A companion's life stage comes from
+     * its record summary, an unowned resident's from its inline entity; null means its active time
+     * is unknown, and it produces nothing.
+     */
+    public record Resident(@Nonnull TameworkCoopSlotsComponent.Slot entry, @Nullable String roleId,
+                           @Nullable TameworkLifeStageComponent lifeStage) {
+    }
+
+    /**
+     * Produces for each resident and returns the entries whose watermark changed. A resident with
+     * no watermark starts from its current active time, with no free first interval.
+     */
+    @Nonnull
+    public List<TameworkCoopSlotsComponent.Slot> produce(
             @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop,
-            @Nonnull Map<CoopSlotKey, CoopOccupancy> occupancies,
-            @Nonnull Map<com.alechilles.alecstamework.companion.identity.ProfileId,
-                    CompanionProfileProjectionState> profiles,
-            @Nonnull DirectLiveCoopProductionState productionState,
+            @Nonnull List<Resident> residents,
             double gameSecondsPerRealSecond
     ) {
         ItemContainer container = coop.container();
-        Map<String, String> drops = normalizeDrops(
-                coop.config().getProduceRules().getDropsByRole()
-        );
-        if (container == null || drops.isEmpty()) {
-            return true;
+        TwCoopConfig config = coop.config();
+        Map<String, String> drops = config == null ? Map.of()
+                : normalizeDrops(config.getProduceRules().getDropsByRole());
+        if (container == null || drops.isEmpty() || residents.isEmpty()) {
+            return List.of();
         }
-        TwCoopConfig.ProduceRules rules = coop.config().getProduceRules();
+        TwCoopConfig.ProduceRules rules = config.getProduceRules();
         long intervalHours = Math.max(
                 WorldTimeResource.HOURS_PER_DAY,
                 rules.getIntervalGameHours()
@@ -60,76 +79,69 @@ final class DirectLiveCoopProduceService {
         int itemsPerTick = rules.getItemsPerTick();
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        boolean readyForRelease = true;
-        for (CoopSlotKey slot : coop.slots()) {
-            CoopOccupancy occupancy = occupancies.get(slot);
-            if (occupancy == null) {
-                continue;
-            }
-            // An unfinished capture/release owns this resident, including quarantined releases.
-            if (occupancy.slot().reserved()) {
-                readyForRelease = false;
-                continue;
-            }
-            CompanionProfileProjectionState profile =
-                    profiles.get(occupancy.residency().profileId());
-            if (profile == null) {
-                continue;
-            }
-            var profileId = occupancy.residency().profileId();
-            if (productionState.pending(profileId)) {
-                readyForRelease = false;
-                continue;
-            }
-            String role = normalize(profile == null ? null : profile.roleId());
+        List<TameworkCoopSlotsComponent.Slot> changed = new ArrayList<>();
+        for (Resident resident : residents) {
+            String role = normalize(resident.roleId());
             String dropId = role == null ? null : drops.get(role);
-            if (dropId == null) {
+            if (dropId == null || resident.lifeStage() == null
+                    || AnimalProgressionService.deathDue(resident.lifeStage(), resident.roleId())) {
                 continue;
             }
-            Long now = productionState.activeTime(profileId, occupancy.residency().snapshotId()).orElse(null);
-            if (now == null) {
-                readyForRelease = false;
-                continue;
-            }
-            if (productionState.deathDue(profileId, profile.roleId())) continue;
-            DirectLiveCoopProductionState.Watermark watermark = productionState.watermark(profileId).orElse(null);
-            if (watermark == null) {
-                readyForRelease = false;
-                if (productionState.malformedWatermark(profileId)) continue;
-                // Migration initializes at the current eligible time: no free first interval.
-                productionState.record(profileId, now, 0L);
-                continue;
-            }
-            int cycles = cyclesDue(now, watermark.eligibleMs(), intervalMs);
-            if (cycles <= 0) continue;
-            ItemDropList dropList = resolveDropList(ItemDropList.getAssetMap(), dropId);
-            int completed = 0;
-            boolean saturated = false;
-            boolean partialCycle = false;
-            for (int cycle = 0; cycle < cycles; cycle++) {
-                boolean cycleAdded = false;
-                for (int item = 0; item < itemsPerTick; item++) {
-                    ProductionResult result = produce(container, dropList, dropId, random);
-                    cycleAdded |= result.addedAny();
-                    if (!result.complete()) {
-                        partialCycle = cycleAdded;
-                        saturated = true;
-                        break;
-                    }
-                }
-                if (saturated) break;
-                completed++;
-            }
-            if (saturated && partialCycle) completed++;
-            if (completed > 0) {
-                productionState.record(profileId, watermark.eligibleMs() + completed * intervalMs,
-                        watermark.revision());
+            TameworkCoopSlotsComponent.Slot entry = resident.entry();
+            long now = AnimalProgressionService.activeTimeMs(resident.lifeStage());
+            long next = advance(entry.producedUntilMs(), now, intervalMs,
+                    cycles -> produceCycles(container, dropId, cycles, itemsPerTick, random));
+            if (next != entry.producedUntilMs()) {
+                changed.add(new TameworkCoopSlotsComponent.Slot(entry.slot(), entry.profileId(), entry.generation(),
+                        entry.unownedEntity(), next));
             }
         }
-        return readyForRelease;
+        return changed;
     }
 
-    void syncInteractionState(
+    /**
+     * The next watermark. No watermark (0) starts at {@code nowMs}. Otherwise the due cycles are
+     * offered to {@code produceCycles}, which returns how many it completed (a cycle cut short by
+     * a full container counts when it added something), and the watermark moves by those.
+     */
+    static long advance(long watermarkMs, long nowMs, long intervalMs, IntUnaryOperator produceCycles) {
+        if (watermarkMs == 0L) {
+            return nowMs;
+        }
+        int cycles = cyclesDue(nowMs, watermarkMs, intervalMs);
+        if (cycles <= 0) {
+            return watermarkMs;
+        }
+        int completed = produceCycles.applyAsInt(cycles);
+        return completed > 0 ? watermarkMs + completed * intervalMs : watermarkMs;
+    }
+
+    private int produceCycles(ItemContainer container, String dropId, int cycles, int itemsPerTick,
+                              ThreadLocalRandom random) {
+        ItemDropList dropList = resolveDropList(ItemDropList.getAssetMap(), dropId);
+        int completed = 0;
+        boolean saturated = false;
+        boolean partialCycle = false;
+        for (int cycle = 0; cycle < cycles; cycle++) {
+            boolean cycleAdded = false;
+            for (int item = 0; item < itemsPerTick; item++) {
+                ProductionResult result = produce(container, dropList, dropId, random);
+                cycleAdded |= result.addedAny();
+                if (!result.complete()) {
+                    partialCycle = cycleAdded;
+                    saturated = true;
+                    break;
+                }
+            }
+            if (saturated) break;
+            completed++;
+        }
+        if (saturated && partialCycle) completed++;
+        return completed;
+    }
+
+    /** Shows the produce-ready state while the coop container holds produce. */
+    public void syncInteractionState(
             @Nonnull World world,
             @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop
     ) {

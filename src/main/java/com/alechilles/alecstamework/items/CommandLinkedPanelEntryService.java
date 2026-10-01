@@ -529,7 +529,7 @@ final class CommandLinkedPanelEntryService {
                     "tamework.ui.notifications.command.locate.coop");
             if (stored != null && stored.coop() != null) {
                 var coop = stored.coop();
-                world = coop.worldKey();
+                world = coop.world();
                 targetX = coop.x();
                 targetZ = coop.z();
                 coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(

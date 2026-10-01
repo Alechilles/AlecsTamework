@@ -103,6 +103,73 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     }
 
     /**
+     * Spawns an unowned coop resident from its inline entity document (spec 8.9): no stamp, owner,
+     * command-link owner or record, the stored tamed state kept, a fresh NPC UUID, added with
+     * {@code AddReason.LOAD}. Alarms are not re-based: the document carries no game time, and a
+     * coop releases into its own world, whose clock kept running. Safe to call from any thread;
+     * the work runs on the destination world thread. Completes true exactly when the body is in
+     * the store, false (never exceptionally) when none was added.
+     */
+    @Nonnull
+    public CompletableFuture<Boolean> spawnUnowned(@Nonnull BsonDocument entity,
+                                                   @Nonnull RestoreFlow.Destination destination) {
+        CompletableFuture<Boolean> done = new CompletableFuture<>();
+        UUID npcUuid = UUID.randomUUID();
+        World world = Universe.get().getWorld(destination.world());
+        if (world == null) {
+            warn(npcUuid, "unowned resident: destination world " + destination.world() + " is not loaded", null);
+            done.complete(false);
+            return done;
+        }
+        try {
+            world.execute(() -> done.complete(spawnUnownedOnWorldThread(world, entity, destination, npcUuid)));
+        } catch (RuntimeException notAccepting) {
+            // World#execute throws when the world no longer accepts tasks; the task was not queued.
+            warn(npcUuid, "unowned resident: world " + destination.world() + " is not accepting tasks", notAccepting);
+            done.complete(false);
+        }
+        return done;
+    }
+
+    /** As {@link #spawnOnWorldThread}, for an unowned body: true exactly when it is in the store. */
+    private boolean spawnUnownedOnWorldThread(World world, BsonDocument entity, RestoreFlow.Destination destination,
+                                              UUID npcUuid) {
+        Ref<EntityStore> ref = null;
+        try {
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            Holder<EntityStore> holder = EntityStore.REGISTRY.deserialize(CompanionRespawn.stripDocument(entity));
+            if (holder == null) {
+                warn(npcUuid, "unowned resident did not deserialize", null);
+                return false;
+            }
+            Vector3d position = new Vector3d(destination.x(), destination.y(), destination.z());
+            // prepare() stamps the body; stripOwnership() removes the stamp again.
+            respawn.prepare(holder, position, new Rotation3f(destination.pitch(), destination.yaw(), 0.0f),
+                    npcUuid, npcUuid, 0L);
+            repointAvatarFlightOrigin(holder, destination);
+            stripOwnership(holder, stampType);
+            ref = new Ref<>(store);
+            if (store.addEntity(holder, ref, AddReason.LOAD) == null) {
+                warn(npcUuid, "the world rejected the unowned resident", null);
+                return false;
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            boolean added = ref != null && ref.isValid();
+            warn(npcUuid, added ? "an on-add step failed after the unowned resident was added"
+                    : "unowned resident spawn failed", failure);
+            if (!added) {
+                return false;
+            }
+        }
+        try {
+            CompanionSaves.markChanged(ref.getStore(), ref);
+        } catch (RuntimeException | LinkageError failure) {
+            warn(npcUuid, "a step after the unowned resident was added failed", failure);
+        }
+        return true;
+    }
+
+    /**
      * Returns true exactly when the new body is in the store. The ref is allocated before the add
      * because {@code Store#addEntity} inserts the entity before it runs the on-add systems and
      * consumes their buffer; a throw from those leaves a live body, which must report true.
@@ -182,14 +249,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         TameworkCommandLinksComponent links = linksType == null ? null : holder.getComponent(linksType);
         UUID owner = committed.ownerUuid();
         if (unowned) {
-            if (ownerType != null) {
-                holder.tryRemoveComponent(ownerType);
-            }
-            holder.tryRemoveComponent(stampType);
-            if (links != null) {
-                holder.putComponent(linksType, new TameworkCommandLinksComponent(null, new String[0],
-                        links.getHomePosition()));
-            }
+            stripOwnership(holder, stampType);
             return;
         }
         if (owner == null) {
@@ -204,6 +264,23 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         }
         if (links != null) {
             holder.putComponent(linksType, new TameworkCommandLinksComponent(owner, links.getToolIds(),
+                    links.getHomePosition()));
+        }
+    }
+
+    /** Removes the owner and stamp and clears the command-link owner and tools; the tamed flag stays. */
+    private static void stripOwnership(Holder<EntityStore> holder,
+                                       ComponentType<EntityStore, TameworkCompanionComponent> stampType) {
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType != null) {
+            holder.tryRemoveComponent(ownerType);
+        }
+        holder.tryRemoveComponent(stampType);
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType == null ? null : holder.getComponent(linksType);
+        if (links != null) {
+            holder.putComponent(linksType, new TameworkCommandLinksComponent(null, new String[0],
                     links.getHomePosition()));
         }
     }

@@ -47,6 +47,17 @@ class CommandSavedNpcPanelSummaryTest {
     private static final double GAME_RATE = 3.0;
 
     @Test
+    void coopRecordCarriesItsCoopBlockEvenWithoutASummary() {
+        CompanionRecord record = CompanionRecord.builder(UUID.randomUUID(), ROLE,
+                CompanionLocation.coop("farm", 4, 64, -9, 2)).build();
+
+        CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.fromSummary(record);
+
+        assertNotNull(saved);
+        assertEquals(new CommandSavedNpcPanelSnapshot.CoopLocation("farm", 4, 64, -9), saved.storedLocation().coop());
+    }
+
+    @Test
     void summaryPanelMatchesTheDecodedCheckpointForCountdownsAndLifeStage() throws Exception {
         try (var ignored = new AgingConfig(ROLE)) {
             long worldMs = -1_000_000L;

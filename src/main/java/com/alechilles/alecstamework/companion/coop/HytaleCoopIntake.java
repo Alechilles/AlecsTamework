@@ -373,7 +373,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
 
     /** The loaded block entity at the position, or null. Call on the world thread. */
     @Nullable
-    private static Block block(World world, int x, int y, int z) {
+    static Block block(World world, int x, int y, int z) {
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> store = chunkStore == null ? null : chunkStore.getStore();
         if (store == null) {
@@ -396,7 +396,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         return new Block(store, ref, info, type == null ? null : store.getComponent(ref, type));
     }
 
-    private record Block(Store<ChunkStore> store, Ref<ChunkStore> ref, BlockModule.BlockStateInfo info,
+    record Block(Store<ChunkStore> store, Ref<ChunkStore> ref, BlockModule.BlockStateInfo info,
                          @Nullable TameworkCoopSlotsComponent slots) {
     }
 }
