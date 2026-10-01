@@ -31,7 +31,8 @@ public final class SnapshotPatch {
     private static final String PARAMETERS = "Parameters";
     private static final String INSTANT = "Instant";
     private static final String[] ALARM_TIMES = {"UntilMs", "StartedAtMs"};
-    private static final String[] BREEDING_TIMES = {"CooldownUntilMs", "CooldownStartedAtMs", "ManualBreedingUntilMs"};
+    // ManualBreedingUntilMs is wall clock (ManualBreedingClock) and must not be shifted.
+    private static final String[] BREEDING_TIMES = {"CooldownUntilMs", "CooldownStartedAtMs"};
 
     private SnapshotPatch() {
     }

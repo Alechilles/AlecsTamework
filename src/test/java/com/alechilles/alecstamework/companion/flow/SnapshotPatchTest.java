@@ -50,7 +50,7 @@ class SnapshotPatchTest {
                 new BsonDocument("Name", new BsonString("graze")).append("UntilMs", new BsonInt64(10_000L))
                         .append("StartedAtMs", new BsonInt64(0L))))))
                 .append("TameworkBreeding", new BsonDocument("CooldownUntilMs", new BsonInt64(-4_000L))
-                        .append("ManualBreedingUntilMs", new BsonInt64(0L)));
+                        .append("ManualBreedingUntilMs", new BsonInt64(9_000L)));
 
         BsonDocument rebased = SnapshotPatch.rebaseAlarms(entity(components), -2_000L).getDocument("Components");
 
@@ -58,7 +58,7 @@ class SnapshotPatchTest {
         assertEquals(8_000L, alarm.getInt64("UntilMs").getValue());
         assertEquals(0L, alarm.getInt64("StartedAtMs").getValue());
         assertEquals(-6_000L, rebased.getDocument("TameworkBreeding").getInt64("CooldownUntilMs").getValue());
-        assertEquals(0L, rebased.getDocument("TameworkBreeding").getInt64("ManualBreedingUntilMs").getValue());
+        assertEquals(9_000L, rebased.getDocument("TameworkBreeding").getInt64("ManualBreedingUntilMs").getValue());
 
         // Once progression is initialized, AnimalProgressionService.currentTimeMs is a clock the body carries.
         components.append("TameworkLifeStage", new BsonDocument("ProgressionInitialized", BsonBoolean.TRUE));
