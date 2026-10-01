@@ -395,6 +395,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             return;
         }
         if (!nestedExplicitKeys.contains("ClearsOwner")) capture.clearsOwner = parent.capture.clearsOwner;
+        if (!nestedExplicitKeys.contains("OwnershipFollowsHolder")) capture.ownershipFollowsHolder = parent.capture.ownershipFollowsHolder;
+        if (!nestedExplicitKeys.contains("BlockIneligibleHolders")) capture.blockIneligibleHolders = parent.capture.blockIneligibleHolders;
         if (!nestedExplicitKeys.contains("RequireTamed")) capture.requireTamed = parent.capture.requireTamed;
         if (!nestedExplicitKeys.contains("TamesTarget")) capture.tamesTarget = parent.capture.tamesTarget;
         if (!nestedExplicitKeys.contains("MaxHealthPercent")) capture.maxHealthPercent = parent.capture.maxHealthPercent;
@@ -482,6 +484,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         return ItemFeatureConfig.builder()
             .spawnerEnabled(true)
             .captureClearsOwner(captureSettings.clearsOwner)
+            .captureOwnershipFollowsHolder(captureSettings.ownershipFollowsHolder)
+            .captureBlockIneligibleHolders(captureSettings.blockIneligibleHolders)
             .captureRequireTamed(captureSettings.requireTamed)
             .captureTamesTarget(captureSettings.tamesTarget)
             .captureOwnerRestricted(captureSettings.ownerRestricted)
@@ -580,6 +584,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
     public static final class CaptureSettings {
         boolean clearsOwner = true;
+        boolean ownershipFollowsHolder = true;
+        boolean blockIneligibleHolders = true;
         boolean requireTamed = true;
         boolean tamesTarget;
         Double maxHealthPercent;

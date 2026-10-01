@@ -54,6 +54,8 @@ public final class ItemFeatureConfig {
 
     private final boolean spawnerEnabled;
     private final boolean captureClearsOwner;
+    private final boolean captureOwnershipFollowsHolder;
+    private final boolean captureBlockIneligibleHolders;
     private final boolean captureRequireTamed;
     private final boolean captureTamesTarget;
     private final boolean captureOwnerRestricted;
@@ -85,6 +87,8 @@ public final class ItemFeatureConfig {
     private ItemFeatureConfig(Builder builder) {
         this.spawnerEnabled = builder.spawnerEnabled;
         this.captureClearsOwner = builder.captureClearsOwner;
+        this.captureOwnershipFollowsHolder = builder.captureOwnershipFollowsHolder;
+        this.captureBlockIneligibleHolders = builder.captureBlockIneligibleHolders;
         this.captureRequireTamed = builder.captureRequireTamed;
         this.captureTamesTarget = builder.captureTamesTarget;
         this.captureOwnerRestricted = builder.captureOwnerRestricted;
@@ -124,6 +128,19 @@ public final class ItemFeatureConfig {
 
     public boolean isCaptureClearsOwner() {
         return captureClearsOwner;
+    }
+
+    /**
+     * {@code Capture.OwnershipFollowsHolder} (spec 8.14): a capture item entering another player's
+     * inventory moves its companion to that player. Applies only when capture keeps the owner.
+     */
+    public boolean isCaptureOwnershipFollowsHolder() {
+        return captureOwnershipFollowsHolder;
+    }
+
+    /** {@code Capture.BlockIneligibleHolders} (spec 8.14): a player who could not take ownership cannot pick the item up. */
+    public boolean isCaptureBlockIneligibleHolders() {
+        return captureBlockIneligibleHolders;
     }
 
     public boolean isCaptureRequireTamed() {
@@ -391,6 +408,8 @@ public final class ItemFeatureConfig {
     public static final class Builder {
         private boolean spawnerEnabled;
         private boolean captureClearsOwner = true;
+        private boolean captureOwnershipFollowsHolder = true;
+        private boolean captureBlockIneligibleHolders = true;
         private boolean captureRequireTamed = true;
         private boolean captureTamesTarget;
         private boolean captureOwnerRestricted = true;
@@ -429,6 +448,16 @@ public final class ItemFeatureConfig {
 
         public Builder captureClearsOwner(boolean captureClearsOwner) {
             this.captureClearsOwner = captureClearsOwner;
+            return this;
+        }
+
+        public Builder captureOwnershipFollowsHolder(boolean captureOwnershipFollowsHolder) {
+            this.captureOwnershipFollowsHolder = captureOwnershipFollowsHolder;
+            return this;
+        }
+
+        public Builder captureBlockIneligibleHolders(boolean captureBlockIneligibleHolders) {
+            this.captureBlockIneligibleHolders = captureBlockIneligibleHolders;
             return this;
         }
 
@@ -606,6 +635,8 @@ public final class ItemFeatureConfig {
         ItemFeatureConfig other = (ItemFeatureConfig) obj;
         return spawnerEnabled == other.spawnerEnabled
                 && captureClearsOwner == other.captureClearsOwner
+                && captureOwnershipFollowsHolder == other.captureOwnershipFollowsHolder
+                && captureBlockIneligibleHolders == other.captureBlockIneligibleHolders
                 && captureRequireTamed == other.captureRequireTamed
                 && captureTamesTarget == other.captureTamesTarget
                 && captureOwnerRestricted == other.captureOwnerRestricted
@@ -640,6 +671,8 @@ public final class ItemFeatureConfig {
         return Objects.hash(
                 spawnerEnabled,
                 captureClearsOwner,
+                captureOwnershipFollowsHolder,
+                captureBlockIneligibleHolders,
                 captureRequireTamed,
                 captureTamesTarget,
                 captureOwnerRestricted,
