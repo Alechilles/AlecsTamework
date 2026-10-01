@@ -66,5 +66,8 @@ class RestoreRulesTest {
         assertEquals(RestoreRules.Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(record,
                 snapshot(record, record.generation() + 1, false), RestoreRules.Reason.RECALL));
         assertEquals(RestoreRules.Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(record, null, RestoreRules.Reason.RECALL));
+        SnapshotEnvelope noEntity = new SnapshotEnvelope(record.profileId(), CompanionSnapshots.FORMAT,
+                record.generation(), new BsonDocument("World", new BsonString("default")));
+        assertEquals(RestoreRules.Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(record, noEntity, RestoreRules.Reason.RECALL));
     }
 }

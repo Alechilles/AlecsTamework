@@ -37,11 +37,13 @@ public final class RestoreRules {
 
     /**
      * Whether this snapshot may restore the record: it must exist, use {@link CompanionSnapshots#FORMAT},
-     * and be no newer than the record. A snapshot taken at death serves only a revive.
+     * be no newer than the record, and hold an entity document. A snapshot taken at death serves
+     * only a revive.
      */
     @Nonnull
     public static Verdict forSnapshot(@Nonnull CompanionRecord record, @Nullable SnapshotEnvelope snapshot, @Nonnull Reason reason) {
-        if (snapshot == null || snapshot.format() != CompanionSnapshots.FORMAT || snapshot.generation() > record.generation()) {
+        if (snapshot == null || snapshot.format() != CompanionSnapshots.FORMAT || snapshot.generation() > record.generation()
+                || !snapshot.data().isDocument("Entity")) {
             return Verdict.NO_SNAPSHOT;
         }
         if (reason != Reason.REVIVE && SnapshotPatch.isDeathSnapshot(CompanionSnapshots.entity(snapshot))) {
