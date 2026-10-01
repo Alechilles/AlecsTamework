@@ -170,6 +170,41 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(readOnly, card + " #ActiveToggleInactiveButton.Visible", false);
     }
 
+    // Catches a dead card without its revive time, a countdown that stops at the first
+    // render, or a stale caption left on a reused live row.
+    @Test
+    void deadCardShowsALiveReviveCountdownAndLiveCardsHideIt() {
+        UUID id = UUID.randomUUID();
+        LinkedNpcEntry dead = new LinkedNpcEntry(id, "Duck", 0, 25,
+                0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
+                false, 125_000L, LinkedNpcTraitIndicator.EMPTY);
+        String caption = "#TameworkLinkedPanelList[0] #ReviveCountdown";
+        UICommandBuilder full = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(full, new UIEventBuilder(), 0, dead, false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        assertVisible(full, caption + ".Visible", true);
+        assertText(full, caption + ".Text", "Revive in "
+                + LinkedNpcPanelStatusTextService.formatRemainingTime(125_000L, "en-US"));
+
+        UICommandBuilder tick = new UICommandBuilder();
+        LinkedNpcPanelCountdownPresenter.refresh(tick, new UIEventBuilder(),
+                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 125_000L, "en-US");
+        assertText(tick, caption + ".Text", "Ready to revive");
+
+        UICommandBuilder live = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(live, new UIEventBuilder(), 0, entryForIdentity(id), false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        assertVisible(live, caption + ".Visible", false);
+    }
+
+    private static void assertText(UICommandBuilder commands, String selector, String text) {
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set(selector, text);
+        assertEquals(expected.getCommands()[0].data, Arrays.stream(commands.getCommands())
+                .filter(command -> selector.equals(command.selector))
+                .reduce((first, last) -> last).orElseThrow().data);
+    }
+
     private static org.bson.BsonDocument anchor(UICommandBuilder commands, String selector) {
         return org.bson.BsonDocument.parse(Arrays.stream(commands.getCommands())
                 .filter(command -> selector.equals(command.selector))

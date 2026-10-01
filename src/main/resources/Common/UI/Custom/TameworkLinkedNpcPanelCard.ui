@@ -24,6 +24,7 @@ $C = "Common.ui";
 @LifecycleSeniorLabel = LabelStyle(FontSize: 9, TextColor: #d9a86f);
 @InlineRecallCountdown = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #ffcf6e, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
 @RecallCountdown = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center);
+@ReviveCountdown = LabelStyle(FontSize: 9, TextColor: #b9beb8, HorizontalAlignment: Center, VerticalAlignment: Center);
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @PortraitCompactStyle = ItemGridStyle(SlotSize: 48, SlotSpacing: 0, SlotIconSize: 48);
 
@@ -102,6 +103,7 @@ Group {
     Label #StatusConfirm { Anchor: (Top: 30, Left: 432, Width: 414, Height: 16); Text: %server.tamework.ui.linkedPanel.card.confirmRemove; Style: (FontSize: 11, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #StatusInactive { Anchor: (Top: 43, Left: 48, Width: 96, Height: 18); Text: %server.tamework.ui.linkedPanel.card.inactive; Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #RecallCountdown { Anchor: (Top: 72, Left: 568, Width: 270, Height: 20); Text: %server.tamework.ui.linkedPanel.card.recallCountdown.default; Style: (FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Label #ReviveCountdown { Anchor: (Top: 98, Left: 432, Width: 414, Height: 12); Text: ""; Style: @ReviveCountdown; HitTestVisible: false; Visible: false; }
     Group #InlineLocation { Anchor: (Top: 32, Left: 432, Width: 414, Height: 74); Visible: false;
         Label #Heading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #a9b69f, VerticalAlignment: Center); }
         Label #Status { Anchor: (Top: 14, Left: 0, Right: 0, Height: 14); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center); Visible: false; }

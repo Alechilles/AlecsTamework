@@ -370,6 +370,11 @@ final class LinkedNpcPanelCardBinder {
         }
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
         commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
+        // Roster and bonded rows already report revival in #RosterTimer.
+        String reviveCaption = emblem == null || showInlineLocation || rosterLayout ? null
+                : LinkedNpcPanelStatusTextService.resolveReviveCaption(
+                        entry, entry.deadRespawnRemainingMs(), language);
+        commandBuilder.set(entrySelector + " #ReviveCountdown.Visible", reviveCaption != null);
         if (emblem != null && !showInlineLocation) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
@@ -386,6 +391,11 @@ final class LinkedNpcPanelCardBinder {
                     fixedAnchor(labelTop, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(lost ? labelTop + 18 : 98, statusLeft, statusWidth, 12));
+            if (reviveCaption != null) {
+                commandBuilder.set(entrySelector + " #ReviveCountdown.Text", reviveCaption);
+                commandBuilder.setObject(entrySelector + " #ReviveCountdown.Anchor",
+                        fixedAnchor(labelTop + 16, statusLeft, statusWidth, 12));
+            }
         }
         commandBuilder.set(inlineLocationSelector + ".Visible", showInlineLocation);
         if (showInlineLocation) {

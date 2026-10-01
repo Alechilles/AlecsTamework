@@ -46,6 +46,12 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     (current.recallLostRemainingMs() + 999L) / 1_000L
             ));
         }
+        String reviveCaption = previous.deadRespawnRemainingMs() == current.deadRespawnRemainingMs()
+                ? null : LinkedNpcPanelStatusTextService.resolveReviveCaption(
+                        current, current.deadRespawnRemainingMs(), language);
+        if (reviveCaption != null) {
+            commands.set(selector + " #ReviveCountdown.Text", reviveCaption);
+        }
         refreshProgression(commands, selector, previous, current);
         if (previous.flightToggleAirborne() != current.flightToggleAirborne()) {
             refreshFlightMode(commands, selector, current, language);

@@ -47,6 +47,18 @@ final class LinkedNpcPanelStatusTextService {
         return primary + "\n" + entry.deathCauseHint();
     }
 
+    /**
+     * Returns the revive caption shown under the DEAD emblem, or {@code null} when the
+     * companion is not dead or revival is disabled (negative remaining time).
+     */
+    static String resolveReviveCaption(LinkedNpcEntry entry, long remainingMs, String language) {
+        if (entry == null || !entry.dead() || remainingMs < 0L) return null;
+        return remainingMs == 0L
+                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.reviveReady")
+                : LocalizedText.format(language, "tamework.ui.linkedPanel.status.reviveIn",
+                        formatRemainingTime(remainingMs, language));
+    }
+
     /** Uses the same lifecycle precedence as the status label; recovery holds keep their own text. */
     static String resolveAvailabilityEmblem(LinkedNpcEntry entry) {
         if (entry == null || entry.recoveryHeld()) return null;
