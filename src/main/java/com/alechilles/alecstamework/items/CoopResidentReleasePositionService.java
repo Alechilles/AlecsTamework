@@ -101,8 +101,9 @@ public final class CoopResidentReleasePositionService {
         return coopBlockY - MAX_VERTICAL_DROP_BELOW_COOP;
     }
 
+    /** The offset turned by the coop block's yaw rotation. */
     @Nonnull
-    Vector3d rotateHorizontalOffset(int coopRotationIndex, double x, double y, double z) {
+    public Vector3d rotateHorizontalOffset(int coopRotationIndex, double x, double y, double z) {
         Rotation yawRotation = resolveYawRotation(coopRotationIndex);
         return yawRotation.rotateY(new Vector3d(x, y, z), new Vector3d());
     }

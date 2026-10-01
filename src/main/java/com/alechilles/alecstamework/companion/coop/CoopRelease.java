@@ -13,7 +13,6 @@ import java.util.function.Function;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.bson.BsonDocument;
 
 /**
  * Releases one coop resident (spec 8.9), at the morning roam start or when the block breaks.
@@ -23,12 +22,14 @@ import org.bson.BsonDocument;
  *   LIVE and spawns the body; the slot is cleared only after RESTORED. A lost clear is harmless:
  *   the entry is then stale by generation.</li>
  *   <li><b>Unowned resident:</b> it has no record, so its inline entity is spawned first and the
- *   slot is cleared only after a successful spawn; a failed spawn keeps the entry.</li>
+ *   port clears the slot in the same world task once the body is in the store; a failed spawn
+ *   keeps the entry.</li>
  * </ul>
  *
  * <p>One release per slot runs at a time, until its slot clear has run, so the next sweep cannot
  * spawn an unowned resident twice. A failed release waits {@link #RETRY_DELAY_MS} before the
- * morning sweep tries it again, so one stuck resident neither spams nor blocks the others.
+ * morning sweep tries it again, so one stuck resident neither spams nor blocks the others; the
+ * mark expires when it is next checked.
  */
 public final class CoopRelease {
     static final long RETRY_DELAY_MS = 30_000L;
@@ -40,18 +41,32 @@ public final class CoopRelease {
         }
     }
 
+    /**
+     * How a release ended. {@code cause} is empty when released, otherwise the restore result's
+     * name, {@code SPAWN_FAILED}, {@code BUSY} (a release of this slot is running) or {@code ERROR}.
+     */
+    public record Outcome(boolean released, @Nonnull String cause) {
+        static final Outcome RELEASED = new Outcome(true, "");
+    }
+
     /** The world side of a release. */
     public interface Port {
         @Nonnull
         CompletableFuture<RestoreFlow.Result> restore(@Nonnull RestoreFlow.Request request);
 
-        /** Spawns an unowned resident; completes false (never exceptionally) when no body was added. */
+        /**
+         * Spawns the unowned resident in {@code entry} and, in the same world task once the body is
+         * in the store, removes the entry from the coop. Completes false (never exceptionally)
+         * when no body was added.
+         */
         @Nonnull
-        CompletableFuture<Boolean> spawnUnowned(@Nonnull BsonDocument entity, @Nonnull RestoreFlow.Destination destination);
+        CompletableFuture<Boolean> spawnUnowned(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry,
+                                                @Nonnull RestoreFlow.Destination destination);
 
         /**
-         * Removes {@code entry} from the coop on its world thread when the slot still holds it; a
-         * broken or unloaded block is left alone. Completes once that ran (or could not run).
+         * Removes a released companion's {@code entry} from the coop on its world thread when the
+         * slot still holds it; a broken or unloaded block is left alone. Completes once that ran
+         * (or could not run).
          */
         @Nonnull
         CompletableFuture<Void> clearSlot(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry);
@@ -84,55 +99,59 @@ public final class CoopRelease {
 
     /** Like {@link #resident}, also skipping a resident whose last release failed recently. */
     public boolean releasableNow(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry) {
-        Long failed = failedAt.get(key(at, entry.slot()));
-        return (failed == null || clock.getAsLong() - failed >= RETRY_DELAY_MS) && resident(at, entry);
+        String key = key(at, entry.slot());
+        Long failed = failedAt.get(key);
+        if (failed != null) {
+            if (clock.getAsLong() - failed < RETRY_DELAY_MS) {
+                return false;
+            }
+            failedAt.remove(key, failed);
+        }
+        return resident(at, entry);
     }
 
     /**
-     * Starts the release of a resident checked with {@link #resident}. Completes true once the
-     * resident is out (never exceptionally); its slot clear has then run.
+     * Starts the release of a resident checked with {@link #resident}. Completes (never
+     * exceptionally) once the resident is out and its slot clear has run, or with the failure.
      */
     @Nonnull
-    public CompletableFuture<Boolean> release(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry,
+    public CompletableFuture<Outcome> release(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry,
                                               @Nonnull RestoreFlow.Destination destination) {
         String key = key(at, entry.slot());
         if (!inFlight.add(key)) {
-            return CompletableFuture.completedFuture(false);
+            return CompletableFuture.completedFuture(new Outcome(false, "BUSY"));
         }
-        CompletableFuture<Boolean> out;
+        CompletableFuture<Outcome> out;
         try {
             out = entry.unownedEntity() != null
-                    ? port.spawnUnowned(entry.unownedEntity(), destination)
+                    ? port.spawnUnowned(at, entry, destination)
+                    .thenApply(spawned -> spawned ? Outcome.RELEASED : new Outcome(false, "SPAWN_FAILED"))
                     : port.restore(RestoreFlow.Request.of(entry.profileId(), RestoreRules.Reason.COOP_RELEASE,
                             destination).withGeneration(entry.generation()))
-                    .thenApply(result -> result == RestoreFlow.Result.RESTORED);
+                    .thenCompose(result -> result == RestoreFlow.Result.RESTORED
+                            ? port.clearSlot(at, entry).exceptionally(failure -> null)
+                            .thenApply(ignored -> Outcome.RELEASED)
+                            : CompletableFuture.completedFuture(new Outcome(false, result.name())));
         } catch (RuntimeException failure) {
             out = CompletableFuture.failedFuture(failure);
         }
-        CompletableFuture<Boolean> done = new CompletableFuture<>();
-        out.exceptionally(failure -> false).thenCompose(released -> released
-                        ? port.clearSlot(at, entry).exceptionally(failure -> null).thenApply(ignored -> true)
-                        : CompletableFuture.completedFuture(false))
-                .whenComplete((released, failure) -> {
-                    boolean ok = failure == null && Boolean.TRUE.equals(released);
-                    if (ok) {
-                        failedAt.remove(key);
-                    } else {
-                        failedAt.put(key, clock.getAsLong());
-                    }
-                    inFlight.remove(key);
-                    done.complete(ok);
-                });
+        CompletableFuture<Outcome> done = new CompletableFuture<>();
+        out.whenComplete((outcome, failure) -> {
+            Outcome ended = failure != null || outcome == null ? new Outcome(false, "ERROR") : outcome;
+            if (ended.released()) {
+                failedAt.remove(key);
+            } else {
+                failedAt.put(key, clock.getAsLong());
+            }
+            inFlight.remove(key);
+            done.complete(ended);
+        });
         return done;
     }
 
-    /** Drops failure marks older than the retry delay. Called once per sweep. */
-    public void pruneFailures() {
-        long now = clock.getAsLong();
-        failedAt.values().removeIf(failed -> now - failed >= RETRY_DELAY_MS);
-    }
-
-    private static String key(At at, int slot) {
+    /** One slot of one coop, for per-slot bookkeeping. */
+    @Nonnull
+    static String key(@Nonnull At at, int slot) {
         return at.world() + '|' + at.x() + '|' + at.y() + '|' + at.z() + '|' + slot;
     }
 }

@@ -20,9 +20,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -50,12 +52,17 @@ import org.joml.Vector3i;
 public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final long SWEEP_INTERVAL_MS = 1_000L;
+    private static final long WARN_INTERVAL_MS = 60_000L;
+    /** Above this many throttle entries, expired ones are dropped. */
+    private static final int MAX_WARN_KEYS = 256;
 
     private final HytaleCoopIntake intake;
     private final HytaleCoopResidents residents;
     @Nullable private final ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> retiredReceipts;
     private final HytaleDirectLiveCoopScanner scanner = new HytaleDirectLiveCoopScanner();
     private final StoreScopedState<TickState> tickStates = new StoreScopedState<>(TickState::new);
+    /** Last WARN time per coop and step; touched only on world threads, which share this instance. */
+    private final Map<String, Long> lastWarnAt = new ConcurrentHashMap<>();
 
     /** {@code retiredReceipts} is the registered retired receipts type, stripped from blocks. */
     public CoopScheduleSystem(@Nonnull HytaleCoopIntake intake, @Nonnull HytaleCoopResidents residents,
@@ -75,7 +82,6 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
         state.nextSweepAtMs = now + SWEEP_INTERVAL_MS;
         stripRetiredReceipts(chunkStore);
         intake.pruneSnapshotFailures();
-        residents.pruneFailures();
         HytaleDirectLiveCoopScanner.Scan scan = scanner.scan(chunkStore, CoopScheduleSystem::takesInNow);
         if (scan == null) {
             return;
@@ -104,17 +110,36 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
                     try {
                         residents.roam(world, coop);
                     } catch (RuntimeException | LinkageError failure) {
-                        LOGGER.at(Level.WARNING).withCause(failure).log("Coop resident sweep failed at %s",
-                                coop.block());
+                        warnThrottled(world, coop, "resident sweep", failure);
                     }
                 }
                 for (HytaleDirectLiveCoopScanner.LoadedCoop coop : coops) {
-                    residents.syncInteractionState(world, coop);
+                    try {
+                        residents.syncInteractionState(world, coop);
+                    } catch (RuntimeException | LinkageError failure) {
+                        warnThrottled(world, coop, "produce-ready state", failure);
+                    }
                 }
             });
         } catch (RuntimeException notAccepting) {
             // World#execute throws when the world no longer accepts tasks; the next sweep retries.
         }
+    }
+
+    /** WARNs at most once per {@link #WARN_INTERVAL_MS} for each coop, since the sweep repeats every second. */
+    private void warnThrottled(World world, HytaleDirectLiveCoopScanner.LoadedCoop coop, String what, Throwable failure) {
+        String key = world.getName() + '|' + coop.block().x + '|' + coop.block().y + '|' + coop.block().z + '|' + what;
+        long now = System.currentTimeMillis();
+        Long last = lastWarnAt.get(key);
+        if (last != null && now - last < WARN_INTERVAL_MS) {
+            return;
+        }
+        if (lastWarnAt.size() >= MAX_WARN_KEYS) {
+            lastWarnAt.values().removeIf(at -> now - at >= WARN_INTERVAL_MS);
+        }
+        lastWarnAt.put(key, now);
+        LOGGER.at(Level.WARNING).withCause(failure).log("Coop %s failed at %s in world %s", what, coop.block(),
+                world.getName());
     }
 
     /** A coop that captures in range and is outside its roam hours. */

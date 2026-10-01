@@ -27,8 +27,10 @@ import javax.annotation.Nullable;
 
 /**
  * Coop produce (spec 8.9) on the resident slot entries. While a coop's residents roam, each due
- * interval of a resident's active time adds its role's drops to the coop container. The watermark
- * ({@code producedUntilMs}, on the resident's active-time clock) lives in the slot entry; the
+ * interval of a resident's clock adds its role's drops to the coop container. The clock is the
+ * resident's active time when it has a life stage, otherwise (an unowned NPC without one, such as
+ * a plain wild chicken) the coop world's game time. The watermark ({@code producedUntilMs}, on
+ * that clock) lives in the slot entry; the
  * caller writes the changed entries back to the block, and a companion's also to its record
  * ({@code CoopProduction}), so it carries across stays. Rules: interval max(24, IntervalGameHours)
  * game hours, {@code ItemsPerTick} items per interval, drops by role, at most
@@ -43,23 +45,29 @@ public final class DirectLiveCoopProduceService {
 
     /**
      * A current resident: its slot entry, role and life stage. A companion's life stage comes from
-     * its record summary, an unowned resident's from its inline entity; null means its active time
-     * is unknown, and it produces nothing.
+     * its record summary, an unowned resident's from its inline entity. Without one, a companion
+     * produces nothing (its active time is unknown) and an unowned resident uses world game time.
      */
     public record Resident(@Nonnull TameworkCoopSlotsComponent.Slot entry, @Nullable String roleId,
                            @Nullable TameworkLifeStageComponent lifeStage) {
     }
 
+    /** A resident's production clock: its current time and one interval, both in that clock's ms. */
+    record Clock(long nowMs, long intervalMs) {
+    }
+
     /**
      * Produces for each resident and returns the entries whose watermark changed. A companion with
      * no watermark starts from its current active time, with no free first interval; an unowned
-     * resident see {@link #startingWatermark}.
+     * resident see {@link #startingWatermark}. {@code worldGameTimeMs} is the coop world's game
+     * time, 0 when unknown.
      */
     @Nonnull
     public List<TameworkCoopSlotsComponent.Slot> produce(
             @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop,
             @Nonnull List<Resident> residents,
-            double gameSecondsPerRealSecond
+            double gameSecondsPerRealSecond,
+            long worldGameTimeMs
     ) {
         ItemContainer container = coop.container();
         TwCoopConfig config = coop.config();
@@ -75,9 +83,8 @@ public final class DirectLiveCoopProduceService {
         );
         double safeRate = Double.isFinite(gameSecondsPerRealSecond)
                 && gameSecondsPerRealSecond > 0.0 ? gameSecondsPerRealSecond : 1.0;
-        long intervalMs = Math.max(1L, (long) Math.ceil(
-                (intervalHours * (double) GAME_MILLIS_PER_HOUR) / safeRate
-        ));
+        long gameIntervalMs = intervalHours * GAME_MILLIS_PER_HOUR;
+        long activeIntervalMs = Math.max(1L, (long) Math.ceil(gameIntervalMs / safeRate));
         int itemsPerTick = rules.getItemsPerTick();
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
@@ -85,12 +92,14 @@ public final class DirectLiveCoopProduceService {
         for (Resident resident : residents) {
             String role = normalize(resident.roleId());
             String dropId = role == null ? null : drops.get(role);
-            if (dropId == null || resident.lifeStage() == null
-                    || AnimalProgressionService.deathDue(resident.lifeStage(), resident.roleId())) {
+            Clock clock = dropId == null ? null : clock(resident, activeIntervalMs, worldGameTimeMs, gameIntervalMs);
+            if (clock == null || resident.lifeStage() != null
+                    && AnimalProgressionService.deathDue(resident.lifeStage(), resident.roleId())) {
                 continue;
             }
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
-            long now = AnimalProgressionService.activeTimeMs(resident.lifeStage());
+            long now = clock.nowMs();
+            long intervalMs = clock.intervalMs();
             long next = advance(startingWatermark(entry, now, intervalMs), now, intervalMs,
                     cycles -> produceCycles(container, dropId, cycles, itemsPerTick, random));
             if (next != entry.producedUntilMs()) {
@@ -102,16 +111,31 @@ public final class DirectLiveCoopProduceService {
     }
 
     /**
+     * The resident's clock: active time with a life stage; world game time for an unowned resident
+     * without one (null when that is unknown); null for a companion without one.
+     */
+    @Nullable
+    static Clock clock(@Nonnull Resident resident, long activeIntervalMs, long worldGameTimeMs, long gameIntervalMs) {
+        if (resident.lifeStage() != null) {
+            return new Clock(AnimalProgressionService.activeTimeMs(resident.lifeStage()), activeIntervalMs);
+        }
+        return resident.entry().unownedEntity() != null && worldGameTimeMs != 0L
+                ? new Clock(worldGameTimeMs, gameIntervalMs) : null;
+    }
+
+    /**
      * The watermark production starts from. A companion's comes from its slot entry, which intake
      * fills from the record, so it carries across stays. An unowned resident has no record and
      * starts each stay without one: it starts one interval in the past, so it produces at most
-     * one cycle per stay. Returns 0 (none) for a companion without one.
+     * one cycle per stay. Returns 0 (none) for a companion without one. World game time can be
+     * negative, so the start keeps its sign and only avoids 0, the "none" value.
      */
     static long startingWatermark(@Nonnull TameworkCoopSlotsComponent.Slot entry, long nowMs, long intervalMs) {
         if (entry.producedUntilMs() != 0L || entry.unownedEntity() == null) {
             return entry.producedUntilMs();
         }
-        return Math.max(1L, nowMs - intervalMs);
+        long start = nowMs - intervalMs;
+        return start == 0L ? -1L : start;
     }
 
     /**

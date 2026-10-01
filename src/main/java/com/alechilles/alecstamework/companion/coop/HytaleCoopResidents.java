@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.coop;
 
+import com.alechilles.alecstamework.companion.flow.CompanionWorldTime;
 import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
@@ -12,10 +13,9 @@ import com.alechilles.alecstamework.items.HytaleDirectLiveCoopScanner;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.codec.ExtraInfo;
-import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentAccessor;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -26,9 +26,10 @@ import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,7 +47,6 @@ import org.joml.Vector3i;
  */
 public final class HytaleCoopResidents implements CoopRelease.Port {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final String COOP_BLOCK_CLASS = "com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock";
 
     private final CompanionIndex index;
     private final RestoreFlow<Ref<EntityStore>> restoreFlow;
@@ -54,6 +54,11 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     private final CoopRelease release;
     private final DirectLiveCoopProduceService produce = new DirectLiveCoopProduceService();
     private final CoopResidentReleasePositionService positions = new CoopResidentReleasePositionService();
+    private final HytaleDirectLiveCoopScanner scanner = new HytaleDirectLiveCoopScanner();
+    /** Slots whose morning release failure was logged; cleared when that slot releases. */
+    private final Set<String> failureLogged = ConcurrentHashMap.newKeySet();
+    /** Unowned residents whose morning spawn was running when their coop broke (the break skipped them). */
+    private final Set<String> brokenWhileInFlight = ConcurrentHashMap.newKeySet();
 
     public HytaleCoopResidents(@Nonnull CompanionIndex index, @Nonnull RestoreFlow<Ref<EntityStore>> restoreFlow,
                                @Nonnull HytaleCompanionSpawner spawner) {
@@ -84,8 +89,9 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         if (residents.isEmpty()) {
             return;
         }
+        Store<EntityStore> store = world.getEntityStore().getStore();
         List<TameworkCoopSlotsComponent.Slot> changed = produce.produce(coop, residents,
-                BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(world.getEntityStore().getStore()));
+                BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store), CompanionWorldTime.gameTimeMs(store));
         writeEntries(block, changed);
         for (TameworkCoopSlotsComponent.Slot entry : changed) {
             if (entry.profileId() != null) {
@@ -93,9 +99,10 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             }
         }
         for (DirectLiveCoopProduceService.Resident resident : residents) {
-            if (release.releasableNow(at, resident.entry())) {
-                release.release(at, resident.entry(),
-                        destination(world, resident.roleId(), b, coop.rotationIndex(), coop.config()));
+            TameworkCoopSlotsComponent.Slot entry = resident.entry();
+            if (release.releasableNow(at, entry)) {
+                release.release(at, entry, destination(world, resident.roleId(), b, coop.rotationIndex(), coop.config()))
+                        .thenAccept(outcome -> morningOutcome(at, entry, resident.roleId(), outcome));
                 return;
             }
         }
@@ -109,7 +116,8 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     /**
      * Releases every current resident of a broken coop next to where it stood. The entries come
      * from the removed block, so each slot clear finds no block and does nothing; a resident whose
-     * release fails is logged (a companion stays COOP for Recover; an unowned one is lost).
+     * release fails is logged (a companion stays COOP for Recover; an unowned one is lost). An
+     * unowned resident whose morning spawn is still running is left to that spawn.
      */
     public void releaseAll(@Nonnull World world, int x, int y, int z,
                            @Nonnull List<TameworkCoopSlotsComponent.Slot> entries, @Nullable TwCoopConfig config) {
@@ -117,12 +125,16 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         Vector3i block = new Vector3i(x, y, z);
         for (TameworkCoopSlotsComponent.Slot entry : entries) {
             if (!release.resident(at, entry)) {
+                if (entry.unownedEntity() != null) {
+                    // Always occupied, so it is in flight: its spawn outcome decides whether it is lost.
+                    brokenWhileInFlight.add(CoopRelease.key(at, entry.slot()));
+                }
                 continue;
             }
             String role = resident(entry).roleId();
             release.release(at, entry, destination(world, role, block, 0, config))
-                    .thenAccept(released -> {
-                        if (released) {
+                    .thenAccept(outcome -> {
+                        if (outcome.released()) {
                             return;
                         }
                         if (entry.profileId() == null) {
@@ -130,15 +142,40 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
                                     + " it could not be spawned", role, entry.slot(), at);
                         } else {
                             LOGGER.at(Level.WARNING).log("Could not release companion %s (%s) from broken coop slot %d"
-                                    + " at %s; it stays in the coop for Recover", entry.profileId(), role, entry.slot(), at);
+                                    + " at %s (%s); it stays in the coop for Recover", entry.profileId(), role,
+                                    entry.slot(), at, outcome.cause());
                         }
                     });
         }
     }
 
-    /** Drops old release-failure marks. Called once per sweep. */
-    public void pruneFailures() {
-        release.pruneFailures();
+    /** The coop config of a block entity being removed, resolved as the sweep resolves it; null when unknown. */
+    @Nullable
+    public TwCoopConfig configOf(@Nonnull ComponentAccessor<ChunkStore> accessor, @Nonnull Ref<ChunkStore> block) {
+        return scanner.configOf(accessor, block);
+    }
+
+    /**
+     * Logs the first failed morning release of a slot (INFO, once until it releases), and WARNs
+     * when an unowned resident's spawn failed after its coop broke, since its only copy is gone.
+     */
+    private void morningOutcome(CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry, @Nullable String role,
+                                CoopRelease.Outcome outcome) {
+        String key = CoopRelease.key(at, entry.slot());
+        boolean broken = entry.unownedEntity() != null && brokenWhileInFlight.remove(key);
+        if (outcome.released()) {
+            failureLogged.remove(key);
+            return;
+        }
+        if (broken) {
+            LOGGER.at(Level.WARNING).log("Lost an unowned %s resident of coop slot %d at %s: its coop broke during"
+                    + " its release and it could not be spawned", role, entry.slot(), at);
+            return;
+        }
+        if (!"BUSY".equals(outcome.cause()) && failureLogged.add(key)) {
+            LOGGER.at(Level.INFO).log("Coop slot %d at %s could not release its %s resident (%s); retrying every %d s",
+                    entry.slot(), at, role, outcome.cause(), CoopRelease.RETRY_DELAY_MS / 1_000L);
+        }
     }
 
     @Override
@@ -147,18 +184,23 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         return restoreFlow.restore(request);
     }
 
+    /** The spawn runs on the coop's world (the destination is next to it), so the clear runs in that task. */
     @Override
     @Nonnull
-    public CompletableFuture<Boolean> spawnUnowned(@Nonnull BsonDocument entity,
+    public CompletableFuture<Boolean> spawnUnowned(@Nonnull CoopRelease.At at, @Nonnull TameworkCoopSlotsComponent.Slot entry,
                                                    @Nonnull RestoreFlow.Destination destination) {
-        return spawner.spawnUnowned(entity, destination);
+        return spawner.spawnUnowned(Objects.requireNonNull(entry.unownedEntity(), "unownedEntity"), destination, () -> {
+            World world = world(at);
+            if (world != null) {
+                clear(world, at, entry);
+            }
+        });
     }
 
     @Override
     @Nonnull
     public CompletableFuture<Void> clearSlot(@Nonnull CoopRelease.At at, @Nonnull TameworkCoopSlotsComponent.Slot entry) {
-        Universe universe = Universe.get();
-        World world = universe == null ? null : universe.getWorld(at.world());
+        World world = world(at);
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (world == null) {
             done.complete(null);
@@ -167,13 +209,7 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         try {
             world.execute(() -> {
                 try {
-                    HytaleCoopIntake.Block block = HytaleCoopIntake.block(world, at.x(), at.y(), at.z());
-                    TameworkCoopSlotsComponent slots = block == null ? null : block.slots();
-                    if (slots != null && sameResident(slots.get(entry.slot()), entry)) {
-                        block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(),
-                                slots.without(entry.slot()));
-                        block.info().markNeedsSaving(block.store());
-                    }
+                    clear(world, at, entry);
                 } finally {
                     done.complete(null);
                 }
@@ -183,6 +219,23 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             done.complete(null);
         }
         return done;
+    }
+
+    @Nullable
+    private static World world(CoopRelease.At at) {
+        Universe universe = Universe.get();
+        return universe == null ? null : universe.getWorld(at.world());
+    }
+
+    /** Removes {@code entry} when the slot still holds that resident. Call on the coop's world thread. */
+    private static void clear(World world, CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry) {
+        HytaleCoopIntake.Block block = HytaleCoopIntake.block(world, at.x(), at.y(), at.z());
+        TameworkCoopSlotsComponent slots = block == null ? null : block.slots();
+        if (slots != null && sameResident(slots.get(entry.slot()), entry)) {
+            block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(),
+                    slots.without(entry.slot()));
+            block.info().markNeedsSaving(block.store());
+        }
     }
 
     /** Writes changed watermarks for entries that still hold the same resident. */
@@ -241,8 +294,9 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     }
 
     /**
-     * Next to the coop: block position plus the coop's release offset, checked for the role's
-     * spawn rules when the role is known, else the plain offset position.
+     * Next to the coop: block position plus the coop's release offset turned by the block's
+     * rotation, checked for the role's spawn rules when the role is known, else that plain
+     * position.
      */
     private RestoreFlow.Destination destination(World world, @Nullable String roleId, Vector3i block, int rotation,
                                                 @Nullable TwCoopConfig config) {
@@ -252,9 +306,13 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         double oy = offset == null ? 0.0 : offset.getY();
         double oz = offset == null ? 0.0 : offset.getZ();
         Builder<Role> builder = roleBuilder(roleId);
-        Vector3d at = builder == null
-                ? new Vector3d(block.x + 0.5 + ox, block.y + oy, block.z + 0.5 + oz)
-                : positions.resolveSpawnPosition(world, builder, block, rotation, ox, oy, oz);
+        Vector3d at;
+        if (builder == null) {
+            Vector3d turned = positions.rotateHorizontalOffset(rotation, ox, oy, oz);
+            at = new Vector3d(block.x + 0.5 + turned.x, block.y + turned.y, block.z + 0.5 + turned.z);
+        } else {
+            at = positions.resolveSpawnPosition(world, builder, block, rotation, ox, oy, oz);
+        }
         return new RestoreFlow.Destination(world.getName(), at.x, at.y, at.z, 0.0f, 0.0f);
     }
 
@@ -268,34 +326,6 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             int index = plugin == null ? -1 : plugin.getIndex(roleId);
             return index < 0 ? null : plugin.tryGetCachedValidRole(index);
         } catch (RuntimeException unavailable) {
-            return null;
-        }
-    }
-
-    /**
-     * The coop config of a block entity that is being removed: its block type is already gone, so
-     * it comes from the vanilla coop component's asset, when the block has one. Reflection keeps
-     * the Farming plugin optional. Null when unknown; the release then uses no offset.
-     */
-    @Nullable
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static TwCoopConfig configOfRemovedBlock(@Nonnull ComponentAccessor<ChunkStore> accessor,
-                                             @Nonnull Ref<ChunkStore> ref) {
-        try {
-            Object type = Class.forName(COOP_BLOCK_CLASS).getMethod("getComponentType").invoke(null);
-            if (!(type instanceof ComponentType<?, ?> coopType)) {
-                return null;
-            }
-            Object coop = accessor.getComponent(ref, (ComponentType<ChunkStore, Component<ChunkStore>>) (ComponentType) coopType);
-            Object asset = coop == null ? null : coop.getClass().getMethod("getCoopAsset").invoke(coop);
-            Object id = asset == null ? null : asset.getClass().getMethod("getId").invoke(asset);
-            if (!(id instanceof String raw) || raw.isBlank()) {
-                return null;
-            }
-            String normalized = raw.trim().toLowerCase(Locale.ROOT);
-            TwCoopConfig config = TwCoopConfig.resolveForCoop(normalized);
-            return config != null ? config : TwCoopConfig.resolveForBlockType(normalized);
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError unavailable) {
             return null;
         }
     }

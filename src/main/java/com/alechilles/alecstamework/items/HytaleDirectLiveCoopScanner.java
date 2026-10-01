@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -87,6 +88,27 @@ public final class HytaleDirectLiveCoopScanner {
                 : List.of();
         return new Scan(world, chunkStore, entityStore, worldTime, coops, npcs);
     }
+    /**
+     * The config of a coop block entity resolved from its vanilla coop component's asset, as the
+     * sweep resolves it, for a block whose type is already gone (a break). Null when the block has
+     * no vanilla coop component (Farming not loaded, or a container-only coop) or no enabled config.
+     */
+    @Nullable
+    public TwCoopConfig configOf(@Nonnull ComponentAccessor<ChunkStore> accessor, @Nonnull Ref<ChunkStore> block) {
+        ComponentType<ChunkStore, ?> type = coopBlockComponentType();
+        if (type == null) {
+            return null;
+        }
+        Object state;
+        try {
+            state = accessor.getComponent(block, castComponentType(type));
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+        TwCoopConfig config = state == null ? null : resolveConfig(null, coopAssetId(state));
+        return config != null && config.isEnabled() ? config : null;
+    }
+
     /** Confirms removal only when the exact coop chunk is loaded and no matching coop remains. */
     boolean confirmedRemoved(
             @Nonnull World world,

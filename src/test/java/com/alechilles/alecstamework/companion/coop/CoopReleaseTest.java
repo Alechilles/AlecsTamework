@@ -32,7 +32,8 @@ class CoopReleaseTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> spawnUnowned(BsonDocument entity, RestoreFlow.Destination destination) {
+        public CompletableFuture<Boolean> spawnUnowned(CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry,
+                                                       RestoreFlow.Destination destination) {
             events.add("spawn");
             return spawn;
         }
@@ -45,28 +46,27 @@ class CoopReleaseTest {
     }, System::currentTimeMillis);
 
     @Test
-    void unownedResidentIsSpawnedOnceAndItsSlotClearedOnlyAfterTheSpawn() {
+    void unownedResidentIsSpawnedOnceWhileItsSpawnRuns() {
         TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(2,
                 new BsonDocument("Components", new BsonString("chicken")));
 
-        CompletableFuture<Boolean> first = release.release(AT, entry, DEST);
+        CompletableFuture<CoopRelease.Outcome> first = release.release(AT, entry, DEST);
         // A second sweep while the spawn is pending must not spawn the resident again.
-        assertFalse(release.release(AT, entry, DEST).join());
+        assertEquals("BUSY", release.release(AT, entry, DEST).join().cause());
         assertEquals(List.of("spawn"), events);
 
         spawn.complete(true);
-        assertTrue(first.join());
-        assertEquals(List.of("spawn", "clear 2"), events);
+        assertTrue(first.join().released());
     }
 
     @Test
-    void failedUnownedSpawnKeepsTheEntry() {
+    void failedUnownedSpawnIsReportedAndRetriedOnlyAfterTheDelay() {
         TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(0,
                 new BsonDocument("Components", new BsonString("chicken")));
         spawn.complete(false);
 
-        assertFalse(release.release(AT, entry, DEST).join());
-        assertEquals(List.of("spawn"), events);
+        assertEquals(new CoopRelease.Outcome(false, "SPAWN_FAILED"), release.release(AT, entry, DEST).join());
+        assertFalse(release.releasableNow(AT, entry));
     }
 
     @Test
@@ -75,11 +75,11 @@ class CoopReleaseTest {
         TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.companion(1, profileId, 7L);
 
         restoreResult = RestoreFlow.Result.STALE;
-        assertFalse(release.release(AT, entry, DEST).join());
+        assertEquals("STALE", release.release(AT, entry, DEST).join().cause());
         assertEquals(List.of("restore"), events);
 
         restoreResult = RestoreFlow.Result.RESTORED;
-        assertTrue(release.release(AT, entry, DEST).join());
+        assertTrue(release.release(AT, entry, DEST).join().released());
         assertEquals(List.of("restore", "restore", "clear 1"), events);
         RestoreFlow.Request request = requests.get(1);
         assertEquals(profileId, request.profileId());

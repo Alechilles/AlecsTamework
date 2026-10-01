@@ -71,7 +71,7 @@ public final class CoopBreakSystem extends RefSystem<ChunkStore> {
             return;
         }
         World world = commandBuffer.getExternalData().getWorld();
-        TwCoopConfig config = HytaleCoopResidents.configOfRemovedBlock(commandBuffer, ref);
+        TwCoopConfig config = residents.configOf(commandBuffer, ref);
         try {
             world.execute(() -> residents.releaseAll(world, at.x, at.y, at.z, entries, config));
         } catch (RuntimeException notAccepting) {

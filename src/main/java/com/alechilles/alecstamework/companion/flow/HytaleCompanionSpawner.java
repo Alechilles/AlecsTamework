@@ -107,12 +107,16 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
      * command-link owner or record, the stored tamed state kept, a fresh NPC UUID, added with
      * {@code AddReason.LOAD}. Alarms are not re-based: the document carries no game time, and a
      * coop releases into its own world, whose clock kept running. Safe to call from any thread;
-     * the work runs on the destination world thread. Completes true exactly when the body is in
-     * the store, false (never exceptionally) when none was added.
+     * the work runs on the destination world thread. {@code onAdded} runs in that same task right
+     * after the body is in the store (a coop clears the resident's slot there, so the body and its
+     * inline copy never both persist); its failure is logged and does not undo the spawn.
+     * Completes true exactly when the body is in the store, false (never exceptionally) when none
+     * was added.
      */
     @Nonnull
     public CompletableFuture<Boolean> spawnUnowned(@Nonnull BsonDocument entity,
-                                                   @Nonnull RestoreFlow.Destination destination) {
+                                                   @Nonnull RestoreFlow.Destination destination,
+                                                   @Nonnull Runnable onAdded) {
         CompletableFuture<Boolean> done = new CompletableFuture<>();
         UUID npcUuid = UUID.randomUUID();
         World world = Universe.get().getWorld(destination.world());
@@ -122,7 +126,8 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             return done;
         }
         try {
-            world.execute(() -> done.complete(spawnUnownedOnWorldThread(world, entity, destination, npcUuid)));
+            world.execute(() -> done.complete(spawnUnownedOnWorldThread(world, entity, destination, npcUuid,
+                    onAdded)));
         } catch (RuntimeException notAccepting) {
             // World#execute throws when the world no longer accepts tasks; the task was not queued.
             warn(npcUuid, "unowned resident: world " + destination.world() + " is not accepting tasks", notAccepting);
@@ -133,7 +138,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
 
     /** As {@link #spawnOnWorldThread}, for an unowned body: true exactly when it is in the store. */
     private boolean spawnUnownedOnWorldThread(World world, BsonDocument entity, RestoreFlow.Destination destination,
-                                              UUID npcUuid) {
+                                              UUID npcUuid, Runnable onAdded) {
         Ref<EntityStore> ref = null;
         try {
             Store<EntityStore> store = world.getEntityStore().getStore();
@@ -165,6 +170,11 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             CompanionSaves.markChanged(ref.getStore(), ref);
         } catch (RuntimeException | LinkageError failure) {
             warn(npcUuid, "a step after the unowned resident was added failed", failure);
+        }
+        try {
+            onAdded.run();
+        } catch (RuntimeException | LinkageError failure) {
+            warn(npcUuid, "the step after the unowned resident was added failed", failure);
         }
         return true;
     }
