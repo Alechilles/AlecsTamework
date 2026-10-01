@@ -205,7 +205,7 @@ public final class RestoreFlow<R> {
         if (commit == null) {
             return CompletableFuture.completedFuture(Result.CONFLICT);
         }
-        return flushOwners(before, commit.after())
+        return OwnerFileFlush.flushOwners(flushOwner, before, commit.after())
                 .handle((ignored, error) -> error)
                 .thenCompose(error -> {
                     if (error != null) {
@@ -253,15 +253,6 @@ public final class RestoreFlow<R> {
             }
             return b;
         };
-    }
-
-    /** An owner change writes the new owner's file first, then the old one's; either failure fails the commit. */
-    private CompletableFuture<Void> flushOwners(CompanionRecord before, CompanionRecord after) {
-        CompletableFuture<Void> first = flushOwner.apply(after.ownerUuid());
-        if (Objects.equals(before.ownerUuid(), after.ownerUuid())) {
-            return first;
-        }
-        return first.thenCompose(v -> flushOwner.apply(before.ownerUuid()));
     }
 
     private CompletableFuture<Boolean> spawnSafely(CompanionRecord committed, SnapshotEnvelope snapshot,

@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CommandCompanionRestorationServiceTest {
     private static final UUID OWNER = UUID.randomUUID();
 
-    /** Revive serves only the dead; Recover serves the lost and a live record whose body is gone. */
+    /** Revive serves only the dead; Recover serves the lost, captured, cooped and a live record whose body is gone. */
     @Test
     void thePanelButtonPicksTheRestoreItsCompanionNeeds() {
         assertEquals(Decision.REVIVE, decide(LifecycleState.DEAD_REVIVABLE, false, true));
@@ -21,6 +21,7 @@ class CommandCompanionRestorationServiceTest {
         assertEquals(Decision.RECOVER, decide(LifecycleState.ACTIVE, false, true));
         assertEquals(Decision.NOT_DORMANT, decide(LifecycleState.ACTIVE, true, true));
         assertEquals(Decision.RECOVER, decide(LifecycleState.CAPTURED, false, true));
+        assertEquals(Decision.RECOVER, decide(LifecycleState.COOP, false, true));
         assertEquals(Decision.UNAVAILABLE, decide(LifecycleState.RELEASED, false, true));
     }
 

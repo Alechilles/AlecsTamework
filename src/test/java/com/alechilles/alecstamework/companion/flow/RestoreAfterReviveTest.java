@@ -65,7 +65,8 @@ class RestoreAfterReviveTest {
                                                                  RestoreRules.Reason reason) {
         Ref<EntityStore> ref = store.addEntity(registry.newHolder(), AddReason.LOAD);
         HytaleCompanionSpawner.finishAddedBody(ref, store, committed, destination.world(), 0L, reason,
-                new CompanionSnapshots(registry::serialize), envelope -> queued.put(envelope.profileId(), envelope));
+                new CompanionSnapshots(registry::serialize), envelope -> queued.put(envelope.profileId(), envelope),
+                true);
         return CompletableFuture.completedFuture(true);
     }
 

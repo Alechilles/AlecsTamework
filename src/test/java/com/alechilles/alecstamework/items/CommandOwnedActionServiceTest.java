@@ -78,14 +78,16 @@ class CommandOwnedActionServiceTest {
         assertFalse(CommandOwnedActionService.allows(owner, (CompanionRecord) null));
     }
 
-    /** Recover reaches a companion in a capture item (spec 8.14) but not a coop resident or a stranger's. */
-    @Test void recoverAlsoReachesAnOwnedCompanionInACaptureItem() {
+    /** Recover reaches an owned companion in a capture item or a coop (spec 8.14) but not a stranger's. */
+    @Test void recoverAlsoReachesAnOwnedCompanionInACaptureItemOrCoop() {
         UUID owner = UUID.randomUUID();
         var item = companion(owner, CompanionLocation.item());
+        var coop = companion(owner, CompanionLocation.coop("default", 1, 2, 3, 0));
         assertTrue(CommandOwnedActionService.allowsRecover(owner, item));
         assertFalse(CommandOwnedActionService.allowsRecover(UUID.randomUUID(), item));
-        assertFalse(CommandOwnedActionService.allowsRecover(owner,
-                companion(owner, CompanionLocation.coop("default", 1, 2, 3, 0))));
+        assertTrue(CommandOwnedActionService.allowsRecover(owner, coop));
+        assertFalse(CommandOwnedActionService.allowsRecover(UUID.randomUUID(), coop));
+        assertFalse(CommandOwnedActionService.allows(owner, coop));
         assertTrue(CommandOwnedActionService.allowsRecover(owner, companion(owner, CompanionLocation.lost(null))));
     }
 

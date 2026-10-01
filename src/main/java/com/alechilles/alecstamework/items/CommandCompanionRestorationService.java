@@ -223,8 +223,9 @@ final class CommandCompanionRestorationService {
         if (profile.dead()) {
             return reviveEnabled ? Decision.REVIVE : Decision.REVIVE_DISABLED;
         }
-        // A captured companion is recovered from its snapshot when its item is out of reach (spec 8.14).
-        if (profile.lost() || profile.captured()
+        // A captured or cooped companion is recovered from its snapshot when its item or coop is out
+        // of reach (spec 8.14); the generation bump makes the old item or slot entry stale.
+        if (profile.lost() || profile.captured() || profile.inCoop()
                 || profile.lifecycleState() == LifecycleState.ACTIVE && !bodyLoaded) {
             return Decision.RECOVER;
         }

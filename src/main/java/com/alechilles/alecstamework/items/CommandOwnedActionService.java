@@ -68,7 +68,7 @@ final class CommandOwnedActionService {
         return requestInternal(player, toolId, rowId, authority, action, Gate.LOCATE);
     }
 
-    /** Revive and Recover; also open for a companion in a capture item (spec 8.14). */
+    /** Revive and Recover; also open for a companion in a capture item (spec 8.14) or a coop. */
     boolean requestRecover(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
         return requestInternal(player, toolId, rowId, authority, action, Gate.RECOVER);
@@ -175,7 +175,7 @@ final class CommandOwnedActionService {
         return ownedBy(owner, companion) && stateAllows(state(companion), Gate.ACTION);
     }
 
-    /** Revive and Recover gate for an index record: also open for a companion in a capture item. */
+    /** Revive and Recover gate for an index record: also open for a captured or cooped companion. */
     static boolean allowsRecover(@Nullable UUID owner, @Nullable CompanionRecord companion) {
         return ownedBy(owner, companion) && stateAllows(state(companion), Gate.RECOVER);
     }
@@ -202,7 +202,7 @@ final class CommandOwnedActionService {
         return switch (state) {
             case ACTIVE, UNLOADED, DEAD_REVIVABLE, LOST -> true;
             case CAPTURED -> gate != Gate.ACTION;
-            case COOP -> gate == Gate.LOCATE;
+            case COOP -> gate != Gate.ACTION;
             default -> false;
         };
     }

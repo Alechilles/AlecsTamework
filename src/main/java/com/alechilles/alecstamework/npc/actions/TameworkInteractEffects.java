@@ -192,6 +192,7 @@ final class TameworkInteractEffects {
                         store,
                         player,
                         role,
+                        resolveSetRoleId(effects, role, ctx),
                         (liveNpcRef, liveStore, livePlayer, liveRole, liveContext) ->
                         applyCustomEffectsWithoutOwner(
                                 interactionConfigId,
@@ -348,8 +349,20 @@ final class TameworkInteractEffects {
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
                              Player player,
+                             @Nullable String targetRoleId,
                              @Nullable InteractionStateEffects.TameAppliedContinuation continuation) {
-        return ownerContinuationEffects.applyStartTaming(npcRef, store, player, continuation);
+        return ownerContinuationEffects.applyStartTaming(npcRef, store, player, targetRoleId, continuation);
+    }
+
+    /** The role a SetRole effect in {@code effects} sets, or null when there is none. */
+    @Nullable
+    String resolveSetRoleId(@Nullable Effects effects, @Nullable Role role, @Nullable InteractionContextSnapshot ctx) {
+        SetRoleEffect setRole = effects == null ? null : effects.getSetRole();
+        if (setRole == null) {
+            return null;
+        }
+        String roleId = resolveRoleId(setRole.getRole(), setRole.getRoleParam(), role, ctx);
+        return roleId == null || roleId.isBlank() ? null : roleId;
     }
 
     Role resolveLiveRole(Ref<EntityStore> npcRef,

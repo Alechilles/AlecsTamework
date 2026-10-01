@@ -297,16 +297,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
 
     /**
      * Steps after the add, on the body's world thread. A failure here is logged; the body is live,
-     * so the spawn still counts.
+     * so the spawn still counts. {@code snapshotBody} is false for an unowned spawn, whose body is
+     * not tracked.
      */
-    static void finishAddedBody(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
-                                @Nonnull CompanionRecord committed, @Nonnull String worldName,
-                                long worldGameTimeMs, @Nonnull RestoreRules.Reason reason, @Nonnull CompanionSnapshots snapshots,
-                                @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
-        finishAddedBody(ref, store, committed, worldName, worldGameTimeMs, reason, snapshots, queueSnapshot, true);
-    }
-
-    /** As above; {@code snapshotBody} is false for an unowned spawn, whose body is not tracked. */
     static void finishAddedBody(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                                 @Nonnull CompanionRecord committed, @Nonnull String worldName,
                                 long worldGameTimeMs, @Nonnull RestoreRules.Reason reason, @Nonnull CompanionSnapshots snapshots,

@@ -28,6 +28,7 @@ final class InteractionOwnerContinuationEffects {
                                         @Nonnull Store<EntityStore> store,
                                         @Nullable Player player,
                                         @Nullable Role fallbackRole,
+                                        @Nullable String targetRoleId,
                                         @Nonnull LiveEffectContinuation continuation) {
         SetOwnerEffect setOwner = effects == null ? null : effects.getSetOwner();
         if (setOwner == null) {
@@ -38,6 +39,7 @@ final class InteractionOwnerContinuationEffects {
                 npcRef,
                 store,
                 player,
+                targetRoleId,
                 (liveNpcRef, liveStore, livePlayer) -> {
                     Role liveRole = resolveLiveRole(liveNpcRef, liveStore, fallbackRole);
                     continuation.apply(
@@ -55,8 +57,9 @@ final class InteractionOwnerContinuationEffects {
     boolean applyStartTaming(@Nonnull Ref<EntityStore> npcRef,
                              @Nonnull Store<EntityStore> store,
                              @Nullable Player player,
+                             @Nullable String targetRoleId,
                              @Nullable InteractionStateEffects.TameAppliedContinuation continuation) {
-        return stateEffects.applyStartTaming(npcRef, store, player, continuation);
+        return stateEffects.applyStartTaming(npcRef, store, player, targetRoleId, continuation);
     }
 
     @Nullable

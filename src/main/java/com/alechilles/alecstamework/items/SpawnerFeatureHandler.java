@@ -390,10 +390,11 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
-     * Checks that must pass before the roll, since a failed roll may spend the source: the caps for
-     * a capture that gives the companion a new owner, and for a tame-and-link capture the target
-     * body, the tamed role, the command item gates and the caps. Returns null when refused; the
-     * player is told why. World thread.
+     * Checks that must pass before the roll, since a failed roll may spend the source: a capture
+     * into an item refuses a command-family roster member and checks the caps for a capture that
+     * gives the companion a new owner or whose item would move it to the capturer; a tame-and-link
+     * capture checks the target body, the tamed role, the command item gates and the caps. Returns
+     * null when refused; the player is told why. World thread.
      */
     @Nullable
     private PreRoll preRoll(Player player, Ref<EntityStore> targetRef, ItemStack source,
@@ -413,10 +414,22 @@ public final class SpawnerFeatureHandler {
         String sourceRole = roles.resolveRoleIdFromNpc(store.getComponent(targetRef, NPCEntity.getComponentType()));
         ItemFeatureConfig.CaptureItemMechanics mechanics = resolved.getCaptureMechanics();
         if (mechanics.successDisposition() != CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            if (isRosterMember(store.getComponent(targetRef, TameworkCompanionComponent.getComponentType()))) {
+                // Only its command-family item may act on a roster member; nothing is spent.
+                warn(player, "captureFailed");
+                return null;
+            }
             UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
                     resolved.isCaptureTamesTarget(), player.getUuid());
-            if (owner != null && facts.ownerUuid() == null && refusedByCaps(player, owner,
-                    sourceRole == null ? facts.roleId() : sourceRole, world.getName(), false)) {
+            String role = sourceRole == null ? facts.roleId() : sourceRole;
+            if (owner != null && facts.ownerUuid() == null
+                    && refusedByCaps(player, owner, role, world.getName(), false)) {
+                return null;
+            }
+            // The filled item lands with the capturer: when it would move the companion to them and
+            // an ineligible holder cannot pick it up, refuse now so it cannot be stranded on the ground.
+            if (owner != null && !owner.equals(player.getUuid()) && blocksIneligibleHolders(resolved)
+                    && refusedByCaps(player, player.getUuid(), role, world.getName(), false)) {
                 return null;
             }
             return new PreRoll(null);
@@ -450,6 +463,19 @@ public final class SpawnerFeatureHandler {
             return null;
         }
         return new PreRoll(targetRole);
+    }
+
+    /** A non-bonded member of a command-family roster, which a generic capture item may not take. */
+    private boolean isRosterMember(@Nullable TameworkCompanionComponent stamp) {
+        UUID id = stamp == null ? null : stamp.getProfileId();
+        CompanionRecord record = id == null ? null : index.get(id);
+        return record != null && record.rosterId() != null && !record.bonded();
+    }
+
+    /** {@code OwnershipFollowsHolder} with {@code BlockIneligibleHolders}, while capture keeps the owner. */
+    private static boolean blocksIneligibleHolders(ItemFeatureConfig resolved) {
+        return resolved.isCaptureOwnershipFollowsHolder() && !resolved.isCaptureClearsOwner()
+                && resolved.isCaptureBlockIneligibleHolders();
     }
 
     private boolean refusedByCaps(Player player, UUID owner, String roleId, String world, boolean deployed) {

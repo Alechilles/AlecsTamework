@@ -43,16 +43,38 @@ public final class OwnerPopulationCapService {
     }
 
     /**
-     * As {@link #evaluateAcquisition(Store, UUID)}, then the population-group caps for a new
-     * companion of {@code roleId} in the store's world. A group refusal has reason
-     * {@link #REASON_GROUP_CAP}. A null or blank role checks the owner cap only.
+     * The owner cap and the population-group caps for a new companion of {@code roleId} in the
+     * store's world, in one admission pre-check. An owned refusal has reason
+     * {@code owner-cap-reached} and a group refusal {@link #REASON_GROUP_CAP}. This check does not
+     * count the owner's companions, so {@code currentCount} is -1. Without a gate, owner or role
+     * it falls back to {@link #evaluateAcquisition(Store, UUID)}, the owner cap only.
      */
     @Nonnull
     public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store,
                                                @Nullable UUID ownerId,
                                                @Nullable String roleId) {
-        return withGroupCaps(evaluateAcquisition(store, ownerId), admissionGate, ownerId, roleId,
-                resolveWorldName(store));
+        CompanionAdmissionGate gate = admissionGate;
+        if (gate == null || ownerId == null || roleId == null || roleId.isBlank()) {
+            return evaluateAcquisition(store, ownerId);
+        }
+        return fromPrecheck(gate.precheck(ownerId, roleId, resolveWorldName(store)), gate.rules());
+    }
+
+    /** Maps an admission pre-check result to a {@link Decision}; the owner's companions are not counted. */
+    @Nonnull
+    static Decision fromPrecheck(@Nullable CompanionAdmission.Refusal refusal,
+                                 @Nonnull CompanionAdmission.Rules rules) {
+        int limit = rules.ownedLimit();
+        TwGlobalConfig.PerPlayerLimitScope scope = rules.ownedPerWorld()
+                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
+                : TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
+        if (refusal == null) {
+            return limit <= 0
+                    ? new Decision(true, false, 0, -1, Integer.MAX_VALUE, scope, "owner-cap-disabled")
+                    : new Decision(true, true, limit, -1, 1, scope, "owner-cap-allow");
+        }
+        return new Decision(false, true, limit, -1, 0, scope,
+                refusal == CompanionAdmission.Refusal.OWNED ? "owner-cap-reached" : REASON_GROUP_CAP);
     }
 
     /**
@@ -86,21 +108,6 @@ public final class OwnerPopulationCapService {
         return refusal == CompanionAdmission.Refusal.OWNED
                 ? Decision.denyAtCap(rules.ownedLimit(), ownerRecords.size(), scope)
                 : new Decision(false, true, rules.ownedLimit(), ownerRecords.size(), 0, scope, REASON_GROUP_CAP);
-    }
-
-    @Nonnull
-    static Decision withGroupCaps(@Nonnull Decision owned, @Nullable CompanionAdmissionGate gate,
-                                  @Nullable UUID ownerId, @Nullable String roleId, @Nullable String worldName) {
-        if (!owned.allowed() || gate == null || ownerId == null || roleId == null || roleId.isBlank()) {
-            return owned;
-        }
-        CompanionAdmission.Refusal refusal = gate.precheck(ownerId, roleId, worldName);
-        if (refusal == null) {
-            return owned;
-        }
-        return refusal == CompanionAdmission.Refusal.OWNED
-                ? Decision.denyAtCap(owned.limit(), owned.currentCount(), owned.scope())
-                : new Decision(false, true, owned.limit(), owned.currentCount(), 0, owned.scope(), REASON_GROUP_CAP);
     }
 
     @Nonnull
@@ -183,17 +190,6 @@ public final class OwnerPopulationCapService {
         return remaining <= 0
                 ? Decision.denyAtCap(safeLimit, safeCurrent, safeScope)
                 : Decision.allowWithCap(safeLimit, safeCurrent, remaining, safeScope);
-    }
-
-    public static int countOwnedPopulation(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
-                                           @Nullable Store<EntityStore> store,
-                                           @Nonnull UUID ownerId) {
-        return countOwnedPopulation(
-                resolveQueries(),
-                scope,
-                resolveWorldName(store),
-                ownerId
-        );
     }
 
     /**

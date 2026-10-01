@@ -101,7 +101,7 @@ public final class CaptureFlow<R> {
             revertSafely(capture, commit);
             return CompletableFuture.completedFuture(new Outcome(Result.COMMIT_FAILED, null));
         }
-        return flushOwners(commit.before(), after).handle((ignored, error) -> error)
+        return OwnerFileFlush.flushOwners(flushOwner, commit.before(), after).handle((ignored, error) -> error)
                 .thenApply(error -> {
                     if (error != null) {
                         LOGGER.at(Level.WARNING).withCause(error)
@@ -162,20 +162,6 @@ public final class CaptureFlow<R> {
         CompanionAdmission.Refusal refusal = admission.apply(before, after);
         return refusal == null ? null
                 : refusal == CompanionAdmission.Refusal.OWNED ? Result.OWNED_LIMIT : Result.GROUP_LIMIT;
-    }
-
-    /** The new owner's file is written first, then the old one's; either failure fails the commit. */
-    private CompletableFuture<Void> flushOwners(@Nullable CompanionRecord before, CompanionRecord after) {
-        CompletableFuture<Void> first;
-        try {
-            first = flushOwner.apply(after.ownerUuid());
-        } catch (RuntimeException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-        if (before == null || Objects.equals(before.ownerUuid(), after.ownerUuid())) {
-            return first;
-        }
-        return first.thenCompose(v -> flushOwner.apply(before.ownerUuid()));
     }
 
     /** A failed undo is logged; it never fails the returned future. */

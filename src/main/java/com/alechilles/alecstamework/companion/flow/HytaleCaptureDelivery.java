@@ -143,7 +143,8 @@ public final class HytaleCaptureDelivery {
 
     /**
      * Puts the item in the recorded slot (compare-then-replace) or the inventory. Returns what is
-     * left to drop, or null when everything was placed.
+     * left to drop, or null when everything was placed. When the source left its slot, one
+     * matching item is taken from elsewhere in the inventory, so the spent source is not kept.
      */
     @Nullable
     private static ItemStack place(Store<EntityStore> store, Ref<EntityStore> ref, Player player,
@@ -159,10 +160,33 @@ public final class HytaleCaptureDelivery {
             // source was spent on the capture, so take it; the item then goes to the inventory or
             // is dropped at the body.
             hotbar.replaceItemStackInSlot((short) slot, handover.expectedSource(), ItemStack.EMPTY);
+        } else {
+            takeMovedSource(player, handover.expectedSource(), handover.ref().profileId());
         }
         ItemStackTransaction given = Player.giveItem(item, ref, store);
         ItemStack remainder = given == null ? item : given.getRemainder();
         return ItemStack.isEmpty(remainder) ? null : remainder;
+    }
+
+    /**
+     * Best-effort: takes one item matching the spent source (same item id and metadata, as the
+     * slot check compares, any quantity) from the player's inventory, hotbar first.
+     */
+    private static void takeMovedSource(Player player, ItemStack source, UUID profileId) {
+        if (ItemStack.isEmpty(source) || player.getInventory() == null) {
+            return;
+        }
+        ItemContainer all = player.getInventory().getCombinedBackpackStorageHotbarFirst();
+        for (short i = 0; all != null && i < all.getCapacity(); i++) {
+            ItemStack held = all.getItemStack(i);
+            if (!ItemStack.isEmpty(held) && held.isStackableWith(source)) {
+                var taken = all.removeItemStackFromSlot(i, 1);
+                if (taken != null && taken.succeeded()) {
+                    return;
+                }
+            }
+        }
+        LOGGER.at(Level.FINE).log("The source item of the capture of companion %s was no longer held", profileId);
     }
 
     private static void dropOn(World world, @Nullable Vector3d at, ItemStack item, UUID profileId) {

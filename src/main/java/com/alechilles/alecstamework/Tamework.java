@@ -1516,7 +1516,10 @@ public class Tamework extends JavaPlugin {
                 new com.alechilles.alecstamework.companion.coop.HytaleCoopIntake(module.index(), module.loaded(),
                         (profileId, snapshot) -> module.writer().queueSnapshot(snapshot), module.writer()::flushNow,
                         CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()));
-        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
+        // Same gate as the coop systems below: without them no intake may commit coop moves.
+        if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
+        }
         com.alechilles.alecstamework.companion.coop.HytaleCoopResidents coopResidents =
                 new com.alechilles.alecstamework.companion.coop.HytaleCoopResidents(module.index(), restoreFlow,
                         new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,

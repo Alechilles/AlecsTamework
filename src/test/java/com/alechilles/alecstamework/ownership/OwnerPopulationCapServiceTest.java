@@ -142,6 +142,31 @@ class OwnerPopulationCapServiceTest {
         assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, decision.reason());
     }
 
+    /** A role-aware pre-check maps owned and group refusals to the reasons that pick the player message. */
+    @Test
+    void preCheckRefusalsKeepTheirMessageReasons() {
+        UUID ownerId = UUID.randomUUID();
+        List<CompanionRecord> owned = List.of(record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha"));
+        CompanionRecord candidate = record(ownerId, CompanionLocation.live("alpha", 0, 0, 0), "alpha");
+        PopulationGroupPolicy herd = new PopulationGroupPolicy("herd", PopulationGroupScope.GLOBAL, 1, 0, 1L);
+        CompanionAdmission.Rules groupFull = new CompanionAdmission.Rules(5, false, role -> List.of(herd));
+        CompanionAdmission.Rules ownedFull = new CompanionAdmission.Rules(1, false, role -> List.of());
+        CompanionAdmission.Rules roomy = new CompanionAdmission.Rules(5, false, role -> List.of());
+
+        OwnerPopulationCapService.Decision group = OwnerPopulationCapService.fromPrecheck(
+                CompanionAdmission.check(owned, null, candidate, groupFull), groupFull);
+        OwnerPopulationCapService.Decision ownedLimit = OwnerPopulationCapService.fromPrecheck(
+                CompanionAdmission.check(owned, null, candidate, ownedFull), ownedFull);
+        OwnerPopulationCapService.Decision allowed = OwnerPopulationCapService.fromPrecheck(
+                CompanionAdmission.check(owned, null, candidate, roomy), roomy);
+
+        assertFalse(group.allowed());
+        assertEquals(OwnerPopulationCapService.REASON_GROUP_CAP, group.reason());
+        assertFalse(ownedLimit.allowed());
+        assertEquals("owner-cap-reached", ownedLimit.reason());
+        assertTrue(allowed.allowed());
+    }
+
     private static CompanionRecord record(UUID owner, CompanionLocation at, String homeWorld) {
         return CompanionRecord.builder(UUID.randomUUID(), "Sheep", at).ownerUuid(owner).homeWorld(homeWorld).build();
     }

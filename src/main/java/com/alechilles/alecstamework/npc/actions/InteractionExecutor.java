@@ -87,10 +87,16 @@ final class InteractionExecutor {
         }
         if (entry instanceof TameInteraction) {
             TameInteraction tame = (TameInteraction) entry;
+            // The role the tame leaves the NPC in: a SetRole effect applies last, else the tame role.
+            String tamedRoleId = effects.resolveSetRoleId(entry.getEffects(), role, ctx);
+            if (tamedRoleId == null) {
+                tamedRoleId = effects.resolveTameRoleId(tame, role, ctx);
+            }
             return effects.applyStartTaming(
                     npcRef,
                     store,
                     player,
+                    tamedRoleId,
                     (liveNpcRef, liveStore, livePlayer, acquired) -> {
                         Role liveRole = effects.resolveLiveRole(liveNpcRef, liveStore, role);
                         InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
