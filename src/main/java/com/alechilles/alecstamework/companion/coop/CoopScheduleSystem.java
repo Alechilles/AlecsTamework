@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.companion.coop;
 
+import com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.HytaleDirectLiveCoopScanner;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -32,8 +32,9 @@ import org.joml.Vector3i;
  *
  * <p>Why a tick: intake depends on the time of day and on NPCs wandering into range, for which
  * there is no event. Scope and cost match the old sweep: one scan of loaded coop blocks per world
- * per second, plus one NPC scan only when a loaded coop captures in range; at most one intake per
- * coop per sweep. Occupancy comes from each block's {@link TameworkCoopSlotsComponent}.
+ * per second, plus one NPC scan only when a loaded coop captures in range outside its roam hours;
+ * at most one intake per coop per sweep. Occupancy comes from each block's
+ * {@link TameworkCoopSlotsComponent}.
  *
  * <p>The tick only reads. The intake itself is queued to the world thread by
  * {@link HytaleCoopIntake}; the retired receipts component is stripped through the iteration's
@@ -43,11 +44,15 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
     private static final long SWEEP_INTERVAL_MS = 1_000L;
 
     private final HytaleCoopIntake intake;
+    @Nullable private final ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> retiredReceipts;
     private final HytaleDirectLiveCoopScanner scanner = new HytaleDirectLiveCoopScanner();
     private final StoreScopedState<TickState> tickStates = new StoreScopedState<>(TickState::new);
 
-    public CoopScheduleSystem(@Nonnull HytaleCoopIntake intake) {
+    /** {@code retiredReceipts} is the registered retired receipts type, stripped from blocks. */
+    public CoopScheduleSystem(@Nonnull HytaleCoopIntake intake,
+                              @Nullable ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> retiredReceipts) {
         this.intake = Objects.requireNonNull(intake, "intake");
+        this.retiredReceipts = retiredReceipts;
     }
 
     @Override
@@ -59,19 +64,23 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
         }
         state.nextSweepAtMs = now + SWEEP_INTERVAL_MS;
         stripRetiredReceipts(chunkStore);
-        HytaleDirectLiveCoopScanner.Scan scan = scanner.scan(chunkStore);
+        intake.pruneSnapshotFailures();
+        HytaleDirectLiveCoopScanner.Scan scan = scanner.scan(chunkStore, CoopScheduleSystem::takesInNow);
         if (scan == null) {
             return;
         }
         Set<UUID> chosen = new HashSet<>();
         for (HytaleDirectLiveCoopScanner.LoadedCoop coop : scan.coops()) {
-            TwCoopConfig config = coop.config();
-            if (config == null || !config.getLifecycleRules().isCaptureWildNPCsInRange()
-                    || roaming(scan.worldTime(), config)) {
-                continue;
+            if (takesInNow(coop, scan.worldTime())) {
+                takeInNearest(scan, coop, coop.config(), chosen);
             }
-            takeInNearest(scan, coop, config, chosen);
         }
+    }
+
+    /** A coop that captures in range and is outside its roam hours. */
+    private static boolean takesInNow(HytaleDirectLiveCoopScanner.LoadedCoop coop, WorldTimeResource worldTime) {
+        TwCoopConfig config = coop.config();
+        return config != null && config.getLifecycleRules().isCaptureWildNPCsInRange() && !roaming(worldTime, config);
     }
 
     private void takeInNearest(HytaleDirectLiveCoopScanner.Scan scan, HytaleDirectLiveCoopScanner.LoadedCoop coop,
@@ -129,16 +138,11 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
     }
 
     /** Removes the retired receipts component from every loaded block that still has it. */
-    private static void stripRetiredReceipts(Store<ChunkStore> chunkStore) {
-        ComponentType<ChunkStore, ? extends Component<ChunkStore>> receipts =
-                TameworkCoopSlotsComponent.retiredReceiptsType();
-        if (receipts != null) {
-            strip(chunkStore, receipts);
+    private void stripRetiredReceipts(Store<ChunkStore> chunkStore) {
+        ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> type = retiredReceipts;
+        if (type == null) {
+            return;
         }
-    }
-
-    private static <T extends Component<ChunkStore>> void strip(Store<ChunkStore> chunkStore,
-                                                                 ComponentType<ChunkStore, T> type) {
         chunkStore.forEachChunk(type, (ArchetypeChunk<ChunkStore> chunk, CommandBuffer<ChunkStore> commands) -> {
             for (int i = 0; i < chunk.size(); i++) {
                 Ref<ChunkStore> ref = chunk.getReferenceTo(i);

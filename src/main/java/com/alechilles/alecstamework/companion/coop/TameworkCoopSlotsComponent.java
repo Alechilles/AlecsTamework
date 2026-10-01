@@ -23,7 +23,7 @@ import org.bson.BsonDocument;
 /**
  * One coop's resident slots (spec 8.9), saved with its block. Codec id "TameworkCoopSlots". It
  * replaces the retired {@code TameworkCoopCaptureReceipts}, which stays registered so old blocks
- * still load and the coop schedule system can strip it.
+ * still load; the coop schedule system strips it.
  *
  * <p>The component is immutable: {@link #with} and {@link #without} return copies, so a copy can
  * be put on the block without sharing state with the one it replaced.
@@ -89,7 +89,6 @@ public final class TameworkCoopSlotsComponent implements Component<ChunkStore> {
             .build();
 
     @Nullable private static ComponentType<ChunkStore, TameworkCoopSlotsComponent> type;
-    @Nullable private static ComponentType<ChunkStore, ? extends Component<ChunkStore>> retiredReceiptsType;
 
     private List<Slot> slots = List.of();
 
@@ -100,26 +99,14 @@ public final class TameworkCoopSlotsComponent implements Component<ChunkStore> {
         this.slots = List.copyOf(slots);
     }
 
-    /**
-     * Registers the component. {@code retiredReceipts} is the registered type of the receipts
-     * component this one replaces; the coop schedule system strips it from coop blocks.
-     */
-    public static void register(@Nonnull Tamework plugin,
-                                @Nullable ComponentType<ChunkStore, ? extends Component<ChunkStore>> retiredReceipts) {
+    public static void register(@Nonnull Tamework plugin) {
         type = plugin.getChunkStoreRegistry().registerComponent(TameworkCoopSlotsComponent.class, CODEC_ID, CODEC);
-        retiredReceiptsType = retiredReceipts;
     }
 
     /** The registered type, or {@code null} before {@link #register} runs. */
     @Nullable
     public static ComponentType<ChunkStore, TameworkCoopSlotsComponent> getComponentType() {
         return type;
-    }
-
-    /** The retired receipts type, or {@code null} before {@link #register} runs. */
-    @Nullable
-    public static ComponentType<ChunkStore, ? extends Component<ChunkStore>> retiredReceiptsType() {
-        return retiredReceiptsType;
     }
 
     /** The entries, ordered by slot number. */

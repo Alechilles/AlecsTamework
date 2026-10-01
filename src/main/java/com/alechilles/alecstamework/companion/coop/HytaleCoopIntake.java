@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.companion.coop;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldTime;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
-import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
@@ -14,12 +16,23 @@ import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.items.CoopEffectService;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
+import com.hypixel.hytale.builtin.mounts.MountedByComponent;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.block.BlockModule;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -37,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,8 +61,11 @@ import javax.annotation.Nullable;
  * {@code world.execute} and resolves its live refs there, so the schedule system and interactions
  * only read.
  *
+ * <p>Owned companions are swept in as in 4.x (that is the coop feature), but never a body in use:
+ * ridden, riding, on a shoulder, gliding, parked for avatar flight, or on a timed summon.
+ *
  * <p>Codec-created interactions cannot be constructed with this, so the plugin installs one
- * instance while companion saving runs and removes it on shutdown.
+ * instance while companion saving runs and removes it before the final flush.
  */
 public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntityStore>> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -111,13 +128,15 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
                 slot -> flow.reserved(name, x, y, z, slot));
     }
 
-    /**
-     * Whether the sweep may take this body in. A stamped body needs a LIVE record at its stamp; an
-     * unstamped one must be unowned (an owned body gets stamped soon and is taken next time). Call
-     * on the world thread.
-     */
+    /** Whether the sweep may take this body in now (see {@link #eligible}). Call on the world thread. */
     public boolean canTakeIn(@Nonnull Ref<EntityStore> body, @Nonnull Store<EntityStore> store, @Nonnull UUID npcUuid) {
-        return !bodiesInFlight.contains(npcUuid) && !recentlyFailed(npcUuid) && canTakeInNow(body, store);
+        return !bodiesInFlight.contains(npcUuid) && !recentlyFailed(npcUuid) && eligible(body, store, npcUuid);
+    }
+
+    /** Drops snapshot-failure marks older than the retry delay. Called once per sweep. */
+    public void pruneSnapshotFailures() {
+        long now = System.currentTimeMillis();
+        snapshotFailedAt.values().removeIf(failedAt -> now - failedAt >= SNAPSHOT_RETRY_MS);
     }
 
     /** Queues the intake of the NPC into {@code site} on its world thread. Call on the world thread. */
@@ -163,7 +182,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
                                                                          UUID npcUuid) {
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> body = world.getEntityRef(npcUuid);
-        if (body == null || !body.isValid() || body.getStore() != store || !canTakeInNow(body, store)) {
+        if (body == null || !body.isValid() || body.getStore() != store || !eligible(body, store, npcUuid)) {
             return CompletableFuture.completedFuture(CoopIntakeFlow.Result.NOT_ELIGIBLE);
         }
         long gameTimeMs = CompanionWorldTime.gameTimeMs(store);
@@ -176,9 +195,9 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
                 snapshotFailedAt.put(npcUuid, System.currentTimeMillis());
                 return CompletableFuture.completedFuture(CoopIntakeFlow.Result.COMMIT_FAILED);
             }
-            CompanionSummary summary = summaries.capture(body, store, System.currentTimeMillis());
+            // A failed summary capture keeps the record's summary.
             return flow.intakeLive(new CoopIntakeFlow.LiveIntake<>(profileId, stamp.getGeneration(), body,
-                    envelope.data(), summary == null ? CompanionSummary.EMPTY : summary, site));
+                    envelope.data(), summaries.capture(body, store, System.currentTimeMillis()), site));
         }
         // The envelope's profile id only names the NPC in a failure log; no record is made.
         SnapshotEnvelope envelope = snapshots.capture(body, store, npcUuid, 0L, world.getName(), gameTimeMs);
@@ -189,27 +208,52 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         return flow.intakeUnowned(body, CompanionSnapshots.entity(envelope), site);
     }
 
-    /** {@link #canTakeIn} without the in-flight check, which the queued task itself holds. */
-    private boolean canTakeInNow(Ref<EntityStore> body, Store<EntityStore> store) {
+    /**
+     * A body the sweep may take in: not in use, and either stamped with a LIVE record at its stamp
+     * that is not on a timed summon, or unstamped, unowned and without a record by its NPC UUID (an
+     * owned unstamped body gets stamped soon and is taken on a later sweep).
+     */
+    private boolean eligible(Ref<EntityStore> body, Store<EntityStore> store, UUID npcUuid) {
+        if (inUse(store, body)) {
+            return false;
+        }
         TameworkCompanionComponent stamp = store.getComponent(body, TameworkCompanionComponent.getComponentType());
         if (stamp != null && stamp.getProfileId() != null) {
             CompanionRecord record = index.get(stamp.getProfileId());
             return record != null && record.location().kind() == LocationKind.LIVE
-                    && record.generation() == stamp.getGeneration();
+                    && record.generation() == stamp.getGeneration() && record.summonedUntilMs() == 0L;
         }
-        return !owned(store, body);
+        return !owned(store, body) && index.byNpcUuid(npcUuid) == null;
+    }
+
+    private static boolean inUse(Store<EntityStore> store, Ref<EntityStore> body) {
+        return has(store, body, TameworkRideMountComponent::getComponentType)
+                || has(store, body, TameworkRideRiderComponent::getComponentType)
+                || has(store, body, TameworkShoulderRideComponent::getComponentType)
+                || has(store, body, TameworkMountedGlideComponent::getComponentType)
+                || has(store, body, TameworkMountedGlideRiderComponent::getComponentType)
+                || has(store, body, AvatarFlightSourceComponent::getComponentType)
+                || has(store, body, AvatarFlightComponent::getComponentType)
+                || has(store, body, AvatarFlightRiderVisualComponent::getComponentType)
+                || has(store, body, MountedComponent::getComponentType)
+                || has(store, body, MountedByComponent::getComponentType)
+                || has(store, body, NPCMountComponent::getComponentType);
+    }
+
+    /** False when the type is not registered (its plugin is not loaded). */
+    private static <T extends Component<EntityStore>> boolean has(Store<EntityStore> store, Ref<EntityStore> body,
+                                                                  Supplier<ComponentType<EntityStore, T>> type) {
+        try {
+            ComponentType<EntityStore, T> resolved = type.get();
+            return resolved != null && store.getComponent(body, resolved) != null;
+        } catch (RuntimeException | LinkageError unavailable) {
+            return false;
+        }
     }
 
     private boolean recentlyFailed(UUID npcUuid) {
         Long failedAt = snapshotFailedAt.get(npcUuid);
-        if (failedAt == null) {
-            return false;
-        }
-        if (System.currentTimeMillis() - failedAt < SNAPSHOT_RETRY_MS) {
-            return true;
-        }
-        snapshotFailedAt.remove(npcUuid, failedAt);
-        return false;
+        return failedAt != null && System.currentTimeMillis() - failedAt < SNAPSHOT_RETRY_MS;
     }
 
     private static boolean owned(Store<EntityStore> store, Ref<EntityStore> body) {
@@ -222,26 +266,44 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
     @Nonnull
     public CompletableFuture<Boolean> writeSlot(@Nonnull CoopIntakeFlow.Site site,
                                                 @Nonnull TameworkCoopSlotsComponent.Slot entry) {
-        Universe universe = Universe.get();
-        World world = universe == null ? null : universe.getWorld(site.world());
-        if (world == null || !world.isAlive()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        CompletableFuture<Boolean> written = new CompletableFuture<>();
-        try {
-            world.execute(() -> {
-                try {
-                    written.complete(writeOnWorldThread(world, site, entry));
-                } catch (RuntimeException | LinkageError failure) {
-                    written.completeExceptionally(failure);
-                }
-            });
-        } catch (RuntimeException notAccepting) {
-            // World#execute throws when the world no longer accepts tasks; the task was not queued.
-            return CompletableFuture.completedFuture(false);
-        }
-        // A write that runs after the timeout leaves an entry that is stale by generation.
-        return written.completeOnTimeout(false, SLOT_WRITE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        return onCoopWorld(site, world -> {
+            Block block = freeBlock(world, site);
+            if (block == null) {
+                return false;
+            }
+            put(world, block, site, entry);
+            return true;
+        });
+    }
+
+    /**
+     * Re-checks the unowned body in the same world task (still valid, unstamped, unowned, not in
+     * use, and no capture made a record for it meanwhile), removes it and writes its entry, so the
+     * body and its inline copy never both exist.
+     */
+    @Override
+    @Nonnull
+    public CompletableFuture<Boolean> takeInUnowned(@Nonnull CoopIntakeFlow.Site site,
+                                                    @Nonnull TameworkCoopSlotsComponent.Slot entry,
+                                                    @Nonnull Ref<EntityStore> body) {
+        return onCoopWorld(site, world -> {
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            if (!body.isValid() || body.getStore() != store) {
+                return false;
+            }
+            UUIDComponent uuid = store.getComponent(body, UUIDComponent.getComponentType());
+            if (uuid == null || uuid.getUuid() == null || !eligible(body, store, uuid.getUuid())
+                    || store.getComponent(body, TameworkCompanionComponent.getComponentType()) != null) {
+                return false;
+            }
+            Block block = freeBlock(world, site);
+            if (block == null) {
+                return false;
+            }
+            store.removeEntity(body, RemoveReason.REMOVE);
+            put(world, block, site, entry);
+            return true;
+        });
     }
 
     @Override
@@ -249,28 +311,53 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         CompanionBodies.removeOnOwnWorld(body);
     }
 
+    /** Runs {@code task} on the coop's world thread; completes false when it cannot run or times out. */
+    private static CompletableFuture<Boolean> onCoopWorld(CoopIntakeFlow.Site site, Function<World, Boolean> task) {
+        Universe universe = Universe.get();
+        World world = universe == null ? null : universe.getWorld(site.world());
+        if (world == null || !world.isAlive()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        CompletableFuture<Boolean> done = new CompletableFuture<>();
+        try {
+            world.execute(() -> {
+                try {
+                    done.complete(task.apply(world));
+                } catch (RuntimeException | LinkageError failure) {
+                    done.completeExceptionally(failure);
+                }
+            });
+        } catch (RuntimeException notAccepting) {
+            // World#execute throws when the world no longer accepts tasks; the task was not queued.
+            return CompletableFuture.completedFuture(false);
+        }
+        // A companion write that runs after the timeout leaves an entry that is stale by generation.
+        return done.completeOnTimeout(false, SLOT_WRITE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    /** The coop block when its slot is free (no entry, or a stale one), otherwise null. */
+    @Nullable
+    private Block freeBlock(World world, CoopIntakeFlow.Site site) {
+        Block block = block(world, site.x(), site.y(), site.z());
+        if (block == null || TameworkCoopSlotsComponent.getComponentType() == null) {
+            return null;
+        }
+        TameworkCoopSlotsComponent.Slot existing = block.slots() == null ? null : block.slots().get(site.slot());
+        boolean held = existing != null && CoopSlots.occupied(existing,
+                existing.profileId() == null ? null : index.get(existing.profileId()),
+                site.world(), site.x(), site.y(), site.z());
+        return held ? null : block;
+    }
+
     /**
      * Puts the entry on the coop block and marks its chunk for saving (no forced save: a crash
      * before the chunk saves leaves the record COOP without an entry, which Recover handles).
      */
-    private boolean writeOnWorldThread(World world, CoopIntakeFlow.Site site, TameworkCoopSlotsComponent.Slot entry) {
-        Block block = block(world, site.x(), site.y(), site.z());
-        ComponentType<ChunkStore, TameworkCoopSlotsComponent> type = TameworkCoopSlotsComponent.getComponentType();
-        if (block == null || type == null) {
-            return false;
-        }
-        TameworkCoopSlotsComponent current = block.slots();
-        TameworkCoopSlotsComponent.Slot existing = current == null ? null : current.get(site.slot());
-        if (existing != null && CoopSlots.occupied(existing,
-                existing.profileId() == null ? null : index.get(existing.profileId()),
-                site.world(), site.x(), site.y(), site.z())) {
-            return false;
-        }
-        TameworkCoopSlotsComponent base = current == null ? new TameworkCoopSlotsComponent() : current;
-        block.store().putComponent(block.ref(), type, base.with(entry));
+    private void put(World world, Block block, CoopIntakeFlow.Site site, TameworkCoopSlotsComponent.Slot entry) {
+        TameworkCoopSlotsComponent base = block.slots() == null ? new TameworkCoopSlotsComponent() : block.slots();
+        block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(), base.with(entry));
         block.info().markNeedsSaving(block.store());
         effects.play(world, site.x() + 0.5, site.y() + 0.5, site.z() + 0.5, site.coopId());
-        return true;
     }
 
     /** The loaded block entity at the position, or null. Call on the world thread. */

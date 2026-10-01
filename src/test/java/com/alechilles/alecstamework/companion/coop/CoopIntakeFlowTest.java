@@ -50,6 +50,15 @@ class CoopIntakeFlowTest {
         }
 
         @Override
+        public CompletableFuture<Boolean> takeInUnowned(CoopIntakeFlow.Site site, TameworkCoopSlotsComponent.Slot entry,
+                                                        String body) {
+            events.add("slot");
+            events.add("remove " + body);
+            written.add(entry);
+            return CompletableFuture.completedFuture(true);
+        }
+
+        @Override
         public void removeBody(String body) {
             events.add("remove " + body);
         }

@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopAuthor;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
@@ -86,9 +87,13 @@ public final class HytaleCapturedItemCoopInteractionService {
             return Result.NOT_MANAGED;
         }
         CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(held);
-        CapturedArtifact artifact = item == null ? null : artifact(held);
+        if (item == null) {
+            // An older capture item must not fall through to vanilla crate handling.
+            return olderCaptureItem(held) ? Result.FAILED_CLOSED : Result.NOT_MANAGED;
+        }
+        CapturedArtifact artifact = artifact(held);
         if (artifact == null) {
-            return Result.NOT_MANAGED;
+            return Result.FAILED_CLOSED;
         }
         if (!InteractionValidation.canPlayerInteractWithBlock(
                 context.getEntity(),
@@ -105,6 +110,22 @@ public final class HytaleCapturedItemCoopInteractionService {
             return Result.FAILED_CLOSED;
         }
         return submit(world, source, target, item);
+    }
+
+    /** Capture metadata that is not a 5.0 index item: a 4.x item (snapshot id) or an alias-only one. */
+    private static boolean olderCaptureItem(@Nullable ItemStack held) {
+        if (held == null || held.isEmpty()) {
+            return false;
+        }
+        if (CaptureItemKeys.read(held) != null) {
+            return true;
+        }
+        try {
+            return held.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) != null
+                    || held.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.STRING) != null;
+        } catch (RuntimeException | LinkageError unreadable) {
+            return true;
+        }
     }
 
     /** Returns whether an item is carrying an in-flight durable retirement receipt. */

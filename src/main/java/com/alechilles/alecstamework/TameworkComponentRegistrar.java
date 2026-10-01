@@ -223,7 +223,7 @@ final class TameworkComponentRegistrar {
                         "TameworkCoopCaptureReceipts",
                         TameworkCoopCaptureReceiptsComponent.CODEC
                 );
-        com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.register(plugin, coopCaptureReceipts);
+        com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.register(plugin);
         return new RegisteredComponents(
                 owner, tamed, hook, npcName, mountedNameplate, commandLinks, happiness, needs,
                 breeding, alarm, flyingCompanion, rideMount, rideRider, shoulderRide, mountedGlide,

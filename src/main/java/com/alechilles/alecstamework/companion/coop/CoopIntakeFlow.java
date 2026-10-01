@@ -75,19 +75,30 @@ public final class CoopIntakeFlow<R> {
         @Nonnull
         CompletableFuture<Boolean> writeSlot(@Nonnull Site site, @Nonnull TameworkCoopSlotsComponent.Slot entry);
 
+        /**
+         * Takes an unowned body in within one world task: re-checks that it is still valid,
+         * unowned, unstamped and without a record, then removes it and writes {@code entry}.
+         * Completes true when done; false changes nothing.
+         */
+        @Nonnull
+        CompletableFuture<Boolean> takeInUnowned(@Nonnull Site site, @Nonnull TameworkCoopSlotsComponent.Slot entry,
+                                                 @Nonnull R body);
+
         /** Removes the body from its world. Its registry entry is already gone. */
         void removeBody(@Nonnull R body);
     }
 
-    /** A stamped live body, snapshotted on its world thread just before. */
+    /**
+     * A stamped live body, snapshotted on its world thread just before. {@code summary} is null
+     * when it could not be read; the record then keeps its summary.
+     */
     public record LiveIntake<R>(@Nonnull UUID profileId, long stampedGeneration, @Nonnull R body,
-                                @Nonnull BsonDocument snapshotData, @Nonnull CompanionSummary summary,
+                                @Nonnull BsonDocument snapshotData, @Nullable CompanionSummary summary,
                                 @Nonnull Site site) {
         public LiveIntake {
             Objects.requireNonNull(profileId, "profileId");
             Objects.requireNonNull(body, "body");
             Objects.requireNonNull(snapshotData, "snapshotData");
-            Objects.requireNonNull(summary, "summary");
             Objects.requireNonNull(site, "site");
         }
     }
@@ -142,20 +153,16 @@ public final class CoopIntakeFlow<R> {
 
     /**
      * Takes in an unowned, unstamped body: its entity document goes into the slot entry and the
-     * body is removed. No record is made, so it comes back unstamped and keeps its death drops.
+     * body is removed in the same world task. No record is made, so it comes back unstamped and
+     * keeps its death drops.
      */
     @Nonnull
     public CompletableFuture<Result> intakeUnowned(@Nonnull R body, @Nonnull BsonDocument entity, @Nonnull Site site) {
         Objects.requireNonNull(body, "body");
         Objects.requireNonNull(entity, "entity");
-        return reserved(site, () -> writeSlot(site, TameworkCoopSlotsComponent.Slot.unowned(site.slot(), entity))
-                .thenApply(written -> {
-                    if (!written) {
-                        return Result.SLOT_FAILED;
-                    }
-                    removeBodySafely(body);
-                    return Result.TAKEN_IN;
-                }));
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(site.slot(), entity);
+        return reserved(site, () -> completesFalseOnFailure(() -> coop.takeInUnowned(site, entry, body), site)
+                .thenApply(done -> done ? Result.TAKEN_IN : Result.SLOT_FAILED));
     }
 
     private CompletableFuture<Result> reserved(Site site, Supplier<CompletableFuture<Result>> intake) {
@@ -293,11 +300,16 @@ public final class CoopIntakeFlow<R> {
         }
     }
 
-    /** A failed or refused write completes false, never exceptionally. */
     private CompletableFuture<Boolean> writeSlot(Site site, TameworkCoopSlotsComponent.Slot entry) {
+        return completesFalseOnFailure(() -> coop.writeSlot(site, entry), site);
+    }
+
+    /** A failed or refused write completes false, never exceptionally. */
+    private static CompletableFuture<Boolean> completesFalseOnFailure(Supplier<CompletableFuture<Boolean>> write,
+                                                                      Site site) {
         CompletableFuture<Boolean> written;
         try {
-            written = coop.writeSlot(site, entry);
+            written = write.get();
         } catch (RuntimeException e) {
             written = CompletableFuture.failedFuture(e);
         }

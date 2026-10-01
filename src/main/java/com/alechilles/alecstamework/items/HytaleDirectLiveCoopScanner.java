@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -58,6 +59,13 @@ public final class HytaleDirectLiveCoopScanner {
     /** Returns one immutable view of currently loaded coops and live NPC candidates. */
     @Nullable
     public Scan scan(@Nonnull Store<ChunkStore> chunkStore) {
+        return scan(chunkStore, (coop, time) -> coop.acceptsCapture());
+    }
+
+    /** Like {@link #scan(Store)}, scanning live NPCs only when {@code needsNpcs} holds for a loaded coop. */
+    @Nullable
+    public Scan scan(@Nonnull Store<ChunkStore> chunkStore,
+                     @Nonnull BiPredicate<LoadedCoop, WorldTimeResource> needsNpcs) {
         World world = chunkStore.getExternalData() == null
                 ? null : chunkStore.getExternalData().getWorld();
         if (world == null || world.getEntityStore() == null) {
@@ -74,7 +82,7 @@ public final class HytaleDirectLiveCoopScanner {
             return null;
         }
         List<LoadedCoop> coops = scanCoops(chunkStore, world);
-        List<LiveNpc> npcs = coops.stream().anyMatch(LoadedCoop::acceptsCapture)
+        List<LiveNpc> npcs = coops.stream().anyMatch(coop -> needsNpcs.test(coop, worldTime))
                 ? scanLiveNpcs(entityStore)
                 : List.of();
         return new Scan(world, chunkStore, entityStore, worldTime, coops, npcs);
