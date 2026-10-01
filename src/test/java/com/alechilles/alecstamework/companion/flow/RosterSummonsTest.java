@@ -21,6 +21,8 @@ class RosterSummonsTest {
     private final Map<UUID, CompanionRecord> records = new HashMap<>();
     private final List<RestoreFlow.Request> restores = new ArrayList<>();
     private final List<String> stores = new ArrayList<>();
+    private final List<String> events = new ArrayList<>();
+    private final Map<UUID, Throwable> storeFailures = new HashMap<>();
     private final Map<String, RosterSummons.Policy> policies = Map.of(
             "Timed_Wolf", new RosterSummons.Policy(60_000L, 5_000L, true),
             "Timed_Stays", new RosterSummons.Policy(60_000L, 5_000L, false),
@@ -35,7 +37,14 @@ class RosterSummonsTest {
                 },
                 (id, reason, cooldownUntilMs) -> {
                     stores.add(id + ":" + reason + ":" + cooldownUntilMs);
-                    return CompletableFuture.completedFuture(StoreFlow.Result.STORED);
+                    events.add("store");
+                    Throwable failure = storeFailures.get(id);
+                    return failure == null ? CompletableFuture.completedFuture(StoreFlow.Result.STORED)
+                            : CompletableFuture.failedFuture(failure);
+                },
+                who -> {
+                    events.add("flush:" + who);
+                    return CompletableFuture.completedFuture(null);
                 },
                 policies::get, () -> NOW);
     }
@@ -75,5 +84,45 @@ class RosterSummonsTest {
         assertEquals(NOW + 60_000L, restores.get(0).summonedUntilMs());
         assertEquals(RestoreRules.Reason.SUMMON, restores.get(1).reason());
         assertEquals(0L, restores.get(1).summonedUntilMs());
+    }
+
+    @Test
+    void prepareTransferStoresTimedAndUntimedRosterSummonsThenFlushesTheOwner() {
+        UUID timed = add("Timed_Wolf", CompanionLocation.live("default", 0, 0, 0), NOW + 1_000L);
+        UUID untimed = add("Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0), 0L);
+
+        summons().prepareTransfer(owner).join();
+
+        assertEquals(List.of(timed + ":TIMED:15000", untimed + ":ROSTER:0").stream().sorted().toList(),
+                stores.stream().sorted().toList());
+        assertEquals(List.of("store", "store", "flush:" + owner), events);
+    }
+
+    @Test
+    void prepareTransferLeavesNonRosterBondedAndStoredCompanionsAlone() {
+        UUID id = UUID.randomUUID();
+        records.put(id, CompanionRecord.builder(id, "Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(owner).build());
+        UUID bonded = UUID.randomUUID();
+        records.put(bonded, CompanionRecord.builder(bonded, "Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(owner).rosterId("pack").bonded(true).build());
+        add("Untimed_Sheep", CompanionLocation.stored(StoredReason.ROSTER), 0L);
+
+        summons().prepareTransfer(owner).join();
+
+        assertEquals(List.of(), stores);
+        assertEquals(List.of("flush:" + owner), events);
+    }
+
+    @Test
+    void prepareTransferCompletesAndStillFlushesWhenAStoreFails() {
+        UUID failing = add("Untimed_Sheep", CompanionLocation.live("default", 0, 0, 0), 0L);
+        add("Timed_Wolf", CompanionLocation.live("default", 0, 0, 0), NOW + 1_000L);
+        storeFailures.put(failing, new IllegalStateException("store failed"));
+
+        summons().prepareTransfer(owner).join();
+
+        assertEquals(2, stores.size());
+        assertEquals("flush:" + owner, events.get(events.size() - 1));
     }
 }

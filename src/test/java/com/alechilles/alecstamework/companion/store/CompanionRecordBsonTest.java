@@ -23,7 +23,7 @@ class CompanionRecordBsonTest {
         CompanionRecord record = CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.stored(StoredReason.BONDED))
                 .revision(0).generation(7)
                 .ownerUuid(UUID.randomUUID()).ownerName("Alec")
-                .displayName("Wooly").scope(RecordScope.PORTABLE).homeWorld("default")
+                .displayName("Wooly").homeWorld("default")
                 .currentNpcUuid(UUID.randomUUID())
                 .summary(new CompanionSummary("Wooly", "server.npcs.sheep.name", "Tamed_Sheep", "Icon_Sheep",
                         12.5f, 20f, "TwHappinessDefault", 55.5, "TwNeedsDefault", 40.0, 35.25,

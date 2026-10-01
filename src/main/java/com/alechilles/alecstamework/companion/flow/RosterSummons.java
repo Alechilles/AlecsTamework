@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionSummonSettings;
 import com.hypixel.hytale.logger.HytaleLogger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -58,6 +59,7 @@ public final class RosterSummons {
     private final Function<UUID, List<CompanionRecord>> owned;
     private final Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore;
     private final Store store;
+    private final Function<UUID, CompletableFuture<Void>> flush;
     private final Function<String, Policy> policies;
     private final LongSupplier clock;
 
@@ -65,18 +67,20 @@ public final class RosterSummons {
      * @param record   a profile's current record, or null
      * @param owned    every non-released record of an owner
      * @param restore  {@link RestoreFlow#restore(RestoreFlow.Request)}
+     * @param flush    writes an owner's file to disk; {@code CompanionWriter::flushNow} in production
      * @param policies the summon policy of a role id; {@link Policy#forRole} in production
      * @param clock    wall clock
      */
     public RosterSummons(@Nonnull Function<UUID, CompanionRecord> record,
                          @Nonnull Function<UUID, List<CompanionRecord>> owned,
                          @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore,
-                         @Nonnull Store store, @Nonnull Function<String, Policy> policies,
-                         @Nonnull LongSupplier clock) {
+                         @Nonnull Store store, @Nonnull Function<UUID, CompletableFuture<Void>> flush,
+                         @Nonnull Function<String, Policy> policies, @Nonnull LongSupplier clock) {
         this.record = Objects.requireNonNull(record, "record");
         this.owned = Objects.requireNonNull(owned, "owned");
         this.restore = Objects.requireNonNull(restore, "restore");
         this.store = Objects.requireNonNull(store, "store");
+        this.flush = Objects.requireNonNull(flush, "flush");
         this.policies = Objects.requireNonNull(policies, "policies");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -155,6 +159,32 @@ public final class RosterSummons {
         return started;
     }
 
+    /**
+     * Readies {@code owner} to leave this server: stores every summoned roster companion (LIVE,
+     * with a roster id, not bonded), timed or not, then flushes the owner's file. Each store keeps
+     * the re-summon cooldown, so hopping servers does not reset timers. Companions without a roster
+     * stay in the world (spec 13.4). Never blocks: a store that fails is logged and does not stop
+     * the others or the flush. The future fails only when the flush itself fails.
+     */
+    @Nonnull
+    public CompletableFuture<Void> prepareTransfer(@Nonnull UUID owner) {
+        List<CompletableFuture<Void>> stores = new ArrayList<>();
+        for (CompanionRecord current : owned.apply(owner)) {
+            if (current.location().kind() != LocationKind.LIVE || current.rosterId() == null || current.bonded()) {
+                continue;
+            }
+            StoredReason reason = current.summonedUntilMs() != 0L ? StoredReason.TIMED : StoredReason.ROSTER;
+            stores.add(report(current, "transfer", storeWithCooldown(current, reason)).handle((outcome, error) -> null));
+        }
+        return CompletableFuture.allOf(stores.toArray(new CompletableFuture<?>[0])).thenCompose(ignored -> {
+            try {
+                return flush.apply(owner);
+            } catch (RuntimeException failure) {
+                return CompletableFuture.failedFuture(failure);
+            }
+        });
+    }
+
     private CompletableFuture<StoreFlow.Result> storeWithCooldown(CompanionRecord current, StoredReason reason) {
         long cooldownMs = policy(current).cooldownMs();
         long cooldownUntilMs = cooldownMs > 0L ? saturatedAdd(clock.getAsLong(), cooldownMs) : 0L;
@@ -180,17 +210,17 @@ public final class RosterSummons {
     }
 
     /**
-     * Auto-store has no player to answer, so a failure is logged. The record keeps its timer, so
+     * Auto-store has no player to answer, so a failure is logged. A timed record keeps its timer, so
      * the expiry scheduler stores it when the timer runs out and retries a failed expiry store.
      */
     private static CompletableFuture<StoreFlow.Result> report(CompanionRecord current, String cause,
                                                               CompletableFuture<StoreFlow.Result> result) {
         return result.whenComplete((outcome, error) -> {
             if (error != null) {
-                LOGGER.at(Level.WARNING).withCause(error).log("Timed summon of companion %s was not stored (%s)",
+                LOGGER.at(Level.WARNING).withCause(error).log("Summoned companion %s was not stored (%s)",
                         current.profileId(), cause);
             } else if (outcome == StoreFlow.Result.NO_SNAPSHOT || outcome == StoreFlow.Result.COMMIT_FAILED) {
-                LOGGER.at(Level.WARNING).log("Timed summon of companion %s was not stored (%s): %s",
+                LOGGER.at(Level.WARNING).log("Summoned companion %s was not stored (%s): %s",
                         current.profileId(), cause, outcome);
             }
         });

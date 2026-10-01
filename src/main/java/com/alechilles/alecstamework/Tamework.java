@@ -1485,7 +1485,8 @@ public class Tamework extends JavaPlugin {
         }
         StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(module);
         RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
-                restoreFlow::restore, storeFlow::store, RosterSummons.Policy::forRole, System::currentTimeMillis);
+                restoreFlow::restore, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
+                System::currentTimeMillis);
         SummonExpiryScheduler expiry = new SummonExpiryScheduler(summons::storeExpired);
         module.index().atomically(() -> {
             module.addChangeListener(expiry::onChange);

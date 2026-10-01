@@ -49,7 +49,8 @@ public record CompanionRecord(
         Objects.requireNonNull(profileId, "profileId");
         Objects.requireNonNull(roleId, "roleId");
         Objects.requireNonNull(location, "location");
-        Objects.requireNonNull(scope, "scope");
+        // The scope is derived from the location so a record's scope can never disagree with where it is written.
+        scope = RecordScope.of(location.kind(), ownerUuid);
         Objects.requireNonNull(summary, "summary");
         if (revision < 0 || generation < 0) {
             throw new IllegalArgumentException("revision and generation must be non-negative");

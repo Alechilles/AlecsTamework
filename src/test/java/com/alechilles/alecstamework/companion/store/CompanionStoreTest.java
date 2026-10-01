@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.store;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.RecordScope;
+import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.hypixel.hytale.server.core.universe.StorageManager;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,16 +32,29 @@ class CompanionStoreTest {
         return new CompanionStore(root, new HytaleCompanionFileIo(() -> storage), () -> 1234L);
     }
 
-    private static CompanionRecord record(UUID owner, long revision, RecordScope scope) {
-        return CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.live("default", 1, 64, 1))
-                .ownerUuid(owner).revision(revision).scope(scope).build();
+    private static CompanionRecord record(UUID owner, long revision) {
+        return record(owner, revision, CompanionLocation.live("default", 1, 64, 1));
+    }
+
+    private static CompanionRecord record(UUID owner, long revision, CompanionLocation location) {
+        return CompanionRecord.builder(UUID.randomUUID(), "Sheep", location)
+                .ownerUuid(owner).revision(revision).build();
+    }
+
+    /** The profile ids in one section of an owner file, read back from disk. */
+    private List<UUID> section(UUID owner, String name) throws IOException {
+        BsonDocument doc = new HytaleCompanionFileIo(() -> new StorageManager(() -> false))
+                .readNow(root.resolve("owners").resolve(owner + ".json"));
+        return doc.getArray(name).stream()
+                .map(entry -> UUID.fromString(entry.asDocument().getString("ProfileId").getValue()))
+                .toList();
     }
 
     @Test
     void recordsWrittenForAnOwnerLoadBackWithTheirScopes() throws Exception {
         CompanionStore store = store();
-        CompanionRecord bound = record(ALICE, 0, RecordScope.WORLD_BOUND);
-        CompanionRecord portable = record(ALICE, 3, RecordScope.PORTABLE);
+        CompanionRecord bound = record(ALICE, 0);
+        CompanionRecord portable = record(ALICE, 3, CompanionLocation.stored(StoredReason.ROSTER));
 
         store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(bound, portable), List.of()).join();
         CompanionStore.LoadResult loaded = store().loadAll();
@@ -48,15 +62,53 @@ class CompanionStoreTest {
         assertEquals(2, loaded.records().size());
         assertTrue(loaded.records().contains(bound));
         assertTrue(loaded.records().contains(portable));
+        assertEquals(RecordScope.WORLD_BOUND, loaded.records().get(loaded.records().indexOf(bound)).scope());
+        assertEquals(RecordScope.PORTABLE, loaded.records().get(loaded.records().indexOf(portable)).scope());
         assertEquals(1L, loaded.versions().get(ALICE.toString()));
+    }
+
+    @Test
+    void storedAndOwnedItemRecordsGoToThePortableSectionAndEverythingElseStaysWorldBound() throws Exception {
+        CompanionRecord stored = record(ALICE, 0, CompanionLocation.stored(StoredReason.ROSTER));
+        CompanionRecord ownedItem = record(ALICE, 0, CompanionLocation.item());
+        List<CompanionRecord> worldBound = List.of(
+                record(ALICE, 0),
+                record(ALICE, 0, CompanionLocation.coop("default", 1, 2, 3, 0)),
+                record(ALICE, 0, CompanionLocation.dead("fall")),
+                record(ALICE, 0, CompanionLocation.lost("gone")),
+                record(ALICE, 0, CompanionLocation.released("freed")),
+                record(null, 0, CompanionLocation.item()));
+        List<CompanionRecord> all = new java.util.ArrayList<>(List.of(stored, ownedItem));
+        all.addAll(worldBound);
+
+        store().writeOwner(CompanionStore.ownerKey(ALICE), 1, all, List.of()).join();
+
+        assertEquals(List.of(stored.profileId(), ownedItem.profileId()), section(ALICE, "Portable"));
+        assertEquals(worldBound.stream().map(CompanionRecord::profileId).toList(), section(ALICE, "WorldBound"));
+        assertEquals(all.size(), store().loadAll().records().size());
+    }
+
+    @Test
+    void aRecordThatMovesFromStoredToLiveMovesSectionsOnTheNextWrite() throws Exception {
+        CompanionStore store = store();
+        CompanionRecord stored = record(ALICE, 0, CompanionLocation.stored(StoredReason.ROSTER));
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(stored), List.of()).join();
+        assertEquals(List.of(stored.profileId()), section(ALICE, "Portable"));
+
+        CompanionRecord live = stored.toBuilder().location(CompanionLocation.live("default", 1, 64, 1)).revision(1).build();
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(live), List.of()).join();
+
+        assertEquals(List.of(), section(ALICE, "Portable"));
+        assertEquals(List.of(live.profileId()), section(ALICE, "WorldBound"));
+        assertEquals(List.of(live), store().loadAll().records());
     }
 
     @Test
     void aCorruptOwnerFileLoadsFromItsBackup() throws Exception {
         CompanionStore store = store();
-        CompanionRecord first = record(ALICE, 0, RecordScope.WORLD_BOUND);
+        CompanionRecord first = record(ALICE, 0);
         store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(first), List.of()).join();
-        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(first, record(ALICE, 0, RecordScope.WORLD_BOUND)), List.of()).join();
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(first, record(ALICE, 0)), List.of()).join();
         Files.writeString(root.resolve("owners").resolve(ALICE + ".json"), "{ broken");
 
         CompanionStore.LoadResult loaded = store().loadAll();
@@ -68,7 +120,7 @@ class CompanionStoreTest {
     @Test
     void anOwnerFileWithNoReadableCopyIsMovedAsideAndOtherOwnersStillLoad() throws Exception {
         CompanionStore store = store();
-        CompanionRecord bobs = record(BOB, 0, RecordScope.WORLD_BOUND);
+        CompanionRecord bobs = record(BOB, 0);
         store.writeOwner(CompanionStore.ownerKey(BOB), 1, List.of(bobs), List.of()).join();
         Path alice = root.resolve("owners").resolve(ALICE + ".json");
         Files.createDirectories(alice.getParent());
@@ -99,7 +151,7 @@ class CompanionStoreTest {
     @Test
     void anUnreadableRecordIsReportedAndKeptOnTheNextWrite() throws Exception {
         CompanionStore store = store();
-        CompanionRecord good = record(ALICE, 0, RecordScope.WORLD_BOUND);
+        CompanionRecord good = record(ALICE, 0);
         UUID futureId = UUID.randomUUID();
         BsonDocument future = new BsonDocument("ProfileId", new BsonString(futureId.toString()))
                 .append("Role", new BsonString("Sheep"))
@@ -123,7 +175,7 @@ class CompanionStoreTest {
     @Test
     void aProfileInTwoOwnerFilesKeepsTheHigherRevision() throws Exception {
         CompanionStore store = store();
-        CompanionRecord old = record(ALICE, 4, RecordScope.PORTABLE);
+        CompanionRecord old = record(ALICE, 4, CompanionLocation.stored(StoredReason.ROSTER));
         CompanionRecord moved = old.toBuilder().ownerUuid(BOB).revision(5).build();
         store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(old), List.of()).join();
         store.writeOwner(CompanionStore.ownerKey(BOB), 1, List.of(moved), List.of()).join();
@@ -149,9 +201,9 @@ class CompanionStoreTest {
     @Test
     void anOwnerFileLeftOnlyAsABackupStillLoads() throws Exception {
         CompanionStore store = store();
-        CompanionRecord first = record(ALICE, 0, RecordScope.WORLD_BOUND);
+        CompanionRecord first = record(ALICE, 0);
         store.writeOwner(CompanionStore.ownerKey(ALICE), 1, List.of(first), List.of()).join();
-        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(first, record(ALICE, 0, RecordScope.WORLD_BOUND)), List.of()).join();
+        store.writeOwner(CompanionStore.ownerKey(ALICE), 2, List.of(first, record(ALICE, 0)), List.of()).join();
         Files.delete(root.resolve("owners").resolve(ALICE + ".json"));
 
         CompanionStore.LoadResult loaded = store().loadAll();
@@ -163,12 +215,12 @@ class CompanionStoreTest {
     @Test
     void anOwnerFileFromANewerFormatIsMovedAsideAndOtherOwnersStillLoad() throws Exception {
         CompanionStore store = store();
-        CompanionRecord bobs = record(BOB, 0, RecordScope.WORLD_BOUND);
+        CompanionRecord bobs = record(BOB, 0);
         store.writeOwner(CompanionStore.ownerKey(BOB), 1, List.of(bobs), List.of()).join();
         Path alice = root.resolve("owners").resolve(ALICE + ".json");
         BsonDocument newer = new BsonDocument("Format", new org.bson.BsonInt32(CompanionStore.FORMAT + 1))
                 .append("Owner", new BsonString(ALICE.toString()))
-                .append("WorldBound", new org.bson.BsonArray(List.of(CompanionRecordBson.encode(record(ALICE, 0, RecordScope.WORLD_BOUND)))));
+                .append("WorldBound", new org.bson.BsonArray(List.of(CompanionRecordBson.encode(record(ALICE, 0)))));
         new HytaleCompanionFileIo(() -> new StorageManager(() -> false)).write(alice, newer).join();
 
         CompanionStore.LoadResult loaded = store().loadAll();
