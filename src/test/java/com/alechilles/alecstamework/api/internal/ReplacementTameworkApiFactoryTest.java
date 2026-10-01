@@ -166,7 +166,6 @@ class ReplacementTameworkApiFactoryTest {
                 TameworkApi api = composition.api();
 
                 assertTrue(api.getCapabilities().containsAll(List.of(
-                        TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
                         TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,
                         TameworkApiCapability.REQUIRED_CONTENT_PROFILES
                 )));
@@ -231,18 +230,13 @@ class ReplacementTameworkApiFactoryTest {
                                 .detail()
                 );
                 assertTrue(api.getCapabilities().containsAll(List.of(
-                        TameworkApiCapability.PERSISTENCE_RESILIENCE,
                         TameworkApiCapability.POPULATION_GROUPS,
-                        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
-                        TameworkApiCapability.COMMAND_TIMED_SUMMONING,
-                        TameworkApiCapability.COMPANION_PROVISIONING,
-                        TameworkApiCapability.PAID_COMMAND_REVIVAL,
                         TameworkApiCapability
                                 .CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
                         TameworkApiCapability.CAPTURE_TAME_AND_LINK
                 )));
                 AtomicInteger timedEvents = new AtomicInteger();
-                api.commandTimedSummoning().subscribe(
+                ((ReplacementTameworkApi) api).commandTimedSummoning().subscribe(
                         ignored -> timedEvents.incrementAndGet()
                 );
                 events.publishPersistenceEvent(

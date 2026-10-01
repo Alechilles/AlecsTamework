@@ -23,29 +23,6 @@ class TameworkApiV09ContractTest {
         );
 
         assertEquals(
-                CompanionProvisioningResult.Status.UNAVAILABLE,
-                legacy.companionProvisioning().provision(request()).toCompletableFuture().join().status()
-        );
-        UUID owner = UUID.randomUUID();
-        CommandTimedSummoningRequest timed = new CommandTimedSummoningRequest(
-                owner, "primary", "profile-1", "summon-1"
-        );
-        assertEquals(
-                CommandTimedSummoningResult.Status.UNAVAILABLE,
-                legacy.commandTimedSummoning().summon(timed)
-                        .toCompletableFuture().join().status()
-        );
-        assertTrue(legacy.commandFamilyRosters()
-                .get(owner, "primary").isEmpty());
-        assertEquals(
-                PaidCommandRevivalQuote.Status.UNAVAILABLE,
-                legacy.paidCommandRevival().quote(
-                        new PaidCommandRevivalQuoteRequest(
-                                owner, "profile-1", "primary"
-                        )
-                ).toCompletableFuture().join().status()
-        );
-        assertEquals(
                 PopulationGroupReconciliationView.Readiness.UNAVAILABLE,
                 legacy.populationGroups().getReconciliationStatus().readiness()
         );
@@ -103,22 +80,6 @@ class TameworkApiV09ContractTest {
                 PopulationAdmissionForcePolicy.ENFORCE,
                 PopulationCompanionLifecycle.PROVISIONED_DORMANT
         ));
-    }
-
-    private static CompanionProvisioningRequest request() {
-        return new CompanionProvisioningRequest(
-                "Alechilles:HyDragon",
-                "soul-bond:player",
-                null,
-                UUID.randomUUID(),
-                "Tamed_Wyvern_Mini",
-                CompanionProvisioningDisposition.PROVISIONED_DORMANT,
-                "default",
-                null,
-                null,
-                null,
-                CompanionProvisioningRequest.CURRENT_POLICY_REVISION
-        );
     }
 
     private static final class LegacyApiImplementation implements TameworkApi {

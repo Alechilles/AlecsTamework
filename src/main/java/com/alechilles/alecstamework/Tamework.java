@@ -14,6 +14,9 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
+import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
+import com.alechilles.alecstamework.api.internal.IndexNpcProfilesApi;
+import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
@@ -296,8 +299,13 @@ public class Tamework extends JavaPlugin {
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private Path runtimeDataDirectory;
-    /** Null until the public API moves to the companion index; {@link #getApi()} callers handle null. */
-    private TameworkApi api;
+    /**
+     * The public API, built in setup once the companion module is ready. Null in
+     * migration-required mode, when the companion store failed to open, and after shutdown;
+     * {@link #getApi()} callers handle null.
+     */
+    @Nullable
+    private volatile IndexTameworkApi api;
     private CompanionPersistenceModule companionModule;
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
@@ -731,15 +739,32 @@ public class Tamework extends JavaPlugin {
                 new OwnedNpcTransformationInteractionService(releaseFlow, companionQueries);
         interactionExtensionRegistry.registerBuiltInEffect(
                 "tamework:transform_owned_npc", ownedNpcTransformations::apply);
-        // No profile API after the index cut-over: trait effects see a null profile id.
-        traitEffectRegistry = new TraitEffectRegistry(getLogger(), null);
+        // Without a ready companion index there is no profile API: trait effects see a null profile id.
+        IndexNpcProfilesApi profilesApi = companionQueries == null ? null : new IndexNpcProfilesApi(companionQueries);
+        traitEffectRegistry = new TraitEffectRegistry(getLogger(), profilesApi);
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-vfx", CaptureChannelVfxSystem::new);
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
-        // The public api stays null until its facades move to the companion index; activity
-        // producers and care credits still need their runtime.
-        ReplacementTameworkApiFactory.installStandaloneActivityRuntime(managedActivityConfigRegistry);
+        if (profilesApi != null) {
+            IndexTameworkApi indexApi = new IndexTameworkApi(
+                    profilesApi,
+                    apiEventBus,
+                    commandLinkedNpcStateSnapshotService,
+                    interactionExtensionRegistry,
+                    traitEffectRegistry,
+                    new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime),
+                    new CommandUiRegistry(),
+                    new CommandHudRegistry(),
+                    itemFeatureRegistry,
+                    capturePolicyRegistry);
+            ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
+            api = indexApi;
+        } else {
+            // No public API without the companion index; activity producers and care credits
+            // still need their runtime.
+            ReplacementTameworkApiFactory.installStandaloneActivityRuntime(managedActivityConfigRegistry);
+        }
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> null,
                 message -> getLogger().at(Level.INFO).log(message),
@@ -809,7 +834,10 @@ public class Tamework extends JavaPlugin {
                 spawner.emptyLocatedCaptureItem(itemTracker, owner, profileId, itemGeneration);
             });
         }
-        commandItemFeatureHandler.configureCommandUi(new CommandUiRegistry());
+        // The command pages use the registry the public API hands to renderers and contributors.
+        IndexTameworkApi commandUiApi = api;
+        commandItemFeatureHandler.configureCommandUi(
+                commandUiApi != null ? commandUiApi.commandUi() : new CommandUiRegistry());
         // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
         CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null
                 : createCaptureItemTransfers(admissionGate);
@@ -1784,6 +1812,11 @@ public class Tamework extends JavaPlugin {
 
     private void closeApiComposition() {
         ActivityRuntime.clear();
+        IndexTameworkApi closing = api;
+        api = null;
+        if (closing != null) {
+            closing.close();
+        }
     }
 
     private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
@@ -1931,6 +1964,10 @@ public class Tamework extends JavaPlugin {
     /** Refreshes runtime-backed API settings without exposing its implementation. */
     public void onRuntimeSettingsChanged() {
         CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
+        IndexTameworkApi currentApi = api;
+        if (currentApi != null) {
+            currentApi.onRuntimeSettingsChanged();
+        }
         AdmissionCache admissionCache = captureAdmissionCache;
         if (admissionCache != null) {
             // Limits, limit scope and the capture item ownership mode decide the cached pickup admissions.

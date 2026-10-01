@@ -82,7 +82,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, null),
                     new SimpleClaimsTamedDamagePolicy()
             )) {
-                assertEquals("2.0.0", api.getApiVersion());
+                assertEquals("3.0.0", api.getApiVersion());
                 assertTrue(api.getCapabilities().containsAll(requiredCapabilities()),
                         "Released capabilities must remain available; additive capabilities are compatible.");
 

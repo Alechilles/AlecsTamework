@@ -15,12 +15,7 @@ final class HyDragonApiSelfTestSuite {
     private static final List<TameworkApiCapability> REQUIRED = List.of(
             TameworkApiCapability.CAPTURE_POLICY,
             TameworkApiCapability.PROFILE_DATA_TRANSACTIONS,
-            TameworkApiCapability.PERSISTENCE_RESILIENCE,
             TameworkApiCapability.POPULATION_GROUPS,
-            TameworkApiCapability.COMPANION_PROVISIONING,
-            TameworkApiCapability.COMMAND_TIMED_SUMMONING,
-            TameworkApiCapability.PAID_COMMAND_REVIVAL,
-            TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
             TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
             TameworkApiCapability.CAPTURE_TAME_AND_LINK
     );

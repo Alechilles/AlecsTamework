@@ -123,7 +123,7 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "2.0.0";
+    static final String API_VERSION = "3.0.0";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
     private static final String SNAPSHOT_LOST = "lost";
@@ -1983,6 +1983,10 @@ public final class TameworkApiImpl
                 cachedState.lastKnownPosition(),
                 persistedState.lastKnownPosition()
         );
+        if (lastKnownPosition == null && profilesApi instanceof IndexNpcProfilesApi indexProfiles) {
+            // An unloaded companion in a world or a coop: the index record keeps its position.
+            lastKnownPosition = indexProfiles.lastKnownPosition(profile.profileId());
+        }
 
         if (isEmpty(resolvedToolIds)
                 && homePosition == null

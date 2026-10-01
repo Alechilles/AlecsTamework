@@ -15,22 +15,6 @@ class PersistenceFeatureApiContractTest {
     );
 
     @Test
-    void restoredCapabilitiesRemainAdditive() {
-        assertTrue(java.util.EnumSet.allOf(TameworkApiCapability.class)
-                .containsAll(java.util.EnumSet.of(
-                        TameworkApiCapability.PERSISTENCE_RESILIENCE,
-                        TameworkApiCapability.POPULATION_GROUPS,
-                        TameworkApiCapability.COMPANION_PROVISIONING,
-                        TameworkApiCapability.COMMAND_TIMED_SUMMONING,
-                        TameworkApiCapability.PAID_COMMAND_REVIVAL,
-                        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
-                        TameworkApiCapability
-                                .CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
-                        TameworkApiCapability.CAPTURE_TAME_AND_LINK
-                )));
-    }
-
-    @Test
     void persistedWorldTimesAcceptNegativeEpochValues() {
         CommandFamilyRosterMembershipView member =
                 new CommandFamilyRosterMembershipView(

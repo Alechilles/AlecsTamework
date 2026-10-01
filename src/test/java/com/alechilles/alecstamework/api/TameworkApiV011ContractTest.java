@@ -27,7 +27,6 @@ class TameworkApiV011ContractTest {
             TameworkApiCapability.ACTIVITY_FEED_V2,
             TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT,
             TameworkApiCapability.DURABLE_OUTPUT_OPERATIONS,
-            TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
             TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,
             TameworkApiCapability.REQUIRED_CONTENT_PROFILES
     );

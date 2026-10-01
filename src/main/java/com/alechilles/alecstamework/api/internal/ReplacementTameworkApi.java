@@ -146,7 +146,6 @@ public final class ReplacementTameworkApi
         EnumSet<TameworkApiCapability> result = base.getCapabilities();
         if (dependencies.availability() != null
                 && dependencies.incidents() != null) {
-            result.add(TameworkApiCapability.PERSISTENCE_RESILIENCE);
         }
         addRestoredCapabilities(result);
         return result;
@@ -182,7 +181,6 @@ public final class ReplacementTameworkApi
         return base.capturedItemDisplay();
     }
 
-    @Override
     public CommandTimedSummoningApi commandTimedSummoning() {
         return mutationReady(PublicPersistenceFeatureRegistry.TIMED_SUMMON)
                 && dependencies.timedSummoning() != null
@@ -230,7 +228,6 @@ public final class ReplacementTameworkApi
         return diagnostics;
     }
 
-    @Override
     public CommandFamilyRosterApi commandFamilyRosters() {
         return mutationReady(PublicPersistenceFeatureRegistry.COMMAND_ROSTER)
                 && dependencies.commandRosters() != null
@@ -238,14 +235,12 @@ public final class ReplacementTameworkApi
                 : CommandFamilyRosterApi.unavailable();
     }
 
-    @Override
     public CompanionProvisioningApi companionProvisioning() {
         return provisioningReady()
                 ? provisioning
                 : CompanionProvisioningApi.unavailable();
     }
 
-    @Override
     public PaidCommandRevivalApi paidCommandRevival() {
         return mutationReady(PublicPersistenceFeatureRegistry.PAID_REVIVAL)
                 && dependencies.paidRevival() != null
@@ -322,18 +317,14 @@ public final class ReplacementTameworkApi
         }
         if (mutationReady(PublicPersistenceFeatureRegistry.COMMAND_ROSTER)
                 && dependencies.commandRosters() != null) {
-            capabilities.add(TameworkApiCapability.COMMAND_FAMILY_ROSTERS);
         }
         if (mutationReady(PublicPersistenceFeatureRegistry.TIMED_SUMMON)
                 && dependencies.timedSummoning() != null) {
-            capabilities.add(TameworkApiCapability.COMMAND_TIMED_SUMMONING);
         }
         if (provisioningReady()) {
-            capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING);
         }
         if (mutationReady(PublicPersistenceFeatureRegistry.PAID_REVIVAL)
                 && dependencies.paidRevival() != null) {
-            capabilities.add(TameworkApiCapability.PAID_COMMAND_REVIVAL);
         }
         if (mutationReady(PublicPersistenceFeatureRegistry.CAPTURE)) {
             if (dependencies.captureResolvedEventsReady()) {
@@ -358,7 +349,6 @@ public final class ReplacementTameworkApi
                     TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT);
         }
         if (populationAdmissionInfrastructureReady()) {
-            capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);
             capabilities.add(TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS);
             capabilities.add(TameworkApiCapability.REQUIRED_CONTENT_PROFILES);
         }

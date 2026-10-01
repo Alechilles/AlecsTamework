@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.api.CommandFamilyRosterMutationRequest;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMutationResult;
 import com.alechilles.alecstamework.api.CommandFamilyRosterView;
 import com.alechilles.alecstamework.api.TameworkApi;
-import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import java.util.HashSet;
@@ -44,12 +43,9 @@ final class CommandRosterCullUnlinkService {
             Supplier<TameworkApi> api
     ) {
         this.registry = registry;
-        this.rosters = () -> {
-            TameworkApi current = api == null ? null : api.get();
-            return current == null || !current.getCapabilities().contains(
-                    TameworkApiCapability.COMMAND_FAMILY_ROSTERS)
-                    ? null : current.commandFamilyRosters();
-        };
+        // API 3.0.0 has no roster authority, so a body that still carries an old
+        // roster marker reports UNAVAILABLE, as it did while the API was absent.
+        this.rosters = () -> null;
     }
 
     CommandRosterCullUnlinkService(
