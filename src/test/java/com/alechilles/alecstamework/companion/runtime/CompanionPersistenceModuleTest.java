@@ -2,11 +2,17 @@ package com.alechilles.alecstamework.companion.runtime;
 
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.store.CompanionFileIo;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.MemoryCompanionFileIo;
+import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonString;
@@ -74,6 +80,66 @@ class CompanionPersistenceModuleTest {
         io.failReads(false);
         assertEquals(saved, io.readNow(ownerFile), "the unread owner file must stay as it was");
         module.shutdown(System.currentTimeMillis() + 1_000L);
+    }
+
+    @Test
+    void aSnapshotQueuedButNotYetWrittenIsReadFromTheWriter() throws Exception {
+        MemoryCompanionFileIo files = new MemoryCompanionFileIo();
+        CountDownLatch gate = new CountDownLatch(1);
+        GatedIo io = new GatedIo(files);
+        CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
+                System::currentTimeMillis, "test");
+        io.gate = gate;
+        UUID profile = UUID.randomUUID();
+        SnapshotEnvelope queued = new SnapshotEnvelope(profile, CompanionSnapshots.FORMAT, 3L,
+                new BsonDocument("Entity", new BsonDocument()));
+        try {
+            module.writer().queueSnapshot(queued);
+
+            assertEquals(queued, module.readSnapshot(profile).join(), "the file is not written yet");
+        } finally {
+            gate.countDown();
+            module.shutdown(System.currentTimeMillis() + 5_000L);
+        }
+    }
+
+    /** Holds every write at {@link #gate} once it is set, so nothing reaches the files. */
+    private static final class GatedIo implements CompanionFileIo {
+        private final MemoryCompanionFileIo files;
+        volatile CountDownLatch gate;
+
+        GatedIo(MemoryCompanionFileIo files) {
+            this.files = files;
+        }
+
+        @Override
+        public CompletableFuture<Void> write(Path file, BsonDocument document) {
+            CountDownLatch g = gate;
+            if (g != null) {
+                try { g.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+            return files.write(file, document);
+        }
+
+        @Override
+        public BsonDocument readNow(Path file) throws IOException {
+            return files.readNow(file);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(Path file) {
+            return files.delete(file);
+        }
+
+        @Override
+        public List<Path> list(Path directory) throws IOException {
+            return files.list(directory);
+        }
+
+        @Override
+        public void moveAside(Path file, String suffix) {
+            files.moveAside(file, suffix);
+        }
     }
 
     @Test

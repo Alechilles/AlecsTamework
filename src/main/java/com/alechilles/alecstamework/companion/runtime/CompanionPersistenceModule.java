@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.store.CompanionFileIo;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.CompanionStore;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
+import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -15,8 +16,11 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -42,6 +46,8 @@ public final class CompanionPersistenceModule {
     @Nullable private final String failure;
     @Nullable private final CompanionIndex index;
     @Nullable private final CompanionWriter writer;
+    @Nullable private final CompanionStore store;
+    @Nullable private final ExecutorService reader;
     private final LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
     @Nullable private final CompanionQueries queries;
     private final Set<UUID> unreadable;
@@ -49,11 +55,20 @@ public final class CompanionPersistenceModule {
     private final ThrottledWarnings warnings;
 
     private CompanionPersistenceModule(State state, @Nullable String failure, @Nullable CompanionIndex index,
-                                       @Nullable CompanionWriter writer, Set<UUID> unreadable, LongSupplier clock) {
+                                       @Nullable CompanionWriter writer, @Nullable CompanionStore store,
+                                       Set<UUID> unreadable, LongSupplier clock) {
         this.state = state;
         this.failure = failure;
         this.index = index;
         this.writer = writer;
+        this.store = store;
+        // Snapshot file reads block, so they get their own thread: never a world thread, and
+        // never the writer thread, whose flushes must not wait behind a read.
+        this.reader = store == null ? null : Executors.newSingleThreadExecutor(r -> {
+            Thread thread = new Thread(r, "tamework-companion-reader");
+            thread.setDaemon(true);
+            return thread;
+        });
         this.queries = index == null ? null : new CompanionQueries(index, loaded);
         this.unreadable = Set.copyOf(unreadable);
         this.clock = clock;
@@ -121,11 +136,11 @@ public final class CompanionPersistenceModule {
             LOGGER.at(Level.WARNING).log("Companion store loaded with %d quarantined files and %d unreadable records",
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
-        return new CompanionPersistenceModule(State.READY, null, index, writer, result.unreadableIds(), clock);
+        return new CompanionPersistenceModule(State.READY, null, index, writer, store, result.unreadableIds(), clock);
     }
 
     private static CompanionPersistenceModule failed(State state, String failure, LongSupplier clock) {
-        return new CompanionPersistenceModule(state, failure, null, null, Set.of(), clock);
+        return new CompanionPersistenceModule(state, failure, null, null, null, Set.of(), clock);
     }
 
     @Nonnull public State state() { return state; }
@@ -145,12 +160,47 @@ public final class CompanionPersistenceModule {
     @Nonnull public ThrottledWarnings warnings() { return warnings; }
 
     /**
+     * Reads a profile's latest snapshot without blocking the caller (spec 6.5): the snapshot the
+     * writer has not written yet when there is one, null when its delete is pending, otherwise the
+     * file, read on the {@code tamework-companion-reader} thread. Completes with null when there is
+     * no snapshot, and exceptionally when the file cannot be read or the reader is shut down.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    @Nonnull
+    public CompletableFuture<SnapshotEnvelope> readSnapshot(@Nonnull UUID profileId) {
+        CompanionWriter w = require(writer);
+        SnapshotEnvelope pending = w.pendingSnapshot(profileId);
+        if (pending != null) {
+            return CompletableFuture.completedFuture(pending);
+        }
+        if (w.isSnapshotDeletePending(profileId)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        CompanionStore s = require(store);
+        try {
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    return s.readSnapshotNow(profileId);
+                } catch (IOException e) {
+                    throw new CompletionException(e);
+                }
+            }, require(reader));
+        } catch (RejectedExecutionException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    /**
      * Final flush (spec 6.9), given an absolute wall-clock {@code deadlineMs} on this module's
      * clock. Called from the ShutdownEvent handler at priority -28 and again from the plugin's
      * shutdown; the second call returns the first call's result at once. Reads no ECS state.
      * Returns true when nothing was left unwritten, and always true when there is no writer.
      */
     public boolean shutdown(long deadlineMs) {
+        if (reader != null) {
+            reader.shutdown();
+        }
         return writer == null || writer.shutdown(Math.max(0L, deadlineMs - clock.getAsLong()));
     }
 
