@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
 import com.alechilles.alecstamework.companion.flow.CaptureFlow;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
@@ -12,6 +14,7 @@ import com.alechilles.alecstamework.companion.flow.CompanionWorldTime;
 import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
+import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
@@ -37,10 +40,14 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonDocument;
 
 /**
  * Capture into a capture item and release from one (spec 8.2, 8.3), over the companion index.
@@ -77,6 +84,11 @@ public final class SpawnerFeatureHandler {
     private final HytaleCaptureDelivery delivery;
     private final CompanionSnapshots snapshots;
     private final CompanionSummaries summaries;
+    private final CompanionAdmissionGate admissionGate;
+    /** Profiles (or unstamped NPC UUIDs) with a capture commit in flight. */
+    private final Set<UUID> capturing = ConcurrentHashMap.newKeySet();
+    /** Profiles with a release in flight. */
+    private final Set<UUID> releasing = ConcurrentHashMap.newKeySet();
 
     public SpawnerFeatureHandler(
             @Nonnull HytaleLogger logger,
@@ -89,7 +101,8 @@ public final class SpawnerFeatureHandler {
             @Nonnull RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nonnull HytaleCaptureDelivery delivery,
             @Nonnull CompanionSnapshots snapshots,
-            @Nonnull CompanionSummaries summaries
+            @Nonnull CompanionSummaries summaries,
+            @Nonnull CompanionAdmissionGate admissionGate
     ) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.registry = Objects.requireNonNull(registry, "registry");
@@ -99,6 +112,7 @@ public final class SpawnerFeatureHandler {
         this.delivery = Objects.requireNonNull(delivery, "delivery");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.summaries = Objects.requireNonNull(summaries, "summaries");
+        this.admissionGate = Objects.requireNonNull(admissionGate, "admissionGate");
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata = new SpawnerCaptureMetadataService(logger, registry);
@@ -376,15 +390,42 @@ public final class SpawnerFeatureHandler {
         UUID stampedId = stamp == null ? null : stamp.getProfileId();
         long stampedGeneration = stampedId == null ? 0L : stamp.getGeneration();
         CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(targetRef, store, summaries);
-        SnapshotEnvelope snapshot = facts == null ? null : snapshots.capture(targetRef, store,
-                stampedId != null ? stampedId : facts.npcUuid(), stampedGeneration, world.getName(),
-                CompanionWorldTime.gameTimeMs(store));
-        if (snapshot == null) {
+        if (facts == null) {
             warn(player, "captureEvidenceFailed");
             return false;
         }
         UUID owner = captureOwner(facts.ownerUuid(), resolved.isCaptureClearsOwner(),
                 resolved.isCaptureTamesTarget(), player.getUuid());
+        if (owner != null && facts.ownerUuid() == null) {
+            // A taming capture gives the companion a new owner: refuse it before anything is spent.
+            // CaptureFlow checks the caps again under the index lock.
+            CompanionAdmission.Refusal refusal = admissionGate.precheck(owner,
+                    facts.roleId() == null ? roleId : facts.roleId(), world.getName(), false);
+            if (refusal != null) {
+                showPopulationLimit(player, refusal == CompanionAdmission.Refusal.OWNED);
+                return false;
+            }
+        }
+        UUID busyKey = stampedId != null ? stampedId : facts.npcUuid();
+        if (!capturing.add(busyKey)) {
+            logCaptureChannelDiagnostic("terminal-denied reason=capture-in-flight");
+            return false;
+        }
+        long capturedAtMs = System.currentTimeMillis();
+        SnapshotEnvelope snapshot = snapshots.capture(targetRef, store, busyKey, stampedGeneration,
+                world.getName(), CompanionWorldTime.gameTimeMs(store));
+        if (snapshot == null) {
+            capturing.remove(busyKey);
+            warn(player, "captureEvidenceFailed");
+            return false;
+        }
+        BsonDocument snapshotData = snapshot.data();
+        if (resolved.isCaptureTamesTarget()) {
+            // TamesTarget means the result is tamed, owned or not (ClearsOwner never untames).
+            snapshotData = new BsonDocument();
+            snapshotData.putAll(snapshot.data());
+            snapshotData.put("Entity", SnapshotPatch.withTamed(CompanionSnapshots.entity(snapshot)));
+        }
         String ownerName = owner == null ? null
                 : owner.equals(facts.ownerUuid()) ? facts.ownerName() : OwnerNameUtil.resolve(player);
         ItemStack item = capturedItems.build(player, targetRef, store, source, resolved, roleId, owner);
@@ -397,15 +438,17 @@ public final class SpawnerFeatureHandler {
         int slot = attempt.hotbarSlot();
         try {
             captureFlow.capture(new CaptureFlow.Capture<>(stampedId, stampedGeneration, targetRef, facts, owner,
-                            ownerName, snapshot.data()))
+                            ownerName, snapshotData))
                     .whenComplete((outcome, error) -> {
+                        capturing.remove(busyKey);
                         if (error != null) {
                             logger.at(Level.WARNING).withCause(error).log("Capture commit failed unexpectedly");
                         }
                         finishCapture(outcome, targetRef, stampedId, stampedGeneration,
-                                item, expectedSource, playerUuid, slot, effect);
+                                item, expectedSource, playerUuid, slot, effect, capturedAtMs);
                     });
         } catch (RuntimeException failure) {
+            capturing.remove(busyKey);
             logger.at(Level.WARNING).withCause(failure).log("Capture commit could not start");
             warn(player, "captureUnavailable");
             return false;
@@ -417,12 +460,12 @@ public final class SpawnerFeatureHandler {
     private void finishCapture(@Nullable CaptureFlow.Outcome outcome, Ref<EntityStore> body,
                                @Nullable UUID stampedId, long stampedGeneration, ItemStack item,
                                @Nullable ItemStack expectedSource, UUID playerUuid, int slot,
-                               SpawnerPublishedEffect effect) {
+                               SpawnerPublishedEffect effect, long capturedAtMs) {
         CaptureFlow.Result result = outcome == null ? CaptureFlow.Result.COMMIT_FAILED : outcome.result();
         switch (result) {
             case CAPTURED -> delivery.deliver(new HytaleCaptureDelivery.Handover(body, outcome.itemRef(), item,
                     playerUuid, slot, expectedSource == null ? ItemStack.EMPTY : expectedSource,
-                    world -> effects.playPublishedEffect(world, effect)));
+                    world -> effects.playPublishedEffect(world, effect), capturedAtMs));
             case CONFLICT -> {
                 // A newer change replaced the commit after the body was unregistered: its stamp is stale.
                 CompanionRecord now = stampedId == null ? null : index.get(stampedId);
@@ -433,6 +476,9 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_CAPTURABLE -> warnLater(playerUuid, "captureProfileConflict");
             case COMMIT_FAILED -> warnLater(playerUuid, "captureUnavailable");
+            case OWNED_LIMIT, GROUP_LIMIT -> HytaleCaptureDelivery.onPlayerWorld(playerUuid,
+                    (world, store, ref, player) -> showPopulationLimit(player, result == CaptureFlow.Result.OWNED_LIMIT),
+                    null);
         }
     }
 
@@ -471,7 +517,22 @@ public final class SpawnerFeatureHandler {
             request = request.withOwner(owner);
         }
         UUID playerUuid = player.getUuid();
-        restoreFlow.restore(request).whenComplete((result, error) -> {
+        UUID profileId = ref.profileId();
+        if (!releasing.add(profileId)) {
+            // A release of this companion is still running; this one could only end stale.
+            return false;
+        }
+        CompletableFuture<RestoreFlow.Result> restored;
+        try {
+            restored = restoreFlow.restore(request);
+        } catch (RuntimeException failure) {
+            releasing.remove(profileId);
+            logger.at(Level.WARNING).withCause(failure).log("Release of companion %s could not start", profileId);
+            warn(player, "releaseFailed");
+            return false;
+        }
+        restored.whenComplete((result, error) -> {
+            releasing.remove(profileId);
             if (error != null) {
                 logger.at(Level.WARNING).withCause(error).log("Release of companion %s failed unexpectedly",
                         ref.profileId());
@@ -502,8 +563,8 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
-            case OWNED_LIMIT -> messages.showKey(player, NotificationStyle.Warning, "tamework.ui.population.ownedLimit");
-            case GROUP_LIMIT -> messages.showKey(player, NotificationStyle.Warning, "tamework.ui.population.groupLimit");
+            case OWNED_LIMIT -> showPopulationLimit(player, true);
+            case GROUP_LIMIT -> showPopulationLimit(player, false);
             default -> warn(player, "releaseFailed");
         }
     }
@@ -534,16 +595,22 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
-     * The owner a release asks for. An owned record keeps its owner (null: no change). An unowned
-     * one goes to the releaser when the item assigns owners, otherwise it comes back unowned.
+     * The owner a release asks for (spec 8.14). An item that assigns owners gives the companion to
+     * the releaser, also when someone else owned it; the restore's caps still apply. Otherwise an
+     * owned record keeps its owner (null: no change) and an unowned one comes back unowned.
      */
     @Nullable
     static RestoreFlow.Owner releaseOwner(@Nullable UUID recordOwner, boolean assignsOwner,
                                           @Nonnull UUID releaser, @Nullable String releaserName) {
-        if (recordOwner != null) {
-            return null;
+        if (assignsOwner) {
+            return new RestoreFlow.Owner(releaser, releaserName);
         }
-        return assignsOwner ? new RestoreFlow.Owner(releaser, releaserName) : new RestoreFlow.Owner(null, null);
+        return recordOwner != null ? null : new RestoreFlow.Owner(null, null);
+    }
+
+    private void showPopulationLimit(Player player, boolean owned) {
+        messages.showKey(player, NotificationStyle.Warning,
+                owned ? "tamework.ui.population.ownedLimit" : "tamework.ui.population.groupLimit");
     }
 
     @Nullable

@@ -71,11 +71,13 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void releaseOfAnUnownedCompanionAssignsTheReleaserOrStaysUnowned() {
+    void releaseAssignsTheReleaserEvenOverAnotherOwnerOrKeepsTheRecordsOwner() {
+        UUID owner = UUID.randomUUID();
         UUID releaser = UUID.randomUUID();
 
         assertEquals(new RestoreFlow.Owner(releaser, "Releaser"),
-                SpawnerFeatureHandler.releaseOwner(null, true, releaser, "Releaser"));
+                SpawnerFeatureHandler.releaseOwner(owner, true, releaser, "Releaser"));
+        assertNull(SpawnerFeatureHandler.releaseOwner(owner, false, releaser, "Releaser"));
         assertEquals(new RestoreFlow.Owner(null, null),
                 SpawnerFeatureHandler.releaseOwner(null, false, releaser, "Releaser"));
     }
@@ -91,7 +93,7 @@ class SpawnerFeatureHandlerTest {
                 RestoreFlow.Owner requested =
                         SpawnerFeatureHandler.releaseOwner(recordOwner, assignsOwner, player, "Player");
                 UUID releasedOwner = requested == null ? recordOwner : requested.uuid();
-                UUID expected = clearsOwner ? (assignsOwner ? player : null) : currentOwner;
+                UUID expected = assignsOwner ? player : clearsOwner ? null : currentOwner;
 
                 assertEquals(expected, releasedOwner,
                         "clearsOwner=" + clearsOwner + ", assignsOwner=" + assignsOwner);

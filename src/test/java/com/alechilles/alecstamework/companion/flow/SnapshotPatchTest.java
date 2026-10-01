@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.EmptyExtraInfo;
 import java.time.Instant;
@@ -78,5 +79,18 @@ class SnapshotPatchTest {
         assertFalse(SnapshotPatch.isDeathSnapshot(revived));
         assertFalse(revived.getDocument("Components").containsKey("TameworkNeeds"));
         assertTrue(revived.getDocument("Components").containsKey("NPC"));
+    }
+
+    @Test
+    void aTamingCaptureMarksTheWildEntityTamedForItsCodec() {
+        BsonDocument wild = entity(new BsonDocument("NPC", new BsonDocument()));
+
+        BsonDocument tamed = SnapshotPatch.withTamed(wild);
+
+        TameworkTamedComponent decoded = TameworkTamedComponent.CODEC.decode(
+                tamed.getDocument("Components").get("TameworkTamed"), EmptyExtraInfo.EMPTY);
+        assertTrue(decoded.isTamed());
+        assertTrue(tamed.getDocument("Components").containsKey("NPC"));
+        assertFalse(wild.getDocument("Components").containsKey("TameworkTamed"));
     }
 }

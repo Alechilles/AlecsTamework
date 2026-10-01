@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.EmptyExtraInfo;
@@ -18,7 +19,7 @@ import org.bson.BsonValue;
  * Tamework registrations: {@code DeathComponent} as "Death", {@code AlarmStore} as "AlarmStore",
  * {@code TameworkNeedsComponent} as "TameworkNeeds", {@code TameworkAlarmComponent} as
  * "TameworkAlarm", {@code TameworkBreedingComponent} as "TameworkBreeding" and
- * {@code TameworkLifeStageComponent} as "TameworkLifeStage".
+ * {@code TameworkLifeStageComponent} as "TameworkLifeStage", {@code TameworkTamedComponent} as "TameworkTamed".
  */
 public final class SnapshotPatch {
     static final String COMPONENTS = "Components";
@@ -28,6 +29,7 @@ public final class SnapshotPatch {
     static final String TAMEWORK_ALARMS = "TameworkAlarm";
     static final String BREEDING = "TameworkBreeding";
     static final String LIFE_STAGE = "TameworkLifeStage";
+    static final String TAMED = "TameworkTamed";
     private static final String PARAMETERS = "Parameters";
     private static final String INSTANT = "Instant";
     private static final String[] ALARM_TIMES = {"UntilMs", "StartedAtMs"};
@@ -135,6 +137,21 @@ public final class SnapshotPatch {
             copy.getDocument(COMPONENTS).remove(DEATH);
             copy.getDocument(COMPONENTS).remove(NEEDS);
         }
+        return copy;
+    }
+
+    /**
+     * Marks the entity tamed (a capture item that tames its target, spec 8.2). The component is
+     * encoded with its own codec, so the body that comes back from this snapshot is tamed.
+     */
+    @Nonnull
+    public static BsonDocument withTamed(@Nonnull BsonDocument entity) {
+        BsonDocument copy = entity.clone();
+        if (!copy.isDocument(COMPONENTS)) {
+            copy.put(COMPONENTS, new BsonDocument());
+        }
+        copy.getDocument(COMPONENTS).put(TAMED,
+                TameworkTamedComponent.CODEC.encode(new TameworkTamedComponent(true), EmptyExtraInfo.EMPTY));
         return copy;
     }
 }

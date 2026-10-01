@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -36,7 +35,8 @@ import org.joml.Vector3d;
  * immutable stacks cross threads, and live state is resolved inside world tasks.
  *
  * <p>On the body's world thread the record must still be ITEM at the item's generation; when it
- * is not, a newer change owns the companion, so the body stays and no item is handed over. A body
+ * is not, a newer change owns the companion: the body (unregistered, and fenced by its stale
+ * generation) is removed and no item is handed over. A body
  * that vanished before the task ran moves the record to LOST; its snapshot is already queued, so
  * the owner can Recover it.
  *
@@ -50,10 +50,12 @@ public final class HytaleCaptureDelivery {
      * One capture to finish. {@code item} is the presentation item without identity keys;
      * {@code expectedSource} is the exact stack the player held in {@code hotbarSlot}.
      * {@code onCaptured} runs on the body's world thread just before the body is removed (effects).
+     * {@code capturedAtMs} is the wall-clock time the snapshot was taken.
      */
     public record Handover(@Nonnull Ref<EntityStore> body, @Nonnull CaptureItemKeys.Ref ref,
                            @Nonnull ItemStack item, @Nonnull UUID playerUuid, int hotbarSlot,
-                           @Nonnull ItemStack expectedSource, @Nullable Consumer<World> onCaptured) {
+                           @Nonnull ItemStack expectedSource, @Nullable Consumer<World> onCaptured,
+                           long capturedAtMs) {
         public Handover {
             Objects.requireNonNull(body, "body");
             Objects.requireNonNull(ref, "ref");
@@ -71,17 +73,15 @@ public final class HytaleCaptureDelivery {
     }
 
     private final CompanionIndex index;
-    private final LongSupplier clock;
 
-    public HytaleCaptureDelivery(@Nonnull CompanionIndex index, @Nonnull LongSupplier clock) {
+    public HytaleCaptureDelivery(@Nonnull CompanionIndex index) {
         this.index = Objects.requireNonNull(index, "index");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     public void deliver(@Nonnull Handover handover) {
         World world = CompanionBodies.worldOf(handover.body());
         if (world == null || !world.isAlive()) {
-            markLost(handover.ref());
+            markLost(handover);
             return;
         }
         try {
@@ -95,7 +95,7 @@ public final class HytaleCaptureDelivery {
             });
         } catch (RuntimeException notAccepting) {
             // World#execute throws when the world no longer accepts tasks; the task was not queued.
-            markLost(handover.ref());
+            markLost(handover);
         }
     }
 
@@ -103,7 +103,7 @@ public final class HytaleCaptureDelivery {
         Ref<EntityStore> body = handover.body();
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (!body.isValid() || body.getStore() != store) {
-            markLost(handover.ref());
+            markLost(handover);
             return;
         }
         UUID profileId = handover.ref().profileId();
@@ -112,6 +112,7 @@ public final class HytaleCaptureDelivery {
                 || record.generation() != handover.ref().generation()) {
             LOGGER.at(Level.WARNING).log("Companion %s changed before its capture was handed over; no item was given",
                     profileId);
+            CompanionBodies.removeOnOwnWorld(body);
             return;
         }
         TransformComponent transform = store.getComponent(body, TransformComponent.getComponentType());
@@ -184,14 +185,14 @@ public final class HytaleCaptureDelivery {
      * Sets an ITEM record whose body vanished before the hand-over to LOST. The snapshot queued at
      * capture is no newer than the LOST record, so Recover can restore from it.
      */
-    private void markLost(CaptureItemKeys.Ref ref) {
-        long now = clock.getAsLong();
+    private void markLost(Handover handover) {
+        CaptureItemKeys.Ref ref = handover.ref();
         boolean lost = index.atomically(() -> {
             CompanionRecord current = index.get(ref.profileId());
             return current != null && current.location().kind() == LocationKind.ITEM
                     && current.generation() == ref.generation()
                     && index.update(ref.profileId(), current.revision(), CompanionTransitions.lost(current, null,
-                    CompanionTransitions.CAUSE_REMOVED, now)).applied();
+                    CompanionTransitions.CAUSE_REMOVED, handover.capturedAtMs())).applied();
         });
         LOGGER.at(Level.WARNING).log("The body of captured companion %s vanished before the hand-over; %s",
                 ref.profileId(), lost ? "it is now lost and can be recovered" : "its record had already changed");

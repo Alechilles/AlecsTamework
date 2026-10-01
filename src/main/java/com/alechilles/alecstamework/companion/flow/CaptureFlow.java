@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -12,6 +13,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -36,7 +38,8 @@ import org.bson.BsonDocument;
 public final class CaptureFlow<R> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    public enum Result { CAPTURED, NOT_CAPTURABLE, CONFLICT, COMMIT_FAILED }
+    /** OWNED_LIMIT and GROUP_LIMIT: the record after capture would pass a population cap; nothing changed. */
+    public enum Result { CAPTURED, NOT_CAPTURABLE, CONFLICT, COMMIT_FAILED, OWNED_LIMIT, GROUP_LIMIT }
 
     /** {@code itemRef} is what to write on the item; null unless CAPTURED. */
     public record Outcome(@Nonnull Result result, @Nullable CaptureItemKeys.Ref itemRef) {
@@ -61,18 +64,23 @@ public final class CaptureFlow<R> {
     private final LoadedBodies<R> loaded;
     private final BiConsumer<UUID, SnapshotEnvelope> queueSnapshot;
     private final Function<UUID, CompletableFuture<Void>> flushOwner;
+    private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission;
 
     /**
      * @param queueSnapshot queues a snapshot write for a profile
      * @param flushOwner    writes the given owner's file now (null for unowned); fails on error or timeout
+     * @param admission     population caps for the change from the current record (null for a new one)
+     *                      to the captured one; returns null to admit. Called under the index lock.
      */
     public CaptureFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
                        @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
-                       @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner) {
+                       @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
+                       @Nonnull BiFunction<CompanionRecord, CompanionRecord, CompanionAdmission.Refusal> admission) {
         this.index = Objects.requireNonNull(index, "index");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
         this.flushOwner = Objects.requireNonNull(flushOwner, "flushOwner");
+        this.admission = Objects.requireNonNull(admission, "admission");
     }
 
     /** Never completes exceptionally for an expected failure; the {@link Result} says what happened. */
@@ -125,8 +133,12 @@ public final class CaptureFlow<R> {
                 // Another body holds this profile; capturing this one would strand the registered one.
                 return Commit.refused(Result.NOT_CAPTURABLE);
             }
-            CompanionIndex.Mutation m = index.update(stamped, before.revision(),
-                    CompanionTransitions.capturedToItem(before, facts.summary(), capture.owner(), capture.ownerName()));
+            var change = CompanionTransitions.capturedToItem(before, facts.summary(), capture.owner(), capture.ownerName());
+            Result capped = capped(before, change.apply(before.toBuilder()).build());
+            if (capped != null) {
+                return Commit.refused(capped);
+            }
+            CompanionIndex.Mutation m = index.update(stamped, before.revision(), change);
             if (!m.applied()) {
                 return Commit.refused(Result.CONFLICT);
             }
@@ -136,9 +148,20 @@ public final class CaptureFlow<R> {
         if (index.byNpcUuid(facts.npcUuid()) != null) {
             return Commit.refused(Result.NOT_CAPTURABLE);
         }
-        CompanionIndex.Mutation m = index.insert(
-                CompanionTransitions.newItem(UUID.randomUUID(), facts, capture.owner(), capture.ownerName()));
+        CompanionRecord created = CompanionTransitions.newItem(UUID.randomUUID(), facts, capture.owner(), capture.ownerName());
+        Result capped = capped(null, created);
+        if (capped != null) {
+            return Commit.refused(capped);
+        }
+        CompanionIndex.Mutation m = index.insert(created);
         return m.applied() ? new Commit(null, null, m.after(), false) : Commit.refused(Result.CONFLICT);
+    }
+
+    @Nullable
+    private Result capped(@Nullable CompanionRecord before, CompanionRecord after) {
+        CompanionAdmission.Refusal refusal = admission.apply(before, after);
+        return refusal == null ? null
+                : refusal == CompanionAdmission.Refusal.OWNED ? Result.OWNED_LIMIT : Result.GROUP_LIMIT;
     }
 
     /** The new owner's file is written first, then the old one's; either failure fails the commit. */

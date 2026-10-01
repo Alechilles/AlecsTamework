@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.flow;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
@@ -27,6 +28,7 @@ class CaptureFlowTest {
     private final List<String> events = new ArrayList<>();
     private final List<SnapshotEnvelope> snapshots = new ArrayList<>();
     private final UUID owner = UUID.randomUUID();
+    private CompanionAdmission.Refusal refusal;
 
     private CompanionTransitions.BodyFacts facts(UUID npcUuid) {
         return new CompanionTransitions.BodyFacts(npcUuid, owner, "Alec", "Tamed_Sheep", "Wooly", "default", 0, 0, 0,
@@ -43,7 +45,7 @@ class CaptureFlowTest {
 
     private CaptureFlow<String> flow(Function<UUID, CompletableFuture<Void>> flush) {
         return new CaptureFlow<>(index, loaded, (id, envelope) -> { events.add("snapshot"); snapshots.add(envelope); },
-                owner -> { events.add("flush"); return flush.apply(owner); });
+                owner -> { events.add("flush"); return flush.apply(owner); }, (before, after) -> refusal);
     }
 
     private CaptureFlow<String> flow(CompletableFuture<Void> flush) {
@@ -127,7 +129,7 @@ class CaptureFlowTest {
         CompanionRecord live = insertLive(2);
         CaptureFlow<String> flow = new CaptureFlow<>(index, loaded,
                 (id, envelope) -> { throw new IllegalStateException("queue full"); },
-                owner -> CompletableFuture.completedFuture(null));
+                owner -> CompletableFuture.completedFuture(null), (before, after) -> null);
 
         CaptureFlow.Outcome outcome = flow.capture(stamped(live, owner)).join();
 
@@ -233,6 +235,27 @@ class CaptureFlowTest {
         List<CompanionRecord> filed = index.fileRecords(owner);
         assertEquals(1, filed.size());
         assertEquals(LocationKind.RELEASED, filed.get(0).location().kind());
+    }
+
+    @Test
+    void aCaptureThatWouldPassAPopulationCapChangesNothing() {
+        UUID npc = UUID.randomUUID();
+        refusal = CompanionAdmission.Refusal.GROUP_OWNED;
+        CaptureFlow.Capture<String> wild = new CaptureFlow.Capture<>(null, 0, "wild", facts(npc), owner, "Alec", DATA);
+        CompanionRecord live = insertLive(1);
+
+        CaptureFlow.Outcome unstamped = flow(CompletableFuture.completedFuture(null)).capture(wild).join();
+        refusal = CompanionAdmission.Refusal.OWNED;
+        CaptureFlow.Outcome stamped = flow(CompletableFuture.completedFuture(null))
+                .capture(stamped(live, UUID.randomUUID())).join();
+
+        assertEquals(CaptureFlow.Result.GROUP_LIMIT, unstamped.result());
+        assertEquals(CaptureFlow.Result.OWNED_LIMIT, stamped.result());
+        assertNull(index.byNpcUuid(npc));
+        assertEquals(LocationKind.LIVE, index.get(live.profileId()).location().kind());
+        assertEquals(1, index.get(live.profileId()).generation());
+        assertEquals("body", loaded.get(live.profileId()));
+        assertTrue(events.isEmpty(), "no snapshot queued and no flush");
     }
 
     @Test

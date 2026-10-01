@@ -62,8 +62,20 @@ public final class CompanionAdmissionGate {
      */
     @Nullable
     public CompanionAdmission.Refusal precheck(@Nonnull UUID owner, @Nonnull String roleId, @Nullable String world) {
-        CompanionLocation at = world == null || world.isBlank() ? CompanionLocation.item()
-                : CompanionLocation.live(world, 0, 0, 0);
+        return precheck(owner, roleId, world, world != null && !world.isBlank());
+    }
+
+    /**
+     * As {@link #precheck(UUID, String, String)}, for a candidate that is deployed (LIVE in
+     * {@code world}) or not. A non-deployed candidate is an ITEM whose home world is {@code world},
+     * as a capture into an item creates: it counts toward the owned limits in that world but not
+     * toward the deployed group limit.
+     */
+    @Nullable
+    public CompanionAdmission.Refusal precheck(@Nonnull UUID owner, @Nonnull String roleId, @Nullable String world,
+                                               boolean deployed) {
+        CompanionLocation at = deployed && world != null && !world.isBlank()
+                ? CompanionLocation.live(world, 0, 0, 0) : CompanionLocation.item();
         CompanionRecord candidate = CompanionRecord.builder(UUID.randomUUID(), roleId, at)
                 .ownerUuid(owner).homeWorld(world).build();
         return CompanionAdmission.check(index.fileRecords(owner), null, candidate, rules.get());

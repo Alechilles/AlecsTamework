@@ -38,4 +38,15 @@ class CompanionAdmissionGateTest {
         own("Dragon_Fire", CompanionLocation.stored(StoredReason.ROSTER));
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.precheck(owner, "Dragon_Fire", "w"));
     }
+
+    /** A capture into an item creates an ITEM record: the deployed limit does not apply, the owned one does. */
+    @Test
+    void aCaptureStylePrecheckIgnoresTheDeployedLimitButNotTheOwnedOne() {
+        own("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0));
+
+        assertNull(gate.precheck(owner, "Dragon_Fire", "w", false));
+
+        own("Dragon_Fire", CompanionLocation.stored(StoredReason.ROSTER));
+        assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.precheck(owner, "Dragon_Fire", "w", false));
+    }
 }
