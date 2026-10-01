@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
@@ -40,8 +41,12 @@ class RestoreFlowTest {
     }
 
     private RestoreFlow<String> flow(CompletableFuture<Void> flush, boolean spawnOk) {
-        return new RestoreFlow<>(index, loaded,
-                id -> CompletableFuture.completedFuture(snapshot(index.get(id))),
+        return flow(id -> CompletableFuture.completedFuture(snapshot(index.get(id))), flush, spawnOk);
+    }
+
+    private RestoreFlow<String> flow(Function<UUID, CompletableFuture<SnapshotEnvelope>> snapshots,
+                                     CompletableFuture<Void> flush, boolean spawnOk) {
+        return new RestoreFlow<>(index, loaded, snapshots,
                 owner -> { events.add("flush"); return flush; },
                 (committed, snap, dest, reason) -> { events.add("spawn gen" + committed.generation());
                     return CompletableFuture.completedFuture(spawnOk); },
@@ -80,8 +85,25 @@ class RestoreFlowTest {
     }
 
     @Test
-    void aChangeDuringTheRestoreWinsAndNothingSpawns() {
+    void aChangeWhileTheSnapshotIsReadWinsAndNothingIsCommitted() {
         CompanionRecord live = insertLive();
+        CompletableFuture<SnapshotEnvelope> read = new CompletableFuture<>();
+        CompletableFuture<RestoreFlow.Result> pending = flow(id -> read, CompletableFuture.completedFuture(null), true)
+                .restore(live.profileId(), RestoreRules.Reason.RECALL, there);
+        index.update(live.profileId(), live.revision(),
+                CompanionTransitions.died(live, CompanionSummary.EMPTY, 5L, 6L, "PLAYER", null));
+
+        read.complete(snapshot(live));
+
+        assertEquals(RestoreFlow.Result.CONFLICT, pending.join());
+        assertTrue(events.isEmpty(), "no flush, no removal and no spawn");
+        assertEquals(LocationKind.DEAD, index.get(live.profileId()).location().kind());
+    }
+
+    @Test
+    void aChangeAfterTheCommitWinsRemovesTheStaleOldBodyAndNothingSpawns() {
+        CompanionRecord live = insertLive();
+        loaded.put(live.profileId(), "old-body");
         CompletableFuture<Void> flush = new CompletableFuture<>();
         CompletableFuture<RestoreFlow.Result> pending = flow(flush, true)
                 .restore(live.profileId(), RestoreRules.Reason.RECALL, there);
@@ -92,7 +114,7 @@ class RestoreFlowTest {
         flush.complete(null);
 
         assertEquals(RestoreFlow.Result.CONFLICT, pending.join());
-        assertTrue(events.stream().noneMatch(e -> e.startsWith("spawn")));
+        assertEquals(List.of("flush", "remove old-body"), events, "the stale body is removed and nothing spawns");
         assertEquals(LocationKind.DEAD, index.get(live.profileId()).location().kind());
     }
 

@@ -39,7 +39,15 @@ public final class RestoreFlow<R> {
         }
     }
 
-    /** Spawns the committed companion at the destination; completes true once the body is added. */
+    /**
+     * Spawns the committed companion at the destination; completes true once the body is added.
+     *
+     * <p>Contract the flow relies on: completing false or exceptionally means no body of
+     * {@code committed}'s generation was added and none will be. No late world task (for example
+     * one still queued after a timeout) may add it, because the flow then reverts the record.
+     * On the world thread, before adding the body, the spawner re-checks that the record's
+     * revision still equals {@code committed.revision()}, and completes false when it does not.
+     */
     public interface Spawner {
         @Nonnull
         CompletableFuture<Boolean> spawn(@Nonnull CompanionRecord committed, @Nonnull SnapshotEnvelope snapshot,
@@ -57,7 +65,8 @@ public final class RestoreFlow<R> {
     /**
      * @param snapshots     reads a profile's snapshot off the world thread; completes with null when there is none
      * @param flushOwner    writes the given owner's file now (null for unowned); fails on error or timeout
-     * @param removeOldBody removes the old body from its world; called only after the commit is written
+     * @param removeOldBody removes the old body from its world; called only after the commit is written,
+     *                      or once a newer change replaced the commit and the old body is stale
      * @param clock         wall clock, used for the revive cooldown
      */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -114,11 +123,14 @@ public final class RestoreFlow<R> {
                 .handle((ignored, error) -> error)
                 .thenCompose(error -> {
                     if (error != null) {
-                        revertCommit(commit, before);
+                        if (!revertCommit(commit, before)) {
+                            removeStaleOldBody(commit);
+                        }
                         return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
                     }
                     CompanionRecord now = index.get(profileId);
                     if (now == null || now.revision() != commit.after().revision()) {
+                        removeStaleOldBody(commit);
                         return CompletableFuture.completedFuture(Result.CONFLICT);
                     }
                     if (commit.oldBody() != null) {
@@ -146,14 +158,30 @@ public final class RestoreFlow<R> {
         return spawned.handle((ok, error) -> error == null && Boolean.TRUE.equals(ok));
     }
 
-    /** Undoes an unwritten commit and re-registers the old body, unless the record changed since. */
-    private void revertCommit(Commit<R> commit, CompanionRecord before) {
-        index.atomically(() -> {
-            if (index.revert(before.profileId(), commit.after().revision(), before).applied() && commit.oldBody() != null) {
+    /**
+     * Undoes an unwritten commit and re-registers the old body. Returns false, changing nothing,
+     * when the record changed since the commit.
+     */
+    private boolean revertCommit(Commit<R> commit, CompanionRecord before) {
+        return index.atomically(() -> {
+            if (!index.revert(before.profileId(), commit.after().revision(), before).applied()) {
+                return false;
+            }
+            if (commit.oldBody() != null) {
                 loaded.put(before.profileId(), commit.oldBody());
             }
-            return null;
+            return true;
         });
+    }
+
+    /**
+     * A newer change replaced the commit, so it builds on generation+1 and the old body, already
+     * unregistered at commit, is stale under the fence. Remove it rather than leave it untracked.
+     */
+    private void removeStaleOldBody(Commit<R> commit) {
+        if (commit.oldBody() != null) {
+            removeOldBody.accept(commit.after().profileId(), commit.oldBody());
+        }
     }
 
     private static Result map(RestoreRules.Verdict verdict) {
