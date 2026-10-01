@@ -8,7 +8,6 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -22,6 +21,8 @@ import javax.annotation.Nullable;
  *
  * <p>Callers invoke this bridge on the owning world thread. Adoption applies the released live
  * cap and owner component directly; no durable reservation or cross-world lookup participates.
+ * A claim happens only when a player actually interacts with the NPC (an interaction action or a
+ * command-item link); showing the interaction prompt never claims.
  */
 public final class LegacyTamedOwnershipBridge {
     private LegacyTamedOwnershipBridge() {
@@ -67,7 +68,7 @@ public final class LegacyTamedOwnershipBridge {
                 OwnerPopulationCapService.evaluateAcquisition(store, playerId,
                         CompanionRoleIdResolver.resolveRoleId(npcRef, store));
         if (!cap.allowed()) {
-            sendCapDenial(player, cap);
+            OwnerMessageUtil.sendAcquisitionDenied(player, cap);
             return ClaimResult.denied(cap.reason());
         }
         String ownerName = OwnerNameUtil.resolve(player);
@@ -81,6 +82,24 @@ public final class LegacyTamedOwnershipBridge {
         publishClaimedTame(npcRef, store, playerId);
         invokeContinuation(continuation, npcRef, store, player, result);
         return result;
+    }
+
+    /**
+     * Whether an interaction by a player would attempt a claim: a tamed NPC with an identity and
+     * no owner. Read-only: it assigns nothing, checks no owner cap and sends nothing, so prompt
+     * evaluation can call it for every nearby player. The cap is checked, and a refusal reported,
+     * only by {@link #claimForPlayerIfEligible} on an actual interaction.
+     */
+    public static boolean isClaimableByInteraction(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid() || resolveNpcUuid(npcRef, store) == null) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            return false;
+        }
+        TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);
+        return (owner == null || owner.getOwnerId() == null) && TamedStateResolver.isTamed(npcRef, store);
     }
 
     /** Resolves owner metadata without mutating NPC state. */
@@ -150,26 +169,6 @@ public final class LegacyTamedOwnershipBridge {
     ) {
         ActivityRuntime.publishTame(
                 UUID.randomUUID(), roleId, ownerId, companionId);
-    }
-
-    private static void sendCapDenial(
-            @Nonnull Player player,
-            @Nonnull OwnerPopulationCapService.Decision decision
-    ) {
-        if ("owner-cap-reached".equals(decision.reason())
-                || OwnerPopulationCapService.REASON_GROUP_CAP.equals(decision.reason())) {
-            OwnerMessageUtil.sendAcquisitionDenied(player, decision);
-            return;
-        }
-        sendUnavailable(player, decision.reason());
-    }
-
-    private static void sendUnavailable(@Nullable Player player, String reason) {
-        if (player != null && player.getPlayerRef() != null) {
-            player.getPlayerRef().sendMessage(Message.raw(
-                    "Ownership could not be assigned right now (" + reason + ")."
-            ));
-        }
     }
 
     private static void invokeContinuation(

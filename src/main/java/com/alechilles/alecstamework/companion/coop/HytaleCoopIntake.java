@@ -271,7 +271,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
             if (block == null) {
                 return false;
             }
-            put(block, entry);
+            put(block, startingProduction(entry, CompanionWorldTime.gameTimeMs(world.getEntityStore().getStore())));
             playEffect(world, site);
             return true;
         });
@@ -302,7 +302,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
             if (block == null) {
                 return false;
             }
-            put(block, entry);
+            put(block, startingProduction(entry, CompanionWorldTime.gameTimeMs(world.getEntityStore().getStore())));
             store.removeEntity(body, RemoveReason.REMOVE);
             playEffect(world, site);
             return true;
@@ -360,6 +360,18 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         TameworkCoopSlotsComponent base = block.slots() == null ? new TameworkCoopSlotsComponent() : block.slots();
         block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(), base.with(entry));
         block.info().markNeedsSaving(block.store());
+    }
+
+    /**
+     * The entry with its production watermark set to the intake's world game time, as a vanilla
+     * coop resident's {@code lastProduced} is its add time. Every intake starts over: nothing
+     * carries across stays. Game time can be negative; 0 (no time resource) leaves the watermark
+     * unset and the first roam sweep starts it.
+     */
+    static TameworkCoopSlotsComponent.Slot startingProduction(TameworkCoopSlotsComponent.Slot entry,
+                                                              long gameTimeMs) {
+        return new TameworkCoopSlotsComponent.Slot(entry.slot(), entry.profileId(), entry.generation(),
+                entry.unownedEntity(), gameTimeMs);
     }
 
     /** Effects are cosmetic: a failure is logged and never undoes an intake already written. */

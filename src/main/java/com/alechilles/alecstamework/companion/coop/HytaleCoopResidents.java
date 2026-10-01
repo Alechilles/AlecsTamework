@@ -5,14 +5,10 @@ import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
-import com.alechilles.alecstamework.companion.live.SummaryLifeStage;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.CoopResidentReleasePositionService;
 import com.alechilles.alecstamework.items.DirectLiveCoopProduceService;
 import com.alechilles.alecstamework.items.HytaleDirectLiveCoopScanner;
-import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
-import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -48,7 +44,6 @@ import org.joml.Vector3i;
 public final class HytaleCoopResidents implements CoopRelease.Port {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    private final CompanionIndex index;
     private final RestoreFlow<Ref<EntityStore>> restoreFlow;
     private final HytaleCompanionSpawner spawner;
     private final CoopRelease release;
@@ -64,14 +59,13 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
                                @Nonnull HytaleCompanionSpawner spawner) {
         this.restoreFlow = Objects.requireNonNull(restoreFlow, "restoreFlow");
         this.spawner = Objects.requireNonNull(spawner, "spawner");
-        this.index = Objects.requireNonNull(index, "index");
+        Objects.requireNonNull(index, "index");
         this.release = new CoopRelease(index::get, this, System::currentTimeMillis);
     }
 
     /**
-     * One sweep of a coop in its roam hours: produce for every resident, save changed watermarks
-     * on the block and on each companion's record, then release the first resident that may go
-     * now (one per sweep, as in 4.x).
+     * One sweep of a coop in its roam hours: produce for every resident on the world's game time
+     * (once per roam window each), save changed watermarks on the block, then release the first resident that may go now (one per sweep, as in 4.x).
      */
     public void roam(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop) {
         Vector3i b = coop.block();
@@ -91,13 +85,8 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         List<TameworkCoopSlotsComponent.Slot> changed = produce.produce(coop, residents,
-                BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store), CompanionWorldTime.gameTimeMs(store));
+                CompanionWorldTime.gameTimeMs(store));
         writeEntries(block, changed);
-        for (TameworkCoopSlotsComponent.Slot entry : changed) {
-            if (entry.profileId() != null) {
-                CoopProduction.save(index, entry.profileId(), entry.generation(), entry.producedUntilMs());
-            }
-        }
         for (DirectLiveCoopProduceService.Resident resident : residents) {
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
             if (release.releasableNow(at, entry)) {
@@ -265,26 +254,12 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         BsonDocument entity = entry.unownedEntity();
         if (entity == null) {
             CompanionRecord record = release.record(entry);
-            return new DirectLiveCoopProduceService.Resident(entry, record == null ? null : record.roleId(),
-                    record == null || record.summary() == null ? null
-                            : SummaryLifeStage.of(record.summary().progression()));
+            return new DirectLiveCoopProduceService.Resident(entry, record == null ? null : record.roleId());
         }
         BsonDocument components = document(entity, "Components");
         BsonDocument npc = document(components, "NPC");
         String role = npc != null && npc.isString("RoleName") ? npc.getString("RoleName").getValue() : null;
-        return new DirectLiveCoopProduceService.Resident(entry, role, lifeStage(document(components, "TameworkLifeStage")));
-    }
-
-    @Nullable
-    private static TameworkLifeStageComponent lifeStage(@Nullable BsonDocument stored) {
-        if (stored == null) {
-            return null;
-        }
-        try {
-            return TameworkLifeStageComponent.CODEC.decode(stored, new ExtraInfo());
-        } catch (RuntimeException unreadable) {
-            return null;
-        }
+        return new DirectLiveCoopProduceService.Resident(entry, role);
     }
 
     @Nullable

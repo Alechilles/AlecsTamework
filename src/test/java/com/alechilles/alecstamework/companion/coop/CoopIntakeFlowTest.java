@@ -17,7 +17,6 @@ import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,25 +103,14 @@ class CoopIntakeFlowTest {
     }
 
     @Test
-    void theProductionWatermarkCarriesAcrossAReleaseAndTheNextIntake() {
-        CompanionRecord live = insertLive(2);
-        UUID id = live.profileId();
-        CoopIntakeFlow<String> flow = flow(CompletableFuture.completedFuture(null));
-        flow.intakeLive(live(live)).join();
-        assertEquals(0L, written.get(0).producedUntilMs());
+    void everyIntakeStartsProductionAtItsOwnIntakeTime() {
+        UUID id = UUID.randomUUID();
+        // An entry that still held an earlier stay's watermark is restamped; game time can be negative.
+        var earlierStay = new TameworkCoopSlotsComponent.Slot(1, id, 3, null, 5_000L);
 
-        assertTrue(CoopProduction.save(index, id, 3, 5_000L));
-        assertFalse(CoopProduction.save(index, id, 2, 7_000L), "a stale entry does not write the record");
-
-        // The morning release commits LIVE; production may no longer write the record.
-        CompanionRecord inCoop = index.get(id);
-        index.update(id, inCoop.revision(), CompanionTransitions.restored(inCoop, "default", 0, 0, 0, UUID.randomUUID()));
-        assertFalse(CoopProduction.save(index, id, 3, 9_000L));
-        loaded.put(id, "body");
-
-        flow.intakeLive(live(index.get(id))).join();
-
-        assertEquals(5_000L, written.get(1).producedUntilMs());
+        assertEquals(-9_000L, HytaleCoopIntake.startingProduction(earlierStay, -9_000L).producedUntilMs());
+        assertEquals(new TameworkCoopSlotsComponent.Slot(1, id, 5, null, 12_000L),
+                HytaleCoopIntake.startingProduction(TameworkCoopSlotsComponent.Slot.companion(1, id, 5), 12_000L));
     }
 
     @Test

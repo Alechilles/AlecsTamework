@@ -35,9 +35,8 @@ public final class TameworkCoopSlotsComponent implements Component<ChunkStore> {
     /**
      * One resident. {@code profileId} and {@code generation} for a companion; {@code unownedEntity}
      * (BSON entity document) for an unowned resident, which has no record and keeps its state
-     * (tamed or wild) as stored. {@code producedUntilMs} is the production watermark on the
-     * resident's active-time clock (world game time for an unowned resident without a life stage,
-     * which can be negative), 0 for none. Treat the entity document as read-only.
+     * (tamed or wild) as stored. {@code producedUntilMs} is the production watermark in world
+     * game time (ms, which can be negative), 0 for none. Treat the entity document as read-only.
      */
     public record Slot(int slot, @Nullable UUID profileId, long generation, @Nullable BsonDocument unownedEntity,
                        long producedUntilMs) {

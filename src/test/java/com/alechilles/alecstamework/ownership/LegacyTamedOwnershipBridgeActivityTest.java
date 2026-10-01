@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.ownership;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.activity.ActivityRuntime;
@@ -82,6 +84,37 @@ class LegacyTamedOwnershipBridgeActivityTest {
         assertEquals(owner, activity.ownerId());
         assertEquals(companion, activity.companionId());
         assertEquals("Tamed_RoleA", activity.roleId());
+    }
+
+    @Test
+    void promptEvaluationOfAnUnownedTamedNpcClaimsNothing() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ActivityRuntime.install(published::add, managedRegistry());
+        try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
+                     SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install()) {
+            ComponentType<EntityStore, TameworkTamedComponent> tamedType =
+                    new ComponentType<>();
+            ComponentType<EntityStore, UUIDComponent> uuidType = new ComponentType<>();
+            set(Tamework.getInstance(), "tamedComponentType", tamedType);
+            componentTypes().put(UUIDComponent.class, uuidType);
+            set(entityModule(), "uuidComponentType", uuidType);
+            try (TestEntityComponentStore store = new TestEntityComponentStore(
+                    new EntityStore(null))) {
+                Ref<EntityStore> npcRef = store.createReference();
+                NPCEntity npc = new NPCEntity();
+                npc.setRoleName("Tamed_RoleA");
+                store.put(npcRef, NPCEntity.getComponentType(), npc);
+                store.put(npcRef, uuidType, new UUIDComponent(UUID.randomUUID()));
+
+                assertTrue(LegacyTamedOwnershipBridge.isClaimableByInteraction(npcRef, store));
+                assertNull(store.getComponent(npcRef, TameworkOwnerComponent.getComponentType()));
+
+                store.put(npcRef, TameworkOwnerComponent.getComponentType(),
+                        new TameworkOwnerComponent(UUID.randomUUID(), "Owner"));
+                assertFalse(LegacyTamedOwnershipBridge.isClaimableByInteraction(npcRef, store));
+            }
+        }
+        assertTrue(published.isEmpty());
     }
 
     private static ManagedActivityConfigRegistry managedRegistry() throws Exception {

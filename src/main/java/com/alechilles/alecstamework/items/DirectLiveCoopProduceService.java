@@ -3,8 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
-import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
-import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
@@ -21,59 +19,56 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.IntUnaryOperator;
+import java.util.function.IntConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Coop produce (spec 8.9) on the resident slot entries. While a coop's residents roam, each due
- * interval of a resident's clock adds its role's drops to the coop container. The clock is the
- * resident's active time when it has a life stage, otherwise (an unowned NPC without one, such as
- * a plain wild chicken) the coop world's game time. The watermark ({@code producedUntilMs}, on
- * that clock) lives in the slot entry; the
- * caller writes the changed entries back to the block, and a companion's also to its record
- * ({@code CoopProduction}), so it carries across stays. Rules: interval max(24, IntervalGameHours)
- * game hours, {@code ItemsPerTick} items per interval, drops by role, at most
- * {@value #MAX_CATCH_UP_CYCLES_PER_SWEEP} intervals per sweep. Call on the coop's world thread.
+ * Coop produce (spec 8.9) on the resident slot entries, following vanilla
+ * {@code CoopBlock.generateProduceToInventory} for every resident, owned or unowned. The clock is
+ * the coop world's game time, never real or owner-online time. Production runs on the roam-hours
+ * sweep, before release: a resident whose role has a drop gets
+ * {@code ceil(floor(hours since its watermark) / interval)} units (0 h gives 0, 1 to 24 h gives 1,
+ * 25 to 48 h gives 2 at the 24 h interval), at most {@value #MAX_CATCH_UP_UNITS_PER_SWEEP} per
+ * sweep, and its watermark moves to now even when that is 0 units. What does not fit in the coop
+ * container is discarded.
+ *
+ * <p>The watermark ({@code producedUntilMs}, game time in ms, can be negative, 0 for none) lives
+ * in the slot entry and starts at the intake time of every stay, owned or unowned; nothing carries
+ * across stays. The caller writes the changed entries back to the block. A resident that stays in its slot through the roam hours (its release keeps being
+ * refused) is not looked at again in the same roam window, so it produces at most once per
+ * window and its entry is written at most once per window. Rules: interval
+ * max(24, IntervalGameHours) game hours, {@code ItemsPerTick} drop rolls per unit, drops by role.
+ * Call on the coop's world thread.
  */
 public final class DirectLiveCoopProduceService {
     private static final long GAME_MILLIS_PER_HOUR = 3_600_000L;
-    private static final int MAX_CATCH_UP_CYCLES_PER_SWEEP = 32;
+    private static final long GAME_MILLIS_PER_DAY = 24L * GAME_MILLIS_PER_HOUR;
+    private static final int MAX_CATCH_UP_UNITS_PER_SWEEP = 32;
     private static final String DEFAULT_INTERACTION_STATE = "default";
     private static final String PRODUCE_READY_INTERACTION_STATE =
             "Produce_Ready";
 
-    /**
-     * A current resident: its slot entry, role and life stage. A companion's life stage comes from
-     * its record summary, an unowned resident's from its inline entity. Without one, a companion
-     * produces nothing (its active time is unknown) and an unowned resident uses world game time.
-     */
-    public record Resident(@Nonnull TameworkCoopSlotsComponent.Slot entry, @Nullable String roleId,
-                           @Nullable TameworkLifeStageComponent lifeStage) {
-    }
-
-    /** A resident's production clock: its current time and one interval, both in that clock's ms. */
-    record Clock(long nowMs, long intervalMs) {
+    /** A current resident: its slot entry and role (a companion's from its record, an unowned one's from its entity). */
+    public record Resident(@Nonnull TameworkCoopSlotsComponent.Slot entry, @Nullable String roleId) {
     }
 
     /**
-     * Produces for each resident and returns the entries whose watermark changed. A companion with
-     * no watermark starts from its current active time, with no free first interval; an unowned
-     * resident see {@link #startingWatermark}. {@code worldGameTimeMs} is the coop world's game
-     * time, 0 when unknown.
+     * Produces for each resident and returns the entries whose watermark changed. A resident whose
+     * role has no drop is skipped without a change. {@code worldGameTimeMs} is the coop world's
+     * game time; 0 means unknown and produces nothing.
      */
     @Nonnull
     public List<TameworkCoopSlotsComponent.Slot> produce(
             @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop,
             @Nonnull List<Resident> residents,
-            double gameSecondsPerRealSecond,
             long worldGameTimeMs
     ) {
         ItemContainer container = coop.container();
         TwCoopConfig config = coop.config();
         Map<String, String> drops = config == null ? Map.of()
                 : normalizeDrops(config.getProduceRules().getDropsByRole());
-        if (container == null || drops.isEmpty() || residents.isEmpty()) {
+        if (container == null || drops.isEmpty() || residents.isEmpty() || worldGameTimeMs == 0L) {
             return List.of();
         }
         TwCoopConfig.ProduceRules rules = config.getProduceRules();
@@ -81,10 +76,8 @@ public final class DirectLiveCoopProduceService {
                 WorldTimeResource.HOURS_PER_DAY,
                 rules.getIntervalGameHours()
         );
-        double safeRate = Double.isFinite(gameSecondsPerRealSecond)
-                && gameSecondsPerRealSecond > 0.0 ? gameSecondsPerRealSecond : 1.0;
-        long gameIntervalMs = intervalHours * GAME_MILLIS_PER_HOUR;
-        long activeIntervalMs = Math.max(1L, (long) Math.ceil(gameIntervalMs / safeRate));
+        long windowStartMs = roamWindowStartMs(worldGameTimeMs,
+                config.getLifecycleRules().getResidentRoamStartHour());
         int itemsPerTick = rules.getItemsPerTick();
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
@@ -92,16 +85,12 @@ public final class DirectLiveCoopProduceService {
         for (Resident resident : residents) {
             String role = normalize(resident.roleId());
             String dropId = role == null ? null : drops.get(role);
-            Clock clock = dropId == null ? null : clock(resident, activeIntervalMs, worldGameTimeMs, gameIntervalMs);
-            if (clock == null || resident.lifeStage() != null
-                    && AnimalProgressionService.deathDue(resident.lifeStage(), resident.roleId())) {
+            if (dropId == null) {
                 continue;
             }
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
-            long now = clock.nowMs();
-            long intervalMs = clock.intervalMs();
-            long next = advance(startingWatermark(entry, now, intervalMs), now, intervalMs,
-                    cycles -> produceCycles(container, dropId, cycles, itemsPerTick, random));
+            long next = advance(entry.producedUntilMs(), worldGameTimeMs, windowStartMs, intervalHours,
+                    units -> produceUnits(container, dropId, units, itemsPerTick, random));
             if (next != entry.producedUntilMs()) {
                 changed.add(new TameworkCoopSlotsComponent.Slot(entry.slot(), entry.profileId(), entry.generation(),
                         entry.unownedEntity(), next));
@@ -111,72 +100,58 @@ public final class DirectLiveCoopProduceService {
     }
 
     /**
-     * The resident's clock: active time with a life stage; world game time for an unowned resident
-     * without one (null when that is unknown); null for a companion without one.
+     * When the current roam window opened: the latest game time at or before {@code nowMs} whose
+     * hour of day is {@code roamStartHour}. A coop that always roams gets one window per day.
      */
-    @Nullable
-    static Clock clock(@Nonnull Resident resident, long activeIntervalMs, long worldGameTimeMs, long gameIntervalMs) {
-        if (resident.lifeStage() != null) {
-            return new Clock(AnimalProgressionService.activeTimeMs(resident.lifeStage()), activeIntervalMs);
-        }
-        return resident.entry().unownedEntity() != null && worldGameTimeMs != 0L
-                ? new Clock(worldGameTimeMs, gameIntervalMs) : null;
+    static long roamWindowStartMs(long nowMs, int roamStartHour) {
+        long startOffsetMs = Math.floorMod(roamStartHour, 24) * GAME_MILLIS_PER_HOUR;
+        return Math.floorDiv(nowMs - startOffsetMs, GAME_MILLIS_PER_DAY) * GAME_MILLIS_PER_DAY + startOffsetMs;
     }
 
     /**
-     * The watermark production starts from. A companion's comes from its slot entry, which intake
-     * fills from the record, so it carries across stays. An unowned resident has no record and
-     * starts each stay without one: it starts one interval in the past, so it produces at most
-     * one cycle per stay. Returns 0 (none) for a companion without one. World game time can be
-     * negative, so the start keeps its sign and only avoids 0, the "none" value.
+     * The next watermark. A watermark inside the current roam window (from {@code windowStartMs}
+     * up to now) is kept and nothing is produced: this window already ran for the resident. No
+     * watermark (0) starts at {@code nowMs} without producing. Otherwise the due units, when
+     * there are any, go to {@code produceUnits}, and the watermark becomes {@code nowMs}.
      */
-    static long startingWatermark(@Nonnull TameworkCoopSlotsComponent.Slot entry, long nowMs, long intervalMs) {
-        if (entry.producedUntilMs() != 0L || entry.unownedEntity() == null) {
-            return entry.producedUntilMs();
-        }
-        long start = nowMs - intervalMs;
-        return start == 0L ? -1L : start;
-    }
-
-    /**
-     * The next watermark. No watermark (0) starts at {@code nowMs}. Otherwise the due cycles are
-     * offered to {@code produceCycles}, which returns how many it completed (a cycle cut short by
-     * a full container counts when it added something), and the watermark moves by those.
-     */
-    static long advance(long watermarkMs, long nowMs, long intervalMs, IntUnaryOperator produceCycles) {
+    static long advance(long watermarkMs, long nowMs, long windowStartMs, long intervalHours,
+                        IntConsumer produceUnits) {
         if (watermarkMs == 0L) {
             return nowMs;
         }
-        int cycles = cyclesDue(nowMs, watermarkMs, intervalMs);
-        if (cycles <= 0) {
+        if (watermarkMs >= windowStartMs && watermarkMs <= nowMs) {
             return watermarkMs;
         }
-        int completed = produceCycles.applyAsInt(cycles);
-        return completed > 0 ? watermarkMs + completed * intervalMs : watermarkMs;
+        int units = unitsDue(watermarkMs, nowMs, intervalHours);
+        if (units > 0) {
+            produceUnits.accept(units);
+        }
+        return nowMs;
     }
 
-    private int produceCycles(ItemContainer container, String dropId, int cycles, int itemsPerTick,
+    /**
+     * Vanilla's count: whole game hours since the watermark, divided by the interval and rounded
+     * up, capped at {@value #MAX_CATCH_UP_UNITS_PER_SWEEP}. A watermark ahead of now gives 0.
+     */
+    static int unitsDue(long watermarkMs, long nowMs, long intervalHours) {
+        long hours = Math.floorDiv(nowMs - watermarkMs, GAME_MILLIS_PER_HOUR);
+        if (hours <= 0L || intervalHours <= 0L) {
+            return 0;
+        }
+        return (int) Math.min(MAX_CATCH_UP_UNITS_PER_SWEEP, (hours + intervalHours - 1L) / intervalHours);
+    }
+
+    /** Rolls the drop {@code itemsPerTick} times per unit; stops when the container is full. */
+    private void produceUnits(ItemContainer container, String dropId, int units, int itemsPerTick,
                               ThreadLocalRandom random) {
         ItemDropList dropList = resolveDropList(ItemDropList.getAssetMap(), dropId);
-        int completed = 0;
-        boolean saturated = false;
-        boolean partialCycle = false;
-        for (int cycle = 0; cycle < cycles; cycle++) {
-            boolean cycleAdded = false;
+        for (int unit = 0; unit < units; unit++) {
             for (int item = 0; item < itemsPerTick; item++) {
-                ProductionResult result = produce(container, dropList, dropId, random);
-                cycleAdded |= result.addedAny();
-                if (!result.complete()) {
-                    partialCycle = cycleAdded;
-                    saturated = true;
-                    break;
+                if (!produce(container, dropList, dropId, random)) {
+                    return;
                 }
             }
-            if (saturated) break;
-            completed++;
         }
-        if (saturated && partialCycle) completed++;
-        return completed;
     }
 
     /** Shows the produce-ready state while the coop container holds produce. */
@@ -213,44 +188,31 @@ public final class DirectLiveCoopProduceService {
         }
     }
 
-    private ProductionResult produce(
+    /** Adds one roll of the drop; false when the container could not take all of it. */
+    private boolean produce(
             ItemContainer container,
             @Nullable ItemDropList dropList,
             String dropId,
             ThreadLocalRandom random
     ) {
         if (dropList == null || dropList.getContainer() == null) {
-            return result(add(container, new ItemStack(dropId, 1)));
+            return add(container, new ItemStack(dropId, 1));
         }
         ArrayList<ItemDrop> drops = new ArrayList<>();
         dropList.getContainer().populateDrops(
                 drops, random::nextDouble, dropId
         );
-        boolean addedAny = false;
         for (ItemDrop drop : drops) {
             if (drop == null || drop.getItemId() == null
                     || drop.getItemId().isBlank()) {
                 continue;
             }
             int quantity = drop.getRandomQuantity(random);
-            if (quantity > 0) {
-                if (!add(container, new ItemStack(drop.getItemId(), quantity, drop.getMetadata()))) {
-                    return new ProductionResult(false, addedAny);
-                }
-                addedAny = true;
+            if (quantity > 0 && !add(container, new ItemStack(drop.getItemId(), quantity, drop.getMetadata()))) {
+                return false;
             }
         }
-        return new ProductionResult(true, addedAny);
-    }
-
-    private ProductionResult result(boolean complete) { return new ProductionResult(complete, complete); }
-
-    private record ProductionResult(boolean complete, boolean addedAny) { }
-
-    static int cyclesDue(long activeTimeMs, long watermarkMs, long intervalMs) {
-        if (intervalMs <= 0L) return 0;
-        long elapsed = Math.max(0L, activeTimeMs - watermarkMs);
-        return (int) Math.min(MAX_CATCH_UP_CYCLES_PER_SWEEP, elapsed / intervalMs);
+        return true;
     }
 
     private boolean add(ItemContainer container, ItemStack stack) {

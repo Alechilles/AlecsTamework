@@ -271,9 +271,8 @@ public final class CoopIntakeFlow<R> {
                 removeStaleBody(commit);
                 return CompletableFuture.completedFuture(Result.CONFLICT);
             }
-            // The record's production watermark carries across stays (CoopProduction).
-            return writeSlot(site, new TameworkCoopSlotsComponent.Slot(site.slot(), profileId, after.generation(), null,
-                            CoopProduction.producedUntil(after)))
+            // No production watermark here: the coop stamps the intake time when it writes the entry.
+            return writeSlot(site, TameworkCoopSlotsComponent.Slot.companion(site.slot(), profileId, after.generation()))
                     .thenApply(written -> {
                         if (written) {
                             finish.run();
