@@ -89,6 +89,16 @@ final class CommandOwnedPanelRecordSource {
                 var linked = linkedByProfile.get(id);
                 if (linked == null && currentAlias != null) linked = linkedByAlias.get(currentAlias);
                 if (linked != null) rows.putIfAbsent(linked.npcUuid, profile.profileId());
+                // A restore respawns the companion under a new NPC UUID. Item metadata may still name
+                // the retired body, so a live profile's row follows its current body; otherwise the
+                // live owner index adds that body as a second card.
+                if (linked != null && currentAlias != null && !currentAlias.equals(linked.npcUuid)
+                        && (profile.lifecycleState() == LifecycleState.ACTIVE
+                        || profile.lifecycleState() == LifecycleState.UNLOADED)) {
+                    linked = new LinkedNpcRecord(currentAlias, id, null, null, linked.homePosition,
+                            linked.cachedDisplayName, linked.cachedNameKey, linked.cachedRoleId,
+                            linked.cachedCommandState, linked.active, linked.breedingEnabled, linked.groupId);
+                }
                 records.add(linked != null ? linked : displayRecord(profile,
                         currentAlias == null ? presentation : currentAlias, false));
             } else if (profile.ownerUuid() == null && profile.lifecycleState() == LifecycleState.CAPTURED) {

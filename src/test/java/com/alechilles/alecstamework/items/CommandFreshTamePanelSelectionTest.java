@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -164,8 +165,69 @@ class CommandFreshTamePanelSelectionTest {
         }
     }
 
+    /**
+     * A cross-world restore gives the companion a new NPC UUID while the flute still records the
+     * retired one. The open panel must show one card for the profile, on its current body.
+     */
+    @Test
+    void restoredCompanionWithStaleItemUuidShowsOneCurrentCard() throws Exception {
+        try (TestScope scope = TestScope.install()) {
+            Ref<EntityStore> playerRef = scope.store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(scope.world);
+            player.setReference(playerRef);
+            scope.world.references.put(OWNER, playerRef);
+
+            Ref<EntityStore> npcRef = scope.store.createReference();
+            NPCEntity npc = new NPCEntity();
+            npc.setLegacyUUID(NPC);
+            scope.store.put(npcRef, scope.npcType, npc);
+            scope.store.put(npcRef, scope.entitySupportType,
+                    (com.hypixel.hytale.server.npc.role.support.EntitySupport) unsafe().allocateInstance(
+                            com.hypixel.hytale.server.npc.role.support.EntitySupport.class));
+            scope.store.put(npcRef, scope.ownerType, new TameworkOwnerComponent(OWNER, "Owner"));
+            scope.store.put(npcRef, scope.transformType, new TransformComponent());
+            scope.world.references.put(NPC, npcRef);
+
+            var profileId = new com.alechilles.alecstamework.companion.identity.ProfileId(UUID.randomUUID());
+            var profile = new com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState(
+                    profileId, new com.alechilles.alecstamework.companion.identity.NpcAlias(NPC),
+                    com.alechilles.alecstamework.companion.lifecycle.LifecycleState.ACTIVE,
+                    new com.alechilles.alecstamework.companion.identity.OwnerId(OWNER), null,
+                    "Cow", "Cow", "My animal", true, null, null, java.util.Set.of(), java.util.Set.of(), 1L);
+            UUID retired = UUID.randomUUID();
+            ItemStack stack = new CommandLinkedNpcRecordStore().write(
+                    new MetadataStack("test:flute", new BsonDocument()),
+                    List.of(new LinkedNpcRecord(retired, profileId.toString(), null, "other-world", null,
+                            "My animal", null, "Cow", null, true, false, null)));
+            TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(new BsonDocument(), new ExtraInfo());
+            var liveIndex = new com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex();
+            liveIndex.observe(NPC, OWNER, scope.world.getName());
+            CommandPanelEntrySourceService source = entrySource(liveIndex,
+                    new CommandOwnedPanelRecordSource(() -> Map.of(profileId, profile)));
+
+            var page = new com.alechilles.alecstamework.ui.LinkedNpcPanelPageState();
+            page.setPageSize(10);
+            for (var entries : List.of(
+                    source.buildSnapshot(player, scope.store, stack, config, "flute", page).entries(),
+                    source.buildSnapshot(player, scope.store, stack, config, "flute").entries())) {
+                assertEquals(1, entries.size(), "One restored profile must render one card.");
+                assertEquals(NPC, entries.getFirst().npcUuid());
+                assertTrue(entries.getFirst().active() && entries.getFirst().linked(),
+                        "The flute selection and link follow the profile.");
+            }
+        }
+    }
+
     private static CommandPanelEntrySourceService entrySource(
             com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex liveIndex) {
+        return entrySource(liveIndex, new CommandOwnedPanelRecordSource(Map::of));
+    }
+
+    private static CommandPanelEntrySourceService entrySource(
+            com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex liveIndex,
+            CommandOwnedPanelRecordSource owned) {
         var names = new CommandNpcNameResolver();
         var policy = new CommandLinkPolicyService();
         var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
@@ -186,7 +248,7 @@ class CommandFreshTamePanelSelectionTest {
                 persistence, policy, new CommandGroupService(), null);
         return new CommandPanelEntrySourceService(
                 linked, new CommandPanelPreferenceService(), policy, names,
-                null, null, null, new CommandOwnedPanelRecordSource(Map::of), liveIndex);
+                null, null, null, owned, liveIndex);
     }
 
     private static com.alechilles.alecstamework.ui.LinkedNpcEntry row(

@@ -237,7 +237,7 @@ final class CommandPanelEntrySourceService {
         records.addAll(inputs.owned().ownedRecords());
         records.addAll(inputs.owned().capturedRecords());
         appendFreshOwnedRecords(player, store, records, inputs.linkedRecords());
-        Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+        Set<UUID> linkedIds = ownedLinkedIds(inputs, toolId);
         CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
         boolean includeCareValues = sort == CommandPanelPreferenceService.PanelSort.Happiness
                 || sort == CommandPanelPreferenceService.PanelSort.Hunger
@@ -297,6 +297,20 @@ final class CommandPanelEntrySourceService {
         }
     }
 
+    /** Item links name an NPC UUID; an owned row that moved to a new body keeps its link through the profile. */
+    private Set<UUID> ownedLinkedIds(RefreshInputs inputs, String toolId) {
+        Set<UUID> ids = new HashSet<>(linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId));
+        if (inputs.owned() == null) return ids;
+        Set<String> linkedProfiles = new HashSet<>();
+        for (LinkedNpcRecord record : inputs.linkedRecords()) {
+            if (record.profileId != null && ids.contains(record.npcUuid)) linkedProfiles.add(record.profileId);
+        }
+        for (LinkedNpcRecord record : inputs.owned().ownedRecords()) {
+            if (record.profileId != null && linkedProfiles.contains(record.profileId)) ids.add(record.npcUuid);
+        }
+        return ids;
+    }
+
     private static Map<UUID, String> profileKeys(List<LinkedNpcRecord> records) {
         Map<UUID, String> keys = new java.util.HashMap<>();
         for (LinkedNpcRecord record : records) {
@@ -353,7 +367,7 @@ final class CommandPanelEntrySourceService {
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (ownedMode) CommandCompanionGroups.importLegacy(player, stack);
         if (ownedMode) {
-            Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+            Set<UUID> linkedIds = ownedLinkedIds(inputs, toolId);
             List<LinkedNpcRecord> ownedRecords = new ArrayList<>();
             if (inputs.owned() != null) {
                 ownedRecords.addAll(inputs.owned().ownedRecords());
