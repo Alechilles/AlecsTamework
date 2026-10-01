@@ -301,6 +301,7 @@ public class Tamework extends JavaPlugin {
     private CompanionPersistenceModule companionModule;
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
+    private volatile CaptureItemHolderSystems.Transfers captureItemTransfers;
     private ReleaseFlow companionReleaseFlow;
     /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */
     @Nullable
@@ -1451,8 +1452,10 @@ public class Tamework extends JavaPlugin {
         AdmissionCache admissionCache = new AdmissionCache(System::currentTimeMillis);
         companionModule.addChangeListener(admissionCache::onRecordChanged);
         captureAdmissionCache = admissionCache;
-        return new CaptureItemHolderSystems.Transfers(companionModule.index(), companionModule.writer(),
-                admissionGate, itemFeatureRegistry, admissionCache);
+        CaptureItemHolderSystems.Transfers transfers = new CaptureItemHolderSystems.Transfers(
+                companionModule.index(), companionModule.writer(), admissionGate, itemFeatureRegistry, admissionCache);
+        captureItemTransfers = transfers;
+        return transfers;
     }
 
     /**
@@ -1877,6 +1880,15 @@ public class Tamework extends JavaPlugin {
         if (admissionCache != null) {
             // Limits, limit scope and ClearsOwner decide the cached pickup admissions.
             admissionCache.clear();
+        }
+        refreshCapturePickupFilters();
+    }
+
+    /** Pickup blocking may have turned on: players already online get their filters now. */
+    private void refreshCapturePickupFilters() {
+        CaptureItemHolderSystems.Transfers transfers = captureItemTransfers;
+        if (transfers != null) {
+            transfers.refreshFilters();
         }
     }
 
@@ -3023,6 +3035,7 @@ public class Tamework extends JavaPlugin {
             // Every config reload, so a changed limit or population group applies to pickup filters at once.
             admissionCache.clear();
         }
+        refreshCapturePickupFilters();
         if (apiEventBus == null || changedIds == null) {
             return;
         }

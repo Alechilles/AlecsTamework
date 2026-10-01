@@ -81,6 +81,42 @@ class SnapshotPatchTest {
         assertTrue(revived.getDocument("Components").containsKey("NPC"));
     }
 
+    private static BsonDocument withHealth(double value) {
+        return entity(new BsonDocument("Death", new BsonDocument()).append("EntityStats",
+                new BsonDocument("Version", new org.bson.BsonInt32(5)).append("Stats", new BsonDocument("Health",
+                        new BsonDocument("Id", new BsonString("Health")).append("Value", new org.bson.BsonDouble(value))
+                                .append("Modifiers", new BsonDocument("NPC_Max", new BsonDocument())))
+                        .append("Mana", new BsonDocument("Id", new BsonString("Mana"))
+                                .append("Value", new org.bson.BsonDouble(0.0))))));
+    }
+
+    private static BsonDocument stats(BsonDocument entity) {
+        return entity.getDocument("Components").getDocument("EntityStats").getDocument("Stats");
+    }
+
+    /** The engine kills a body whose loaded Health is 0 on its first stat tick, before the refill. */
+    @Test
+    void aReviveLiftsTheSavedHealthAboveZeroSoTheLoadedBodyIsNotKilledAgain() {
+        BsonDocument dead = withHealth(0.0);
+
+        BsonDocument revived = SnapshotPatch.forRevive(dead);
+
+        assertTrue(stats(revived).getDocument("Health").getNumber("Value").doubleValue() > 0.0);
+        assertTrue(stats(revived).getDocument("Health").containsKey("Modifiers"));
+        assertEquals(0.0, stats(revived).getDocument("Mana").getNumber("Value").doubleValue());
+        assertEquals(0.0, stats(dead).getDocument("Health").getNumber("Value").doubleValue());
+    }
+
+    @Test
+    void aReviveKeepsPositiveHealthAndLeavesASnapshotWithoutStatsAlone() {
+        BsonDocument healthy = withHealth(2.5);
+        assertEquals(stats(healthy), stats(SnapshotPatch.forRevive(healthy)));
+
+        BsonDocument noStats = entity(new BsonDocument("Death", new BsonDocument()).append("NPC", new BsonDocument()));
+        assertEquals(new BsonDocument("NPC", new BsonDocument()),
+                SnapshotPatch.forRevive(noStats).getDocument("Components"));
+    }
+
     @Test
     void aTamingCaptureMarksTheWildEntityTamedForItsCodec() {
         BsonDocument wild = entity(new BsonDocument("NPC", new BsonDocument()));

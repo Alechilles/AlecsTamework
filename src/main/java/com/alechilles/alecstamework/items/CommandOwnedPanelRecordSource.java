@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -22,6 +23,8 @@ final class CommandOwnedPanelRecordSource {
     private final Function<UUID, Collection<ProfileSnapshot>> profiles;
     /** Profiles an owner's generic items show read-only, because another authority manages them. */
     private final Function<UUID, java.util.Set<ProfileId>> managedProfiles;
+    /** Index path only: one profile id to its record when that is an unowned capture item, else null. */
+    private final Function<UUID, ProfileSnapshot> unownedCapture;
 
     CommandOwnedPanelRecordSource(
             Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles) {
@@ -33,12 +36,14 @@ final class CommandOwnedPanelRecordSource {
             Supplier<java.util.Set<ProfileId>> managedProfiles) {
         this.profiles = ignoredOwner -> profiles.get().values().stream().map(ProfileSnapshot::from).toList();
         this.managedProfiles = ignoredOwner -> managedProfiles.get();
+        this.unownedCapture = null;
     }
 
     /**
-     * Owned rows from the companion index. The index lists records by owner only, so unowned
-     * captured rows are absent from this source. Command-family roster members (a roster id, not
-     * bonded) are read-only here: their family item's panel owns their actions.
+     * Owned rows from the companion index, plus the unowned captured rows this viewer knows: the
+     * index lists records by owner only, so the profiles of carried capture items and of the
+     * item's linked records are looked up one by one. Command-family roster members (a roster id,
+     * not bonded) are read-only here: their family item's panel owns their actions.
      */
     CommandOwnedPanelRecordSource(CompanionQueries companions) {
         this.profiles = owner -> owner == null ? List.of()
@@ -48,6 +53,30 @@ final class CommandOwnedPanelRecordSource {
                         .filter(record -> record.rosterId() != null && !record.bonded())
                         .map(record -> new ProfileId(record.profileId()))
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        this.unownedCapture = id -> {
+            var record = companions.get(id);
+            return record != null && record.ownerUuid() == null
+                    && record.location().kind() == LocationKind.ITEM
+                    ? CommandPersistenceView.from(record) : null;
+        };
+    }
+
+    /** The index path's unowned captured rows for the profile ids this viewer carries or has linked. */
+    private List<ProfileSnapshot> knownUnownedCaptures(List<LinkedNpcRecord> linkedRecords,
+                                                       java.util.Set<String> carriedProfiles) {
+        if (unownedCapture == null) return List.of();
+        var ids = new java.util.LinkedHashSet<String>(carriedProfiles);
+        for (var linked : linkedRecords) if (linked.profileId != null) ids.add(linked.profileId);
+        var found = new ArrayList<ProfileSnapshot>();
+        for (String id : ids) {
+            try {
+                var profile = unownedCapture.apply(UUID.fromString(id));
+                if (profile != null) found.add(profile);
+            } catch (IllegalArgumentException notAProfileId) {
+                // Item metadata that names no profile shows nothing.
+            }
+        }
+        return found;
     }
 
     /** One refresh owns this immutable display snapshot; action handlers still read current authority. */
@@ -77,7 +106,9 @@ final class CommandOwnedPanelRecordSource {
         var captures = new ArrayList<LinkedNpcRecord>();
         var rows = new HashMap<UUID, ProfileId>();
         var features = new HashMap<UUID, CommandPanelFeaturePresentation>();
-        for (var profile : profiles.apply(ownerUuid)) {
+        var candidates = new ArrayList<ProfileSnapshot>(profiles.apply(ownerUuid));
+        candidates.addAll(knownUnownedCaptures(linkedRecords, carriedProfiles));
+        for (var profile : candidates) {
             String id = profile.profileId().toString();
             UUID currentAlias = profile.currentNpcUuid();
             if (profile.ownerUuid() != null && profile.ownerUuid().equals(ownerUuid)) {

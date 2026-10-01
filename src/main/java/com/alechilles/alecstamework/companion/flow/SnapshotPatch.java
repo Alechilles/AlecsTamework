@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.bson.BsonDocument;
+import org.bson.BsonDouble;
 import org.bson.BsonInt64;
 import org.bson.BsonInvalidOperationException;
 import org.bson.BsonValue;
@@ -30,6 +31,12 @@ public final class SnapshotPatch {
     static final String BREEDING = "TameworkBreeding";
     static final String LIFE_STAGE = "TameworkLifeStage";
     static final String TAMED = "TameworkTamed";
+    private static final String STATS = "EntityStats";
+    private static final String STAT_VALUES = "Stats";
+    private static final String HEALTH = "Health";
+    private static final String STAT_VALUE = "Value";
+    /** Any positive value: the spawner refills Health to its maximum once the body is added. */
+    static final double REVIVE_HEALTH = 1.0;
     private static final String PARAMETERS = "Parameters";
     private static final String INSTANT = "Instant";
     private static final String[] ALARM_TIMES = {"UntilMs", "StartedAtMs"};
@@ -126,16 +133,29 @@ public final class SnapshotPatch {
     }
 
     /**
-     * Removes the death state and the needs that killed it. On add, the progression bootstrap
+     * Removes the death state and the needs that killed it, and lifts a saved Health of 0 or less
+     * to {@link #REVIVE_HEALTH}. On add, the progression bootstrap
      * ({@code CompanionProgressionBootstrapOnLoadSystem}) recreates the needs of a tamed body with
      * the config defaults.
+     *
+     * <p>The death snapshot keeps {@code EntityStats.Stats.Health.Value} at 0. The engine's stat
+     * decode queues that value as an update, and its stat change system kills a body whose Health
+     * update is 0 or less on the next tick, before the spawner's refill to the maximum applies.
      */
     @Nonnull
     public static BsonDocument forRevive(@Nonnull BsonDocument entity) {
         BsonDocument copy = entity.clone();
         if (copy.isDocument(COMPONENTS)) {
-            copy.getDocument(COMPONENTS).remove(DEATH);
-            copy.getDocument(COMPONENTS).remove(NEEDS);
+            BsonDocument components = copy.getDocument(COMPONENTS);
+            components.remove(DEATH);
+            components.remove(NEEDS);
+            if (components.isDocument(STATS) && components.getDocument(STATS).isDocument(STAT_VALUES)
+                    && components.getDocument(STATS).getDocument(STAT_VALUES).isDocument(HEALTH)) {
+                BsonDocument health = components.getDocument(STATS).getDocument(STAT_VALUES).getDocument(HEALTH);
+                if (health.isNumber(STAT_VALUE) && health.getNumber(STAT_VALUE).doubleValue() <= 0.0) {
+                    health.put(STAT_VALUE, new BsonDouble(REVIVE_HEALTH));
+                }
+            }
         }
         return copy;
     }

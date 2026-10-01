@@ -201,6 +201,42 @@ class CommandOwnedPanelRecordSourceTest {
         assertFalse(features.containsKey(ordinary.currentNpcUuid()));
     }
 
+    /** With capture clearing the owner, the index files the item unowned; the holder still sees what they carry. */
+    @Test
+    void indexShowsCarriedUnownedCapturesReadOnlyAndHidesOthers() {
+        UUID owner = UUID.randomUUID();
+        var index = new com.alechilles.alecstamework.companion.index.CompanionIndex(
+                System::currentTimeMillis, (before, after) -> { });
+        var carried = itemRecord(null);
+        var tracked = itemRecord(null);
+        var elsewhere = itemRecord(null);
+        var someoneElses = itemRecord(UUID.randomUUID());
+        for (var record : java.util.List.of(carried, tracked, elsewhere, someoneElses)) {
+            assertTrue(index.insert(record).applied());
+        }
+        var source = new CommandOwnedPanelRecordSource(new com.alechilles.alecstamework.companion.runtime
+                .CompanionQueries(index, new com.alechilles.alecstamework.companion.live.LoadedBodies<>()));
+        var link = new LinkedNpcRecord(UUID.randomUUID(), tracked.profileId().toString(),
+                null, null, null, "Tracked", null, "Cow", null, false, false, null);
+
+        var snapshot = source.snapshot(owner, java.util.List.of(link),
+                Set.of(carried.profileId().toString(), someoneElses.profileId().toString(), "not-a-uuid"));
+
+        assertEquals(Set.of(carried.profileId().toString(), tracked.profileId().toString()),
+                snapshot.capturedRecords().stream().map(record -> record.profileId)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(snapshot.ownedRecords().isEmpty());
+        for (var record : snapshot.capturedRecords()) {
+            assertTrue(source.profileForRow(owner, record.npcUuid).isEmpty(), "Carrying grants no authority.");
+        }
+    }
+
+    private static com.alechilles.alecstamework.companion.index.CompanionRecord itemRecord(UUID owner) {
+        return com.alechilles.alecstamework.companion.index.CompanionRecord.builder(UUID.randomUUID(), "Cow",
+                        com.alechilles.alecstamework.companion.index.CompanionLocation.item())
+                .ownerUuid(owner).build();
+    }
+
     private static com.alechilles.alecstamework.companion.index.CompanionRecord indexRecord(
             UUID owner, String rosterId, boolean bonded) {
         return com.alechilles.alecstamework.companion.index.CompanionRecord.builder(UUID.randomUUID(), "Cow",

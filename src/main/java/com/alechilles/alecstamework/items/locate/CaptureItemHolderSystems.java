@@ -148,8 +148,10 @@ public final class CaptureItemHolderSystems {
      * Ownership follows the holder (spec 8.14). One instance serves every world; each method runs
      * on the calling player's world thread, and the shared maps are concurrent because players in
      * different worlds are handled on different threads. Per-player entries are dropped when the
-     * player leaves the world. It also installs the pickup filters on each container it has not
-     * seen before.
+     * player leaves the world. It also installs the pickup filters on each container that does
+     * not have them yet, while an item config blocks pickup: when the container is first seen or
+     * replaced, on its next change, and for every tracked player when a settings change or config
+     * reload turns blocking on ({@link #refreshFilters()}).
      */
     public static final class Transfers {
         static final String TRANSFER_REFUSED_KEY = "tamework.ui.notifications.captureItem.transferRefused";
@@ -160,14 +162,21 @@ public final class CaptureItemHolderSystems {
         private record Attempt(@Nonnull Decision decision, @Nullable CompanionRecord before) {
         }
 
-        /** The inventory containers a player had when last seen, compared by identity. */
+        /**
+         * The inventory containers a player had when last seen, compared by identity, and the ones
+         * that carry the pickup filter. The maps are used only on {@code world}'s thread.
+         */
         private static final class Held {
             private final Ref<EntityStore> ref;
+            private final World world;
             private final Map<ComponentType<EntityStore, ? extends InventoryComponent>, ItemContainer> containers =
                     new HashMap<>();
+            private final Map<ComponentType<EntityStore, ? extends InventoryComponent>, ItemContainer> filtered =
+                    new HashMap<>();
 
-            private Held(Ref<EntityStore> ref) {
+            private Held(Ref<EntityStore> ref, World world) {
                 this.ref = ref;
+                this.world = world;
             }
         }
 
@@ -195,13 +204,12 @@ public final class CaptureItemHolderSystems {
         /** Join check: items that arrived while the player was away (spec 8.14). */
         void joined(@Nonnull Ref<EntityStore> ref, @Nonnull Player player, @Nonnull World world,
                     @Nonnull CommandBuffer<EntityStore> buffer) {
-            held.put(player.getUuid(), new Held(ref));
+            held.put(player.getUuid(), new Held(ref, world));
             for (ComponentType<EntityStore, ? extends InventoryComponent> type : holderInventories()) {
                 InventoryComponent inventory = buffer.getComponent(ref, type);
                 if (inventory != null) {
-                    if (noteContainer(player.getUuid(), ref, type, inventory.getInventory())) {
-                        installFilter(player.getUuid(), world, inventory.getInventory());
-                    }
+                    installFilter(noteContainer(player.getUuid(), ref, world, type, inventory.getInventory()),
+                            player.getUuid(), type);
                     checkContainer(player, inventory.getInventory());
                 }
             }
@@ -218,8 +226,9 @@ public final class CaptureItemHolderSystems {
          * uses now. The component's current container is used, since a resize replaces it and
          * leaves the event's one detached.
          *
-         * When it is new for this player (first seen, or it replaced the recorded one), installs the
-         * pickup filter on it: filters are not saved, and a resize copies items but not filters.
+         * When it has no pickup filter yet (first seen, it replaced the recorded one, or blocking
+         * was off when it was last seen), installs one: filters are not saved, and a resize copies
+         * items but not filters.
          */
         void containerSeen(@Nonnull Ref<EntityStore> ref, @Nonnull UUID player, @Nonnull World world,
                            @Nonnull InventoryChangeEvent event) {
@@ -228,8 +237,45 @@ public final class CaptureItemHolderSystems {
                 return;
             }
             ItemContainer container = event.getInventory().getInventory();
-            if (noteContainer(player, ref, type, container)) {
-                installFilter(player, world, container);
+            installFilter(noteContainer(player, ref, world, type, container), player, type);
+        }
+
+        /**
+         * A runtime settings change or config reload, on any thread: when pickup blocking is on
+         * now, installs the filters for every tracked player who lacks them. Each player is
+         * handled on the thread of the world they were last seen in, and only the player id and
+         * that world cross threads; the entry, ref and inventories are resolved inside the task.
+         * A player who left or changed world meanwhile is skipped: the new world's join check
+         * installs the filters.
+         */
+        public void refreshFilters() {
+            if (!filters.anyBlocks()) {
+                return;
+            }
+            for (Map.Entry<UUID, Held> tracked : held.entrySet()) {
+                UUID player = tracked.getKey();
+                World world = tracked.getValue().world;
+                try {
+                    world.execute(() -> installFilters(player, world));
+                } catch (RuntimeException notQueued) {
+                    // The world is stopping; its players get filters when they join a world again.
+                }
+            }
+        }
+
+        /** World thread: filters the current holder containers of a player still tracked in {@code world}. */
+        private void installFilters(UUID player, World world) {
+            Held entry = held.get(player);
+            if (entry == null || entry.world != world || !entry.ref.isValid()) {
+                return;
+            }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            for (ComponentType<EntityStore, ? extends InventoryComponent> type : holderInventories()) {
+                InventoryComponent inventory = store.getComponent(entry.ref, type);
+                if (inventory != null) {
+                    entry.containers.put(type, inventory.getInventory());
+                    installFilter(entry, player, type);
+                }
             }
         }
 
@@ -242,31 +288,35 @@ public final class CaptureItemHolderSystems {
             }
         }
 
-        /**
-         * Records the container a holder inventory uses now. Returns true when it differs from the
-         * recorded one, including the first time it is seen.
-         */
-        private boolean noteContainer(UUID player, Ref<EntityStore> ref,
-                                      ComponentType<EntityStore, ? extends InventoryComponent> type,
-                                      ItemContainer container) {
+        /** Records the container a holder inventory uses now and returns the player's entry. */
+        private Held noteContainer(UUID player, Ref<EntityStore> ref, World world,
+                                   ComponentType<EntityStore, ? extends InventoryComponent> type,
+                                   ItemContainer container) {
             Held entry = held.get(player);
             if (entry == null || !entry.ref.equals(ref)) {
-                entry = new Held(ref);
+                entry = new Held(ref, world);
                 held.put(player, entry);
             }
-            return entry.containers.put(type, container) != container;
+            entry.containers.put(type, container);
+            return entry;
         }
 
         /**
-         * Sets the ADD filter on every slot. Armor and Utility are not holder inventories, so they
-         * keep their vanilla filters; Tool has none to replace. The engine skips an empty
-         * container; a resize replaces it and the new one is filtered on its first change. Nothing
-         * is installed while no item config blocks, so other mods' slot filters stay in place; a
-         * reload that turns blocking on applies to a container when it is next seen as new.
+         * Sets the ADD filter on every slot of the recorded container of {@code type}, unless that
+         * container already has it. Armor and Utility are not holder inventories, so they keep
+         * their vanilla filters; Tool has none to replace. The engine skips an empty container; a
+         * resize replaces it and the new one is filtered on its first change. Nothing is installed
+         * while no item config blocks, so other mods' slot filters stay in place; the container
+         * stays unfiltered until blocking turns on, and then {@link #refreshFilters()} or its next
+         * change installs the filter.
          */
-        private void installFilter(UUID player, World world, ItemContainer container) {
-            if (filters.anyBlocks()) {
-                ItemContainerUtil.trySetSlotFilters(container, new CaptureItemPickupFilter(filters, player, world));
+        private void installFilter(Held entry, UUID player,
+                                   ComponentType<EntityStore, ? extends InventoryComponent> type) {
+            ItemContainer container = entry.containers.get(type);
+            if (container != null && entry.filtered.get(type) != container && filters.anyBlocks()) {
+                ItemContainerUtil.trySetSlotFilters(container,
+                        new CaptureItemPickupFilter(filters, player, entry.world));
+                entry.filtered.put(type, container);
             }
         }
 
