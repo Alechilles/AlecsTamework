@@ -203,7 +203,7 @@ public final class CompanionPersistenceModule {
 
     /**
      * The size of the companion folder's files in bytes, as last measured; 0 until the first
-     * measurement finishes. Never reads files on the caller's thread: when the value is older
+     * measurement finishes. A measurement that cannot list the folder keeps the previous value. Never reads files on the caller's thread: when the value is older
      * than 30 s this starts one measurement on the {@code tamework-companion-reader} thread and
      * returns the old value. Nothing runs unless someone asks.
      *
@@ -217,7 +217,10 @@ public final class CompanionPersistenceModule {
             try {
                 require(reader).execute(() -> {
                     try {
-                        folderBytes = measure(folder);
+                        long measured = measure(folder);
+                        if (measured >= 0L) {
+                            folderBytes = measured;
+                        }
                         folderBytesAtMs = Math.max(1L, clock.getAsLong());
                     } finally {
                         folderSizeRefreshing.set(false);
@@ -230,7 +233,7 @@ public final class CompanionPersistenceModule {
         return folderBytes;
     }
 
-    /** Sums the regular files under {@code folder}; 0 when it cannot be listed. Blocks on file I/O. */
+    /** Sums the regular files under {@code folder}; -1 when it cannot be listed. Blocks on file I/O. */
     private static long measure(Path folder) {
         try (Stream<Path> files = Files.walk(folder)) {
             return files.mapToLong(file -> {
@@ -241,7 +244,7 @@ public final class CompanionPersistenceModule {
                 }
             }).sum();
         } catch (IOException | RuntimeException unavailable) {
-            return 0L;
+            return -1L;
         }
     }
     @Nonnull public ThrottledWarnings warnings() { return warnings; }

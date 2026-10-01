@@ -32,16 +32,17 @@ import javax.annotation.Nullable;
  * No call blocks the caller on file I/O.</p>
  *
  * <p>There is no stored operation log. The operation in a result is built from the profile, key
- * and revision, so repeating a committed request while its value is still current reports the
- * same committed operation; after a later change it reports a revision mismatch. A released
- * companion, an unparsable profile id and the reserved Tamework namespaces read as "no profile
- * data" and refuse writes.</p>
+ * and revision, so repeating a request while its value is still current reports the same
+ * committed operation once the owner file is written; after a later change it reports a revision
+ * mismatch. A released companion, an unparsable profile id, the reserved Tamework namespaces and
+ * a namespace containing "/" read as "no profile data" and refuse writes.</p>
  */
 public final class IndexProfileDataApi implements ProfileDataApi {
     static final String COMMITTED = "profile-data-committed";
     static final String REVISION_MISMATCH = "profile-data-revision-mismatch";
     static final String PROFILE_NOT_FOUND = "profile-data-profile-not-found";
     static final String FLUSH_FAILED = "profile-data-flush-failed";
+    static final String NAMESPACE_REFUSED = "profile-data-namespace-refused";
 
     private final CompanionIndex index;
     private final Function<UUID, CompletableFuture<Void>> flush;
@@ -126,7 +127,7 @@ public final class IndexProfileDataApi implements ProfileDataApi {
     public CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(ProfileDataCompareAndSetRequest request) {
         Objects.requireNonNull(request, "request");
         if (!usable(request.namespace())) {
-            return CompletableFuture.completedFuture(ProfileDataCompareAndSetResult.unavailable());
+            return CompletableFuture.completedFuture(denied(request, NAMESPACE_REFUSED, 0L));
         }
         String extensionKey = extensionKey(request.namespace(), request.key());
         ExtensionEntry wanted = new ExtensionEntry(request.expectedRevision() + 1L, request.jsonPayload());
@@ -138,8 +139,9 @@ public final class IndexProfileDataApi implements ProfileDataApi {
             }
             ExtensionEntry current = record.extensions().get(extensionKey);
             if (wanted.equals(current)) {
-                // The same request again: the value it asked for is the current one.
-                return committed(request, record);
+                // The same request again: the value it asked for is the current one, but its
+                // owner file may still be unwritten, so this caller waits for a flush too.
+                return new Applied(record, null, true);
             }
             if (revisionOf(current) != request.expectedRevision()) {
                 return denied(request, REVISION_MISMATCH, record.updatedAtMs());
@@ -147,24 +149,20 @@ public final class IndexProfileDataApi implements ProfileDataApi {
             CompanionIndex.Mutation applied = index.update(
                     record.profileId(), record.revision(), b -> b.extension(extensionKey, wanted));
             return applied.applied()
-                    ? new Applied(applied.after(), current)
+                    ? new Applied(applied.after(), current, false)
                     : denied(request, REVISION_MISMATCH, record.updatedAtMs());
         });
         if (!(outcome instanceof Applied applied)) {
             return CompletableFuture.completedFuture((ProfileDataCompareAndSetResult) outcome);
         }
         CompanionRecord after = applied.after();
-        CompletableFuture<Void> flushed;
-        try {
-            flushed = flush.apply(after.ownerUuid());
-        } catch (RuntimeException failure) {
-            flushed = CompletableFuture.failedFuture(failure);
-        }
-        return flushed.handle((ignored, failure) -> {
+        return flush.apply(after.ownerUuid()).handle((ignored, failure) -> {
             if (failure == null) {
                 return committed(request, after);
             }
-            undo(after.profileId(), extensionKey, wanted, applied.previous());
+            if (!applied.replay()) {
+                undo(after.profileId(), extensionKey, wanted, applied.previous());
+            }
             return new ProfileDataCompareAndSetResult(
                     ProfileDataCompareAndSetResult.Status.UNAVAILABLE, FLUSH_FAILED, null, null);
         });
@@ -231,13 +229,18 @@ public final class IndexProfileDataApi implements ProfileDataApi {
         return namespace.trim() + "/" + key.trim();
     }
 
-    /** Tamework's own extension entries (for example bonded capture evidence) are not public data. */
+    /**
+     * Tamework's own extension entries (for example bonded capture evidence) are not public data.
+     * A namespace with "/" is refused because the stored key is {@code namespace + "/" + key}:
+     * it could not be told apart from a shorter namespace with a longer key. Keys may contain "/".
+     */
     private static boolean usable(@Nullable String namespace) {
         if (namespace == null || namespace.isBlank()) {
             return false;
         }
         String normalized = namespace.trim();
-        return !normalized.equalsIgnoreCase("tamework") && !normalized.equalsIgnoreCase("Alechilles:Tamework");
+        return !normalized.contains("/")
+                && !normalized.equalsIgnoreCase("tamework") && !normalized.equalsIgnoreCase("Alechilles:Tamework");
     }
 
     @Nullable
@@ -254,6 +257,7 @@ public final class IndexProfileDataApi implements ProfileDataApi {
         return record != null && record.location().kind() != LocationKind.RELEASED ? record : null;
     }
 
-    private record Applied(CompanionRecord after, @Nullable ExtensionEntry previous) {
+    /** @param replay the value was already current, so a failed write leaves it to the first caller */
+    private record Applied(CompanionRecord after, @Nullable ExtensionEntry previous, boolean replay) {
     }
 }

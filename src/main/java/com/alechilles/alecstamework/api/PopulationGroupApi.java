@@ -54,9 +54,9 @@ public interface PopulationGroupApi {
     }
 
     /**
-     * Counts durable animals out in the world, including unloaded and unresolved
-     * profiles. Captured, stored, released and dead profiles do not count.
-     * This projected read is a prompt precheck, not a capacity reservation.
+     * Counts LIVE companions only: those with a body in a world, loaded or not.
+     * Captured, housed, stored, dead, lost and released companions do not count.
+     * This read is a prompt precheck, not a capacity reservation.
      */
     @Nonnull
     default OptionalLong getDurableDeployableCount(

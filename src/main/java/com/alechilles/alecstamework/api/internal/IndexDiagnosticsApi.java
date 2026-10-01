@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntSupplier;
@@ -47,7 +47,7 @@ public final class IndexDiagnosticsApi implements DiagnosticsApi {
         CompanionWriter.Status writer = writerStatus.get();
         long[] counts = new long[LocationKind.values().length];
         index.forEach(record -> counts[record.location().kind().ordinal()]++);
-        Map<String, Long> byLocation = new LinkedHashMap<>();
+        Map<String, Long> byLocation = new HashMap<>();
         for (LocationKind kind : LocationKind.values()) {
             byLocation.put(kind.name(), counts[kind.ordinal()]);
         }

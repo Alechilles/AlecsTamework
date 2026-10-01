@@ -142,6 +142,38 @@ class IndexProfileDataApiTest {
     }
 
     @Test
+    void aRepeatWhileTheFirstWriteIsPendingIsNotCommittedWhenThatWriteFails() {
+        CompletableFuture<ProfileDataCompareAndSetResult> first =
+                data.compareAndSet(request(profile, 0L, "{\"a\":1}")).toCompletableFuture();
+        CompletableFuture<ProfileDataCompareAndSetResult> repeat =
+                data.compareAndSet(request(profile, 0L, "{\"a\":1}")).toCompletableFuture();
+
+        assertFalse(repeat.isDone(), "the owner file is not written yet");
+        flushes.forEach(flush -> flush.completeExceptionally(new IOException("disk full")));
+
+        assertEquals(ProfileDataCompareAndSetResult.Status.UNAVAILABLE, first.join().status());
+        assertEquals(ProfileDataCompareAndSetResult.Status.UNAVAILABLE, repeat.join().status());
+        assertEquals(IndexProfileDataApi.FLUSH_FAILED, repeat.join().reason());
+        assertTrue(data.get(profile, NS, "state").isEmpty());
+    }
+
+    @Test
+    void aNamespaceWithASlashIsRefusedButAKeyMayHaveOne() {
+        assertFalse(data.put(profile, "a/b", "c", "1"));
+        assertFalse(data.delete(profile, "a/b", "c"));
+        ProfileDataCompareAndSetResult refused = data.compareAndSet(new ProfileDataCompareAndSetRequest(
+                profile, "a/b", "c", 0L, "op", "1")).toCompletableFuture().join();
+        assertEquals(ProfileDataCompareAndSetResult.Status.TERMINAL_DENIED, refused.status());
+        assertEquals(IndexProfileDataApi.NAMESPACE_REFUSED, refused.reason());
+
+        assertTrue(data.put(profile, "a", "b/c", "2"));
+        assertEquals(Optional.of("2"), data.get(profile, "a", "b/c"));
+        assertTrue(data.list(profile, "a/b").isEmpty());
+        assertTrue(data.getVersioned(profile, "a/b", "c").isEmpty());
+        assertEquals(Map.of("b/c", "2"), data.list(profile, "a"));
+    }
+
+    @Test
     void aFailedWriteUndoesTheChangeAndReportsUnavailable() {
         assertTrue(cas(0L, "{\"a\":1}").committed());
 

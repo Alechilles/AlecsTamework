@@ -28,6 +28,10 @@ public interface ProfileDataApi {
     /**
      * Atomically compare-and-sets one namespaced value and records the outcome under its stable
      * namespace/idempotency-key origin. Queue acceptance is never returned as success.
+     *
+     * <p>The stage may complete on a thread that is not a world thread (the store's writer
+     * thread). A continuation must not block and must not read or change entities, components or
+     * worlds; hop to the owning world with {@code world.execute(...)} first.</p>
      */
     default CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(
             ProfileDataCompareAndSetRequest request
