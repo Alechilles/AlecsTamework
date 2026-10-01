@@ -335,9 +335,10 @@ public final class CommandItemFeatureHandler {
                 canonicalRecordCommitGate,
                 companionPlacementService,
                 profileActionResolver,
-                RECALL_SAFE_SPAWN_DISTANCE
+                RECALL_SAFE_SPAWN_DISTANCE,
+                restoreFlow,
+                companions
         );
-        this.worldChangeTravel.useRestoreFlow(restoreFlow, companions);
         this.inventoryRepairService =
                 new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
         this.inventoryCanonicalizer = new CommandPlayerInventoryCanonicalizer(

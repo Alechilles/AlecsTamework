@@ -3,13 +3,16 @@ package com.alechilles.alecstamework.companion.flow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -30,6 +33,8 @@ import javax.annotation.Nullable;
  * @param <R> the body reference type (Ref&lt;EntityStore&gt; in production)
  */
 public final class RestoreFlow<R> {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED }
 
     /**
@@ -39,6 +44,13 @@ public final class RestoreFlow<R> {
     public record Destination(@Nonnull String world, double x, double y, double z, float yaw, float pitch) {
         public Destination {
             Objects.requireNonNull(world, "world");
+        }
+
+        /** The placement's world, position, yaw and pitch. */
+        @Nonnull
+        public static Destination of(@Nonnull CompanionSpawnPlacement placement) {
+            return new Destination(placement.worldKey(), placement.x(), placement.y(), placement.z(),
+                    placement.yawRadians(), placement.pitchRadians());
         }
     }
 
@@ -136,9 +148,7 @@ public final class RestoreFlow<R> {
                         removeStaleOldBody(commit);
                         return CompletableFuture.completedFuture(Result.CONFLICT);
                     }
-                    if (commit.oldBody() != null) {
-                        removeOldBody.accept(profileId, commit.oldBody());
-                    }
+                    removeOldBodySafely(profileId, commit.oldBody());
                     return spawnSafely(commit.after(), snapshot, destination, reason)
                             .thenApply(ok -> {
                                 if (ok) {
@@ -182,8 +192,19 @@ public final class RestoreFlow<R> {
      * unregistered at commit, is stale under the fence. Remove it rather than leave it untracked.
      */
     private void removeStaleOldBody(Commit<R> commit) {
-        if (commit.oldBody() != null) {
-            removeOldBody.accept(commit.after().profileId(), commit.oldBody());
+        removeOldBodySafely(commit.after().profileId(), commit.oldBody());
+    }
+
+    /** A failed removal is logged and never stops the spawn, so the committed record gets a body. */
+    private void removeOldBodySafely(UUID profileId, @Nullable R oldBody) {
+        if (oldBody == null) {
+            return;
+        }
+        try {
+            removeOldBody.accept(profileId, oldBody);
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).withCause(failure)
+                    .log("Could not remove the old body of restored companion %s", profileId);
         }
     }
 

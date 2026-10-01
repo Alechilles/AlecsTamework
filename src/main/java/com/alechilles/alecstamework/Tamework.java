@@ -229,14 +229,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.flow.CompanionBodies;
 import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
 import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.items.CompanionRestoreRecallSink;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
-import com.hypixel.hytale.component.Store;
-import java.util.UUID;
 import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
@@ -1371,32 +1369,14 @@ public class Tamework extends JavaPlugin {
                 module.queries()::loadedBody, module.index()::get, module.writer()::queueSnapshot,
                 module::readSnapshot, CompanionSnapshots.production());
         HytaleCompanionSpawner spawner =
-                new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get);
+                new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
+                        module.writer()::queueSnapshot);
+        // The flow unregistered the old body at commit, so its removal raises no LOST transition.
+        // A ref no longer valid means the body left its store; if its chunk loads it again, the
+        // generation fence removes it.
         return new RestoreFlow<>(module.index(), module.loaded(), snapshots::read,
-                module.writer()::flushNow, spawner, Tamework::removeRestoredOldBody, System::currentTimeMillis);
-    }
-
-    /**
-     * Removes a restored companion's old body on its world thread. The flow already unregistered
-     * it, so its removal raises no LOST transition. A ref that is no longer valid means the body
-     * left the store (unload or removal); if its chunk loads it again, the generation fence
-     * removes it. When the world no longer accepts tasks, the fence covers it the same way.
-     */
-    private static void removeRestoredOldBody(UUID profileId, Ref<EntityStore> body) {
-        Store<EntityStore> store = body.getStore();
-        World world = store == null || store.getExternalData() == null ? null : store.getExternalData().getWorld();
-        if (world == null || !world.isAlive()) {
-            return;
-        }
-        try {
-            world.execute(() -> {
-                if (body.isValid()) {
-                    body.getStore().removeEntity(body, RemoveReason.REMOVE);
-                }
-            });
-        } catch (RuntimeException notAccepting) {
-            // World#execute throws when the world no longer accepts tasks.
-        }
+                module.writer()::flushNow, spawner, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
+                System::currentTimeMillis);
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */

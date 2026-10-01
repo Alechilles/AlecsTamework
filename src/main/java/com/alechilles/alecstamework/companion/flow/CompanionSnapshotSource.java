@@ -25,13 +25,15 @@ import javax.annotation.Nullable;
  *
  * <p>{@link #read} returns at once and is safe from any thread, including a world thread. The
  * capture runs in a task on the body's world thread, which re-resolves the registered body and
- * queues the new snapshot to the writer. When the body is gone, the capture fails, the world does
- * not accept the task or the task does not run within {@link #CAPTURE_TIMEOUT_MS}, it falls back
- * to the stored snapshot, which is read off the world thread.
+ * queues the new snapshot to the writer. While a body is registered only that capture is used:
+ * when the body is gone or moved by then, the capture fails, or the task does not run within
+ * {@link #CAPTURE_TIMEOUT_MS}, the result is null (the restore reports no snapshot and changes
+ * nothing; the player can retry). The stored snapshot, read off the world thread, is used only
+ * when no body is registered or its world no longer accepts tasks.
  */
 public final class CompanionSnapshotSource {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    /** How long to wait for the body's world to run the capture before using the stored snapshot. */
+    /** How long to wait for the body's world to run the capture before giving up. */
     static final long CAPTURE_TIMEOUT_MS = 5_000L;
 
     private final Function<UUID, Ref<EntityStore>> loadedBody;
@@ -62,9 +64,12 @@ public final class CompanionSnapshotSource {
     @Nonnull
     public CompletableFuture<SnapshotEnvelope> read(@Nonnull UUID profileId) {
         Ref<EntityStore> body = loadedBody.apply(profileId);
-        World world = body == null ? null : worldOf(body);
-        if (world == null) {
+        if (body == null) {
             return storedSnapshot.apply(profileId);
+        }
+        World world = CompanionBodies.worldOf(body);
+        if (world == null) {
+            return CompletableFuture.completedFuture(null);
         }
         CompletableFuture<SnapshotEnvelope> captured = new CompletableFuture<>();
         try {
@@ -74,9 +79,7 @@ public final class CompanionSnapshotSource {
             return storedSnapshot.apply(profileId);
         }
         // A task queued just before the world stopped may never run.
-        return captured.completeOnTimeout(null, CAPTURE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .thenCompose(fresh -> fresh != null ? CompletableFuture.completedFuture(fresh)
-                        : storedSnapshot.apply(profileId));
+        return captured.completeOnTimeout(null, CAPTURE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -100,14 +103,8 @@ public final class CompanionSnapshotSource {
             return envelope;
         } catch (RuntimeException | LinkageError failure) {
             LOGGER.at(Level.WARNING).withCause(failure)
-                    .log("Fresh companion snapshot failed for profile %s; using the stored one", profileId);
+                    .log("Fresh companion snapshot failed for profile %s", profileId);
             return null;
         }
-    }
-
-    @Nullable
-    private static World worldOf(Ref<EntityStore> body) {
-        Store<EntityStore> store = body.getStore();
-        return store == null || store.getExternalData() == null ? null : store.getExternalData().getWorld();
     }
 }

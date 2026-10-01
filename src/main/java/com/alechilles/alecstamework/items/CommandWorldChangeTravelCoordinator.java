@@ -38,8 +38,8 @@ import org.joml.Vector3d;
  * {@link RestoreFlow} (reason RECALL) once its live state passes the follow state filter on its
  * own world thread. A companion whose body is already loaded in the destination world is moved by
  * the in-world relocation. A companion with no loaded body is skipped: it was not near its owner,
- * so it was not following. The old cross-world transfer is never used. Until
- * {@link #useRestoreFlow} supplies the flow and the index queries, nothing travels.</p>
+ * so it was not following. The old cross-world transfer is never used. Without the flow and the
+ * index queries, nothing travels.</p>
  */
 final class CommandWorldChangeTravelCoordinator {
     private static final Logger LOGGER =
@@ -54,9 +54,9 @@ final class CommandWorldChangeTravelCoordinator {
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final double defaultSafeSpawnDistance;
     @Nullable
-    private volatile RestoreFlow<Ref<EntityStore>> restoreFlow;
+    private final RestoreFlow<Ref<EntityStore>> restoreFlow;
     @Nullable
-    private volatile CompanionQueries companions;
+    private final CompanionQueries companions;
 
     CommandWorldChangeTravelCoordinator(
             CommandNpcRelocationService relocationService,
@@ -65,7 +65,9 @@ final class CommandWorldChangeTravelCoordinator {
             CommandCanonicalRecordCommitGate canonicalRecordCommitGate,
             CommandCompanionPlacementService placementService,
             @Nullable CommandNpcProfileActionResolver profileActionResolver,
-            double defaultSafeSpawnDistance
+            double defaultSafeSpawnDistance,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
+            @Nullable CompanionQueries companions
     ) {
         this.relocationService = relocationService;
         this.resolutionService = resolutionService;
@@ -74,11 +76,6 @@ final class CommandWorldChangeTravelCoordinator {
         this.placementService = placementService;
         this.profileActionResolver = profileActionResolver;
         this.defaultSafeSpawnDistance = defaultSafeSpawnDistance;
-    }
-
-    /** Supplies the restore path; null for either leaves world-change travel off. */
-    void useRestoreFlow(@Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
-                        @Nullable CompanionQueries companions) {
         this.restoreFlow = restoreFlow;
         this.companions = companions;
     }
@@ -244,9 +241,7 @@ final class CommandWorldChangeTravelCoordinator {
         CompanionSpawnPlacement placement = placementService.computeRestorationPlacement(
                 playerRef, destinationStore, safeSpawnDistance, roleId, sourceHint);
         if (placement == null) return false;
-        RestoreFlow.Destination destination = new RestoreFlow.Destination(
-                placement.worldKey(), placement.x(), placement.y(), placement.z(),
-                placement.yawRadians(), placement.pitchRadians());
+        RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
         // The follow state lives on the body, so it is read on the body's own world thread. Only
         // the profile id and the store identity cross threads; the ref is resolved again there.
         try {

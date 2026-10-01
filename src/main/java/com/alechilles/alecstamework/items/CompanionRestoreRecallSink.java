@@ -44,8 +44,7 @@ public final class CompanionRestoreRecallSink implements ImportedRecallRecoveryS
     @Nonnull
     CompletableFuture<RestoreFlow.Result> restoreNear(@Nonnull UUID profileId,
                                                       @Nonnull CompanionSpawnPlacement placement) {
-        return restore(profileId, new RestoreFlow.Destination(placement.worldKey(), placement.x(), placement.y(),
-                placement.z(), placement.yawRadians(), placement.pitchRadians()));
+        return restore(profileId, RestoreFlow.Destination.of(placement));
     }
 
     /**

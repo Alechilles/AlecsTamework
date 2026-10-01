@@ -130,8 +130,7 @@ final class CommandCompanionRestorationService {
         if (placement == null) {
             return RequestStatus.INVALID_CONTEXT;
         }
-        RestoreFlow.Destination destination = new RestoreFlow.Destination(placement.worldKey(),
-                placement.x(), placement.y(), placement.z(), placement.yawRadians(), placement.pitchRadians());
+        RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
         String name = profile.displayName() != null && !profile.displayName().isBlank()
                 ? profile.displayName()
                 : profile.customName();

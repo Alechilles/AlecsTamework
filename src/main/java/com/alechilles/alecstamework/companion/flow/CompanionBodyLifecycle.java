@@ -189,13 +189,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
 
     @Override
     public void onDisplaced(@Nonnull Ref<EntityStore> displacedBody, @Nonnull UUID profileId) {
-        Store<EntityStore> store = displacedBody.getStore();
-        World world = store.getExternalData().getWorld();
-        world.execute(() -> {
-            if (displacedBody.isValid()) {
-                displacedBody.getStore().removeEntity(displacedBody, RemoveReason.REMOVE);
-            }
-        });
+        CompanionBodies.removeOnOwnWorld(displacedBody);
     }
 
     @Override

@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -51,16 +52,21 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
 
     private final CompanionRespawn respawn;
     private final Function<UUID, CompanionRecord> currentRecord;
+    private final CompanionSnapshots snapshots = CompanionSnapshots.production();
+    private final Consumer<SnapshotEnvelope> queueSnapshot;
 
     /**
      * @param stampType     the registered companion stamp type
      * @param currentRecord reads the index's current record for a profile id (null when absent);
      *                      the world task re-checks the committed revision with it
+     * @param queueSnapshot queues the snapshot taken of each restored body to the writer
      */
     public HytaleCompanionSpawner(@Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
-                                  @Nonnull Function<UUID, CompanionRecord> currentRecord) {
+                                  @Nonnull Function<UUID, CompanionRecord> currentRecord,
+                                  @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
         this.respawn = new CompanionRespawn(CompanionRespawn.Types.production(Objects.requireNonNull(stampType, "stampType")));
         this.currentRecord = Objects.requireNonNull(currentRecord, "currentRecord");
+        this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
     }
 
     @Nonnull
@@ -94,6 +100,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                                        RestoreFlow.Destination destination, RestoreRules.Reason reason) {
         UUID profileId = committed.profileId();
         Ref<EntityStore> ref = null;
+        long worldGameTimeMs = 0L;
         try {
             CompanionRecord now = currentRecord.apply(profileId);
             if (now == null || now.revision() != committed.revision()) {
@@ -107,8 +114,8 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
             Store<EntityStore> store = world.getEntityStore().getStore();
             BsonDocument doc = CompanionRespawn.stripDocument(CompanionSnapshots.entity(snapshot));
-            doc = SnapshotPatch.rebaseAlarms(doc, gameTimeDelta(CompanionWorldTime.gameTimeMs(store),
-                    CompanionSnapshots.gameTimeMs(snapshot)));
+            worldGameTimeMs = CompanionWorldTime.gameTimeMs(store);
+            doc = SnapshotPatch.rebaseAlarms(doc, gameTimeDelta(worldGameTimeMs, CompanionSnapshots.gameTimeMs(snapshot)));
             if (reason == RestoreRules.Reason.REVIVE) {
                 doc = SnapshotPatch.forRevive(doc);
             }
@@ -133,13 +140,20 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 return false;
             }
         }
-        finishAddedBody(ref, ref.getStore(), profileId, reason);
+        finishAddedBody(ref, ref.getStore(), committed, world.getName(), worldGameTimeMs, reason, snapshots,
+                queueSnapshot);
         return true;
     }
 
-    /** Steps after the add. A failure here is logged; the body is live, so the spawn still counts. */
-    private static void finishAddedBody(Ref<EntityStore> ref, Store<EntityStore> store, UUID profileId,
-                                        RestoreRules.Reason reason) {
+    /**
+     * Steps after the add, on the body's world thread. A failure here is logged; the body is live,
+     * so the spawn still counts.
+     */
+    static void finishAddedBody(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                @Nonnull CompanionRecord committed, @Nonnull String worldName,
+                                long worldGameTimeMs, @Nonnull RestoreRules.Reason reason, @Nonnull CompanionSnapshots snapshots,
+                                @Nonnull Consumer<SnapshotEnvelope> queueSnapshot) {
+        UUID profileId = committed.profileId();
         try {
             CompanionSaves.markChanged(store, ref);
             if (reason == RestoreRules.Reason.REVIVE) {
@@ -149,6 +163,19 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
         } catch (RuntimeException | LinkageError failure) {
             warn(profileId, "a step after the body was added failed", failure);
+        }
+        // Snapshot the new body at once: after a revive the stored snapshot is the death one,
+        // which no later recall or Recover may use. Runs after the revive reset so it is captured.
+        try {
+            SnapshotEnvelope fresh = snapshots.capture(ref, store, profileId, committed.generation(), worldName,
+                    worldGameTimeMs);
+            if (fresh == null) {
+                warn(profileId, "the restored body could not be snapshotted", null);
+            } else {
+                queueSnapshot.accept(fresh);
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            warn(profileId, "the restored body could not be snapshotted", failure);
         }
     }
 
