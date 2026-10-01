@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /** Resolves Owned requests without adding a command-item link. */
 final class CommandOwnedActionService {
@@ -201,8 +203,12 @@ final class CommandOwnedActionService {
         String world = companion.location().world() != null ? companion.location().world() : companion.homeWorld();
         String name = companion.summary().customName() != null
                 ? companion.summary().customName() : companion.displayName();
+        // A LIVE position lets a recall load the companion's chunk before it moves the body.
+        Vector3d position = companion.location().kind() == LocationKind.LIVE
+                ? new Vector3d(companion.location().x(), companion.location().y(), companion.location().z())
+                : null;
         return new LinkedNpcRecord(companion.currentNpcUuid() == null ? rowId : companion.currentNpcUuid(),
-                companion.profileId().toString(), null, world, null, name, null, companion.roleId(), null,
+                companion.profileId().toString(), position, world, null, name, null, companion.roleId(), null,
                 true, false, null);
     }
 

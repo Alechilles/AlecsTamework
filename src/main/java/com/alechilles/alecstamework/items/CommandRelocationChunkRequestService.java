@@ -106,6 +106,10 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         if (position == null) {
             return;
         }
+        // The lease keeps the source chunk loaded until the relocation ends, so the body cannot
+        // unload again between the section load and the move.
+        requestChunk(sourceWorld, destinationWorld, pending,
+                worldAccess.toChunk(position.x), worldAccess.toChunk(position.z));
         requestEntitySection(
                 sourceWorld, destinationWorld, pending, position
         );

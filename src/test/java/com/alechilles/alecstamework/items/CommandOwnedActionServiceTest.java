@@ -82,6 +82,14 @@ class CommandOwnedActionServiceTest {
         return CompanionRecord.builder(UUID.randomUUID(), "Sheep", location).ownerUuid(owner).build();
     }
 
+    /** Without the LIVE position a recall of an unloaded owned companion has no source chunk to load. */
+    @Test void indexActionRecordCarriesTheLivePosition() {
+        var record = CommandOwnedActionService.record(
+                companion(UUID.randomUUID(), CompanionLocation.live("default", 10, 64, -20)), UUID.randomUUID());
+        assertEquals(10, record.lastKnownPosition.x);
+        assertEquals(-20, record.lastKnownPosition.z);
+    }
+
     @Test void actionRecordUsesCurrentAliasInsteadOfStaleCardId() {
         var profile = profile(UUID.randomUUID(), LifecycleState.UNLOADED);
         var record = CommandOwnedActionService.record(profile, UUID.randomUUID());

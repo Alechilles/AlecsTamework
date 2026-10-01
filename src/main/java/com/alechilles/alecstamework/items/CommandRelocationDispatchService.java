@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import org.joml.Vector3d;
@@ -7,24 +10,41 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.List;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Coordinates relocation dispatch for loaded and unloaded linked companions.
+ *
+ * <p>With the companion index set, an unloaded recall follows {@link RecallRoute}: a LIVE
+ * companion in the player's world is moved by the relocation service, one in another world is
+ * restored near the player, and any other record is skipped. Relocations never use the old
+ * cross-world transfer.
  */
 final class CommandRelocationDispatchService {
     private final CommandNpcRelocationService relocationService;
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
+    @Nullable
+    private final CompanionQueries companions;
+    @Nullable
+    private volatile CompanionRestoreRecallSink recallRestore;
 
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
-                                     CommandCompanionPlacementService companionPlacementService) {
+                                     CommandCompanionPlacementService companionPlacementService,
+                                     @Nullable CompanionQueries companions) {
         this.relocationService = relocationService;
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
+        this.companions = companions;
+    }
+
+    /** Sets where a recall of a companion in another world goes; until then such a recall is skipped. */
+    void setRecallRestore(@Nullable CompanionRestoreRecallSink recallRestore) {
+        this.recallRestore = recallRestore;
     }
 
     QueueResult queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
@@ -79,7 +99,21 @@ final class CommandRelocationDispatchService {
                 queued++;
                 continue;
             }
-            Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
+            CompanionRecord indexed = indexRecord(record);
+            RecallRoute route = companions == null ? RecallRoute.LOAD_AND_MOVE
+                    : RecallRoute.decide(indexed, isLoadedIn(indexed, world), world.getName());
+            if (route == RecallRoute.REFUSE) {
+                continue;
+            }
+            if (route == RecallRoute.RESTORE) {
+                if (restoreNearPlayer(context, ownerUuid, indexed)) {
+                    queued++;
+                }
+                continue;
+            }
+            Vector3d sourceHint = indexed != null
+                    ? new Vector3d(indexed.location().x(), indexed.location().y(), indexed.location().z())
+                    : record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
             TwCompanionConfig.EffectiveSettings settings =
                     TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId);
             double safeSpawnDistance = resolvePositiveDouble(
@@ -96,9 +130,12 @@ final class CommandRelocationDispatchService {
             if (safeDestination == null) {
                 continue;
             }
+            // The index knows the current body; a cached row can name a replaced one.
+            UUID npcUuid = indexed != null && indexed.currentNpcUuid() != null
+                    ? indexed.currentNpcUuid() : record.npcUuid;
             relocationService.queueRelocation(
                     world,
-                    record.npcUuid,
+                    npcUuid,
                     safeDestination,
                     ownerUuid,
                     true,
@@ -108,7 +145,7 @@ final class CommandRelocationDispatchService {
                     0L,
                     sourceHint,
                     record.homePosition,
-                    settings.isCrossWorldRecallEnabled(),
+                    false,
                     settings.getOnTransferFailure(),
                     null,
                     true
@@ -119,6 +156,58 @@ final class CommandRelocationDispatchService {
                 queued,
                 CompanionDestinationAdmissionPolicy.Decision.ALLOWED
         );
+    }
+
+    /** The index record behind a row: by profile id, else by the row's NPC UUID. */
+    @Nullable
+    private CompanionRecord indexRecord(LinkedNpcRecord record) {
+        if (companions == null) {
+            return null;
+        }
+        UUID profileId = parseUuid(record.profileId);
+        CompanionRecord indexed = profileId == null ? null : companions.get(profileId);
+        return indexed != null ? indexed : companions.byNpcUuid(record.npcUuid);
+    }
+
+    private boolean isLoadedIn(@Nullable CompanionRecord indexed, World world) {
+        return indexed != null && companions != null && world.getName().equals(indexed.location().world())
+                && companions.loadedBody(indexed.profileId()) != null;
+    }
+
+    /**
+     * Starts a restore of the owner's companion at a placement frozen now, on the player's world
+     * thread. Returns whether the restore started; its result arrives later and is logged.
+     */
+    private boolean restoreNearPlayer(Context context, @Nullable UUID ownerUuid, CompanionRecord indexed) {
+        CompanionRestoreRecallSink restore = recallRestore;
+        if (restore == null || ownerUuid == null || !ownerUuid.equals(indexed.ownerUuid())) {
+            return false;
+        }
+        TwCompanionConfig.EffectiveSettings settings =
+                TwCompanionConfig.resolveEffectiveForRole(indexed.roleId());
+        double safeSpawnDistance = resolvePositiveDouble(
+                settings.getRecallSafeSpawnDistance(),
+                context.recallSafeSpawnDistance
+        );
+        CompanionSpawnPlacement placement = companionPlacementService.computeRestorationPlacement(
+                context.playerRef, context.store, safeSpawnDistance, indexed.roleId(), null);
+        if (placement == null) {
+            return false;
+        }
+        restore.restoreNear(ownerUuid, indexed.profileId(), placement);
+        return true;
+    }
+
+    @Nullable
+    private static UUID parseUuid(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
