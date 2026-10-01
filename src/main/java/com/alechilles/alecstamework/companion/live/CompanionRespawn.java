@@ -24,6 +24,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
+import org.bson.BsonString;
 import org.joml.Vector3d;
 
 /**
@@ -76,6 +77,8 @@ public final class CompanionRespawn {
             addIfPresent(strip, TameworkProjectionIdentityComponent::getComponentType);
             // Kept on purpose: TameworkShoulderRide, TameworkMountedNameplate and
             // TameworkAvatarFlightSource restore this body's own state once it is not mounted.
+            // The respawn caller must re-point AvatarFlightSource's origin at the destination:
+            // its recovery moves the body there when it unparks it.
             return new Types(UUIDComponent.getComponentType(), NPCEntity.getComponentType(),
                     TransformComponent.getComponentType(), PersistentRefCount.getComponentType(),
                     Velocity.getComponentType(), HeadRotation.getComponentType(),
@@ -108,12 +111,28 @@ public final class CompanionRespawn {
     /**
      * Removes path state from the serialized NPC component. PathManager has no clear method, so
      * it is dropped before deserializing. Returns a new document; the input is not modified.
+     *
+     * <p>A body snapshotted while ridden through Tamework ride keeps the ride's motion controller
+     * in the NPC's persisted {@code ActiveMC}, which {@code RoleActivateSystem} re-activates on
+     * add. {@link #prepare} strips {@code TameworkRideMount}, so its cleanup never restores the
+     * controller; this puts the controller the ride recorded back first. The ride state itself
+     * is not persisted: the role starts in its start state.
      */
     @Nonnull
     public static BsonDocument stripDocument(@Nonnull BsonDocument entity) {
         BsonDocument copy = entity.clone();
         if (copy.isDocument("Components") && copy.getDocument("Components").isDocument("NPC")) {
-            copy.getDocument("Components").getDocument("NPC").remove("PathManager");
+            BsonDocument components = copy.getDocument("Components");
+            BsonDocument npc = components.getDocument("NPC");
+            npc.remove("PathManager");
+            if (components.isDocument("TameworkRideMount")
+                    && components.getDocument("TameworkRideMount").isString("PreviousMotionController")) {
+                String previous = components.getDocument("TameworkRideMount")
+                        .getString("PreviousMotionController").getValue().trim();
+                if (!previous.isEmpty()) {
+                    npc.put("ActiveMC", new BsonString(previous));
+                }
+            }
         }
         return copy;
     }
