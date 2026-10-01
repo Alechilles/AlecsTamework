@@ -21,6 +21,7 @@ class CoopReleaseTest {
     private final List<String> events = new ArrayList<>();
     private final List<RestoreFlow.Request> requests = new ArrayList<>();
     private CompletableFuture<Boolean> spawn = new CompletableFuture<>();
+    private CompletableFuture<Void> clear = CompletableFuture.completedFuture(null);
     private RestoreFlow.Result restoreResult = RestoreFlow.Result.RESTORED;
 
     private final CoopRelease release = new CoopRelease(id -> null, new CoopRelease.Port() {
@@ -41,7 +42,7 @@ class CoopReleaseTest {
         @Override
         public CompletableFuture<Void> clearSlot(CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry) {
             events.add("clear " + entry.slot());
-            return CompletableFuture.completedFuture(null);
+            return clear;
         }
     }, System::currentTimeMillis);
 
@@ -57,6 +58,23 @@ class CoopReleaseTest {
 
         spawn.complete(true);
         assertTrue(first.join().released());
+    }
+
+    @Test
+    void aBreakQueuedBetweenTheSpawnAndTheSlotClearDoesNotSpawnTheResidentAgain() {
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(3,
+                new BsonDocument("Components", new BsonString("chicken")));
+        clear = new CompletableFuture<>();
+        spawn.complete(true);
+
+        CompletableFuture<CoopRelease.Outcome> morning = release.release(AT, entry, DEST);
+        // The spawn task ran; the queued clear has not. A break release queued before it runs now.
+        assertFalse(release.resident(AT, entry));
+        assertEquals("BUSY", release.release(AT, entry, DEST).join().cause());
+        assertEquals(List.of("spawn", "clear 3"), events);
+
+        clear.complete(null);
+        assertTrue(morning.join().released());
     }
 
     @Test

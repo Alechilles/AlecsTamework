@@ -23,7 +23,9 @@ import javax.annotation.Nullable;
  *   the entry is then stale by generation.</li>
  *   <li><b>Unowned resident:</b> it has no record, so its inline entity is spawned first and the
  *   port clears the slot in the same world task once the body is in the store; a failed spawn
- *   keeps the entry.</li>
+ *   keeps the entry. After a spawn this also queues {@link Port#clearSlot} (a no-op by then) and
+ *   holds the slot in flight until it ran: a break release queued before it then still sees the
+ *   resident in flight and does not spawn it a second time.</li>
  * </ul>
  *
  * <p>One release per slot runs at a time, until its slot clear has run, so the next sweep cannot
@@ -64,9 +66,9 @@ public final class CoopRelease {
                                                 @Nonnull RestoreFlow.Destination destination);
 
         /**
-         * Removes a released companion's {@code entry} from the coop on its world thread when the
-         * slot still holds it; a broken or unloaded block is left alone. Completes once that ran
-         * (or could not run).
+         * Queues the removal of a released resident's {@code entry} from the coop on its world
+         * thread when the slot still holds it; a broken or unloaded block is left alone. Completes
+         * once that task ran (or could not run).
          */
         @Nonnull
         CompletableFuture<Void> clearSlot(@Nonnull At at, @Nonnull TameworkCoopSlotsComponent.Slot entry);
@@ -125,7 +127,10 @@ public final class CoopRelease {
         try {
             out = entry.unownedEntity() != null
                     ? port.spawnUnowned(at, entry, destination)
-                    .thenApply(spawned -> spawned ? Outcome.RELEASED : new Outcome(false, "SPAWN_FAILED"))
+                    .thenCompose(spawned -> spawned
+                            ? port.clearSlot(at, entry).exceptionally(failure -> null)
+                            .thenApply(ignored -> Outcome.RELEASED)
+                            : CompletableFuture.completedFuture(new Outcome(false, "SPAWN_FAILED")))
                     : port.restore(RestoreFlow.Request.of(entry.profileId(), RestoreRules.Reason.COOP_RELEASE,
                             destination).withGeneration(entry.generation()))
                     .thenCompose(result -> result == RestoreFlow.Result.RESTORED
