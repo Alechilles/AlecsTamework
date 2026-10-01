@@ -126,6 +126,7 @@ final class CommandWorldChangeTravelCoordinator {
 
         ItemContainer hotbar = inventory.getHotbar();
         Set<UUID> queuedNpcUuids = new HashSet<>();
+        Set<UUID> queuedProfileIds = new HashSet<>();
         for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
             ItemStack stack = hotbar.getItemStack(slot);
             if (stack == null || stack.isEmpty()) continue;
@@ -144,7 +145,7 @@ final class CommandWorldChangeTravelCoordinator {
                     hotbar, slot, stack, linkedRecords);
             if (linkedRecords == null) continue;
             queueRecords(player, playerRef, destinationWorld,
-                    destinationStore, linkedRecords, queuedNpcUuids);
+                    destinationStore, linkedRecords, queuedNpcUuids, queuedProfileIds);
         }
     }
 
@@ -178,7 +179,8 @@ final class CommandWorldChangeTravelCoordinator {
             World destinationWorld,
             Store<EntityStore> destinationStore,
             List<LinkedNpcRecord> linkedRecords,
-            Set<UUID> queuedNpcUuids
+            Set<UUID> queuedNpcUuids,
+            Set<UUID> queuedProfileIds
     ) {
         for (LinkedNpcRecord cachedRecord : linkedRecords) {
             LinkedNpcRecord record = resolveRelocationRecord(cachedRecord);
@@ -192,7 +194,7 @@ final class CommandWorldChangeTravelCoordinator {
                 continue;
             }
             if (queueRecord(player, playerRef, destinationWorld,
-                    destinationStore, record, roleId, settings)) {
+                    destinationStore, record, roleId, settings, queuedProfileIds)) {
                 queuedNpcUuids.add(record.npcUuid);
             }
         }
@@ -206,16 +208,20 @@ final class CommandWorldChangeTravelCoordinator {
             Store<EntityStore> destinationStore,
             LinkedNpcRecord record,
             @Nullable String roleId,
-            TwCompanionConfig.EffectiveSettings settings
+            TwCompanionConfig.EffectiveSettings settings,
+            Set<UUID> queuedProfileIds
     ) {
         RestoreFlow<Ref<EntityStore>> flow = restoreFlow;
         CompanionQueries queries = companions;
         if (flow == null || queries == null) return false;
         CompanionRecord companion = resolveCompanion(queries, record);
         if (companion == null
-                || !player.getUuid().equals(companion.ownerUuid())) return false;
-        Ref<EntityStore> body = queries.loadedBody(companion.profileId());
-        World sourceWorld = body != null ? body.getStore().getExternalData().getWorld() : null;
+                || !player.getUuid().equals(companion.ownerUuid())
+                || queuedProfileIds.contains(companion.profileId())) return false;
+        UUID profileId = companion.profileId();
+        Ref<EntityStore> body = queries.loadedBody(profileId);
+        Store<EntityStore> sourceStore = body != null ? body.getStore() : null;
+        World sourceWorld = sourceStore != null ? sourceStore.getExternalData().getWorld() : null;
         if (sourceWorld == null) return false;
         Vector3d sourceHint = record.lastKnownPosition != null
                 ? record.lastKnownPosition : record.homePosition;
@@ -232,6 +238,7 @@ final class CommandWorldChangeTravelCoordinator {
                     true, true, state.state, state.subState, 0L, sourceHint,
                     record.homePosition, false, settings.getOnTransferFailure(),
                     settings.getFollowMasterOnWorldChangeStateFilter());
+            queuedProfileIds.add(profileId);
             return true;
         }
         CompanionSpawnPlacement placement = placementService.computeRestorationPlacement(
@@ -240,24 +247,39 @@ final class CommandWorldChangeTravelCoordinator {
         RestoreFlow.Destination destination = new RestoreFlow.Destination(
                 placement.worldKey(), placement.x(), placement.y(), placement.z(),
                 placement.yawRadians(), placement.pitchRadians());
-        UUID profileId = companion.profileId();
-        // The follow state lives on the body, so it is read on the body's own world thread.
-        sourceWorld.execute(() -> {
-            if (!body.isValid()) return;
-            Store<EntityStore> sourceStore = body.getStore();
-            NPCEntity npc = sourceStore.getComponent(body, NPCEntity.getComponentType());
-            if (npc == null || !settings.isWorldChangeStateAllowed(
-                    currentStateName(body, npc, sourceStore))) return;
-            flow.restore(profileId, RestoreRules.Reason.RECALL, destination)
-                    .thenAccept(result -> {
-                        if (result != RestoreFlow.Result.RESTORED) {
-                            LOGGER.log(Level.INFO, "World-change follow restore for profile "
-                                    + profileId + " to " + destination.world()
-                                    + " ended with " + result);
-                        }
-                    });
-        });
+        // The follow state lives on the body, so it is read on the body's own world thread. Only
+        // the profile id and the store identity cross threads; the ref is resolved again there.
+        try {
+            sourceWorld.execute(() -> {
+                Ref<EntityStore> live = queries.loadedBody(profileId);
+                if (live == null || live.getStore() != sourceStore) return;
+                NPCEntity npc = sourceStore.getComponent(live, NPCEntity.getComponentType());
+                if (npc == null || !settings.isWorldChangeStateAllowed(
+                        currentStateName(live, npc, sourceStore))) return;
+                flow.restore(profileId, RestoreRules.Reason.RECALL, destination)
+                        .whenComplete((result, error) -> logRestoreOutcome(
+                                profileId, destination, result, error));
+            });
+        } catch (RuntimeException e) {
+            // A closing world refuses new tasks; skip this companion and keep going.
+            LOGGER.log(Level.INFO, "World-change follow skipped for profile " + profileId
+                    + ": source world " + sourceWorld.getName() + " refused the task", e);
+            return false;
+        }
+        queuedProfileIds.add(profileId);
         return true;
+    }
+
+    private static void logRestoreOutcome(UUID profileId, RestoreFlow.Destination destination,
+                                          @Nullable RestoreFlow.Result result,
+                                          @Nullable Throwable error) {
+        if (error != null) {
+            LOGGER.log(Level.INFO, "World-change follow restore for profile " + profileId
+                    + " to " + destination.world() + " failed", error);
+        } else if (result != RestoreFlow.Result.RESTORED) {
+            LOGGER.log(Level.INFO, "World-change follow restore for profile " + profileId
+                    + " to " + destination.world() + " ended with " + result);
+        }
     }
 
     @Nullable
