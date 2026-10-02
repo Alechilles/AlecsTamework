@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.StoredReason;
+import com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
@@ -21,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -91,7 +93,17 @@ final class CommandPersistenceView {
      * from the record's in-memory summary, so it needs no cache or refresh signals.
      */
     CommandPersistenceView(@Nonnull CompanionQueries companions) {
+        this(companions, LegacyItemAdoption::profileOf);
+    }
+
+    /**
+     * @param legacyProfile the profile an imported 3.x/4.x world knew an NPC UUID for, or null
+     *                      (plan 7 R19): a link saved by an older version may name a body the
+     *                      companion has since left
+     */
+    CommandPersistenceView(@Nonnull CompanionQueries companions, @Nonnull Function<UUID, UUID> legacyProfile) {
         this.companions = Objects.requireNonNull(companions, "Companion queries are required");
+        Objects.requireNonNull(legacyProfile, "Legacy profile lookup is required");
         this.projections = null;
         this.snapshots = new SnapshotLookup() {
             @Override
@@ -101,7 +113,12 @@ final class CommandPersistenceView {
 
             @Override
             public Optional<ProfileSnapshot> find(NpcAlias alias) {
-                return Optional.ofNullable(companions.byNpcUuid(alias.value())).map(CommandPersistenceView::from);
+                CompanionRecord current = companions.byNpcUuid(alias.value());
+                if (current == null) {
+                    UUID legacy = legacyProfile.apply(alias.value());
+                    current = legacy == null ? null : companions.get(legacy);
+                }
+                return Optional.ofNullable(current).map(CommandPersistenceView::from);
             }
         };
     }
@@ -148,7 +165,9 @@ final class CommandPersistenceView {
     }
 
     /**
-     * Resolves one command record by stable profile first and known alias second.
+     * Resolves one command record by stable profile first and known alias second. On the
+     * companion index a known alias is the record's current body, else a body an imported world
+     * knew for it.
      *
      * <p>Records created before their first projection use the NPC UUID as their deterministic
      * profile ID. Absence is not interpreted as a lifecycle state.</p>

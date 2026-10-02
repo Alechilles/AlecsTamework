@@ -7,7 +7,6 @@ import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.google.gson.JsonElement;
@@ -203,12 +202,8 @@ public final class OwnedNpcTransformationInteractionService {
 
     private static boolean ownsLiveTamedNpc(Ref<EntityStore> target, Store<EntityStore> store, UUID actorId) {
         if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(target, store)) return false;
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        TameworkProjectionIdentityComponent projection = store.getComponent(target, projectionType);
         // Command-family companions need their roster authority, outside this ordinary-pet conversion.
-        if (projection != null && TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER
-                .equals(projection.getProjectionKind())) return false;
+        if (CommandGenericTargetAuthority.isRosterMember(target, store)) return false;
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
         TameworkOwnerComponent owner = ownerType == null ? null : store.getComponent(target, ownerType);
         ComponentType<EntityStore, DeathComponent> deathType = DeathComponent.getComponentType();

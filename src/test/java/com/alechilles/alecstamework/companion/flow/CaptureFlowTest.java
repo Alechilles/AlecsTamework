@@ -251,6 +251,24 @@ class CaptureFlowTest {
         assertEquals(1, index.fileRecords(owner).size());
     }
 
+    /** Plan 7 R14: a leftover 4.x body must not become a second companion beside its imported record. */
+    @Test
+    void anUnstampedBodyAnImportedWorldKnewIsNotCaptured() {
+        UUID oldBody = UUID.randomUUID();
+        CaptureFlow<String> flow = new CaptureFlow<>(index, loaded, (id, envelope) -> events.add("snapshot"),
+                owner -> CompletableFuture.completedFuture(null), ProviderAdmission.none(),
+                (before, after, provided) -> null, oldBody::equals);
+
+        CaptureFlow.Outcome refused = flow.capture(
+                new CaptureFlow.Capture<>(null, 0, "old", facts(oldBody), owner, "Alec", DATA)).join();
+        CaptureFlow.Outcome wild = flow.capture(
+                new CaptureFlow.Capture<>(null, 0, "wild", facts(UUID.randomUUID()), owner, "Alec", DATA)).join();
+
+        assertEquals(CaptureFlow.Result.NOT_CAPTURABLE, refused.result());
+        assertEquals(CaptureFlow.Result.CAPTURED, wild.result());
+        assertEquals(1, index.fileRecords(owner).size(), "only the wild body became a companion");
+    }
+
     @Test
     void aFailedUnstampedCaptureLeavesATombstoneInsteadOfAnItem() {
         UUID npc = UUID.randomUUID();

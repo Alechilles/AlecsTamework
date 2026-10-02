@@ -125,47 +125,6 @@ class CommandLinkedNpcStateSnapshotServiceTest {
     }
 
     @Test
-    void operationOwnedRecoveryReleaseAndCaptureMarkersDeferGenericProfileUpsert() {
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_RECOVERY
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD
-        )));
-        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
-                TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER
-        )));
-    }
-
-    @Test
-    void missingIncompleteAndUnknownMarkersDoNotSuppressNormalPersistence() {
-        assertFalse(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(null));
-        assertFalse(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(
-                new TameworkProjectionIdentityComponent(
-                        "profile-a", "", TameworkProjectionIdentityComponent.KIND_RECOVERY,
-                        null, null, 0L
-                )
-        ));
-        assertFalse(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(
-                new TameworkProjectionIdentityComponent(
-                        "profile-a", "operation-a", "UNKNOWN", null, null, 0L
-                )
-        ));
-    }
-
-    @Test
     void failedProfileAdoptionDoesNotPublishItsCheckpoint() {
         CompletableFuture<Void> profile = new CompletableFuture<>();
         List<CompanionEntityCheckpointCapture> published = new ArrayList<>();
@@ -250,12 +209,6 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         );
 
         assertEquals(List.of(first), published);
-    }
-
-    private TameworkProjectionIdentityComponent marker(String kind) {
-        return new TameworkProjectionIdentityComponent(
-                "profile-a", "operation-a", kind, null, null, 0L
-        );
     }
 
     private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot(

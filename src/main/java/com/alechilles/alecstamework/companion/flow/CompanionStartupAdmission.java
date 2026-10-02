@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.live.FenceAction;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -18,12 +19,17 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * One pass per world, run once right after the companion systems register. Worlds start loading
  * before Tamework starts, and the engine does not replay {@code onEntityAdded} for systems
  * registered later, so bodies already in a store are fenced and registered here with the same
  * logic the add systems use. Entities added after registration go through the systems as usual.
+ *
+ * <p>On a world imported from 3.x or 4.x this pass also matches the old bodies already loaded
+ * (plan 7 R14), which reads the retired projection identity component: a startup strip of
+ * retired components must run after this pass.</p>
  */
 public final class CompanionStartupAdmission {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -39,12 +45,15 @@ public final class CompanionStartupAdmission {
                                      @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
                                      @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
                                      @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-                                     @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamedType) {
+                                     @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamedType,
+                                     @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent>
+                                             projectionType) {
         this.bodies = Objects.requireNonNull(bodies, "bodies");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.stampType = Objects.requireNonNull(stampType, "stampType");
-        this.unstamped = Query.and(npcType, ownerType, tamedType, Query.not(stampType));
+        this.unstamped = CompanionOwnershipSystems.unstamped(npcType, ownerType, tamedType, stampType,
+                projectionType);
     }
 
     /** Queues one pass on each world's thread; returns at once. */

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -11,12 +12,16 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.dependency.Dependency;
+import com.hypixel.hytale.component.dependency.Order;
+import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.RefChangeSystem;
 import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -29,17 +34,49 @@ public final class CompanionOwnershipSystems {
     private CompanionOwnershipSystems() {
     }
 
-    /** An owned, tamed NPC added to a store without a stamp (for example spawned already owned). */
+    /**
+     * The unstamped NPCs the add system and the startup pass look at: owned and tamed ones, and,
+     * when {@code projection} is given (a world imported from 3.x or 4.x), also bodies that carry
+     * only a tamed component or the retired projection identity. Those have no owner (unowned,
+     * coop and released animals) and can still be the body, or a stale duplicate, of an imported
+     * record.
+     */
+    @Nonnull
+    static Query<EntityStore> unstamped(
+            @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> owner,
+            @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamed,
+            @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp,
+            @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent> projection) {
+        return projection == null ? Query.and(npc, owner, tamed, Query.not(stamp))
+                : Query.and(npc, Query.not(stamp), Query.or(tamed, projection));
+    }
+
+    /**
+     * An NPC added to a store without a stamp: owned and tamed (for example spawned already
+     * owned), or, on an imported world, a body saved by 3.x or 4.x.
+     *
+     * <p>Ordering contract (plan 7 R14, R15): this system reads the retired
+     * {@code TameworkProjectionIdentity} component from the store to match an old body to its
+     * imported record. A system that strips retired components must run after this one
+     * ({@code Order.AFTER} this class) and strip through the command buffer of the add callback,
+     * never from the holder before the entity enters the store.</p>
+     */
     public static final class OnAdd extends RefSystem<EntityStore> {
         private final CompanionBodyLifecycle lifecycle;
         private final Query<EntityStore> query;
+        // The body's NPC UUID is its identity for the legacy alias lookup.
+        private final Set<Dependency<EntityStore>> dependencies =
+                Set.of(new SystemDependency<>(Order.AFTER, EntityStore.UUIDSystem.class));
 
+        /** {@code projection} is non-null only on an imported world (see {@link #unstamped}). */
         public OnAdd(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
                      @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> owner,
                      @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamed,
-                     @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
+                     @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp,
+                     @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent> projection) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
-            this.query = Query.and(npc, owner, tamed, Query.not(stamp));
+            this.query = unstamped(npc, owner, tamed, stamp, projection);
         }
 
         @Override
@@ -50,12 +87,15 @@ public final class CompanionOwnershipSystems {
 
         /**
          * Stamps an owned, tamed, unstamped NPC; also used by the startup pass. World thread only.
+         * The tame path matches a 3.x/4.x body to its imported record before it mints a profile;
+         * a body with no owner can only be matched, never tamed.
          *
          * @return true when the NPC was owned and tamed, so a tame was attempted
          */
         static boolean admit(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull Ref<EntityStore> ref,
                              @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
             if (!isTamed(store, ref)) {
+                lifecycle.admitLegacyBody(ref, store, buffer, false);
                 return false;
             }
             // Already owned when it arrived: register it, never strip the owner over a cap.
@@ -72,6 +112,12 @@ public final class CompanionOwnershipSystems {
         @Nonnull
         public Query<EntityStore> getQuery() {
             return query;
+        }
+
+        @Override
+        @Nonnull
+        public Set<Dependency<EntityStore>> getDependencies() {
+            return dependencies;
         }
     }
 

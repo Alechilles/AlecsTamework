@@ -42,6 +42,18 @@ class CommandPersistenceViewIndexTest {
                 true, false, null);
     }
 
+    /** Plan 7 R19: a link saved by 3.x/4.x may name a body the companion has since left. */
+    @Test
+    void aUuidOnlyLinkNamingARetiredAliasResolvesToItsProfile() {
+        UUID retired = UUID.randomUUID();
+        CompanionRecord live = live(UUID.randomUUID(), List.of());
+        CommandPersistenceView imported = new CommandPersistenceView(new CompanionQueries(index, new LoadedBodies<>()),
+                Map.of(retired, live.profileId())::get);
+
+        assertEquals(live.profileId(), imported.find(record(retired, null)).orElseThrow().profileId().value());
+        assertTrue(view.find(record(retired, null)).isEmpty(), "unknown without the import's alias file");
+    }
+
     @Test
     void aLiveRecordIsActiveAndBlocksNothing() {
         UUID npc = UUID.randomUUID();

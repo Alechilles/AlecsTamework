@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -10,18 +13,106 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Physical authority checks shared by ordinary command-item boundaries.
  *
- * <p>Bonded projections and Horn stacks are authoritative to their roster
+ * <p>Bonded companions and Horn stacks are authoritative to their roster
  * path. Generic pages may neither present nor mutate them, including when a
  * callback was created before a reload changed the physical tool's config.</p>
+ *
+ * <p>What a loaded body is comes from its {@link TameworkCompanionComponent}
+ * stamp and the companion index record the stamp names, the same evidence the
+ * bonded command path uses. A body saved by 3.x or 4.x and a body spawned by
+ * this version therefore get the same answer. The retired projection identity
+ * component is not read.</p>
  */
 final class CommandGenericTargetAuthority {
+    /** What the companion index says about the profile a body is stamped with. */
+    enum Standing {
+        /** No record, or an ordinary companion: generic items may act on it. */
+        ORDINARY,
+        /** A command-family roster member that is not bonded. */
+        ROSTER_MEMBER,
+        /** A bonded companion: only its bonded item may act on it. */
+        BONDED
+    }
+
+    /** Index lookup by profile id; tests replace it through {@link #standingsForTest}. */
+    private static volatile Function<UUID, Standing> standings =
+            CommandGenericTargetAuthority::indexStanding;
+
     private CommandGenericTargetAuthority() {
+    }
+
+    /** Replaces the index lookup and returns the previous one; null restores the default. */
+    @Nonnull
+    static Function<UUID, Standing> standingsForTest(@Nullable Function<UUID, Standing> lookup) {
+        Function<UUID, Standing> previous = standings;
+        standings = lookup != null ? lookup : CommandGenericTargetAuthority::indexStanding;
+        return previous;
+    }
+
+    /**
+     * Reads the live index. While companion saving is paused there is no index and every body
+     * counts as ordinary: the bonded items are off as well, and blocking every command item
+     * would be worse than the missing restriction.
+     */
+    @Nonnull
+    private static Standing indexStanding(@Nonnull UUID profileId) {
+        Tamework plugin = Tamework.getInstance();
+        CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
+        CompanionRecord record = companions == null ? null : companions.get(profileId);
+        if (record == null) {
+            return Standing.ORDINARY;
+        }
+        if (record.bonded()) {
+            return Standing.BONDED;
+        }
+        return record.rosterId() != null ? Standing.ROSTER_MEMBER : Standing.ORDINARY;
+    }
+
+    /**
+     * The standing of a loaded body, or null when it cannot be read (invalid reference, stamp
+     * type not registered, lookup failure). Callers treat null as "not allowed".
+     */
+    @Nullable
+    private static Standing standing(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable ComponentAccessor<EntityStore> components
+    ) {
+        if (reference == null || !reference.isValid() || components == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkCompanionComponent> type =
+                TameworkCompanionComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        try {
+            TameworkCompanionComponent stamp = components.getComponent(reference, type);
+            UUID profileId = stamp == null ? null : stamp.getProfileId();
+            return profileId == null ? Standing.ORDINARY : standings.apply(profileId);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * True when the body is a command-family roster member that is not bonded. Its family item's
+     * panel owns it, so one-way generic conversions leave it alone (the same rule the owned panel
+     * applies to roster records).
+     */
+    static boolean isRosterMember(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable Store<EntityStore> store
+    ) {
+        return standing(reference, store) == Standing.ROSTER_MEMBER;
     }
 
     static boolean allowsNearbyPresentation(
@@ -32,9 +123,10 @@ final class CommandGenericTargetAuthority {
     }
 
     /**
-     * Returns whether a generic command action may act on this loaded target.
-     * Missing marker evidence is intentionally denied: destructive generic
-     * actions must never win an authority race against a bonded projection.
+     * Returns whether a generic command action may act on this loaded target:
+     * every body except a bonded companion. A body whose standing cannot be
+     * read is denied: destructive generic actions must never win an authority
+     * race against a bonded companion.
      */
     static boolean allowsGenericTargetMutation(
             @Nullable Ref<EntityStore> reference,
@@ -48,21 +140,8 @@ final class CommandGenericTargetAuthority {
             @Nullable Ref<EntityStore> reference,
             @Nullable ComponentAccessor<EntityStore> components
     ) {
-        if (reference == null || !reference.isValid() || components == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> type =
-                TameworkProjectionIdentityComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        try {
-            TameworkProjectionIdentityComponent marker =
-                    components.getComponent(reference, type);
-            return marker == null || isRecognizedGenericMarker(marker);
-        } catch (RuntimeException ignored) {
-            return false;
-        }
+        Standing standing = standing(reference, components);
+        return standing != null && standing != Standing.BONDED;
     }
 
     static boolean allowsCurrentGenericCallback(
@@ -199,23 +278,6 @@ final class CommandGenericTargetAuthority {
         return physicalStack != null && !physicalStack.isEmpty()
                 && CommandRosterStorageBoundary.allowsGenericRosterActions(
                         currentPhysicalConfig);
-    }
-
-    private static boolean isRecognizedGenericMarker(
-            TameworkProjectionIdentityComponent marker
-    ) {
-        return switch (marker.getProjectionKind()) {
-            case TameworkProjectionIdentityComponent.KIND_RECOVERY,
-                    TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE,
-                    TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE,
-                    TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
-                    TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE,
-                    TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
-                    TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
-                    TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
-                    TameworkProjectionIdentityComponent.KIND_PROVISIONING_ACTIVATION -> true;
-            default -> false;
-        };
     }
 
     private static TwCommandItemConfig resolveCurrentConfig(

@@ -219,18 +219,20 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (componentUuid == null && legacyNpcUuid == null) {
             return null;
         }
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        TameworkProjectionIdentityComponent marker = markerType != null
-                ? store.getComponent(reference, markerType) : null;
+        // No projection key: the retired projection identity is no longer read, and nothing
+        // looks a loaded NPC up by it.
         return new LoadedNpcIdentityIndex.LoadedNpcObservation(
                 componentUuid,
                 legacyNpcUuid,
                 location,
-                projectionKey(marker)
+                null
         );
     }
 
+    /**
+     * Maps a retired projection marker to an index key. Live code no longer reads the marker;
+     * only the unregistered 4.x identity bootstrap still calls this.
+     */
     @Nullable
     static LoadedNpcIdentityIndex.ProjectionKey projectionKey(
             @Nullable TameworkProjectionIdentityComponent marker) {
@@ -337,10 +339,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             return CompletableFuture.completedFuture(null);
         }
         snapshotsByNpc.put(npcUuid, snapshot);
-        if (!hasProjectionIdentity(reference, store)) {
-            return upsertProfile(snapshot, worldKey(store));
-        }
-        return CompletableFuture.completedFuture(null);
+        return upsertProfile(snapshot, worldKey(store));
     }
 
     /**
@@ -380,32 +379,6 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         snapshotsByNpc.remove(npcUuid);
-    }
-
-    private boolean hasProjectionIdentity(@Nonnull Ref<EntityStore> reference,
-                                          @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        if (markerType == null) {
-            return false;
-        }
-        return shouldDeferProfileUpsert(store.getComponent(reference, markerType));
-    }
-
-    static boolean shouldDeferProfileUpsert(@Nullable TameworkProjectionIdentityComponent marker) {
-        if (marker == null || marker.getProfileId() == null || marker.getProfileId().isBlank()
-                || marker.getOperationId() == null || marker.getOperationId().isBlank()) {
-            return false;
-        }
-        String kind = marker.getProjectionKind();
-        return TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind);
     }
 
     private CompletionStage<Void> upsertProfile(

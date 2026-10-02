@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.LocationKind;
@@ -14,6 +15,8 @@ import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.FenceAction;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.migrate.LegacyAliases;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyResolution;
 import com.alechilles.alecstamework.companion.runtime.ThrottledWarnings;
 import com.alechilles.alecstamework.companion.store.CompanionWriter;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -21,6 +24,7 @@ import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -39,6 +43,7 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -57,6 +62,8 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     /** Release cause of a companion that died of old age; an owner or admin release has none. */
     public static final String CAUSE_OLD_AGE = "OLD_AGE";
+    /** Told to a player whose newly claimed animal was a leftover copy of an existing companion. */
+    static final String KEY_DUPLICATE_REMOVED = "tamework.companions.legacy.duplicateRemoved";
 
     private final CompanionIndex index;
     private final CompanionWriter writer;
@@ -68,13 +75,19 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
     private final LongSupplier clock;
     private final BiFunction<CompanionRecord, CompanionRecord, CompanionAdmissionGate.Admission> admission;
     private final BondedRecords.Families bondedFamilies;
+    private final LegacyAliases legacyAliases;
+    private final Predicate<UUID> unreadable;
+    private final AtomicInteger legacyRemoved = new AtomicInteger();
+    private final AtomicInteger legacyLeft = new AtomicInteger();
 
     /**
      * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
      * checks a new record against the population caps and the cached admission provider decision
      * under the index lock ({@link CompanionAdmissionGate#admit}); a null answer admits it.
      * {@code bondedFamilies} gives a bonded companion's roster family, whose revive cooldown its
-     * death uses (plan 6 R18).
+     * death uses (plan 6 R18). {@code legacyAliases} is the imported world's alias table, empty on
+     * a world that was never imported; {@code unreadable} is true for profile ids whose record
+     * could not be read at startup (a pure in-memory lookup).
      */
     public CompanionBodyLifecycle(@Nonnull CompanionIndex index, @Nonnull CompanionWriter writer,
                                   @Nonnull LoadedBodies<Ref<EntityStore>> loaded,
@@ -83,7 +96,8 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                                   @Nonnull ThrottledWarnings warnings, @Nonnull LongSupplier clock,
                                   @Nonnull BiFunction<CompanionRecord, CompanionRecord,
                                           CompanionAdmissionGate.Admission> admission,
-                                  @Nonnull BondedRecords.Families bondedFamilies) {
+                                  @Nonnull BondedRecords.Families bondedFamilies,
+                                  @Nonnull LegacyAliases legacyAliases, @Nonnull Predicate<UUID> unreadable) {
         this.index = Objects.requireNonNull(index, "index");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
@@ -94,6 +108,136 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.admission = Objects.requireNonNull(admission, "admission");
         this.bondedFamilies = Objects.requireNonNull(bondedFamilies, "bondedFamilies");
+        this.legacyAliases = Objects.requireNonNull(legacyAliases, "legacyAliases");
+        this.unreadable = Objects.requireNonNull(unreadable, "unreadable");
+    }
+
+    /** True on a world imported from 3.x or 4.x: its saved bodies must be matched as they load. */
+    public boolean hasLegacyBodies() {
+        return legacyAliases.size() > 0;
+    }
+
+    /**
+     * True when {@code npcUuid} is a body a 3.x/4.x world knew for a companion that still has a
+     * record (plan 7 R14). Such a body, while it has no stamp, must not become a new companion
+     * through any path (coop intake, capture): it is its record's own body or a leftover copy.
+     * A body whose record is a RELEASED tombstone, or has no record, is an ordinary animal again
+     * and answers false. Always false on a world that was never imported. Any thread; a pure
+     * in-memory lookup.
+     */
+    public boolean isLegacyBody(@Nonnull UUID npcUuid) {
+        LegacyAliases.Entry alias = legacyAliases.byNpcUuid(npcUuid).orElse(null);
+        CompanionRecord record = alias == null ? null : index.get(alias.profileId());
+        return record != null && record.location().kind() != LocationKind.RELEASED;
+    }
+
+    /**
+     * Spec 12.4 "Old bodies", plan 7 R14: matches an unstamped body saved by 3.x or 4.x to its
+     * imported record before anything can mint a new profile for it. The record's current body is
+     * stamped and registered, and the record takes what the body is the authority for: world,
+     * position, name, role, tool links, summary and, when the body has one, its owner (an imported
+     * record may hold a guessed world, no position and an empty summary). The body of a record
+     * imported as lost brings that record back to LIVE. A stale duplicate is removed. The decision
+     * and the record update are one step under the index lock ({@link LegacyBodyResolution#admit}).
+     * Does nothing on a world that was never imported.
+     *
+     * <p>{@code liveTame} is true when a player is taming the loaded body right now. Then an
+     * animal 4.x released is adopted as a new companion, and the tamer is told when the animal
+     * they claimed was a leftover copy of a companion that still exists and was removed.</p>
+     *
+     * <p>The retired {@code TameworkProjectionIdentity} component is read here, so nothing may
+     * strip it from a loading body before this ran (plan 7 R15).</p>
+     *
+     * @return true when the body was decided here and must not go on to the tame path
+     */
+    public boolean admitLegacyBody(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                   @Nonnull CommandBuffer<EntityStore> buffer, boolean liveTame) {
+        if (!hasLegacyBodies() || store.getComponent(ref, stampType) != null) {
+            return false;
+        }
+        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(ref, store, summaries);
+        if (facts == null) {
+            return false;
+        }
+        UUID npcUuid = facts.npcUuid();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        TameworkProjectionIdentityComponent projection =
+                projectionType == null ? null : store.getComponent(ref, projectionType);
+        LegacyBodyResolution.Body body = new LegacyBodyResolution.Body(
+                CompanionOwnershipSystems.isTamed(store, ref), projection != null,
+                projection == null ? null : parseUuid(projection.getProfileId()), npcUuid);
+        LegacyBodyResolution.Decision decision = LegacyBodyResolution.admit(index, loaded, legacyAliases, unreadable,
+                Ref::isValid, body, ref, liveTame, record -> matched(record, facts));
+        UUID profileId = decision.profileId();
+        switch (decision.action()) {
+            case ADOPT -> {
+                return false;
+            }
+            case LEAVE -> {
+                if (profileId != null) {
+                    int left = legacyLeft.incrementAndGet();
+                    warn("legacy-body-left", "Left an old companion body alone: NPC %s, profile %s (%s); "
+                            + "%d such sightings since start", npcUuid, profileId, decision.reason(), left);
+                }
+            }
+            case STAMP_CURRENT, REJOIN -> {
+                buffer.putComponent(ref, stampType, new TameworkCompanionComponent(profileId, decision.generation()));
+                CompanionSaves.markChanged(buffer, ref);
+                if (decision.action() == LegacyBodyResolution.Action.REJOIN) {
+                    LOGGER.at(Level.INFO).log("Companion %s was imported as lost and its body %s loaded: "
+                            + "it is live again", profileId, npcUuid);
+                }
+            }
+            case REMOVE_STALE -> {
+                // No -1 stamp: it would sit in the same buffer as the removal and never be saved.
+                buffer.tryRemoveEntity(ref, RemoveReason.REMOVE);
+                int removed = legacyRemoved.incrementAndGet();
+                LOGGER.at(Level.FINE).log("Removed stale duplicate body %s of companion %s: %s",
+                        npcUuid, profileId, decision.reason());
+                if (warnings.shouldLog("legacy-body-removed")) {
+                    LOGGER.at(Level.INFO).log("Removed %d stale duplicate companion bodies left by the old "
+                            + "save format since start (latest: NPC %s of companion %s, %s)",
+                            removed, npcUuid, profileId, decision.reason());
+                }
+                if (liveTame && facts.ownerUuid() != null) {
+                    tellOwnerAtLimit(store.getExternalData().getWorld(), facts.ownerUuid(), KEY_DUPLICATE_REMOVED);
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The change that makes an imported record LIVE at its matched body. Runs under the index lock.
+     * The home world follows the body only when the import could not know it: it is blank, or the
+     * record is LIVE at exactly 0,0,0 (imported without a checkpoint, its world a guess).
+     */
+    private UnaryOperator<CompanionRecord.Builder> matched(CompanionRecord record, CompanionTransitions.BodyFacts facts) {
+        UnaryOperator<CompanionRecord.Builder> seen = CompanionTransitions.unloaded(facts, null);
+        // A body with no owner keeps the record's owner; a body with one is the authority for it.
+        UnaryOperator<CompanionRecord.Builder> owner = facts.ownerUuid() == null
+                || Objects.equals(record.ownerUuid(), facts.ownerUuid()) && Objects.equals(record.ownerName(), facts.ownerName())
+                ? UnaryOperator.identity() : ownerChange(record, facts.ownerUuid(), facts.ownerName());
+        CompanionLocation at = record.location();
+        boolean guessedHome = record.homeWorld() == null || record.homeWorld().isBlank()
+                || at.kind() == LocationKind.LIVE && at.x() == 0 && at.y() == 0 && at.z() == 0;
+        return b -> {
+            owner.apply(seen.apply(b));
+            return guessedHome ? b.homeWorld(facts.world()) : b;
+        };
+    }
+
+    @Nullable
+    private static UUID parseUuid(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
     }
 
     /**
@@ -108,10 +252,13 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
      * change the tame already made (for example wild to tamed livestock) is not undone; the body
      * keeps its current role. Bodies that arrive already owned (chunk loads, pre-rework bodies,
      * the startup pass) pass false: they are registered without the caps and never lose their owner.
+     *
+     * <p>On an imported world the body is first matched to its imported record
+     * ({@link #admitLegacyBody}); only a body no record knows gets a new profile here.</p>
      */
     public void tame(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> buffer, boolean enforceCaps) {
-        if (store.getComponent(ref, stampType) != null) {
+        if (store.getComponent(ref, stampType) != null || admitLegacyBody(ref, store, buffer, enforceCaps)) {
             return;
         }
         CompanionTransitions.BodyFacts body = CompanionBodyFacts.read(ref, store, summaries);
@@ -149,7 +296,10 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
      * Runs as a world task so the ECS callback only queues it; the owner is looked up by UUID when
      * it runs.
      */
-    private static void tellOwnerAtLimit(@Nonnull World world, @Nonnull UUID owner, @Nonnull String key) {
+    private static void tellOwnerAtLimit(@Nullable World world, @Nonnull UUID owner, @Nonnull String key) {
+        if (world == null) {
+            return;
+        }
         world.execute(() -> {
             Universe universe = Universe.get();
             PlayerRef player = universe == null ? null : universe.getPlayer(owner);
@@ -174,17 +324,21 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         update(stamp.getProfileId(), r -> !Objects.equals(r.ownerUuid(), owner) || !Objects.equals(r.ownerName(), ownerName),
-                r -> {
-                    UnaryOperator<CompanionRecord.Builder> changed = CompanionTransitions.ownerChanged(owner, ownerName);
-                    if (Objects.equals(r.ownerUuid(), owner)) {
-                        return changed;
-                    }
-                    CompanionRecord candidate = changed.apply(r.toBuilder()).domainClaims(List.of()).build();
-                    CompanionAdmissionGate.Admission admitted = admission.apply(r, candidate);
-                    List<DomainClaim> claims = admitted == null || admitted.denial() != null
-                            ? List.of() : admitted.record().domainClaims();
-                    return b -> changed.apply(b).domainClaims(claims);
-                });
+                r -> ownerChange(r, owner, ownerName));
+    }
+
+    /** The record change for a body whose owner is now {@code owner}; see {@link #ownerChanged}. */
+    private UnaryOperator<CompanionRecord.Builder> ownerChange(CompanionRecord r, @Nullable UUID owner,
+                                                               @Nullable String ownerName) {
+        UnaryOperator<CompanionRecord.Builder> changed = CompanionTransitions.ownerChanged(owner, ownerName);
+        if (Objects.equals(r.ownerUuid(), owner)) {
+            return changed;
+        }
+        CompanionRecord candidate = changed.apply(r.toBuilder()).domainClaims(List.of()).build();
+        CompanionAdmissionGate.Admission admitted = admission.apply(r, candidate);
+        List<DomainClaim> claims = admitted == null || admitted.denial() != null
+                ? List.of() : admitted.record().domainClaims();
+        return b -> changed.apply(b).domainClaims(claims);
     }
 
     /**

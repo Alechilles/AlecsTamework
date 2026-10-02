@@ -314,6 +314,8 @@ public class Tamework extends JavaPlugin {
     @Nullable
     private volatile IndexTameworkApi api;
     private CompanionPersistenceModule companionModule;
+    /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
+    private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
     /** Backs {@code /tw persistence start-fresh}; null unless old saves block this world. */
     @Nullable
     private Supplier<CompanionPersistenceModule.FreshStart> companionStartFresh;
@@ -333,6 +335,9 @@ public class Tamework extends JavaPlugin {
     /** Summon aura, expiry warning and expiry fall protection of bonded companions; closed with the bonded API. */
     private com.alechilles.alecstamework.companion.bonded.BondedSummonEffects bondedSummonEffects;
     private CompanionStartupAdmission companionStartupAdmission;
+    /** Retired 3.x/4.x entity component types that nothing reads any more (plan 7 R15). */
+    private List<ComponentType<EntityStore, ?>> retiredEntityComponentTypes = List.of();
+    private com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup retiredComponentCleanup;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
     private AutoCloseable companionXpLegacyAdapter;
@@ -667,6 +672,8 @@ public class Tamework extends JavaPlugin {
         bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
         coopCaptureReceiptsComponentType = components.coopCaptureReceipts();
+        retiredEntityComponentTypes = List.of(components.persistenceRetirement(),
+                components.captureSourceReceipts(), components.inventoryOperationReceipts());
 
         spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
         deferPersistenceIndependentRuntimeParticipants();
@@ -850,11 +857,17 @@ public class Tamework extends JavaPlugin {
                             module.writer()::flushNow, providerAdmission,
                             // A capture into bonded storage re-checks the family's owned limit under the index lock.
                             com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
-                                    admissionGate::deny, module.index()::fileRecords, bondedFamilies)),
+                                    admissionGate::deny, module.index()::fileRecords, bondedFamilies),
+                            // A leftover 4.x body is never captured into a second record (plan 7 R14).
+                            companionLegacyBody),
                     restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.production(),
                             module.writer()::queueSnapshot),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
-                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, bondedFamilies);
+                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, bondedFamilies,
+                    // A 2.x capture item gets its record and stored state on its first release (plan 7 R18).
+                    new com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption(module.index(),
+                            module.legacyAliases(), module.writer()::queueSnapshot,
+                            admissionGate::admit, System::currentTimeMillis));
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1492,6 +1505,8 @@ public class Tamework extends JavaPlugin {
                 System::currentTimeMillis,
                 version,
                 runtimeDataDirectory);
+        // Command items resolve links that name an old body through the import's alias file (plan 7 R19).
+        com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(companionModule.legacyAliases());
         // Only a world blocked by old saves may start fresh (spec 12.3).
         if (companionModule.state() == CompanionPersistenceModule.State.MIGRATION_REQUIRED) {
             companionStartFresh = () -> CompanionPersistenceModule.startFresh(companionRoot, legacyDirectories,
@@ -1512,6 +1527,11 @@ public class Tamework extends JavaPlugin {
             return;
         }
         admission.admitLoadedWorlds(universe.getWorlds().values());
+        // Queued after the admission pass, which reads the retired projection identity (plan 7 R15).
+        com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup cleanup = retiredComponentCleanup;
+        if (cleanup != null) {
+            cleanup.stripLoadedWorlds(universe.getWorlds().values());
+        }
     }
 
     /**
@@ -1749,7 +1769,9 @@ public class Tamework extends JavaPlugin {
                 TameworkCompanionComponent.getComponentType(),
                 CompanionSnapshots.production(),
                 new CompanionSummaries(new HytaleSummarySources()),
-                module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies);
+                module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies,
+                module.legacyAliases(), module.unreadable());
+        companionLegacyBody = lifecycle::isLegacyBody;
         CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
                 ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
                 lifecycle);
@@ -1757,7 +1779,8 @@ public class Tamework extends JavaPlugin {
         com.alechilles.alecstamework.companion.coop.HytaleCoopIntake coopIntake =
                 new com.alechilles.alecstamework.companion.coop.HytaleCoopIntake(module.index(), module.loaded(),
                         (profileId, snapshot) -> module.writer().queueSnapshot(snapshot), module.writer()::flushNow,
-                        CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()));
+                        CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
+                        lifecycle::isLegacyBody);
         // Same gate as the coop systems below: without them no intake may commit coop moves.
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
             com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
@@ -1774,7 +1797,23 @@ public class Tamework extends JavaPlugin {
                         com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.getComponentType()));
         companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
                 TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
-                ownerComponentType, tamedComponentType);
+                ownerComponentType, tamedComponentType,
+                lifecycle.hasLegacyBodies() ? projectionIdentityComponentType : null);
+        // Retired 3.x/4.x components (plan 7 R15, R16). Declared after the companion index systems:
+        // the strip system depends on CompanionOwnershipSystems.OnAdd. The projection identity
+        // goes once its body is stamped; only the old-body match above still reads it.
+        com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup retiredCleanup =
+                new com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup(
+                        retiredEntityComponentTypes, projectionIdentityComponentType,
+                        TameworkCompanionComponent.getComponentType(), lifecycle.hasLegacyBodies());
+        retiredComponentCleanup = retiredCleanup;
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-component-cleanup",
+                retiredCleanup::addSystem);
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-projection-identity-cleanup",
+                retiredCleanup::stampedSystem);
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-revive-escrow-refund",
+                () -> new com.alechilles.alecstamework.companion.migrate.EscrowRefund(
+                        bondedReviveEscrowComponentType).system());
         CompanionWorldRemovalListener worldRemoval =
                 new CompanionWorldRemovalListener(lifecycle, module.index(), module.loaded());
         deferGlobalListener(
@@ -1924,6 +1963,8 @@ public class Tamework extends JavaPlugin {
             commandNpcRelocationService = null;
         }
         com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+        com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(
+                com.alechilles.alecstamework.companion.migrate.LegacyAliases.EMPTY);
         if (companionModule != null) {
             // Returns the -28 ShutdownEvent flush result when that already ran.
             if (!companionModule.shutdown(System.currentTimeMillis() + 2_000L)) {

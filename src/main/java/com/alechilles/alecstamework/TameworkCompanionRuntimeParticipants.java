@@ -4,8 +4,10 @@ import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionDeathSystem;
 import com.alechilles.alecstamework.companion.flow.CompanionOwnershipSystems;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.hypixel.hytale.builtin.encountermanager.EncounterManagerPlugin;
 import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
 import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
@@ -81,7 +83,9 @@ public final class TameworkCompanionRuntimeParticipants {
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownershiponaddsystem",
                 () -> new CompanionOwnershipSystems.OnAdd(lifecycle, NPCEntity.getComponentType(),
                         plugin.getOwnerComponentType(), plugin.getTamedComponentType(),
-                        TameworkCompanionComponent.getComponentType()));
+                        TameworkCompanionComponent.getComponentType(),
+                        // Only an imported world has old bodies to match (plan 7 R14).
+                        lifecycle.hasLegacyBodies() ? plugin.getProjectionIdentityComponentType() : null));
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownerchangedsystem",
                 () -> new CompanionOwnershipSystems.OwnerChanged(lifecycle, NPCEntity.getComponentType(),
                         plugin.getOwnerComponentType(), TameworkCompanionComponent.getComponentType()));
@@ -282,8 +286,12 @@ public final class TameworkCompanionRuntimeParticipants {
                         plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.LEVELING, "summonedcompanionexperiencesystem",
                 () -> new SummonedCompanionExperienceSystem(NPCEntity.getComponentType(),
-                        plugin.getProjectionIdentityComponentType(), plugin.getLevelingComponentType(),
-                        DeathComponent.getComponentType()));
+                        TameworkCompanionComponent.getComponentType(), profileId -> {
+                            // Read per call: the index is absent while companion saving is paused.
+                            CompanionQueries companions = plugin.getCompanionQueries();
+                            CompanionRecord record = companions == null ? null : companions.get(profileId);
+                            return record != null && record.bonded();
+                        }, plugin.getLevelingComponentType(), DeathComponent.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionlifestageresumeonloadsystem",
                 () -> new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(),
                         plugin.getLifeStageComponentType()));

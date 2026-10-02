@@ -50,11 +50,11 @@ class CapturedItemMetadataTest {
         assertNull(CapturedItemMetadata.read(snapshotOnly));
         ItemStack profile = legacy.withMetadata(
                 TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, UUID.randomUUID().toString());
-        ItemStack first = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
+        // A 4.x item (profile id and snapshot id) is the index item of its profile at generation 0.
+        ItemStack fourX = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 Codec.STRING, UUID.randomUUID().toString());
-        ItemStack second = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
-                Codec.STRING, UUID.randomUUID().toString());
-        assertNotEquals(CapturedItemMetadata.read(first), CapturedItemMetadata.read(second));
+        assertEquals(CapturedItemMetadata.indexKey(CaptureItemKeys.read(profile).profileId(), 0L),
+                CapturedItemMetadata.read(fourX));
         assertNull(CapturedItemMetadata.read(new ItemStack("Test_Ordinary", 1)));
     }
 

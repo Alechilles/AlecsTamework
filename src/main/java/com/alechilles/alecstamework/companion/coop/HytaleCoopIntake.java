@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -82,11 +83,18 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
     private final CoopEffectService effects = new CoopEffectService();
     private final Set<UUID> bodiesInFlight = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> snapshotFailedAt = new ConcurrentHashMap<>();
+    private final Predicate<UUID> legacyBody;
 
+    /**
+     * {@code legacyBody} is true for the NPC UUID of a body an imported 3.x/4.x record still claims
+     * ({@code CompanionBodyLifecycle#isLegacyBody}); a pure in-memory lookup.
+     */
     public HytaleCoopIntake(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<Ref<EntityStore>> loaded,
                             @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
                             @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
-                            @Nonnull CompanionSnapshots snapshots, @Nonnull CompanionSummaries summaries) {
+                            @Nonnull CompanionSnapshots snapshots, @Nonnull CompanionSummaries summaries,
+                            @Nonnull Predicate<UUID> legacyBody) {
+        this.legacyBody = Objects.requireNonNull(legacyBody, "legacyBody");
         this.index = Objects.requireNonNull(index, "index");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.summaries = Objects.requireNonNull(summaries, "summaries");
@@ -211,7 +219,8 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
     /**
      * A body the sweep may take in: not in use, and either stamped with a LIVE record at its stamp
      * that is not on a timed summon, or unstamped, unowned and without a record by its NPC UUID (an
-     * owned unstamped body gets stamped soon and is taken on a later sweep).
+     * owned unstamped body gets stamped soon and is taken on a later sweep). An unstamped body an
+     * imported record still claims is never taken: it would become a second companion.
      */
     private boolean eligible(Ref<EntityStore> body, Store<EntityStore> store, UUID npcUuid) {
         if (inUse(store, body)) {
@@ -223,7 +232,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
             return record != null && record.location().kind() == LocationKind.LIVE
                     && record.generation() == stamp.getGeneration() && record.summonedUntilMs() == 0L;
         }
-        return !owned(store, body) && index.byNpcUuid(npcUuid) == null;
+        return !owned(store, body) && index.byNpcUuid(npcUuid) == null && !legacyBody.test(npcUuid);
     }
 
     private static boolean inUse(Store<EntityStore> store, Ref<EntityStore> body) {

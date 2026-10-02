@@ -3,8 +3,11 @@ package com.alechilles.alecstamework.companion.migrate;
 import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.persistence.LegacyCapturedArtifactMetadata;
+import com.alechilles.alecstamework.items.persistence.LegacyCapturedArtifactProgressionMapper;
 import com.alechilles.alecstamework.items.persistence.LegacyDeathV1Payload;
 import com.alechilles.alecstamework.items.persistence.LegacyDeathV1SnapshotCodec;
 import com.alechilles.alecstamework.items.persistence.LegacyLostV1Payload;
@@ -51,7 +54,8 @@ import org.joml.Vector3d;
  * tables. {@link #legacyState} rebuilds the full state from both, as the 4.x restore did
  * ({@code LegacyRestorationFullStateMapper}), but never refuses over a disagreement: the profile
  * rows win and unreadable details are left out, because the import must not drop saved state.
- * A version 1 {@code capture} payload holds no state at all; that state is in the capture item.
+ * A version 1 {@code capture} payload holds no state at all; that state is in the capture item,
+ * and {@link #itemState} reads it when the item is first used under 5.0.
  *
  * <p>Summaries are built with {@link CompanionSummaries#build}, the same clamp a live body's
  * summary goes through. The role's name key, the icon and the harvest alarm need engine or
@@ -62,6 +66,8 @@ final class LegacyState {
     private static final CoopResidentStateSnapshotCodec STATE_CODEC = new CoopResidentStateSnapshotCodec();
     private static final LegacyDeathV1SnapshotCodec DEATH_V1 = new LegacyDeathV1SnapshotCodec();
     private static final LegacyLostV1SnapshotCodec LOST_V1 = new LegacyLostV1SnapshotCodec();
+    private static final LegacyCapturedArtifactProgressionMapper ITEM_PROGRESSION =
+            new LegacyCapturedArtifactProgressionMapper();
     static final String KIND_DEATH = "death";
     static final String KIND_LOST = "lost";
     static final String KIND_CAPTURE = "capture";
@@ -152,6 +158,45 @@ final class LegacyState {
             } else {
                 return null;
             }
+            return new State(STATE_CODEC.encode(state), state.npcUuid(), summary(state), customName(state.npcName()));
+        } catch (RuntimeException | LinkageError unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * The state a 2.x capture item carries in its own metadata, written as the plain state JSON:
+     * the progression groups, the given name, the attachments and the health share, completed
+     * from {@code identity} as the 4.x release did ({@code LegacyCapturedArtifactFullStateMapper}).
+     * An item with no state keys gives the identity alone. Null when a group on the item is
+     * incomplete or of the wrong type: the caller must then leave the item as it is, because a
+     * state without that group would silently drop what the item holds.
+     *
+     * @param metadata      the item's metadata
+     * @param capturedAtMs  the wall-clock time to record; the item stores none
+     */
+    @Nullable
+    static State itemState(@Nonnull BsonDocument metadata, long capturedAtMs, @Nonnull Identity identity) {
+        try {
+            LegacyCapturedArtifactMetadata item = new LegacyCapturedArtifactMetadata(metadata);
+            LegacyCapturedArtifactProgressionMapper.State progression =
+                    ITEM_PROGRESSION.map(item, capturedAtMs, identity.roleId());
+            String itemName = item.text(TameworkMetadataKeys.NPC_NAME);
+            String attachmentJson = item.text(TameworkMetadataKeys.ATTACHMENTS);
+            TameworkAttachmentsComponent attachments = null;
+            if (attachmentJson != null) {
+                Map<String, String> ids = new LinkedHashMap<>();
+                JsonParser.parseString(attachmentJson).getAsJsonObject().entrySet()
+                        .forEach(entry -> ids.put(entry.getKey(), entry.getValue().getAsString()));
+                attachments = new TameworkAttachmentsComponent(null, ids);
+            }
+            CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(identity.npcUuid(), null, -1,
+                    identity.roleId(), commandLinks(identity, null), owner(identity, null),
+                    identity.tamed() == null ? null : new TameworkTamedComponent(identity.tamed()),
+                    name(itemName != null ? itemName : identity.customName(), identity.ownerUuid()),
+                    progression.happiness(), progression.needs(), progression.breeding(), progression.leveling(),
+                    progression.traits(), progression.talents(), progression.lifeStage(), attachments,
+                    progression.healthPercent(), capturedAtMs);
             return new State(STATE_CODEC.encode(state), state.npcUuid(), summary(state), customName(state.npcName()));
         } catch (RuntimeException | LinkageError unreadable) {
             return null;

@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
@@ -89,8 +89,8 @@ class CommandFreshTamePanelSelectionTest {
             assertTrue(service.purchaseManaged(player, "flute", NPC, "test-talent").notFound());
             assertTrue(service.resetManaged(player, "flute", NPC).notFound());
             scope.store.put(npcRef, scope.ownerType, new TameworkOwnerComponent(OWNER, "Owner"));
-            scope.store.put(npcRef, scope.projectionType,
-                    TameworkProjectionIdentityComponent.bondedCompanion("profile", "lease"));
+            scope.store.put(npcRef, scope.stampType,
+                    new TameworkCompanionComponent(TestScope.BONDED_PROFILE, 0L));
             assertNull(service.managedSnapshot(player, "flute", NPC),
                     "Bonded companions must use their own talent authority.");
         }
@@ -296,7 +296,11 @@ class CommandFreshTamePanelSelectionTest {
         private final ComponentType<EntityStore, NPCMountComponent> mountType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
         private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
-        private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType;
+        private static final UUID BONDED_PROFILE = UUID.fromString(
+                "78000000-0000-0000-0000-0000000000b0");
+        private final ComponentType<EntityStore, TameworkCompanionComponent> stampType = new ComponentType<>();
+        private final Object oldStampType;
+        private final java.util.function.Function<UUID, CommandGenericTargetAuthority.Standing> oldStandings;
         private final TestWorld world;
         private final TestEntityComponentStore store;
 
@@ -317,9 +321,13 @@ class CommandFreshTamePanelSelectionTest {
                     TameworkOwnerComponent.CODEC);
             this.tamedType = EntityStore.REGISTRY.registerComponent(
                     TameworkTamedComponent.class, "TestFreshTameTamed", TameworkTamedComponent.CODEC);
-            this.projectionType = EntityStore.REGISTRY.registerComponent(
-                    TameworkProjectionIdentityComponent.class, "TestFreshTameProjection",
-                    TameworkProjectionIdentityComponent.CODEC);
+            this.oldStampType = staticField(TameworkCompanionComponent.class, "type").get(null);
+            staticField(TameworkCompanionComponent.class, "type").set(null, stampType);
+            // Stands in for the companion index: only this profile's record is bonded.
+            this.oldStandings = CommandGenericTargetAuthority.standingsForTest(profileId ->
+                    BONDED_PROFILE.equals(profileId)
+                            ? CommandGenericTargetAuthority.Standing.BONDED
+                            : CommandGenericTargetAuthority.Standing.ORDINARY);
             this.world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
             this.world.references = new HashMap<>();
             TestEntityStore entityStore = new TestEntityStore(world);
@@ -336,7 +344,6 @@ class CommandFreshTamePanelSelectionTest {
             Tamework tamework = (Tamework) unsafe().allocateInstance(Tamework.class);
             setField(tamework, Tamework.class, "ownerComponentType", ownerType);
             setField(tamework, Tamework.class, "tamedComponentType", tamedType);
-            setField(tamework, Tamework.class, "projectionIdentityComponentType", projectionType);
             staticField(Tamework.class, "instance").set(null, tamework);
 
             MountPlugin mountPlugin = (MountPlugin) unsafe().allocateInstance(MountPlugin.class);
@@ -362,7 +369,8 @@ class CommandFreshTamePanelSelectionTest {
         public void close() throws Exception {
             store.close();
             staticField(com.hypixel.hytale.server.npc.NPCPlugin.class, "instance").set(null, oldNpcPlugin);
-            EntityStore.REGISTRY.unregisterComponent(projectionType);
+            CommandGenericTargetAuthority.standingsForTest(oldStandings);
+            staticField(TameworkCompanionComponent.class, "type").set(null, oldStampType);
             EntityStore.REGISTRY.unregisterComponent(ownerType);
             EntityStore.REGISTRY.unregisterComponent(tamedType);
             staticField(Tamework.class, "instance").set(null, oldTamework);

@@ -12,9 +12,12 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import javax.annotation.Nullable;
 import org.bson.BsonValue;
 
-/** Maps the progression component groups written by released-public captured items. */
-final class LegacyCapturedArtifactProgressionMapper {
-    State map(
+/**
+ * Maps the progression component groups written by released-public captured items. Public for
+ * the 5.0 adoption of 2.x capture items ({@code companion.migrate}).
+ */
+public final class LegacyCapturedArtifactProgressionMapper {
+    public State map(
             LegacyCapturedArtifactMetadata metadata,
             long capturedAtMs,
             @Nullable String canonicalRole
@@ -401,7 +404,7 @@ final class LegacyCapturedArtifactProgressionMapper {
                 : null;
     }
 
-    record State(
+    public record State(
             @Nullable TameworkHappinessComponent happiness,
             @Nullable TameworkNeedsComponent needs,
             @Nullable TameworkBreedingComponent breeding,

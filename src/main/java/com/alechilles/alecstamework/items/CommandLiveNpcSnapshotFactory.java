@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -82,12 +81,6 @@ final class CommandLiveNpcSnapshotFactory {
         // player links a command item. Unrelated wild NPCs need no profile.
         if (!allowUnlinked && toolIds.length == 0) {
             if (owner == null || owner.getOwnerId() == null || !tamed) {
-                return null;
-            }
-            // Managed projections already have an operation or bonded lease
-            // owning their durable identity; do not adopt their disposable UUID.
-            if (component(npcRef, store,
-                    TameworkProjectionIdentityComponent.getComponentType()) != null) {
                 return null;
             }
         }

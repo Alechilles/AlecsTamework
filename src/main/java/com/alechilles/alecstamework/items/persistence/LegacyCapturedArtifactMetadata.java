@@ -7,8 +7,11 @@ import org.bson.BsonDocument;
 import org.bson.BsonNumber;
 import org.bson.BsonValue;
 
-/** Strict typed access to one immutable released-public captured artifact document. */
-record LegacyCapturedArtifactMetadata(BsonDocument values) {
+/**
+ * Strict typed access to one immutable released-public captured artifact document. Public for
+ * the 5.0 adoption of 2.x capture items ({@code companion.migrate}).
+ */
+public record LegacyCapturedArtifactMetadata(BsonDocument values) {
     static LegacyCapturedArtifactMetadata parse(CapturedArtifact artifact) {
         try {
             return new LegacyCapturedArtifactMetadata(BsonDocument.parse(
@@ -50,7 +53,7 @@ record LegacyCapturedArtifactMetadata(BsonDocument values) {
     }
 
     @Nullable
-    String text(String key) {
+    public String text(String key) {
         BsonValue value = optional(key);
         if (value == null) {
             return null;
@@ -65,7 +68,7 @@ record LegacyCapturedArtifactMetadata(BsonDocument values) {
     }
 
     @Nullable
-    UUID uuid(String key) {
+    public UUID uuid(String key) {
         String value = text(key);
         if (value == null) {
             return null;
@@ -78,7 +81,7 @@ record LegacyCapturedArtifactMetadata(BsonDocument values) {
     }
 
     @Nullable
-    Boolean bool(String key) {
+    public Boolean bool(String key) {
         BsonValue value = optional(key);
         if (value == null) {
             return null;

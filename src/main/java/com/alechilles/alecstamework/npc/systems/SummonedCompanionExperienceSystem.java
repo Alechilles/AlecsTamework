@@ -1,9 +1,9 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.SummonedCompanionExperienceService;
@@ -17,14 +17,21 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.UUID;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Awards bounded active-time XP exclusively to live bonded companion projections. */
+/**
+ * Awards bounded active-time XP exclusively to live bonded companions. A body is one when its
+ * companion stamp names a profile the index holds as bonded ({@code bonded}, a pure in-memory
+ * lookup that runs every tick).
+ */
 public final class SummonedCompanionExperienceSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, NPCEntity> npcType;
-    private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentityType;
+    private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
+    private final Predicate<UUID> bonded;
     private final ComponentType<EntityStore, TameworkLevelingComponent> levelingType;
     private final ComponentType<EntityStore, DeathComponent> deathType;
     private final Query<EntityStore> query;
@@ -35,14 +42,16 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
 
     public SummonedCompanionExperienceSystem(
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-            @Nonnull ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentityType,
+            @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
+            @Nonnull Predicate<UUID> bonded,
             @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> levelingType,
             @Nonnull ComponentType<EntityStore, DeathComponent> deathType) {
         this.npcType = npcType;
-        this.projectionIdentityType = projectionIdentityType;
+        this.stampType = stampType;
+        this.bonded = bonded;
         this.levelingType = levelingType;
         this.deathType = deathType;
-        this.query = Query.and(npcType, projectionIdentityType);
+        this.query = Query.and(npcType, stampType);
         this.settingsResolver = (reference, store) -> {
             String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
             TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
@@ -56,17 +65,19 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
 
     SummonedCompanionExperienceSystem(
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-            @Nonnull ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentityType,
+            @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
+            @Nonnull Predicate<UUID> bonded,
             @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> levelingType,
             @Nonnull ComponentType<EntityStore, DeathComponent> deathType,
             @Nonnull ProjectionSettingsResolver settingsResolver,
             @Nonnull CompanionXpAwarder xpAwarder,
             @Nonnull LongSupplier clock) {
         this.npcType = npcType;
-        this.projectionIdentityType = projectionIdentityType;
+        this.stampType = stampType;
+        this.bonded = bonded;
         this.levelingType = levelingType;
         this.deathType = deathType;
-        this.query = Query.and(npcType, projectionIdentityType);
+        this.query = Query.and(npcType, stampType);
         this.settingsResolver = settingsResolver;
         this.xpAwarder = xpAwarder;
         this.clock = clock;
@@ -84,7 +95,12 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
                      @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> reference = chunk.getReferenceTo(index);
-        TameworkProjectionIdentityComponent identity = chunk.getComponent(index, projectionIdentityType);
+        TameworkCompanionComponent stamp = chunk.getComponent(index, stampType);
+        UUID profileId = stamp == null ? null : stamp.getProfileId();
+        // Ordinary companions stop here: only bonded ones carry summoned XP state.
+        if (profileId == null || !bonded.test(profileId)) {
+            return;
+        }
         boolean dead = reference != null && reference.isValid() && store.getComponent(reference, deathType) != null;
         boolean referenceValid = reference != null && reference.isValid();
         if (!referenceValid) {
@@ -92,8 +108,7 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
         }
 
         TameworkLevelingComponent leveling = store.getComponent(reference, levelingType);
-        boolean eligible = isEligibleForSummonedXp(true, identity, dead);
-        ResolvedSettings resolved = eligible ? settingsResolver.resolve(reference, store) : null;
+        ResolvedSettings resolved = !dead ? settingsResolver.resolve(reference, store) : null;
         boolean active = resolved != null;
         if (active && leveling == null) {
             leveling = CompanionLevelingService.ensureLevelingComponent(
@@ -103,7 +118,7 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
             return;
         }
         long nowMs = clock.getAsLong();
-        processProjection(leveling, identity, dead,
+        processProjection(leveling, dead,
                 active ? resolved.settings() : null,
                 nowMs, dt,
                 (source, amount) -> xpAwarder.award(
@@ -120,32 +135,15 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
         }
     }
 
-    static boolean isEligibleForSummonedXp(boolean referenceValid,
-                                           @Nullable TameworkProjectionIdentityComponent identity,
-                                           boolean dead) {
-        return referenceValid && !dead && identity != null && identity.isBondedCompanion();
-    }
-
-    static void processProjection(@Nonnull TameworkLevelingComponent leveling,
-                                  @Nullable TameworkProjectionIdentityComponent identity,
-                                  boolean dead,
-                                  @Nullable TwLevelingConfig.SummonedXpSourceSettings settings,
-                                  long nowMs,
-                                  double dt,
-                                  @Nonnull AwardSink awardSink) {
-        processProjection(leveling, identity, dead, settings, nowMs, dt, awardSink,
-                new SummonedCompanionExperienceService());
-    }
-
+    /** Advances the summoned XP cadence of a bonded companion; a dead one is paused. */
     private static void processProjection(@Nonnull TameworkLevelingComponent leveling,
-                                          @Nullable TameworkProjectionIdentityComponent identity,
                                           boolean dead,
                                           @Nullable TwLevelingConfig.SummonedXpSourceSettings settings,
                                           long nowMs,
                                           double dt,
                                           @Nonnull AwardSink awardSink,
                                           @Nonnull SummonedCompanionExperienceService experienceService) {
-        boolean active = isEligibleForSummonedXp(true, identity, dead) && settings != null;
+        boolean active = !dead && settings != null;
         SummonedCompanionExperienceService.Result result = experienceService.advance(
                 new SummonedCompanionExperienceService.State(
                         leveling.getSummonedActiveSeconds(),

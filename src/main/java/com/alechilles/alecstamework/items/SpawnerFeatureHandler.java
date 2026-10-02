@@ -37,6 +37,7 @@ import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
@@ -102,8 +103,9 @@ import org.bson.BsonString;
  * <p>A TAME_AND_COMMAND_LINK capture tames the wild body in place for the capturing player and
  * registers it as a member of the item's command-family roster (record {@code rosterId}). A
  * capture that succeeds, and a failed roll that spent its source, publish
- * {@link CaptureAttemptResolvedEvent} on the body's world thread. Items in the 2.x and 4.x
- * formats are refused until their migration.
+ * {@link CaptureAttemptResolvedEvent} on the body's world thread. A 4.x item releases as an index
+ * item at generation 0, and a 2.x item is adopted on its first release
+ * ({@link LegacyItemAdoption}).
  *
  * <p>A STORE_BONDED_COMPANION capture gives no item: the body goes into the capturing player's
  * bonded roster as {@code STORED(BONDED)} through the same {@link CaptureFlow}, with the role the
@@ -141,6 +143,7 @@ public final class SpawnerFeatureHandler {
     private final CommandItemRegistry commandItems;
     private final Consumer<TameworkEvent> captureResolved;
     private final BondedRecords.Families bondedFamilies;
+    private final LegacyItemAdoption legacyItems;
     /** Profiles (or unstamped NPC UUIDs) with a capture commit in flight. */
     private final Set<UUID> capturing = ConcurrentHashMap.newKeySet();
     /** Profiles with a release in flight. */
@@ -162,7 +165,8 @@ public final class SpawnerFeatureHandler {
             @Nonnull CompanionAdmissionGate admissionGate,
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull Consumer<TameworkEvent> captureResolved,
-            @Nonnull BondedRecords.Families bondedFamilies
+            @Nonnull BondedRecords.Families bondedFamilies,
+            @Nonnull LegacyItemAdoption legacyItems
     ) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.registry = Objects.requireNonNull(registry, "registry");
@@ -177,6 +181,7 @@ public final class SpawnerFeatureHandler {
         this.commandItems = Objects.requireNonNull(commandItems, "commandItems");
         this.captureResolved = Objects.requireNonNull(captureResolved, "captureResolved");
         this.bondedFamilies = Objects.requireNonNull(bondedFamilies, "bondedFamilies");
+        this.legacyItems = Objects.requireNonNull(legacyItems, "legacyItems");
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata = new SpawnerCaptureMetadataService(logger, registry);
@@ -1151,8 +1156,9 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
-     * Releases a 5.0 capture item through {@link RestoreFlow}. The ownership mode decides who may
-     * release, read from the record, not the item. Returns true when the restore started.
+     * Releases a capture item through {@link RestoreFlow}. The ownership mode decides who may
+     * release, read from the record, not the item. A 2.x item is adopted first and then released
+     * like any other. Returns true when the restore started.
      */
     private boolean release(
             Player player,
@@ -1166,9 +1172,11 @@ public final class SpawnerFeatureHandler {
         }
         CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(source);
         if (ref == null) {
-            // 2.x and 4.x items are migrated in phase 7; until then they cannot be released.
-            warn(player, "releaseInvalidContext");
-            return false;
+            ref = adoptLegacyItem(player, source, config, hotbarSlot, emptyItemIdOverride);
+            if (ref == null) {
+                return false;
+            }
+            source = CaptureItemKeys.write(source, ref);
         }
         CompanionRecord record = index.get(ref.profileId());
         CaptureItemOwnership.Release ownership = CaptureItemOwnership.release(
@@ -1195,6 +1203,7 @@ public final class SpawnerFeatureHandler {
             request = request.withOwner(owner);
         }
         UUID playerUuid = player.getUuid();
+        CaptureItemKeys.Ref item = ref;
         UUID profileId = ref.profileId();
         if (!releasing.add(profileId)) {
             // A release of this companion is still running; this one could only end stale.
@@ -1213,15 +1222,46 @@ public final class SpawnerFeatureHandler {
             releasing.remove(profileId);
             if (error != null) {
                 logger.at(Level.WARNING).withCause(error).log("Release of companion %s failed unexpectedly",
-                        ref.profileId());
+                        profileId);
             }
             RestoreFlow.Outcome outcome = error != null || result == null
                     ? new RestoreFlow.Outcome(RestoreFlow.Result.COMMIT_FAILED, null) : result;
             HytaleCaptureDelivery.onPlayerWorld(playerUuid,
-                    (world, store, actorRef, actor) -> finishRelease(outcome, world, actor, ref, prepared),
+                    (world, store, actorRef, actor) -> finishRelease(outcome, world, actor, item, prepared),
                     null);
         });
         return true;
+    }
+
+    /**
+     * Adopts a 2.x capture item (plan 7 R18): its record is created or completed from the item's
+     * own state, and the held stack is stamped with the profile id and generation 0, so from here
+     * on it is an ordinary index item. Nothing is adopted unless the release could go ahead from
+     * where the player stands. Returns null after telling the player why, with the item left as
+     * it was. Call on the player's world thread.
+     */
+    @Nullable
+    private CaptureItemKeys.Ref adoptLegacyItem(Player player, ItemStack source, ItemFeatureConfig config,
+                                                @Nullable Integer hotbarSlot, @Nullable String emptyItemIdOverride) {
+        SpawnerReleaseIntentFactory.PreparedRelease located =
+                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
+        if (located == null) {
+            return null;
+        }
+        LegacyItemAdoption.Adoption adoption =
+                legacyItems.adopt(source.getMetadata(), player.getUuid(), OwnerNameUtil.resolve(player));
+        switch (adoption.result()) {
+            case ADOPTED -> {
+                // The slot was matched against the exact source stack just above, on this thread.
+                return inventory.updateHotbarSlot(player, located.slot(), CaptureItemKeys.write(source, adoption.ref()))
+                        ? adoption.ref() : null;
+            }
+            case STALE -> warn(player, "releaseProfileConflict");
+            case UNREADABLE -> warn(player, "releaseEvidenceFailed");
+            case LIMIT -> showPopulationLimit(player, adoption.messageKey());
+            case INVALID -> warn(player, "releaseInvalidContext");
+        }
+        return null;
     }
 
     /** Runs on the player's current world thread. */

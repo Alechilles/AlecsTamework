@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -126,6 +127,7 @@ public final class CaptureFlow<R> {
     private final Function<UUID, CompletableFuture<Void>> flushOwner;
     private final ProviderAdmission providers;
     private final CompanionAdmissionGate.Check admission;
+    private final Predicate<UUID> legacyBody;
 
     /** A flow with no admission providers; {@code admission} is the built-in caps only. */
     public CaptureFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -147,6 +149,21 @@ public final class CaptureFlow<R> {
                        @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
                        @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
                        @Nonnull ProviderAdmission providers, @Nonnull CompanionAdmissionGate.Check admission) {
+        this(index, loaded, queueSnapshot, flushOwner, providers, admission, npcUuid -> false);
+    }
+
+    /**
+     * @param legacyBody whether an NPC UUID is a body an imported 3.x/4.x world knew for a companion
+     *                   that still has a record ({@code CompanionBodyLifecycle::isLegacyBody}). An
+     *                   unstamped body like that is never captured: a capture would make a second
+     *                   record beside the imported one (plan 7 R14).
+     */
+    public CaptureFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
+                       @Nonnull BiConsumer<UUID, SnapshotEnvelope> queueSnapshot,
+                       @Nonnull Function<UUID, CompletableFuture<Void>> flushOwner,
+                       @Nonnull ProviderAdmission providers, @Nonnull CompanionAdmissionGate.Check admission,
+                       @Nonnull Predicate<UUID> legacyBody) {
+        this.legacyBody = Objects.requireNonNull(legacyBody, "legacyBody");
         this.index = Objects.requireNonNull(index, "index");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
@@ -161,7 +178,7 @@ public final class CaptureFlow<R> {
         // What the commit would write, read without the lock, so the provider is asked off it.
         UUID stamped = capture.stampedProfileId();
         CompanionRecord seen = stamped == null ? null : index.get(stamped);
-        if (stamped != null && seen == null) {
+        if (stamped != null ? seen == null : legacyBody.test(capture.facts().npcUuid())) {
             return CompletableFuture.completedFuture(new Outcome(Result.NOT_CAPTURABLE, null));
         }
         CompanionRecord created = stamped != null ? null : created(capture, UUID.randomUUID());
