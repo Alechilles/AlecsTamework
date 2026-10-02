@@ -30,6 +30,13 @@ art graph.
   writable token per project, while consent remains project-specific.
 - For integration details and the breaking package migration, see the
   [Beacon 2.0 migration guide](https://wiki.hytalemodding.dev/mod/beacon/migrate-to-beacon-2-0).
+- The SQLite JDBC driver is bundled for the one-time legacy importer. The jar
+  keeps only its natives for Windows, Linux, and Mac on x86_64 and aarch64,
+  plus Linux-Musl (Alpine containers) on x86_64 and aarch64; `shadowJar`
+  excludes every other native and the GraalVM `nativeimage` classes to save
+  about 10 MB. Keep `org.sqlite` unrelocated, because the natives' JNI symbols
+  are bound to that package name. `packagingTest` opens a database through the
+  packaged driver to prove the trimmed jar still loads its native library.
 - The shared workspace links both mods' asset files into its `run/mods` tree,
   so edits in Tamework and HyDragon can reload together.
 

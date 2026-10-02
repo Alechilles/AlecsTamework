@@ -157,6 +157,23 @@ tasks.named('shadowJar', ShadowJar) {
         skipStringConstants = true
     }
     relocate 'org.slf4j', 'com.alechilles.alecstamework.shadow.slf4j'
+    // The SQLite driver is only used by the one-time importer. Ship natives for the platforms
+    // Hytale servers run on (Windows, Linux, Mac on x86_64/aarch64, plus Alpine/musl containers)
+    // and drop the rest. Do not relocate org.sqlite: the JNI symbols in the natives are bound to
+    // that package name. Plain patterns (not a closure) so Gradle tracks them for up-to-date checks.
+    exclude 'META-INF/versions/9/org/sqlite/nativeimage/**'
+    exclude 'org/sqlite/native/FreeBSD/**'
+    exclude 'org/sqlite/native/Linux-Android/**'
+    exclude 'org/sqlite/native/Linux-Musl/x86/**'
+    exclude 'org/sqlite/native/Linux/arm/**'
+    exclude 'org/sqlite/native/Linux/armv6/**'
+    exclude 'org/sqlite/native/Linux/armv7/**'
+    exclude 'org/sqlite/native/Linux/ppc64/**'
+    exclude 'org/sqlite/native/Linux/riscv64/**'
+    exclude 'org/sqlite/native/Linux/x86/**'
+    exclude 'org/sqlite/native/Windows/aarch64/**'
+    exclude 'org/sqlite/native/Windows/armv7/**'
+    exclude 'org/sqlite/native/Windows/x86/**'
     manifest {
         attributes(
                 'Plugin-Group': project.group,
