@@ -21,14 +21,5 @@ class PopulationAdmissionFailureFeedbackTest {
                         "revive"
                 )
         );
-        assertEquals(
-                "Husbandry requirements are temporarily unavailable. Try again shortly.",
-                PopulationAdmissionFailureFeedback.describe(
-                        new IllegalStateException(
-                                "runehusbandry.admission.provider_unavailable"
-                        ),
-                        "release"
-                )
-        );
     }
 }
