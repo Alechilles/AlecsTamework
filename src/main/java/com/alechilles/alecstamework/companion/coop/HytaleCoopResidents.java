@@ -113,8 +113,11 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
 
     /**
      * The sites in {@code world} whose chunk has been loaded without a managed coop block for
-     * {@link #SWEEPS_WITHOUT_COOP} sweeps in a row: the coop was broken while the server ran 4.x,
-     * or its block is no longer an enabled coop. Read-only apart from that count.
+     * {@link #SWEEPS_WITHOUT_COOP} sweeps in a row and whose position holds no coop block of any
+     * kind (air or another block): the coop was broken while the server ran 4.x. While a coop block
+     * still stands there without an enabled config (its content pack did not load, say) the
+     * residents wait and one INFO line per site and server run says so. Read-only apart from that
+     * bookkeeping.
      */
     @Nonnull
     public List<CoopImportedResidents.Site> importSitesWithoutCoop(
@@ -126,6 +129,12 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             }
             if (!chunkLoaded(world, site)) {
                 imports.notLoaded(site);
+            } else if (coopBlockStands(world, site)) {
+                if (imports.waitsForCoop(site)) {
+                    LOGGER.at(Level.INFO).log("Imported coop residents wait for the coop at %d, %d, %d in world %s:"
+                            + " its block is there but has no enabled coop config (is its content pack loaded?)",
+                            site.x(), site.y(), site.z(), world.getName());
+                }
             } else if (imports.seenWithoutCoop(site, SWEEPS_WITHOUT_COOP)) {
                 gone.add(site);
             }
@@ -135,13 +144,20 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
 
     /** Moves the imported residents of a site with no coop block out next to where the coop stood. */
     public void releaseImportedWithoutCoop(@Nonnull World world, @Nonnull CoopImportedResidents.Site site) {
-        if (!chunkLoaded(world, site)) {
+        if (!chunkLoaded(world, site) || coopBlockStands(world, site)) {
             return;
         }
         Vector3i block = new Vector3i(site.x(), site.y(), site.z());
         for (CompanionRecord record : imports.withoutCoop(site)) {
             moveOutImported(world, record, block, 0, null, "its coop is gone");
         }
+    }
+
+    /** A coop block of any kind, or one that cannot be told apart, at the site; an unreadable chunk store counts too. */
+    private boolean coopBlockStands(World world, CoopImportedResidents.Site site) {
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> store = chunkStore == null ? null : chunkStore.getStore();
+        return store == null || scanner.coopBlockOfAnyKindAt(world, store, site.x(), site.y(), site.z());
     }
 
     private static boolean chunkLoaded(World world, CoopImportedResidents.Site site) {

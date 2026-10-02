@@ -24,7 +24,8 @@ import javax.annotation.Nullable;
  * Coop residents imported from 3.x or 4.x (plan 7 R20). The importer writes each one as a COOP
  * record at generation 0, but an old coop block has no {@link TameworkCoopSlotsComponent}: 4.x
  * kept residency in its database. This puts those records back into their block's slots the first
- * time the block is seen loaded, and moves out the ones whose coop is gone or full.
+ * time the block is seen loaded as a managed coop, and moves out the ones whose coop is gone or
+ * full. While a coop block still stands there without a usable config they wait.
  *
  * <p>An imported resident is a record that is COOP at generation 0. A 5.0 intake always commits
  * generation+1, so no resident taken in by 5.0 matches, and an intake that has committed but not
@@ -61,6 +62,7 @@ public final class CoopImportedResidents {
     private static final class Waiting {
         private final Set<UUID> profiles = ConcurrentHashMap.newKeySet();
         private int sweepsWithoutCoop;
+        private boolean waitNoted;
     }
 
     private final CompanionIndex index;
@@ -111,6 +113,23 @@ public final class CoopImportedResidents {
     public boolean seenWithoutCoop(@Nonnull Site site, int sweeps) {
         Waiting entry = sites().get(site);
         return entry != null && ++entry.sweepsWithoutCoop >= sweeps;
+    }
+
+    /**
+     * Notes that a coop block still stands at {@code site} but is not a managed coop now (its
+     * config is missing or disabled, or its content pack did not load). Its residents keep
+     * waiting: nothing is released and the count of {@link #seenWithoutCoop} starts over. True the
+     * first time this is noted for the site in this server run, for one log line.
+     */
+    public boolean waitsForCoop(@Nonnull Site site) {
+        Waiting entry = sites().get(site);
+        if (entry == null) {
+            return false;
+        }
+        entry.sweepsWithoutCoop = 0;
+        boolean first = !entry.waitNoted;
+        entry.waitNoted = true;
+        return first;
     }
 
     /** Starts the count of {@link #seenWithoutCoop} over: the site's chunk is not loaded. */

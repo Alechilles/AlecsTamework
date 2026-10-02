@@ -109,6 +109,29 @@ public final class HytaleDirectLiveCoopScanner {
         return config != null && config.isEnabled() ? config : null;
     }
 
+    /**
+     * Whether the block at this position of a loaded chunk is a coop of any kind, managed or not:
+     * its block entity has the vanilla coop component, or its block type has a coop config
+     * (enabled or disabled). A block that cannot be told apart also counts: a placeholder for a
+     * block type whose content pack is not loaded, or a block section that cannot be read. False
+     * only for air or another known block. Read-only; call on the world thread.
+     */
+    public boolean coopBlockOfAnyKindAt(@Nonnull World world, @Nonnull Store<ChunkStore> chunkStore,
+                                        int x, int y, int z) {
+        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(x, z));
+        if (chunk == null) {
+            return false;
+        }
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
+        if (block == null || block.isUnknown() || resolveIdentifier(block.getId()) != null) {
+            return true;
+        }
+        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(x, y, z);
+        ComponentType<ChunkStore, ?> type = coopBlockComponentType();
+        return blockRef != null && type != null
+                && safeChunkComponent(chunkStore, blockRef, castComponentType(type)) != null;
+    }
+
     /** Confirms removal only when the exact coop chunk is loaded and no matching coop remains. */
     boolean confirmedRemoved(
             @Nonnull World world,

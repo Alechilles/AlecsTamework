@@ -120,6 +120,25 @@ class CoopImportedResidentsTest {
     }
 
     @Test
+    void residentsWaitWhileACoopBlockWithoutAConfigStillStands() {
+        UUID waiting = imported(0, UUID.randomUUID());
+        CoopImportedResidents imports = new CoopImportedResidents(index);
+        CoopImportedResidents.Site site = CoopImportedResidents.Site.of(WORLD, 4, 64, 9);
+
+        assertFalse(imports.seenWithoutCoop(site, 2));
+        assertTrue(imports.waitsForCoop(site), "noted once per server run");
+        assertFalse(imports.waitsForCoop(site));
+        // The block standing started the missing-coop count over.
+        assertFalse(imports.seenWithoutCoop(site, 2));
+
+        assertTrue(imports.pendingAt(WORLD, 4, 64, 9));
+        assertEquals(LocationKind.COOP, index.get(waiting).location().kind());
+        assertEquals(0L, index.get(waiting).generation());
+        // Once the config is back the coop is filled as usual.
+        assertEquals(waiting, fill(imports, null, 4).get(0).profileId());
+    }
+
+    @Test
     void residentsBeyondTheCoopCapacityAreReturnedAsOverflow() {
         UUID kept = imported(0, UUID.randomUUID());
         UUID extra = imported(1, UUID.randomUUID());
