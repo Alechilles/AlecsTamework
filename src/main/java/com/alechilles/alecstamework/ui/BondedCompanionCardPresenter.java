@@ -250,18 +250,32 @@ final class BondedCompanionCardPresenter {
             BondedCompanionStateView state
     ) {
         int maximum = positiveRoundedInt(attributes.get("maxHealth"), 100);
-        int current = state == BondedCompanionStateView.DEAD ? 0
+        // A companion that was never summoned has no recorded health. Its first body spawns at
+        // full health, so the bar is full; the role's maximum is not known without a body, so
+        // no numbers are shown.
+        boolean unrecorded = state != BondedCompanionStateView.DEAD && !healthRecorded(attributes);
+        int current = state == BondedCompanionStateView.DEAD ? 0 : unrecorded ? maximum
                 : boundedInt(attributes.get("currentHealth"), maximum,
                         percent(attributes.get("healthPercent"), maximum));
-        commands.set(entrySelector + " #BondedHealthTextShadow.Text", current + " / " + maximum);
-        commands.set(entrySelector + " #BondedHealthText.Text",
-                current + " / " + maximum);
+        String text = unrecorded ? "" : current + " / " + maximum;
+        commands.set(entrySelector + " #BondedHealthTextShadow.Text", text);
+        commands.set(entrySelector + " #BondedHealthText.Text", text);
         commands.setObject(entrySelector + " #BondedHealthFill.Anchor",
                 fixedWidthAnchor(1, 1, (int) Math.round(HEALTH_FILL_WIDTH
                         * current / maximum), 18));
         commands.set(entrySelector + " #BondedHealthFill.Visible", current > 0);
         commands.set(entrySelector + " #BondedHealthFill.Background",
                 state == BondedCompanionStateView.ACTIVE ? "#85b99a" : "#737a74");
+    }
+
+    private static boolean healthRecorded(Map<String, String> attributes) {
+        for (String key : new String[] {"maxHealth", "currentHealth", "healthPercent"}) {
+            String value = attributes.get(key);
+            if (value != null && !value.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void bindXpProgress(
@@ -486,6 +500,15 @@ final class BondedCompanionCardPresenter {
         int level = positiveRoundedInt(attributes.get("level"), 0);
         String levelingConfig = attributes.get("levelingConfigId");
         String talentConfig = attributes.get("talentConfigId");
+        if (level == 0 && (levelingConfig == null || levelingConfig.isBlank())
+                && !healthRecorded(attributes)) {
+            // Never summoned: the first body starts at level 1 when its role has leveling.
+            TwLevelingConfig roleLeveling = TwLevelingConfig.resolveForRole(roleId);
+            if (roleLeveling != null && roleLeveling.isEnabled()) {
+                level = 1;
+                levelingConfig = roleLeveling.getId();
+            }
+        }
         if (level == 0 || levelingConfig == null || levelingConfig.isBlank()) {
             return ProgressionSummary.hidden();
         }

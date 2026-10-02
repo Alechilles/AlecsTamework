@@ -40,6 +40,11 @@ public final class BondedRecords {
     /** Presentation key: the family's owned limit. Absent when the family has no owned limit. */
     public static final String OWNED_CAPACITY_LIMIT = "bonded.ownedCapacity.limit";
     /**
+     * Presentation key: the one role of a family that allows a single role, so the panel can name
+     * the family by that role's translated name. Roster families have no display name of their own.
+     */
+    public static final String FAMILY_SOLE_ROLE_ID = "bonded.family.soleRoleId";
+    /**
      * Presentation keys naming one active companion of a full family, on a stored or dead record
      * that the full family blocks: its given name, its role name key and its role id. Each is
      * absent when unknown; the viewer's language resolves them ({@link BondedCompanionNames}).
@@ -298,6 +303,9 @@ public final class BondedRecords {
         attributes.put(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT,
                 Integer.toString(policy.maximumActive()));
         attributes.put(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, familyLabel(policy.familyId()));
+        if (policy.allowedRoles().size() == 1) {
+            attributes.put(FAMILY_SOLE_ROLE_ID, policy.allowedRoles().iterator().next());
+        }
         return attributes;
     }
 

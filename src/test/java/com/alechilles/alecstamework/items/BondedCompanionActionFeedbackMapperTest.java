@@ -42,6 +42,15 @@ class BondedCompanionActionFeedbackMapperTest {
         }
     }
 
+    @Test
+    void theOwnedLimitHasItsOwnSentenceApartFromTheActiveLimit() {
+        assertNotEquals(
+                BondedCompanionActionFeedbackMapper.localizationKey(
+                        BondedCompanionActionBlockReason.CAPACITY_REACHED),
+                BondedCompanionActionFeedbackMapper.localizationKey(
+                        BondedCompanionActionBlockReason.OWNED_LIMIT_REACHED));
+    }
+
     private static List<ResultCase> resultCases() {
         return List.of(
                 result(BondedCompanionResultCode.SUCCESS, null,
@@ -64,6 +73,12 @@ class BondedCompanionActionFeedbackMapperTest {
                 result(BondedCompanionResultCode.POLICY_DENIED,
                         "bonded-transition-active_capacity_reached",
                         BondedCompanionActionBlockReason.CAPACITY_REACHED),
+                result(BondedCompanionResultCode.POLICY_DENIED,
+                        "bonded-transition-owned_capacity_reached",
+                        BondedCompanionActionBlockReason.OWNED_LIMIT_REACHED),
+                result(BondedCompanionResultCode.POLICY_DENIED,
+                        "bonded-transition-family_capacity_reached",
+                        BondedCompanionActionBlockReason.OWNED_LIMIT_REACHED),
                 result(BondedCompanionResultCode.POLICY_DENIED,
                         "bonded-transition-cooldown_active",
                         BondedCompanionActionBlockReason.COOLDOWN_ACTIVE),

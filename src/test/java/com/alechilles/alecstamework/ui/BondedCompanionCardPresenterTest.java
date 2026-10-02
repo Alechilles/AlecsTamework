@@ -376,6 +376,24 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedHealthFill.Anchor", "139");
     }
 
+    /** A provisioned or granted companion has no stats until its first summon. */
+    @Test
+    void aNeverSummonedCompanionShowsAFullHealthBarWithoutNumbers() {
+        Bound stored = bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null));
+
+        stored.assertCommand("#BondedHealthFill.Visible", "true");
+        stored.assertCommand("#BondedHealthFill.Anchor", "278");
+        assertFalse(Arrays.stream(stored.commands.getCommands()).anyMatch(command ->
+                "#Card #BondedHealthText.Text".equals(command.selector) && command.data.contains("/")));
+
+        Bound dead = bind(presentation(BondedCompanionStateView.DEAD,
+                BondedCompanionStatusPresentation.Action.REVIVE, false, Map.of(), null));
+
+        dead.assertCommand("#BondedHealthFill.Visible", "false");
+        dead.assertCommand("#BondedHealthText.Text", "0 / 100");
+    }
+
     /** The per-tick path: a running timer patches the sentence and bar and binds no input again. */
     @Test
     void liveRefreshUpdatesTheTimerAndHealthWithoutRebindingInput() {
