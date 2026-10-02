@@ -656,7 +656,7 @@ class TameworkCommandSelectionPageRefreshTest {
         packets.fail = false; refresh(page, true);
         assertEquals(2, packets.attempts);
         assertEquals(1, packets.updates.size());
-        assertCommand(packets.updates.getFirst(), "#TameworkLinkedPanelList[0] #BondedLevelText.Text");
+        assertCommand(packets.updates.getFirst(), "#TameworkLinkedPanelList[0] #BondedSubtitle.Text");
     }
 
     @Test
@@ -667,7 +667,7 @@ class TameworkCommandSelectionPageRefreshTest {
         TameworkCommandSelectionPage page = page(packets, feature);
         build(page); feature.set(feature(5, true)); refresh(page, true);
         CapturedUpdate update = packets.updates.getFirst();
-        assertCommand(update, "#TameworkLinkedPanelList[0] #BondedLevelText.Text");
+        assertCommand(update, "#TameworkLinkedPanelList[0] #BondedSubtitle.Text");
         assertEquals(0, update.events.getEvents().length,
                 "An unrelated refresh must preserve the existing input handlers.");
         assertFalse(java.util.Arrays.stream(update.commands.getCommands()).anyMatch(command ->
@@ -697,7 +697,7 @@ class TameworkCommandSelectionPageRefreshTest {
 
         CapturedUpdate update = packets.updates.getFirst();
         assertCommand(update,
-                "#TameworkLinkedPanelList[0] #BondedFlightModeAirborneIcon.Visible");
+                "#TameworkLinkedPanelList[0] #BondedFlightToggleButton.Style");
         assertEquals(0, update.events.getEvents().length,
                 "Flight feedback must preserve the existing input handlers.");
     }
@@ -901,7 +901,7 @@ class TameworkCommandSelectionPageRefreshTest {
                 BsonDocument.parse(cancel.data), new com.hypixel.hytale.codec.ExtraInfo()));
         refresh(page, true);
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedUnlinkConfirmButton.Visible", "false");
-        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedPrimaryActionNoTooltip.Visible", "true");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedPrimaryAction.Visible", "true");
         page.onDismiss(null, null);
     }
 

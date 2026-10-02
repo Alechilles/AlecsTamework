@@ -101,7 +101,7 @@ Group #BondedRosterModeTabs { Anchor: (Top: 0, Left: 0, Width: 284, Height: 30);
     TextButton #BondedRosterStored { Anchor: (Left: 144, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.stored; Style: $A.@PanelButton; }
     TextButton #BondedRosterDead { Anchor: (Left: 216, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.dead; Style: $A.@PanelButton; }
 }
-Label #BondedRosterCapacity { Anchor: (Top: 0, Right: 0, Width: 180, Height: 28); Visible: false; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+Label #BondedRosterCapacity { Anchor: (Top: 0, Right: 0, Width: 216, Height: 28); Visible: false; Style: (FontSize: 11, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
 
 
 Group #TameworkLinkedPanelControlsSecondary {

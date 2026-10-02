@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +93,11 @@ final class BondedCompanionPanelChrome {
         }).toArray(LinkedNpcEntry[]::new);
     }
 
+    /**
+     * The header capacity line: the family's active and owned counts against their limits. A part
+     * whose limit is unlimited carries no count and is left out. One family shows its line; several
+     * families show one labelled line each.
+     */
     static String capacityText(Map<UUID, CommandPanelFeaturePresentation> features, String language) {
         // Capacity belongs to a policy family, not to the currently filtered rows.
         Map<String, String> capacities = new TreeMap<>();
@@ -100,10 +106,22 @@ final class BondedCompanionPanelChrome {
             Map<String, String> attributes = feature.bonded().attributes();
             String count = attributes.get(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT);
             String limit = attributes.get(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT);
+            String owned = attributes.get(BondedRecords.OWNED_CAPACITY_COUNT);
+            String ownedLimit = attributes.get(BondedRecords.OWNED_CAPACITY_LIMIT);
             String label = attributes.getOrDefault(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, "");
-            if (count == null || limit == null) continue;
-            capacities.put(label, LocalizedText.format(language, "tamework.ui.roster.activeCapacity", count,
-                    "0".equals(limit) ? "∞" : limit));
+            boolean active = count != null && limit != null;
+            boolean ownedKnown = owned != null && ownedLimit != null;
+            if (active) limit = "0".equals(limit) ? "∞" : limit;
+            if (active && ownedKnown) {
+                capacities.put(label, LocalizedText.format(language, "tamework.ui.roster.activeOwnedCapacity",
+                        count, limit, owned, ownedLimit));
+            } else if (active) {
+                capacities.put(label, LocalizedText.format(language, "tamework.ui.roster.activeCapacity",
+                        count, limit));
+            } else if (ownedKnown) {
+                capacities.put(label, LocalizedText.format(language, "tamework.ui.roster.ownedCapacity",
+                        owned, ownedLimit));
+            }
         }
         if (capacities.size() == 1) return capacities.values().iterator().next();
         return capacities.entrySet().stream().map(entry -> entry.getKey() + ": " + entry.getValue())

@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.Map;
 import java.util.UUID;
 
@@ -42,6 +44,29 @@ class BondedCompanionPanelChromeTest {
         assertArrayEquals(entries, BondedCompanionPanelChrome.filter(entries, features, "All"));
         // Two active companions count against policy even though only one active row is listed here.
         assertEquals("Active 2 / 3", BondedCompanionPanelChrome.capacityText(features, "en-US"));
+    }
+
+    @Test
+    void headerShowsActiveAndOwnedCountsAndLeavesOutAnUnlimitedPart() {
+        Map<String, String> active = Map.of("bonded.activeCapacity.count", "1", "bonded.activeCapacity.limit", "1");
+        Map<String, String> owned = Map.of(BondedRecords.OWNED_CAPACITY_COUNT, "4",
+                BondedRecords.OWNED_CAPACITY_LIMIT, "6");
+        java.util.HashMap<String, String> both = new java.util.HashMap<>(active);
+        both.putAll(owned);
+
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.activeOwnedCapacity", "1", "1", "4", "6"),
+                BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(both)), "en-US"));
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.ownedCapacity", "4", "6"),
+                BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(owned)), "en-US"));
+        assertEquals("", BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(Map.of())),
+                "en-US"));
+    }
+
+    private static CommandPanelFeaturePresentation feature(Map<String, String> attributes) {
+        return CommandPanelFeaturePresentation.bonded(new BondedCompanionPanelPresentation(
+                "profile", "roster", "Wolf", 1L, "Wolf", "Wolf", null, null, attributes, Map.of(),
+                new BondedCompanionStatusPresentation(BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.NONE, false, null, null, 0L), null));
     }
 
     private static LinkedNpcEntry entry(UUID id) {

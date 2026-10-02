@@ -71,7 +71,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
     ) {
         BondedCompanionCardPresenter.refreshDynamicState(
                 commands, selector, previous == null ? null : previous.bonded(),
-                current.bonded(), language);
+                current.bonded(), pendingUnlink, language);
         BondedCompanionCardPresenter.refreshProgressionState(
                 commands, selector, current.bonded(), pendingUnlink, language);
     }

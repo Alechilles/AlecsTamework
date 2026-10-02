@@ -196,4 +196,27 @@ class BondedRecordsTest {
                 "a revived companion comes back active");
         assertTrue(view(dead, List.of(live, dead), dragons(2, ALL), 0L).reviveAvailable());
     }
+
+    /** The panel header and the "dismiss first" sentence read these entries. */
+    @Test
+    void aBlockedCompanionOfAFullFamilyCarriesTheOwnedCountsAndTheActiveCompanionsName() {
+        BondedCompanionPolicy limited = new BondedCompanionPolicy(7L, ROSTER, "hydragon:fire_dragon",
+                Set.of(DRAGON), 5, 1, 600L, 30L, 120L, null, null, null, ALL);
+        CompanionRecord live = bonded(DRAGON, CompanionLocation.live("world-a", 0, 0, 0)).displayName("Blaze").build();
+        CompanionRecord stored = bonded(DRAGON, CompanionLocation.stored(StoredReason.BONDED)).build();
+        List<CompanionRecord> mine = List.of(stored, live);
+
+        Map<String, String> blocked = view(stored, mine, limited, 0L).snapshotPresentationData();
+        Map<String, String> active = view(live, mine, limited, 0L).snapshotPresentationData();
+
+        assertEquals("2", blocked.get(BondedRecords.OWNED_CAPACITY_COUNT));
+        assertEquals("5", blocked.get(BondedRecords.OWNED_CAPACITY_LIMIT));
+        assertEquals("Blaze", blocked.get(BondedRecords.ACTIVE_BLOCKER_NAME));
+        assertEquals(DRAGON, blocked.get(BondedRecords.ACTIVE_BLOCKER_ROLE_ID));
+        assertFalse(active.containsKey(BondedRecords.ACTIVE_BLOCKER_NAME), "an active companion is not blocked");
+        // A family without an owned limit, or with a free active place, carries neither.
+        Map<String, String> free = view(stored, List.of(stored), dragons(1, ALL), 0L).snapshotPresentationData();
+        assertFalse(free.containsKey(BondedRecords.OWNED_CAPACITY_COUNT));
+        assertFalse(free.containsKey(BondedRecords.ACTIVE_BLOCKER_ROLE_ID));
+    }
 }

@@ -35,6 +35,18 @@ public final class BondedRecords {
     public static final String UNRESOLVED_FAMILY_ID = "tamework:unresolved";
     /** Presentation key: the full length of the cooldown a stored or dead companion waits on. */
     public static final String COOLDOWN_DURATION_MS = "cooldownDurationMs";
+    /** Presentation key: how many companions of the family the owner owns. Present with {@link #OWNED_CAPACITY_LIMIT}. */
+    public static final String OWNED_CAPACITY_COUNT = "bonded.ownedCapacity.count";
+    /** Presentation key: the family's owned limit. Absent when the family has no owned limit. */
+    public static final String OWNED_CAPACITY_LIMIT = "bonded.ownedCapacity.limit";
+    /**
+     * Presentation keys naming one active companion of a full family, on a stored or dead record
+     * that the full family blocks: its given name, its role name key and its role id. Each is
+     * absent when unknown; the viewer's language resolves them ({@link BondedCompanionNames}).
+     */
+    public static final String ACTIVE_BLOCKER_NAME = "bonded.activeCapacity.blockerName";
+    public static final String ACTIVE_BLOCKER_NAME_KEY = "bonded.activeCapacity.blockerNameKey";
+    public static final String ACTIVE_BLOCKER_ROLE_ID = "bonded.activeCapacity.blockerRoleId";
     /** {@code roleId} of a listed record whose stored role id is blank; it resolves to no family. */
     public static final String UNKNOWN_ROLE_ID = "unknown";
     /** Tamework's own extension namespace. Public callers may not read or write it. */
@@ -145,6 +157,31 @@ public final class BondedRecords {
         return n;
     }
 
+    /** The family's owned and active counts and its first active record, from one pass over the owner's records. */
+    private record FamilyCounts(int owned, int active, @Nullable CompanionRecord firstActive) {
+        private static final FamilyCounts NONE = new FamilyCounts(0, 0, null);
+    }
+
+    private static FamilyCounts familyCounts(Collection<CompanionRecord> ownerRecords, BondedCompanionPolicy family,
+                                             Families families) {
+        int owned = 0;
+        int active = 0;
+        CompanionRecord firstActive = null;
+        for (CompanionRecord record : ownerRecords) {
+            if (!inFamily(record, family, families)) {
+                continue;
+            }
+            owned++;
+            if (record.isDeployed()) {
+                active++;
+                if (firstActive == null) {
+                    firstActive = record;
+                }
+            }
+        }
+        return new FamilyCounts(owned, active, firstActive);
+    }
+
     /**
      * The public view of a bonded record, or null when {@link #state} is null.
      *
@@ -168,7 +205,8 @@ public final class BondedRecords {
             return null;
         }
         BondedCompanionPolicy policy = policy(record, families);
-        int active = policy == null ? 0 : activeCount(ownerRecords, policy, families);
+        FamilyCounts counts = policy == null ? FamilyCounts.NONE : familyCounts(ownerRecords, policy, families);
+        int active = counts.active();
         boolean activePlace = policy != null && (policy.maximumActive() == 0 || active < policy.maximumActive());
         boolean summon = policy != null && state == BondedCompanionStateView.STORED && policy.features().summon()
                 && passed(record.summonCooldownUntilMs(), nowMs) && activePlace;
@@ -178,6 +216,16 @@ public final class BondedRecords {
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         if (policy != null) {
             presentation.putAll(capacityAttributes(policy, active));
+            if (policy.maximumOwned() > 0) {
+                presentation.put(OWNED_CAPACITY_COUNT, Integer.toString(counts.owned()));
+                presentation.put(OWNED_CAPACITY_LIMIT, Integer.toString(policy.maximumOwned()));
+            }
+            CompanionRecord blocker = counts.firstActive();
+            if (!activePlace && state != BondedCompanionStateView.ACTIVE && blocker != null) {
+                putIfText(presentation, ACTIVE_BLOCKER_NAME, blocker.displayName());
+                putIfText(presentation, ACTIVE_BLOCKER_NAME_KEY, blocker.summary().nameKey());
+                putIfText(presentation, ACTIVE_BLOCKER_ROLE_ID, blocker.roleId());
+            }
             if (state != BondedCompanionStateView.ACTIVE) {
                 long seconds = state == BondedCompanionStateView.DEAD
                         ? policy.reviveCooldownSeconds() : policy.summonCooldownSeconds();
@@ -251,6 +299,12 @@ public final class BondedRecords {
                 Integer.toString(policy.maximumActive()));
         attributes.put(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, familyLabel(policy.familyId()));
         return attributes;
+    }
+
+    private static void putIfText(Map<String, String> target, String key, @Nullable String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value.trim());
+        }
     }
 
     /** {@code hydragon:mini_wyvern} reads "Mini Wyvern", as in 4.x. */

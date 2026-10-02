@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
-import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Value;
@@ -36,22 +35,14 @@ final class LinkedNpcPanelFeatureBinder {
         String summonSelector = entrySelector + " #RosterSummonButton";
         String dismissSelector =
                 entrySelector + " #RosterDismissButton";
-        boolean visible = row != null && (row.roster() != null || row.bonded() != null);
+        // Bonded rows render on their own card (BondedCompanionCardPresenter), never here.
+        boolean visible = row != null && row.roster() != null;
         if (!visible) {
             builder.set(stateSelector + ".Visible", false);
             builder.set(timerSelector + ".Visible", false);
             builder.set(capacitySelector + ".Visible", false);
             builder.set(summonSelector + ".Visible", false);
             builder.set(dismissSelector + ".Visible", false);
-            return;
-        }
-        if (row.bonded() != null) {
-            builder.set(stateSelector + ".Visible", true);
-            builder.set(timerSelector + ".Visible", true);
-            builder.set(capacitySelector + ".Visible", true);
-            bindBonded(builder, events, npcUuid, row.bonded(), config,
-                    stateSelector, timerSelector, capacitySelector,
-                    summonSelector, dismissSelector, language);
             return;
         }
         CommandRosterStatusPresentation roster = row.roster();
@@ -113,36 +104,6 @@ final class LinkedNpcPanelFeatureBinder {
                                 && row.revival().actionVisible());
     }
 
-    private static void bindBonded(
-            UICommandBuilder builder, UIEventBuilder events, UUID cardUuid,
-            BondedCompanionPanelPresentation row,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            String stateSelector, String detailSelector, String reasonSelector,
-            String summonSelector, String dismissSelector, String language) {
-        BondedCompanionStatusPresentation status = row.status();
-        builder.set(stateSelector + ".Text", bondedStateText(status, language));
-        builder.set(detailSelector + ".Text", bondedDetailText(row, language));
-        builder.set(reasonSelector + ".Text", status.blockReason() == null
-                ? "" : BondedCompanionActionFeedbackMapper.resolve(
-                        language, status.blockReason()));
-        boolean summon = status.action()
-                == BondedCompanionStatusPresentation.Action.SUMMON;
-        boolean dismiss = status.action()
-                == BondedCompanionStatusPresentation.Action.DISMISS;
-        builder.set(summonSelector + ".Visible", summon && status.actionEnabled());
-        builder.set(dismissSelector + ".Visible", dismiss);
-        if (summon && status.actionEnabled()) {
-            events.addEventBinding(CustomUIEventBindingType.Activating,
-                    summonSelector, EventData.of(config.eventCommandId(),
-                            config.summonCommandPrefix() + cardUuid), false);
-        }
-        if (dismiss && status.actionEnabled()) {
-            events.addEventBinding(CustomUIEventBindingType.Activating,
-                    dismissSelector, EventData.of(config.eventCommandId(),
-                            config.dismissCommandPrefix() + cardUuid), false);
-        }
-    }
-
     /** The state caption of a bonded row, in the viewer's language; the roster state texts are shared. */
     static String bondedStateText(BondedCompanionStatusPresentation status, String language) {
         return LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state." + switch (status.state()) {
@@ -150,44 +111,6 @@ final class LinkedNpcPanelFeatureBinder {
             case ACTIVE -> "active";
             case DEAD -> "dead";
         });
-    }
-
-    /**
-     * The detail line of a bonded row for the viewer: species, role presentation, level and
-     * health. Every other attribute is either shown elsewhere on the card or is an internal key,
-     * and extension values are other mods' data, so none of them is printed.
-     */
-    static String bondedDetailText(BondedCompanionPanelPresentation row, String language) {
-        java.util.ArrayList<String> details = new java.util.ArrayList<>();
-        if (row.species() != null) details.add(row.species());
-        if (row.rolePresentation() != null
-                && !row.rolePresentation().equalsIgnoreCase(row.species())) {
-            details.add(row.rolePresentation());
-        }
-        Long level = wholeNumber(row.attributes().get("level"));
-        if (level != null) {
-            details.add(LocalizedText.format(language, "tamework.ui.talents.requirement.level", level));
-        }
-        Long health = wholeNumber(row.attributes().get("currentHealth"));
-        Long maxHealth = wholeNumber(row.attributes().get("maxHealth"));
-        if (health != null && maxHealth != null && maxHealth > 0L) {
-            details.add(LocalizedText.format(language, "tamework.ui.commandTargetHud.health.value", health, maxHealth));
-        }
-        return String.join(" | ", details);
-    }
-
-    /** A presentation value rounded to a whole number; null when it is absent or not a number. */
-    @Nullable
-    private static Long wholeNumber(@Nullable String value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            double parsed = Double.parseDouble(value.trim());
-            return Double.isFinite(parsed) ? Math.round(parsed) : null;
-        } catch (NumberFormatException notANumber) {
-            return null;
-        }
     }
 
     private static String stateText(

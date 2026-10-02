@@ -73,35 +73,6 @@ class BondedCompanionPanelFeatureBinderTest {
     }
 
     @Test
-    void detailLineShowsSpeciesRoleLevelAndHealthAndNoInternalKeys() {
-        BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
-                "profile-7", "hydragon:dragons",
-                "Bonded_Miniwyvern_Storm", 4L, "Nimbus",
-                "Miniwyvern", "Male", "Storm Miniwyvern",
-                Map.of("level", "7", "currentHealth", "63.4", "maxHealth", "100.0",
-                        "levelingConfigId", "hydragon:leveling", "bonded.activeCapacity.count", "1"),
-                Map.of("hydragon:bond",
-                        "{\"archetype\":\"storm\",\"ability\":\"dash\"}"),
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON,
-                        true, null, 0L), null);
-
-        String detail = LinkedNpcPanelFeatureBinder.bondedDetailText(row, "en-US");
-
-        assertTrue(detail.contains("Miniwyvern"));
-        assertTrue(detail.contains("Storm Miniwyvern"));
-        assertTrue(detail.contains("7"), detail);
-        assertTrue(detail.contains("63") && detail.contains("100"), detail);
-        // Raw attribute keys, config ids, role ids and other mods' extension data stay off the card.
-        assertFalse(detail.contains("level:"), detail);
-        assertFalse(detail.contains("hydragon:leveling"), detail);
-        assertFalse(detail.contains("activeCapacity"), detail);
-        assertFalse(detail.contains("archetype"), detail);
-        assertFalse(detail.contains("Bonded_Miniwyvern_Storm"));
-    }
-
-    @Test
     void deadBondedCardUsesPaidReviveWithoutLegacyLinkFallback() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons",

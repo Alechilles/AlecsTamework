@@ -1,303 +1,198 @@
 package com.alechilles.alecstamework.ui;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
-import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
+import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
+import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
-/** Regression coverage for the dedicated final bonded-companion card states. */
+/** Behavior of the bonded companion card: what each state says, shows and lets the player do. */
 class BondedCompanionCardPresenterTest {
-    @Test
-    void activeCardKeepsTheDismissActionWithoutPersistentNeedsMeters() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS,
-                true,
-                Map.of(
-                        "currentHealth", "320.0",
-                        "maxHealth", "400.0",
-                        "happiness", "0.80",
-                        "level", "12",
-                        "levelingConfigId", "TwLevelingDefault",
-                        "talentConfigId", "TwTalentsExample",
-                        "talentSpentPoints", "3"
-                ),
-                null
-        );
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(
-                commands, new UIEventBuilder(), "#Card", UUID.randomUUID(),
-                row, false, bindingConfig(), "en-US"
-        );
-
-        assertCommand(commands, "#Card #BondedStateInWorld.Text", "IN WORLD");
-        assertCommand(commands, "#Card #BondedStateDetail.Text", "SUMMONED");
-        assertCommand(commands, "#Card #BondedStateDetailValue.Text", "AT YOUR SIDE");
-        assertCommand(commands, "#Card #BondedActionLabel.Text", "DISMISS");
-        assertCommand(commands, "#Card #BondedHealthText.Text", "320 / 400");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> command.selector.contains("BondedMetric")),
-                "Temporary roster summons must not render persisted needs meters.");
-        assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
-        assertCommand(commands, "#Card #BondedLevelText.Text", "Lv. 12");
-        assertCommand(commands, "#Card #BondedProgressionButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedProgressionButton.TooltipText",
-                "Level: 12");
-    }
+    private static final String LANGUAGE = "en-US";
+    private static final String STATUS = "tamework.ui.linkedPanel.bonded.status.";
+    private static final Map<String, String> FULL_FAMILY = Map.of(
+            BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT, "1",
+            BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT, "1",
+            BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, "Full Dragons");
 
     @Test
-    void activeAvailableFlightToggleShowsTheGroundedIconAndFlightTooltip() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS,
-                true, Map.of(
-                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
-                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "false"),
-                null);
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightGrounded");
-        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "false");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
-                "Switch to flight");
-    }
-
-    @Test
-    void activeAvailableFlightToggleShowsTheAirborneIconAndGroundTooltip() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS,
-                true, Map.of(
-                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
-                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"),
-                null);
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightAirborne");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
-                "Switch to ground");
-    }
-
-    @Test
-    void flightToggleHidesForStoredDeadDisabledAndUnreadableRows() {
-        for (BondedCompanionPanelPresentation row : List.of(
-                presentation(BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON, true,
-                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
-                presentation(BondedCompanionStateView.DEAD,
-                        BondedCompanionStatusPresentation.Action.REVIVE, true,
-                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
-                presentation(BondedCompanionStateView.ACTIVE,
-                        BondedCompanionStatusPresentation.Action.DISMISS, true,
-                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "false"), null),
-                presentation(BondedCompanionStateView.ACTIVE,
-                        BondedCompanionStatusPresentation.Action.DISMISS, true,
-                        Map.of(), null))) {
-            UICommandBuilder commands = new UICommandBuilder();
-            BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                    "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-            assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "false");
-            assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
-            assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "false");
-        }
-    }
-
-    @Test
-    void dynamicRefreshUpdatesFlightToggleWithoutRecreatingTheCard() {
-        UICommandBuilder commands = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, presentation(
-                BondedCompanionStateView.ACTIVE,
+    void activeTimedSessionShowsTheTimeLeftAGreenBarAndDismiss() {
+        Bound card = bind(presentation(BondedCompanionStateView.ACTIVE,
                 BondedCompanionStatusPresentation.Action.DISMISS, true,
-                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
-                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"), null), "en-US");
+                Map.of("sessionDurationMs", "80000", "sessionRemainingMs", "40000",
+                        "currentHealth", "320.0", "maxHealth", "400.0"), null));
 
-        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightAirborne");
-        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
-                "Switch to ground");
+        card.assertTone(BondedCompanionStateView.ACTIVE);
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "sessionEndsIn", "0:40"), false);
+        card.assertCommand("#BondedTimerFrame.Visible", "true");
+        card.assertCommand("#BondedTimerFillSession.Visible", "true");
+        card.assertCommand("#BondedTimerFillSession.Anchor", "135");
+        card.assertCommand("#BondedTimerFillCooldown.Visible", "false");
+        card.assertCommand("#BondedHealthText.Text", "320 / 400");
+        card.assertPrimaryAction("dismiss:");
     }
 
     @Test
-    void liveRefreshPreservesFlightInputWhileHealthChangesAndUpdatesFlightFeedback() {
-        UUID cardUuid = UUID.randomUUID();
-        BondedCompanionPanelPresentation eligible = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS, true,
-                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
-                        "currentHealth", "100", "maxHealth", "100"),
-                null);
-        for (boolean airborne : new boolean[] {false, true}) {
-            BondedCompanionPanelPresentation current = presentation(
-                    BondedCompanionStateView.ACTIVE,
-                    BondedCompanionStatusPresentation.Action.DISMISS, true,
-                    Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
-                            BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE,
-                            Boolean.toString(airborne), "currentHealth", "90", "maxHealth", "100"), null);
-            UICommandBuilder commands = new UICommandBuilder();
-            UIEventBuilder events = new UIEventBuilder();
-            LinkedNpcPanelCardDynamicPresenter.refresh(commands, events, "#Card", cardUuid,
-                    null, null, CommandPanelFeaturePresentation.bonded(eligible),
-                    CommandPanelFeaturePresentation.bonded(current), false, bindingConfig(), "en-US");
+    void activeUntimedCompanionShowsNoTimer() {
+        Bound card = bind(presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(), null));
 
-            assertCommand(commands, "#Card #BondedHealthText.Text", "90 / 100");
-            assertTrue(events.getEvents().length == 0,
-                    "Live patches must preserve existing input handlers.");
-            if (airborne) {
-                assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText", "Switch to ground");
-            } else {
-                assertFalse(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
-                                command.selector.contains("#BondedFlight")),
-                        "Health updates must leave the flight control untouched.");
-            }
-        }
+        card.assertStatus(LocalizedText.resolve(LANGUAGE, STATUS + "active"), false);
+        card.assertCommand("#BondedTimerFrame.Visible", "false");
+        card.assertPrimaryAction("dismiss:");
+    }
+
+    /** Dismiss is absent when it is not possible, and the status line says why. */
+    @Test
+    void activeCompanionInAnotherWorldHasNoDismissAndSaysWhy() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.ACTIVE, BondedCompanionStatusPresentation.Action.DISMISS,
+                false, BondedCompanionActionBlockReason.WORLD_UNAVAILABLE, null, 0L), Map.of(), null));
+
+        card.assertStatus(BondedCompanionActionFeedbackMapper.resolve(LANGUAGE,
+                BondedCompanionActionBlockReason.WORLD_UNAVAILABLE), true);
+        card.assertNoPrimaryAction();
     }
 
     @Test
-    void storedCooldownDoesNotClaimTheCompanionIsReadyToSummon() {
-        BondedCompanionPanelPresentation row = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON,
-                        false, BondedCompanionActionBlockReason.COOLDOWN_ACTIVE,
-                        null, 60_000L), Map.of(), null);
-        UICommandBuilder commands = new UICommandBuilder();
+    void storedCompanionThatCanBeSummonedSaysSoAndOffersSummon() {
+        Bound card = bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null));
 
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedStateStored.Text", "STORED");
-        assertCommand(commands, "#Card #BondedStateDetail.Text", "SUMMON AVAILABLE IN");
-        assertCommand(commands, "#Card #BondedStateDetailValue.Text", "1m");
+        card.assertTone(BondedCompanionStateView.STORED);
+        card.assertStatus(LocalizedText.resolve(LANGUAGE, STATUS + "readyToSummon"), false);
+        card.assertCommand("#BondedTimerFrame.Visible", "false");
+        card.assertCommand("#BondedPortraitDim.Visible", "false");
+        card.assertPrimaryAction("summon:");
     }
 
     /** Summon is hidden, not shown disabled, until a summon is possible. */
     @Test
-    void summonIsHiddenWhileTheFamilyIsFullOrOnCooldownAndTheCooldownBarStays() {
-        BondedCompanionPanelPresentation full = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON,
-                        false, BondedCompanionActionBlockReason.CAPACITY_REACHED,
-                        null, 0L),
-                Map.of(
-                        "bonded.activeCapacity.count", "1",
-                        "bonded.activeCapacity.limit", "1",
-                        "bonded.activeCapacity.label", "Full Dragons"
-                ), null);
-        BondedCompanionPanelPresentation cooling = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON,
-                        false, BondedCompanionActionBlockReason.COOLDOWN_ACTIVE,
-                        null, 40_000L),
-                Map.of("cooldownDurationMs", "80000"), null);
+    void storedCooldownShowsTheWaitAsAWarningWithAnAmberBarAndNoSummon() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.STORED, BondedCompanionStatusPresentation.Action.SUMMON,
+                        false, BondedCompanionActionBlockReason.COOLDOWN_ACTIVE, null, 40_000L),
+                Map.of(BondedRecords.COOLDOWN_DURATION_MS, "80000"), null));
 
-        for (BondedCompanionPanelPresentation row : List.of(full, cooling)) {
-            UICommandBuilder commands = new UICommandBuilder();
-            UIEventBuilder events = new UIEventBuilder();
-            UUID cardUuid = UUID.randomUUID();
-            BondedCompanionCardPresenter.bind(commands, events,
-                    "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "summonIn", "0:40"), true);
+        card.assertCommand("#BondedTimerFrame.Visible", "true");
+        card.assertCommand("#BondedTimerFillCooldown.Visible", "true");
+        card.assertCommand("#BondedTimerFillCooldown.Anchor", "135");
+        card.assertCommand("#BondedTimerFillSession.Visible", "false");
+        card.assertNoPrimaryAction();
+    }
 
-            for (String button : List.of("#BondedPrimaryAction", "#BondedPrimaryActionNoTooltip",
-                    "#BondedPrimaryActionDisabled", "#BondedPrimaryActionDisabledNoTooltip",
-                    "#BondedActionContent")) {
-                assertCommand(commands, "#Card " + button + ".Visible", "false");
-            }
-            assertFalse(java.util.Arrays.stream(events.getEvents())
-                    .anyMatch(event -> event.data.contains("summon:" + cardUuid)));
-        }
-        UICommandBuilder commands = new UICommandBuilder();
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), cooling, false, bindingConfig(), "en-US");
-        assertCommand(commands, "#Card #BondedSessionFrame.Visible", "true");
-        assertCommand(commands, "#Card #BondedSessionFill.Visible", "true");
+    @Test
+    void storedCompanionOfAFullFamilyNamesTheActiveCompanionToDismiss() {
+        java.util.HashMap<String, String> attributes = new java.util.HashMap<>(FULL_FAMILY);
+        attributes.put(BondedRecords.ACTIVE_BLOCKER_NAME, "Ember");
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.STORED, BondedCompanionStatusPresentation.Action.SUMMON,
+                false, BondedCompanionActionBlockReason.CAPACITY_REACHED, null, 0L), attributes, null));
+
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "dismissFirst", "Ember", 1, 1), true);
+        card.assertNoPrimaryAction();
+    }
+
+    @Test
+    void fullFamilyWithNoKnownActiveCompanionGivesTheCounts() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.STORED, BondedCompanionStatusPresentation.Action.SUMMON,
+                false, BondedCompanionActionBlockReason.CAPACITY_REACHED, null, 0L), FULL_FAMILY, null));
+
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "familyFull", 1, 1), true);
+        card.assertNoPrimaryAction();
+    }
+
+    @Test
+    void storedCompanionBlockedForAnotherReasonShowsThatReason() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                BondedCompanionStateView.STORED, BondedCompanionStatusPresentation.Action.SUMMON,
+                false, BondedCompanionActionBlockReason.PLACEMENT_UNAVAILABLE, null, 0L), Map.of(), null));
+
+        card.assertStatus(BondedCompanionActionFeedbackMapper.resolve(LANGUAGE,
+                BondedCompanionActionBlockReason.PLACEMENT_UNAVAILABLE), true);
+        card.assertNoPrimaryAction();
+    }
+
+    @Test
+    void deadCompanionThatCanBeRevivedShowsTheCostAndOffersRevive() {
+        Bound card = bind(presentation(BondedCompanionStateView.DEAD,
+                BondedCompanionStatusPresentation.Action.REVIVE, true,
+                Map.of("currentHealth", "320", "maxHealth", "400"), quote(0L,
+                        new BondedCompanionReviveQuote.CostLine("Ingredient_Life_Essence", 2, 2),
+                        new BondedCompanionReviveQuote.CostLine("Ingredient_Amber", 4, 9))));
+
+        card.assertTone(BondedCompanionStateView.DEAD);
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "reviveCost.many", 6), false);
+        card.assertCommand("#BondedStatusSecondary.Visible", "false");
+        card.assertCommand("#BondedPortraitDim.Visible", "true");
+        card.assertCommand("#BondedHealthText.Text", "0 / 400");
+        card.assertCommand("#BondedHealthFill.Visible", "false");
+        card.assertPrimaryAction("respawn:");
     }
 
     /** The cost page shows what is missing, so Revive opens it even when the player cannot pay. */
     @Test
-    void reviveStaysClickableWhenOnlyTheCostItemsAreMissing() {
-        BondedCompanionPanelPresentation row = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.DEAD,
-                        BondedCompanionStatusPresentation.Action.REVIVE,
-                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE,
-                        null, 0L), Map.of(), new BondedCompanionReviveQuote(
-                        "profile-7", true, List.of(
-                        new BondedCompanionReviveQuote.CostLine(
-                                "Ingredient_Life_Essence", 2, 1)), 0L, 4L));
-        UICommandBuilder commands = new UICommandBuilder();
-        UIEventBuilder events = new UIEventBuilder();
-        UUID cardUuid = UUID.randomUUID();
+    void deadCompanionWithMissingCostItemsKeepsReviveAndNamesTheShortfall() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.DEAD, BondedCompanionStatusPresentation.Action.REVIVE,
+                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE, null, 0L), Map.of(),
+                quote(0L, new BondedCompanionReviveQuote.CostLine("Ingredient_Life_Essence", 2, 1))));
 
-        BondedCompanionCardPresenter.bind(commands, events,
-                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "reviveCost.many", 2), false);
+        card.assertCommand("#BondedStatusSecondary.Visible", "true");
+        card.assertCommand("#BondedStatusSecondary.Text",
+                LocalizedText.format(LANGUAGE, STATUS + "missingItems.one", 1));
+        card.assertPrimaryAction("respawn:");
+    }
 
-        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "true");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "false");
-        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(event ->
-                        "#Card #BondedPrimaryAction".equals(event.selector)
-                                && event.data.contains("respawn:" + cardUuid)),
-                "Revive must open the cost page.");
+    @Test
+    void deadCompanionOnReviveCooldownShowsTheWaitWithAnAmberBarAndNoRevive() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.DEAD, BondedCompanionStatusPresentation.Action.REVIVE,
+                        false, BondedCompanionActionBlockReason.COOLDOWN_ACTIVE, null, 0L),
+                Map.of(BondedRecords.COOLDOWN_DURATION_MS, "544000"),
+                quote(272L, new BondedCompanionReviveQuote.CostLine("Ingredient_Life_Essence", 2, 2))));
+
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "reviveIn", "4:32"), false);
+        card.assertCommand("#BondedTimerFillCooldown.Visible", "true");
+        card.assertCommand("#BondedTimerFillCooldown.Anchor", "135");
+        card.assertNoPrimaryAction();
     }
 
     /** A full family blocks a revive too; the cost page could not explain that. */
     @Test
-    void reviveBlockedByAFullFamilyStaysDisabledAndSaysWhy() {
-        BondedCompanionPanelPresentation row = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.DEAD,
-                        BondedCompanionStatusPresentation.Action.REVIVE,
-                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE,
-                        null, 0L),
-                Map.of(
-                        "bonded.activeCapacity.count", "1",
-                        "bonded.activeCapacity.limit", "1",
-                        "bonded.activeCapacity.label", "Full Dragons"
-                ), new BondedCompanionReviveQuote(
-                        "profile-7", true, List.of(
-                        new BondedCompanionReviveQuote.CostLine(
-                                "Ingredient_Life_Essence", 2, 1)), 0L, 4L));
-        UICommandBuilder commands = new UICommandBuilder();
-        UIEventBuilder events = new UIEventBuilder();
-        UUID cardUuid = UUID.randomUUID();
+    void deadCompanionOfAFullFamilyHasNoReviveAndSaysWhy() {
+        Bound card = bind(presentation(new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.DEAD, BondedCompanionStatusPresentation.Action.REVIVE,
+                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE, null, 0L), FULL_FAMILY,
+                quote(0L, new BondedCompanionReviveQuote.CostLine("Ingredient_Life_Essence", 2, 1))));
 
-        BondedCompanionCardPresenter.bind(commands, events,
-                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+        card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "familyFull", 1, 1), true);
+        card.assertNoPrimaryAction();
+    }
 
-        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText", "(1/1)");
-        assertFalse(java.util.Arrays.stream(events.getEvents())
-                .anyMatch(event -> event.data.contains("respawn:" + cardUuid)));
+    @Test
+    void timesUnderAnHourReadAsMinutesAndSecondsAndLongerTimesKeepTheSharedFormat() {
+        assertEquals("0:05", BondedCompanionCardStatePresentation.clock(4_200L, LANGUAGE));
+        assertEquals("59:59", BondedCompanionCardStatePresentation.clock(3_599_000L, LANGUAGE));
+        assertEquals(LinkedNpcPanelStatusTextService.formatRemainingTime(5_400_000L, LANGUAGE),
+                BondedCompanionCardStatePresentation.clock(5_400_000L, LANGUAGE));
     }
 
     /** A captured companion has no stored name or species; its role name key names it. */
@@ -309,7 +204,7 @@ class BondedCompanionCardPresenterTest {
             String roleName = LocalizedText.resolve(language, nameKey);
             BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                     "profile-7", "hydragon:dragons", "Tamed_RockDrakeT1", 4L,
-                    null, null, null, null,
+                    null, null, "Female", null,
                     Map.of(BondedCompanionNames.NAME_KEY, nameKey), Map.of(),
                     new BondedCompanionStatusPresentation(
                             BondedCompanionStateView.STORED,
@@ -322,197 +217,215 @@ class BondedCompanionCardPresenterTest {
 
             assertFalse(roleName.equals(nameKey));
             assertCommand(commands, "#Card #BondedName.Text", roleName);
+            // The title already is the role name, so the line under it does not repeat it.
+            assertFalse(Arrays.stream(commands.getCommands()).anyMatch(command ->
+                    "#Card #BondedSubtitle.Text".equals(command.selector) && command.data.contains(roleName)));
         }
     }
 
     @Test
-    void compactStoredCardUpdatesTheStateDetailAndSummonIntoOneActionRow() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.STORED,
-                BondedCompanionStatusPresentation.Action.SUMMON,
-                true, Map.of(), null);
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
-        assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
-    }
-
-    @Test
-    void unavailableReviveKeepsTheDeadStateInsteadOfShowingReady() {
-        BondedCompanionPanelPresentation row = presentation(
-                new BondedCompanionStatusPresentation(
-                        BondedCompanionStateView.DEAD,
-                        BondedCompanionStatusPresentation.Action.REVIVE,
-                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE,
-                        null, 0L), Map.of(), new BondedCompanionReviveQuote(
-                        "profile-7", true, List.of(), 0L, 0L));
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
-        assertCommand(commands, "#Card #BondedAccentReady.Visible", "false");
-    }
-
-    @Test
-    void pendingUnlinkReplacesNormalActionsWithPermanentDeleteConfirmation() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS,
-                true, Map.of(), null);
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, true, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedUnlinkButton.Visible", "false");
-        assertCommand(commands, "#Card #BondedUnlinkConfirmButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
-        assertCommand(commands, "#Card #BondedUnlinkCancelButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedActionLabel.Text", "DELETE");
-    }
-
-    @Test
-    void deadCooldownCardKeepsReviveCostInTheActionTooltip() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.DEAD,
-                BondedCompanionStatusPresentation.Action.REVIVE,
-                false,
-                Map.of("currentHealth", "320", "maxHealth", "400"),
-                new BondedCompanionReviveQuote(
-                        "profile-7", true, List.of(
-                        new BondedCompanionReviveQuote.CostLine(
-                                "Ingredient_Life_Essence", 2, 1),
-                        new BondedCompanionReviveQuote.CostLine(
-                                "Ingredient_Amber", 4, 4)
-                ), 272L, 4L)
-        );
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(
-                commands, new UIEventBuilder(), "#Card", UUID.randomUUID(),
-                row, false, bindingConfig(), "en-US"
-        );
-
-        assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
-        assertCommand(commands, "#Card #BondedActionLabel.Text", "REVIVE");
-        assertCommand(commands, "#Card #BondedHealthText.Text", "0 / 400");
-        assertCommand(commands, "#Card #BondedHealthFill.Visible", "false");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",
-                "REVIVE COST");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> command.selector.contains("BondedCostList")),
-                "Cost lines must not increase the compact companion card height.");
-    }
-
-    @Test
-    void identityLineKeepsGenderInItsIconAndProgressionUsesSeparateSafeLabels() {
+    void aNamedCompanionShowsItsRoleLevelAndGenderUnderTheName() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons", "NordicDrake", 4L,
                 "Wyatt", "Nordic Drake", "Female", null,
-                Map.of("level", "1", "levelingConfigId", "saved-leveling",
+                Map.of("level", "3", "levelingConfigId", "saved-leveling",
                         "talentConfigId", "saved-talents", "talentSpentPoints", "0"),
                 Map.of(), new BondedCompanionStatusPresentation(
                 BondedCompanionStateView.STORED,
                 BondedCompanionStatusPresentation.Action.SUMMON,
-                true, null, 0L), null
-        );
-        UICommandBuilder commands = new UICommandBuilder();
-        UIEventBuilder events = new UIEventBuilder();
-        UUID cardUuid = UUID.randomUUID();
+                true, null, 0L), null);
 
-        BondedCompanionCardPresenter.bind(commands, events,
-                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+        Bound card = bind(row);
 
-        assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
-        assertCommand(commands, "#Card #BondedLevelText.Text", "Lv. 1");
-        assertCommand(commands, "#Card #BondedGenderFemaleIcon.Visible", "true");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
-                                && command.data.contains("Female")),
-                "Gender belongs exclusively to the existing gender icon.");
-        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
-        assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "false");
-        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(event ->
-                        "#Card #BondedTalentPointButton".equals(event.selector)
-                                && event.data.contains(bindingConfig().openTalentsCommandPrefix() + cardUuid)),
-                "The initially hidden badge must open talents when a live level-up reveals it.");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)
-                                && command.data.contains("<color")),
-                "Runtime label text is literal; colored spans must not be sent as markup.");
+        card.assertCommand("#BondedName.Text", "Wyatt");
+        card.assertCommand("#BondedSubtitle.Text", "Nordic Drake");
+        card.assertCommand("#BondedSubtitle.Text",
+                LocalizedText.format(LANGUAGE, "tamework.ui.linkedPanel.bonded.talents.level", 3));
+        card.assertCommand("#BondedSubtitle.Text",
+                LocalizedText.resolve(LANGUAGE, "tamework.ui.linkedPanel.bonded.gender.female"));
     }
 
     @Test
-    void durationAndCooldownBarsShowRemainingFractionAndHideWhenReady() {
-        for (BondedCompanionStateView state : BondedCompanionStateView.values()) {
-            boolean active = state == BondedCompanionStateView.ACTIVE;
-            var status = new BondedCompanionStatusPresentation(state,
-                    active ? BondedCompanionStatusPresentation.Action.DISMISS
-                            : state == BondedCompanionStateView.DEAD
-                                    ? BondedCompanionStatusPresentation.Action.REVIVE
-                                    : BondedCompanionStatusPresentation.Action.SUMMON,
-                    active, null, active ? 0L : 40_000L);
-            var row = new BondedCompanionPanelPresentation("timer", "roster", "role", 1L,
-                    "Companion", null, null, null,
-                    Map.of("sessionDurationMs", "80000", "sessionRemainingMs", "40000",
-                            "cooldownDurationMs", "80000"), Map.of(), status, null);
-            UICommandBuilder commands = new UICommandBuilder();
-            BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, row, "en-US");
-            assertCommand(commands, "#Card #BondedSessionFrame.Visible", "true");
-            assertCommand(commands, "#Card #BondedSessionFill.Anchor", "191");
-            assertCommand(commands, "#Card #BondedSessionFill.Visible", "true");
+    void talentsButtonShowsUnspentPointsAndOpensTheTalentsPage() {
+        Bound spent = bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true,
+                Map.of("level", "1", "levelingConfigId", "saved-leveling",
+                        "talentConfigId", "saved-talents", "talentSpentPoints", "0"), null));
+        spent.assertCommand("#BondedTalentPointAction.Visible", "true");
+        spent.assertCommand("#BondedTalentPointBadge.Visible", "false");
+        spent.assertEvent("#BondedTalentPointButton", "talents:");
+
+        Bound unspent = bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true,
+                Map.of("level", "4", "levelingConfigId", "missing-config",
+                        "talentConfigId", "saved-talents", "talentSpentPoints", "1"), null));
+        unspent.assertCommand("#BondedTalentPointBadge.Visible", "true");
+        unspent.assertCommand("#BondedTalentPointCount.Text", "2");
+    }
+
+    @Test
+    void flightToggleShowsOnlyForAnActiveFlyerAndReflectsItsMode() {
+        for (boolean airborne : new boolean[] {false, true}) {
+            Bound card = bind(presentation(BondedCompanionStateView.ACTIVE,
+                    BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(
+                            BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                            BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE,
+                            Boolean.toString(airborne)), null));
+            card.assertCommand("#BondedFlightToggleButton.Visible", "true");
+            card.assertCommand("#BondedFlightToggleButton.Style", airborne ? "FlightAirborne" : "FlightGrounded");
+            card.assertCommand("#BondedFlightToggleButton.TooltipText", LocalizedText.resolve(LANGUAGE,
+                    airborne ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
+                            : "tamework.ui.linkedPanel.bonded.flight.switchToFlight"));
+            card.assertEvent("#BondedFlightToggleButton", card.uuid.toString());
         }
-        UICommandBuilder ready = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(ready, "#Card", null,
+        for (BondedCompanionPanelPresentation row : List.of(
                 presentation(BondedCompanionStateView.STORED,
-                        BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null), "en-US");
-        assertCommand(ready, "#Card #BondedSessionFrame.Visible", "false");
+                        BondedCompanionStatusPresentation.Action.SUMMON, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
+                presentation(BondedCompanionStateView.DEAD,
+                        BondedCompanionStatusPresentation.Action.REVIVE, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(), null))) {
+            Bound card = bind(row);
+            card.assertCommand("#BondedFlightToggleButton.Visible", "false");
+            assertFalse(Arrays.stream(card.events.getEvents())
+                    .anyMatch(event -> event.selector.endsWith("#BondedFlightToggleButton")));
+        }
+    }
+
+    @Test
+    void shoulderRideShowsForAnActiveSupportedCompanionAndFollowsItsMountState() {
+        Bound card = bind(presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(
+                        BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED, "false"), null));
+        card.assertCommand("#BondedShoulderRideButton.Visible", "true");
+        card.assertCommand("#BondedShoulderRideButton.Style", "ShoulderOff");
+        card.assertCommand("#BondedShoulderRideButton.TooltipText", LocalizedText.resolve(LANGUAGE,
+                "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip"));
+
+        UICommandBuilder mounted = new UICommandBuilder();
+        BondedCompanionCardPresenter.refreshDynamicState(mounted, "#Card", null,
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(
+                                BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE, "true",
+                                BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED, "true"), null),
+                false, LANGUAGE);
+        assertCommand(mounted, "#Card #BondedShoulderRideButton.Style", "ShoulderOn");
+        assertCommand(mounted, "#Card #BondedShoulderRideButton.TooltipText", LocalizedText.resolve(LANGUAGE,
+                "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"));
+
+        bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(
+                        BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE, "true"), null))
+                .assertCommand("#BondedShoulderRideButton.Visible", "false");
+    }
+
+    /** Hidden buttons leave no gap: the talents button sits next to the nearest visible button. */
+    @Test
+    void iconRowClosesUpWhenFlightAndShoulderRideAreAbsent() {
+        Bound plain = bind(presentation(BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null));
+        plain.assertCommand("#BondedUnlinkButton.Anchor", "822");
+        plain.assertCommand("#BondedTalentPointAction.Anchor", "790");
+
+        Bound full = bind(presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE, "true"), null));
+        full.assertCommand("#BondedShoulderRideButton.Anchor", "790");
+        full.assertCommand("#BondedFlightToggleButton.Anchor", "758");
+        full.assertCommand("#BondedTalentPointAction.Anchor", "726");
+    }
+
+    @Test
+    void pendingAbandonReplacesTheActionsWithConfirmAndCancel() {
+        UUID cardUuid = UUID.randomUUID();
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        BondedCompanionCardPresenter.bind(commands, events, "#Card", cardUuid,
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true, Map.of(
+                                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
+                true, bindingConfig(), LANGUAGE);
+
+        assertCommand(commands, "#Card #BondedUnlinkButton.Visible", "false");
+        assertCommand(commands, "#Card #BondedUnlinkConfirmButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedUnlinkCancelButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
+        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "false");
+        assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
+                "#Card #BondedUnlinkConfirmButton".equals(event.selector)
+                        && event.data.contains("unlink:" + cardUuid)));
+        assertFalse(Arrays.stream(events.getEvents())
+                .anyMatch(event -> event.data.contains("dismiss:" + cardUuid)));
     }
 
     @Test
     void dynamicRefreshPatchesTheLiveHealthBarWithoutRecreatingTheCard() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.ACTIVE,
-                BondedCompanionStatusPresentation.Action.DISMISS,
-                true,
-                Map.of("currentHealth", "125", "maxHealth", "250"), null
-        );
         UICommandBuilder commands = new UICommandBuilder();
 
-        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, row,
-                "en-US");
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null,
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true,
+                        Map.of("currentHealth", "125", "maxHealth", "250"), null), false, LANGUAGE);
 
         assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "129");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "139");
+    }
+
+    /** The per-tick path: a running timer patches the sentence and bar and binds no input again. */
+    @Test
+    void liveRefreshUpdatesTheTimerAndHealthWithoutRebindingInput() {
+        UUID cardUuid = UUID.randomUUID();
+        BondedCompanionPanelPresentation before = presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        "sessionDurationMs", "80000", "sessionRemainingMs", "41000",
+                        "currentHealth", "100", "maxHealth", "100"), null);
+        BondedCompanionPanelPresentation after = presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        "sessionDurationMs", "80000", "sessionRemainingMs", "40000",
+                        "currentHealth", "90", "maxHealth", "100"), null);
+        assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(before, after));
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+
+        LinkedNpcPanelCardDynamicPresenter.refresh(commands, events, "#Card", cardUuid,
+                null, null, CommandPanelFeaturePresentation.bonded(before),
+                CommandPanelFeaturePresentation.bonded(after), false, bindingConfig(), LANGUAGE);
+
+        assertCommand(commands, "#Card #BondedHealthText.Text", "90 / 100");
+        assertCommand(commands, "#Card #BondedStatusText.Text",
+                LocalizedText.format(LANGUAGE, STATUS + "sessionEndsIn", "0:40"));
+        assertEquals(0, events.getEvents().length, "Live patches must preserve existing input handlers.");
+        assertFalse(Arrays.stream(commands.getCommands()).anyMatch(command ->
+                        command.selector.contains("#BondedFlight")),
+                "Timer and health updates must leave the flight control untouched.");
     }
 
     @Test
-    void pointsUseTheCompactLevelUpIconInsteadOfLongInlineText() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.STORED,
-                BondedCompanionStatusPresentation.Action.SUMMON,
-                true,
-                Map.of("level", "4", "levelingConfigId", "missing-config",
-                        "talentConfigId", "saved-talents", "talentSpentPoints", "1"),
-                null);
+    void liveRefreshUpdatesFlightFeedbackWhenTheModeChanges() {
+        BondedCompanionPanelPresentation grounded = presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null);
+        BondedCompanionPanelPresentation airborne = presentation(BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"), null);
         UICommandBuilder commands = new UICommandBuilder();
 
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", grounded, airborne, false, LANGUAGE);
 
-        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "true");
-        assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "true");
-        assertCommand(commands, "#Card #BondedTalentPointCount.Text", "2");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
-                                && command.data.contains("POINTS AVAILABLE")),
-                "Available points should be represented by the compact icon badge.");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightAirborne");
+    }
+
+    private static BondedCompanionReviveQuote quote(long cooldownSeconds,
+                                                    BondedCompanionReviveQuote.CostLine... costs) {
+        return new BondedCompanionReviveQuote("profile-7", true, List.of(costs), cooldownSeconds, 4L);
     }
 
     private static BondedCompanionPanelPresentation presentation(
@@ -546,79 +459,73 @@ class BondedCompanionCardPresenterTest {
                 "return:", "talents:", true, true);
     }
 
-    private static String selectorBlock(String asset, String selector) {
-        Matcher matcher = Pattern.compile("(?m)^\\s*(?:[A-Za-z]+\\s+)?"
-                + Pattern.quote(selector) + "\\s*\\{").matcher(asset);
-        assertTrue(matcher.find(), () -> "Expected selector block " + selector);
-        int start = matcher.start();
-        int cursor = matcher.end();
-        int depth = 1;
-        while (cursor < asset.length() && depth > 0) {
-            char character = asset.charAt(cursor++);
-            if (character == '{') {
-                depth++;
-            } else if (character == '}') {
-                depth--;
-            }
-        }
-        assertTrue(depth == 0, () -> "Unclosed selector block " + selector);
-        return asset.substring(start, cursor);
+    private static Bound bind(BondedCompanionPanelPresentation row) {
+        Bound bound = new Bound(row.status().state());
+        BondedCompanionCardPresenter.bind(bound.commands, bound.events, "#Card", bound.uuid,
+                row, false, bindingConfig(), LANGUAGE);
+        return bound;
     }
 
-    private static void assertCommand(
-            UICommandBuilder commands, String selector, String expected
-    ) {
-        assertTrue(java.util.Arrays.stream(commands.getCommands())
+    private static void assertCommand(UICommandBuilder commands, String selector, String expected) {
+        assertTrue(Arrays.stream(commands.getCommands())
                         .anyMatch(command -> selector.equals(command.selector)
                                 && command.data.contains(expected)),
                 () -> "Expected " + selector + " to contain " + expected
-                        + "; actual data: " + java.util.Arrays.stream(commands.getCommands())
+                        + "; actual data: " + Arrays.stream(commands.getCommands())
                         .filter(command -> selector.equals(command.selector))
                         .map(command -> command.data)
                         .toList());
     }
 
-    @Test
-    void shoulderRideIconUpdatesItsMountStateTooltip() {
-        UICommandBuilder commands = new UICommandBuilder();
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), presentation(
-                        BondedCompanionStateView.ACTIVE,
-                        BondedCompanionStatusPresentation.Action.DISMISS,
-                        true, Map.of(
-                                BondedCompanionPresentationAttributes
-                                        .SHOULDER_RIDE_AVAILABLE, "true",
-                                BondedCompanionPresentationAttributes
-                                        .SHOULDER_RIDE_MOUNTED, "false"), null),
-                false, bindingConfig(), "en-US");
+    /** One bound card and the checks the status cases share. */
+    private static final class Bound {
+        private final UICommandBuilder commands = new UICommandBuilder();
+        private final UIEventBuilder events = new UIEventBuilder();
+        private final UUID uuid = UUID.randomUUID();
+        private final BondedCompanionStateView state;
 
-        assertCommand(commands, "#Card #BondedShoulderRideButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedShoulderRideButton.Style", "Shoulder");
-        assertCommand(commands, "#Card #BondedShoulderRideButton.Text", "");
-        assertCommand(commands, "#Card #BondedShoulderRideButton.TooltipText",
-                "Bring this companion to your shoulder");
+        private Bound(BondedCompanionStateView state) {
+            this.state = state;
+        }
 
-        UICommandBuilder mounted = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(mounted, "#Card", null,
-                presentation(BondedCompanionStateView.ACTIVE,
-                        BondedCompanionStatusPresentation.Action.DISMISS,
-                        true, Map.of(
-                                BondedCompanionPresentationAttributes
-                                        .SHOULDER_RIDE_AVAILABLE, "true",
-                                BondedCompanionPresentationAttributes
-                                        .SHOULDER_RIDE_MOUNTED, "true"), null),
-                "en-US");
-        assertCommand(mounted, "#Card #BondedShoulderRideButton.Text", "");
-        assertCommand(mounted, "#Card #BondedShoulderRideButton.TooltipText",
-                "Set this companion down");
+        void assertCommand(String selector, String expected) {
+            BondedCompanionCardPresenterTest.assertCommand(commands, "#Card " + selector, expected);
+        }
+
+        /** Exactly the tone (accent stripe and chip) of the given state is visible. */
+        void assertTone(BondedCompanionStateView expected) {
+            for (BondedCompanionStateView candidate : BondedCompanionStateView.values()) {
+                assertCommand(BondedCompanionCardPresenter.toneSelector(candidate) + ".Visible",
+                        Boolean.toString(candidate == expected));
+            }
+        }
+
+        /** The sentence is bound to the normal or the warning line, and only that line shows. */
+        void assertStatus(String sentence, boolean warning) {
+            assertFalse(sentence.isBlank());
+            assertCommand(warning ? "#BondedStatusWarning.Text" : "#BondedStatusText.Text", sentence);
+            assertCommand("#BondedStatusWarning.Visible", Boolean.toString(warning));
+            assertCommand("#BondedStatusText.Visible", Boolean.toString(!warning));
+        }
+
+        void assertPrimaryAction(String commandPrefix) {
+            assertCommand("#BondedPrimaryAction.Visible", "true");
+            assertCommand(BondedCompanionCardPresenter.toneSelector(state) + " #ActionRing.Visible", "true");
+            assertEvent("#BondedPrimaryAction", commandPrefix + uuid);
+        }
+
+        void assertNoPrimaryAction() {
+            assertCommand("#BondedPrimaryAction.Visible", "false");
+            assertCommand(BondedCompanionCardPresenter.toneSelector(state) + " #ActionRing.Visible", "false");
+            assertFalse(Arrays.stream(events.getEvents())
+                            .anyMatch(event -> event.selector.endsWith("#BondedPrimaryAction")),
+                    "An absent action must not be bound.");
+        }
+
+        void assertEvent(String selector, String data) {
+            assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
+                            ("#Card " + selector).equals(event.selector) && event.data.contains(data)),
+                    () -> "Expected an event on " + selector + " carrying " + data);
+        }
     }
-
-    private static void assertCommandSelector(
-            UICommandBuilder commands, String selector
-    ) {
-        assertTrue(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> selector.equals(command.selector)),
-                () -> "Expected a command for " + selector);
-    }
-
 }
