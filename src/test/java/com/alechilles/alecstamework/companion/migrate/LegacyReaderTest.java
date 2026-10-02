@@ -217,7 +217,8 @@ class LegacyReaderTest {
         assertEquals(List.of(
                 new LegacyRows.Snapshot("snap-coop", "p-coop", "coop", 1, "{\"roleId\":\"Tamed_Chicken\"}", 4, 3400),
                 new LegacyRows.Snapshot("snap-dead", "p-dead", "death", 2, DEATH_JSON, 2, 2400)),
-                state.currentSnapshots(), "only current snapshots are returned");
+                state.currentSnapshots(),
+                "current snapshots, and the one a coop residency names although it is not current");
         assertEquals(List.of(new LegacyRows.EntityCheckpoint("p-live", "alias:" + NPC, CHECKPOINT_JSON, 9, 1480)),
                 state.entityCheckpoints(), "a tombstoned checkpoint is skipped");
         assertEquals(List.of(new LegacyRows.ToolLink(

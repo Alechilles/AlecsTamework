@@ -101,7 +101,9 @@ public final class LegacyReader {
                 query(db, """
                         SELECT snapshot_id, profile_id, snapshot_kind, payload_version, payload_json,
                                source_lifecycle_revision, created_at_ms
-                        FROM companion_snapshot WHERE is_current = 1 ORDER BY snapshot_id
+                        FROM companion_snapshot
+                        WHERE is_current = 1 OR snapshot_id IN (SELECT snapshot_id FROM coop_residency)
+                        ORDER BY snapshot_id
                         """, r -> new LegacyRows.Snapshot(
                         r.getString(1), r.getString(2), r.getString(3), r.getInt(4), r.getString(5),
                         r.getLong(6), r.getLong(7))),

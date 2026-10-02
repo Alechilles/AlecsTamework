@@ -29,7 +29,10 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nonnull List<Profile> profiles,
             @Nonnull List<Lifecycle> lifecycles,
             @Nonnull List<Alias> aliases,
-            /** Only rows with {@code is_current = 1}; at most one per profile and kind. */
+            /**
+             * Rows with {@code is_current = 1} (at most one per profile and kind), plus any row a
+             * {@code coop_residency} names, which holds a coop resident's state even when not current.
+             */
             @Nonnull List<Snapshot> currentSnapshots,
             /** {@code profile_extension_data} rows in the entity checkpoint namespace, tombstones skipped. */
             @Nonnull List<EntityCheckpoint> entityCheckpoints,
@@ -86,7 +89,7 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nullable Long retiredAtMs) {
     }
 
-    /** A current {@code companion_snapshot} row. */
+    /** A {@code companion_snapshot} row that is current or named by a coop residency. */
     public record Snapshot(
             @Nonnull String snapshotId,
             @Nonnull String profileId,

@@ -65,7 +65,7 @@ VALUES ('snap-dead', 'p-dead', 'death', 2,
     hex(zeroblob(32)), 2, 1, 2400);
 INSERT INTO companion_snapshot (snapshot_id, profile_id, snapshot_kind, payload_version, payload_json,
     payload_hash, source_lifecycle_revision, is_current, created_at_ms)
-VALUES ('snap-coop', 'p-coop', 'coop', 1, '{"roleId":"Tamed_Chicken"}', hex(zeroblob(32)), 4, 1, 3400);
+VALUES ('snap-coop', 'p-coop', 'coop', 1, '{"roleId":"Tamed_Chicken"}', hex(zeroblob(32)), 4, 0, 3400);
 
 INSERT INTO companion_tool_link (profile_id, tool_uuid, link_type, created_at_ms, updated_at_ms)
 VALUES ('p-live', 'bbbbbbbb-0000-0000-0000-000000000001', 'COMMAND', 1300, 1350);
