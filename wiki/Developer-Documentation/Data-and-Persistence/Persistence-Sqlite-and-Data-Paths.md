@@ -60,8 +60,15 @@ discard their large operation payload and consumed outbox event after the
 extension index acknowledges them. Incomplete operations, active quarantine,
 public extension data, and other operation families keep their evidence.
 
-Cleanup runs in bounded batches as new checkpoints publish. To reclaim existing
-file space, an administrator can run `/tw debug persistence compact` on the running
+Cleanup runs in bounded batches as new checkpoints publish. On startup, Tamework
+automatically compacts older databases after recovery and projection startup,
+before world reconciliation and normal saves. Databases already using incremental
+vacuum, including fresh databases and those previously compacted by the command,
+skip this pass. If maintenance fails, the server log records the cause and a later
+startup retries while the database still needs conversion. Integrity failures
+retain the existing read-only protection.
+
+An administrator can also reclaim file space with `/tw debug persistence compact` on the running
 server. This temporarily pauses Tamework saves and companion mutations, drains
 accepted work, removes eligible history, and rebuilds the database. Automatic
 profile snapshots and unload checkpoints wait in their existing save coordinators

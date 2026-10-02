@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.api.internal;
 
-import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
-import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -26,7 +24,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -215,45 +212,6 @@ class CompanionEventPublisherTest {
         index.update(released.profileId(), released.revision(), b -> b.displayName("gone"));
 
         assertTrue(events.isEmpty());
-    }
-
-    @Test
-    void joiningAndLeavingACommandFamilyRosterPublishesMembershipChanges() {
-        CompanionRecord live = insertLive();
-
-        CompanionRecord member = index.update(live.profileId(), live.revision(), b -> b.rosterId("wolves")).after();
-
-        CommandFamilyRosterMembershipChangedEvent joined = only(CommandFamilyRosterMembershipChangedEvent.class);
-        assertEquals(ALICE, joined.ownerUuid());
-        assertEquals("wolves", joined.commandFamilyId());
-        assertEquals(live.profileId().toString(), joined.profileId());
-        assertNull(joined.previousMembership());
-        assertNotNull(joined.currentMembership());
-        assertEquals(CommandFamilyRosterMemberState.ACTIVE, joined.currentMembership().state());
-        assertEquals("Sheep", joined.currentMembership().roleId());
-        events.clear();
-
-        CompanionRecord stored = index.update(member.profileId(), member.revision(),
-                CompanionTransitions.stored(member, StoredReason.ROSTER, null, null, 0L)).after();
-
-        assertTrue(events.stream().noneMatch(CommandFamilyRosterMembershipChangedEvent.class::isInstance));
-        events.clear();
-
-        index.update(stored.profileId(), stored.revision(), CompanionTransitions.released(stored));
-
-        CommandFamilyRosterMembershipChangedEvent left = only(CommandFamilyRosterMembershipChangedEvent.class);
-        assertEquals("wolves", left.commandFamilyId());
-        assertEquals(CommandFamilyRosterMemberState.ROSTER_STORED, left.previousMembership().state());
-        assertNull(left.currentMembership());
-    }
-
-    @Test
-    void aBondedRecordPublishesNoCommandFamilyMembership() {
-        CompanionRecord live = insertLive();
-
-        index.update(live.profileId(), live.revision(), b -> b.bonded(true).rosterId("dragons"));
-
-        assertTrue(events.stream().noneMatch(CommandFamilyRosterMembershipChangedEvent.class::isInstance));
     }
 
     @Test

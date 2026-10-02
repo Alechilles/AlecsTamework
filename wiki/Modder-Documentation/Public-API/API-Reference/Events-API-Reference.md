@@ -39,7 +39,6 @@ Published in 3.0.0:
 - `NpcLostRecordedEvent`
 - `CaptureAttemptResolvedEvent`
 - `BondedCompanionCaptureResolvedEvent`
-- `CommandFamilyRosterMembershipChangedEvent`
 - `ConfigReloadedEvent`
 - `CompanionXpAwardedEvent`
 
@@ -53,6 +52,8 @@ No longer published in 3.0.0, because their APIs were removed or replaced:
   `ProvisionedCompanionRevivedEvent`, and `PaidCommandRevivedEvent`. Use
   `NpcProfileChangedEvent`, or `BondedCompanionApi.subscribe` for bonded
   companions.
+- `CommandFamilyRosterMembershipChangedEvent`. `commandFamilyRosters()` was
+  removed and roster membership has no public replacement.
 
 A subscription to one of these types is accepted and never called.
 
@@ -124,9 +125,6 @@ and the sets empty.
 
 These follow `NpcProfileChangedEvent` for the same change. Home positions are
 null in 3.0.0, and the lost event's relocation fields are zero.
-
-`CommandFamilyRosterMembershipChangedEvent` is published when a companion that
-is not bonded joins or leaves an owner's command roster.
 
 ## Capture events
 

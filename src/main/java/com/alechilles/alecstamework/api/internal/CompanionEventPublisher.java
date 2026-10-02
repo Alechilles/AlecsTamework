@@ -1,8 +1,5 @@
 package com.alechilles.alecstamework.api.internal;
 
-import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
-import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
-import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipView;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -14,7 +11,6 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.LocationKind;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
@@ -34,10 +30,8 @@ import javax.annotation.Nullable;
  *
  * <p>Every change that a subscriber can see publishes {@link NpcProfileChangedEvent}; a RELEASED
  * record has no profile view, so a release has no {@code after}. A companion going into a capture
- * item, dying or becoming lost also publishes its own event, and a non-bonded companion joining
- * or leaving an owner's command-family roster publishes
- * {@link CommandFamilyRosterMembershipChangedEvent}. Fields the record does not hold keep their
- * absent value: home positions are null, and the lost event's relocation fields are zero.</p>
+ * item, dying or becoming lost also publishes its own event. Fields the record does not hold keep
+ * their absent value: home positions are null, and the lost event's relocation fields are zero.</p>
  */
 public final class CompanionEventPublisher implements CompanionIndex.ChangeListener {
     private final TameworkEventBus events;
@@ -74,7 +68,6 @@ public final class CompanionEventPublisher implements CompanionIndex.ChangeListe
                 publishHolderChange(before, after, afterView, npcUuid, now);
             }
         }
-        publishRosterMembership(before, after, now);
     }
 
     private void publishProfileChanged(@Nullable CompanionRecord before, CompanionRecord after,
@@ -143,59 +136,6 @@ public final class CompanionEventPublisher implements CompanionIndex.ChangeListe
             }
             default -> { }
         }
-    }
-
-    /**
-     * A membership is one (owner, roster id) pair on a non-bonded, non-released record. A record
-     * that moves between rosters or owners leaves one membership and joins another.
-     */
-    private void publishRosterMembership(@Nullable CompanionRecord before, CompanionRecord after, long now) {
-        boolean was = isMember(before);
-        boolean is = isMember(after);
-        if (!was && !is) {
-            return;
-        }
-        if (was && is && before.ownerUuid().equals(after.ownerUuid()) && before.rosterId().equals(after.rosterId())) {
-            return;
-        }
-        long previousRevision = before == null ? 0L : before.revision();
-        long currentRevision = Math.max(previousRevision, after.revision());
-        // The index has no operation ids; one change of one profile gets a stable id.
-        UUID operationId = UUID.nameUUIDFromBytes(
-                (after.profileId() + ":" + after.revision()).getBytes(StandardCharsets.UTF_8));
-        if (was) {
-            events.publishPersistenceEvent(new CommandFamilyRosterMembershipChangedEvent(
-                    operationId, before.ownerUuid(), before.rosterId(), after.profileId().toString(),
-                    membership(before), null, previousRevision, currentRevision, after.updatedAtMs(), now));
-        }
-        if (is) {
-            events.publishPersistenceEvent(new CommandFamilyRosterMembershipChangedEvent(
-                    operationId, after.ownerUuid(), after.rosterId(), after.profileId().toString(),
-                    null, membership(after), previousRevision, currentRevision, after.updatedAtMs(), now));
-        }
-    }
-
-    private static boolean isMember(@Nullable CompanionRecord record) {
-        return record != null && !record.bonded() && record.ownerUuid() != null
-                && record.rosterId() != null && !record.rosterId().isBlank()
-                && record.location().kind() != LocationKind.RELEASED;
-    }
-
-    private static CommandFamilyRosterMembershipView membership(CompanionRecord record) {
-        return new CommandFamilyRosterMembershipView(
-                record.ownerUuid(), record.rosterId(), record.profileId().toString(), record.roleId(),
-                record.revision(), memberState(record.location().kind()), null, false, null, record.updatedAtMs());
-    }
-
-    private static CommandFamilyRosterMemberState memberState(LocationKind kind) {
-        return switch (kind) {
-            case LIVE -> CommandFamilyRosterMemberState.ACTIVE;
-            case STORED -> CommandFamilyRosterMemberState.ROSTER_STORED;
-            case DEAD -> CommandFamilyRosterMemberState.DEAD_REVIVABLE;
-            case LOST -> CommandFamilyRosterMemberState.LOST;
-            case ITEM, COOP -> CommandFamilyRosterMemberState.UNLOADED;
-            case RELEASED -> CommandFamilyRosterMemberState.UNAVAILABLE;
-        };
     }
 
     /** Claims the public record would reject (blank domain, weight below one) are left out. */

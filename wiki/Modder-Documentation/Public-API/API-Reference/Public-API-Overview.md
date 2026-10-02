@@ -80,7 +80,7 @@ Removed accessors:
 
 | Removed | Use instead |
 | --- | --- |
-| `commandFamilyRosters()` | No public replacement. `CommandFamilyRosterMembershipChangedEvent` still reports roster changes. |
+| `commandFamilyRosters()` | No public replacement. `CommandFamilyRosterMembershipChangedEvent` is no longer published. |
 | `commandTimedSummoning()` | `bondedCompanions().summon` and `store` for bonded rosters. |
 | `companionProvisioning()` | `bondedCompanions().provision`. |
 | `paidCommandRevival()` | `bondedCompanions().quoteRevive` and `revive`. |
