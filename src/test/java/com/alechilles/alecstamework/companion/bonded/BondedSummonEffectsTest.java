@@ -52,9 +52,10 @@ class BondedSummonEffectsTest {
                 }
 
                 @Override
-                public void notifyExpiry(UUID ownerUuid, String companionName,
+                public void notifyExpiry(CompanionRecord record,
                                          BondedCompanionExpiryWarningSchedule.Warning warning) {
-                    notices.add(ownerUuid + ":" + companionName + ":" + warning.secondsRemaining()
+                    notices.add(record.ownerUuid() + ":"
+                            + (record.displayName() == null ? record.roleId() : record.displayName()) + ":" + warning.secondsRemaining()
                             + ":" + warning.style());
                 }
 
@@ -222,7 +223,7 @@ class BondedSummonEffectsTest {
                     }
 
                     @Override
-                    public void notifyExpiry(UUID ownerUuid, String companionName,
+                    public void notifyExpiry(CompanionRecord record,
                                              BondedCompanionExpiryWarningSchedule.Warning warning) {
                     }
 

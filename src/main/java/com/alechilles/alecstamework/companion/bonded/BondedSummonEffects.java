@@ -49,10 +49,10 @@ public final class BondedSummonEffects implements AutoCloseable {
         void playEffect(@Nonnull CompanionRecord record, @Nonnull String effectId, long keepUntilMs);
 
         /**
-         * Tells the owner that {@code companionName} expires in {@code warning.secondsRemaining()}
-         * seconds, in the owner's language. Does nothing when the owner is offline.
+         * Tells the owner that the companion expires in {@code warning.secondsRemaining()} seconds,
+         * with the name the panel shows, in the owner's language. Does nothing when the owner is offline.
          */
-        void notifyExpiry(@Nonnull UUID ownerUuid, @Nonnull String companionName,
+        void notifyExpiry(@Nonnull CompanionRecord record,
                           @Nonnull BondedCompanionExpiryWarningSchedule.Warning warning);
 
         /** Protects a player riding the companion from the fall that follows its removal. */
@@ -218,7 +218,7 @@ public final class BondedSummonEffects implements AutoCloseable {
             }
             if (seconds != 0 && record.ownerUuid() != null) {
                 BondedCompanionExpiryWarningSchedule.warning(untilMs, untilMs - seconds * 1_000L)
-                        .ifPresent(warning -> bodies.notifyExpiry(record.ownerUuid(), name(record), warning));
+                        .ifPresent(warning -> bodies.notifyExpiry(record, warning));
             }
         } catch (RuntimeException | LinkageError failure) {
             LOGGER.at(Level.WARNING).withCause(failure)
@@ -233,9 +233,4 @@ public final class BondedSummonEffects implements AutoCloseable {
         }
     }
 
-    /** The name the bonded panel shows for the record: its display name, else its role id. */
-    private static String name(CompanionRecord record) {
-        String name = record.displayName();
-        return name == null || name.isBlank() ? record.roleId() : name;
-    }
 }

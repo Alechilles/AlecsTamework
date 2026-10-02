@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightMountPhase;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpiryWarningSchedule;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.companion.bonded.BondedSummonEffects;
 import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
@@ -82,10 +83,13 @@ public final class HytaleBondedBodies implements BondedSummonEffects.Bodies, Bon
 
     /** The owner is resolved, and the text translated, on the owner's current world thread. */
     @Override
-    public void notifyExpiry(@Nonnull UUID ownerUuid, @Nonnull String companionName,
+    public void notifyExpiry(@Nonnull CompanionRecord record,
                              @Nonnull BondedCompanionExpiryWarningSchedule.Warning warning) {
-        HytaleCaptureDelivery.onPlayerWorld(ownerUuid, (world, store, ref, player) -> notifications.showKey(
-                player, warning.style(), EXPIRES_IN_KEY, companionName, warning.secondsRemaining()), null);
+        HytaleCaptureDelivery.onPlayerWorld(record.ownerUuid(), (world, store, ref, player) -> {
+            String language = player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage();
+            notifications.showKey(player, warning.style(), EXPIRES_IN_KEY,
+                    BondedCompanionNames.displayName(record, language), warning.secondsRemaining());
+        }, null);
     }
 
     @Override
