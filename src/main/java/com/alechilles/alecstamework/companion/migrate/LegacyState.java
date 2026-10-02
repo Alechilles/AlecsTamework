@@ -365,6 +365,17 @@ final class LegacyState {
         }
     }
 
+    /** The same state with no needs component; null when the result does not decode. */
+    @Nullable
+    static State withoutNeeds(@Nonnull State state) {
+        JsonObject root = object(state.json());
+        if (root == null) {
+            return null;
+        }
+        root.remove("needs");
+        return state(root.toString());
+    }
+
     /** A state that holds nothing but its NPC UUID: a restore from it builds the body from the role. */
     @Nonnull
     static String emptyState(@Nonnull UUID npcUuid) {

@@ -89,6 +89,9 @@ public record ImportResult(
      * @param liveUsedHistory         LIVE records with no checkpoint whose snapshot is an old,
      *                                non-current row (never a death): the best saved state of a
      *                                body that is out in the world
+     * @param liveUsedOldDeathState   LIVE records with no checkpoint and no other state, whose
+     *                                snapshot is the state of an earlier death with its needs
+     *                                removed. The record is alive and has no death timers
      */
     public record Report(
             @Nonnull Map<LocationKind, Integer> recordsByLocation,
@@ -103,8 +106,10 @@ public record ImportResult(
             @Nonnull List<UUID> checkpointsOfDyingBodies,
             @Nonnull List<UUID> liveWorldGuessed,
             @Nonnull List<UUID> stateInItem,
-            @Nonnull List<UUID> liveUsedHistory) {
+            @Nonnull List<UUID> liveUsedHistory,
+            @Nonnull List<UUID> liveUsedOldDeathState) {
         public Report {
+            liveUsedOldDeathState = List.copyOf(liveUsedOldDeathState);
             liveUsedHistory = List.copyOf(liveUsedHistory);
             liveWorldGuessed = List.copyOf(liveWorldGuessed);
             stateInItem = List.copyOf(stateInItem);

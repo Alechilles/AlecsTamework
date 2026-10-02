@@ -63,6 +63,7 @@ public final class LegacyMapper {
     private final List<UUID> liveWorldGuessed = new ArrayList<>();
     private final List<UUID> stateInItem = new ArrayList<>();
     private final List<UUID> liveUsedHistory = new ArrayList<>();
+    private final List<UUID> liveUsedOldDeathState = new ArrayList<>();
     /** The last body of each record imported LOST for want of a place, by NPC UUID. */
     private final Map<UUID, UUID> rejoinBodies = new LinkedHashMap<>();
     private int bondedRecords;
@@ -263,6 +264,17 @@ public final class LegacyMapper {
                             || !LegacyState.KIND_DEATH.equals(row.snapshotKind())).toList(), null, List.of(), identity);
                     if (state != null && !state.row().current()) {
                         liveUsedHistory.add(id);
+                    }
+                    if (state == null) {
+                        // Last resort: the state the body had when it died in an earlier life,
+                        // without the needs that killed it. The record is alive, so no death timers.
+                        Snapshot died = choose(snapshotRows.stream().filter(row -> !row.current()
+                                && LegacyState.KIND_DEATH.equals(row.snapshotKind())).toList(), null, List.of(), identity);
+                        LegacyState.State alive = died == null ? null : LegacyState.withoutNeeds(died.state());
+                        if (alive != null) {
+                            state = new Snapshot(died.row(), alive, false);
+                            liveUsedOldDeathState.add(id);
+                        }
                     }
                 }
                 if (currentAlias == null) {
@@ -576,7 +588,7 @@ public final class LegacyMapper {
         return new ImportResult(new ArrayList<>(records.values()), snapshots, new LegacyAliases(aliases),
                 new ImportResult.Report(counts, bondedRecords, unfinishedOperations, quarantined, skipped,
                         liveWithoutCheckpoint, importedLost, collisions, withoutState, dyingCheckpoints,
-                        liveWorldGuessed, stateInItem, liveUsedHistory));
+                        liveWorldGuessed, stateInItem, liveUsedHistory, liveUsedOldDeathState));
     }
 
     /** R9: of the LIVE records that name one NPC UUID, the newest keeps it and the others become LOST. */
@@ -632,7 +644,7 @@ public final class LegacyMapper {
         snapshots.remove(profileId);
         rejoinBodies.values().remove(profileId);
         for (List<UUID> list : List.of(quarantined, liveWithoutCheckpoint, importedLost, withoutState,
-                dyingCheckpoints, liveWorldGuessed, stateInItem, liveUsedHistory)) {
+                dyingCheckpoints, liveWorldGuessed, stateInItem, liveUsedHistory, liveUsedOldDeathState)) {
             list.remove(profileId);
         }
         skip(table, profileId + " (" + failure.getClass().getSimpleName() + ": " + failure.getMessage() + ")",

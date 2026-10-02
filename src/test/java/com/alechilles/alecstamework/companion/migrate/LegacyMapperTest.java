@@ -570,6 +570,7 @@ class LegacyMapperTest {
         UUID revivedBody = UUID.randomUUID();
         rows.alias(revivedBody, diedBefore, "CURRENT");
         rows.snapshot(diedBefore, "old-death", "death", 2, "{\"fullState\":" + plainState(STATE_NPC, 9)
+                .replace("\"currentHealth\"", "\"needs\":{\"configId\":\"Needs_A\",\"hunger\":0.0},\"currentHealth\"")
                 + ",\"diedAtMs\":1,\"respawnAvailableAtMs\":2,\"deathCauseKind\":\"NPC\"}", 3, 1500, false);
 
         ImportResult result = rows.map();
@@ -583,8 +584,16 @@ class LegacyMapperTest {
         assertEquals(8, record(result, withHistory).summary().level(),
                 "an old snapshot is the best saved state of a body that is out in the world");
         assertEquals(List.of(withHistory), result.report().liveUsedHistory());
-        assertEquals("{\"npcUuid\":\"" + revivedBody + "\"}", result.snapshots().get(diedBefore).importedStateJson(),
-                "an old death snapshot is the state of a life the body has left behind");
+        // An old death is the last resort: its state without the needs that killed that body, and no death timers.
+        assertEquals(List.of(diedBefore), result.report().liveUsedOldDeathState());
+        assertEquals(LocationKind.LIVE, record(result, diedBefore).location().kind());
+        assertEquals(9, record(result, diedBefore).summary().level());
+        assertEquals(0L, record(result, diedBefore).diedAtMs());
+        assertEquals(0L, record(result, diedBefore).reviveAvailableAtMs());
+        var revived = new CoopResidentStateSnapshotCodec().decode(
+                result.snapshots().get(diedBefore).importedStateJson()).snapshotOrNull();
+        assertNull(revived.needs());
+        assertEquals(9, revived.leveling().getLevel());
         assertEquals(List.of(bare, withHistory, diedBefore), result.report().liveWorldGuessed());
         assertEquals(List.of(), result.report().importedLost());
         assertEquals(Optional.of(new LegacyAliases.Entry(bare, LegacyAliases.Kind.CURRENT)), result.aliases().byNpcUuid(OLD_NPC));
