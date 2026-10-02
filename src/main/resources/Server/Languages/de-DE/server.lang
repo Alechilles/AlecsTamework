@@ -618,6 +618,7 @@ tamework.ui.linkedLocation.worldLabel=Welt:
 tamework.ui.notifications.capture.effectRequired={0} kann {1} nicht einfangen. Benötigt Effekt {2}.
 tamework.ui.notifications.capture.tranquilizedRequired={0} kann {1} erst nach Betäubung einfangen.
 tamework.ui.notifications.capture.powerTooLow={0} ist zu schwach, um {1} einzufangen. Benötigt Einfangstärke {2}.
+tamework.ui.notifications.bonded.expiresIn={0} verschwindet in {1} s
 tamework.ui.notifications.capture.healthTooHigh={0} hat zu viel Gesundheit zum Einfangen.
 tamework.ui.notifications.capture.cooldownActive={0} hat eine Einfangabklingzeit.
 tamework.ui.notifications.capture.outOfRange={0} ist außerhalb der Einfangreichweite.

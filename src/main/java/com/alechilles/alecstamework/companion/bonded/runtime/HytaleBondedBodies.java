@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpiryWarnin
 import com.alechilles.alecstamework.companion.bonded.BondedSummonEffects;
 import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates;
 import com.alechilles.alecstamework.companion.flow.CompanionBodies;
+import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.damage.ExpiryDismountFallProtectionService;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
@@ -17,6 +18,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -41,12 +43,16 @@ import javax.annotation.Nullable;
  * What the bonded companion code does to a loaded body: play an effect, protect its rider at
  * expiry, and change its talents. Every method may be called from any thread. It reads only the
  * loaded-body registry on the caller's thread and runs the entity work on the body's own world
- * thread (at once when the caller is already on it), where the ref is checked again.
+ * thread (at once when the caller is already on it), where the ref is checked again. The expiry
+ * notice goes to the owner instead, on the owner's current world thread.
  */
 public final class HytaleBondedBodies implements BondedSummonEffects.Bodies, BondedTalentUpdates.LiveBody {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
+    private static final String EXPIRES_IN_KEY = "tamework.ui.notifications.bonded.expiresIn";
+
     private final Function<UUID, Ref<EntityStore>> loaded;
+    private final TameworkUiMessageService notifications = new TameworkUiMessageService();
 
     /** @param loaded a profile's loaded body, or null; {@code LoadedBodies::get} */
     public HytaleBondedBodies(@Nonnull Function<UUID, Ref<EntityStore>> loaded) {
@@ -72,6 +78,14 @@ public final class HytaleBondedBodies implements BondedSummonEffects.Bodies, Bon
                         keepUntilMs, System.currentTimeMillis(), effect.getDuration()), OverlapBehavior.OVERWRITE, store);
             }
         });
+    }
+
+    /** The owner is resolved, and the text translated, on the owner's current world thread. */
+    @Override
+    public void notifyExpiry(@Nonnull UUID ownerUuid, @Nonnull String companionName,
+                             @Nonnull BondedCompanionExpiryWarningSchedule.Warning warning) {
+        HytaleCaptureDelivery.onPlayerWorld(ownerUuid, (world, store, ref, player) -> notifications.showKey(
+                player, warning.style(), EXPIRES_IN_KEY, companionName, warning.secondsRemaining()), null);
     }
 
     @Override

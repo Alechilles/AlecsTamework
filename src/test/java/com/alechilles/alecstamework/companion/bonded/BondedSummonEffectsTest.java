@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.StoredReason;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -36,6 +37,8 @@ class BondedSummonEffectsTest {
     private final List<Timer> timers = new ArrayList<>();
     /** "effect@keepUntilMs" per played effect, and the profiles whose rider was protected. */
     private final List<String> played = new ArrayList<>();
+    /** "owner:name:seconds:style" per expiry notice sent to an owner. */
+    private final List<String> notices = new ArrayList<>();
     private final List<UUID> armed = new ArrayList<>();
     private final BondedCompanionPolicy policy = new BondedCompanionPolicy(7L, ROSTER, "hydragon:fire_dragon",
             Set.of(DRAGON), 0, 0, 600L, 30L, 120L, "Aura", "Fading", null,
@@ -46,6 +49,13 @@ class BondedSummonEffectsTest {
                 @Override
                 public void playEffect(CompanionRecord record, String effectId, long keepUntilMs) {
                     played.add(effectId + "@" + keepUntilMs);
+                }
+
+                @Override
+                public void notifyExpiry(UUID ownerUuid, String companionName,
+                                         BondedCompanionExpiryWarningSchedule.Warning warning) {
+                    notices.add(ownerUuid + ":" + companionName + ":" + warning.secondsRemaining()
+                            + ":" + warning.style());
                 }
 
                 @Override
@@ -90,22 +100,90 @@ class BondedSummonEffectsTest {
     private void runTimers() {
         List<Timer> due = new ArrayList<>(timers);
         timers.clear();
-        due.stream().filter(timer -> !timer.cancelled).forEach(timer -> timer.task.run());
+        due.stream().filter(timer -> !timer.cancelled).forEach(timer -> {
+            now += timer.delayMs;
+            timer.task.run();
+        });
+    }
+
+    /** Lets the clock reach each pending timer in turn until none is left. */
+    private void runUntilIdle() {
+        while (timers.stream().anyMatch(timer -> !timer.cancelled)) {
+            runTimers();
+        }
+    }
+
+    private String notice(String name, int seconds, NotificationStyle style) {
+        return owner + ":" + name + ":" + seconds + ":" + style;
     }
 
     @Test
     void theWarningPlaysFiveSecondsBeforeTheSessionEndsAndLastsUntilItDoes() {
-        CompanionRecord record = summon(stored(), now + 600_000L);
+        long untilMs = now + 600_000L;
+        CompanionRecord record = summon(stored(), untilMs);
 
         assertEquals(1, timers.size());
-        assertEquals(600_000L - BondedSummonEffects.WARNING_LEAD_MS, timers.get(0).delayMs);
         // A position refresh of the live body keeps the timer it has.
         index.update(record.profileId(), record.revision(), b -> b.location(CompanionLocation.live("default", 5, 0, 5)));
         assertEquals(1, timers.size());
 
-        runTimers();
+        while (now < untilMs - BondedSummonEffects.WARNING_LEAD_MS) {
+            assertTrue(played.isEmpty());
+            runTimers();
+        }
 
-        assertEquals(List.of("Fading@" + (now + 600_000L)), played);
+        assertEquals(untilMs - BondedSummonEffects.WARNING_LEAD_MS, now);
+        assertEquals(List.of("Fading@" + untilMs), played);
+        runUntilIdle();
+        assertEquals(List.of("Fading@" + untilMs), played);
+    }
+
+    @Test
+    void theOwnerIsToldAtEachThresholdOfASessionLongerThanAMinute() {
+        summon(stored(), now + 600_000L);
+
+        assertEquals(1, timers.size());
+        assertEquals(540_000L, timers.get(0).delayMs);
+        runUntilIdle();
+
+        assertEquals(List.of(
+                notice(DRAGON, 60, NotificationStyle.Warning), notice(DRAGON, 30, NotificationStyle.Warning),
+                notice(DRAGON, 10, NotificationStyle.Warning), notice(DRAGON, 5, NotificationStyle.Danger),
+                notice(DRAGON, 4, NotificationStyle.Danger), notice(DRAGON, 3, NotificationStyle.Danger),
+                notice(DRAGON, 2, NotificationStyle.Danger), notice(DRAGON, 1, NotificationStyle.Danger)), notices);
+    }
+
+    @Test
+    void aTwentySecondSessionStartsAtTenSecondsAndUsesTheRecordsName() {
+        CompanionRecord record = stored();
+        index.update(record.profileId(), record.revision(), b -> b.displayName("Ember"));
+        summon(record, now + 20_000L);
+
+        assertEquals(10_000L, timers.get(0).delayMs);
+        runUntilIdle();
+
+        assertEquals(List.of(
+                notice("Ember", 10, NotificationStyle.Warning), notice("Ember", 5, NotificationStyle.Danger),
+                notice("Ember", 4, NotificationStyle.Danger), notice("Ember", 3, NotificationStyle.Danger),
+                notice("Ember", 2, NotificationStyle.Danger), notice("Ember", 1, NotificationStyle.Danger)), notices);
+    }
+
+    @Test
+    void storingTheCompanionMidWayCancelsTheRestOfItsNotices() {
+        CompanionRecord record = summon(stored(), now + 600_000L);
+        runTimers();
+        runTimers();
+        assertEquals(2, notices.size());
+        Timer pending = timers.get(0);
+
+        store(record);
+
+        assertTrue(pending.cancelled);
+        // Even if the cancelled task still ran, it would find the companion stored and arm nothing.
+        pending.task.run();
+        assertEquals(2, notices.size());
+        assertTrue(played.isEmpty());
+        assertEquals(1, timers.size());
     }
 
     @Test
@@ -120,8 +198,9 @@ class BondedSummonEffectsTest {
         first.task.run();
 
         assertTrue(played.isEmpty());
+        assertTrue(notices.isEmpty());
         assertEquals(2, timers.size());
-        assertEquals(900_000L - BondedSummonEffects.WARNING_LEAD_MS, timers.get(1).delayMs);
+        assertEquals(840_000L, timers.get(1).delayMs);
     }
 
     @Test
@@ -140,6 +219,11 @@ class BondedSummonEffectsTest {
                     @Override
                     public void playEffect(CompanionRecord record, String effectId, long keepUntilMs) {
                         played.add(record.profileId() + ":" + effectId);
+                    }
+
+                    @Override
+                    public void notifyExpiry(UUID ownerUuid, String companionName,
+                                             BondedCompanionExpiryWarningSchedule.Warning warning) {
                     }
 
                     @Override

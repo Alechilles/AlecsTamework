@@ -639,6 +639,7 @@ tamework.ui.linkedLocation.worldLabel=World:
 tamework.ui.notifications.capture.effectRequired={0} cannot capture {1}. Requires effect {2}.
 tamework.ui.notifications.capture.tranquilizedRequired={0} cannot capture {1} until it is tranquilized.
 tamework.ui.notifications.capture.powerTooLow={0} is too weak to capture {1}. Requires capture power {2}.
+tamework.ui.notifications.bonded.expiresIn={0} expires in {1}s
 tamework.ui.notifications.capture.healthTooHigh={0} has too much health to capture.
 tamework.ui.notifications.capture.cooldownActive={0} is on capture cooldown.
 tamework.ui.notifications.capture.outOfRange={0} is out of capture range.

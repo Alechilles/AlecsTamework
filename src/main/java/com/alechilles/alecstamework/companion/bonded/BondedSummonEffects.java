@@ -18,13 +18,15 @@ import javax.annotation.Nullable;
  * The cosmetic side of a bonded summon, driven by the record's summon timer
  * ({@code summonedUntilMs}): the family's {@code SummonAuraEffectId} when a companion comes into
  * the world, its {@code ExpiryWarningEffectId} {@link #WARNING_LEAD_MS} before the session ends,
+ * the owner's "expires in" notifications at 60, 30, 10, 5, 4, 3, 2 and 1 seconds before it ends,
  * and fall protection for a player riding the companion when the session ends.
  *
- * <p>One timer per timed active bonded companion, not a scan: {@link #onChanged} (an index
- * listener that runs after the index lock is released) schedules the warning when a companion
- * gets a timer and cancels it when the companion stops being active or its timer changes.
- * {@link #rebuild} schedules the companions already active at start. The warning task re-reads
- * the record, so a timer left over from an earlier session does nothing.</p>
+ * <p>One pending timer per timed active bonded companion, not a scan: {@link #onChanged} (an
+ * index listener that runs after the index lock is released) schedules the first warning when a
+ * companion gets a timer and cancels the pending one when the companion stops being active or
+ * its timer changes. Each warning arms the next one. {@link #rebuild} schedules the companions
+ * already active at start. The warning task re-reads the record, so a timer left over from an
+ * earlier session does nothing.</p>
  *
  * <p>Nothing here touches an entity: {@link Bodies} hops to the body's world thread. Effects are
  * best effort and never change a record. Owner: {@code Tamework} builds one with the bonded API
@@ -34,6 +36,8 @@ public final class BondedSummonEffects implements AutoCloseable {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     /** How long before the session ends the warning effect starts. */
     public static final long WARNING_LEAD_MS = 5_000L;
+    /** Seconds before the session ends at which the owner is told, in the order they come due. */
+    private static final int[] NOTICE_SECONDS = {60, 30, 10, 5, 4, 3, 2, 1};
 
     /** Plays effects on a companion's loaded body. Every method returns at once and may be called from any thread. */
     public interface Bodies {
@@ -43,6 +47,13 @@ public final class BondedSummonEffects implements AutoCloseable {
          * at least, or 0 for the effect's own duration. Does nothing without a loaded body.
          */
         void playEffect(@Nonnull CompanionRecord record, @Nonnull String effectId, long keepUntilMs);
+
+        /**
+         * Tells the owner that {@code companionName} expires in {@code warning.secondsRemaining()}
+         * seconds, in the owner's language. Does nothing when the owner is offline.
+         */
+        void notifyExpiry(@Nonnull UUID ownerUuid, @Nonnull String companionName,
+                          @Nonnull BondedCompanionExpiryWarningSchedule.Warning warning);
 
         /** Protects a player riding the companion from the fall that follows its removal. */
         void armExpiryDismount(@Nonnull CompanionRecord record);
@@ -157,31 +168,74 @@ public final class BondedSummonEffects implements AutoCloseable {
             if (closed || untilMs == 0L || untilMs <= nowMs) {
                 return;
             }
-            // A session with less than the lead left (a restart close to its end) is warned at once.
-            long delayMs = Math.max(0L, untilMs - WARNING_LEAD_MS - nowMs);
-            try {
-                warnings.put(profileId, new Pending(untilMs, scheduler.schedule(() -> warn(profileId, untilMs), delayMs)));
-            } catch (RuntimeException stopped) {
-                // The timer thread stops at shutdown; there is nothing left to warn.
+            if (untilMs - nowMs < WARNING_LEAD_MS) {
+                // A session with less than the lead left (a restart close to its end) gets the effect at once.
+                schedule(profileId, untilMs, 0, 0L);
+            } else {
+                armNext(profileId, untilMs, Integer.MAX_VALUE, nowMs);
             }
         }
     }
 
-    /** Timer thread. The entry stays tracked until the record changes, so it is warned once. */
-    private void warn(UUID profileId, long untilMs) {
+    /**
+     * Under the lock: arms the first notice below {@code belowSeconds} that is still ahead. When
+     * none is left the entry stays tracked until the record changes, so nothing is warned twice.
+     */
+    private void armNext(UUID profileId, long untilMs, int belowSeconds, long nowMs) {
+        for (int seconds : NOTICE_SECONDS) {
+            long dueMs = untilMs - seconds * 1_000L;
+            if (seconds < belowSeconds && dueMs >= nowMs) {
+                schedule(profileId, untilMs, seconds, dueMs - nowMs);
+                return;
+            }
+        }
+        warnings.put(profileId, new Pending(untilMs, () -> { }));
+    }
+
+    /** Under the lock. {@code seconds} is the notice to give, or 0 for the late effect alone. */
+    private void schedule(UUID profileId, long untilMs, int seconds, long delayMs) {
+        try {
+            warnings.put(profileId,
+                    new Pending(untilMs, scheduler.schedule(() -> warn(profileId, untilMs, seconds), delayMs)));
+        } catch (RuntimeException stopped) {
+            // The timer thread stops at shutdown; there is nothing left to warn.
+        }
+    }
+
+    /** Timer thread: gives one warning and arms the next. */
+    private void warn(UUID profileId, long untilMs, int seconds) {
         try {
             CompanionRecord record = records.apply(profileId);
             if (record == null || !record.bonded() || record.location().kind() != LocationKind.LIVE
                     || record.summonedUntilMs() != untilMs) {
                 return;
             }
-            BondedCompanionPolicy family = BondedRecords.policy(record, families);
-            if (family != null && family.expiryWarningEffectId() != null) {
-                bodies.playEffect(record, family.expiryWarningEffectId(), untilMs);
+            if (seconds == 0 || seconds * 1_000L == WARNING_LEAD_MS) {
+                BondedCompanionPolicy family = BondedRecords.policy(record, families);
+                if (family != null && family.expiryWarningEffectId() != null) {
+                    bodies.playEffect(record, family.expiryWarningEffectId(), untilMs);
+                }
+            }
+            if (seconds != 0 && record.ownerUuid() != null) {
+                BondedCompanionExpiryWarningSchedule.warning(untilMs, untilMs - seconds * 1_000L)
+                        .ifPresent(warning -> bodies.notifyExpiry(record.ownerUuid(), name(record), warning));
             }
         } catch (RuntimeException | LinkageError failure) {
             LOGGER.at(Level.WARNING).withCause(failure)
                     .log("Expiry warning failed for bonded companion %s", profileId);
         }
+        synchronized (warnings) {
+            Pending pending = warnings.get(profileId);
+            // A store, a new summon or close() since this task started has already replaced the entry.
+            if (!closed && pending != null && pending.untilMs() == untilMs) {
+                armNext(profileId, untilMs, seconds == 0 ? Integer.MAX_VALUE : seconds, clock.getAsLong());
+            }
+        }
+    }
+
+    /** The name the bonded panel shows for the record: its display name, else its role id. */
+    private static String name(CompanionRecord record) {
+        String name = record.displayName();
+        return name == null || name.isBlank() ? record.roleId() : name;
     }
 }

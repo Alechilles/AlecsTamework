@@ -46,6 +46,7 @@ tamework.ui.linkedPanel.bonded.shoulder.down.tooltip=Baja a este companero
 tamework.ui.notifications.capture.effectRequired={0} no puede capturar a {1}. Requiere el efecto {2}.
 tamework.ui.notifications.capture.tranquilizedRequired={0} no puede capturar a {1} hasta que esté tranquilizado.
 tamework.ui.notifications.capture.powerTooLow={0} es demasiado débil para capturar a {1}. Requiere poder de captura {2}.
+tamework.ui.notifications.bonded.expiresIn={0} desaparece en {1} s
 tamework.ui.notifications.capture.healthTooHigh={0} tiene demasiada salud para capturarlo.
 tamework.ui.notifications.capture.cooldownActive={0} está en tiempo de reutilización de captura.
 tamework.ui.notifications.capture.outOfRange={0} está fuera del alcance de captura.

@@ -618,6 +618,7 @@ tamework.ui.linkedLocation.worldLabel=Mundo:
 tamework.ui.notifications.capture.effectRequired={0} não pode capturar {1}. Requer o efeito {2}.
 tamework.ui.notifications.capture.tranquilizedRequired={0} não pode capturar {1} até que seja tranquilizado.
 tamework.ui.notifications.capture.powerTooLow={0} é fraco demais para capturar {1}. Requer poder de captura {2}.
+tamework.ui.notifications.bonded.expiresIn={0} desaparece em {1}s
 tamework.ui.notifications.capture.healthTooHigh={0} tem vida demais para ser capturado.
 tamework.ui.notifications.capture.cooldownActive={0} está em tempo de recarga de captura.
 tamework.ui.notifications.capture.outOfRange={0} está fora do alcance de captura.
