@@ -38,48 +38,9 @@ public final class TameworkDebugPersistenceCommand extends AbstractCommandCollec
             @Nullable Consumer<PersistenceFailureSignal> failureSink
     ) {
         super("persistence", "server.tamework.commands.debugPersistence.description");
-        addSubCommand(diagnostic(
-                TameworkDebugDbCommand.Action.STATUS,
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics
-        ));
-        addSubCommand(diagnostic(
-                TameworkDebugDbCommand.Action.HEALTH,
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics
-        ));
-        addSubCommand(diagnostic(
-                TameworkDebugDbCommand.Action.DETAIL,
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics
-        ));
-        addSubCommand(diagnostic(
-                TameworkDebugDbCommand.Action.EXPORT,
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics
-        ));
-        addSubCommand(new TameworkDebugReviveReadyCommand(
-                persistenceQueries, persistenceOperations
-        ));
+        // status, health, detail, export, reviveready and compact served the old SQLite runtime.
+        // Since the index cut-over they only answered "unavailable", so they are not registered.
+        // Their classes go with the old runtime.
         addSubCommand(new TameworkDebugPersistenceFailureCommand(failureSink));
-        addSubCommand(new TameworkDebugCompactDatabaseCommand(persistenceOperations));
-    }
-
-    private TameworkDebugDbCommand diagnostic(
-            TameworkDebugDbCommand.Action action,
-            PersistenceDiagnosticsReader persistenceDiagnostics,
-            PersistenceDiagnosticExporter persistenceExporter,
-            BondedCompanionDiagnosticContributor bondedDiagnostics
-    ) {
-        return new TameworkDebugDbCommand(
-                action,
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics
-        );
     }
 }

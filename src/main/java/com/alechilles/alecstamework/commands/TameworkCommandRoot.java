@@ -163,6 +163,15 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     }
 
     /**
+     * Adds {@code /tw persistence start-fresh} (spec 12.3). Called once before registration;
+     * {@code startFresh} is null unless old saves block the world.
+     */
+    public void addPersistenceCommands(
+            @Nullable java.util.function.Supplier<com.alechilles.alecstamework.companion.runtime.CompanionPersistenceModule.FreshStart> startFresh) {
+        addSubCommand(new TameworkPersistenceCommandGroup(startFresh));
+    }
+
+    /**
      * Adds {@code /tw bonded grant}. Called once before registration; {@code api} gives null
      * while bonded persistence is not running.
      */

@@ -29,8 +29,8 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
 - `/tw debug view spawn-beacons [radius|off]`
-- `/tw debug persistence [status|health|detail|export]`
-- `/tw debug persistence reviveready`
+- `/tw debug persistence simulateerror`
+- `/tw persistence start-fresh [confirm]`
 - `/tw bonded grant <self|player|UUID> <rosterId> <roleId> [name]`
 
 `/tw bonded grant` gives an online player one stored bonded companion for
@@ -77,6 +77,27 @@ Captured, cooped, and managed roster companions are skipped and reported. Bonded
 companions are also preserved and are not included in the ordinary-profile counts.
 Inventory items are untouched. Completion reports cleared, skipped, and failed
 counts; busy or changed profiles are not forcibly deleted.
+
+## Starting fresh when old data cannot be converted
+
+When a world holds companion data from an older Tamework version that this
+version cannot convert, Tamework creates no new companion store and turns
+companion saving, capture, recall and the companion panel off. Every start logs
+a console warning, and admins, operators and the local singleplayer owner get a
+chat notice and a popup when they join. The normal fix is to run the Tamework
+version named in the notice once on the world and then update again.
+
+`/tw persistence start-fresh` is the alternative for a world whose old
+companions do not need to be kept. Run it once to read what it does, then run
+`/tw persistence start-fresh confirm`. It creates a new empty companion store
+and asks for a server restart; companion features stay off until that restart.
+Companions from the old data are not brought over. The old files are never
+changed or deleted. Tamework stops looking at them once the new store exists.
+
+The command uses the `tamework.command.tw` permission and works from the
+console. On a world that is not waiting for a conversion it answers that there
+is nothing to do. The new store's `meta.json` records the fresh start in a
+`FreshStart` section with the kind of old data found and the time.
 
 ## Debug toggles
 
@@ -140,13 +161,7 @@ active trace evidence.
 
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain
-free. `/tw debug persistence reviveready` is the exception for generic
-`DEAD_REVIVABLE` profiles. It submits the normal persistence operation for
-every dead generic linked profile owned by the calling player. The result shows
-accepted, already-ready, and rejected counts. An accepted update completes
-through the normal persistence workflow. The command asks the caller to retry
-if linked roster data is still updating. It does not revive, summon, or change
-bonded profiles.
+free.
 
 For coops, test direct live capture, direct captured-item intake through the
 supported managed-coop interaction, and resident release independently.
@@ -155,10 +170,7 @@ Command status comes from the canonical lifecycle projection. A relocation
 timeout only drops the pending retry; it cannot manufacture `LOST`, and none of
 the debug toggles changes that rule.
 
-`/tw debug persistence status` and `health` print the same bounded
-replacement-persistence summary. `detail` adds bounded feature, outbox,
-operation-phase, incident, quarantine, and circuit counts. `export` writes a
-bounded redacted support ZIP under Tamework's universe data directory without
-including the database or save. None of these actions retries work or mutates
-saved persistence state. Each response line is sent to the command caller and
-written to the server log, including the export bundle path.
+`/tw debug persistence simulateerror` sends one harmless synthetic failure
+through the persistence diagnostic path. The older `status`, `health`, `detail`,
+`export`, `reviveready` and `compact` subcommands served the SQLite persistence
+that Tamework 5.0 replaced and are no longer registered.

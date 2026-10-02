@@ -14,14 +14,18 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPersistenceModuleTest {
@@ -63,6 +67,57 @@ class CompanionPersistenceModuleTest {
         assertEquals(CompanionStorage.LegacyKind.LEGACY_3X_4X, module.legacyKind());
         assertTrue(io.writtenPaths().isEmpty(), "nothing may be written, not even meta.json");
         module.shutdown(System.currentTimeMillis() + 1_000L);
+    }
+
+    @Test
+    void startingFreshWritesAnEmptyStoreWithAReceiptAndLeavesTheOldFilesAlone(@TempDir Path data) throws Exception {
+        byte[] oldDatabase = {1, 2, 3, 4, 5};
+        byte[] oldBundle = {9, 8, 7};
+        Files.write(data.resolve("tamework.sqlite"), oldDatabase);
+        Files.write(data.resolve("CommandLinkedNpcDeaths.dat"), oldBundle);
+        MemoryCompanionFileIo io = new MemoryCompanionFileIo();
+        Predicate<Path> exists = p -> io.exists(p) || Files.exists(p);
+        CompanionPersistenceModule blocked = CompanionPersistenceModule.open(ROOT, List.of(data), exists, io,
+                System::currentTimeMillis, "test");
+        assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, blocked.state());
+
+        assertEquals(CompanionPersistenceModule.FreshStart.CREATED,
+                CompanionPersistenceModule.startFresh(ROOT, List.of(data), exists, io, () -> -1234L, "test"));
+
+        Path meta = CompanionStorage.metaFile(ROOT);
+        assertEquals(List.of(meta), io.writtenPaths(), "only meta.json is written");
+        BsonDocument receipt = io.readNow(meta).getDocument("FreshStart");
+        assertEquals(CompanionStorage.LegacyKind.LEGACY_2X.name(), receipt.getString("FoundData").getValue());
+        assertEquals(-1234L, receipt.getInt64("AtMs").getValue());
+        assertArrayEquals(oldDatabase, Files.readAllBytes(data.resolve("tamework.sqlite")));
+        assertArrayEquals(oldBundle, Files.readAllBytes(data.resolve("CommandLinkedNpcDeaths.dat")));
+        try (Stream<Path> files = Files.list(data)) {
+            assertEquals(2L, files.count(), "nothing is added to or removed from the old data folder");
+        }
+
+        CompanionPersistenceModule reopened = CompanionPersistenceModule.open(ROOT, List.of(data), exists, io,
+                System::currentTimeMillis, "test");
+        try {
+            assertEquals(CompanionPersistenceModule.State.READY, reopened.state());
+            assertNull(reopened.legacyKind());
+            assertTrue(reopened.queries().owned(OWNER).isEmpty());
+            assertEquals(CompanionPersistenceModule.FreshStart.NOT_NEEDED,
+                    CompanionPersistenceModule.startFresh(ROOT, List.of(data), exists, io, () -> 5L, "test"));
+            assertEquals(-1234L, io.readNow(meta).getDocument("FreshStart").getInt64("AtMs").getValue(),
+                    "an existing store keeps its receipt");
+        } finally {
+            reopened.shutdown(System.currentTimeMillis() + 5_000L);
+        }
+    }
+
+    @Test
+    void aWorldWithNoOldSavesHasNothingToStartFresh() {
+        MemoryCompanionFileIo io = new MemoryCompanionFileIo();
+
+        assertEquals(CompanionPersistenceModule.FreshStart.NOT_NEEDED,
+                CompanionPersistenceModule.startFresh(ROOT, List.of(DATA), p -> false, io, () -> 1L, "test"));
+
+        assertTrue(io.writtenPaths().isEmpty());
     }
 
     @Test

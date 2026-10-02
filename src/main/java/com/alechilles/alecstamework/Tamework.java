@@ -314,6 +314,9 @@ public class Tamework extends JavaPlugin {
     @Nullable
     private volatile IndexTameworkApi api;
     private CompanionPersistenceModule companionModule;
+    /** Backs {@code /tw persistence start-fresh}; null unless old saves block this world. */
+    @Nullable
+    private Supplier<CompanionPersistenceModule.FreshStart> companionStartFresh;
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
     /** Cached admission provider decisions for the synchronous sites; closed in {@link #closeApiComposition}. */
@@ -1449,6 +1452,7 @@ public class Tamework extends JavaPlugin {
                     companions
             );
             root.addCompanionCommands(captureItemFlows, companions);
+            root.addPersistenceCommands(companionStartFresh);
             root.addBondedCommands(() -> bondedCompanionApi, () -> bondedCompanionRosterRegistry == null
                     ? null : bondedCompanionRosterRegistry.snapshot());
             getCommandRegistry().registerCommand(root);
@@ -1477,13 +1481,21 @@ public class Tamework extends JavaPlugin {
                     "Universe is unavailable at Tamework start; companion persistence is disabled.");
             return;
         }
+        Path companionRoot = CompanionStorage.root(universe.getPath());
+        HytaleCompanionFileIo companionIo = new HytaleCompanionFileIo(() -> Universe.get().getStorageManager());
+        String version = String.valueOf(getManifest().getVersion());
         companionModule = CompanionPersistenceModule.open(
-                CompanionStorage.root(universe.getPath()),
+                companionRoot,
                 legacyDirectories,
                 Files::exists,
-                new HytaleCompanionFileIo(() -> Universe.get().getStorageManager()),
+                companionIo,
                 System::currentTimeMillis,
-                String.valueOf(getManifest().getVersion()));
+                version);
+        // Only a world blocked by old saves may start fresh (spec 12.3).
+        if (companionModule.state() == CompanionPersistenceModule.State.MIGRATION_REQUIRED) {
+            companionStartFresh = () -> CompanionPersistenceModule.startFresh(companionRoot, legacyDirectories,
+                    Files::exists, companionIo, System::currentTimeMillis, version);
+        }
     }
 
     /**

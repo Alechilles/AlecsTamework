@@ -114,10 +114,11 @@ public final class CompanionPersistenceModule {
         Objects.requireNonNull(clock, "clock");
         CompanionStorage.LegacyKind legacy = CompanionStorage.detectLegacy(root, legacyDirs, exists);
         if (legacy != null) {
-            LOGGER.at(Level.SEVERE).log("Tamework found companion data from version %s (%s) on this world and no "
+            LOGGER.at(Level.WARNING).log("Tamework found companion data from version %s (%s) on this world and no "
                     + "store at %s. This version cannot convert it. Stop the server, run Tamework %s once on this "
                     + "world to convert it, then update to this version again. Companion persistence is disabled "
-                    + "until then and the old files are not changed (spec 12.1).",
+                    + "until then and the old files are not changed (spec 12.1). To start with an empty store "
+                    + "instead, run /tw persistence start-fresh.",
                     legacy.dataVersions(), legacy, root, legacy.converterVersion());
             return failed(State.MIGRATION_REQUIRED, "migration-required", legacy, clock);
         }
@@ -171,6 +172,46 @@ public final class CompanionPersistenceModule {
         }
         return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
                 result.unreadableIds(), clock, root);
+    }
+
+    /** What {@link #startFresh} did. */
+    public enum FreshStart {
+        /** The empty store was written; it loads at the next server start. */
+        CREATED,
+        /** Nothing was written: a store already exists, or no old saves block this world. */
+        NOT_NEEDED,
+        /** The store could not be written; the cause is in the server log. */
+        FAILED
+    }
+
+    /**
+     * Creates the empty store for a world whose old saves cannot be converted (spec 12.3): it
+     * writes only {@code meta.json}, with a fresh-start receipt, so the next {@link #open} loads
+     * an empty store instead of reporting {@link State#MIGRATION_REQUIRED}. It never reads, changes
+     * or deletes the old files, and it does not change any module that is already open. Blocks on
+     * file I/O, so never call it on a world thread. Never throws for store problems.
+     */
+    @Nonnull
+    public static synchronized FreshStart startFresh(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs,
+                                                     @Nonnull Predicate<Path> exists, @Nonnull CompanionFileIo io,
+                                                     @Nonnull LongSupplier clock, @Nonnull String createdBy) {
+        CompanionStorage.LegacyKind legacy = CompanionStorage.detectLegacy(root, legacyDirs, exists);
+        if (legacy == null) {
+            return FreshStart.NOT_NEEDED;
+        }
+        Path meta = CompanionStorage.metaFile(root);
+        try {
+            io.write(meta, CompanionStorage.freshStartMeta(createdBy, legacy, clock.getAsLong())).join();
+        } catch (RuntimeException e) {
+            Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+            LOGGER.at(Level.WARNING).withCause(cause).log("Could not write %s; no fresh companion store was created",
+                    meta);
+            return FreshStart.FAILED;
+        }
+        LOGGER.at(Level.INFO).log("Created an empty companion store at %s by operator request. The old %s companion "
+                + "data was left unchanged and is no longer used. Restart the server to load the new store.",
+                root, legacy.dataVersions());
+        return FreshStart.CREATED;
     }
 
     private static CompanionPersistenceModule failed(State state, String failure,

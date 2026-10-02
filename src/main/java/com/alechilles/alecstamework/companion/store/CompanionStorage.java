@@ -9,6 +9,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
+import org.bson.BsonInt64;
 import org.bson.BsonString;
 
 /**
@@ -104,5 +105,17 @@ public final class CompanionStorage {
     public static BsonDocument meta(@Nonnull String createdBy) {
         return new BsonDocument("Format", new BsonInt32(META_FORMAT))
                 .append("CreatedBy", new BsonString(Objects.requireNonNull(createdBy, "createdBy")));
+    }
+
+    /**
+     * {@code meta.json} for an empty store an operator created with {@code /tw persistence start-fresh}
+     * while old saves blocked the world (spec 12.3). The {@code FreshStart} section is the receipt:
+     * {@code FoundData} names the {@link LegacyKind} that was left unconverted and {@code AtMs} is the
+     * wall-clock time. Other receipts get their own named section beside it.
+     */
+    @Nonnull
+    public static BsonDocument freshStartMeta(@Nonnull String createdBy, @Nonnull LegacyKind found, long atMs) {
+        return meta(createdBy).append("FreshStart",
+                new BsonDocument("FoundData", new BsonString(found.name())).append("AtMs", new BsonInt64(atMs)));
     }
 }
