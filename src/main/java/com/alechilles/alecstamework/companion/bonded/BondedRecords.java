@@ -41,9 +41,13 @@ public final class BondedRecords {
     public static final String OWNED_CAPACITY_LIMIT = "bonded.ownedCapacity.limit";
     /**
      * Presentation key: the one role of a family that allows a single role, so the panel can name
-     * the family by that role's translated name. Roster families have no display name of their own.
+     * the family by that role's translated name when it has no {@link #FAMILY_NAME_KEY}.
      */
     public static final String FAMILY_SOLE_ROLE_ID = "bonded.family.soleRoleId";
+    /** Presentation key: the record's family id. It tells families apart; it is never shown. */
+    public static final String FAMILY_ID = "bonded.family.id";
+    /** Presentation key: the family's {@code NameKey}, when its roster config sets one. */
+    public static final String FAMILY_NAME_KEY = "bonded.family.nameKey";
     /**
      * Presentation keys naming one active companion of a full family, on a stored or dead record
      * that the full family blocks: its given name, its role name key and its role id. Each is
@@ -221,6 +225,11 @@ public final class BondedRecords {
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         if (policy != null) {
             presentation.putAll(capacityAttributes(policy, active));
+            presentation.put(FAMILY_ID, policy.familyId());
+            putIfText(presentation, FAMILY_NAME_KEY, policy.nameKey());
+            if (policy.allowedRoles().size() == 1) {
+                presentation.put(FAMILY_SOLE_ROLE_ID, policy.allowedRoles().iterator().next());
+            }
             if (policy.maximumOwned() > 0) {
                 presentation.put(OWNED_CAPACITY_COUNT, Integer.toString(counts.owned()));
                 presentation.put(OWNED_CAPACITY_LIMIT, Integer.toString(policy.maximumOwned()));
@@ -303,9 +312,6 @@ public final class BondedRecords {
         attributes.put(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT,
                 Integer.toString(policy.maximumActive()));
         attributes.put(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, familyLabel(policy.familyId()));
-        if (policy.allowedRoles().size() == 1) {
-            attributes.put(FAMILY_SOLE_ROLE_ID, policy.allowedRoles().iterator().next());
-        }
         return attributes;
     }
 

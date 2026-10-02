@@ -100,8 +100,8 @@ final class BondedCompanionPanelChrome {
      * The header capacity text. One family shows its active and owned counts. Several families do
      * not fit on the line with both, so each shows its active count (its owned count when no
      * family has an active limit) and the tooltip, {@link #capacityText}, carries the rest.
-     * Families are named only when every one of them has a translated name; a roster family has no
-     * display name of its own, so the name is that of its role when it allows a single role.
+     * Families are named only when every one of them has a translated name: its roster config's
+     * {@code NameKey}, else the name of its role when it allows a single role.
      */
     static String capacityHeader(Map<UUID, CommandPanelFeaturePresentation> features, String language) {
         List<Family> families = families(features, language);
@@ -163,23 +163,23 @@ final class BondedCompanionPanelChrome {
 
     /** The families with at least one limit, in a stable order. */
     private static List<Family> families(Map<UUID, CommandPanelFeaturePresentation> features, String language) {
-        // Capacity belongs to a policy family, not to the currently filtered rows. The capacity
-        // label only tells the families apart here; it is built from the family id and never shown.
+        // Capacity belongs to a policy family, not to the currently filtered rows. The family id
+        // (the capacity label on older sources) only tells the families apart; it is never shown.
         Map<String, Family> families = new TreeMap<>();
         for (CommandPanelFeaturePresentation feature : features.values()) {
             if (feature.bonded() == null) continue;
             Map<String, String> attributes = feature.bonded().attributes();
             String limit = attributes.get(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT);
             Family family = new Family(
-                    BondedCompanionNames.speciesLabel(null, null,
+                    BondedCompanionNames.speciesLabel(null, attributes.get(BondedRecords.FAMILY_NAME_KEY),
                             attributes.get(BondedRecords.FAMILY_SOLE_ROLE_ID), language),
                     attributes.get(BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT),
                     "0".equals(limit) ? "\u221e" : limit,
                     attributes.get(BondedRecords.OWNED_CAPACITY_COUNT),
                     attributes.get(BondedRecords.OWNED_CAPACITY_LIMIT));
             if (family.active() || family.owned()) {
-                families.put(attributes.getOrDefault(
-                        BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, ""), family);
+                families.put(attributes.getOrDefault(BondedRecords.FAMILY_ID, attributes.getOrDefault(
+                        BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL, "")), family);
             }
         }
         return List.copyOf(families.values());

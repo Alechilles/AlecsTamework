@@ -61,6 +61,7 @@ is rejected and the last accepted generation remains active.
   "Priority": 100,
   "RosterId": "example:shared_roster",
   "FamilyId": "example:large_companions",
+  "NameKey": "server.example.roster.family.large",
   "AllowedRoles": [ "Tamed_Example_Large" ],
   "MaximumOwned": 0,
   "MaximumActive": 1,
@@ -89,6 +90,13 @@ is rejected and the last accepted generation remains active.
   it does not make duplicate `(RosterId, FamilyId)` definitions valid.
 - `RosterId`: required namespaced ID for the shared player-facing roster.
 - `FamilyId`: required namespaced ID for this independently balanced family.
+- `NameKey`: optional translation key of the family's short display name
+  (for example `server.messages.roster.family.fullDragons`). The bonded roster
+  panel shows it with the family's counts when a roster has several families,
+  as in `Dragons 0 / 1 · Miniwyvern 0 / 1`, and resolves it in each viewer's
+  language. Omission inherits. When no family name resolves, the panel uses the
+  name of the family's role if it allows a single role; otherwise it shows the
+  counts without names. The key may live in any loaded mod's language files.
 - `AllowedRoles`: required non-empty array of exact, unique role IDs.
 - `MaximumOwned`: maximum stored, active, and dead profiles in this family for
   one owner. `0` means unlimited.

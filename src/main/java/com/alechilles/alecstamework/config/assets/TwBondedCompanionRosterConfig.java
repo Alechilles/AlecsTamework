@@ -45,6 +45,7 @@ public final class TwBondedCompanionRosterConfig implements
     int priority;
     String rosterId;
     String familyId;
+    String nameKey;
     String[] allowedRoles = ArrayUtil.EMPTY_STRING_ARRAY;
     int maximumOwned;
     int maximumActive;
@@ -136,6 +137,9 @@ public final class TwBondedCompanionRosterConfig implements
         }
         if (!explicitTopLevelKeys.contains("FamilyId")) {
             familyId = parent.familyId;
+        }
+        if (!explicitTopLevelKeys.contains("NameKey")) {
+            nameKey = parent.nameKey;
         }
         if (!explicitTopLevelKeys.contains("AllowedRoles")) {
             allowedRoles = parent.allowedRoles;
@@ -321,6 +325,15 @@ public final class TwBondedCompanionRosterConfig implements
 
     public String getFamilyId() {
         return normalize(familyId);
+    }
+
+    /**
+     * Translation key of the family's short display name, shown with its counts in the bonded
+     * roster panel. Null when unset; the panel then falls back to the family's single role name.
+     */
+    @Nullable
+    public String getNameKey() {
+        return normalize(nameKey);
     }
 
     public String[] getAllowedRoles() {

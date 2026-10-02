@@ -143,7 +143,9 @@ Behavior summary:
   command behavior.
 - `TwBondedCompanionRosterConfig` defines bonded roster-family limits, session
   duration, summon cooldown, revive cooldown, revive price, and action gates.
-  `ReviveCooldownSeconds: 0` disables the bonded revive cooldown.
+  `ReviveCooldownSeconds: 0` disables the bonded revive cooldown. Optional
+  `NameKey` is the translation key of the family's short display name, shown
+  with its counts in the bonded roster panel header.
 - Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config open` hide them so server owners use `/tw settings`.
 
 Persistence machinery does not have feature-specific asset families.

@@ -233,7 +233,8 @@ public final class BondedCompanionRosterRegistry {
                         configuredFeatures.isSummon(),
                         configuredFeatures.isDismiss(),
                         configuredFeatures.isRevive()
-                )
+                ),
+                config.getNameKey()
         );
     }
 
@@ -456,9 +457,11 @@ public final class BondedCompanionRosterRegistry {
             @Nullable String summonAuraEffectId,
             @Nullable String expiryWarningEffectId,
             @Nullable RevivePrice revivePrice,
-            @Nonnull FeatureFlags features
+            @Nonnull FeatureFlags features,
+            @Nullable String nameKey
     ) {
         public RosterDefinition {
+            nameKey = nameKey == null || nameKey.isBlank() ? null : nameKey.trim();
             configId = Objects.requireNonNull(configId, "configId");
             rosterId = Objects.requireNonNull(rosterId, "rosterId");
             familyId = Objects.requireNonNull(familyId, "familyId");
@@ -486,7 +489,7 @@ public final class BondedCompanionRosterRegistry {
         ) {
             this(configId, priority, rosterId, familyId, allowedRoles,
                     maximumOwned, maximumActive, sessionDurationSeconds,
-                    summonCooldownSeconds, 0L, null, null, revivePrice, features);
+                    summonCooldownSeconds, 0L, null, null, revivePrice, features, null);
         }
     }
 

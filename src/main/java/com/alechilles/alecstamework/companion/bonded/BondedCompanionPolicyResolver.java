@@ -143,7 +143,8 @@ public final class BondedCompanionPolicyResolver {
                 new BondedCompanionPolicy.FeatureFlags(
                         flags.capture(), flags.provision(), flags.summon(),
                         flags.dismiss(), flags.revive()
-                )
+                ),
+                source.nameKey()
         );
     }
 

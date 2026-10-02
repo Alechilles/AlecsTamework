@@ -136,6 +136,19 @@ public final class TwBondedCompanionRosterCodecs {
             )
             .documentation("Stable namespaced companion family ID. An omitted value inherits.")
             .add()
+            .<String>append(
+                    new KeyedCodec<>("NameKey", Codec.STRING),
+                    (asset, value) -> asset.nameKey = value,
+                    asset -> asset.getNameKey()
+            )
+            .documentation(
+                    "Optional translation key of the family's short display "
+                            + "name, shown with its counts in the bonded roster "
+                            + "panel (for example \"Dragons 0 / 1\"). Omission "
+                            + "inherits; blank or unset falls back to the name "
+                            + "of the family's role when it allows a single role."
+            )
+            .add()
             .<String[]>append(
                     new KeyedCodec<>("AllowedRoles", Codec.STRING_ARRAY),
                     (asset, value) -> asset.allowedRoles = value == null
