@@ -17,6 +17,9 @@ import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.hypixel.hytale.codec.EmptyExtraInfo;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -318,5 +321,39 @@ class BondedTalentUpdatesTest {
         liveOutcome = null;
         assertEquals(BondedCompanionResultCode.WORLD_UNAVAILABLE,
                 api.updateTalents(purchase(record, "swift")).join().code());
+    }
+
+    /** An imported stored companion whose format 0 state holds {@code level} and, when given, {@code talents}. */
+    private CompanionRecord importedAt(int level, TameworkTalentsComponent talents) {
+        CompanionRecord record = insert(CompanionLocation.stored(StoredReason.BONDED));
+        String json = new CoopResidentStateSnapshotCodec().encode(new CoopResidentStateSnapshot(UUID.randomUUID(),
+                null, -1, DRAGON, null, null, null, null, null, null, null,
+                new TameworkLevelingComponent("test:leveling", level, 0.0, 0.0), null, talents, null, null,
+                null, null, 50.0, 1L));
+        stored = SnapshotEnvelope.importedState(record.profileId(), record.generation(), json);
+        return record;
+    }
+
+    /** Before its first summon an imported companion has only its 4.x state; its talents live there. */
+    @Test
+    void anImportedCompanionsTalentsAreReadFromAndBoughtIntoItsStateSnapshot() {
+        CompanionRecord record = importedAt(12, swiftBought());
+
+        BondedTalentUpdates.Stored read = api.storedTalents(owner, ROSTER, record.profileId().toString()).join();
+        BondedCompanionResult<BondedCompanionProfileView> result = api.updateTalents(purchase(record, "mighty")).join();
+
+        assertEquals(12, read.leveling().getLevel());
+        assertArrayEquals(new String[] {"swift"}, read.talents().getPurchasedTalentIds());
+        assertTrue(result.successful(), String.valueOf(result.reason()));
+        assertEquals(1, queued.size());
+        // The snapshot stays an imported state, so the first summon still restores everything else in it.
+        assertEquals(SnapshotEnvelope.FORMAT_IMPORTED_STATE, queued.get(0).format());
+        assertEquals(record.generation(), queued.get(0).generation());
+        CoopResidentStateSnapshot after = new CoopResidentStateSnapshotCodec()
+                .decode(queued.get(0).importedStateJson()).snapshotOrNull();
+        assertEquals(Set.of("swift", "mighty"), Set.of(after.talents().getPurchasedTalentIds()));
+        assertEquals(3, after.talents().getSpentPoints());
+        assertEquals(12, after.leveling().getLevel());
+        assertEquals(50.0, after.healthPercent());
     }
 }

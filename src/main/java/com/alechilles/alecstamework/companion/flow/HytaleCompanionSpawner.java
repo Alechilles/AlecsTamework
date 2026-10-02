@@ -253,12 +253,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         finishAddedBody(ref, ref.getStore(), committed, world.getName(), worldGameTimeMs, reason, snapshots,
                 queueSnapshot, !unowned);
         if (unowned) {
-            // The body is untracked: no later recall or Recover may restore this profile from a snapshot.
-            try {
-                deleteSnapshot.accept(profileId);
-            } catch (RuntimeException failure) {
-                warn(profileId, "the snapshot of an unowned spawn could not be queued for deletion", failure);
-            }
+            deleteUnownedSnapshot(profileId);
         }
         return true;
     }
@@ -297,7 +292,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }
-            CoopResidentStateSnapshot state = imported == null ? null : RestoreRules.importedState(imported);
+            // A revive comes back without the needs that killed the companion.
+            CoopResidentStateSnapshot state = imported == null ? null
+                    : RestoreRules.importedStateFor(imported, reason);
             if (imported != null && state == null) {
                 warn(profileId, "the imported state snapshot is unreadable", null);
                 return false;
@@ -363,12 +360,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         finishAddedBody(ref, store, committed, world.getName(), worldGameTimeMs, reason, snapshots, queueSnapshot,
                 !unowned);
         if (unowned) {
-            // The body is untracked: no later recall or Recover may restore this profile from a snapshot.
-            try {
-                deleteSnapshot.accept(profileId);
-            } catch (RuntimeException failure) {
-                warn(profileId, "the snapshot of an unowned spawn could not be queued for deletion", failure);
-            }
+            deleteUnownedSnapshot(profileId);
         }
         return true;
     }
@@ -393,6 +385,15 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         if (work.hasAttachmentWork()) {
             CompanionModelAttachmentService.applyAttachments(ref, store.getComponent(ref, NPCEntity.getComponentType()),
                     store, work.attachments().getAttachmentIds());
+        }
+    }
+
+    /** An unowned body is untracked: no later recall or Recover may restore its profile from a snapshot. */
+    private void deleteUnownedSnapshot(UUID profileId) {
+        try {
+            deleteSnapshot.accept(profileId);
+        } catch (RuntimeException failure) {
+            warn(profileId, "the snapshot of an unowned spawn could not be queued for deletion", failure);
         }
     }
 

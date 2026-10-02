@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
+import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -9,10 +10,14 @@ import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,7 +34,9 @@ import org.bson.BsonDocument;
  * talents, so the change is made on the body, on its world thread ({@link LiveBody}). Any other
  * companion keeps them in its stored snapshot: the snapshot is read, checked against the level it
  * holds, patched ({@link SnapshotPatch#withTalents}) and queued for writing, so the next summon
- * comes back with the new talents.
+ * comes back with the new talents. A companion imported from 3.x or 4.x that has not been
+ * restored yet keeps them in its format 0 state snapshot, which is read and patched the same way
+ * and stays format 0.
  *
  * <p>The stored change is fenced on the record revision the caller saw. Under the index lock the
  * record's summary gets the new spent points and tree, at that revision, and the patched snapshot
@@ -43,6 +50,9 @@ import org.bson.BsonDocument;
 public final class BondedTalentUpdates {
     private static final String COMPONENTS = "Components";
     private static final String LEVELING = "TameworkLeveling";
+    /** The talents member of the imported state JSON, as {@code CoopResidentStateSnapshotCodec} names it. */
+    private static final String IMPORTED_TALENTS = "talents";
+    private static final Gson GSON = new Gson();
 
     /** How an update ended. Only {@link #APPLIED} changed anything. */
     public enum Status {
@@ -175,6 +185,10 @@ public final class BondedTalentUpdates {
     @Nullable
     public static Stored decode(@Nonnull SnapshotEnvelope snapshot) {
         try {
+            if (snapshot.format() == SnapshotEnvelope.FORMAT_IMPORTED_STATE) {
+                CoopResidentStateSnapshot state = RestoreRules.importedState(snapshot);
+                return state == null ? null : new Stored(state.leveling(), state.talents());
+            }
             BsonDocument entity = CompanionSnapshots.entity(snapshot);
             BsonDocument components = entity.isDocument(COMPONENTS) ? entity.getDocument(COMPONENTS) : new BsonDocument();
             return new Stored(
@@ -202,9 +216,7 @@ public final class BondedTalentUpdates {
         if (updated == null) {
             return Outcome.of(Status.REJECTED);
         }
-        BsonDocument data = snapshot.data().clone();
-        data.put("Entity", SnapshotPatch.withTalents(CompanionSnapshots.entity(snapshot), updated));
-        SnapshotEnvelope patched = new SnapshotEnvelope(snapshot.profileId(), snapshot.format(), snapshot.generation(), data);
+        SnapshotEnvelope patched = withTalents(snapshot, updated);
         CompanionSummary summary = withTalents(record.summary(), updated);
         boolean queued = index.atomically(() -> {
             // The fence is the revision the caller read, not the current one: any change since
@@ -217,6 +229,22 @@ public final class BondedTalentUpdates {
         });
         return queued ? new Outcome(Status.APPLIED, updated, leveling.getLevel(), leveling.getConfigId())
                 : Outcome.of(Status.CONFLICT);
+    }
+
+    /**
+     * The snapshot with its talents replaced and everything else kept, in the format it came in.
+     * An imported state gets its {@code talents} member rewritten as its codec encodes that
+     * component; {@link #decode} has already read that JSON, so it parses.
+     */
+    private static SnapshotEnvelope withTalents(SnapshotEnvelope snapshot, TameworkTalentsComponent talents) {
+        if (snapshot.format() == SnapshotEnvelope.FORMAT_IMPORTED_STATE) {
+            JsonObject state = JsonParser.parseString(snapshot.importedStateJson()).getAsJsonObject();
+            state.add(IMPORTED_TALENTS, GSON.toJsonTree(talents, TameworkTalentsComponent.class));
+            return SnapshotEnvelope.importedState(snapshot.profileId(), snapshot.generation(), state.toString());
+        }
+        BsonDocument data = snapshot.data().clone();
+        data.put("Entity", SnapshotPatch.withTalents(CompanionSnapshots.entity(snapshot), talents));
+        return new SnapshotEnvelope(snapshot.profileId(), snapshot.format(), snapshot.generation(), data);
     }
 
     /** The summary with the spent points and tree of {@code talents}; stored companions are listed from it. */

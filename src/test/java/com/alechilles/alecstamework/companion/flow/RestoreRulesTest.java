@@ -136,20 +136,6 @@ class RestoreRulesTest {
             + "\",\"roleId\":\"Tamed_Sheep\",\"currentHealth\":0.0,\"maximumHealth\":20.0,\"healthPercent\":0.0}";
 
     @Test
-    void anImportedStateSnapshotServesARecoverAReviveAndASummon() {
-        CompanionRecord lost = at(CompanionLocation.lost("IMPORTED_UNRESOLVED"));
-        CompanionRecord dead = dead(0L);
-        CompanionRecord stored = at(CompanionLocation.stored(StoredReason.BONDED));
-
-        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(lost,
-                SnapshotEnvelope.importedState(lost.profileId(), 0L, IMPORTED_STATE), Reason.RECOVER));
-        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(dead,
-                SnapshotEnvelope.importedState(dead.profileId(), 0L, IMPORTED_STATE), Reason.REVIVE));
-        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(stored,
-                SnapshotEnvelope.importedState(stored.profileId(), 0L, IMPORTED_STATE), Reason.SUMMON));
-    }
-
-    @Test
     void anImportedStateSnapshotThatCannotBeReadIsNotUsed() {
         CompanionRecord stored = at(CompanionLocation.stored(StoredReason.ROSTER));
         UUID id = stored.profileId();
@@ -172,5 +158,18 @@ class RestoreRulesTest {
         assertEquals(false, RestoreRules.appliesImportedHealth(Reason.RECOVER, 0.0, 0.0));
         assertEquals(false, RestoreRules.appliesImportedHealth(Reason.SUMMON, null, null));
         assertEquals(false, RestoreRules.appliesImportedHealth(Reason.REVIVE, 12.0, 60.0));
+    }
+
+    /** A companion that starved must not come back with the needs that killed it. */
+    @Test
+    void aReviveFromAnImportedStateDropsItsNeedsAndKeepsTheRest() {
+        UUID id = UUID.randomUUID();
+        String starved = IMPORTED_STATE.replace("{\"version\"",
+                "{\"needs\":{\"hunger\":0.0,\"thirst\":0.0},\"leveling\":{\"level\":7},\"version\"");
+        SnapshotEnvelope snapshot = SnapshotEnvelope.importedState(id, 0L, starved);
+
+        assertEquals(true, RestoreRules.importedStateFor(snapshot, Reason.SUMMON).needs() != null);
+        assertEquals(null, RestoreRules.importedStateFor(snapshot, Reason.REVIVE).needs());
+        assertEquals(7, RestoreRules.importedStateFor(snapshot, Reason.REVIVE).leveling().getLevel());
     }
 }

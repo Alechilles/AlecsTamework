@@ -45,7 +45,8 @@ public final class BondedTalentTimers {
         }
     }
 
-    private static BondedCompanionPolicy adjust(BondedCompanionPolicy family, SnapshotEnvelope snapshot,
+    /** The family's timers with the snapshot's purchased talents applied; the family's own when it has none readable. */
+    static BondedCompanionPolicy adjust(BondedCompanionPolicy family, SnapshotEnvelope snapshot,
                                                 TwTalentConfig config) {
         try {
             BondedTalentUpdates.Stored state = BondedTalentUpdates.decode(snapshot);

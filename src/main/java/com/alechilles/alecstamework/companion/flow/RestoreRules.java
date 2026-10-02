@@ -124,7 +124,7 @@ public final class RestoreRules {
      * envelope is not format 0 or its JSON cannot be read.
      */
     @Nullable
-    static CoopResidentStateSnapshot importedState(@Nonnull SnapshotEnvelope snapshot) {
+    public static CoopResidentStateSnapshot importedState(@Nonnull SnapshotEnvelope snapshot) {
         String json = snapshot.importedStateJson();
         if (json == null) {
             return null;
@@ -146,5 +146,25 @@ public final class RestoreRules {
                                          @Nullable Double healthPercent) {
         Double stored = currentHealth != null ? currentHealth : healthPercent;
         return reason != Reason.REVIVE && stored != null && stored > 0.0;
+    }
+
+    /**
+     * The imported state as this restore writes it into the new body; null when it cannot be
+     * read. A revive drops the needs that killed the companion, as {@link SnapshotPatch#forRevive}
+     * does for format 1, so the progression bootstrap recreates them with the config defaults.
+     * The other things that patch removes or lifts are not in an imported state's components: the
+     * body is built fresh from the role, so it has no death component, and its health is handled
+     * by {@link #appliesImportedHealth}.
+     */
+    @Nullable
+    static CoopResidentStateSnapshot importedStateFor(@Nonnull SnapshotEnvelope snapshot, @Nonnull Reason reason) {
+        CoopResidentStateSnapshot s = importedState(snapshot);
+        if (s == null || reason != Reason.REVIVE || s.needs() == null) {
+            return s;
+        }
+        return new CoopResidentStateSnapshot(s.npcUuid(), s.coopId(), s.residentSlot(), s.roleId(), s.commandLinks(),
+                s.owner(), s.tamed(), s.npcName(), s.happiness(), null, s.breeding(), s.leveling(), s.traits(),
+                s.talents(), s.lifeStage(), s.attachments(), s.currentHealth(), s.maximumHealth(), s.healthPercent(),
+                s.capturedAtMs(), s.alarms());
     }
 }
