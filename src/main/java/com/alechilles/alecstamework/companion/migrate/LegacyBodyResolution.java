@@ -136,6 +136,17 @@ public final class LegacyBodyResolution {
         return new Decision(Action.REMOVE_STALE, profileId, 0L, why + " (record is " + kind + ")");
     }
 
+    /**
+     * True for a record imported LIVE whose body 5.0 has not seen yet: still at generation 0 and at
+     * exactly 0,0,0, where the importer puts a body it has no position for. The first sighting of
+     * the body writes its real position. Until then the record's world may be a guess and its
+     * snapshot is not the body's state (it is empty or an older one), so nothing routine may
+     * replace the body from it.
+     */
+    public static boolean neverSighted(@Nonnull CompanionRecord record) {
+        return record.neverSighted();
+    }
+
     /** True for a record still exactly as it was imported LOST with no known place. */
     private static boolean awaitsItsBody(CompanionRecord record) {
         String cause = record.location().cause();
@@ -169,13 +180,14 @@ public final class LegacyBodyResolution {
      * lock, so no other change to the record (for example an owner's Recover) can land between
      * the decision and the update. For {@link Action#STAMP_CURRENT} and {@link Action#REJOIN} the
      * record is updated with {@code matched} and {@code ref} becomes the loaded body; if that
-     * update does not apply, the answer is {@link Action#LEAVE} and nothing changed. The caller
-     * writes the stamp and removes a stale body.
+     * update does not apply, or {@code matched} refuses the match by returning null, the answer is
+     * {@link Action#LEAVE} and nothing changed. The caller writes the stamp and removes a stale body.
      *
      * @param valid   true while a registered body reference is still usable
      * @param matched given the record as it is under the lock, the change that makes it LIVE at
-     *                this body (place, NPC UUID and whatever else the body is the authority for);
-     *                it must not change the generation. Runs under the index lock: no I/O.
+     *                this body (place, NPC UUID and whatever else the body is the authority for),
+     *                or null to refuse the match (a live tame over the owner's limit). It must not
+     *                change the generation. Runs under the index lock: no I/O.
      */
     @Nonnull
     public static <R> Decision admit(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -192,7 +204,11 @@ public final class LegacyBodyResolution {
             boolean anotherLoaded = other != null && !other.equals(ref) && valid.test(other);
             Decision decision = decide(body, alias, record, unread, anotherLoaded, liveTame);
             if (decision.action() == Action.STAMP_CURRENT || decision.action() == Action.REJOIN) {
-                if (!index.update(record.profileId(), record.revision(), matched.apply(record)).applied()) {
+                UnaryOperator<CompanionRecord.Builder> change = matched.apply(record);
+                if (change == null) {
+                    return leave(record, "the match was refused");
+                }
+                if (!index.update(record.profileId(), record.revision(), change).applied()) {
                     return leave(record, "its record could not be updated");
                 }
                 loaded.put(record.profileId(), ref);

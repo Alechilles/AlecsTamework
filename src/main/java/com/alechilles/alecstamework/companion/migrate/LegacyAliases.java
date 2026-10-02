@@ -52,11 +52,6 @@ public record LegacyAliases(@Nonnull Map<UUID, Entry> entries) {
             Objects.requireNonNull(profileId, "profileId");
             Objects.requireNonNull(kind, "kind");
         }
-
-        /** True when the body is the live body of its record. */
-        public boolean current() {
-            return kind == Kind.CURRENT;
-        }
     }
 
     public LegacyAliases {

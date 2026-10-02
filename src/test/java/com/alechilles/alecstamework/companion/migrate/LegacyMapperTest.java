@@ -65,7 +65,7 @@ class LegacyMapperTest {
         assertEquals(CompanionLocation.item(), record(result, captured).location());
         assertEquals(CompanionLocation.coop("world-a", 10, 64, -20, 3), record(result, coop).location());
         assertEquals(CompanionLocation.stored(StoredReason.ROSTER), record(result, roster).location());
-        assertEquals(CompanionLocation.stored(StoredReason.PROVISIONED), record(result, provisioned).location());
+        assertEquals(CompanionLocation.lost(LegacyMapper.CAUSE_UNRESOLVED), record(result, provisioned).location());
         assertEquals(CompanionLocation.dead(null), record(result, dead).location());
         assertEquals(CompanionLocation.lost(null), record(result, lost).location());
         assertEquals(CompanionLocation.released(null), record(result, released).location());
@@ -85,11 +85,44 @@ class LegacyMapperTest {
         assertNull(result.snapshots().get(released));
         assertEquals(List.of(), record(result, released).toolIds());
         assertEquals(Map.of(), record(result, released).extensions());
-        assertEquals(Map.of(LocationKind.LIVE, 2, LocationKind.ITEM, 1, LocationKind.COOP, 1, LocationKind.STORED, 3,
-                LocationKind.DEAD, 2, LocationKind.LOST, 2, LocationKind.RELEASED, 1),
+        assertEquals(Map.of(LocationKind.LIVE, 2, LocationKind.ITEM, 1, LocationKind.COOP, 1, LocationKind.STORED, 2,
+                LocationKind.DEAD, 2, LocationKind.LOST, 3, LocationKind.RELEASED, 1),
                 result.report().recordsByLocation());
         assertEquals(2, result.report().bondedRecords());
-        assertEquals(List.of(unresolved), result.report().importedLost());
+        assertEquals(List.of(provisioned, unresolved), result.report().importedLost());
+    }
+
+    /**
+     * A STORED record comes back only through a summon. 5.0 summons PROVISIONED only for a bonded
+     * record, and a timed one needs its roster; Recover does not take STORED. Imported as STORED
+     * these companions could never be brought back, so they are imported LOST and recoverable.
+     */
+    @Test
+    void aStoredProfileThatNoSummonCouldReachIsImportedLostAndRecoverable() {
+        UUID provisioned = rows.profile("PROVISIONED_DORMANT", "PROVISIONING", "prov", null);
+        rows.alias(NPC, provisioned, "CURRENT");
+        rows.snapshot(provisioned, "state", "full_state_projection", plainState(STATE_NPC, 6), 1, 1000);
+        UUID timedNoRoster = rows.profile("ROSTER_STORED", "COMMAND_ROSTER", "slot", null);
+        rows.leases.add(lease(timedNoRoster, null, 5_000L));
+        UUID timedInRoster = rows.profile("PROVISIONED_DORMANT", "PROVISIONING", "prov-2", null);
+        rows.leases.add(lease(timedInRoster, null, null));
+        rows.rosters.add(new LegacyRows.RosterMembership("slot-2", timedInRoster.toString(), OWNER.toString(), "wolves",
+                2, "pack", true, null, null, null, null, 1, 1));
+
+        ImportResult result = rows.map();
+
+        CompanionRecord lost = record(result, provisioned);
+        assertEquals(CompanionLocation.lost(LegacyMapper.CAUSE_UNRESOLVED), lost.location());
+        assertEquals(RestoreRules.Verdict.ALLOWED, RestoreRules.forRecord(lost, RestoreRules.Reason.RECOVER, 0L));
+        assertEquals(RestoreRules.Verdict.ALLOWED, RestoreRules.forSnapshot(lost, result.snapshots().get(provisioned),
+                RestoreRules.Reason.RECOVER), "its stored state serves the recover");
+        assertEquals(6, lost.summary().level());
+        assertEquals(Optional.of(new LegacyAliases.Entry(provisioned, LegacyAliases.Kind.REJOIN)),
+                result.aliases().byNpcUuid(NPC));
+        assertEquals(CompanionLocation.lost(LegacyMapper.CAUSE_UNRESOLVED), record(result, timedNoRoster).location());
+        assertEquals(5_000L, record(result, timedNoRoster).summonCooldownUntilMs());
+        assertEquals(CompanionLocation.stored(StoredReason.TIMED), record(result, timedInRoster).location());
+        assertEquals(List.of(provisioned, timedNoRoster), result.report().importedLost());
     }
 
     @Test
@@ -286,6 +319,8 @@ class LegacyMapperTest {
         rows.leases.add(lease(expired, -5_000L, null));
         UUID stored = rows.profile("ROSTER_STORED", "COMMAND_ROSTER", "slot", null);
         rows.leases.add(lease(stored, null, -7_000L));
+        rows.rosters.add(new LegacyRows.RosterMembership("slot", stored.toString(), OWNER.toString(), "wolves", 2,
+                "pack", true, null, null, null, null, 1, 1));
 
         ImportResult result = rows.map();
 

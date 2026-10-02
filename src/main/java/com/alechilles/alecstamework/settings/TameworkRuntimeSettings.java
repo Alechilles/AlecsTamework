@@ -93,6 +93,11 @@ public final class TameworkRuntimeSettings {
         return values.populationLimitPerPlayerOwnedTotal();
     }
 
+    /** The limit on a player's companions out in the world; 0 = no limit. */
+    public int populationLimitPerPlayerDeployedTotal() {
+        return values.populationLimitPerPlayerDeployedTotal();
+    }
+
     @Nonnull
     public String populationPerPlayerLimitScope() {
         return values.populationPerPlayerLimitScope();
@@ -320,6 +325,11 @@ public final class TameworkRuntimeSettings {
     public static int populationLimitPerPlayerOwnedTotal(int configLimit) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.populationLimitPerPlayerOwnedTotal() : configLimit;
+    }
+
+    public static int populationLimitPerPlayerDeployedTotal(int configLimit) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.populationLimitPerPlayerDeployedTotal() : configLimit;
     }
 
     @Nonnull

@@ -72,8 +72,9 @@ public record ImportResult(
      *                                the body is seen, and a recover respawns from the role unless
      *                                an older state snapshot existed (R5)
      * @param importedLost            records imported LOST because the old row named no usable
-     *                                body or coop slot, or had state UNRESOLVED or unknown. The
-     *                                last body of such a record is a REJOIN alias
+     *                                body or coop slot, had state UNRESOLVED or unknown, or was
+     *                                stored where no summon reaches it. The last body of such a
+     *                                record is a REJOIN alias
      * @param npcUuidCollisions       both sides of every current NPC UUID claimed twice: the
      *                                newer record kept it, the other is LOST (R9)
      * @param withoutState            records other than LIVE whose old rows held no readable

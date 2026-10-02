@@ -144,7 +144,10 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
      *
      * <p>{@code liveTame} is true when a player is taming the loaded body right now. Then an
      * animal 4.x released is adopted as a new companion, and the tamer is told when the animal
-     * they claimed was a leftover copy of a companion that still exists and was removed.</p>
+     * they claimed was a leftover copy of a companion that still exists and was removed. A live
+     * tame that gives an imported record with no owner its first owner is a tame like any other:
+     * it is checked against that owner's limits under the index lock, and a refused body is left
+     * untamed and unmatched, as {@link #tame} leaves a refused tame.</p>
      *
      * <p>The retired {@code TameworkProjectionIdentity} component is read here, so nothing may
      * strip it from a loading body before this ran (plan 7 R15).</p>
@@ -180,8 +183,25 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         }
         LegacyBodyResolution.Body body = new LegacyBodyResolution.Body(
                 ownedAndTamed, projection != null, projectionProfile, npcUuid);
+        CompanionAdmissionGate.Denial[] refused = new CompanionAdmissionGate.Denial[1];
         LegacyBodyResolution.Decision decision = LegacyBodyResolution.admit(index, loaded, legacyAliases, unreadable,
-                Ref::isValid, body, ref, liveTame, record -> matched(record, facts));
+                Ref::isValid, body, ref, liveTame, record -> {
+                    UnaryOperator<CompanionRecord.Builder> change = matched(record, facts);
+                    if (liveTame && record.ownerUuid() == null && facts.ownerUuid() != null) {
+                        CompanionAdmissionGate.Admission admitted =
+                                admission.apply(record, change.apply(record.toBuilder()).build());
+                        if (admitted != null && admitted.denial() != null) {
+                            refused[0] = admitted.denial();
+                            return null;
+                        }
+                    }
+                    return change;
+                });
+        if (refused[0] != null) {
+            untame(buffer, ref);
+            tellOwnerAtLimit(store.getExternalData().getWorld(), facts.ownerUuid(), refused[0].messageKey());
+            return true;
+        }
         UUID profileId = decision.profileId();
         switch (decision.action()) {
             case ADOPT -> {
@@ -287,9 +307,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                 CompanionTransitions.newLive(profileId, 0, body), ref,
                 record -> enforceCaps ? admission.apply(null, record) : null);
         if (outcome.refusal() != null) {
-            buffer.tryRemoveComponent(ref, TameworkOwnerComponent.getComponentType());
-            buffer.tryRemoveComponent(ref, TameworkTamedComponent.getComponentType());
-            buffer.tryRemoveComponent(ref, TameworkCommandLinksComponent.getComponentType());
+            untame(buffer, ref);
             tellOwnerAtLimit(store.getExternalData().getWorld(), body.ownerUuid(),
                     outcome.messageKey() != null ? outcome.messageKey()
                             : CompanionAdmissionGate.Denial.of(outcome.refusal()).messageKey());
@@ -301,6 +319,13 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         }
         buffer.addComponent(ref, stampType, new TameworkCompanionComponent(profileId, 0));
         CompanionSaves.markChanged(buffer, ref);
+    }
+
+    /** Reverts a refused tame through the command buffer: the owner, tamed and command-link components go. */
+    private static void untame(CommandBuffer<EntityStore> buffer, Ref<EntityStore> ref) {
+        buffer.tryRemoveComponent(ref, TameworkOwnerComponent.getComponentType());
+        buffer.tryRemoveComponent(ref, TameworkTamedComponent.getComponentType());
+        buffer.tryRemoveComponent(ref, TameworkCommandLinksComponent.getComponentType());
     }
 
     /**

@@ -244,6 +244,11 @@ class LegacyItemAdoptionTest {
         UUID checkpointed = UUID.randomUUID();
         index.insert(CompanionRecord.builder(checkpointed, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
                 .ownerUuid(OWNER).currentNpcUuid(NPC).lastSnapshotAtMs(50L).build());
+        // 5.0 matched this one to its body (it has a real position); the body is unloaded again
+        // and no snapshot was taken yet. The companion is in the world, not in the item.
+        UUID sighted = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(sighted, "Tamed_Sheep", CompanionLocation.live("default", 40.5, 64, -3))
+                .ownerUuid(OWNER).currentNpcUuid(NPC).build());
 
         assertEquals(LegacyItemAdoption.Result.STALE, adoption(new LegacyAliases(Map.of(NPC,
                 new LegacyAliases.Entry(otherBody, LegacyAliases.Kind.STALE))))
@@ -251,6 +256,10 @@ class LegacyItemAdoptionTest {
         assertEquals(LegacyItemAdoption.Result.STALE, adoption(new LegacyAliases(Map.of(NPC,
                 new LegacyAliases.Entry(checkpointed, LegacyAliases.Kind.CURRENT))))
                 .adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains).result());
+        assertEquals(LegacyItemAdoption.Result.STALE, adoption(new LegacyAliases(Map.of(NPC,
+                new LegacyAliases.Entry(sighted, LegacyAliases.Kind.CURRENT))))
+                .adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains).result());
+        assertEquals(LocationKind.LIVE, index.get(sighted).location().kind());
         assertTrue(queued.isEmpty());
     }
 

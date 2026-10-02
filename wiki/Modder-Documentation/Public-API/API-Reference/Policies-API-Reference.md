@@ -36,6 +36,12 @@ requested scope, loaded or not. The request names no role, so population-group
 limits and admission providers are not part of the answer. `pendingCount` is
 `0` when the count is known.
 
+Both calls answer for the owned limit only (`limitPerPlayerOwnedTotal`, every
+companion the player owns). They do not include the per-player deployed limit
+(`limitPerPlayerDeployedTotal`, companions out in the world), which is checked
+when a companion is tamed, summoned, released, revived or recovered. Read both
+limits from `configs().getGlobalConfig().population()`.
+
 Both calls are informational. They reserve nothing. The binding check runs when
 the companion record changes, so a later change by the same owner can still be
 refused. There is no public way to reserve capacity in 3.0.0.

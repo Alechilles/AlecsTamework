@@ -315,12 +315,19 @@ final class CommandItemUseOrchestrator {
                                        long cooldownMs) {
         LoadedDispatch loaded = executeLoadedRecipients(context, recipients);
         refreshLinkedPositions(use, context, recipients, loaded.appliedCommandStates());
-        int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloaded).queued();
+        CommandRelocationDispatchService.QueueResult relocations =
+                relocationDispatchService.queueRelocationsForUnloaded(context, unloaded);
+        int queued = relocations.queued();
         use.synchronizeFrom(context);
+        if (relocations.unseenImports() > 0) {
+            feedbackService.showWarningKey(use.player, CommandRelocationDispatchService.KEY_UNSEEN_IMPORT);
+        }
         if (loaded.affected() <= 0 && queued <= 0) {
             use.flushHeldItem();
-            feedbackService.showWarningKey(
-                    use.player, "tamework.ui.notifications.command.execution.none");
+            if (relocations.unseenImports() <= 0) {
+                feedbackService.showWarningKey(
+                        use.player, "tamework.ui.notifications.command.execution.none");
+            }
             return false;
         }
         applyCooldown(use, context, cooldownMs);

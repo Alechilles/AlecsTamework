@@ -17,8 +17,11 @@ import javax.annotation.Nullable;
  *
  * <p>With the companion index set, an unloaded recall follows {@link RecallRoute}: a LIVE
  * companion in the player's world is moved by the relocation service, one in another world is
- * restored near the player, and any other record is skipped. Relocations never use the old
- * cross-world transfer.
+ * restored near the player, and any other record is skipped. An import whose body has not been
+ * seen since the update is counted in {@link QueueResult#unseenImports} and nothing is queued for
+ * it: a relocation would lease the chunks at 0,0,0, find no body and, when it ran out, restore
+ * the companion from a state that is not its body's. Relocations never use the old cross-world
+ * transfer.
  */
 final class CommandRelocationDispatchService {
     private final CommandNpcRelocationService relocationService;
@@ -72,6 +75,7 @@ final class CommandRelocationDispatchService {
             return QueueResult.rejected(destinationDecision);
         }
         int queued = 0;
+        int unseenImports = 0;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
                 continue;
@@ -103,6 +107,10 @@ final class CommandRelocationDispatchService {
             RecallRoute route = companions == null ? RecallRoute.LOAD_AND_MOVE
                     : RecallRoute.decide(indexed, false, world.getName());
             if (route == RecallRoute.REFUSE) {
+                continue;
+            }
+            if (route == RecallRoute.UNSEEN_IMPORT) {
+                unseenImports++;
                 continue;
             }
             if (route == RecallRoute.RESTORE) {
@@ -154,7 +162,8 @@ final class CommandRelocationDispatchService {
         }
         return new QueueResult(
                 queued,
-                CompanionDestinationAdmissionPolicy.Decision.ALLOWED
+                CompanionDestinationAdmissionPolicy.Decision.ALLOWED,
+                unseenImports
         );
     }
 
@@ -279,21 +288,30 @@ final class CommandRelocationDispatchService {
         return configured > 0.0 ? configured : fallback;
     }
 
+    /** Told to a player whose recall skipped a companion that has not been seen since the import. */
+    static final String KEY_UNSEEN_IMPORT = "tamework.ui.notifications.command.recall.notSeenSinceUpdate";
+
+    /**
+     * @param unseenImports recalled companions that were skipped because their body has not been
+     *                      seen since the import ({@link RecallRoute#UNSEEN_IMPORT})
+     */
     record QueueResult(
             int queued,
-            CompanionDestinationAdmissionPolicy.Decision destinationDecision
+            CompanionDestinationAdmissionPolicy.Decision destinationDecision,
+            int unseenImports
     ) {
         private static QueueResult none() {
             return new QueueResult(
                     0,
-                    CompanionDestinationAdmissionPolicy.Decision.ALLOWED
+                    CompanionDestinationAdmissionPolicy.Decision.ALLOWED,
+                    0
             );
         }
 
         private static QueueResult rejected(
                 CompanionDestinationAdmissionPolicy.Decision decision
         ) {
-            return new QueueResult(0, decision);
+            return new QueueResult(0, decision, 0);
         }
     }
 }

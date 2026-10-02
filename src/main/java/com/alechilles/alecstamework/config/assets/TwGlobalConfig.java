@@ -357,14 +357,24 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.limitPerPlayerOwnedTotal = value,
                     section -> section.limitPerPlayerOwnedTotal
             )
-            .documentation("Maximum tamed NPCs a player can own within the selected scope.")
+            .documentation("Maximum companions a player can own within the selected scope, counting every"
+                    + " owned companion: out in the world, stored, in items, in coops, dead and lost."
+                    + " 0 means no limit.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("LimitPerPlayerDeployedTotal", Codec.INTEGER),
+                    (section, value) -> section.limitPerPlayerDeployedTotal = value,
+                    section -> section.limitPerPlayerDeployedTotal
+            )
+            .documentation("Maximum companions a player can have out in the world within the selected scope,"
+                    + " loaded or not. 0 means no limit.")
             .add()
             .<String>append(
                     new KeyedCodec<>("PerPlayerLimitScope", Codec.STRING),
                     (section, value) -> section.perPlayerLimitScope = value,
                     section -> section.perPlayerLimitScope
             )
-            .documentation("Scope used when counting per-player ownership limits.")
+            .documentation("Scope used when counting the per-player owned and deployed limits.")
             .add()
             .build();
     private static final BuilderCodec<SimpleClaimsBreedingSection> SIMPLE_CLAIMS_BREEDING_SECTION_CODEC = BuilderCodec.builder(
@@ -565,6 +575,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean herbivoreFeedAssetSetEnabled;
     private boolean carnivoreFeedAssetSetEnabled;
     private int populationLimitPerPlayerOwnedTotal;
+    private int populationLimitPerPlayerDeployedTotal;
     private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private boolean simpleClaimsEnabled;
     private int simpleClaimsBreedingLimitPerClaimChunk;
@@ -970,8 +981,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return carnivoreFeedAssetSetEnabled;
     }
 
+    /** The limit on every companion a player owns, wherever it is; 0 means no limit. */
     public int getPopulationLimitPerPlayerOwnedTotal() {
         return Math.max(0, populationLimitPerPlayerOwnedTotal);
+    }
+
+    /** The limit on a player's companions out in the world, loaded or not; 0 means no limit. */
+    public int getPopulationLimitPerPlayerDeployedTotal() {
+        return Math.max(0, populationLimitPerPlayerDeployedTotal);
     }
 
     @Nonnull
@@ -1270,6 +1287,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.limitPerPlayerOwnedTotal != null) {
             populationLimitPerPlayerOwnedTotal = section.limitPerPlayerOwnedTotal;
         }
+        if (section.limitPerPlayerDeployedTotal != null) {
+            populationLimitPerPlayerDeployedTotal = section.limitPerPlayerDeployedTotal;
+        }
         if (section.perPlayerLimitScope != null) {
             populationPerPlayerLimitScope = PerPlayerLimitScope.fromConfigValue(section.perPlayerLimitScope);
         }
@@ -1278,6 +1298,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private PopulationSection toPopulationSection() {
         PopulationSection section = new PopulationSection();
         section.limitPerPlayerOwnedTotal = populationLimitPerPlayerOwnedTotal;
+        section.limitPerPlayerDeployedTotal = populationLimitPerPlayerDeployedTotal;
         section.perPlayerLimitScope = getPopulationPerPlayerLimitScope().configValue();
         return section;
     }
@@ -1599,6 +1620,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Population")) {
             populationLimitPerPlayerOwnedTotal = parent.populationLimitPerPlayerOwnedTotal;
+            populationLimitPerPlayerDeployedTotal = parent.populationLimitPerPlayerDeployedTotal;
             populationPerPlayerLimitScope = parent.populationPerPlayerLimitScope;
             return;
         }
@@ -1610,6 +1632,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("LimitPerPlayerOwnedTotal")) {
             populationLimitPerPlayerOwnedTotal = parent.populationLimitPerPlayerOwnedTotal;
+        }
+        if (!nestedExplicit.contains("LimitPerPlayerDeployedTotal")) {
+            populationLimitPerPlayerDeployedTotal = parent.populationLimitPerPlayerDeployedTotal;
         }
         if (!nestedExplicit.contains("PerPlayerLimitScope")) {
             populationPerPlayerLimitScope = parent.populationPerPlayerLimitScope;
@@ -1763,6 +1788,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     private static final class PopulationSection {
         private Integer limitPerPlayerOwnedTotal;
+        private Integer limitPerPlayerDeployedTotal;
         private String perPlayerLimitScope;
     }
 

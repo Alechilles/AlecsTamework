@@ -164,6 +164,7 @@ public final class CompanionAdmissionGate {
         public static Denial of(@Nonnull CompanionAdmission.Refusal refusal) {
             return new Denial(refusal, switch (refusal) {
                 case OWNED -> CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY;
+                case DEPLOYED -> CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY;
                 case GROUP_OWNED, GROUP_DEPLOYED -> GROUP_LIMIT_MESSAGE_KEY;
                 case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
                 case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
@@ -204,7 +205,7 @@ public final class CompanionAdmissionGate {
      * Lock-free pre-check for the tame, set-owner and spawn sites, so a capped tame is refused
      * before food is spent or effects play: would a new LIVE companion of {@code roleId} for
      * {@code owner} in {@code world} be refused? A null world checks a companion with no world
-     * (the deployed group limit is then not checked). The binding check is {@link #admit} under
+     * (the deployed limits are then not checked). The binding check is {@link #admit} under
      * the index lock; this one may miss a change made after it returns.
      */
     @Nullable
@@ -216,7 +217,7 @@ public final class CompanionAdmissionGate {
      * As {@link #precheck(UUID, String, String)}, for a candidate that is deployed (LIVE in
      * {@code world}) or not. A non-deployed candidate is an ITEM whose home world is {@code world},
      * as a capture into an item creates: it counts toward the owned limits in that world but not
-     * toward the deployed group limit.
+     * toward the deployed limits.
      */
     @Nullable
     public CompanionAdmission.Refusal precheck(@Nonnull UUID owner, @Nonnull String roleId, @Nullable String world,
@@ -248,9 +249,12 @@ public final class CompanionAdmissionGate {
         TwGlobalConfig global = active == null ? TwGlobalConfig.defaultConfig() : active;
         int ownedLimit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
                 global.getPopulationLimitPerPlayerOwnedTotal());
+        int deployedLimit = TameworkRuntimeSettings.populationLimitPerPlayerDeployedTotal(
+                global.getPopulationLimitPerPlayerDeployedTotal());
         boolean perWorld = TameworkRuntimeSettings.populationPerPlayerLimitScope(
                 global.getPopulationPerPlayerLimitScope()) == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD;
         PopulationGroupConfigIndex groupIndex = current == null ? PopulationGroupConfigIndex.empty() : current;
-        return new CompanionAdmission.Rules(Math.max(0, ownedLimit), perWorld, groupIndex::resolvePoliciesForRole);
+        return new CompanionAdmission.Rules(Math.max(0, ownedLimit), Math.max(0, deployedLimit), perWorld,
+                groupIndex::resolvePoliciesForRole);
     }
 }

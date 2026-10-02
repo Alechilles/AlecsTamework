@@ -1286,7 +1286,7 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
-            case OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
+            case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
                     showPopulationLimit(player, outcome.messageKey());
             default -> warn(player, "releaseFailed");
         }

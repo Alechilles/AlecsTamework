@@ -59,14 +59,14 @@ class IndexPopulationGroupApiTest {
 
     @Test
     void countsCoverEveryOwnedRecordAndOnlyLiveOnesAsDeployed() {
-        insert(ALICE, "Sheep", CompanionLocation.live("default", 0, 0, 0));
-        insert(ALICE, "Sheep", CompanionLocation.live("default", 0, 0, 0));
+        insert(ALICE, "Sheep", CompanionLocation.live("default", 1, 64, 1));
+        insert(ALICE, "Sheep", CompanionLocation.live("default", 1, 64, 1));
         insert(ALICE, "Goat", CompanionLocation.item());
         insert(ALICE, "Sheep", CompanionLocation.stored(StoredReason.ROSTER));
         insert(ALICE, "Sheep", CompanionLocation.dead("fall"));
         insert(ALICE, "Sheep", CompanionLocation.released("released"));
-        insert(ALICE, "Wolf", CompanionLocation.live("default", 0, 0, 0));
-        insert(BOB, "Sheep", CompanionLocation.live("default", 0, 0, 0));
+        insert(ALICE, "Wolf", CompanionLocation.live("default", 1, 64, 1));
+        insert(BOB, "Sheep", CompanionLocation.live("default", 1, 64, 1));
 
         PopulationGroupCountsView counts = groups.getCounts(ALICE, FLOCK, null).orElseThrow();
 
@@ -85,8 +85,8 @@ class IndexPopulationGroupApiTest {
 
     @Test
     void aPerWorldGroupCountsOneWorldAndNeedsThatWorld() {
-        insert(ALICE, "Cow", CompanionLocation.live("default", 0, 0, 0));
-        insert(ALICE, "Cow", CompanionLocation.live("nether", 0, 0, 0));
+        insert(ALICE, "Cow", CompanionLocation.live("default", 1, 64, 1));
+        insert(ALICE, "Cow", CompanionLocation.live("nether", 1, 64, 1));
         insert(ALICE, "Cow", CompanionLocation.item(), "nether");
 
         assertTrue(groups.getCounts(ALICE, HERD, null).isEmpty());
@@ -100,8 +100,8 @@ class IndexPopulationGroupApiTest {
 
     @Test
     void aRecordInTwoRequestedGroupsCountsOnceAndAnUnknownGroupGivesNoCount() {
-        insert(ALICE, "Goat", CompanionLocation.live("default", 0, 0, 0));
-        insert(ALICE, "Cow", CompanionLocation.live("default", 0, 0, 0));
+        insert(ALICE, "Goat", CompanionLocation.live("default", 1, 64, 1));
+        insert(ALICE, "Cow", CompanionLocation.live("default", 1, 64, 1));
 
         assertEquals(OptionalLong.of(2L), groups.getDurableDeployableCount(ALICE, Set.of(FLOCK, HERD)));
         assertEquals(OptionalLong.of(2L), groups.getDurableOwnedCount(ALICE, Set.of(FLOCK, HERD)));

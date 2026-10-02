@@ -190,6 +190,22 @@ class LegacyBodyResolutionTest {
         assertEquals(10.0, index.get(PROFILE).location().x());
     }
 
+    /** A live tame over the owner's limit refuses the match: the record and the loaded bodies stay as they were. */
+    @Test
+    void aRefusedMatchLeavesTheRecordAndTheBodyUnregistered() {
+        CompanionRecord before = live(NPC);
+        CompanionIndex index = index(before);
+        LoadedBodies<String> loaded = new LoadedBodies<>();
+
+        Decision decision = LegacyBodyResolution.admit(index, loaded,
+                new LegacyAliases(Map.of(NPC, alias(Kind.CURRENT))), id -> false, ref -> true, owned(NPC), "ref", true,
+                record -> null);
+
+        assertEquals(Action.LEAVE, decision.action());
+        assertEquals(before, index.get(PROFILE));
+        assertNull(loaded.get(PROFILE));
+    }
+
     @Test
     void aRecordThatMovedOnSinceTheImportIsNotOverwrittenByItsOldBody() {
         // The owner recovered the companion: generation 1, a new body.

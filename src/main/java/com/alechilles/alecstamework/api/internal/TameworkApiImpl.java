@@ -1112,8 +1112,9 @@ public final class TameworkApiImpl
 
     /**
      * Answers from the owner's records in the companion index: every owned companion in the
-     * request's scope counts, loaded or not. The request names no role, so population-group limits
-     * are not part of this answer.
+     * request's scope counts, loaded or not. This is the owned limit only. The request names no
+     * role, so population-group limits are not part of this answer, and neither is the per-player
+     * deployed limit ({@code GlobalConfigView.PopulationView#limitPerPlayerDeployedTotal}).
      */
     @Nonnull
     @Override

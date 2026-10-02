@@ -38,6 +38,9 @@ public final class BondedCompanionActionFeedbackMapper {
         if (contains(detail, "owned_capacity") || contains(detail, "family_capacity")) {
             return BondedCompanionActionBlockReason.OWNED_LIMIT_REACHED;
         }
+        if (contains(detail, "deployed_limit")) {
+            return BondedCompanionActionBlockReason.DEPLOYED_LIMIT_REACHED;
+        }
         if (contains(detail, "capacity")) {
             return BondedCompanionActionBlockReason.CAPACITY_REACHED;
         }
@@ -91,13 +94,16 @@ public final class BondedCompanionActionFeedbackMapper {
             // The same sentence the population cap uses.
             return "tamework.ui.population.ownedLimit";
         }
+        if (reason == BondedCompanionActionBlockReason.DEPLOYED_LIMIT_REACHED) {
+            return "tamework.ui.population.deployedLimit";
+        }
         return PREFIX + switch (reason) {
             case NONE -> "ready";
             case REFRESHING -> "refreshing";
             case REFRESH_FAILED -> "refreshFailed";
             case AUTHORITY_UNAVAILABLE -> "authority";
             case COOLDOWN_ACTIVE -> "cooldown";
-            case CAPACITY_REACHED, OWNED_LIMIT_REACHED -> "capacity";
+            case CAPACITY_REACHED, OWNED_LIMIT_REACHED, DEPLOYED_LIMIT_REACHED -> "capacity";
             case FEATURE_DISABLED -> "featureDisabled";
             case POLICY_DENIED -> "policy";
             case ROLE_NOT_ALLOWED -> "role";

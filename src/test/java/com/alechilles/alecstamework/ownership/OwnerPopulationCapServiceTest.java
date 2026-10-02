@@ -138,6 +138,24 @@ class OwnerPopulationCapServiceTest {
         assertTrue(allowed.allowed());
     }
 
+    /** A tamed spawn or a tame is refused by the deployed limit with its own reason, limit and message. */
+    @Test
+    void aDeployedLimitRefusalHasItsOwnReasonLimitAndMessage() {
+        UUID ownerId = UUID.randomUUID();
+        List<CompanionRecord> owned = List.of(record(ownerId, CompanionLocation.live("alpha", 1, 64, 1), "alpha"));
+        CompanionRecord candidate = record(ownerId, CompanionLocation.live("alpha", 2, 64, 2), "alpha");
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(9, 1, false, role -> List.of());
+
+        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.fromPrecheck(
+                denial(CompanionAdmission.check(owned, null, candidate, rules, CompanionAdmission.Provided.none())),
+                rules);
+
+        assertFalse(decision.allowed());
+        assertEquals(OwnerPopulationCapService.REASON_DEPLOYED_CAP, decision.reason());
+        assertEquals(1, decision.limit());
+        assertEquals(CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY, OwnerMessageUtil.acquisitionDeniedKey(decision));
+    }
+
     /** A provider refusal is not a group limit: it has its own reason and shows its own message. */
     @Test
     void providerRefusalsHaveTheirOwnReasonAndShowTheirOwnMessage() {

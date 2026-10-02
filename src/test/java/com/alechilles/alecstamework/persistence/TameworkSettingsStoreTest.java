@@ -177,6 +177,58 @@ class TameworkSettingsStoreTest {
         assertNull(saved.spawnSetsOwner());
     }
 
+    /**
+     * Before 5.0 the owned limit counted only loaded companions out in the world. A file from then
+     * keeps its number as the deployed limit, so an upgrade does not lock players out of taming.
+     */
+    @Test
+    void aFileWithOnlyTheOwnedLimitMovesItToTheDeployedLimitOnce() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        Files.writeString(settingsFile,
+                "{\"version\":2,\"population\":{\"limitPerPlayerOwnedTotal\":3,\"perPlayerLimitScope\":\"Global\"}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+
+        ResolvedTameworkSettings upgraded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals(3, upgraded.populationLimitPerPlayerDeployedTotal());
+        assertEquals(0, upgraded.populationLimitPerPlayerOwnedTotal());
+        assertEquals("Global", upgraded.populationPerPlayerLimitScope());
+
+        // The file now has both limits, so a later load, or an owned limit set by an admin, is not moved again.
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings reloaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(3, reloaded.populationLimitPerPlayerDeployedTotal());
+        assertEquals(0, reloaded.populationLimitPerPlayerOwnedTotal());
+
+        Files.writeString(settingsFile, "{\"version\":2,\"population\":{\"limitPerPlayerOwnedTotal\":8,"
+                + "\"limitPerPlayerDeployedTotal\":2}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings both = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(8, both.populationLimitPerPlayerOwnedTotal());
+        assertEquals(2, both.populationLimitPerPlayerDeployedTotal());
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, both.toSnapshot(), null));
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        TameworkSettingsStore.GlobalOverrides saved = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals(8, saved.populationLimitPerPlayerOwnedTotal());
+        assertEquals(2, saved.populationLimitPerPlayerDeployedTotal());
+    }
+
+    @Test
+    void aFreshSettingsFileHasNoOwnedOrDeployedLimit() {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("fresh").resolve("Tamework"));
+
+        ResolvedTameworkSettings fresh = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals(0, fresh.populationLimitPerPlayerOwnedTotal());
+        assertEquals(0, fresh.populationLimitPerPlayerDeployedTotal());
+        // The template on disk has both keys, so an owned limit an admin sets later is not moved.
+        TameworkSettingsStore.GlobalOverrides template = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals(0, template.populationLimitPerPlayerOwnedTotal());
+        assertEquals(0, template.populationLimitPerPlayerDeployedTotal());
+    }
+
     @Test
     void loadGlobalOverridesCreatesDefaultDocumentWhenFileMissing() {
         Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");

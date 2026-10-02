@@ -20,7 +20,10 @@ import javax.annotation.Nullable;
  * <ul>
  *   <li><b>Companion:</b> {@code restore(COOP_RELEASE)} at the entry's generation, which commits
  *   LIVE and spawns the body; the slot is cleared only after RESTORED. A lost clear is harmless:
- *   the entry is then stale by generation.</li>
+ *   the entry is then stale by generation. A record with no owner (an unowned resident imported
+ *   from 3.x or 4.x, or one taken in from an unowned capture item) is released unowned instead
+ *   ({@link #request}): the body comes out untracked and the record becomes a tombstone, so the
+ *   evening intake takes the animal back as an inline unowned resident.</li>
  *   <li><b>Unowned resident:</b> it has no record, so its inline entity is spawned first and the
  *   port clears the slot in the same world task once the body is in the store; a failed spawn
  *   keeps the entry. After a spawn this also queues {@link Port#clearSlot} (a no-op by then) and
@@ -131,8 +134,7 @@ public final class CoopRelease {
                             ? port.clearSlot(at, entry).exceptionally(failure -> null)
                             .thenApply(ignored -> Outcome.RELEASED)
                             : CompletableFuture.completedFuture(new Outcome(false, "SPAWN_FAILED")))
-                    : port.restore(RestoreFlow.Request.of(entry.profileId(), RestoreRules.Reason.COOP_RELEASE,
-                            destination).withGeneration(entry.generation()))
+                    : port.restore(request(entry.profileId(), entry.generation(), record(entry), destination))
                     .thenCompose(result -> result == RestoreFlow.Result.RESTORED
                             ? port.clearSlot(at, entry).exceptionally(failure -> null)
                             .thenApply(ignored -> Outcome.RELEASED)
@@ -152,6 +154,20 @@ public final class CoopRelease {
             done.complete(ended);
         });
         return done;
+    }
+
+    /**
+     * The COOP_RELEASE of a resident's record at {@code generation}. A record with no owner is
+     * released unowned, as an unowned capture item is: a LIVE record needs an owner to be of use
+     * to anyone, and a body built from the role is refused without one.
+     */
+    @Nonnull
+    static RestoreFlow.Request request(@Nonnull UUID profileId, long generation, @Nullable CompanionRecord record,
+                                       @Nonnull RestoreFlow.Destination destination) {
+        RestoreFlow.Request request = RestoreFlow.Request.of(profileId, RestoreRules.Reason.COOP_RELEASE, destination)
+                .withGeneration(generation);
+        return record != null && record.ownerUuid() == null
+                ? request.withOwner(new RestoreFlow.Owner(null, null)) : request;
     }
 
     /** One slot of one coop, for per-slot bookkeeping. */

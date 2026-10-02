@@ -162,6 +162,7 @@ final class CommandPanelFeatureActionService {
             case RESTORED, CONFLICT -> null;
             case COOLDOWN -> "tamework.ui.notifications.command.shared.cooldown";
             case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
+            case DEPLOYED_LIMIT -> CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY;
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
             case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
             case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;

@@ -175,14 +175,21 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         return false;
     }
 
-    /** Releases an imported resident beside the coop position, as a broken coop does; LOST when that fails. */
+    /**
+     * Releases an imported resident beside the coop position, as a broken coop does. When that
+     * fails an owned one becomes LOST and one with no owner waits for the next server start
+     * ({@link CoopImportedResidents#moveOut}).
+     */
     private void moveOutImported(World world, CompanionRecord record, Vector3i block, int rotation,
                                  @Nullable TwCoopConfig config, String why) {
         imports.moveOut(record, destination(world, record.roleId(), block, rotation, config), restoreFlow::restore)
-                .thenAccept(released -> LOGGER.at(Level.INFO).log(
-                        "Imported coop resident %s (%s) of the coop at %s in world %s: %s; %s", record.profileId(),
-                        record.roleId(), block, world.getName(), why, released ? "released beside it"
-                                : "not released (if it is now LOST its owner can recover it)"));
+                .thenAccept(released -> LOGGER.at(released || record.ownerUuid() != null ? Level.INFO : Level.WARNING)
+                        .log("Imported coop resident %s (%s) of the coop at %s in world %s: %s; %s", record.profileId(),
+                                record.roleId(), block, world.getName(), why, released ? "released beside it"
+                                        : record.ownerUuid() != null
+                                        ? "not released (if it is now LOST its owner can recover it)"
+                                        : "not released; it has no owner, so it stays an imported resident and is"
+                                        + " tried again at the next server start (is its role loaded?)"));
     }
 
     /**

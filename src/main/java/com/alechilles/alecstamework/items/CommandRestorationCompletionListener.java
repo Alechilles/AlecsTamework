@@ -39,6 +39,7 @@ public final class CommandRestorationCompletionListener
             case NO_SNAPSHOT, SPAWN_FAILED -> PREFIX + "respawn.recoverFailed";
             case COMMIT_FAILED, CONFLICT -> PREFIX + "respawn.unavailable";
             case OWNED_LIMIT -> "tamework.ui.population.ownedLimit";
+            case DEPLOYED_LIMIT -> CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY;
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
             case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
             case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;

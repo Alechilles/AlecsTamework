@@ -68,9 +68,28 @@ public record CompanionRecord(
         return ownerUuid != null && location.kind().countsAsOwned();
     }
 
-    /** True when this record counts toward its owner's deployed limit. */
+    /** True when this record is out in the world (LIVE), loaded or not. */
     public boolean isDeployed() {
         return location.kind() == LocationKind.LIVE;
+    }
+
+    /**
+     * True for a record imported LIVE whose body 5.0 has not seen yet: still at generation 0 and at
+     * exactly 0,0,0, where the importer puts a body it has no position for. The first sighting of
+     * the body writes its real position.
+     */
+    public boolean neverSighted() {
+        return isDeployed() && generation == 0L
+                && location.x() == 0.0 && location.y() == 0.0 && location.z() == 0.0;
+    }
+
+    /**
+     * True when this record counts toward its owner's deployed limits: out in the world and seen.
+     * A {@link #neverSighted() never-seen import} may have no body at all, so it is left out until
+     * its body is matched. It still counts as owned.
+     */
+    public boolean countsAsDeployed() {
+        return isDeployed() && !neverSighted();
     }
 
     @Nonnull

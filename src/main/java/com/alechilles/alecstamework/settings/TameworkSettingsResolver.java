@@ -73,7 +73,10 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.animalOldAgeDeathEnabled(), defaults.animalOldAgeDeathEnabled()),
                 resolveCommandPanelCardsPerPage(
                         values.commandPanelCardsPerPage(), defaults.commandPanelCardsPerPage()
-                )
+                ),
+                resolveNonNegativeInt(values.populationLimitPerPlayerDeployedTotal(),
+                        defaults.populationLimitPerPlayerDeployedTotal() != null
+                                ? defaults.populationLimitPerPlayerDeployedTotal() : 0)
         );
     }
 

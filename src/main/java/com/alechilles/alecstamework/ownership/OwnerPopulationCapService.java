@@ -16,9 +16,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Pre-checks the owner cap, and with a role id the population-group caps, for the tame, set-owner
- * and spawn sites against the owner's records in the companion index: every owned companion
- * counts, loaded or not. The binding check is {@link CompanionAdmissionGate#admit} under the
+ * Pre-checks the owner caps, and with a role id the population-group caps, for the tame, set-owner
+ * and spawn sites against the owner's records in the companion index. The owned limit counts
+ * every owned companion; the deployed limit counts the ones out in the world, loaded or not. A
+ * tame or a tamed spawn makes a companion that is both, so with a role id both limits apply. The binding check is {@link CompanionAdmissionGate#admit} under the
  * index lock; this one only refuses early with a message, before food is spent or effects play.
  *
  * <p>Reads are in-memory index reads. They never enter another world thread, block on futures,
@@ -27,6 +28,8 @@ import javax.annotation.Nullable;
  * with the "checking requirements" message.
  */
 public final class OwnerPopulationCapService {
+    /** Reason of a {@link Decision} refused by the per-player deployed limit. */
+    public static final String REASON_DEPLOYED_CAP = "owner-deployed-cap-reached";
     /** Reason of a {@link Decision} refused by a population-group cap. */
     public static final String REASON_GROUP_CAP = "owner-group-cap-reached";
     /** Reason of a {@link Decision} refused by an admission provider or one of its domain limits. */
@@ -48,13 +51,15 @@ public final class OwnerPopulationCapService {
     }
 
     /**
-     * The owner cap and the population-group caps for a new companion of {@code roleId} in the
-     * store's world, in one admission pre-check. An owned refusal has reason
-     * {@code owner-cap-reached}, a group refusal {@link #REASON_GROUP_CAP} and a provider refusal
+     * The owned and deployed caps and the population-group caps for a new companion of
+     * {@code roleId} out in the store's world, in one admission pre-check. An owned refusal has
+     * reason {@code owner-cap-reached}, a deployed refusal {@link #REASON_DEPLOYED_CAP} (its
+     * {@code limit} is the deployed limit), a group refusal {@link #REASON_GROUP_CAP} and a provider refusal
      * {@link #REASON_PROVIDER_DENIED} or {@link #REASON_PROVIDER_UNAVAILABLE}; a refused decision
      * carries the message key to show. This check does not count the owner's companions, so
      * {@code currentCount} is -1. Without a gate, owner or role it falls back to
-     * {@link #evaluateAcquisition(Store, UUID)}, the owner cap only.
+     * {@link #evaluateAcquisition(Store, UUID)}, the owned cap only; the gate still enforces the
+     * deployed cap under the index lock.
      */
     @Nonnull
     public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store,
@@ -87,23 +92,26 @@ public final class OwnerPopulationCapService {
                             int currentCount) {
         String reason = switch (denial.refusal()) {
             case OWNED -> "owner-cap-reached";
+            case DEPLOYED -> REASON_DEPLOYED_CAP;
             case GROUP_OWNED, GROUP_DEPLOYED -> REASON_GROUP_CAP;
             case PROVIDER_DENIED -> REASON_PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> REASON_PROVIDER_UNAVAILABLE;
         };
-        return new Decision(false, true, rules.ownedLimit(), currentCount, 0, scope(rules), reason,
-                denial.messageKey());
+        int limit = denial.refusal() == CompanionAdmission.Refusal.DEPLOYED
+                ? rules.deployedLimit() : rules.ownedLimit();
+        return new Decision(false, true, limit, currentCount, 0, scope(rules), reason, denial.messageKey());
     }
 
     private static TwGlobalConfig.PerPlayerLimitScope scope(CompanionAdmission.Rules rules) {
-        return rules.ownedPerWorld()
+        return rules.perWorld()
                 ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
                 : TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
     }
 
     /**
      * Pre-checks a whole litter (spec 8.11): would adding {@code candidates} to {@code ownerId}'s
-     * companions pass the owned limit, a group limit or, for a managed role, the cached provider
+     * companions pass the owned limit, the deployed limit, a group limit or, for a managed role,
+     * the cached provider
      * decision and its domain limits? A refusal has the reasons of {@link #evaluateAcquisition}.
      * Allowed when there is no owner, no candidate, no gate or no index. Like the other pre-checks
      * it is lock-free; each child's tame stamping still re-checks under the index lock.

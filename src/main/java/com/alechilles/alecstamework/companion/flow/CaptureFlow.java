@@ -338,7 +338,8 @@ public final class CaptureFlow<R> {
 
     private static Result result(CompanionAdmission.Refusal refusal) {
         return switch (refusal) {
-            case OWNED -> Result.OWNED_LIMIT;
+            // A capture never puts a companion out in the world, so DEPLOYED does not occur here.
+            case OWNED, DEPLOYED -> Result.OWNED_LIMIT;
             case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
             case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;

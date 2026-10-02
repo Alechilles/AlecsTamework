@@ -124,6 +124,24 @@ Keep the old database files. Tamework does not use them again, but they are your
 source if the import must be repeated. Do not run a 3.x or 4.x server on the same
 universe while 5.0 imports from it.
 
+## Companion limits after the upgrade
+
+5.0 has two limits per player in `/tw settings`:
+
+- **Max companions out in the world per player.** Counts companions that are out
+  in the world, loaded or not.
+- **Max companions owned per player.** Counts every owned companion: out, stored,
+  in items, in coops, dead and lost.
+
+In 4.x the one limit counted only the loaded companions that were out. So on the
+first 5.0 start, your old limit becomes the limit for companions out in the
+world, and the owned limit starts at 0 (no limit). Nobody is locked out of taming
+by companions they have stored. Set an owned limit in `/tw settings` if you want
+one.
+
+An imported companion that has not been seen since the import does not count as
+out in the world until its animal is found. It still counts as owned.
+
 ## Animals in the world
 
 Animals are not touched during the import. Each one is handled when its chunk loads.
@@ -166,6 +184,9 @@ Old versions kept coop residents in the database, not on the coop block.
 - If the coop block is gone, or the coop is full, the residents are released beside
   where the block was. If that is not possible they become lost, and their owners can
   recover them.
+- A resident with no owner comes out as an ordinary untracked animal, the way 5.0
+  treats its own unowned residents, and can go back in at evening. If its release
+  fails it stays in the coop and the release is tried again.
 
 ## Bonded revive items
 
@@ -194,6 +215,11 @@ are out in the world. The report lists them under **Live without checkpoint**.
 Tell players to visit their animals before they use Recover on a companion that shows
 no level or stats. The import report lists these companions under "Live without
 checkpoint", so you can see how many your world has.
+
+**Recall is refused for these companions.** A recall command on a companion that has
+not been seen since the update is refused with a message that asks the player to visit
+it first. Once its animal has loaded, recall works again. Recover in the companion
+panel is still allowed, with the effect described above.
 
 ## If the import fails
 
@@ -226,6 +252,14 @@ succeeds.
 `universe/Tamework/Companions` while the old database files are still in place. The
 next start imports again. Everything that happened to companions since the first
 import is lost.
+
+### A missing legacy-aliases.json
+
+The import writes `legacy-aliases.json` into the `Companions` folder. It lists the
+old ids of every animal so 5.0 can tell real companions from leftover copies. If the
+store was imported but this file is missing, for example after a partial restore of
+a backup, companion features stay off and the console says why. Restore the file
+from the same backup as the rest of the folder. Do not delete it.
 
 ### A Companions folder that is a link or junction
 

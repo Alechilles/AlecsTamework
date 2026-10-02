@@ -108,7 +108,7 @@ public final class RosterSummons {
 
     /**
      * Summons a stored roster companion to {@code destination}, timed when its role has a summon
-     * duration. COOLDOWN, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED and PROVIDER_UNAVAILABLE come
+     * duration. COOLDOWN, OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED and PROVIDER_UNAVAILABLE come
      * back from the restore as they are, with the message key of a population refusal (a cap, an
      * admission provider's denial or a domain limit). A bonded companion is NOT_ALLOWED: the
      * bonded API summons it with its roster's timers. The summon is bound to the record

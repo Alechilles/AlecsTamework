@@ -64,7 +64,7 @@ public final class OwnerMessageUtil {
     /**
      * Tells the player why {@link OwnerPopulationCapService} refused an acquisition, in the
      * player's language: the decision's own message key when it has one (a provider's key, a
-     * domain limit, "checking requirements"), else the owned limit, a population-group limit, a
+     * domain limit, "checking requirements"), else the owned or deployed limit, a population-group limit, a
      * provider refusal, or that the limits cannot be checked right now.
      */
     public static void sendAcquisitionDenied(Player player, OwnerPopulationCapService.Decision decision) {
@@ -81,6 +81,7 @@ public final class OwnerMessageUtil {
         }
         return switch (decision.reason()) {
             case "owner-cap-reached" -> "tamework.ui.population.ownedLimit";
+            case OwnerPopulationCapService.REASON_DEPLOYED_CAP -> CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY;
             case OwnerPopulationCapService.REASON_GROUP_CAP -> "tamework.ui.population.groupLimit";
             case OwnerPopulationCapService.REASON_PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
             case OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE ->

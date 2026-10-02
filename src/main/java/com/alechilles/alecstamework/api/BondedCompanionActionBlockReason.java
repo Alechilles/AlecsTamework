@@ -21,5 +21,7 @@ public enum BondedCompanionActionBlockReason {
     NOT_OWNER,
     INVALID_STATE,
     VALIDATION_FAILED,
-    GENERIC_FAILURE
+    GENERIC_FAILURE,
+    /** The owner's limit of companions out in the world is reached. */
+    DEPLOYED_LIMIT_REACHED
 }

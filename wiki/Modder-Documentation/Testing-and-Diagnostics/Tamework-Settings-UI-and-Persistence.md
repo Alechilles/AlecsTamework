@@ -34,20 +34,45 @@ revives and recall teleportation, disable old-age death, and restore the 2%/3%
 damage rates. Only Hardcore changes the aging mode. Review the form before applying;
 presets preserve ownership, claims, population limits, and other custom policies.
 
-## Population limit
+## Population limits
 
-`LimitPerPlayerOwnedTotal` is a durable canonical owner cap:
+There are two per-player limits. Both use `perPlayerLimitScope` (`PerWorld` or
+`Global`), and `0` means no limit. The default for both is `0`.
 
-- it counts saved profiles with that player as owner, including unloaded,
-  captured, cooped, roster-stored, provisioned, dead, and Lost profiles;
-- `0` disables the cap;
-- `PerPlayerLimitScope` selects `PerWorld` or `Global`;
-- the shared check is used by positive owner-acquisition paths including
-  taming, owner assignment, breeding, NPC spawn, and filled-spawner release;
-- positive acquisitions reserve capacity in their shared persistence operation;
-  and
-- sealed world evidence reconciles startup observations without treating
-  temporary absence as ownership removal.
+| Setting | Key in `tamework-settings.json` | Counts |
+| --- | --- | --- |
+| Max companions out in the world per player | `population.limitPerPlayerDeployedTotal` | Companions that are out in the world, loaded or not. |
+| Max companions owned per player | `population.limitPerPlayerOwnedTotal` | Every owned companion: out, stored, in items, in coops, dead and lost. |
+
+- The deployed limit is checked when a change puts a companion out in the world:
+  a tame, a summon, a release from a capture item, a revive, a recover, a coop
+  release, a birth, or a tamed spawn. Storing or capturing a companion frees a
+  place.
+- The owned limit is checked when a player gets one more companion: a tame, a
+  capture, a provision or a claim. Summoning a companion the player already owns
+  is not an owned-limit change.
+- A change that adds nothing always passes. A player who is already over a
+  lowered limit keeps every companion.
+- Each limit has its own message for the player.
+- Population groups (`TwPopulationGroupConfig`) keep their own owned and
+  deployed limits and are checked as well.
+
+### Upgrading from 4.x
+
+In 4.x, `limitPerPlayerOwnedTotal` counted only the loaded companions out in the
+world. In 5.0 that key counts every owned companion, so the old number would be
+much stricter. To keep the old meaning, a settings file that has
+`limitPerPlayerOwnedTotal` and no `limitPerPlayerDeployedTotal` is changed once
+when it is read: the old value becomes the deployed limit and the owned limit
+becomes `0` (no limit). The file is saved with both keys, and from then on the
+two values are independent. The console logs one line when this happens.
+
+If you edit the file by hand, keep both keys. A file with only the owned key is
+read as a 4.x file.
+
+A companion imported from a 3.x or 4.x world that has not been seen since the
+import does not count toward the deployed limit until its animal is found. It
+counts as owned.
 
 ## SimpleClaims
 

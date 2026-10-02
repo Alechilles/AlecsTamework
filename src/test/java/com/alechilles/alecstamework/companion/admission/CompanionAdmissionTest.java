@@ -22,7 +22,7 @@ class CompanionAdmissionTest {
     private static final CompanionAdmission.Provided NONE = CompanionAdmission.Provided.none();
     private static final String PASTURE = "runeteria:husbandry_deployable";
     private static final String BARN = "runeteria:husbandry_owned";
-    private static final CompanionLocation LIVE = CompanionLocation.live("w", 0, 0, 0);
+    private static final CompanionLocation LIVE = CompanionLocation.live("w", 1, 64, 1);
 
     private static DomainClaim deployable(int weight) {
         return new DomainClaim(PASTURE, weight, false, true);
@@ -53,15 +53,15 @@ class CompanionAdmissionTest {
     void aNewCompanionPastTheOwnedLimitIsRefused() {
         List<CompanionRecord> mine = List.of(rec("Sheep", CompanionLocation.item()), rec("Sheep", CompanionLocation.stored(StoredReason.ROSTER)));
         assertEquals(CompanionAdmission.Refusal.OWNED,
-                CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rules(2, false), NONE));
-        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rules(3, false), NONE));
+                CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 1, 64, 1)), rules(2, false), NONE));
+        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 1, 64, 1)), rules(3, false), NONE));
     }
 
     @Test
     void aMoveThatAddsNothingIsAllowedEvenOverALoweredLimit() {
         CompanionRecord stored = rec("Sheep", CompanionLocation.stored(StoredReason.ROSTER));
         List<CompanionRecord> mine = List.of(stored, rec("Sheep", CompanionLocation.item()), rec("Sheep", CompanionLocation.item()));
-        CompanionRecord summoned = stored.toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+        CompanionRecord summoned = stored.toBuilder().location(CompanionLocation.live("w", 1, 64, 1)).build();
         assertNull(CompanionAdmission.check(mine, stored, summoned, rules(1, false), NONE));
     }
 
@@ -75,38 +75,38 @@ class CompanionAdmissionTest {
         CompanionRecord dead = CompanionRecord.builder(UUID.randomUUID(), "Dragon_Fire",
                 CompanionLocation.dead("UNKNOWN")).ownerUuid(owner).build();
         List<CompanionRecord> mine = List.of(captured, provisioned, dead,
-                rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rec("Dragon_Ice", CompanionLocation.item()));
+                rec("Sheep", CompanionLocation.live("w", 1, 64, 1)), rec("Dragon_Ice", CompanionLocation.item()));
         PopulationGroupPolicy perWorld = new PopulationGroupPolicy("dragons", PopulationGroupScope.PER_WORLD, 1, 0, 1);
         CompanionAdmission.Rules rules = new CompanionAdmission.Rules(1, true,
                 role -> role.startsWith("Dragon") ? List.of(perWorld) : List.of());
 
         for (CompanionRecord stored : List.of(captured, provisioned, dead)) {
-            CompanionRecord summoned = stored.toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+            CompanionRecord summoned = stored.toBuilder().location(CompanionLocation.live("w", 1, 64, 1)).build();
             assertNull(CompanionAdmission.check(mine, stored, summoned, rules, NONE), stored.location().toString());
         }
         // A companion that has a home counts there, so another world's limit still applies to it.
-        CompanionRecord elsewhere = captured.toBuilder().location(CompanionLocation.live("other", 0, 0, 0)).build();
-        List<CompanionRecord> withOther = List.of(captured, rec("Sheep", CompanionLocation.live("other", 0, 0, 0)));
+        CompanionRecord elsewhere = captured.toBuilder().location(CompanionLocation.live("other", 1, 64, 1)).build();
+        List<CompanionRecord> withOther = List.of(captured, rec("Sheep", CompanionLocation.live("other", 1, 64, 1)));
         assertEquals(CompanionAdmission.Refusal.OWNED,
                 CompanionAdmission.check(withOther, captured, elsewhere, rules, NONE));
     }
 
     @Test
     void perWorldOwnedLimitsCountOnlyThatWorld() {
-        List<CompanionRecord> mine = List.of(rec("Sheep", CompanionLocation.live("other", 0, 0, 0)));
-        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rules(1, true), NONE));
+        List<CompanionRecord> mine = List.of(rec("Sheep", CompanionLocation.live("other", 1, 64, 1)));
+        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 1, 64, 1)), rules(1, true), NONE));
         assertEquals(CompanionAdmission.Refusal.OWNED,
-                CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("other", 0, 0, 0)), rules(1, true), NONE));
+                CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("other", 1, 64, 1)), rules(1, true), NONE));
     }
 
     @Test
     void groupLimitsCountOnlyTheirGroupAndActiveCountsOnlyLive() {
         CompanionRecord storedDragon = rec("Dragon_Fire", CompanionLocation.stored(StoredReason.ROSTER));
-        List<CompanionRecord> mine = List.of(rec("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0)), storedDragon,
-                rec("Sheep", CompanionLocation.live("w", 0, 0, 0)));
+        List<CompanionRecord> mine = List.of(rec("Dragon_Ice", CompanionLocation.live("w", 1, 64, 1)), storedDragon,
+                rec("Sheep", CompanionLocation.live("w", 1, 64, 1)));
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED,
                 CompanionAdmission.check(mine, null, rec("Dragon_Ice", CompanionLocation.item()), rules(0, false), NONE));
-        CompanionRecord summoned = storedDragon.toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+        CompanionRecord summoned = storedDragon.toBuilder().location(CompanionLocation.live("w", 1, 64, 1)).build();
         assertEquals(CompanionAdmission.Refusal.GROUP_DEPLOYED, CompanionAdmission.check(mine, storedDragon, summoned, rules(0, false), NONE));
     }
 
@@ -182,9 +182,100 @@ class CompanionAdmissionTest {
         assertNull(CompanionAdmission.check(all, mine, moved, rules(0, false), provided(deployable(3), 5)));
     }
 
+    // --- The per-player deployed limit ---
+
+    private static CompanionAdmission.Rules limits(int owned, int deployed, boolean perWorld) {
+        return new CompanionAdmission.Rules(owned, deployed, perWorld, role -> List.of());
+    }
+
+    private static CompanionRecord movedTo(CompanionRecord record, CompanionLocation at) {
+        return record.toBuilder().location(at).build();
+    }
+
+    @Test
+    void atTheDeployedLimitNothingMoreIsPutOutInTheWorldButCapturesAndStoresPass() {
+        CompanionRecord out = rec("Sheep", LIVE);
+        CompanionRecord stored = rec("Sheep", CompanionLocation.stored(StoredReason.ROSTER));
+        CompanionRecord inItem = rec("Sheep", CompanionLocation.item());
+        CompanionRecord dead = rec("Sheep", CompanionLocation.dead("UNKNOWN"));
+        CompanionRecord lost = rec("Sheep", CompanionLocation.lost("UNKNOWN"));
+        List<CompanionRecord> mine = List.of(out, stored, inItem, dead, lost);
+        CompanionAdmission.Rules rules = limits(0, 1, false);
+
+        // A summon, a release from an item, a revive and a recover.
+        for (CompanionRecord before : List.of(stored, inItem, dead, lost)) {
+            assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                    CompanionAdmission.check(mine, before, movedTo(before, LIVE), rules, NONE),
+                    before.location().toString());
+        }
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.check(mine, null, rec("Sheep", LIVE), rules, NONE), "a tame");
+
+        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.item()), rules, NONE),
+                "a capture into an item");
+        assertNull(CompanionAdmission.check(mine, out,
+                movedTo(out, CompanionLocation.stored(StoredReason.ROSTER)), rules, NONE), "a store");
+        assertNull(CompanionAdmission.check(mine, out,
+                movedTo(out, CompanionLocation.live("w", 9, 64, 9)), rules, NONE), "a move of the one that is out");
+        assertNull(CompanionAdmission.check(mine, stored, movedTo(stored, LIVE), limits(0, 2, false), NONE));
+    }
+
+    @Test
+    void atTheOwnedLimitATameOrCaptureIsRefusedButASummonOfAnOwnedCompanionIsNot() {
+        CompanionRecord stored = rec("Sheep", CompanionLocation.stored(StoredReason.ROSTER));
+        List<CompanionRecord> mine = List.of(stored, rec("Sheep", CompanionLocation.item()));
+        CompanionAdmission.Rules rules = limits(2, 0, false);
+
+        assertEquals(CompanionAdmission.Refusal.OWNED,
+                CompanionAdmission.check(mine, null, rec("Sheep", LIVE), rules, NONE));
+        assertEquals(CompanionAdmission.Refusal.OWNED,
+                CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.item()), rules, NONE));
+        assertNull(CompanionAdmission.check(mine, stored, movedTo(stored, LIVE), rules, NONE));
+    }
+
+    /** An import that was never seen may have no body at all, so it holds no place out in the world. */
+    @Test
+    void anImportNotSeenSinceTheImportCountsAsOwnedButNotAsDeployed() {
+        CompanionLocation importedWithoutPosition = CompanionLocation.live("w", 0, 0, 0);
+        CompanionRecord unseen = rec("Sheep", importedWithoutPosition);
+        CompanionRecord unseenDragon = rec("Dragon_Ice", importedWithoutPosition);
+        CompanionRecord stored = rec("Sheep", CompanionLocation.stored(StoredReason.ROSTER));
+        CompanionRecord storedDragon = rec("Dragon_Fire", CompanionLocation.stored(StoredReason.ROSTER));
+        List<CompanionRecord> mine = List.of(unseen, unseenDragon, stored, storedDragon);
+
+        assertNull(CompanionAdmission.check(mine, stored, movedTo(stored, LIVE), limits(0, 1, false), NONE));
+        assertNull(CompanionAdmission.check(mine, storedDragon, movedTo(storedDragon, LIVE), rules(0, false), NONE),
+                "the group's deployed limit of 1");
+        assertEquals(CompanionAdmission.Refusal.OWNED,
+                CompanionAdmission.check(mine, null, rec("Sheep", LIVE), limits(4, 0, false), NONE));
+
+        // The body is matched: the record gets its real position and holds its place from then on.
+        CompanionRecord seen = movedTo(unseen, LIVE);
+        CompanionRecord seenDragon = movedTo(unseenDragon, LIVE);
+        List<CompanionRecord> full = List.of(rec("Sheep", LIVE), unseen, stored);
+        assertNull(CompanionAdmission.check(full, unseen, seen, limits(0, 1, false), NONE),
+                "matching a body is never refused");
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED, CompanionAdmission.check(
+                List.of(seen, stored), stored, movedTo(stored, LIVE), limits(0, 1, false), NONE));
+        assertEquals(CompanionAdmission.Refusal.GROUP_DEPLOYED, CompanionAdmission.check(
+                List.of(seenDragon, storedDragon), storedDragon, movedTo(storedDragon, LIVE), rules(0, false), NONE));
+    }
+
+    @Test
+    void perWorldDeployedLimitsCountOnlyThatWorld() {
+        CompanionLocation other = CompanionLocation.live("other", 1, 64, 1);
+        List<CompanionRecord> mine = List.of(rec("Sheep", other));
+
+        assertNull(CompanionAdmission.check(mine, null, rec("Sheep", LIVE), limits(0, 1, true), NONE));
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.check(mine, null, rec("Sheep", other), limits(0, 1, true), NONE));
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.check(mine, null, rec("Sheep", LIVE), limits(0, 1, false), NONE));
+    }
+
     @Test
     void anUnownedOrReleasedResultIsAlwaysAllowed() {
-        CompanionRecord wild = CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.live("w", 0, 0, 0)).build();
+        CompanionRecord wild = CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.live("w", 1, 64, 1)).build();
         assertNull(CompanionAdmission.check(List.of(), null, wild, rules(0, false), NONE));
     }
 }

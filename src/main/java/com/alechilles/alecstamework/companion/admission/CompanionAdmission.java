@@ -20,6 +20,13 @@ import javax.annotation.Nullable;
  * counted in and that bucket would then pass its limit, so moves that add nothing always pass,
  * even for an owner already over a limit lowered by config. A limit of 0 means no limit.
  *
+ * <p>Each owner has two built-in limits with one scope. The owned limit counts every record that
+ * {@link CompanionRecord#countsAsOwned() counts as owned}: out in the world, stored, in an item,
+ * in a coop, dead or lost. The deployed limit counts the records that
+ * {@link CompanionRecord#countsAsDeployed() count as deployed}: out in the world (LIVE), loaded or
+ * not, except an import whose body has not been seen yet. Population groups count their deployed
+ * records the same way.</p>
+ *
  * <p>A per-world limit counts a record in {@link #scopeWorld its world}. A record that has been in
  * no world yet (a provisioned companion before its first summon, which has no home world) was
  * admitted as owned when it was made, so the first world it enters is not a new bucket for it.
@@ -32,7 +39,7 @@ import javax.annotation.Nullable;
 public final class CompanionAdmission {
     /** Message key of a refused owned-domain claim. */
     public static final String OWNED_LIMIT_MESSAGE_KEY = "tamework.ui.population.ownedLimit";
-    /** Message key of a refused deployable-domain claim. */
+    /** Message key of a refused deployable-domain claim and of {@link Refusal#DEPLOYED}. */
     public static final String DEPLOYED_LIMIT_MESSAGE_KEY = "tamework.ui.population.deployedLimit";
     /** Message key of a {@link Refusal#PROVIDER_DENIED} that reached a presenter without its own key. */
     public static final String PROVIDER_DENIED_MESSAGE_KEY = "tamework.ui.population.providerDenied";
@@ -40,11 +47,12 @@ public final class CompanionAdmission {
     public static final String PROVIDER_UNAVAILABLE_MESSAGE_KEY = "tamework.ui.population.providerUnavailable";
 
     /**
+     * {@code OWNED} and {@code DEPLOYED}: the owner's built-in owned or deployed limit is reached.
      * {@code PROVIDER_DENIED}: an admission provider denied the change, or one of its domain
      * limits is reached ({@link #checkDomains} names the message key). {@code PROVIDER_UNAVAILABLE}:
      * the provider gave no decision; {@link #check} never returns it.
      */
-    public enum Refusal { OWNED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+    public enum Refusal { OWNED, DEPLOYED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
 
     /**
      * What an admission provider allowed for the record being changed: the domain claims the
@@ -71,13 +79,20 @@ public final class CompanionAdmission {
 
     /**
      * @param ownedLimit    owned companions per owner (0 = none)
-     * @param ownedPerWorld count the owned limit per world instead of across worlds
+     * @param deployedLimit companions out in the world per owner (0 = none)
+     * @param perWorld      count the owned and deployed limits per world instead of across worlds
      * @param groupsForRole the population groups a role belongs to, with their limits
      */
-    public record Rules(int ownedLimit, boolean ownedPerWorld,
+    public record Rules(int ownedLimit, int deployedLimit, boolean perWorld,
                         @Nonnull Function<String, List<PopulationGroupPolicy>> groupsForRole) {
         public Rules {
             Objects.requireNonNull(groupsForRole, "groupsForRole");
+        }
+
+        /** Rules with no deployed limit. */
+        public Rules(int ownedLimit, boolean perWorld,
+                     @Nonnull Function<String, List<PopulationGroupPolicy>> groupsForRole) {
+            this(ownedLimit, 0, perWorld, groupsForRole);
         }
     }
 
@@ -97,12 +112,19 @@ public final class CompanionAdmission {
             return null;
         }
         CompanionRecord prior = before != null && owner.equals(before.ownerUuid()) && before.countsAsOwned() ? before : null;
-        if (rules.ownedLimit() > 0) {
-            Predicate<CompanionRecord> bucket = sameScope(rules.ownedPerWorld(), after);
-            if ((prior == null || !(bucket.test(prior) || unplaced(prior)))
-                    && 1 + count(ownerRecords, after, bucket) > rules.ownedLimit()) {
-                return Refusal.OWNED;
-            }
+        Predicate<CompanionRecord> ownerBucket = sameScope(rules.perWorld(), after);
+        if (rules.ownedLimit() > 0
+                && (prior == null || !(ownerBucket.test(prior) || unplaced(prior)))
+                && 1 + count(ownerRecords, after, ownerBucket) > rules.ownedLimit()) {
+            return Refusal.OWNED;
+        }
+        // The record itself is read as LIVE or not: a never-seen import that gets its body was
+        // LIVE before, so matching it adds nothing and is never refused.
+        if (rules.deployedLimit() > 0 && after.isDeployed()
+                && !(prior != null && prior.isDeployed() && ownerBucket.test(prior))
+                && 1 + count(ownerRecords, after, ownerBucket.and(CompanionRecord::countsAsDeployed))
+                > rules.deployedLimit()) {
+            return Refusal.DEPLOYED;
         }
         for (PopulationGroupPolicy group : rules.groupsForRole().apply(after.roleId())) {
             Predicate<CompanionRecord> bucket = sameScope(group.scope() == PopulationGroupScope.PER_WORLD, after)
@@ -114,7 +136,8 @@ public final class CompanionAdmission {
                 return Refusal.GROUP_OWNED;
             }
             if (group.maxActivePerOwner() > 0 && after.isDeployed() && !(wasInGroup && prior.isDeployed())
-                    && 1 + count(ownerRecords, after, bucket.and(CompanionRecord::isDeployed)) > group.maxActivePerOwner()) {
+                    && 1 + count(ownerRecords, after, bucket.and(CompanionRecord::countsAsDeployed))
+                    > group.maxActivePerOwner()) {
                 return Refusal.GROUP_DEPLOYED;
             }
         }

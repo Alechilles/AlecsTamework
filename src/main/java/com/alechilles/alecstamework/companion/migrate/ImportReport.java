@@ -223,8 +223,9 @@ public final class ImportReport {
                         "The only saved copy of these live companions was taken as the body died. The death was "
                                 + "removed from the copy so the companion can be recovered if its body is gone."),
                 line("Imported lost", report.importedLost(),
-                        "The old data named no usable body or coop slot for these, or their state was "
-                                + "unresolved. Their owners can recover them like any lost companion."),
+                        "The old data named no usable body or coop slot for these, their state was "
+                                + "unresolved, or they were stored with nothing left to summon them from. "
+                                + "Their owners can recover them like any lost companion."),
                 line("Npc uuid collisions", report.npcUuidCollisions(),
                         "Two companions named the same body. Of each pair the one changed last kept the body and "
                                 + "the other was imported as lost. Both are listed."),

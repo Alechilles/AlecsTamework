@@ -38,7 +38,11 @@ import org.bson.BsonString;
  * end, which restarts at the import time (R6).</p>
  */
 public final class LegacyMapper {
-    /** LOST cause of a profile the old runtime had as UNRESOLVED, or in a state this build does not know. */
+    /**
+     * LOST cause of a profile the old runtime had as UNRESOLVED or in a state this build does not
+     * know, and of a stored profile that no summon could reach (provisioned and not bonded, or
+     * timed with no roster).
+     */
     public static final String CAUSE_UNRESOLVED = "IMPORTED_UNRESOLVED";
     /** LOST cause of a profile whose old row named no usable body, world or coop slot. */
     public static final String CAUSE_NO_BODY = "IMPORTED_NO_BODY";
@@ -314,7 +318,14 @@ public final class LegacyMapper {
                 StoredReason reason = lease != null ? StoredReason.TIMED
                         : "ROSTER_STORED".equals(life.lifecycleState()) ? StoredReason.ROSTER
                         : StoredReason.PROVISIONED;
-                location = CompanionLocation.stored(reason);
+                // A stored record comes back only through a summon, and Recover does not take one.
+                // No summon reaches a provisioned profile of this file (5.0 summons PROVISIONED
+                // only for a bonded record, and those live in the bonded file), nor a timed one
+                // with no roster to summon it from. Such a profile is imported LOST and
+                // recoverable instead, and rejoins by itself if its last body turns up.
+                boolean noWayBack = reason == StoredReason.PROVISIONED
+                        || reason == StoredReason.TIMED && (roster == null || blank(roster.familyId()));
+                location = noWayBack ? lost(id, CAUSE_UNRESOLVED, currentAlias) : CompanionLocation.stored(reason);
                 state = choose(snapshotRows, null, List.of("timed_summon", "full_state_projection"), identity);
             }
             case "DEAD_REVIVABLE" -> {

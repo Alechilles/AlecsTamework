@@ -378,13 +378,18 @@ final class CommandMenuMoveService {
                 );
                 return;
             }
+            if (relocationResult.unseenImports() > 0) {
+                feedbackService.showWarningKey(player, CommandRelocationDispatchService.KEY_UNSEEN_IMPORT);
+            }
             if (affected <= 0 && queued <= 0) {
-                feedbackService.showWarningKey(
-                        player,
-                        returnHome
-                                ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
-                                : "tamework.ui.notifications.command.execution.none"
-                );
+                if (relocationResult.unseenImports() <= 0) {
+                    feedbackService.showWarningKey(
+                            player,
+                            returnHome
+                                    ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
+                                    : "tamework.ui.notifications.command.execution.none"
+                    );
+                }
                 return;
             }
             feedbackService.emitCommandExecutionFeedback(

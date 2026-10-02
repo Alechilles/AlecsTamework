@@ -53,6 +53,11 @@ final class TameworkSettingsFormParser {
         if (!populationLimit.success()) {
             return NumericResult.failure(populationLimit.message());
         }
+        ValueResult<Integer> deployedLimit = parseNonNegativeInt(
+                payload.populationDeployedLimit, "tamework.ui.settings.field.populationDeployedLimit");
+        if (!deployedLimit.success()) {
+            return NumericResult.failure(deployedLimit.message());
+        }
         ValueResult<Integer> commandPanelCardsPerPage = parseIntInRange(
                 payload.commandPanelCardsPerPage,
                 "tamework.ui.settings.field.commandPanelCardsPerPage",
@@ -96,7 +101,7 @@ final class TameworkSettingsFormParser {
             return NumericResult.failure(dehydrationDamage.message());
         }
         return NumericResult.success(new NumericValues(
-                populationLimit.value(), commandPanelCardsPerPage.value(),
+                populationLimit.value(), deployedLimit.value(), commandPanelCardsPerPage.value(),
                 claimLimitChunk.value(), claimLimitTotal.value(),
                 offlineGraceHours.value(), offlineDecayMultiplier.value(),
                 starvationDamage.value(), dehydrationDamage.value()
@@ -182,7 +187,8 @@ final class TameworkSettingsFormParser {
                 choices.animalAgingMode(),
                 boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled()),
                 boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled()),
-                numbers.commandPanelCardsPerPage()
+                numbers.commandPanelCardsPerPage(),
+                numbers.deployedLimit()
         );
     }
 
@@ -280,6 +286,7 @@ final class TameworkSettingsFormParser {
     }
 
     private record NumericValues(int populationLimit,
+                                 int deployedLimit,
                                  int commandPanelCardsPerPage,
                                  int claimLimitChunk,
                                  int claimLimitTotal,

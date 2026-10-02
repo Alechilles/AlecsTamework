@@ -45,7 +45,63 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                                        boolean telemetryBreadcrumbsEnabled,
                                        @Nonnull String animalAgingMode,
                                        boolean animalOldAgeDeathEnabled,
-                                       int commandPanelCardsPerPage) {
+                                       int commandPanelCardsPerPage,
+                                       int populationLimitPerPlayerDeployedTotal) {
+
+    /** Compatibility constructor for integrations compiled before the per-player deployed limit: no deployed limit. */
+    public ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
+                                    @Nonnull String populationPerPlayerLimitScope,
+                                    boolean simpleClaimsEnabled,
+                                    int simpleClaimsLimitPerClaimChunk,
+                                    int simpleClaimsLimitPerClaimTotal,
+                                    boolean simpleClaimsBreedingRequiresClaim,
+                                    boolean simpleClaimsProtectTamedFromNonMembers,
+                                    boolean blockOwnerDamage,
+                                    boolean blockAllPlayerDamageIfOwned,
+                                    boolean invulnerableIfOwned,
+                                    @Nonnull String captureItemOwnership,
+                                    boolean captureRequiresOwner,
+                                    boolean spawnRequiresOwner,
+                                    boolean interactionRequiresOwner,
+                                    boolean linkingRequiresOwner,
+                                    boolean needsEnabled,
+                                    @Nonnull String needsResourceMode,
+                                    @Nonnull String needsTickPolicyMode,
+                                    double needsOwnerOfflineGraceHours,
+                                    double needsOwnerOfflineDecayMultiplier,
+                                    boolean needsDamageEnabled,
+                                    @Nonnull String needsDamageModel,
+                                    @Nonnull String needsDamageDualNeedRule,
+                                    double needsStarvationDamagePerMinute,
+                                    double needsDehydrationDamagePerMinute,
+                                    boolean needsDamageLethal,
+                                    boolean happinessEnabled,
+                                    boolean passiveBreedingEnabled,
+                                    boolean breedingRequiresHappiness,
+                                    boolean breedingGenderEnabled,
+                                    boolean traitsEnabled,
+                                    boolean levelingEnabled,
+                                    boolean talentsEnabled,
+                                    boolean reviveSystemEnabled,
+                                    boolean recallTeleportingEnabled,
+                                    boolean telemetryEnabled,
+                                    boolean telemetryBreadcrumbsEnabled,
+                                    @Nonnull String animalAgingMode,
+                                    boolean animalOldAgeDeathEnabled,
+                                    int commandPanelCardsPerPage) {
+        this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope, simpleClaimsEnabled,
+                simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
+                simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership, captureRequiresOwner,
+                spawnRequiresOwner, interactionRequiresOwner, linkingRequiresOwner, needsEnabled,
+                needsResourceMode, needsTickPolicyMode, needsOwnerOfflineGraceHours,
+                needsOwnerOfflineDecayMultiplier, needsDamageEnabled, needsDamageModel,
+                needsDamageDualNeedRule, needsStarvationDamagePerMinute, needsDehydrationDamagePerMinute,
+                needsDamageLethal, happinessEnabled, passiveBreedingEnabled, breedingRequiresHappiness,
+                breedingGenderEnabled, traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled, animalAgingMode,
+                animalOldAgeDeathEnabled, commandPanelCardsPerPage, 0);
+    }
 
     public ResolvedTameworkSettings {
         captureItemOwnership = CaptureItemOwnershipMode.fromConfigValue(captureItemOwnership).toConfigValue();
@@ -316,7 +372,8 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                 telemetryBreadcrumbsEnabled,
                 animalAgingMode,
                 animalOldAgeDeathEnabled,
-                commandPanelCardsPerPage
+                commandPanelCardsPerPage,
+                populationLimitPerPlayerDeployedTotal
         );
     }
 

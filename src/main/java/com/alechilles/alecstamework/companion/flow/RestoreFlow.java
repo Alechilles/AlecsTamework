@@ -46,11 +46,13 @@ public final class RestoreFlow<R> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     /**
-     * {@code PROVIDER_DENIED}: an admission provider denied the restore or one of its domain limits
-     * is reached. {@code PROVIDER_UNAVAILABLE}: the provider gave no decision. Nothing changed.
+     * {@code OWNED_LIMIT} and {@code DEPLOYED_LIMIT}: the owner's owned or deployed (out in the
+     * world) limit is reached. {@code PROVIDER_DENIED}: an admission provider denied the restore or
+     * one of its domain limits is reached. {@code PROVIDER_UNAVAILABLE}: the provider gave no
+     * decision. Nothing changed.
      */
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED,
-        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOYED_LIMIT }
 
     /**
      * A restore's result with the translation key of a population refusal (a cap, a provider's
@@ -412,6 +414,7 @@ public final class RestoreFlow<R> {
     private static Result map(CompanionAdmission.Refusal refusal) {
         return switch (refusal) {
             case OWNED -> Result.OWNED_LIMIT;
+            case DEPLOYED -> Result.DEPLOYED_LIMIT;
             case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
             case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;

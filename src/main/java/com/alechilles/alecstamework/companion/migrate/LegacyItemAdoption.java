@@ -24,8 +24,9 @@ import org.bson.BsonValue;
 
 /**
  * What a capture item written before 5.0 is to the companion index (plan 7 R17, R18), and the
- * one-time adoption of a 2.x item. Everything about old item shapes lives here, so the release
- * that drops the importer removes it in one place.
+ * one-time adoption of a 2.x item. Everything about old item shapes lives here. This class does
+ * not go when the importer does: an old item can sit in a chest for years, so it stays for as
+ * long as worlds that were imported exist (see the package note).
  *
  * <p>The shapes, by the keys an item carries:
  * <ul>
@@ -175,8 +176,10 @@ public final class LegacyItemAdoption {
             // 4.x imported some 2.x captures as bodies in unloaded chunks: the old rows name the
             // captured body as the current one and hold no state for it. With no such body in
             // the world the companion is in this item. A registered body means it is out there
-            // and the item is a stale copy.
-            case LIVE -> new Decision(stateInItem && npcUuid.equals(record.currentNpcUuid()) && !hasBody.test(profileId)
+            // and the item is a stale copy. So does a record 5.0 has matched to its body before
+            // (it has a real position) even while that body is unloaded and not yet snapshotted.
+            case LIVE -> new Decision(stateInItem && npcUuid.equals(record.currentNpcUuid())
+                    && LegacyBodyResolution.neverSighted(record) && !hasBody.test(profileId)
                     ? Kind.RESTORE_FROM_ITEM : Kind.REFUSE, profileId, npcUuid);
             default -> new Decision(Kind.REFUSE, profileId, npcUuid);
         };

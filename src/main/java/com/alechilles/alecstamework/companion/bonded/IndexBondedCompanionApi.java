@@ -94,6 +94,8 @@ public final class IndexBondedCompanionApi
     static final String FEATURE_DISABLED = "bonded-transition-feature_disabled";
     static final String COOLDOWN_ACTIVE = "bonded-transition-cooldown_active";
     static final String ACTIVE_CAPACITY = "bonded-transition-active_capacity_reached";
+    /** The owner's per-player deployed limit (companions out in the world) is reached. */
+    static final String DEPLOYED_LIMIT = "bonded-transition-deployed_limit_reached";
     public static final String OWNED_CAPACITY = "bonded-transition-owned_capacity_reached";
     /** Only {@link #grantByAdmin} reports this; {@link #provision} reports a full family as {@link #OWNED_CAPACITY}. */
     public static final String FAMILY_CAPACITY = "bonded-transition-family_capacity_reached";
@@ -1083,6 +1085,7 @@ public final class IndexBondedCompanionApi
             case CONFLICT, STALE -> failure(BondedCompanionResultCode.REVISION_CONFLICT, REVISION_CONFLICT);
             case SPAWN_FAILED -> failure(BondedCompanionResultCode.WORLD_UNAVAILABLE, PLACEMENT_UNAVAILABLE);
             case OWNED_LIMIT -> failure(BondedCompanionResultCode.POLICY_DENIED, OWNED_CAPACITY);
+            case DEPLOYED_LIMIT -> failure(BondedCompanionResultCode.POLICY_DENIED, DEPLOYED_LIMIT);
             case GROUP_LIMIT -> failure(BondedCompanionResultCode.POLICY_DENIED, ACTIVE_CAPACITY);
             case COMMIT_FAILED, RESTORED -> failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
             // An admission provider's refusal.

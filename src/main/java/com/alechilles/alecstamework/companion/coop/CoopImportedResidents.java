@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.companion.coop;
 
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
-import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -41,7 +40,7 @@ import javax.annotation.Nullable;
  * sites of the same concurrent map.
  */
 public final class CoopImportedResidents {
-    /** LOST cause of an imported resident whose coop is gone or full and that could not be released beside it. */
+    /** LOST cause of an owned imported resident whose coop is gone or full and that could not be released beside it. */
     public static final String CAUSE_COOP_MISSING = "IMPORTED_COOP_MISSING";
 
     /** A coop block. The world name is lower case: 4.x stored normalized world keys. */
@@ -191,10 +190,20 @@ public final class CoopImportedResidents {
 
     /**
      * Moves an imported resident out of a coop that is gone or full, as a broken coop releases its
-     * residents: {@code restore} gets a COOP_RELEASE at the record's generation. When that does not
-     * restore it, the record becomes LOST with {@link #CAUSE_COOP_MISSING}; its generation and
-     * snapshot are kept, so its owner can recover it. Completes true when released into the world,
-     * false when LOST or when the record had moved on by itself. Never completes exceptionally.
+     * residents: {@code restore} gets the COOP_RELEASE of {@link CoopRelease#request} at the
+     * record's generation, which releases a record with no owner unowned (untracked body, record
+     * tombstoned). When that does not restore it:
+     *
+     * <ul>
+     *   <li>an owned record becomes LOST with {@link #CAUSE_COOP_MISSING}; its generation and
+     *   snapshot are kept, so its owner can recover it;</li>
+     *   <li>a record with no owner stays an imported resident (COOP at generation 0), because
+     *   nobody could recover it from LOST. Its site is collected again at the next server start
+     *   and the release is tried again then (for example once the role's content pack loads).</li>
+     * </ul>
+     *
+     * <p>Completes true when released into the world, false otherwise (also when the record had
+     * moved on by itself). Never completes exceptionally.
      */
     @Nonnull
     public CompletableFuture<Boolean> moveOut(
@@ -202,8 +211,8 @@ public final class CoopImportedResidents {
             @Nonnull Function<RestoreFlow.Request, CompletableFuture<RestoreFlow.Result>> restore) {
         CompletableFuture<RestoreFlow.Result> restored;
         try {
-            restored = restore.apply(RestoreFlow.Request.of(record.profileId(), RestoreRules.Reason.COOP_RELEASE,
-                    destination).withGeneration(record.generation()));
+            restored = restore.apply(CoopRelease.request(record.profileId(), record.generation(), record,
+                    destination));
         } catch (RuntimeException failure) {
             restored = CompletableFuture.failedFuture(failure);
         }
@@ -212,7 +221,8 @@ public final class CoopImportedResidents {
                 return true;
             }
             CompanionRecord now = index.get(record.profileId());
-            if (now != null && now.location().kind() == LocationKind.COOP && now.generation() == record.generation()) {
+            if (now != null && now.ownerUuid() != null && now.location().kind() == LocationKind.COOP
+                    && now.generation() == record.generation()) {
                 moveTo(now, CompanionLocation.lost(CAUSE_COOP_MISSING));
             }
             return false;

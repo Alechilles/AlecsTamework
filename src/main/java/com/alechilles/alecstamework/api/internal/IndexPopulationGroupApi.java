@@ -76,7 +76,7 @@ public final class IndexPopulationGroupApi implements PopulationGroupApi {
         Predicate<CompanionRecord> bucket = record -> record.countsAsOwned() && roles.contains(record.roleId())
                 && (!perWorld || CompanionAdmission.scopeWorld(record).equals(world));
         long owned = index.count(ownerUuid, bucket);
-        long deployed = index.count(ownerUuid, bucket.and(CompanionRecord::isDeployed));
+        long deployed = index.count(ownerUuid, bucket.and(CompanionRecord::countsAsDeployed));
         return Optional.of(new PopulationGroupCountsView(
                 ownerUuid,
                 policy.groupId(),
@@ -103,7 +103,7 @@ public final class IndexPopulationGroupApi implements PopulationGroupApi {
     @Override
     @Nonnull
     public OptionalLong getDurableDeployableCount(@Nonnull UUID ownerUuid, @Nonnull Set<String> groupIds) {
-        return count(ownerUuid, groupIds, record -> record.countsAsOwned() && record.isDeployed());
+        return count(ownerUuid, groupIds, record -> record.countsAsOwned() && record.countsAsDeployed());
     }
 
     /** Counts each record once, however many of the groups its role belongs to. */

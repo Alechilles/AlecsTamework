@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import java.util.List;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CommandRecallRoutingTest {
     private static CompanionRecord liveIn(String world) {
         return CompanionTransitions.newLive(UUID.randomUUID(), 0, new CompanionTransitions.BodyFacts(UUID.randomUUID(),
-                UUID.randomUUID(), "Alec", "Tamed_Sheep", null, world, 0, 0, 0, List.of(), CompanionSummary.EMPTY));
+                UUID.randomUUID(), "Alec", "Tamed_Sheep", null, world, 12, 64, -7, List.of(), CompanionSummary.EMPTY));
     }
 
     @Test
@@ -26,5 +27,27 @@ class CommandRecallRoutingTest {
         assertEquals(RecallRoute.LOAD_AND_MOVE, RecallRoute.decide(here, false, "default"));
         assertEquals(RecallRoute.RESTORE, RecallRoute.decide(liveIn("other"), false, "default"));
         assertEquals(RecallRoute.REFUSE, RecallRoute.decide(dead, false, "default"));
+    }
+
+    /**
+     * An import with no checkpoint is LIVE at generation 0 and 0,0,0 in a world that may be a
+     * guess. A recall must neither restore it (a fresh animal would replace the real one) nor
+     * queue a relocation for it (there is no position to load, and the relocation's timeout would
+     * end in the same restore).
+     */
+    @Test
+    void anImportThatWasNeverSeenIsNotRecalledUntilItsBodyLoads() {
+        CompanionRecord elsewhere = liveIn("other").toBuilder()
+                .location(CompanionLocation.live("other", 0.0, 0.0, 0.0)).build();
+        CompanionRecord sameWorld = liveIn("default").toBuilder()
+                .location(CompanionLocation.live("default", 0.0, 0.0, 0.0)).build();
+
+        assertEquals(RecallRoute.UNSEEN_IMPORT, RecallRoute.decide(elsewhere, false, "default"));
+        assertEquals(RecallRoute.UNSEEN_IMPORT, RecallRoute.decide(sameWorld, false, "default"));
+        // Its body is loaded next to the player: it is simply moved.
+        assertEquals(RecallRoute.MOVE_LOADED, RecallRoute.decide(sameWorld, true, "default"));
+        // Restored once by 5.0 (generation above 0): its snapshot is its own again.
+        assertEquals(RecallRoute.RESTORE,
+                RecallRoute.decide(elsewhere.toBuilder().generation(1L).build(), false, "default"));
     }
 }

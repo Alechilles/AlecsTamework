@@ -41,7 +41,7 @@ class CompanionAdmissionGateTest {
     /** The tame sites refuse before the tame runs, so a group-capped tame never has to be undone. */
     @Test
     void thePrecheckRefusesANewCompanionAtAGroupLimit() {
-        own("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0));
+        own("Dragon_Ice", CompanionLocation.live("w", 1, 64, 1));
 
         assertEquals(CompanionAdmission.Refusal.GROUP_DEPLOYED, gate.precheck(owner, "Dragon_Fire", "w"));
         assertNull(gate.precheck(owner, "Sheep", "w"), "other roles are not in the group");
@@ -53,7 +53,7 @@ class CompanionAdmissionGateTest {
     /** A capture into an item creates an ITEM record: the deployed limit does not apply, the owned one does. */
     @Test
     void aCaptureStylePrecheckIgnoresTheDeployedLimitButNotTheOwnedOne() {
-        own("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0));
+        own("Dragon_Ice", CompanionLocation.live("w", 1, 64, 1));
 
         assertNull(gate.precheck(owner, "Dragon_Fire", "w", false));
 
@@ -61,17 +61,29 @@ class CompanionAdmissionGateTest {
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.precheck(owner, "Dragon_Fire", "w", false));
     }
 
+    /** A tame makes a companion that is out in the world; a capture into an item does not. */
+    @Test
+    void thePrecheckRefusesATameAtTheDeployedLimitWithItsOwnMessageButNotACapture() {
+        CompanionAdmissionGate capped = CompanionAdmissionGate.withRules(index,
+                () -> new CompanionAdmission.Rules(0, 1, false, role -> List.of()));
+        own("Sheep", CompanionLocation.live("w", 1, 64, 1));
+
+        assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY), capped.precheckDenial(owner, "Sheep", "w", true));
+        assertNull(capped.precheckDenial(owner, "Sheep", "w", false));
+    }
+
     /** The flows show the denial's key, so a provider domain limit must not read as a group limit. */
     @Test
     void aDenialNamesTheMessageOfTheCapOrTheDomainLimitThatRefused() {
         DomainClaim pasture = new DomainClaim("pasture", 2, false, true);
-        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 0, 0, 0))
+        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 1, 64, 1))
                 .ownerUuid(owner).domainClaims(List.of(pasture)).build());
-        own("Dragon_Ice", CompanionLocation.live("w", 0, 0, 0));
-        CompanionRecord cow = CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 0, 0, 0))
+        own("Dragon_Ice", CompanionLocation.live("w", 1, 64, 1));
+        CompanionRecord cow = CompanionRecord.builder(UUID.randomUUID(), "Cow", CompanionLocation.live("w", 1, 64, 1))
                 .ownerUuid(owner).build();
         CompanionRecord dragon = CompanionRecord.builder(UUID.randomUUID(), "Dragon_Fire",
-                CompanionLocation.live("w", 0, 0, 0)).ownerUuid(owner).build();
+                CompanionLocation.live("w", 1, 64, 1)).ownerUuid(owner).build();
 
         assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,
                         CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY),
@@ -117,7 +129,7 @@ class CompanionAdmissionGateTest {
     }
 
     private CompanionRecord live(String role) {
-        return CompanionRecord.builder(UUID.randomUUID(), role, CompanionLocation.live("w", 0, 0, 0))
+        return CompanionRecord.builder(UUID.randomUUID(), role, CompanionLocation.live("w", 1, 64, 1))
                 .ownerUuid(owner).homeWorld("w").currentNpcUuid(UUID.randomUUID()).build();
     }
 

@@ -1227,6 +1227,36 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 34);
 
+              Label #TwSettingsPopulationDeployedLimitLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.populationDeployedLimit;
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsPopulationDeployedLimitTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.populationDeployedLimit;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              TextField #TwSettingsPopulationDeployedLimitInput {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "0";
+                MaxLength: 8;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
               Label #TwSettingsPopulationLimitLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.populationLimit;

@@ -156,6 +156,7 @@ public final class CompanionPersistenceModule {
             // Old bodies are matched to imported records through this file. Without it they would
             // be adopted as new companions, so an unreadable one stops the store like an owner file.
             aliases = LegacyAliases.load(io, root);
+            requireImportedAliases(aliases, io, root);
         } catch (IOException | RuntimeException e) {
             // RuntimeException covers UncheckedIOException and DirectoryIteratorException from
             // listing, and a missing StorageManager.
@@ -202,6 +203,35 @@ public final class CompanionPersistenceModule {
         }
         return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
                 result.unreadableIds(), clock, root, aliases, null);
+    }
+
+    /**
+     * A missing alias file reads as "never imported", and then every stale owned body a 3.x/4.x
+     * world left behind would be adopted as a new companion. The import receipt in
+     * {@code meta.json} says how many aliases the import wrote, so a store that was imported with
+     * aliases and now has none (a partial restore of the folder, say) is refused like an unreadable
+     * alias file. A {@code meta.json} that cannot be read gives no receipt and changes nothing here.
+     *
+     * @throws IOException when the receipt names aliases and none were loaded
+     */
+    private static void requireImportedAliases(LegacyAliases aliases, CompanionFileIo io, Path root)
+            throws IOException {
+        if (aliases.size() > 0) {
+            return;
+        }
+        int expected;
+        try {
+            expected = CompanionStorage.importedAliasCount(io.readNow(CompanionStorage.metaFile(root)));
+        } catch (IOException | RuntimeException unreadableMeta) {
+            return;
+        }
+        if (expected > 0) {
+            throw new IOException(LegacyAliases.FILE_NAME + " is missing or empty in " + root + ", but meta.json says"
+                    + " this store was imported from 3.x/4.x with " + expected + " known old bodies. Without that"
+                    + " file old animals would be registered as new companions. Stop the server and restore "
+                    + LegacyAliases.FILE_NAME + " from a backup of the Companions folder (the import wrote it once"
+                    + " and it never changes)");
+        }
     }
 
     /** What {@link #startFresh} did. */

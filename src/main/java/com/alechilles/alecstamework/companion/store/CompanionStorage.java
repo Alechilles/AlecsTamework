@@ -11,6 +11,7 @@ import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
+import org.bson.BsonValue;
 
 /**
  * Where companion data lives and whether this world may use the new store (spec 7, 12.1).
@@ -137,5 +138,22 @@ public final class CompanionStorage {
     @Nonnull
     public static BsonDocument importMeta(@Nonnull String createdBy, @Nonnull BsonDocument receipt) {
         return meta(createdBy).append("Import", Objects.requireNonNull(receipt, "receipt"));
+    }
+
+    /**
+     * How many old bodies the import receipt in {@code meta} says the import wrote into the alias
+     * file ({@code Import.Counts.Aliases}); 0 when {@code meta} is null, has no import receipt (a
+     * store that was never imported) or names no such count.
+     */
+    public static int importedAliasCount(@Nullable BsonDocument meta) {
+        if (meta == null || !meta.isDocument("Import")) {
+            return 0;
+        }
+        BsonDocument receipt = meta.getDocument("Import");
+        if (!receipt.isDocument("Counts")) {
+            return 0;
+        }
+        BsonValue aliases = receipt.getDocument("Counts").get("Aliases");
+        return aliases != null && aliases.isNumber() ? aliases.asNumber().intValue() : 0;
     }
 }

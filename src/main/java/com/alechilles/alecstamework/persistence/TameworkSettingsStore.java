@@ -176,6 +176,8 @@ public final class TameworkSettingsStore {
 
         document.population = new PopulationSection();
         document.population.limitPerPlayerOwnedTotal = Math.max(0, snapshot.populationLimitPerPlayerOwnedTotal());
+        document.population.limitPerPlayerDeployedTotal =
+                Math.max(0, snapshot.populationLimitPerPlayerDeployedTotal());
         document.population.perPlayerLimitScope = normalizeScope(snapshot.populationPerPlayerLimitScope());
 
         document.simpleClaims = new SimpleClaimsSection();
@@ -392,6 +394,7 @@ public final class TameworkSettingsStore {
 
         document.population = new PopulationSection();
         document.population.limitPerPlayerOwnedTotal = 0;
+        document.population.limitPerPlayerDeployedTotal = 0;
         document.population.perPlayerLimitScope = "PerWorld";
 
         document.simpleClaims = new SimpleClaimsSection();
@@ -486,6 +489,17 @@ public final class TameworkSettingsStore {
             }
             if (migrateToCurrentVersion(parsed) && !writeDocument(globalSettingsFile, parsed, logger)) {
                 return null;
+            }
+            if (moveLegacyOwnedLimitToDeployed(parsed)) {
+                // Saved so the file shows both limits. A failed save is logged and the move is
+                // made again on the next read, with the same result.
+                writeDocument(globalSettingsFile, parsed, logger);
+                if (logger != null) {
+                    logger.at(Level.INFO).log("Tamework settings: limitPerPlayerOwnedTotal ("
+                            + parsed.population.limitPerPlayerDeployedTotal
+                            + ") is now limitPerPlayerDeployedTotal, the limit on companions out in the"
+                            + " world. The owned limit is now unlimited (0).");
+                }
             }
             return parsed;
         } catch (JsonSyntaxException syntaxException) {
@@ -648,7 +662,8 @@ public final class TameworkSettingsStore {
                 animalProgression != null ? trimToNull(animalProgression.agingMode) : null,
                 animalProgression != null ? animalProgression.oldAgeDeathEnabled : null,
                 commandPanel != null ? commandPanel.cardsPerPage : null,
-                ownershipCapture != null ? trimToNull(ownershipCapture.captureItemOwnership) : null
+                ownershipCapture != null ? trimToNull(ownershipCapture.captureItemOwnership) : null,
+                population != null ? population.limitPerPlayerDeployedTotal : null
         );
     }
 
@@ -803,7 +818,64 @@ public final class TameworkSettingsStore {
                                           boolean telemetryBreadcrumbsEnabled,
                                           @Nonnull String animalAgingMode,
                                           boolean animalOldAgeDeathEnabled,
-                                          int commandPanelCardsPerPage) {
+                                          int commandPanelCardsPerPage,
+                                         int populationLimitPerPlayerDeployedTotal) {
+
+        /** Compatibility constructor for callers compiled before the per-player deployed limit: no deployed limit. */
+        public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                      @Nonnull String populationPerPlayerLimitScope,
+                                      boolean simpleClaimsEnabled,
+                                      int simpleClaimsLimitPerClaimChunk,
+                                      int simpleClaimsLimitPerClaimTotal,
+                                      boolean simpleClaimsBreedingRequiresClaim,
+                                      boolean simpleClaimsProtectTamedFromNonMembers,
+                                      boolean blockOwnerDamage,
+                                      boolean blockAllPlayerDamageIfOwned,
+                                      boolean invulnerableIfOwned,
+                                      @Nonnull String captureItemOwnership,
+                                      boolean captureRequiresOwner,
+                                      boolean spawnRequiresOwner,
+                                      boolean interactionRequiresOwner,
+                                      boolean linkingRequiresOwner,
+                                      boolean needsEnabled,
+                                      @Nonnull String needsResourceMode,
+                                      @Nonnull String needsTickPolicyMode,
+                                      double needsOwnerOfflineGraceHours,
+                                      double needsOwnerOfflineDecayMultiplier,
+                                      boolean needsDamageEnabled,
+                                      @Nonnull String needsDamageModel,
+                                      @Nonnull String needsDamageDualNeedRule,
+                                      double needsStarvationDamagePerMinute,
+                                      double needsDehydrationDamagePerMinute,
+                                      boolean needsDamageLethal,
+                                      boolean happinessEnabled,
+                                      boolean passiveBreedingEnabled,
+                                      boolean breedingRequiresHappiness,
+                                      boolean breedingGenderEnabled,
+                                      boolean traitsEnabled,
+                                      boolean levelingEnabled,
+                                      boolean talentsEnabled,
+                                      boolean reviveSystemEnabled,
+                                      boolean recallTeleportingEnabled,
+                                      boolean telemetryEnabled,
+                                      boolean telemetryBreadcrumbsEnabled,
+                                      @Nonnull String animalAgingMode,
+                                      boolean animalOldAgeDeathEnabled,
+                                      int commandPanelCardsPerPage) {
+            this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope, simpleClaimsEnabled,
+                    simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
+                    simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
+                    blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership,
+                    captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner, linkingRequiresOwner,
+                    needsEnabled, needsResourceMode, needsTickPolicyMode, needsOwnerOfflineGraceHours,
+                    needsOwnerOfflineDecayMultiplier, needsDamageEnabled, needsDamageModel,
+                    needsDamageDualNeedRule, needsStarvationDamagePerMinute, needsDehydrationDamagePerMinute,
+                    needsDamageLethal, happinessEnabled, passiveBreedingEnabled, breedingRequiresHappiness,
+                    breedingGenderEnabled, traitsEnabled, levelingEnabled, talentsEnabled,
+                    reviveSystemEnabled, recallTeleportingEnabled, telemetryEnabled,
+                    telemetryBreadcrumbsEnabled, animalAgingMode, animalOldAgeDeathEnabled,
+                    commandPanelCardsPerPage, 0);
+        }
         /** Compatibility constructor for callers compiled before the capture item ownership mode. */
         public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
                                       @Nonnull String populationPerPlayerLimitScope,
@@ -1069,7 +1141,66 @@ public final class TameworkSettingsStore {
                                    @Nullable String animalAgingMode,
                                    @Nullable Boolean animalOldAgeDeathEnabled,
                                    @Nullable Integer commandPanelCardsPerPage,
-                                   @Nullable String captureItemOwnership) {
+                                   @Nullable String captureItemOwnership,
+                                  @Nullable Integer populationLimitPerPlayerDeployedTotal) {
+
+        /** Compatibility constructor for callers compiled before the per-player deployed limit. */
+        public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
+                               @Nullable String populationPerPlayerLimitScope,
+                               @Nullable Boolean simpleClaimsEnabled,
+                               @Nullable Integer simpleClaimsLimitPerClaimChunk,
+                               @Nullable Integer simpleClaimsLimitPerClaimTotal,
+                               @Nullable Boolean simpleClaimsBreedingRequiresClaim,
+                               @Nullable Boolean simpleClaimsProtectTamedFromNonMembers,
+                               @Nullable Boolean blockOwnerDamage,
+                               @Nullable Boolean blockAllPlayerDamageIfOwned,
+                               @Nullable Boolean invulnerableIfOwned,
+                               @Nullable Boolean captureClearsOwner,
+                               @Nullable Boolean spawnSetsOwner,
+                               @Nullable Boolean captureRequiresOwner,
+                               @Nullable Boolean spawnRequiresOwner,
+                               @Nullable Boolean interactionRequiresOwner,
+                               @Nullable Boolean linkingRequiresOwner,
+                               @Nullable Boolean needsEnabled,
+                               @Nullable String needsResourceMode,
+                               @Nullable String needsTickPolicyMode,
+                               @Nullable Double needsOwnerOfflineGraceHours,
+                               @Nullable Double needsOwnerOfflineDecayMultiplier,
+                               @Nullable Boolean needsDamageEnabled,
+                               @Nullable String needsDamageModel,
+                               @Nullable String needsDamageDualNeedRule,
+                               @Nullable Double needsStarvationDamagePerMinute,
+                               @Nullable Double needsDehydrationDamagePerMinute,
+                               @Nullable Boolean needsDamageLethal,
+                               @Nullable Boolean happinessEnabled,
+                               @Nullable Boolean passiveBreedingEnabled,
+                               @Nullable Boolean breedingRequiresHappiness,
+                               @Nullable Boolean breedingGenderEnabled,
+                               @Nullable Boolean traitsEnabled,
+                               @Nullable Boolean levelingEnabled,
+                               @Nullable Boolean talentsEnabled,
+                               @Nullable Boolean reviveSystemEnabled,
+                               @Nullable Boolean recallTeleportingEnabled,
+                               @Nullable Boolean telemetryEnabled,
+                               @Nullable Boolean telemetryBreadcrumbsEnabled,
+                               @Nullable String animalAgingMode,
+                               @Nullable Boolean animalOldAgeDeathEnabled,
+                               @Nullable Integer commandPanelCardsPerPage,
+                               @Nullable String captureItemOwnership) {
+            this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope, simpleClaimsEnabled,
+                    simpleClaimsLimitPerClaimChunk, simpleClaimsLimitPerClaimTotal,
+                    simpleClaimsBreedingRequiresClaim, simpleClaimsProtectTamedFromNonMembers,
+                    blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureClearsOwner,
+                    spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner,
+                    linkingRequiresOwner, needsEnabled, needsResourceMode, needsTickPolicyMode,
+                    needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier, needsDamageEnabled,
+                    needsDamageModel, needsDamageDualNeedRule, needsStarvationDamagePerMinute,
+                    needsDehydrationDamagePerMinute, needsDamageLethal, happinessEnabled,
+                    passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled, traitsEnabled,
+                    levelingEnabled, talentsEnabled, reviveSystemEnabled, recallTeleportingEnabled,
+                    telemetryEnabled, telemetryBreadcrumbsEnabled, animalAgingMode, animalOldAgeDeathEnabled,
+                    commandPanelCardsPerPage, captureItemOwnership, null);
+        }
         /** Compatibility constructor for callers compiled before the capture item ownership mode. */
         public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
                                @Nullable String populationPerPlayerLimitScope,
@@ -1256,6 +1387,25 @@ public final class TameworkSettingsStore {
         return true;
     }
 
+    /**
+     * Before 5.0 {@code limitPerPlayerOwnedTotal} counted only the loaded companions out in the
+     * world, so a file written before the deployed limit existed (it has the owned key and no
+     * deployed key) keeps its number as the deployed limit and gets no owned limit. A file with
+     * both keys is left alone, so the move happens once.
+     *
+     * @return true when the value was moved
+     */
+    private static boolean moveLegacyOwnedLimitToDeployed(@Nonnull GlobalSettingsDocument document) {
+        PopulationSection population = document.population;
+        if (population == null || population.limitPerPlayerDeployedTotal != null
+                || population.limitPerPlayerOwnedTotal == null) {
+            return false;
+        }
+        population.limitPerPlayerDeployedTotal = Math.max(0, population.limitPerPlayerOwnedTotal);
+        population.limitPerPlayerOwnedTotal = 0;
+        return true;
+    }
+
     private record CachedResolvedPaths(@Nonnull Tamework plugin,
                                        @Nonnull Path tameworkUniverseRoot,
                                        @Nonnull Path settingsDirectory,
@@ -1279,7 +1429,10 @@ public final class TameworkSettingsStore {
     }
 
     private static final class PopulationSection {
+        /** Every companion that counts as owned. 0 = no limit. */
         private Integer limitPerPlayerOwnedTotal;
+        /** Companions out in the world. 0 = no limit. Absent in a file written before 5.0. */
+        private Integer limitPerPlayerDeployedTotal;
         private String perPlayerLimitScope;
     }
 

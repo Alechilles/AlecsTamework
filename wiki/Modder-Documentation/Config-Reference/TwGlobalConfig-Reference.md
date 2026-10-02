@@ -112,10 +112,18 @@ For the current compatibility release only, the same configured key is also chec
 
 These legacy fields are still decoded but `/tw settings` is authoritative:
 
-- `Population.LimitPerPlayerOwnedTotal`: maximum canonical owned profiles per
-  player; `0` disables the cap.
-- `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for that
-  durable count.
+- `Population.LimitPerPlayerOwnedTotal`: maximum companions a player can own,
+  counting every owned companion (out in the world, stored, in items, in coops,
+  dead and lost); `0` means no limit.
+- `Population.LimitPerPlayerDeployedTotal`: maximum companions a player can have
+  out in the world, loaded or not; `0` means no limit. Default `0`.
+- `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for both
+  limits.
+
+Both limit keys inherit from the parent config one by one. The settings file
+written by `/tw settings` (`limitPerPlayerOwnedTotal`,
+`limitPerPlayerDeployedTotal`) wins at runtime; see
+[Tamework Settings UI and Persistence](../Testing-and-Diagnostics/Tamework-Settings-UI-and-Persistence.md).
 - `SimpleClaims.SimpleClaimsEnabled`: backward-compatible master claim-integration gate.
 - `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: live
   SimpleClaims capacity limits used by taming and breeding.

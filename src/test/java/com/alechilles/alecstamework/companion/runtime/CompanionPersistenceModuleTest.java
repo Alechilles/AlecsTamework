@@ -218,6 +218,35 @@ class CompanionPersistenceModuleTest {
         module.shutdown(System.currentTimeMillis() + 1_000L);
     }
 
+    /**
+     * Without the alias file a world reads as "never imported" and every stale owned 4.x body
+     * would be adopted as a new companion. The import receipt tells the two cases apart.
+     */
+    @Test
+    void anImportedStoreWhoseAliasFileIsGoneFailsInsteadOfLoadingAsNeverImported() {
+        MemoryCompanionFileIo io = new MemoryCompanionFileIo();
+        io.write(CompanionStorage.metaFile(ROOT), CompanionStorage.importMeta("test",
+                new BsonDocument("Counts", new BsonDocument("Aliases", new BsonInt32(3))))).join();
+        List<Path> seeded = io.writtenPaths();
+
+        CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), io::exists, io,
+                System::currentTimeMillis, "test", DATA);
+
+        assertEquals(CompanionPersistenceModule.State.FAILED, module.state());
+        assertTrue(module.failure().contains("legacy-aliases.json"), module.failure());
+        assertEquals(seeded, io.writtenPaths(), "nothing is written");
+        module.shutdown(System.currentTimeMillis() + 1_000L);
+
+        // An import that knew no old bodies writes an empty alias file; that store loads.
+        MemoryCompanionFileIo empty = new MemoryCompanionFileIo();
+        empty.write(CompanionStorage.metaFile(ROOT), CompanionStorage.importMeta("test",
+                new BsonDocument("Counts", new BsonDocument("Aliases", new BsonInt32(0))))).join();
+        CompanionPersistenceModule loads = CompanionPersistenceModule.open(ROOT, List.of(DATA), empty::exists, empty,
+                System::currentTimeMillis, "test", DATA);
+        assertEquals(CompanionPersistenceModule.State.READY, loads.state());
+        loads.shutdown(System.currentTimeMillis() + 1_000L);
+    }
+
     @Test
     void aSnapshotQueuedButNotYetWrittenIsReadFromTheWriter() throws Exception {
         MemoryCompanionFileIo files = new MemoryCompanionFileIo();
