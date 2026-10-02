@@ -765,6 +765,19 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void bodyWhoseRecordWasUnreadableAtStartupIsRejected() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            Ref<EntityStore> body = scope.store.createReference();
+            scope.store.put(body, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.UNREADABLE_PROFILE, 0L));
+
+            // The lost record may be a bonded one, so generic items must not act on its body.
+            assertFalse(allowsGenericTargetMutation(body, scope.store));
+            assertFalse(CommandGenericTargetAuthority.isRosterMember(body, scope.store));
+        }
+    }
+
+    @Test
     void rosterMembershipIsReadFromTheStampedRecord() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             Ref<EntityStore> rosterMember = scope.store.createReference();
@@ -1199,8 +1212,9 @@ class CommandGenericTargetAuthorityTest {
         private final ComponentType<EntityStore, TameworkCompanionComponent>
                 stampType = new ComponentType<>();
         private Object oldStampType;
-        private java.util.function.Function<UUID,
-                CommandGenericTargetAuthority.Standing> oldStandings;
+        private static final UUID UNREADABLE_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000f0");
+        private CommandGenericTargetAuthority.Index oldIndex;
         private final ComponentType<EntityStore, TameworkOwnerComponent>
                 ownerType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkTamedComponent>
@@ -1261,25 +1275,29 @@ class CommandGenericTargetAuthorityTest {
             Field stampTypeField = staticField(TameworkCompanionComponent.class, "type");
             scope.oldStampType = stampTypeField.get(null);
             stampTypeField.set(null, scope.stampType);
-            // Stands in for the companion index: what each stamped profile's record says.
-            scope.oldStandings = CommandGenericTargetAuthority.standingsForTest(profileId -> {
-                if (FAILING_PROFILE.equals(profileId)) {
-                    throw new IllegalStateException("index unavailable");
-                }
-                if (BONDED_PROFILE.equals(profileId)) {
-                    return CommandGenericTargetAuthority.Standing.BONDED;
-                }
-                return ROSTER_PROFILE.equals(profileId)
-                        ? CommandGenericTargetAuthority.Standing.ROSTER_MEMBER
-                        : CommandGenericTargetAuthority.Standing.ORDINARY;
-            });
+            // Stands in for the companion index with real records: a bonded one, a roster
+            // member, a plain one, and one profile whose file was unreadable at startup.
+            Map<UUID, CompanionRecord> records = new HashMap<>();
+            var live = com.alechilles.alecstamework.companion.index.CompanionLocation.live("default", 0, 0, 0);
+            records.put(BONDED_PROFILE, CompanionRecord.builder(BONDED_PROFILE, "Dragon", live)
+                    .rosterId("test:roster").rosterSlot(0).bonded(true).build());
+            records.put(ROSTER_PROFILE, CompanionRecord.builder(ROSTER_PROFILE, "Sheep", live)
+                    .rosterId("test:family").rosterSlot(0).build());
+            records.put(ORDINARY_PROFILE, CompanionRecord.builder(ORDINARY_PROFILE, "Sheep", live).build());
+            scope.oldIndex = CommandGenericTargetAuthority.indexForTest(
+                    new CommandGenericTargetAuthority.Index(profileId -> {
+                        if (FAILING_PROFILE.equals(profileId)) {
+                            throw new IllegalStateException("index unavailable");
+                        }
+                        return records.get(profileId);
+                    }, UNREADABLE_PROFILE::equals));
             return scope;
         }
 
         @Override
         public void close() throws Exception {
             store.close();
-            CommandGenericTargetAuthority.standingsForTest(oldStandings);
+            CommandGenericTargetAuthority.indexForTest(oldIndex);
             staticField(TameworkCompanionComponent.class, "type").set(null, oldStampType);
             staticField(Tamework.class, "instance").set(null, oldTamework);
             staticField(EntityModule.class, "instance").set(null,

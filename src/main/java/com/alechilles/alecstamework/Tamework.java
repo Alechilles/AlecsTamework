@@ -1809,8 +1809,6 @@ public class Tamework extends JavaPlugin {
         retiredComponentCleanup = retiredCleanup;
         deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-component-cleanup",
                 retiredCleanup::addSystem);
-        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-projection-identity-cleanup",
-                retiredCleanup::stampedSystem);
         deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-revive-escrow-refund",
                 () -> new com.alechilles.alecstamework.companion.migrate.EscrowRefund(
                         bondedReviveEscrowComponentType).system());
@@ -3746,6 +3744,12 @@ public class Tamework extends JavaPlugin {
     public CompanionQueries getCompanionQueries() {
         CompanionPersistenceModule module = companionModule;
         return module != null && module.ready() ? module.queries() : null;
+    }
+
+    /** True when the companion record of {@code profileId} could not be read at startup. */
+    public boolean isCompanionRecordUnreadable(@Nonnull java.util.UUID profileId) {
+        CompanionPersistenceModule module = companionModule;
+        return module != null && module.unreadable().test(profileId);
     }
 
     public ComponentType<EntityStore, TameworkHappinessComponent> getHappinessComponentType() {

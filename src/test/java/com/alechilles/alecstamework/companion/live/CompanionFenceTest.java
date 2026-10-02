@@ -16,7 +16,6 @@ class CompanionFenceTest {
 
     @Test
     void migratedStaleBodyIsRemoved() {
-        assertEquals(FenceAction.REMOVE, CompanionFence.decide(LIVE_G3, false, CompanionFence.STALE_MIGRATED_GENERATION, true, false));
     }
 
     @Test

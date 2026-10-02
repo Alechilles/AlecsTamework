@@ -38,6 +38,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.NotificationUtil;
 import java.util.List;
@@ -155,18 +156,30 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         if (!hasLegacyBodies() || store.getComponent(ref, stampType) != null) {
             return false;
         }
-        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(ref, store, summaries);
-        if (facts == null) {
+        UUIDComponent identity = store.getComponent(ref, UUIDComponent.getComponentType());
+        UUID npcUuid = identity == null ? null : identity.getUuid();
+        if (npcUuid == null) {
             return false;
         }
-        UUID npcUuid = facts.npcUuid();
         ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType =
                 TameworkProjectionIdentityComponent.getComponentType();
         TameworkProjectionIdentityComponent projection =
                 projectionType == null ? null : store.getComponent(ref, projectionType);
+        UUID projectionProfile = projection == null ? null : parseUuid(projection.getProfileId());
+        boolean ownedAndTamed = CompanionOwnershipSystems.isTamed(store, ref);
+        // Most animals on an imported world are unknown to the import: nothing can match, so the
+        // answer is the one the resolution gives for "no record" without reading the full body.
+        if (legacyAliases.byNpcUuid(npcUuid).isEmpty() && index.get(npcUuid) == null && !unreadable.test(npcUuid)
+                && (projectionProfile == null
+                || index.get(projectionProfile) == null && !unreadable.test(projectionProfile))) {
+            return !ownedAndTamed;
+        }
+        CompanionTransitions.BodyFacts facts = CompanionBodyFacts.read(ref, store, summaries);
+        if (facts == null) {
+            return false;
+        }
         LegacyBodyResolution.Body body = new LegacyBodyResolution.Body(
-                CompanionOwnershipSystems.isTamed(store, ref), projection != null,
-                projection == null ? null : parseUuid(projection.getProfileId()), npcUuid);
+                ownedAndTamed, projection != null, projectionProfile, npcUuid);
         LegacyBodyResolution.Decision decision = LegacyBodyResolution.admit(index, loaded, legacyAliases, unreadable,
                 Ref::isValid, body, ref, liveTame, record -> matched(record, facts));
         UUID profileId = decision.profileId();

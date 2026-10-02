@@ -300,7 +300,7 @@ class CommandFreshTamePanelSelectionTest {
                 "78000000-0000-0000-0000-0000000000b0");
         private final ComponentType<EntityStore, TameworkCompanionComponent> stampType = new ComponentType<>();
         private final Object oldStampType;
-        private final java.util.function.Function<UUID, CommandGenericTargetAuthority.Standing> oldStandings;
+        private final CommandGenericTargetAuthority.Index oldIndex;
         private final TestWorld world;
         private final TestEntityComponentStore store;
 
@@ -323,11 +323,13 @@ class CommandFreshTamePanelSelectionTest {
                     TameworkTamedComponent.class, "TestFreshTameTamed", TameworkTamedComponent.CODEC);
             this.oldStampType = staticField(TameworkCompanionComponent.class, "type").get(null);
             staticField(TameworkCompanionComponent.class, "type").set(null, stampType);
-            // Stands in for the companion index: only this profile's record is bonded.
-            this.oldStandings = CommandGenericTargetAuthority.standingsForTest(profileId ->
-                    BONDED_PROFILE.equals(profileId)
-                            ? CommandGenericTargetAuthority.Standing.BONDED
-                            : CommandGenericTargetAuthority.Standing.ORDINARY);
+            // Stands in for the companion index: its only record is this bonded profile.
+            var bondedRecord = com.alechilles.alecstamework.companion.index.CompanionRecord.builder(
+                    BONDED_PROFILE, "Dragon",
+                    com.alechilles.alecstamework.companion.index.CompanionLocation.live("default", 0, 0, 0))
+                    .rosterId("test:roster").rosterSlot(0).bonded(true).build();
+            this.oldIndex = CommandGenericTargetAuthority.indexForTest(new CommandGenericTargetAuthority.Index(
+                    profileId -> BONDED_PROFILE.equals(profileId) ? bondedRecord : null, profileId -> false));
             this.world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
             this.world.references = new HashMap<>();
             TestEntityStore entityStore = new TestEntityStore(world);
@@ -369,7 +371,7 @@ class CommandFreshTamePanelSelectionTest {
         public void close() throws Exception {
             store.close();
             staticField(com.hypixel.hytale.server.npc.NPCPlugin.class, "instance").set(null, oldNpcPlugin);
-            CommandGenericTargetAuthority.standingsForTest(oldStandings);
+            CommandGenericTargetAuthority.indexForTest(oldIndex);
             staticField(TameworkCompanionComponent.class, "type").set(null, oldStampType);
             EntityStore.REGISTRY.unregisterComponent(ownerType);
             EntityStore.REGISTRY.unregisterComponent(tamedType);

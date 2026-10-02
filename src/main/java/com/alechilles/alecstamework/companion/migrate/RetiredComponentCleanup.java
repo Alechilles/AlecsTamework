@@ -13,7 +13,6 @@ import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.component.system.RefChangeSystem;
 import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -78,8 +77,10 @@ public final class RetiredComponentCleanup {
      * Whether the projection identity may be removed from a body. On an imported world an
      * unstamped body is matched again every time it loads (a body left alone because its record
      * was unreadable or another body held the profile), and the projection identity is the first
-     * thing that match reads, so it stays until the body carries a stamp. Where no matching runs,
-     * nothing reads it and it goes at once.
+     * thing that match reads, so it stays until the body carries a stamp. A body stamped while it
+     * loads keeps the marker for that session (the stamp is applied after the add callbacks) and
+     * loses it on its next load; nothing reads the marker of a stamped body. Where no matching
+     * runs, nothing reads it and it goes at once.
      */
     static boolean stripsProjection(boolean stamped, boolean legacyMatching) {
         return stamped || !legacyMatching;
@@ -109,12 +110,6 @@ public final class RetiredComponentCleanup {
     @Nonnull
     public RefSystem<EntityStore> addSystem() {
         return new OnAdd(this);
-    }
-
-    /** The system that strips the projection identity once a body is stamped. */
-    @Nonnull
-    public RefChangeSystem<EntityStore, TameworkCompanionComponent> stampedSystem() {
-        return new OnStamped(projection, stamp);
     }
 
     /**
@@ -190,52 +185,6 @@ public final class RetiredComponentCleanup {
         @Nonnull
         public Set<Dependency<EntityStore>> getDependencies() {
             return dependencies;
-        }
-    }
-
-    /**
-     * A body that still carries the projection identity was stamped (matched to its imported
-     * record, or tamed): the match is done, so the projection identity goes. The stamp put by the
-     * ownership add system is applied after the add callbacks, so {@link OnAdd} cannot see it.
-     */
-    private static final class OnStamped extends RefChangeSystem<EntityStore, TameworkCompanionComponent> {
-        private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projection;
-        private final ComponentType<EntityStore, TameworkCompanionComponent> stamp;
-
-        private OnStamped(ComponentType<EntityStore, TameworkProjectionIdentityComponent> projection,
-                          ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
-            this.projection = projection;
-            this.stamp = stamp;
-        }
-
-        @Override
-        @Nonnull
-        public ComponentType<EntityStore, TameworkCompanionComponent> componentType() {
-            return stamp;
-        }
-
-        @Override
-        public void onComponentAdded(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkCompanionComponent component,
-                                     @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
-            buffer.tryRemoveComponent(ref, projection);
-        }
-
-        @Override
-        public void onComponentSet(@Nonnull Ref<EntityStore> ref, @Nullable TameworkCompanionComponent oldComponent,
-                                   @Nonnull TameworkCompanionComponent newComponent, @Nonnull Store<EntityStore> store,
-                                   @Nonnull CommandBuffer<EntityStore> buffer) {
-            buffer.tryRemoveComponent(ref, projection);
-        }
-
-        @Override
-        public void onComponentRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkCompanionComponent component,
-                                       @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
-        }
-
-        @Override
-        @Nonnull
-        public Query<EntityStore> getQuery() {
-            return projection;
         }
     }
 }

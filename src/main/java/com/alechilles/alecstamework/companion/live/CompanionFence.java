@@ -7,18 +7,12 @@ import javax.annotation.Nullable;
 
 /** The generation fence for bodies (spec 6.8). Pure decision; the body system applies it. */
 public final class CompanionFence {
-    /** Stamp given to migrated 4.x bodies that are not the companion's current body (spec 12.4). */
-    public static final long STALE_MIGRATED_GENERATION = -1L;
-
     private CompanionFence() {
     }
 
     @Nonnull
     public static FenceAction decide(@Nullable CompanionRecord record, boolean unreadable, long bodyGeneration,
                                      boolean bodyIsOwnedAndTamed, boolean anotherBodyLoaded) {
-        if (bodyGeneration == STALE_MIGRATED_GENERATION) {
-            return FenceAction.REMOVE;
-        }
         if (record == null) {
             // The unreadable mark only matters when there is no readable record to fence by.
             if (unreadable) {

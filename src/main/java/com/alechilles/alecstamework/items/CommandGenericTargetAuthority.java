@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Physical authority checks shared by ordinary command-item boundaries.
@@ -43,33 +44,53 @@ final class CommandGenericTargetAuthority {
         BONDED
     }
 
-    /** Index lookup by profile id; tests replace it through {@link #standingsForTest}. */
-    private static volatile Function<UUID, Standing> standings =
-            CommandGenericTargetAuthority::indexStanding;
+    /**
+     * Where records come from: the live companion index, or a stand-in set by a test.
+     * {@code unreadable} answers whether a profile's file could not be read at startup.
+     */
+    record Index(@Nonnull Function<UUID, CompanionRecord> records, @Nonnull Predicate<UUID> unreadable) {
+        /**
+         * The live index, read on every call. While companion saving is paused there is no index:
+         * every record is missing and nothing counts as unreadable, so every body is ordinary.
+         * The bonded items are off as well then, and blocking every command item would be worse
+         * than the missing restriction.
+         */
+        private static final Index LIVE = new Index(
+                profileId -> {
+                    Tamework plugin = Tamework.getInstance();
+                    CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
+                    return companions == null ? null : companions.get(profileId);
+                },
+                profileId -> {
+                    Tamework plugin = Tamework.getInstance();
+                    return plugin != null && plugin.isCompanionRecordUnreadable(profileId);
+                });
+    }
+
+    private static volatile Index index = Index.LIVE;
 
     private CommandGenericTargetAuthority() {
     }
 
-    /** Replaces the index lookup and returns the previous one; null restores the default. */
+    /** Replaces the record source and returns the previous one; null restores the live index. */
     @Nonnull
-    static Function<UUID, Standing> standingsForTest(@Nullable Function<UUID, Standing> lookup) {
-        Function<UUID, Standing> previous = standings;
-        standings = lookup != null ? lookup : CommandGenericTargetAuthority::indexStanding;
+    static Index indexForTest(@Nullable Index replacement) {
+        Index previous = index;
+        index = replacement != null ? replacement : Index.LIVE;
         return previous;
     }
 
     /**
-     * Reads the live index. While companion saving is paused there is no index and every body
-     * counts as ordinary: the bonded items are off as well, and blocking every command item
-     * would be worse than the missing restriction.
+     * What the index says about a stamped profile. A record that is missing because its file was
+     * unreadable at startup might be a bonded one, so its standing is unknown (null); a record
+     * that is simply missing makes the body ordinary.
      */
-    @Nonnull
-    private static Standing indexStanding(@Nonnull UUID profileId) {
-        Tamework plugin = Tamework.getInstance();
-        CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
-        CompanionRecord record = companions == null ? null : companions.get(profileId);
+    @Nullable
+    private static Standing standingOf(@Nonnull UUID profileId) {
+        Index source = index;
+        CompanionRecord record = source.records().apply(profileId);
         if (record == null) {
-            return Standing.ORDINARY;
+            return source.unreadable().test(profileId) ? null : Standing.ORDINARY;
         }
         if (record.bonded()) {
             return Standing.BONDED;
@@ -79,7 +100,7 @@ final class CommandGenericTargetAuthority {
 
     /**
      * The standing of a loaded body, or null when it cannot be read (invalid reference, stamp
-     * type not registered, lookup failure). Callers treat null as "not allowed".
+     * type not registered, record unreadable, lookup failure). Callers treat null as "not allowed".
      */
     @Nullable
     private static Standing standing(
@@ -97,7 +118,7 @@ final class CommandGenericTargetAuthority {
         try {
             TameworkCompanionComponent stamp = components.getComponent(reference, type);
             UUID profileId = stamp == null ? null : stamp.getProfileId();
-            return profileId == null ? Standing.ORDINARY : standings.apply(profileId);
+            return profileId == null ? Standing.ORDINARY : standingOf(profileId);
         } catch (RuntimeException ignored) {
             return null;
         }
