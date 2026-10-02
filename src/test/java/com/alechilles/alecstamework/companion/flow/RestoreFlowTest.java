@@ -16,7 +16,13 @@ import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.hypixel.hytale.component.AddReason;
+import com.hypixel.hytale.component.ComponentRegistry;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -386,5 +392,78 @@ class RestoreFlowTest {
                 CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY), pending.join());
         assertEquals(List.of("provider"), events, "no flush, no removal and no spawn");
         assertEquals(item, index.get(item.profileId()));
+    }
+
+    private static final String IMPORTED_STATE = "{\"version\":\"1\",\"npcUuid\":\"" + UUID.randomUUID()
+            + "\",\"roleId\":\"Tamed_Sheep\",\"healthPercent\":0.0}";
+
+    /**
+     * An imported dead, lost or stored companion has only a format 0 snapshot. Its restore must
+     * hand that state to the spawner, and the body's first snapshot must replace it with a native
+     * one, or the companion could never be recalled afterwards.
+     */
+    @Test
+    void anImportedCompanionComesBackFromItsStateSnapshotAndIsNativeAfterwards() {
+        ComponentRegistry<EntityStore> registry = new ComponentRegistry<>();
+        Store<EntityStore> store = registry.addStore(null, null);
+        try {
+            Map<UUID, SnapshotEnvelope> queued = new HashMap<>();
+            List<Integer> handedFormats = new ArrayList<>();
+            RestoreFlow<String> flow = new RestoreFlow<>(index, loaded,
+                    id -> CompletableFuture.completedFuture(queued.get(id)),
+                    owner -> CompletableFuture.completedFuture(null),
+                    (committed, snap, dest, reason) -> {
+                        handedFormats.add(snap.format());
+                        // As the production spawner does once the body from the role is in the store.
+                        Ref<EntityStore> ref = store.addEntity(registry.newHolder(), AddReason.LOAD);
+                        HytaleCompanionSpawner.finishAddedBody(ref, store, committed, dest.world(), 0L, reason,
+                                new CompanionSnapshots(registry::serialize), e -> queued.put(e.profileId(), e), true);
+                        return CompletableFuture.completedFuture(true);
+                    },
+                    (id, body) -> { }, System::currentTimeMillis, admission);
+            CompanionRecord lost = imported(r -> CompanionTransitions.lost(r, null, "IMPORTED_UNRESOLVED", null));
+            CompanionRecord dead = imported(r -> CompanionTransitions.died(r, CompanionSummary.EMPTY, 5L, 6L, "PLAYER", null));
+            CompanionRecord stored = imported(r -> b -> b.location(CompanionLocation.stored(StoredReason.BONDED))
+                    .currentNpcUuid(null));
+            Map<CompanionRecord, RestoreRules.Reason> reasons = Map.of(lost, RestoreRules.Reason.RECOVER,
+                    dead, RestoreRules.Reason.REVIVE, stored, RestoreRules.Reason.SUMMON);
+
+            reasons.forEach((record, reason) -> {
+                UUID id = record.profileId();
+                queued.put(id, SnapshotEnvelope.importedState(id, record.generation(), IMPORTED_STATE));
+
+                assertEquals(RestoreFlow.Result.RESTORED, flow.restore(id, reason, there).join(), reason.name());
+                assertEquals(LocationKind.LIVE, index.get(id).location().kind(), reason.name());
+                assertEquals(CompanionSnapshots.FORMAT, queued.get(id).format(), reason.name());
+                assertEquals(RestoreFlow.Result.RESTORED,
+                        flow.restore(id, RestoreRules.Reason.RECALL, there).join(), reason.name());
+            });
+            assertEquals(List.of(0, 1, 0, 1, 0, 1), handedFormats);
+        } finally {
+            registry.removeStore(store);
+            registry.shutdown();
+        }
+    }
+
+    @Test
+    void anImportedCompanionWhoseStateCannotBeReadIsRefusedWithoutAnyChange() {
+        CompanionRecord stored = imported(r -> b -> b.location(CompanionLocation.stored(StoredReason.ROSTER))
+                .currentNpcUuid(null));
+        SnapshotEnvelope unreadable = SnapshotEnvelope.importedState(stored.profileId(), 0L, "{not json");
+
+        RestoreFlow.Result result = flow(id -> CompletableFuture.completedFuture(unreadable),
+                CompletableFuture.completedFuture(null), true)
+                .restore(stored.profileId(), RestoreRules.Reason.SUMMON, there).join();
+
+        assertEquals(RestoreFlow.Result.NO_SNAPSHOT, result);
+        assertTrue(events.isEmpty(), "no flush and no spawn");
+        assertEquals(stored, index.get(stored.profileId()));
+    }
+
+    /** A record moved from LIVE by {@code change}, standing in for one the importer wrote. */
+    private CompanionRecord imported(Function<CompanionRecord, java.util.function.UnaryOperator<CompanionRecord.Builder>> change) {
+        CompanionRecord live = insertLive();
+        index.update(live.profileId(), live.revision(), change.apply(live));
+        return index.get(live.profileId());
     }
 }

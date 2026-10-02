@@ -131,4 +131,46 @@ class RestoreRulesTest {
                 record.generation(), new BsonDocument("World", new BsonString("default")));
         assertEquals(RestoreRules.Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(record, noEntity, RestoreRules.Reason.RECALL));
     }
+
+    private static final String IMPORTED_STATE = "{\"version\":\"1\",\"npcUuid\":\"" + UUID.randomUUID()
+            + "\",\"roleId\":\"Tamed_Sheep\",\"currentHealth\":0.0,\"maximumHealth\":20.0,\"healthPercent\":0.0}";
+
+    @Test
+    void anImportedStateSnapshotServesARecoverAReviveAndASummon() {
+        CompanionRecord lost = at(CompanionLocation.lost("IMPORTED_UNRESOLVED"));
+        CompanionRecord dead = dead(0L);
+        CompanionRecord stored = at(CompanionLocation.stored(StoredReason.BONDED));
+
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(lost,
+                SnapshotEnvelope.importedState(lost.profileId(), 0L, IMPORTED_STATE), Reason.RECOVER));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(dead,
+                SnapshotEnvelope.importedState(dead.profileId(), 0L, IMPORTED_STATE), Reason.REVIVE));
+        assertEquals(Verdict.ALLOWED, RestoreRules.forSnapshot(stored,
+                SnapshotEnvelope.importedState(stored.profileId(), 0L, IMPORTED_STATE), Reason.SUMMON));
+    }
+
+    @Test
+    void anImportedStateSnapshotThatCannotBeReadIsNotUsed() {
+        CompanionRecord stored = at(CompanionLocation.stored(StoredReason.ROSTER));
+        UUID id = stored.profileId();
+
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(stored,
+                SnapshotEnvelope.importedState(id, 0L, "{not json"), Reason.SUMMON));
+        // A 4.x death wrapper the importer did not unwrap has no source NPC UUID at its root.
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(stored,
+                SnapshotEnvelope.importedState(id, 0L, "{\"fullState\":" + IMPORTED_STATE + "}"), Reason.SUMMON));
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(stored,
+                new SnapshotEnvelope(id, SnapshotEnvelope.FORMAT_IMPORTED_STATE, 0L, new BsonDocument()), Reason.SUMMON));
+        assertEquals(Verdict.NO_SNAPSHOT, RestoreRules.forSnapshot(stored,
+                SnapshotEnvelope.importedState(id, stored.generation() + 1, IMPORTED_STATE), Reason.SUMMON));
+    }
+
+    @Test
+    void importedHealthIsNeverAppliedAtZeroOrOnARevive() {
+        assertEquals(true, RestoreRules.appliesImportedHealth(Reason.SUMMON, 12.0, 60.0));
+        assertEquals(true, RestoreRules.appliesImportedHealth(Reason.RECOVER, null, 60.0));
+        assertEquals(false, RestoreRules.appliesImportedHealth(Reason.RECOVER, 0.0, 0.0));
+        assertEquals(false, RestoreRules.appliesImportedHealth(Reason.SUMMON, null, null));
+        assertEquals(false, RestoreRules.appliesImportedHealth(Reason.REVIVE, 12.0, 60.0));
+    }
 }

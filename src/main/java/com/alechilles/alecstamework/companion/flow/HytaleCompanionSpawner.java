@@ -8,7 +8,11 @@ import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.items.CoopResidentStateRestorer;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.spawning.CompanionSpawnAuthorityService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -28,6 +32,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +49,9 @@ import org.joml.Vector3d;
  * Puts a committed companion back into its destination world from its snapshot (spec 6.5). A
  * provisioned bonded companion that never had a snapshot written is handed none: its body is
  * built from the record's role, stamped before it is added, and snapshotted once it is in the
- * store (plan 6 R16).
+ * store (plan 6 R16). A companion imported from 3.x or 4.x arrives with a format 0 snapshot (plan 7
+ * R4): its body is built from the role in the same way, with the imported state written into it
+ * before it is added, and the snapshot taken afterwards replaces the format 0 one.
  *
  * <p>{@link #spawn} only resolves the world and queues one task, so it is safe to call from the
  * companion writer thread mid-flush. The entity work runs inside that task on the destination
@@ -61,6 +68,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final long WARN_INTERVAL_MS = 10_000L;
     private static final AtomicLong LAST_WARN_MS = new AtomicLong(Long.MIN_VALUE);
+    private static final CoopResidentStateRestorer IMPORTED_STATE_RESTORER = new CoopResidentStateRestorer();
 
     private final CompanionRespawn respawn;
     private final Function<UUID, CompanionRecord> currentRecord;
@@ -101,9 +109,10 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             return done;
         }
         try {
-            world.execute(() -> done.complete(snapshot == null
-                    ? spawnFromRoleOnWorldThread(world, committed, destination, reason)
-                    : spawnOnWorldThread(world, committed, snapshot, destination, reason)));
+            world.execute(() -> done.complete(
+                    snapshot == null || snapshot.format() == SnapshotEnvelope.FORMAT_IMPORTED_STATE
+                            ? spawnFromRoleOnWorldThread(world, committed, snapshot, destination, reason)
+                            : spawnOnWorldThread(world, committed, snapshot, destination, reason)));
         } catch (RuntimeException notAccepting) {
             // World#execute throws when the world no longer accepts tasks; the task was not queued.
             warn(committed.profileId(), "world " + destination.world() + " is not accepting tasks", notAccepting);
@@ -255,30 +264,48 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
     }
 
     /**
-     * Builds the first body of a provisioned bonded companion from the committed record's role.
-     * The NPC UUID, the stamp, the owner and the tamed flag are written in the engine's pre-add
-     * callback, so the body is never in the store without them and the tame and adoption systems
-     * see a stamped body. Returns true exactly when that stamped body is in the store. A body
-     * that reached the store without its stamp is removed again, so a failure leaves nothing
-     * behind and {@link RestoreFlow} puts the record back to {@code STORED(PROVISIONED)}.
+     * Builds a body from the committed record's role: the first body of a provisioned bonded
+     * companion ({@code imported} null), or the first 5.0 body of an imported companion, whose
+     * format 0 state is written into the holder (plan 7 R4). The NPC UUID, the imported state,
+     * the stamp, the owner and the tamed flag are written in the engine's pre-add callback, in
+     * that order, so the body is never in the store without them, the record's owner wins over
+     * the imported one, and the tame and adoption systems see a stamped body. Returns true
+     * exactly when that prepared body is in the store. A body that reached the store before the
+     * callback finished is removed again, so an unreadable state or a failed apply leaves nothing
+     * behind and {@link RestoreFlow} puts the record back with its format 0 snapshot untouched.
+     *
+     * <p>An unowned release (a {@code RELEASED} tombstone) gets a fresh NPC UUID, no stamp and no
+     * owner, keeps the imported tamed flag, and is not snapshotted, as for format 1.
+     *
+     * <p>Imported alarm and breeding deadlines are world time and are kept as stored: the state
+     * records no game time to re-base them from.
      */
     private boolean spawnFromRoleOnWorldThread(World world, CompanionRecord committed,
+                                               @Nullable SnapshotEnvelope imported,
                                                RestoreFlow.Destination destination, RestoreRules.Reason reason) {
         UUID profileId = committed.profileId();
-        UUID npcUuid = committed.currentNpcUuid();
+        boolean unowned = committed.location().kind() == LocationKind.RELEASED;
+        // An unowned tombstone carries no NPC UUID: the body is untracked, so it gets a fresh one.
+        UUID npcUuid = unowned ? UUID.randomUUID() : committed.currentNpcUuid();
         Ref<EntityStore> ref = null;
         long worldGameTimeMs = 0L;
-        boolean[] stamped = new boolean[1];
+        boolean[] prepared = new boolean[1];
+        CoopResidentStateRestorer.PostAddWork[] importedWork = new CoopResidentStateRestorer.PostAddWork[1];
         try {
             CompanionRecord now = currentRecord.apply(profileId);
             if (!RestoreFlow.sameHolder(committed, now)) {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }
+            CoopResidentStateSnapshot state = imported == null ? null : RestoreRules.importedState(imported);
+            if (imported != null && state == null) {
+                warn(profileId, "the imported state snapshot is unreadable", null);
+                return false;
+            }
             NPCPlugin plugin = NPCPlugin.get();
             int roleIndex = plugin == null ? -1 : plugin.getIndex(committed.roleId());
-            if (npcUuid == null || committed.ownerUuid() == null || roleIndex < 0) {
-                warn(profileId, "a first summon needs an owner, an NPC UUID and a loaded role ("
+            if (npcUuid == null || !unowned && committed.ownerUuid() == null || roleIndex < 0) {
+                warn(profileId, "a spawn from the role needs an owner, an NPC UUID and a loaded role ("
                         + committed.roleId() + ")", null);
                 return false;
             }
@@ -289,9 +316,16 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             var spawned = plugin.spawnEntity(store, roleIndex, position, rotation, null, (npc, holder, into) -> {
                 holder.putComponent(UUIDComponent.getComponentType(), new UUIDComponent(npcUuid));
                 npc.setLegacyUUID(npcUuid);
-                holder.putComponent(stampType, new TameworkCompanionComponent(profileId, committed.generation()));
-                applyOwnership(holder, committed, false, stampType);
-                stamped[0] = true;
+                if (state != null) {
+                    importedWork[0] = IMPORTED_STATE_RESTORER.restoreToHolder(holder, state, null);
+                }
+                if (unowned) {
+                    stripOwnership(holder, stampType);
+                } else {
+                    holder.putComponent(stampType, new TameworkCompanionComponent(profileId, committed.generation()));
+                    applyOwnership(holder, committed, false, stampType);
+                }
+                prepared[0] = true;
             }, null);
             ref = spawned == null ? null : spawned.first();
         } catch (RuntimeException | LinkageError failure) {
@@ -299,34 +333,75 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             // leave the body in the store; it is found by the NPC UUID written before the add.
             ref = npcUuid == null ? null : world.getEntityRef(npcUuid);
             boolean added = ref != null && ref.isValid();
-            warn(profileId, added ? "an on-add step failed after the first body was added"
-                    : "first summon from role " + committed.roleId() + " failed", failure);
+            warn(profileId, added ? "an on-add step failed after the body from the role was added"
+                    : "spawn from role " + committed.roleId() + " failed", failure);
         }
         if (ref == null || !ref.isValid()) {
             return false;
         }
         Store<EntityStore> store = ref.getStore();
-        if (!stamped[0]) {
-            removeUnstamped(ref, store, profileId);
+        if (!prepared[0]) {
+            removeUnprepared(ref, store, profileId);
             return false;
         }
         try {
             CompanionSpawnAuthorityService.detach(ref, store);
-            CompanionProgressionBootstrapService.ensureProgressionComponents(ref, store, committed.roleId());
+            if (!unowned) {
+                CompanionProgressionBootstrapService.ensureProgressionComponents(ref, store, committed.roleId());
+            }
         } catch (RuntimeException | LinkageError failure) {
-            warn(profileId, "a step after the first body was added failed", failure);
+            warn(profileId, "a step after the body from the role was added failed", failure);
         }
-        // The snapshot taken here is the one every later summon restores from.
-        finishAddedBody(ref, store, committed, world.getName(), worldGameTimeMs, reason, snapshots, queueSnapshot, true);
+        if (importedWork[0] != null) {
+            try {
+                applyImportedPostAddWork(ref, store, importedWork[0], reason);
+            } catch (RuntimeException | LinkageError failure) {
+                warn(profileId, "the imported name, health or attachments could not be applied", failure);
+            }
+        }
+        // The snapshot taken here is the one every later restore uses; it replaces a format 0 one.
+        finishAddedBody(ref, store, committed, world.getName(), worldGameTimeMs, reason, snapshots, queueSnapshot,
+                !unowned);
+        if (unowned) {
+            // The body is untracked: no later recall or Recover may restore this profile from a snapshot.
+            try {
+                deleteSnapshot.accept(profileId);
+            } catch (RuntimeException failure) {
+                warn(profileId, "the snapshot of an unowned spawn could not be queued for deletion", failure);
+            }
+        }
         return true;
     }
 
-    /** World thread, between ticks: takes out a first body that never got its stamp. */
-    private static void removeUnstamped(Ref<EntityStore> ref, Store<EntityStore> store, UUID profileId) {
+    /**
+     * The parts of an imported state that need the live body: the display name, health and model
+     * attachments. Stored health is applied only where {@link RestoreRules#appliesImportedHealth}
+     * allows it; after a revive {@link #finishAddedBody} fills health to its maximum, as for format 1.
+     */
+    private static void applyImportedPostAddWork(Ref<EntityStore> ref, Store<EntityStore> store,
+                                                 CoopResidentStateRestorer.PostAddWork work,
+                                                 RestoreRules.Reason reason) {
+        if (work.hasDisplayNameWork()) {
+            NpcDisplayNameAccess.set(ref, work.displayName(), store);
+        }
+        if (RestoreRules.appliesImportedHealth(reason, work.currentHealth(), work.healthPercent())) {
+            // Trait modifiers first, so the stored value meets the modified maximum.
+            CompanionStatModifierService.applyTraitModifiers(ref, store);
+            CompanionHealthStateService.applyStoredHealth(ref, store, work.currentHealth(), work.maximumHealth(),
+                    work.healthPercent());
+        }
+        if (work.hasAttachmentWork()) {
+            CompanionModelAttachmentService.applyAttachments(ref, store.getComponent(ref, NPCEntity.getComponentType()),
+                    store, work.attachments().getAttachmentIds());
+        }
+    }
+
+    /** World thread, between ticks: takes out a body from the role whose pre-add callback did not finish. */
+    private static void removeUnprepared(Ref<EntityStore> ref, Store<EntityStore> store, UUID profileId) {
         try {
             store.removeEntity(ref, RemoveReason.REMOVE);
         } catch (RuntimeException | LinkageError failure) {
-            warn(profileId, "an unstamped first body could not be removed", failure);
+            warn(profileId, "an unprepared body from the role could not be removed", failure);
         }
     }
 
