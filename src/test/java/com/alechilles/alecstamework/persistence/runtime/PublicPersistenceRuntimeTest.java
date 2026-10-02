@@ -35,6 +35,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -58,6 +60,86 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PublicPersistenceRuntimeTest {
     @TempDir
     Path tempDir;
+
+    /** Catches old save databases becoming ready without reclaiming their accumulated free pages. */
+    @Test
+    void startupCompactsAnOldDatabaseBeforeWorldEvidenceAndPreservesCompanions() throws Exception {
+        Path database = seedOldDatabase();
+        long before = Files.size(database);
+        PublicPersistenceWorldReconciliation world = new PublicPersistenceWorldReconciliation() {
+            @Override
+            public CompletionStage<Result> awaitEvidence() {
+                try {
+                    assertEquals(2, queryInt(database, "PRAGMA auto_vacuum"));
+                    assertTrue(Files.size(database) < before);
+                } catch (Exception failure) {
+                    throw new AssertionError(failure);
+                }
+                return CompletableFuture.completedFuture(Result.COMPLETE);
+            }
+
+            @Override
+            public CompletionStage<Result> reconcile() {
+                return CompletableFuture.completedFuture(Result.COMPLETE);
+            }
+
+            @Override
+            public void quiesce() { }
+        };
+        try (PublicPersistenceRuntime runtime = runtime(world)) {
+            assertTrue(runtime.start().toCompletableFuture().get(15, TimeUnit.SECONDS).complete());
+            assertInstanceOf(PersistenceReadResult.Found.class,
+                    runtime.queries().findProfile(profileId()).toCompletableFuture().join());
+        }
+    }
+
+    /** Catches optional maintenance blocking startup or preventing a retry after a busy reader clears. */
+    @Test
+    void startupContinuesAfterBusyCompactionAndRetriesOnNextStart() throws Exception {
+        Path database = seedOldDatabase();
+        try (PublicPersistenceRuntime runtime = runtime(PublicPersistenceWorldReconciliation.alreadyComplete())) {
+            try (Connection writer = new SqliteConnectionFactory(database).openWriterConnection();
+                 Connection reader = new SqliteConnectionFactory(database).openReadConnection();
+                 Statement reading = reader.createStatement();
+                 var snapshot = reading.executeQuery("SELECT display_name FROM companion_profile");
+                 Statement writing = writer.createStatement()) {
+                assertTrue(snapshot.next());
+                writing.execute("UPDATE companion_profile SET display_name = 'Saved companion'");
+                assertTrue(runtime.start().toCompletableFuture().get(20, TimeUnit.SECONDS).complete());
+                assertEquals(PersistenceReadinessLevel.MUTATION_READY,
+                        runtime.readiness(PublicPersistenceFeatureRegistry.IDENTITY));
+                assertEquals(0, queryInt(database, "PRAGMA auto_vacuum"));
+            }
+        }
+        try (PublicPersistenceRuntime retry = runtime(PublicPersistenceWorldReconciliation.alreadyComplete())) {
+            var report = retry.start().toCompletableFuture().get(15, TimeUnit.SECONDS);
+            assertTrue(report.complete(), report.toString());
+            assertEquals(2, queryInt(database, "PRAGMA auto_vacuum"));
+            assertEquals("Saved companion", queryString(database, "SELECT display_name FROM companion_profile"));
+        }
+    }
+
+    private Path seedOldDatabase() throws Exception {
+        Path database;
+        try (PublicPersistenceRuntime initial = runtime(PublicPersistenceWorldReconciliation.alreadyComplete())) {
+            assertTrue(initial.start().toCompletableFuture().join().complete());
+            assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                    initial.operations().mutateProfile(OperationId.create(),
+                            new IdempotencyKey("startup-compaction-profile"), profileCreate())
+                            .completion().toCompletableFuture().join().status());
+            database = initial.databasePath().orElseThrow();
+        }
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA auto_vacuum=NONE");
+            statement.execute("VACUUM");
+            statement.execute("CREATE TABLE discarded_payload (body BLOB)");
+            statement.execute("INSERT INTO discarded_payload VALUES (zeroblob(4194304))");
+            statement.execute("DROP TABLE discarded_payload");
+            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+        }
+        return database;
+    }
 
     @Test
     void freshRuntimePublishesOneLineageAndShutsDownCleanly() {

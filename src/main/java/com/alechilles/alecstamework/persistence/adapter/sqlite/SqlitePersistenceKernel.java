@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceCancellation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import java.time.Duration;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
@@ -106,11 +109,23 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
     /** Queues physical compaction after runtime admission has paused and workflows drained. */
     @Nonnull
     public CompletionStage<SqliteDatabaseCompactionResult> compactDatabase(long nowMs) {
-        return writer.compactDatabase(nowMs).completion().thenCompose(result -> {
-            if (result instanceof com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult.Committed<SqliteDatabaseCompactionResult> committed) {
-                return java.util.concurrent.CompletableFuture.completedFuture(committed.value());
+        return compactDatabase(nowMs, false).thenApply(Optional::orElseThrow);
+    }
+
+    /** Runs before world reconciliation and public mutation readiness, after recovery and projections. */
+    @Nonnull
+    public CompletionStage<Optional<SqliteDatabaseCompactionResult>> compactDatabaseOnStartup(long nowMs) {
+        return compactDatabase(nowMs, true);
+    }
+
+    private CompletionStage<Optional<SqliteDatabaseCompactionResult>> compactDatabase(
+            long nowMs, boolean onlyIfNeeded
+    ) {
+        return writer.compactDatabase(nowMs, onlyIfNeeded).completion().thenCompose(result -> {
+            if (result instanceof PersistenceTransactionResult.Committed<Optional<SqliteDatabaseCompactionResult>> committed) {
+                return CompletableFuture.completedFuture(committed.value());
             }
-            return java.util.concurrent.CompletableFuture.failedFuture(
+            return CompletableFuture.failedFuture(
                     new IllegalStateException("database_maintenance_writer_unavailable"));
         });
     }

@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Optional;
 import org.sqlite.SQLiteConnection;
 
 /** One writer-lane maintenance pass that reclaims obsolete checkpoint history and file space. */
@@ -16,6 +17,18 @@ final class SqliteDatabaseCompaction {
     private static final int AUTO_VACUUM_INCREMENTAL = 2;
 
     private SqliteDatabaseCompaction() {
+    }
+
+    /** The persistent reclamation mode also identifies fresh or previously compacted databases. */
+    static Optional<SqliteDatabaseCompactionResult> runOnStartup(
+            Connection connection, Path databasePath, long nowMs
+    ) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            if (integerPragma(statement, "PRAGMA auto_vacuum") == AUTO_VACUUM_INCREMENTAL) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(run(connection, databasePath, nowMs));
     }
 
     /**

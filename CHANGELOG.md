@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.2 - Startup Database Compaction Hotfix - 2026-10-01
+
+- Older databases now compact automatically during startup, before normal saves,
+  to reclaim disk space from accumulated checkpoint history.
+- Fresh databases and databases already compacted skip the pass. Failed attempts
+  are logged and retried on a later startup while conversion is still needed.
+- The manual `/tw debug persistence compact` command remains available.
+
 ## 4.3.1 - Newly Tamed Companion Talents - 2026-09-29
 
 - Fixed blank talent pages for newly tamed companions. Owned, loaded companions

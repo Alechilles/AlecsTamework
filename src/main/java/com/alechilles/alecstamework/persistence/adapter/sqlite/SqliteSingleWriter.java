@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -79,12 +80,16 @@ public final class SqliteSingleWriter implements AutoCloseable {
     }
 
     /** Serialized physical maintenance; VACUUM must execute outside a transaction. */
-    WriteSubmission<SqliteDatabaseCompactionResult> compactDatabase(long nowMs) {
+    WriteSubmission<Optional<SqliteDatabaseCompactionResult>> compactDatabase(
+            long nowMs, boolean onlyIfNeeded
+    ) {
         return submit(new SqliteTransactionCommand<>(
                 com.alechilles.alecstamework.persistence.operation.OperationId.create(),
                 new com.alechilles.alecstamework.persistence.operation.OperationKind("database_compaction"),
                 TransactionReplayPolicy.SAFE_DATABASE_ONLY,
-                connection -> SqliteDatabaseCompaction.run(connection, connections.databasePath(), nowMs)),
+                connection -> onlyIfNeeded
+                        ? SqliteDatabaseCompaction.runOnStartup(connection, connections.databasePath(), nowMs)
+                        : Optional.of(SqliteDatabaseCompaction.run(connection, connections.databasePath(), nowMs))),
                 PersistenceCancellation.NONE, true);
     }
 
