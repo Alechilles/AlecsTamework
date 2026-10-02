@@ -83,6 +83,8 @@ class IndexBondedCompanionApiTest {
             CompletableFuture.completedFuture(new StoreFlow.CapturedBody(BODY, CompanionSummary.EMPTY));
     /** 600 s session, 30 s summon cooldown, 120 s revive cooldown, 3 Gems to revive. */
     private BondedCompanionPolicy policy = dragons(0);
+    /** The built-in population caps under the family caps; none unless a test sets them. */
+    private CompanionAdmissionGate.Check builtIn = (before, after, provided) -> null;
     private final CompanionIndex index = new CompanionIndex(() -> now, (b, a) -> { });
     private final BondedRecords.Families families = (rosterId, roleId) -> {
         if (roleId.isBlank()) {
@@ -120,7 +122,8 @@ class IndexBondedCompanionApiTest {
                     return CompletableFuture.completedFuture(spawnOk);
                 },
                 (id, body) -> removed.add(body), () -> now, ProviderAdmission.none(),
-                BondedAdmission.withFamilyCaps((before, after, provided) -> null, index::fileRecords, families));
+                BondedAdmission.withFamilyCaps((before, after, provided) -> builtIn.deny(before, after, provided),
+                        index::fileRecords, families));
         StoreFlow<String> store = new StoreFlow<>(index, loaded,
                 body -> captured,
                 id -> CompletableFuture.completedFuture(snapshot(id)), (id, envelope) -> { }, who -> flush,
@@ -508,6 +511,40 @@ class IndexBondedCompanionApiTest {
 
         assertTrue(spawned.isEmpty());
         assertEquals(provisioned, index.get(provisioned.profileId()));
+    }
+
+    @Test
+    void aGrantedCompanionIsSummonedAndRevivedLikeACapturedOneWhereItsOwnerIsOverAPerWorldOwnedLimit() {
+        // One owned companion per world, and the owner already has two in this one.
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(1, true, role -> List.of());
+        builtIn = (before, after, provided) -> {
+            CompanionAdmission.Refusal refusal =
+                    CompanionAdmission.check(index.fileRecords(owner), before, after, rules, provided);
+            return refusal == null ? null : CompanionAdmissionGate.Denial.of(refusal);
+        };
+        for (int cow = 0; cow < 2; cow++) {
+            index.insert(CompanionRecord.builder(UUID.randomUUID(), "Tamed_Cow", CompanionLocation.live(WORLD, 0, 0, 0))
+                    .ownerUuid(owner).homeWorld(WORLD).build());
+        }
+        CompanionRecord stored = stored();
+        CompanionRecord captured = index.update(stored.profileId(), stored.revision(), b -> b.homeWorld(WORLD)).after();
+        CompanionRecord granted = index.get(UUID.fromString(
+                api.grantByAdmin(owner, ROSTER, DRAGON, null).join().value().profileId()));
+        noSnapshot.add(granted.profileId());
+        CompanionRecord dead = dead();
+
+        for (BondedCompanionProfileView card : api.list(owner, ROSTER).join().value()) {
+            assertTrue(card.summonAvailable() || card.reviveAvailable(), "the card offers the action: " + card.state());
+        }
+        assertEquals(BondedCompanionResultCode.SUCCESS, api.summon(action(captured)).join().code());
+        api.store(action(index.get(captured.profileId()))).join();
+        BondedCompanionResult<BondedCompanionProfileView> summoned = api.summon(action(granted)).join();
+        assertEquals(BondedCompanionResultCode.SUCCESS, summoned.code(), String.valueOf(summoned.reason()));
+        assertEquals(WORLD, index.get(granted.profileId()).homeWorld(), "its first world is its home from then on");
+        api.store(action(index.get(granted.profileId()))).join();
+        BondedCompanionResult<BondedCompanionProfileView> revived =
+                api.revive(new BondedCompanionReviveRequest(action(dead, new Purse(3)), 7L)).join();
+        assertEquals(BondedCompanionResultCode.SUCCESS, revived.code(), String.valueOf(revived.reason()));
     }
 
     @Test

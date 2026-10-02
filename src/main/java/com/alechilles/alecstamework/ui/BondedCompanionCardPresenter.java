@@ -14,7 +14,6 @@ import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -39,6 +38,10 @@ final class BondedCompanionCardPresenter {
     private static final int ICON_ROW_RIGHT = 850;
     private static final int ICON_SIZE = 28;
     private static final int ICON_GAP = 4;
+    /** The identity column, and the room the 20 px gender icon takes before the name. */
+    private static final int IDENTITY_LEFT = 100;
+    private static final int IDENTITY_RIGHT = 380;
+    private static final int GENDER_ICON_SPACE = 24;
 
     private BondedCompanionCardPresenter() {
     }
@@ -152,21 +155,29 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         commands.set(entrySelector + " #BondedName.Text", displayName(row, language));
+        boolean male = "male".equalsIgnoreCase(row.gender());
+        boolean female = "female".equalsIgnoreCase(row.gender());
+        commands.set(entrySelector + " #BondedGenderMaleIcon.Visible", male);
+        commands.set(entrySelector + " #BondedGenderFemaleIcon.Visible", female);
+        // The name starts right of the gender icon when there is one.
+        int nameLeft = male || female ? IDENTITY_LEFT + GENDER_ICON_SPACE : IDENTITY_LEFT;
+        commands.setObject(entrySelector + " #BondedName.Anchor",
+                fixedWidthAnchor(nameLeft, 8, IDENTITY_RIGHT - nameLeft, 22));
         commands.set(entrySelector + " #BondedSubtitle.Text",
                 identityLine(row, progression, language));
     }
 
     /**
      * The muted line under the name: the translated role name (only when the companion has a
-     * given name, since the role name is the title otherwise), the level and the gender. Unknown
-     * parts are left out. The parts are separate facts, each translated on its own.
+     * given name, since the role name is the title otherwise) and the level. Unknown parts are
+     * left out. The parts are separate facts, each translated on its own.
      */
     private static String identityLine(
             BondedCompanionPanelPresentation row,
             ProgressionSummary progression,
             @Nullable String language
     ) {
-        ArrayList<String> parts = new ArrayList<>(3);
+        ArrayList<String> parts = new ArrayList<>(2);
         if (row.displayName() != null && !row.displayName().isBlank()) {
             String role = BondedCompanionNames.speciesLabel(row.species(),
                     row.attributes().get(BondedCompanionNames.NAME_KEY), row.roleId(), language);
@@ -177,10 +188,6 @@ final class BondedCompanionCardPresenter {
         if (progression.visible()) {
             parts.add(LocalizedText.format(language,
                     "tamework.ui.linkedPanel.bonded.talents.level", progression.level()));
-        }
-        String gender = row.gender() == null ? "" : row.gender().trim().toLowerCase(Locale.ROOT);
-        if (gender.equals("male") || gender.equals("female")) {
-            parts.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.gender." + gender));
         }
         return String.join(" \u00b7 ", parts);
     }

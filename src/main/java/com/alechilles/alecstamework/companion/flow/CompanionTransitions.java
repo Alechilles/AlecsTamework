@@ -157,17 +157,27 @@ public final class CompanionTransitions {
         };
     }
 
-    /** A restored body at a new place: LIVE, one generation newer, new NPC UUID, death timers cleared. */
+    /**
+     * A restored body at a new place: LIVE, one generation newer, new NPC UUID, death timers cleared.
+     * A record with no home world (a provisioned companion's first summon) gets {@code world} as its
+     * home, so it counts there for per-world limits once it is stored again, like a tamed one.
+     */
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> restored(@Nonnull CompanionRecord before, @Nonnull String world,
                                                                  double x, double y, double z, @Nonnull UUID newNpcUuid) {
         long generation = before.generation() + 1;
-        return b -> b.generation(generation)
-                .location(CompanionLocation.live(world, x, y, z))
-                .currentNpcUuid(newNpcUuid)
-                .diedAtMs(0L)
-                .reviveAvailableAtMs(0L)
-                .summonedUntilMs(0L);
+        return b -> {
+            b.generation(generation)
+                    .location(CompanionLocation.live(world, x, y, z))
+                    .currentNpcUuid(newNpcUuid)
+                    .diedAtMs(0L)
+                    .reviveAvailableAtMs(0L)
+                    .summonedUntilMs(0L);
+            if (before.homeWorld() == null || before.homeWorld().isBlank()) {
+                b.homeWorld(world);
+            }
+            return b;
+        };
     }
 
     /**

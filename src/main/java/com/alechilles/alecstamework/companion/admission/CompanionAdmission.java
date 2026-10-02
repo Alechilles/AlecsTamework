@@ -20,6 +20,11 @@ import javax.annotation.Nullable;
  * counted in and that bucket would then pass its limit, so moves that add nothing always pass,
  * even for an owner already over a limit lowered by config. A limit of 0 means no limit.
  *
+ * <p>A per-world limit counts a record in {@link #scopeWorld its world}. A record that has been in
+ * no world yet (a provisioned companion before its first summon, which has no home world) was
+ * admitted as owned when it was made, so the first world it enters is not a new bucket for it.
+ * From then on that world is its home ({@code CompanionTransitions.restored}).</p>
+ *
  * <p>An admission provider's domain limits follow the same rule, with these differences: a claim
  * counts by its weight, a domain limit of 0 admits nothing, and a claim on a domain with no limit
  * entry is refused, because the provider's answer is incomplete.</p>
@@ -94,14 +99,16 @@ public final class CompanionAdmission {
         CompanionRecord prior = before != null && owner.equals(before.ownerUuid()) && before.countsAsOwned() ? before : null;
         if (rules.ownedLimit() > 0) {
             Predicate<CompanionRecord> bucket = sameScope(rules.ownedPerWorld(), after);
-            if ((prior == null || !bucket.test(prior)) && 1 + count(ownerRecords, after, bucket) > rules.ownedLimit()) {
+            if ((prior == null || !(bucket.test(prior) || unplaced(prior)))
+                    && 1 + count(ownerRecords, after, bucket) > rules.ownedLimit()) {
                 return Refusal.OWNED;
             }
         }
         for (PopulationGroupPolicy group : rules.groupsForRole().apply(after.roleId())) {
             Predicate<CompanionRecord> bucket = sameScope(group.scope() == PopulationGroupScope.PER_WORLD, after)
                     .and(r -> inGroup(rules, r, group.groupId()));
-            boolean wasInGroup = prior != null && bucket.test(prior);
+            boolean wasInGroup = prior != null
+                    && (bucket.test(prior) || unplaced(prior) && inGroup(rules, prior, group.groupId()));
             if (group.maxOwnedPerOwner() > 0 && !wasInGroup
                     && 1 + count(ownerRecords, after, bucket) > group.maxOwnedPerOwner()) {
                 return Refusal.GROUP_OWNED;
@@ -153,6 +160,11 @@ public final class CompanionAdmission {
     public static String scopeWorld(@Nonnull CompanionRecord record) {
         String world = record.location().world() != null ? record.location().world() : record.homeWorld();
         return world == null ? "" : world;
+    }
+
+    /** True when the record has been in no world yet, so it counts in no world's bucket. */
+    private static boolean unplaced(CompanionRecord record) {
+        return scopeWorld(record).isEmpty();
     }
 
     private static Predicate<CompanionRecord> sameScope(boolean perWorld, CompanionRecord after) {

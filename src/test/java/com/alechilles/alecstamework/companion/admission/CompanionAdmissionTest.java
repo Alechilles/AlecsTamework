@@ -66,6 +66,32 @@ class CompanionAdmissionTest {
     }
 
     @Test
+    void aCompanionThatHasBeenInNoWorldEntersItsFirstWorldLikeOneThatWasTamedThere() {
+        // A provisioned or granted companion has no home world until its first summon. The owner
+        // is over a per-world limit that was lowered, as a captured companion's owner can be.
+        CompanionRecord captured = rec("Sheep", CompanionLocation.stored(StoredReason.BONDED));
+        CompanionRecord provisioned = CompanionRecord.builder(UUID.randomUUID(), "Sheep",
+                CompanionLocation.stored(StoredReason.PROVISIONED)).ownerUuid(owner).build();
+        CompanionRecord dead = CompanionRecord.builder(UUID.randomUUID(), "Dragon_Fire",
+                CompanionLocation.dead("UNKNOWN")).ownerUuid(owner).build();
+        List<CompanionRecord> mine = List.of(captured, provisioned, dead,
+                rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rec("Dragon_Ice", CompanionLocation.item()));
+        PopulationGroupPolicy perWorld = new PopulationGroupPolicy("dragons", PopulationGroupScope.PER_WORLD, 1, 0, 1);
+        CompanionAdmission.Rules rules = new CompanionAdmission.Rules(1, true,
+                role -> role.startsWith("Dragon") ? List.of(perWorld) : List.of());
+
+        for (CompanionRecord stored : List.of(captured, provisioned, dead)) {
+            CompanionRecord summoned = stored.toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+            assertNull(CompanionAdmission.check(mine, stored, summoned, rules, NONE), stored.location().toString());
+        }
+        // A companion that has a home counts there, so another world's limit still applies to it.
+        CompanionRecord elsewhere = captured.toBuilder().location(CompanionLocation.live("other", 0, 0, 0)).build();
+        List<CompanionRecord> withOther = List.of(captured, rec("Sheep", CompanionLocation.live("other", 0, 0, 0)));
+        assertEquals(CompanionAdmission.Refusal.OWNED,
+                CompanionAdmission.check(withOther, captured, elsewhere, rules, NONE));
+    }
+
+    @Test
     void perWorldOwnedLimitsCountOnlyThatWorld() {
         List<CompanionRecord> mine = List.of(rec("Sheep", CompanionLocation.live("other", 0, 0, 0)));
         assertNull(CompanionAdmission.check(mine, null, rec("Sheep", CompanionLocation.live("w", 0, 0, 0)), rules(1, true), NONE));

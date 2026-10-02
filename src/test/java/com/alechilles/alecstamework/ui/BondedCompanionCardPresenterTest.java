@@ -224,7 +224,7 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void aNamedCompanionShowsItsRoleLevelAndGenderUnderTheName() {
+    void aNamedCompanionShowsItsRoleAndLevelUnderTheNameAndItsGenderAsAnIcon() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons", "NordicDrake", 4L,
                 "Wyatt", "Nordic Drake", "Female", null,
@@ -241,8 +241,8 @@ class BondedCompanionCardPresenterTest {
         card.assertCommand("#BondedSubtitle.Text", "Nordic Drake");
         card.assertCommand("#BondedSubtitle.Text",
                 LocalizedText.format(LANGUAGE, "tamework.ui.linkedPanel.bonded.talents.level", 3));
-        card.assertCommand("#BondedSubtitle.Text",
-                LocalizedText.resolve(LANGUAGE, "tamework.ui.linkedPanel.bonded.gender.female"));
+        card.assertCommand("#BondedGenderFemaleIcon.Visible", "true");
+        card.assertCommand("#BondedGenderMaleIcon.Visible", "false");
     }
 
     @Test
