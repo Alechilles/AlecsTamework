@@ -122,6 +122,18 @@ class LegacyMapperTest {
         assertEquals(List.of(), result.report().liveWithoutCheckpoint());
     }
 
+    /** A record with no snapshot time is one whose state is still in its 2.x item; a real snapshot must not look like that. */
+    @Test
+    void aSnapshotRowWithNoCreationTimeStillGivesTheRecordASnapshotTime() {
+        UUID captured = rows.profile("CAPTURED", "CAPTURE_ITEM", "item-1", null);
+        rows.snapshot(captured, "a-capture", "capture", plainState(STATE_NPC, 9), 1, 0);
+
+        ImportResult result = rows.map();
+
+        assertNotNull(result.snapshots().get(captured));
+        assertTrue(record(result, captured).lastSnapshotAtMs() != 0L);
+    }
+
     @Test
     void aCheckpointOfADyingBodyIsMadeRestorable() {
         UUID id = rows.profile("ACTIVE", "LIVE_ENTITY", NPC.toString(), "world-a");

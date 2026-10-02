@@ -112,13 +112,10 @@ public final class HytaleCapturedItemCoopInteractionService {
         return submit(world, source, target, item);
     }
 
-    /** Capture metadata that is not a 5.0 index item: a 4.x item (snapshot id) or an alias-only one. */
+    /** Capture metadata that is no index item: a 2.x alias-only item, or a snapshot id with no profile id. */
     private static boolean olderCaptureItem(@Nullable ItemStack held) {
         if (held == null || held.isEmpty()) {
             return false;
-        }
-        if (CaptureItemKeys.read(held) != null) {
-            return true;
         }
         try {
             return held.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) != null

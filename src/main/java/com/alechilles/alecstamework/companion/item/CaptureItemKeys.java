@@ -24,9 +24,20 @@ public final class CaptureItemKeys {
     private CaptureItemKeys() {
     }
 
-    /** Null when the stack has no profile id or the id or generation cannot be read. */
+    /**
+     * The index item a stack is: a 5.0 item (profile id and generation), or a 4.x item (profile
+     * id, the old capture snapshot id and no generation), which counts as generation 0 (plan 7
+     * R17). Records imported from 4.x start at generation 0, so the first release of a 4.x item
+     * matches and a copy of it is stale afterwards. The index is not read here: every caller
+     * compares the result with the record, and an item whose record is missing, is not in an item
+     * or has moved on is stale to all of them. The old keys stay on the item until it is rewritten.
+     *
+     * <p>Null when the stack has no profile id or the id or generation cannot be read. That
+     * includes a 2.x item, which carries no profile id; a release adopts that one through
+     * {@code LegacyItemAdoption}.
+     */
     @Nullable
-    public static Ref read(@Nullable ItemStack stack) {
+    public static Ref readIndexItem(@Nullable ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
@@ -43,22 +54,6 @@ public final class CaptureItemKeys {
         } catch (RuntimeException unreadable) {
             return null;
         }
-    }
-
-    /**
-     * The index item a stack is: a 5.0 item (profile id and generation), or a 4.x item (profile
-     * id, the old capture snapshot id and no generation), which counts as generation 0 (plan 7
-     * R17). Records imported from 4.x start at generation 0, so the first release of a 4.x item
-     * matches and a copy of it is stale afterwards. The index is not read here: every caller
-     * compares the result with the record, and an item whose record is missing, is not in an item
-     * or has moved on is stale to all of them. The old keys stay on the item until it is rewritten.
-     *
-     * <p>Null for anything else, including a 2.x item, which carries no profile id; a release
-     * adopts that one through {@code LegacyItemAdoption}.
-     */
-    @Nullable
-    public static Ref readIndexItem(@Nullable ItemStack stack) {
-        return read(stack);
     }
 
     /** A copy of {@code stack} carrying {@code ref}. */

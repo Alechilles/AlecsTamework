@@ -21,8 +21,10 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
@@ -42,6 +44,8 @@ class LegacyItemAdoptionTest {
     private final CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
     private final Map<UUID, SnapshotEnvelope> snapshots = new HashMap<>();
     private final List<UUID> queued = new ArrayList<>();
+    /** Profiles with a body registered right now. */
+    private final Set<UUID> bodies = new HashSet<>();
     private CompanionAdmission.Refusal refusal;
     private Field itemAssets;
     private Object previousItemAssets;
@@ -120,8 +124,6 @@ class LegacyItemAdoptionTest {
         CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(item);
 
         assertEquals(new CaptureItemKeys.Ref(profileId, 0L), ref);
-        assertEquals(LegacyItemAdoption.Kind.INDEX_ITEM,
-                LegacyItemAdoption.decide(item.getMetadata(), index::get, LegacyAliases.EMPTY).kind());
         assertEquals(RestoreFlow.Result.RESTORED, release(ref));
         assertEquals(LocationKind.LIVE, index.get(profileId).location().kind());
         assertEquals(RestoreFlow.Result.NOT_ALLOWED, release(CaptureItemKeys.readIndexItem(item)),
@@ -135,8 +137,6 @@ class LegacyItemAdoptionTest {
                 .withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, UUID.randomUUID().toString())
                 .withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING, UUID.randomUUID().toString());
 
-        assertEquals(LegacyItemAdoption.Kind.REFUSE,
-                LegacyItemAdoption.decide(item.getMetadata(), index::get, LegacyAliases.EMPTY).kind());
         assertEquals(RestoreFlow.Result.NOT_FOUND, release(CaptureItemKeys.readIndexItem(item)));
     }
 
@@ -145,7 +145,7 @@ class LegacyItemAdoptionTest {
         ItemStack item = oldItem(7);
         LegacyItemAdoption adoption = adoption(LegacyAliases.EMPTY);
 
-        LegacyItemAdoption.Adoption first = adoption.adopt(item.getMetadata(), PLAYER, "Player");
+        LegacyItemAdoption.Adoption first = adoption.adopt(item.getMetadata(), PLAYER, "Player", bodies::contains);
 
         assertEquals(LegacyItemAdoption.Result.ADOPTED, first.result());
         assertEquals(new CaptureItemKeys.Ref(NPC, 0L), first.ref(), "every copy of the item means this profile");
@@ -158,7 +158,7 @@ class LegacyItemAdoptionTest {
         assertEquals("Dolly", storedState(NPC).npcName().getName());
 
         assertEquals(RestoreFlow.Result.RESTORED, release(first.ref()));
-        LegacyItemAdoption.Adoption copy = adoption.adopt(item.getMetadata(), OWNER, "Alec");
+        LegacyItemAdoption.Adoption copy = adoption.adopt(item.getMetadata(), OWNER, "Alec", bodies::contains);
 
         assertEquals(LegacyItemAdoption.Result.STALE, copy.result());
         assertNull(copy.ref());
@@ -172,7 +172,7 @@ class LegacyItemAdoptionTest {
     void aTwoXItemKeepsTheOwnerItNamesAndAnUntamedOneStaysUnowned() {
         ItemStack owned = oldItem(2).withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.STRING, OWNER.toString());
         assertEquals(LegacyItemAdoption.Result.ADOPTED,
-                adoption(LegacyAliases.EMPTY).adopt(owned.getMetadata(), PLAYER, "Player").result());
+                adoption(LegacyAliases.EMPTY).adopt(owned.getMetadata(), PLAYER, "Player", bodies::contains).result());
         assertEquals(OWNER, index.get(NPC).ownerUuid());
 
         UUID wildNpc = UUID.randomUUID();
@@ -180,7 +180,7 @@ class LegacyItemAdoptionTest {
                 .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.STRING, wildNpc.toString())
                 .withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, false);
         assertEquals(LegacyItemAdoption.Result.ADOPTED,
-                adoption(LegacyAliases.EMPTY).adopt(wild.getMetadata(), PLAYER, "Player").result());
+                adoption(LegacyAliases.EMPTY).adopt(wild.getMetadata(), PLAYER, "Player", bodies::contains).result());
         assertNull(index.get(wildNpc).ownerUuid());
     }
 
@@ -192,8 +192,8 @@ class LegacyItemAdoptionTest {
         ItemStack item = oldItem(9);
 
         assertEquals(LegacyItemAdoption.Kind.RESTORE_FROM_ITEM,
-                LegacyItemAdoption.decide(item.getMetadata(), index::get, aliases).kind());
-        LegacyItemAdoption.Adoption adopted = adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player");
+                LegacyItemAdoption.decide(item.getMetadata(), index::get, aliases, bodies::contains).kind());
+        LegacyItemAdoption.Adoption adopted = adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains);
 
         assertEquals(new CaptureItemKeys.Ref(profileId, 0L), adopted.ref());
         CoopResidentStateSnapshot state = storedState(profileId);
@@ -202,7 +202,68 @@ class LegacyItemAdoptionTest {
         assertEquals(OWNER, index.get(profileId).ownerUuid());
         assertEquals(RestoreFlow.Result.RESTORED, release(adopted.ref()));
         assertEquals(LegacyItemAdoption.Result.STALE,
-                adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player").result());
+                adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains).result());
+    }
+
+    /** 4.x imported some 2.x captures as bodies in unloaded chunks; the companion is really in the item. */
+    @Test
+    void anImportedLiveRecordWhoseBodyIsTheItemsAndIsNotLoadedIsReleasedFromItsItem() {
+        UUID profileId = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(profileId, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(OWNER).ownerName("Alec").currentNpcUuid(NPC).build());
+        LegacyAliases aliases = new LegacyAliases(Map.of(NPC, new LegacyAliases.Entry(profileId, LegacyAliases.Kind.CURRENT)));
+        ItemStack item = oldItem(6);
+
+        bodies.add(profileId);
+        assertEquals(LegacyItemAdoption.Result.STALE,
+                adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains).result(),
+                "the companion is out in the world: the item is a stale copy");
+        assertEquals(LocationKind.LIVE, index.get(profileId).location().kind());
+        assertTrue(queued.isEmpty());
+
+        bodies.clear();
+        LegacyItemAdoption.Adoption adopted = adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains);
+
+        assertEquals(new CaptureItemKeys.Ref(profileId, 0L), adopted.ref());
+        CompanionRecord inItem = index.get(profileId);
+        assertEquals(LocationKind.ITEM, inItem.location().kind());
+        assertEquals(0L, inItem.generation());
+        assertNull(inItem.currentNpcUuid(), "the old body, if it ever loads, no longer belongs to the record");
+        assertEquals(OWNER, inItem.ownerUuid());
+        assertEquals(6, storedState(profileId).leveling().getLevel());
+        assertEquals(RestoreFlow.Result.RESTORED, release(adopted.ref()));
+        assertEquals(LegacyItemAdoption.Result.STALE,
+                adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains).result());
+    }
+
+    @Test
+    void anImportedLiveRecordWithADifferentBodyOrStoredStateIsNotTakenFromTheWorld() {
+        UUID otherBody = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(otherBody, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(OWNER).currentNpcUuid(UUID.randomUUID()).build());
+        UUID checkpointed = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(checkpointed, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(OWNER).currentNpcUuid(NPC).lastSnapshotAtMs(50L).build());
+
+        assertEquals(LegacyItemAdoption.Result.STALE, adoption(new LegacyAliases(Map.of(NPC,
+                new LegacyAliases.Entry(otherBody, LegacyAliases.Kind.STALE))))
+                .adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains).result());
+        assertEquals(LegacyItemAdoption.Result.STALE, adoption(new LegacyAliases(Map.of(NPC,
+                new LegacyAliases.Entry(checkpointed, LegacyAliases.Kind.CURRENT))))
+                .adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains).result());
+        assertTrue(queued.isEmpty());
+    }
+
+    @Test
+    void anItemNamingABodyThatHasItsOwnRecordCreatesNothing() {
+        UUID living = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(living, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(OWNER).currentNpcUuid(NPC).generation(3).build());
+
+        assertEquals(LegacyItemAdoption.Result.STALE, adoption(LegacyAliases.EMPTY)
+                .adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains).result());
+        assertNull(index.get(NPC));
+        assertTrue(queued.isEmpty());
     }
 
     @Test
@@ -211,7 +272,7 @@ class LegacyItemAdoptionTest {
         importedItem(profileId, 77L);
         LegacyAliases aliases = new LegacyAliases(Map.of(NPC, new LegacyAliases.Entry(profileId, LegacyAliases.Kind.STALE)));
 
-        LegacyItemAdoption.Adoption adopted = adoption(aliases).adopt(oldItem(9).getMetadata(), PLAYER, "Player");
+        LegacyItemAdoption.Adoption adopted = adoption(aliases).adopt(oldItem(9).getMetadata(), PLAYER, "Player", bodies::contains);
 
         assertEquals(LegacyItemAdoption.Result.ADOPTED, adopted.result());
         assertEquals(new CaptureItemKeys.Ref(profileId, 0L), adopted.ref());
@@ -227,12 +288,12 @@ class LegacyItemAdoptionTest {
         ItemStack broken = oldItem(3).withMetadata(TameworkMetadataKeys.LEVELING_LEVEL, Codec.STRING, "three");
 
         assertEquals(LegacyItemAdoption.Result.UNREADABLE,
-                adoption(aliases).adopt(broken.getMetadata(), PLAYER, "Player").result());
+                adoption(aliases).adopt(broken.getMetadata(), PLAYER, "Player", bodies::contains).result());
         assertTrue(queued.isEmpty(), "no empty state replaces what the item holds");
 
         ItemStack unknown = broken.withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.STRING, UUID.randomUUID().toString());
         assertEquals(LegacyItemAdoption.Result.UNREADABLE,
-                adoption(LegacyAliases.EMPTY).adopt(unknown.getMetadata(), PLAYER, "Player").result());
+                adoption(LegacyAliases.EMPTY).adopt(unknown.getMetadata(), PLAYER, "Player", bodies::contains).result());
         List<CompanionRecord> all = new ArrayList<>();
         index.forEach(all::add);
         assertEquals(1, all.size(), "no record is created from an unreadable item");
@@ -242,7 +303,7 @@ class LegacyItemAdoptionTest {
     void aNewOwnerAtTheirLimitGetsNoRecord() {
         refusal = CompanionAdmission.Refusal.OWNED;
 
-        LegacyItemAdoption.Adoption refused = adoption(LegacyAliases.EMPTY).adopt(oldItem(4).getMetadata(), PLAYER, "Player");
+        LegacyItemAdoption.Adoption refused = adoption(LegacyAliases.EMPTY).adopt(oldItem(4).getMetadata(), PLAYER, "Player", bodies::contains);
 
         assertEquals(LegacyItemAdoption.Result.LIMIT, refused.result());
         assertNotNull(refused.messageKey());
@@ -256,9 +317,9 @@ class LegacyItemAdoptionTest {
                 .withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING, UUID.randomUUID().toString());
 
         assertEquals(LegacyItemAdoption.Kind.REFUSE,
-                LegacyItemAdoption.decide(snapshotOnly.getMetadata(), index::get, LegacyAliases.EMPTY).kind());
+                LegacyItemAdoption.decide(snapshotOnly.getMetadata(), index::get, LegacyAliases.EMPTY, bodies::contains).kind());
         assertEquals(LegacyItemAdoption.Result.INVALID,
-                adoption(LegacyAliases.EMPTY).adopt(snapshotOnly.getMetadata(), PLAYER, "Player").result());
+                adoption(LegacyAliases.EMPTY).adopt(snapshotOnly.getMetadata(), PLAYER, "Player", bodies::contains).result());
         assertNull(index.get(NPC));
     }
 }

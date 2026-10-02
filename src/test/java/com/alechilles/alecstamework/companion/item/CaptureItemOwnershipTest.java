@@ -123,6 +123,25 @@ class CaptureItemOwnershipTest {
                 CaptureItemOwnership.release(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder));
     }
 
+    /** Plan 7: 4.x cleared the owner at capture and gave the companion to whoever released it. */
+    @Test
+    void anUnownedTamedImportGoesToTheReleaserInEveryMode() {
+        CompanionRecord imported = inItem(0).toBuilder().ownerUuid(null).ownerName(null).build();
+        for (CaptureItemOwnershipMode mode : CaptureItemOwnershipMode.values()) {
+            assertEquals(Release.ASSIGN_RELEASER, CaptureItemOwnership.release(mode, null, holder,
+                    CaptureItemOwnership.claimsUnownedImport(imported, 0, true)), mode.name());
+            assertEquals(Release.UNOWNED, CaptureItemOwnership.release(mode, null, holder,
+                    CaptureItemOwnership.claimsUnownedImport(imported, 0, false)), "a wild capture, " + mode.name());
+        }
+        assertFalse(CaptureItemOwnership.claimsUnownedImport(inItem(0), 0, true), "an owned record keeps its owner");
+        CompanionRecord recaptured = imported.toBuilder().generation(2).build();
+        assertFalse(CaptureItemOwnership.claimsUnownedImport(recaptured, 2, true), "a 5.0 capture is not an import");
+        assertFalse(CaptureItemOwnership.claimsUnownedImport(recaptured, 0, true), "a stale copy claims nothing");
+        assertEquals(Release.REFUSE_NOT_OWNER,
+                CaptureItemOwnership.release(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder, true),
+                "an owned companion still follows the mode");
+    }
+
     @Test
     void anUnownedWildCaptureIsReleasedUnownedInEveryMode() {
         for (CaptureItemOwnershipMode mode : CaptureItemOwnershipMode.values()) {

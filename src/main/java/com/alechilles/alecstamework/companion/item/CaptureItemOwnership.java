@@ -137,6 +137,32 @@ public final class CaptureItemOwnership {
     }
 
     /**
+     * As {@link #release(CaptureItemOwnershipMode, UUID, UUID)}, for a record that may be an
+     * unowned import. {@code claimUnowned} ({@link #claimsUnownedImport}) gives an unowned
+     * companion to the releasing player in every mode: no one owns it, so no mode has an owner to
+     * protect, and the restore's admission still applies.
+     */
+    @Nonnull
+    public static Release release(@Nonnull CaptureItemOwnershipMode mode, @Nullable UUID recordOwner,
+                                  @Nonnull UUID releaser, boolean claimUnowned) {
+        return recordOwner == null && claimUnowned ? Release.ASSIGN_RELEASER : release(mode, recordOwner, releaser);
+    }
+
+    /**
+     * Whether a release gives an unowned companion to the releasing player (plan 7): the record
+     * is in an item at generation 0 with no owner, which is how a 4.x capture that cleared the
+     * owner was imported, and the item says the animal is tamed. 4.x assigned such a companion to
+     * whoever released it. A wild capture (not tamed) still releases unowned. 5.0 itself never
+     * leaves a tamed companion unowned in an item, so this only meets imported records.
+     *
+     * @param itemGen   the generation the item carries
+     * @param itemTamed the item's {@code Tamework.Tamed} flag
+     */
+    public static boolean claimsUnownedImport(@Nullable CompanionRecord record, long itemGen, boolean itemTamed) {
+        return itemTamed && itemGen == 0L && record != null && record.ownerUuid() == null && !isStale(record, itemGen);
+    }
+
+    /**
      * Whether a release must be refused with the item left filled: {@code OWNER_ONLY} binds only
      * an item that still holds its companion. A stale copy is not refused, so it goes on to be
      * emptied whoever holds it.

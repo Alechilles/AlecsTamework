@@ -349,7 +349,7 @@ public final class LegacyMapper {
                     new BsonDocument("Entity", checkpoint.entity())
                             .append("World", new BsonString(liveWorld == null ? commonWorld : liveWorld))
                             .append("GameTimeMs", new BsonInt64(0L))));
-            record.summary(checkpoint.summary()).lastSnapshotAtMs(checkpoint.capturedAtMs());
+            record.summary(checkpoint.summary()).lastSnapshotAtMs(storedAt(checkpoint.capturedAtMs()));
             record.roleId(bodyRole(profile.roleId(), checkpoint.summary().roleId(), true));
             if (customName == null) {
                 customName = checkpoint.customName();
@@ -359,7 +359,7 @@ public final class LegacyMapper {
             }
         } else if (state != null) {
             snapshots.put(id, SnapshotEnvelope.importedState(id, 0L, state.state().json()));
-            record.summary(state.state().summary()).lastSnapshotAtMs(state.row().createdAtMs());
+            record.summary(state.state().summary()).lastSnapshotAtMs(storedAt(state.row().createdAtMs()));
             record.roleId(bodyRole(profile.roleId(), state.state().summary().roleId(), state.matchesState()));
             if (customName == null) {
                 customName = state.state().customName();
@@ -377,6 +377,15 @@ public final class LegacyMapper {
             }
         }
         records.put(id, record.location(location).displayName(customName).build());
+    }
+
+    /**
+     * The snapshot time of a record that got a snapshot. Never 0: an imported record with no
+     * snapshot time is one whose state is still in its 2.x capture item ({@code LegacyItemAdoption}),
+     * and an old row's time can be 0.
+     */
+    private static long storedAt(long sourceTimeMs) {
+        return sourceTimeMs == 0L ? 1L : sourceTimeMs;
     }
 
     /**
@@ -546,7 +555,7 @@ public final class LegacyMapper {
         } else {
             knownBodies.putIfAbsent(state.npcUuid(), id);
             snapshots.put(id, SnapshotEnvelope.importedState(id, 0L, state.json()));
-            record.summary(state.summary()).lastSnapshotAtMs(profile.updatedAtMs());
+            record.summary(state.summary()).lastSnapshotAtMs(storedAt(profile.updatedAtMs()));
             // The row keeps the role the companion was bonded as; its state has the form it is in now.
             record.roleId(bodyRole(profile.roleId(), state.summary().roleId(), true));
             customName = state.customName();

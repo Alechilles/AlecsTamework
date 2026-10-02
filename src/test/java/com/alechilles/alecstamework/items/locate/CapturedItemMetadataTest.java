@@ -53,7 +53,7 @@ class CapturedItemMetadataTest {
         // A 4.x item (profile id and snapshot id) is the index item of its profile at generation 0.
         ItemStack fourX = profile.withMetadata(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 Codec.STRING, UUID.randomUUID().toString());
-        assertEquals(CapturedItemMetadata.indexKey(CaptureItemKeys.read(profile).profileId(), 0L),
+        assertEquals(CapturedItemMetadata.indexKey(CaptureItemKeys.readIndexItem(profile).profileId(), 0L),
                 CapturedItemMetadata.read(fourX));
         assertNull(CapturedItemMetadata.read(new ItemStack("Test_Ordinary", 1)));
     }
@@ -79,8 +79,8 @@ class CapturedItemMetadataTest {
         ItemStack item = new ItemStack("Test_Capture", 1)
                 .withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, profileId.toString());
 
-        assertEquals(new CaptureItemKeys.Ref(profileId, 0), CaptureItemKeys.read(item));
-        assertNull(CaptureItemKeys.read(new ItemStack("Test_Capture", 1)
+        assertEquals(new CaptureItemKeys.Ref(profileId, 0), CaptureItemKeys.readIndexItem(item));
+        assertNull(CaptureItemKeys.readIndexItem(new ItemStack("Test_Capture", 1)
                 .withMetadata(TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING, "not-a-uuid")));
     }
 }

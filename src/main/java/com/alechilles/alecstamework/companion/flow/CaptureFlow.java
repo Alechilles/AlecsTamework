@@ -60,7 +60,9 @@ public final class CaptureFlow<R> {
      * reached. PROVIDER_UNAVAILABLE: the provider gave no decision. Nothing changed for any of them.
      */
     public enum Result { CAPTURED, NOT_CAPTURABLE, CONFLICT, COMMIT_FAILED, OWNED_LIMIT, GROUP_LIMIT,
-        PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+        PROVIDER_DENIED, PROVIDER_UNAVAILABLE,
+        /** The body is a leftover copy from a 3.x/4.x world whose companion has its own record. */
+        LEGACY_BODY }
 
     /**
      * {@code itemRef} is the committed profile and generation, which a capture into an item writes
@@ -178,8 +180,11 @@ public final class CaptureFlow<R> {
         // What the commit would write, read without the lock, so the provider is asked off it.
         UUID stamped = capture.stampedProfileId();
         CompanionRecord seen = stamped == null ? null : index.get(stamped);
-        if (stamped != null ? seen == null : legacyBody.test(capture.facts().npcUuid())) {
+        if (stamped != null && seen == null) {
             return CompletableFuture.completedFuture(new Outcome(Result.NOT_CAPTURABLE, null));
+        }
+        if (stamped == null && legacyBody.test(capture.facts().npcUuid())) {
+            return CompletableFuture.completedFuture(new Outcome(Result.LEGACY_BODY, null));
         }
         CompanionRecord created = stamped != null ? null : created(capture, UUID.randomUUID());
         CompanionRecord preview = created != null ? created : captured(capture, seen).apply(seen.toBuilder()).build();

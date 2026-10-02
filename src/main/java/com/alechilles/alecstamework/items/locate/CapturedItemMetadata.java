@@ -27,9 +27,9 @@ public final class CapturedItemMetadata {
     }
 
     /**
-     * Reads either identity shape. A 5.0 item (profile id and generation, no snapshot id) is keyed
-     * by its generation where the older shapes use the snapshot id, so a recapture of the same
-     * companion is a different key.
+     * Reads either identity shape. An index item (5.0, or 4.x at generation 0) is keyed by its
+     * profile and generation, so a recapture of the same companion is a different key. A 2.x item
+     * carries only the captured body's NPC UUID and is keyed by that.
      */
     @Nullable
     public static CaptureKey read(@Nullable ItemStack stack) {
@@ -41,13 +41,11 @@ public final class CapturedItemMetadata {
         if (!has(stack, TameworkMetadataKeys.TARGET_UUID)) return null;
         BsonDocument metadata = stack.getMetadata();
         try {
-            UUID alias = UUID.fromString(metadata.getString(TameworkMetadataKeys.TARGET_UUID).getValue());
-            boolean profile = metadata.containsKey(TameworkMetadataKeys.COMPANION_PROFILE_ID);
-            boolean snapshot = metadata.containsKey(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID);
-            if (profile != snapshot) return null;
-            return new CaptureKey(profile ? UUID.fromString(metadata.getString(
-                    TameworkMetadataKeys.COMPANION_PROFILE_ID).getValue()).toString() : null,
-                    snapshot ? metadata.getString(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID).getValue() : null, alias);
+            // A profile id that could not be read, or a snapshot id without one, is damaged.
+            if (metadata.containsKey(TameworkMetadataKeys.COMPANION_PROFILE_ID)
+                    || metadata.containsKey(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID)) return null;
+            return new CaptureKey(null, null,
+                    UUID.fromString(metadata.getString(TameworkMetadataKeys.TARGET_UUID).getValue()));
         } catch (RuntimeException invalid) {
             return null;
         }

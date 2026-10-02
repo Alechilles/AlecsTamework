@@ -42,6 +42,7 @@ import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
@@ -64,6 +65,7 @@ import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -1146,6 +1148,7 @@ public final class SpawnerFeatureHandler {
                 warnLater(playerUuid, "captureProfileConflict");
             }
             case NOT_CAPTURABLE -> warnLater(playerUuid, "captureProfileConflict");
+            case LEGACY_BODY -> warnLater(playerUuid, "captureLegacyBody");
             case COMMIT_FAILED -> warnLater(playerUuid, "captureUnavailable");
             case OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE -> {
                 String key = outcome.messageKey();
@@ -1171,17 +1174,23 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(source);
+        // A 2.x item stays as it is until the release commits: its own keys hold the state, so it
+        // must stay adoptable if the server stops before the record and snapshot are written.
+        ItemStack legacySource = ref == null ? source : null;
+        SpawnerReleaseIntentFactory.PreparedRelease prepared = null;
         if (ref == null) {
-            ref = adoptLegacyItem(player, source, config, hotbarSlot, emptyItemIdOverride);
+            // Nothing is adopted unless the release can go ahead from where the player stands.
+            prepared = releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
+            ref = prepared == null ? null : adoptLegacyItem(player, source);
             if (ref == null) {
                 return false;
             }
-            source = CaptureItemKeys.write(source, ref);
         }
         CompanionRecord record = index.get(ref.profileId());
         CaptureItemOwnership.Release ownership = CaptureItemOwnership.release(
                 TameworkRuntimeSettings.current().captureItemOwnership(),
-                record == null ? null : record.ownerUuid(), player.getUuid());
+                record == null ? null : record.ownerUuid(), player.getUuid(),
+                CaptureItemOwnership.claimsUnownedImport(record, ref.generation(), itemSaysTamed(source)));
         if (CaptureItemOwnership.releaseRefused(ownership, record, ref.generation())) {
             // Bound to its owner: nothing changes, and the item stays filled.
             messages.showKey(player, NotificationStyle.Warning,
@@ -1191,13 +1200,15 @@ public final class SpawnerFeatureHandler {
         }
         // The ownership mode alone decides who may release. A stale copy goes on to the restore,
         // which answers STALE and empties it.
-        SpawnerReleaseIntentFactory.PreparedRelease prepared =
-                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
+        if (prepared == null) {
+            prepared = releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
+        }
         if (prepared == null) {
             return false;
         }
+        SpawnerReleaseIntentFactory.PreparedRelease release = prepared;
         RestoreFlow.Request request = RestoreFlow.Request.of(ref.profileId(), RestoreRules.Reason.RELEASE,
-                RestoreFlow.Destination.of(prepared.placement())).withGeneration(ref.generation());
+                RestoreFlow.Destination.of(release.placement())).withGeneration(ref.generation());
         RestoreFlow.Owner owner = releaseOwner(ownership, player.getUuid(), OwnerNameUtil.resolve(player));
         if (owner != null) {
             request = request.withOwner(owner);
@@ -1227,7 +1238,8 @@ public final class SpawnerFeatureHandler {
             RestoreFlow.Outcome outcome = error != null || result == null
                     ? new RestoreFlow.Outcome(RestoreFlow.Result.COMMIT_FAILED, null) : result;
             HytaleCaptureDelivery.onPlayerWorld(playerUuid,
-                    (world, store, actorRef, actor) -> finishRelease(outcome, world, actor, item, prepared),
+                    (world, store, actorRef, actor) ->
+                            finishRelease(outcome, world, actor, item, release, legacySource),
                     null);
         });
         return true;
@@ -1235,26 +1247,17 @@ public final class SpawnerFeatureHandler {
 
     /**
      * Adopts a 2.x capture item (plan 7 R18): its record is created or completed from the item's
-     * own state, and the held stack is stamped with the profile id and generation 0, so from here
-     * on it is an ordinary index item. Nothing is adopted unless the release could go ahead from
-     * where the player stands. Returns null after telling the player why, with the item left as
-     * it was. Call on the player's world thread.
+     * own state. The item itself is not changed; adopting it again gives the same result. Returns
+     * the record's identity, or null after telling the player why it was refused. Call on the
+     * player's world thread.
      */
     @Nullable
-    private CaptureItemKeys.Ref adoptLegacyItem(Player player, ItemStack source, ItemFeatureConfig config,
-                                                @Nullable Integer hotbarSlot, @Nullable String emptyItemIdOverride) {
-        SpawnerReleaseIntentFactory.PreparedRelease located =
-                releaseIntents.prepare(player, source, config, hotbarSlot, emptyItemIdOverride);
-        if (located == null) {
-            return null;
-        }
-        LegacyItemAdoption.Adoption adoption =
-                legacyItems.adopt(source.getMetadata(), player.getUuid(), OwnerNameUtil.resolve(player));
+    private CaptureItemKeys.Ref adoptLegacyItem(Player player, ItemStack source) {
+        LegacyItemAdoption.Adoption adoption = legacyItems.adopt(source.getMetadata(), player.getUuid(),
+                OwnerNameUtil.resolve(player), profileId -> loaded.get(profileId) != null);
         switch (adoption.result()) {
             case ADOPTED -> {
-                // The slot was matched against the exact source stack just above, on this thread.
-                return inventory.updateHotbarSlot(player, located.slot(), CaptureItemKeys.write(source, adoption.ref()))
-                        ? adoption.ref() : null;
+                return adoption.ref();
             }
             case STALE -> warn(player, "releaseProfileConflict");
             case UNREADABLE -> warn(player, "releaseEvidenceFailed");
@@ -1266,11 +1269,11 @@ public final class SpawnerFeatureHandler {
 
     /** Runs on the player's current world thread. */
     private void finishRelease(RestoreFlow.Outcome outcome, World world, Player player, CaptureItemKeys.Ref ref,
-                               SpawnerReleaseIntentFactory.PreparedRelease prepared) {
+                               SpawnerReleaseIntentFactory.PreparedRelease prepared, @Nullable ItemStack legacySource) {
         RestoreFlow.Result result = outcome.result();
         switch (result) {
             case RESTORED -> {
-                emptyHeldCapture(player, ref, prepared);
+                emptyHeldCapture(player, ref, prepared, legacySource);
                 if (world.getName().equals(prepared.placement().worldKey())) {
                     effects.playPublishedEffect(world, prepared.effect());
                 }
@@ -1278,7 +1281,7 @@ public final class SpawnerFeatureHandler {
             case STALE, NOT_ALLOWED -> {
                 // The item no longer matches its record; it becomes an empty capture item and
                 // never changes who owns the companion.
-                emptyHeldCapture(player, ref, prepared);
+                emptyHeldCapture(player, ref, prepared, legacySource);
                 warn(player, "releaseProfileConflict");
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
@@ -1289,12 +1292,29 @@ public final class SpawnerFeatureHandler {
         }
     }
 
-    /** Compare-then-replace: only a slot still holding this profile at this generation is emptied. */
+    /**
+     * Compare-then-replace: only a slot still holding this profile at this generation is emptied.
+     * A 2.x item carries neither, so its slot must still hold the exact stack the release began
+     * with ({@code legacySource}).
+     */
     private void emptyHeldCapture(Player player, CaptureItemKeys.Ref ref,
-                                  SpawnerReleaseIntentFactory.PreparedRelease prepared) {
-        ItemStack current = inventory.getHotbarItem(player, prepared.slot());
-        if (ref.equals(CaptureItemKeys.readIndexItem(current))) {
+                                  SpawnerReleaseIntentFactory.PreparedRelease prepared,
+                                  @Nullable ItemStack legacySource) {
+        boolean held = legacySource != null
+                ? Integer.valueOf(prepared.slot()).equals(
+                        inventory.resolveExactHotbarSlot(player, legacySource, prepared.slot()))
+                : ref.equals(CaptureItemKeys.readIndexItem(inventory.getHotbarItem(player, prepared.slot())));
+        if (held) {
             inventory.updateHotbarSlot(player, prepared.slot(), prepared.receipt());
+        }
+    }
+
+    /** The tamed flag 2.x and 4.x captures wrote on the filled item; false when it is absent or unreadable. */
+    private static boolean itemSaysTamed(ItemStack source) {
+        try {
+            return Boolean.TRUE.equals(source.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
+        } catch (RuntimeException unreadable) {
+            return false;
         }
     }
 

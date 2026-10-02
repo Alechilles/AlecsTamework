@@ -264,7 +264,7 @@ class CaptureFlowTest {
         CaptureFlow.Outcome wild = flow.capture(
                 new CaptureFlow.Capture<>(null, 0, "wild", facts(UUID.randomUUID()), owner, "Alec", DATA)).join();
 
-        assertEquals(CaptureFlow.Result.NOT_CAPTURABLE, refused.result());
+        assertEquals(CaptureFlow.Result.LEGACY_BODY, refused.result());
         assertEquals(CaptureFlow.Result.CAPTURED, wild.result());
         assertEquals(1, index.fileRecords(owner).size(), "only the wild body became a companion");
     }
