@@ -53,7 +53,8 @@ public final class CoopSlots {
         return -1;
     }
 
-    private static boolean taken(List<TameworkCoopSlotsComponent.Slot> entries, int slot,
+    /** True when {@code slot} has an entry that still holds its resident. */
+    static boolean taken(List<TameworkCoopSlotsComponent.Slot> entries, int slot,
                                  Function<UUID, CompanionRecord> records, String world, int x, int y, int z) {
         for (TameworkCoopSlotsComponent.Slot entry : entries) {
             if (entry.slot() == slot) {

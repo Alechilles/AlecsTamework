@@ -36,7 +36,9 @@ import org.joml.Vector3i;
  * Once a second per world it scans the loaded managed coops; outside a coop's roam hours each coop
  * that captures in range takes in the nearest accepted NPC into its first free slot. Inside its
  * roam hours each coop produces for its residents and releases one resident per sweep, as in 4.x
- * ({@link HytaleCoopResidents#roam}).
+ * ({@link HytaleCoopResidents#roam}). A coop seen loaded for the first time also gets back the
+ * residents imported from 3.x or 4.x ({@link HytaleCoopResidents#ensureImportedResidents}); that
+ * adds no scan: it reads the same coop list and a map of waiting sites that empties as coops load.
  *
  * <p>Why a tick: intake depends on the time of day and on NPCs wandering into range, for which
  * there is no event. Scope and cost match the old sweep: one scan of loaded coop blocks per world
@@ -86,26 +88,54 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
         if (scan == null) {
             return;
         }
+        // Residents imported from 3.x or 4.x (plan 7 R20): a coop that still waits for them is
+        // filled first and takes nobody in this sweep, so an intake cannot take their slots.
+        boolean imports = residents.importsPendingIn(scan.world());
+        List<HytaleDirectLiveCoopScanner.LoadedCoop> importCoops = new ArrayList<>();
         Set<UUID> chosen = new HashSet<>();
         List<HytaleDirectLiveCoopScanner.LoadedCoop> roamingCoops = new ArrayList<>();
         for (HytaleDirectLiveCoopScanner.LoadedCoop coop : scan.coops()) {
-            if (takesInNow(coop, scan.worldTime())) {
+            if (imports && residents.importsPendingAt(scan.world(), coop)) {
+                importCoops.add(coop);
+            } else if (takesInNow(coop, scan.worldTime())) {
                 takeInNearest(scan, coop, coop.config(), chosen);
             } else if (coop.config() != null && roaming(scan.worldTime(), coop.config())) {
                 roamingCoops.add(coop);
             }
         }
-        queueResidentWork(scan.world(), roamingCoops, scan.coops());
+        List<CoopImportedResidents.Site> goneSites = imports
+                ? residents.importSitesWithoutCoop(scan.world(), scan.coops()) : List.of();
+        queueResidentWork(scan.world(), roamingCoops, scan.coops(), importCoops, goneSites);
     }
 
-    /** Production and release for roaming coops, and the produce-ready state of every coop, on the world thread. */
+    /**
+     * Imported residents, then production and release for roaming coops, and the produce-ready
+     * state of every coop, on the world thread.
+     */
     private void queueResidentWork(World world, List<HytaleDirectLiveCoopScanner.LoadedCoop> roamingCoops,
-                                   List<HytaleDirectLiveCoopScanner.LoadedCoop> coops) {
-        if (coops.isEmpty()) {
+                                   List<HytaleDirectLiveCoopScanner.LoadedCoop> coops,
+                                   List<HytaleDirectLiveCoopScanner.LoadedCoop> importCoops,
+                                   List<CoopImportedResidents.Site> goneSites) {
+        if (coops.isEmpty() && goneSites.isEmpty()) {
             return;
         }
         try {
             world.execute(() -> {
+                for (HytaleDirectLiveCoopScanner.LoadedCoop coop : importCoops) {
+                    try {
+                        residents.ensureImportedResidents(world, coop);
+                    } catch (RuntimeException | LinkageError failure) {
+                        warnThrottled(world, coop, "imported residents", failure);
+                    }
+                }
+                for (CoopImportedResidents.Site site : goneSites) {
+                    try {
+                        residents.releaseImportedWithoutCoop(world, site);
+                    } catch (RuntimeException | LinkageError failure) {
+                        LOGGER.at(Level.WARNING).withCause(failure).log(
+                                "Could not move imported residents out of the missing coop at %s", site);
+                    }
+                }
                 for (HytaleDirectLiveCoopScanner.LoadedCoop coop : roamingCoops) {
                     try {
                         residents.roam(world, coop);

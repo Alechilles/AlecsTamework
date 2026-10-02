@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.CoopResidentReleasePositionService;
 import com.alechilles.alecstamework.items.DirectLiveCoopProduceService;
@@ -13,8 +14,10 @@ import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -43,10 +46,13 @@ import org.joml.Vector3i;
  */
 public final class HytaleCoopResidents implements CoopRelease.Port {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    /** Sweeps (one per second) a loaded chunk must show no coop before its imported residents are moved out. */
+    private static final int SWEEPS_WITHOUT_COOP = 5;
 
     private final RestoreFlow<Ref<EntityStore>> restoreFlow;
     private final HytaleCompanionSpawner spawner;
     private final CoopRelease release;
+    private final CoopImportedResidents imports;
     private final DirectLiveCoopProduceService produce = new DirectLiveCoopProduceService();
     private final CoopResidentReleasePositionService positions = new CoopResidentReleasePositionService();
     private final HytaleDirectLiveCoopScanner scanner = new HytaleDirectLiveCoopScanner();
@@ -61,6 +67,106 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         this.spawner = Objects.requireNonNull(spawner, "spawner");
         Objects.requireNonNull(index, "index");
         this.release = new CoopRelease(index::get, this, System::currentTimeMillis);
+        this.imports = new CoopImportedResidents(index);
+    }
+
+    /** True while {@code world} has residents imported from 3.x or 4.x that are not in a coop block yet (plan 7 R20). */
+    public boolean importsPendingIn(@Nonnull World world) {
+        return imports.pendingIn(world.getName());
+    }
+
+    /** True while this coop has imported residents to place; the sweep then fills it before any intake. */
+    public boolean importsPendingAt(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop) {
+        Vector3i b = coop.block();
+        return imports.pendingAt(world.getName(), b.x, b.y, b.z);
+    }
+
+    /**
+     * Writes the imported residents of a loaded coop into its block, once (plan 7 R20). An old
+     * block has no slots component, so the first write adds it. Residents that find no free slot
+     * leave as from a broken coop ({@link #moveOutImported}). A block that cannot be read keeps
+     * its residents waiting for the next sweep.
+     */
+    public void ensureImportedResidents(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop) {
+        Vector3i b = coop.block();
+        TwCoopConfig config = coop.config();
+        if (config == null || !imports.pendingAt(world.getName(), b.x, b.y, b.z)) {
+            return;
+        }
+        HytaleCoopIntake.Block block = HytaleCoopIntake.block(world, b.x, b.y, b.z);
+        if (block == null || TameworkCoopSlotsComponent.getComponentType() == null) {
+            return;
+        }
+        CoopImportedResidents.Fill fill = imports.fill(world.getName(), b.x, b.y, b.z, block.slots(),
+                config.getLifecycleRules().getMaxResidents(),
+                CompanionWorldTime.gameTimeMs(world.getEntityStore().getStore()));
+        if (fill.slots() != null) {
+            block.store().putComponent(block.ref(), TameworkCoopSlotsComponent.getComponentType(), fill.slots());
+            block.info().markNeedsSaving(block.store());
+            LOGGER.at(Level.INFO).log("Imported coop residents rejoined the coop at %s in world %s (%d slot entries)",
+                    b, world.getName(), fill.slots().slots().size());
+        }
+        for (CompanionRecord record : fill.overflow()) {
+            moveOutImported(world, record, b, coop.rotationIndex(), config, "the coop is full");
+        }
+    }
+
+    /**
+     * The sites in {@code world} whose chunk has been loaded without a managed coop block for
+     * {@link #SWEEPS_WITHOUT_COOP} sweeps in a row: the coop was broken while the server ran 4.x,
+     * or its block is no longer an enabled coop. Read-only apart from that count.
+     */
+    @Nonnull
+    public List<CoopImportedResidents.Site> importSitesWithoutCoop(
+            @Nonnull World world, @Nonnull List<HytaleDirectLiveCoopScanner.LoadedCoop> coops) {
+        List<CoopImportedResidents.Site> gone = new ArrayList<>();
+        for (CoopImportedResidents.Site site : imports.sitesIn(world.getName())) {
+            if (hasCoop(coops, site)) {
+                continue;
+            }
+            if (!chunkLoaded(world, site)) {
+                imports.notLoaded(site);
+            } else if (imports.seenWithoutCoop(site, SWEEPS_WITHOUT_COOP)) {
+                gone.add(site);
+            }
+        }
+        return gone;
+    }
+
+    /** Moves the imported residents of a site with no coop block out next to where the coop stood. */
+    public void releaseImportedWithoutCoop(@Nonnull World world, @Nonnull CoopImportedResidents.Site site) {
+        if (!chunkLoaded(world, site)) {
+            return;
+        }
+        Vector3i block = new Vector3i(site.x(), site.y(), site.z());
+        for (CompanionRecord record : imports.withoutCoop(site)) {
+            moveOutImported(world, record, block, 0, null, "its coop is gone");
+        }
+    }
+
+    private static boolean chunkLoaded(World world, CoopImportedResidents.Site site) {
+        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(site.x(), site.z()));
+        return chunk != null && HytaleChunkAccess.isOwnedBy(chunk, world);
+    }
+
+    private static boolean hasCoop(List<HytaleDirectLiveCoopScanner.LoadedCoop> coops, CoopImportedResidents.Site site) {
+        for (HytaleDirectLiveCoopScanner.LoadedCoop coop : coops) {
+            Vector3i b = coop.block();
+            if (b.x == site.x() && b.y == site.y() && b.z == site.z()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Releases an imported resident beside the coop position, as a broken coop does; LOST when that fails. */
+    private void moveOutImported(World world, CompanionRecord record, Vector3i block, int rotation,
+                                 @Nullable TwCoopConfig config, String why) {
+        imports.moveOut(record, destination(world, record.roleId(), block, rotation, config), restoreFlow::restore)
+                .thenAccept(released -> LOGGER.at(Level.INFO).log(
+                        "Imported coop resident %s (%s) of the coop at %s in world %s: %s; %s", record.profileId(),
+                        record.roleId(), block, world.getName(), why, released ? "released beside it"
+                                : "not released (if it is now LOST its owner can recover it)"));
     }
 
     /**
