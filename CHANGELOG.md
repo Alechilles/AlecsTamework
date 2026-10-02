@@ -4,6 +4,9 @@
 
 - Fixed blank talent pages for newly tamed companions. Owned, loaded companions
   can open their talents without being selected on a command flute.
+- Older databases now compact automatically during startup. Fresh databases and
+  databases already compacted skip the pass; unsuccessful attempts are logged
+  and retried on a later startup.
 
 ## 4.3.0 - Boss Tools and Update 7 Compatibility - 2026-09-28
 

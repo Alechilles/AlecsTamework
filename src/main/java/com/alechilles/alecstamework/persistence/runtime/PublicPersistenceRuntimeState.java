@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTarget;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTargetOpener;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.EnumMap;
@@ -32,9 +33,11 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.logging.Level;
 
 /** Mutable composition state owned exclusively by one public runtime. */
 final class PublicPersistenceRuntimeState {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final PublicPersistenceRuntimeConfiguration configuration;
     private final PersistenceFeatureRegistry registry;
     private final PublicPersistenceTargetOpener targets;
@@ -419,7 +422,7 @@ final class PublicPersistenceRuntimeState {
 
     private CompletionStage<PersistenceStartupAction.Result>
     buildProjections() {
-        return workflows.track(adapter.buildProjections().thenApply(result -> {
+        return workflows.track(adapter.buildProjections().thenCompose(result -> {
             if (result.status()
                     != SqlitePublicProjectionStartupResult.Status.COMPLETE) {
                 throw new IllegalStateException(
@@ -430,7 +433,23 @@ final class PublicPersistenceRuntimeState {
                         result.failure()
                 );
             }
-            return PersistenceStartupAction.Result.COMPLETE;
+            // Recovery and projection reads have finished; public mutations and world
+            // reconciliation have not started. Keep maintenance inside this tracked work.
+            return kernel.compactDatabaseOnStartup(configuration.clock().getAsLong())
+                    .handle((compacted, failure) -> {
+                        if (failure != null) {
+                            control.maintenanceFailed(failure);
+                            LOGGER.at(Level.WARNING).withCause(failure).log(
+                                    "Startup database compaction failed for %s; retry on a later startup.",
+                                    target.databasePath());
+                        } else {
+                            compacted.ifPresent(compaction -> LOGGER.at(Level.INFO).log(
+                                    "Startup database compaction completed for %s: %d bytes before, %d after; %d operations compacted.",
+                                    target.databasePath(), compaction.bytesBefore(),
+                                    compaction.bytesAfter(), compaction.compactedOperations()));
+                        }
+                        return PersistenceStartupAction.Result.COMPLETE;
+                    });
         }));
     }
 

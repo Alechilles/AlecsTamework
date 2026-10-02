@@ -139,6 +139,26 @@ class SqliteDatabaseCompactionTest {
         }
     }
 
+    /** Catches rebuilding fresh or already converted databases on every server restart. */
+    @Test
+    void startupSkipsFreshAndPreviouslyCompactedDatabases() throws Exception {
+        try (Connection fresh = new SqliteConnectionFactory(tempDir.resolve("fresh-startup.sqlite"))
+                .openWriterConnection()) {
+            assertTrue(SqliteDatabaseCompaction.runOnStartup(
+                    fresh, tempDir.resolve("fresh-startup.sqlite"), COMPACTION_TIME).isEmpty());
+        }
+        Path database = tempDir.resolve("converted-startup.sqlite");
+        seedCheckpointHistory(database, 2);
+        try (Connection writer = new SqliteConnectionFactory(database).openWriterConnection()) {
+            assertEquals(2, SqliteDatabaseCompaction.runOnStartup(
+                    writer, database, COMPACTION_TIME).orElseThrow().compactedOperations());
+        }
+        // Reopen to prove the decision survives restart rather than relying on session state.
+        try (Connection writer = new SqliteConnectionFactory(database).openWriterConnection()) {
+            assertTrue(SqliteDatabaseCompaction.runOnStartup(writer, database, COMPACTION_TIME).isEmpty());
+        }
+    }
+
     /** Catches converted databases reverting to reusable pages instead of returning later history to disk. */
     @Test
     void convertedDatabaseIncrementallyReclaimsLaterCheckpointHistory() throws Exception {
