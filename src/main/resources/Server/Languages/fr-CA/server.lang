@@ -667,7 +667,7 @@ tamework.ui.notifications.command.move.returnHome.notConfigured=La commande Rent
 tamework.ui.notifications.command.move.unavailable={0} indisponible.
 tamework.ui.notifications.command.destination.npcsFrozen=Les compagnons ne peuvent pas entrer dans ce monde, car les PNJ y sont désactivés.
 tamework.ui.notifications.command.recall.notSeenSinceUpdate=Un compagnon n'a pas été rappelé, car il n'a pas été vu depuis la mise à jour. Allez d'abord à l'endroit où vous l'avez laissé.
-tamework.ui.notifications.command.recall.stillLocating=Un compagnon est encore en cours de localisation après la mise à jour. Réessayez dans un moment.
+tamework.ui.notifications.command.recall.stillLocating=Un compagnon est encore en cours de localisation après la mise à jour. Dans les grands mondes, cela peut prendre un certain temps.
 tamework.ui.notifications.command.locate.location={0} : {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=Aucune position enregistrée pour {0}.
 tamework.ui.notifications.command.locate.unknownWorld=monde inconnu
@@ -1763,7 +1763,7 @@ tamework.traits.description.fertilityNeutral=Cet animal n’a pas de bonus au no
 tamework.traits.description.productYield={direction} le rendement de laine, d’œufs et de lait de {percent}%.
 
 tamework.ui.linkedLocation.captured=Capturé
-tamework.ui.linkedLocation.beingLocated=Localisation en cours après la mise à jour. Revenez vérifier plus tard.
+tamework.ui.linkedLocation.beingLocated=Localisation en cours après la mise à jour. Cela peut prendre un certain temps dans les grands mondes.
 tamework.ui.linkedLocation.relative.here=À moins de 1 m
 tamework.ui.linkedLocation.relative.north={0} m au nord
 tamework.ui.linkedLocation.relative.south={0} m au sud

@@ -241,16 +241,29 @@ Players can play normally meanwhile.
 When a world's read starts, about once a minute while it runs, and when it ends:
 
 ```text
-Locating imported companions in the saved chunks of world <world>: <n> chunks, starting at chunk <n>, <n> companions to find
-Locating imported companions in world <world>: <n> of <n> chunks read, <n> located, <n> still missing
-Locating imported companions in world <world> ended after <time> (<reason>): <n> of <n> chunks read, <n> located so far
+Locating imported companions in the saved chunks of world <world>: <n> chunks listed, <n> already read, <n> companions to find
+Locating imported companions in world <world>: <n> of <n> chunks read, <n> located, <n> still missing, <n> chunks per second
+Locating imported companions in world <world> ended after <time> (<reason>): <n> of <n> chunks read, <n> located so far, <n> chunks per second
 ```
 
 When the whole search is done:
 
 ```text
-Finished locating imported companions in saved chunks after <time>: <n> located, <n> not found and now listed as lost (their owners can recover them), <n> leftover old bodies seen, <n> chunks could not be read
+Finished locating imported companions in saved chunks after <time>: <n> located, <n> not found and now listed as lost (their owners can recover them), <n> leftover old bodies seen, <n> chunks could not be read, <n> chunks per second
 ```
+
+Companions are listed as lost only when every world was read to its end. If a world
+was removed during the search, could not be listed, stopped answering, or had 20
+unreadable chunks in a row, the search ends with this warning instead, marks nothing
+as lost, and goes on from the same place at the next start:
+
+```text
+The search for imported companions ended after <time> without reading these worlds to the end: [<world>]. <n> located, <n> still missing. Nothing was marked as lost. ...
+```
+
+A few single unreadable chunks do not stop a world. Its end line is then a warning
+that gives their number. A companion listed as lost may be in one of those chunks,
+and it goes back to normal by itself when that chunk loads.
 
 ### What players see
 
@@ -269,8 +282,8 @@ Finished locating imported companions in saved chunks after <time>: <n> located,
 - A companion whose state is in a 2.x capture item can still be released from that
   item, during the search and after it.
 
-If the search stops on an error, the console says so and it runs again at the next
-start. Until then recall asks the player to visit the animal first, and Recover is
+If the search stops on an error or ends without reading every world to the end, the
+console says so and it runs again at the next start. Until then recall asks the player to visit the animal first, and Recover is
 allowed again: Recover on a companion that was never found gives a fresh animal of
 the role, and the original animal is removed as a leftover copy if it loads later.
 

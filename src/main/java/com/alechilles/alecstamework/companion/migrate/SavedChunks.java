@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.ChunkColumn;
 import com.hypixel.hytale.server.core.universe.world.chunk.EntityChunk;
@@ -33,7 +34,7 @@ import org.joml.Vector3d;
  * and must never be called on a world thread.</p>
  */
 public final class SavedChunks implements LegacyBodyLocator.Chunks {
-    private static final long LOAD_TIMEOUT_SECONDS = 60L;
+    private static final long LOAD_TIMEOUT_SECONDS = 15L;
 
     private final World world;
 
@@ -68,18 +69,37 @@ public final class SavedChunks implements LegacyBodyLocator.Chunks {
     }
 
     /**
-     * The world's average tick length over the last ten seconds as a share of its tick step. The
-     * engine keeps both in plain fields its world thread writes, and its own metrics read them from
-     * other threads. A value read here can be a little old, which is fine for choosing a pause.
+     * The average tick length over the last ten seconds, as a share of the tick step, of the
+     * busiest world that is loaded. The chunk decode runs on storage threads shared by the whole
+     * server, so the busiest world is the better sign than only the world being read. The engine
+     * keeps both numbers in plain fields a world thread writes, and its own metrics read them
+     * (and the universe's concurrent world map) from other threads. A value read here can be a
+     * little old, which is fine for choosing a pause. NaN when nothing could be read.
      */
     @Override
     public double tickLoad() {
+        double busiest = Double.NaN;
         try {
-            int step = world.getTickStepNanos();
-            return step <= 0 ? Double.NaN : world.getBufferedTickLengthMetricSet().getAverage(0) / step;
+            Universe universe = Universe.get();
+            if (universe == null) {
+                return tickLoad(world);
+            }
+            for (World loaded : universe.getWorlds().values()) {
+                double load = tickLoad(loaded);
+                if (!Double.isNaN(load) && !(load <= busiest)) {
+                    busiest = load;
+                }
+            }
         } catch (RuntimeException unavailable) {
             return Double.NaN;
         }
+        return busiest;
+    }
+
+    private static double tickLoad(World world) {
+        int step = world.getTickStepNanos();
+        return step <= 0 || !world.isAlive() ? Double.NaN
+                : world.getBufferedTickLengthMetricSet().getAverage(0) / step;
     }
 
     private IChunkLoader loader() throws IOException {

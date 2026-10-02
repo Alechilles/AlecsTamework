@@ -667,7 +667,7 @@ tamework.ui.notifications.command.move.returnHome.notConfigured=„Nach Hause sc
 tamework.ui.notifications.command.move.unavailable={0} nicht verfügbar.
 tamework.ui.notifications.command.destination.npcsFrozen=Begleiter können diese Welt nicht betreten, weil NPCs hier deaktiviert sind.
 tamework.ui.notifications.command.recall.notSeenSinceUpdate=Ein Begleiter wurde nicht zurückgerufen, weil er seit dem Update nicht mehr gesehen wurde. Besuche zuerst den Ort, an dem du ihn zurückgelassen hast.
-tamework.ui.notifications.command.recall.stillLocating=Ein Begleiter wird nach dem Update noch gesucht. Versuche es in Kürze erneut.
+tamework.ui.notifications.command.recall.stillLocating=Ein Begleiter wird nach dem Update noch gesucht. In großen Welten kann das eine Weile dauern.
 tamework.ui.notifications.command.locate.location={0}: {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=Kein gespeicherter Standort für {0}.
 tamework.ui.notifications.command.locate.unknownWorld=unbekannte Welt
@@ -1763,7 +1763,7 @@ tamework.traits.description.fertilityNeutral=Dieses Tier hat keinen Bonus auf di
 tamework.traits.description.productYield={direction} den Ertrag von Wolle, Eiern und Milch um {percent}%.
 
 tamework.ui.linkedLocation.captured=Gefangen
-tamework.ui.linkedLocation.beingLocated=Wird nach dem Update noch gesucht. Schau später noch einmal nach.
+tamework.ui.linkedLocation.beingLocated=Wird nach dem Update noch gesucht. In großen Welten kann das eine Weile dauern.
 tamework.ui.linkedLocation.relative.here=Weniger als 1 m entfernt
 tamework.ui.linkedLocation.relative.north={0} m nach Norden
 tamework.ui.linkedLocation.relative.south={0} m nach Süden

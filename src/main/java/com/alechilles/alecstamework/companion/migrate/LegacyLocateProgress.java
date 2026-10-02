@@ -21,7 +21,8 @@ import org.bson.BsonValue;
  * <p>A world's chunk indexes are read in ascending order. {@code after} is the last index that was
  * read, so a resumed pass goes on with the first stored index above it. A cursor value is used
  * instead of a count because chunks can be added to or removed from storage between two starts;
- * a count would then skip or repeat the wrong chunks. {@code done} is only for the log.</p>
+ * a count would then skip or repeat the wrong chunks. Only a chunk that was read moves the
+ * cursor, so a run of unreadable chunks at the end of a run is read again.</p>
  *
  * <p>Not thread safe: the pass thread owns it once the pass has started.</p>
  */
@@ -33,7 +34,6 @@ final class LegacyLocateProgress {
     static final class World {
         boolean started;
         long after;
-        int done;
         boolean finished;
     }
 
@@ -57,7 +57,6 @@ final class LegacyLocateProgress {
         BsonDocument byWorld = new BsonDocument();
         worlds.forEach((name, world) -> byWorld.put(name, new BsonDocument("Started", BsonBoolean.valueOf(world.started))
                 .append("After", new BsonInt64(world.after))
-                .append("Done", new BsonInt32(world.done))
                 .append("Finished", BsonBoolean.valueOf(world.finished))));
         return new BsonDocument("Format", new BsonInt32(FORMAT))
                 .append("Complete", BsonBoolean.valueOf(complete))
@@ -78,7 +77,6 @@ final class LegacyLocateProgress {
             World world = progress.world(entry.getKey());
             world.started = saved.getBoolean("Started").getValue();
             world.after = saved.getNumber("After").longValue();
-            world.done = saved.getNumber("Done").intValue();
             world.finished = saved.getBoolean("Finished").getValue();
         }
         return progress;

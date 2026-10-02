@@ -688,7 +688,7 @@ tamework.ui.notifications.command.move.returnHome.notConfigured=Return Home comm
 tamework.ui.notifications.command.move.unavailable={0} unavailable.
 tamework.ui.notifications.command.destination.npcsFrozen=Companions cannot enter this world because NPCs are disabled here.
 tamework.ui.notifications.command.recall.notSeenSinceUpdate=A companion was not recalled because it has not been seen since the update. Visit the place where you left it first.
-tamework.ui.notifications.command.recall.stillLocating=A companion is still being located after the update. Try again in a little while.
+tamework.ui.notifications.command.recall.stillLocating=A companion is still being located after the update. On large worlds this can take a while.
 tamework.ui.notifications.command.locate.location={0}: {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=No recorded location for {0}.
 tamework.ui.notifications.command.locate.unknownWorld=unknown world
@@ -1775,7 +1775,7 @@ tamework.traits.description.fertilityNeutral=This animal has no bonus to the num
 tamework.traits.description.productYield={direction} wool, egg, and milk yield by {percent}%.
 
 tamework.ui.linkedLocation.captured=Captured
-tamework.ui.linkedLocation.beingLocated=Being located after the update. Check again later.
+tamework.ui.linkedLocation.beingLocated=Being located after the update. This can take a while on large worlds.
 tamework.ui.linkedLocation.relative.here=Less than 1m away
 tamework.ui.linkedLocation.relative.north={0}m north
 tamework.ui.linkedLocation.relative.south={0}m south
