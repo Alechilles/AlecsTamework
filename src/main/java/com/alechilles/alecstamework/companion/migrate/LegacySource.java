@@ -161,9 +161,11 @@ public final class LegacySource implements AutoCloseable {
     }
 
     /**
-     * {@code quick_check}, not {@code integrity_check}: it finds damaged pages and broken table
-     * structure but skips the index cross-checks, which take minutes on a database of several
-     * gigabytes. The importer reads tables by primary key order and writes nothing back.
+     * {@code quick_check}, not {@code integrity_check}: it checks every page and the structure of
+     * every table and index, but not that each index agrees with its table, which takes minutes on
+     * a database of several gigabytes. A damaged index could therefore still make a query miss or
+     * repeat a row (text primary keys are indexes too). That is accepted here: the import only
+     * reads, the old files are kept, and the report lists what was imported.
      */
     private static List<String> integrityProblems(Connection connection) throws SQLException {
         List<String> problems = new ArrayList<>();

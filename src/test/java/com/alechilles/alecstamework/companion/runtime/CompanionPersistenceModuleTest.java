@@ -49,13 +49,13 @@ class CompanionPersistenceModuleTest {
     void recordsSurviveAShutdownAndReopen() throws Exception {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
         CompanionPersistenceModule first = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
         UUID profile = UUID.randomUUID();
         first.index().insert(CompanionTransitions.newLive(profile, 0, body(UUID.randomUUID())));
         assertTrue(first.shutdown(System.currentTimeMillis() + 5_000L));
 
         CompanionPersistenceModule second = CompanionPersistenceModule.open(ROOT, List.of(DATA), io::exists, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
 
         assertEquals(CompanionPersistenceModule.State.READY, second.state());
         assertNotNull(second.queries().get(profile));
@@ -68,7 +68,7 @@ class CompanionPersistenceModuleTest {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
 
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA),
-                p -> p.equals(DATA.resolve("tamework.sqlite")), io, System::currentTimeMillis, "test");
+                p -> p.equals(DATA.resolve("tamework.sqlite")), io, System::currentTimeMillis, "test", DATA);
 
         assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, module.state());
         assertEquals(CompanionStorage.LegacyKind.LEGACY_2X, module.legacyKind());
@@ -156,7 +156,7 @@ class CompanionPersistenceModuleTest {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
         Predicate<Path> exists = p -> io.exists(p) || Files.exists(p);
         CompanionPersistenceModule blocked = CompanionPersistenceModule.open(ROOT, List.of(data), exists, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
         assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, blocked.state());
 
         assertEquals(CompanionPersistenceModule.FreshStart.CREATED,
@@ -174,7 +174,7 @@ class CompanionPersistenceModuleTest {
         }
 
         CompanionPersistenceModule reopened = CompanionPersistenceModule.open(ROOT, List.of(data), exists, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
         try {
             assertEquals(CompanionPersistenceModule.State.READY, reopened.state());
             assertNull(reopened.legacyKind());
@@ -208,7 +208,7 @@ class CompanionPersistenceModuleTest {
         io.failReads(true);
 
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
 
         assertEquals(CompanionPersistenceModule.State.FAILED, module.state());
         assertNotNull(module.failure());
@@ -224,7 +224,7 @@ class CompanionPersistenceModuleTest {
         CountDownLatch gate = new CountDownLatch(1);
         GatedIo io = new GatedIo(files);
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
-                System::currentTimeMillis, "test");
+                System::currentTimeMillis, "test", DATA);
         io.gate = gate;
         UUID profile = UUID.randomUUID();
         SnapshotEnvelope queued = new SnapshotEnvelope(profile, CompanionSnapshots.FORMAT, 3L,
@@ -245,7 +245,7 @@ class CompanionPersistenceModuleTest {
         Files.write(root.resolve("owners").resolve(OWNER + ".json"), new byte[40]);
         Files.write(root.resolve("meta.json"), new byte[2]);
         CompanionPersistenceModule module = CompanionPersistenceModule.open(root, List.of(DATA), p -> false,
-                new MemoryCompanionFileIo(), System::currentTimeMillis, "test");
+                new MemoryCompanionFileIo(), System::currentTimeMillis, "test", DATA);
         try {
             long deadline = System.currentTimeMillis() + 5_000L;
             while (module.folderBytes() != 42L && System.currentTimeMillis() < deadline) {
@@ -304,7 +304,7 @@ class CompanionPersistenceModuleTest {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
 
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA), p -> false, io,
-                System::currentTimeMillis, "5.0.0-test");
+                System::currentTimeMillis, "5.0.0-test", DATA);
 
         assertTrue(io.exists(CompanionStorage.metaFile(ROOT)));
         module.shutdown(System.currentTimeMillis() + 1_000L);

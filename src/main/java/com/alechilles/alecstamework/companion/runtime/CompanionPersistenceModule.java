@@ -110,27 +110,15 @@ public final class CompanionPersistenceModule {
 
     /**
      * Opens the store at {@code root}. Blocks on file I/O, so call it before worlds start and
-     * never on a world thread. Never throws for store problems; check {@link #state()}. Import
-     * reports go into the folder that holds {@code root}.
+     * never on a world thread. Never throws for store problems; check {@link #state()}.
+     *
+     * <p>A world with 3.x/4.x saves and no store is imported here, on the caller's thread, before
+     * the normal load (spec 12.2); that can take minutes on a large world. A failed import writes
+     * nothing and leaves the module {@link State#MIGRATION_REQUIRED} with the reason in
+     * {@link #failure()} (plan 7 R2).</p>
      *
      * @param legacyDirs directories that may hold old Tamework saves (spec 12.1)
      * @param exists     file-existence check used for old-save detection and {@code meta.json}
-     */
-    @Nonnull
-    public static CompanionPersistenceModule open(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs,
-                                                  @Nonnull Predicate<Path> exists, @Nonnull CompanionFileIo io,
-                                                  @Nonnull LongSupplier clock, @Nonnull String createdBy) {
-        Path parent = root.toAbsolutePath().getParent();
-        return open(root, legacyDirs, exists, io, clock, createdBy, parent == null ? root : parent);
-    }
-
-    /**
-     * {@link #open(Path, Collection, Predicate, CompanionFileIo, LongSupplier, String)} with the
-     * folder for the import report. A world with 3.x/4.x saves and no store is imported here, on
-     * the caller's thread, before the normal load (spec 12.2); that can take minutes on a large
-     * world. A failed import writes nothing and leaves the module {@link State#MIGRATION_REQUIRED}
-     * with the reason in {@link #failure()} (plan 7 R2).
-     *
      * @param reportDir where an import report is written (the Tamework data folder)
      */
     @Nonnull

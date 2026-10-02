@@ -8,10 +8,14 @@ import com.alechilles.alecstamework.companion.store.CompanionStore;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -25,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
@@ -41,10 +46,11 @@ import org.bson.BsonString;
  * folder to {@code Companions/}. The store is the same one the module loads on every later start,
  * so the caller just falls through to its normal load.
  *
- * <p>All or nothing (plan 7 R2). {@code Companions/meta.json} appears only once the whole store
- * is in place, so a crash or a failure at any earlier point leaves a world that imports again
- * from a clean folder at the next start. On failure nothing is left in {@code Companions/}, the
- * importing folder is removed and the old files are untouched.</p>
+ * <p>All or nothing (plan 7 R2). The store appears as {@code Companions/} through one atomic
+ * folder rename, after every file in it was forced to disk, so a crash, a power loss or a failure
+ * at any earlier point leaves a world that imports again from a clean folder at the next start.
+ * On failure nothing is left in {@code Companions/}, the importing folder is removed and the old
+ * files are untouched.</p>
  *
  * <p>Blocks on file and database I/O. It runs on the plugin start thread before any companion
  * system registers; never call it on a world thread. Folders are deleted and renamed with
@@ -52,11 +58,10 @@ import org.bson.BsonString;
  */
 public final class CompanionImporter {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    /** Marks a {@code Companions/} folder that a non-atomic move has not finished filling. */
-    static final String UNFINISHED_MARKER = "import-unfinished";
     private static final String SCRATCH = "legacy-scratch";
-    /** The most snapshots decoded when checking the written store. */
-    static final int SNAPSHOT_SAMPLE_MAX = 200;
+    /** A virus scanner can hold a file inside the new folder for a moment on Windows. */
+    private static final int MOVE_ATTEMPTS = 5;
+    private static final long MOVE_RETRY_MS = 200L;
 
     /**
      * How an import ended.
@@ -65,10 +70,9 @@ public final class CompanionImporter {
      * @param failure    why nothing was imported; null when {@code imported}
      * @param reportName the report's file name, for the operator notice; set in both cases
      * @param reportFile the report file, or null when it could not be written
-     * @param summary    the one-line console summary; null on failure
      */
     public record Outcome(boolean imported, @Nullable String failure, @Nonnull String reportName,
-                          @Nullable Path reportFile, @Nullable String summary) {
+                          @Nullable Path reportFile) {
     }
 
     private CompanionImporter() {
@@ -89,9 +93,10 @@ public final class CompanionImporter {
         long startedNanos = System.nanoTime();
         Path importing = CompanionStorage.importingDir(root);
         ImportReport.Sources sources = null;
+        ImportResult result;
         try {
             deleteTree(importing);
-            clearUnfinished(root);
+            clearEmptyRoot(root);
             LegacySource.Located located = LegacySource.locate(legacyDirs);
             if (located.isEmpty()) {
                 throw new IOException("no " + LegacySource.STATE_FILE + " or " + LegacySource.BONDED_FILE
@@ -103,7 +108,7 @@ public final class CompanionImporter {
             LegacyRows rows = LegacyReader.read(legacyDirs, importing.resolve(SCRATCH));
             deleteTree(importing.resolve(SCRATCH));
             sources = sources(rows, legacyDirs);
-            ImportResult result = LegacyMapper.map(rows, startedAtMs);
+            result = LegacyMapper.map(rows, startedAtMs);
 
             CompanionStore store = new CompanionStore(importing, io, clock);
             for (Map.Entry<String, List<CompanionRecord>> owner : byOwner(result.records()).entrySet()) {
@@ -114,30 +119,46 @@ public final class CompanionImporter {
             }
             result.aliases().save(io, importing).join();
             verify(importing, io, clock, result);
-            io.write(CompanionStorage.metaFile(importing),
-                    CompanionStorage.importMeta(createdBy, receipt(sources, result, startedAtMs))).join();
-            promote(importing, root, true);
-
-            long durationMs = (System.nanoTime() - startedNanos) / 1_000_000L;
-            String summary = ImportReport.summary(result, durationMs);
-            Path reportFile = writeReport(reportDir, startedAtMs,
-                    ImportReport.success(sources, result, root, startedAtMs, durationMs, createdBy));
-            LOGGER.at(Level.INFO).log("%s Report: %s", summary,
-                    reportFile == null ? "could not be written" : reportFile);
-            return new Outcome(true, null, ImportReport.fileName(startedAtMs), reportFile, summary);
-        } catch (LegacySource.Refused | IOException | RuntimeException failure) {
+            // The read-back above came from the OS cache. Force the files to disk before the
+            // marker of a finished store exists, or a power loss could leave meta.json and the
+            // renamed folder with empty files in it, and that store would never be imported again.
+            forceTree(importing);
+            Path meta = CompanionStorage.metaFile(importing);
+            io.write(meta, CompanionStorage.importMeta(createdBy, receipt(sources, result, startedAtMs))).join();
+            force(meta);
+            forceDirectory(importing);
+            promote(importing, root);
+            forceDirectory(root.toAbsolutePath().getParent());
+        } catch (LegacySource.Refused | IOException | RuntimeException | OutOfMemoryError failure) {
             Throwable cause = failure instanceof CompletionException && failure.getCause() != null
                     ? failure.getCause() : failure;
-            String reason = failure instanceof LegacySource.Refused refused
-                    ? refusal(refused) : cause.getClass().getSimpleName() + ": " + cause.getMessage();
-            cleanUp(importing, root);
-            Path reportFile = writeReport(reportDir, startedAtMs,
-                    ImportReport.failure(sources, reason, root, startedAtMs, createdBy));
+            String reason = failure instanceof LegacySource.Refused refused ? refusal(refused)
+                    : failure instanceof OutOfMemoryError
+                    ? "not enough memory to import; raise the server's maximum heap size (-Xmx) and restart"
+                    : cause.getClass().getSimpleName() + ": " + cause.getMessage();
+            cleanUp(importing);
+            ImportReport.Sources found = sources;
+            Path reportFile = writeReport(reportDir, ImportReport.FAILURE_FILE_NAME,
+                    () -> ImportReport.failure(found, reason, root, startedAtMs, createdBy));
             LOGGER.at(Level.WARNING).withCause(cause).log("The Tamework 3.x/4.x companion import failed and wrote "
                     + "nothing: %s. The old files were not changed. Report: %s", reason,
                     reportFile == null ? "could not be written" : reportFile);
-            return new Outcome(false, reason, ImportReport.fileName(startedAtMs), reportFile, null);
+            return new Outcome(false, reason, ImportReport.FAILURE_FILE_NAME, reportFile);
         }
+        // The store is in place. Nothing below may turn that into a failed import.
+        long durationMs = (System.nanoTime() - startedNanos) / 1_000_000L;
+        String reportName = ImportReport.fileName(startedAtMs);
+        ImportReport.Sources read = sources;
+        Path reportFile = writeReport(reportDir, reportName,
+                () -> ImportReport.success(read, result, root, startedAtMs, durationMs, createdBy));
+        try {
+            LOGGER.at(Level.INFO).log("%s Report: %s", ImportReport.summary(result, durationMs),
+                    reportFile == null ? "could not be written" : reportFile);
+        } catch (RuntimeException failure) {
+            LOGGER.at(Level.WARNING).withCause(failure).log("The companion import finished in %d ms but its "
+                    + "summary could not be built", durationMs);
+        }
+        return new Outcome(true, null, reportName, reportFile);
     }
 
     private static String refusal(LegacySource.Refused refused) {
@@ -207,8 +228,8 @@ public final class CompanionImporter {
 
     /**
      * Reads the written store back the way the module will: every owner file must decode into
-     * exactly the mapped records, the alias file must hold the mapped aliases, every snapshot file
-     * must exist, and a sample of snapshots must decode.
+     * exactly the mapped records, the alias file must hold the mapped aliases, and every snapshot
+     * must read back as the profile, format and generation that were mapped.
      */
     private static void verify(Path importing, CompanionFileIo io, LongSupplier clock, ImportResult result)
             throws IOException {
@@ -234,37 +255,13 @@ public final class CompanionImporter {
             throw new IOException("the written store holds " + snapshotFiles + " snapshots but "
                     + result.snapshots().size() + " were mapped");
         }
-        for (SnapshotEnvelope expected : snapshotSample(result.records(), result.snapshots())) {
+        for (SnapshotEnvelope expected : result.snapshots().values()) {
             SnapshotEnvelope read = store.readSnapshotNow(expected.profileId());
             if (read == null || read.format() != expected.format() || read.generation() != expected.generation()
                     || !read.data().keySet().equals(expected.data().keySet())) {
                 throw new IOException("the written snapshot of " + expected.profileId() + " does not read back");
             }
         }
-    }
-
-    /**
-     * At least one snapshot of every (format, location kind) pair, then evenly spread ones up to
-     * {@link #SNAPSHOT_SAMPLE_MAX}. A large world has thousands; decoding them all would only slow
-     * the start.
-     */
-    static List<SnapshotEnvelope> snapshotSample(List<CompanionRecord> records, Map<UUID, SnapshotEnvelope> snapshots) {
-        Map<UUID, SnapshotEnvelope> sample = new LinkedHashMap<>();
-        Set<String> seen = new HashSet<>();
-        Map<UUID, LocationKind> kinds = new LinkedHashMap<>();
-        records.forEach(record -> kinds.put(record.profileId(), record.location().kind()));
-        List<SnapshotEnvelope> all = new ArrayList<>(snapshots.values());
-        for (SnapshotEnvelope snapshot : all) {
-            if (seen.add(snapshot.format() + "/" + kinds.get(snapshot.profileId()))
-                    && sample.size() < SNAPSHOT_SAMPLE_MAX) {
-                sample.put(snapshot.profileId(), snapshot);
-            }
-        }
-        int step = Math.max(1, all.size() / SNAPSHOT_SAMPLE_MAX);
-        for (int i = 0; i < all.size() && sample.size() < SNAPSHOT_SAMPLE_MAX; i += step) {
-            sample.putIfAbsent(all.get(i).profileId(), all.get(i));
-        }
-        return List.copyOf(sample.values());
     }
 
     /** The {@code Import} section of {@code meta.json}. */
@@ -293,50 +290,83 @@ public final class CompanionImporter {
     }
 
     /**
-     * Makes {@code importing} the store folder. A rename of a folder to a sibling name is atomic
-     * on the file systems servers use. Where it is not, the files are moved one by one with
-     * {@code meta.json} last, under a marker that lets the next start discard a half-moved folder.
+     * Makes {@code importing} the store folder with one atomic rename; the two are siblings, so
+     * they are on one file store. Any failure fails the import with nothing in {@code root}.
      */
-    static void promote(Path importing, Path root, boolean atomic) throws IOException {
-        if (atomic) {
+    private static void promote(Path importing, Path root) throws IOException {
+        for (int attempt = 1; ; attempt++) {
             try {
                 Files.move(importing, root, StandardCopyOption.ATOMIC_MOVE);
                 return;
             } catch (AtomicMoveNotSupportedException unsupported) {
-                // Fall through to the file-by-file move.
+                throw unsupported;
+            } catch (IOException busy) {
+                if (attempt >= MOVE_ATTEMPTS) {
+                    throw busy;
+                }
+                try {
+                    Thread.sleep(MOVE_RETRY_MS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw busy;
+                }
             }
         }
-        Files.createDirectories(root);
-        Files.createFile(root.resolve(UNFINISHED_MARKER));
-        List<Path> children;
-        try (Stream<Path> listed = Files.list(importing)) {
-            children = listed.toList();
+    }
+
+    /** Forces every regular file under {@code folder} to disk, then the folders themselves. */
+    private static void forceTree(Path folder) throws IOException {
+        List<Path> paths;
+        try (Stream<Path> walk = Files.walk(folder)) {
+            paths = walk.toList();
         }
-        Path meta = CompanionStorage.metaFile(importing);
-        for (Path child : children) {
-            if (!child.equals(meta)) {
-                Files.move(child, root.resolve(child.getFileName()));
+        for (Path path : paths) {
+            if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+                force(path);
             }
         }
-        Files.move(meta, CompanionStorage.metaFile(root));
-        Files.delete(root.resolve(UNFINISHED_MARKER));
-        deleteTree(importing);
+        for (Path path : paths) {
+            if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                forceDirectory(path);
+            }
+        }
+    }
+
+    private static void force(Path file) throws IOException {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            channel.force(true);
+        }
+    }
+
+    /** Forces a folder's entries to disk where the platform can; Windows cannot open a folder this way. */
+    private static void forceDirectory(@Nullable Path folder) {
+        if (folder == null) {
+            return;
+        }
+        try (FileChannel channel = FileChannel.open(folder, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException | RuntimeException unsupported) {
+            // Best effort: the file contents are already forced.
+        }
     }
 
     /**
-     * Makes sure {@code root} is free for the import: an empty folder or one a killed non-atomic
-     * move left behind is removed. Any other content is not the importer's to delete, so it stops.
+     * Makes sure {@code root} is free for the import: an empty folder is removed. Anything else is
+     * not the importer's to delete or replace, so the import stops: a folder with files in it, or
+     * a symbolic link or junction (deleting one would detach the operator's storage).
      */
-    private static void clearUnfinished(Path root) throws IOException {
-        if (!Files.exists(root)) {
+    private static void clearEmptyRoot(Path root) throws IOException {
+        if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
             return;
+        }
+        BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class,
+                LinkOption.NOFOLLOW_LINKS);
+        if (attributes.isSymbolicLink() || attributes.isOther() || !attributes.isDirectory()) {
+            throw new IOException(root + " is a link or junction, which the importer cannot replace with the "
+                    + "imported folder. Remove the link, let the import run, then move the folder and link it again");
         }
         if (Files.exists(CompanionStorage.metaFile(root))) {
             throw new IOException(root + " already holds a companion store");
-        }
-        if (Files.exists(root.resolve(UNFINISHED_MARKER))) {
-            deleteTree(root);
-            return;
         }
         boolean empty;
         try (Stream<Path> children = Files.list(root)) {
@@ -349,25 +379,23 @@ public final class CompanionImporter {
         Files.delete(root);
     }
 
-    /** After a failure: removes the importing folder, and a store folder this run half filled. */
-    private static void cleanUp(Path importing, Path root) {
+    /** After a failure: removes the importing folder. */
+    private static void cleanUp(Path importing) {
         try {
             deleteTree(importing);
-            if (Files.exists(root.resolve(UNFINISHED_MARKER))) {
-                deleteTree(root);
-            }
         } catch (IOException | RuntimeException leftover) {
-            // The next start deletes both before it imports again; neither holds a meta.json.
+            // The next start deletes it before it imports again; it is never loaded as a store.
             LOGGER.at(Level.WARNING).withCause(leftover).log("Could not remove %s after a failed import", importing);
         }
     }
 
     @Nullable
-    private static Path writeReport(Path reportDir, long atMs, String text) {
+    private static Path writeReport(Path reportDir, String fileName, Supplier<String> text) {
         try {
-            return ImportReport.write(reportDir, atMs, text);
+            return ImportReport.write(reportDir, fileName, text.get());
         } catch (IOException | RuntimeException failure) {
-            LOGGER.at(Level.WARNING).withCause(failure).log("Could not write the import report to %s", reportDir);
+            LOGGER.at(Level.WARNING).withCause(failure).log("Could not write the import report %s to %s", fileName,
+                    reportDir);
             return null;
         }
     }

@@ -1,20 +1,15 @@
 package com.alechilles.alecstamework.companion.migrate;
 
-import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.CompanionStore;
 import com.alechilles.alecstamework.companion.store.DiskCompanionFileIo;
-import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,6 +89,8 @@ class CompanionImporterTest {
                 "{\"Format\":1,\"Owner\":\"99999999-9999-9999-9999-999999999999\",\"WorldBound\":[]}");
         Files.createDirectories(importing.resolve("snapshots"));
         Files.writeString(importing.resolve("snapshots").resolve("stale.json"), "{}");
+        // A kill after the receipt was written but before the rename: still not a store.
+        Files.writeString(CompanionStorage.metaFile(importing), "{\"Format\":1,\"CreatedBy\":\"killed\"}");
         Files.createDirectories(importing.resolve("legacy-scratch"));
         Files.writeString(importing.resolve("legacy-scratch").resolve(LegacySource.STATE_FILE), "copy");
 
@@ -119,6 +116,10 @@ class CompanionImporterTest {
         assertEquals(before, ImportFixtures.contents(data));
         assertNotNull(outcome.reportFile());
         assertTrue(Files.readString(outcome.reportFile()).contains(outcome.failure()));
+
+        // Every failed start writes the same file, so reports do not pile up.
+        CompanionImporter.run(root, List.of(data), io, () -> NOW + 60_000L, "test", reports);
+        assertEquals(List.of(outcome.reportName()), List.copyOf(ImportFixtures.contents(reports).keySet()));
     }
 
     @Test
@@ -150,50 +151,5 @@ class CompanionImporterTest {
         assertFalse(outcome.imported());
         assertEquals("{\"Format\":1}", Files.readString(existing));
         assertFalse(Files.exists(CompanionStorage.metaFile(root)));
-    }
-
-    /** Where a folder rename is not atomic the files move one by one; a kill in between must not block the next start. */
-    @Test
-    void aFileByFileMoveGivesTheSameStoreAndAHalfMovedFolderIsDiscarded() throws Exception {
-        Path clean = temp.resolve("clean").resolve("Companions");
-        Files.createDirectories(clean.getParent());
-        assertTrue(run(clean).imported());
-        Map<String, String> expected = ImportFixtures.contents(clean);
-
-        Path moved = temp.resolve("moved").resolve("Companions");
-        Files.createDirectories(moved.getParent());
-        CompanionImporter.promote(clean, moved, false);
-        assertEquals(expected, ImportFixtures.contents(moved));
-        assertFalse(Files.exists(clean));
-
-        // What a kill in the middle of that move leaves: some files, the marker, no meta.json.
-        Files.createDirectories(root.resolve("owners"));
-        Files.writeString(root.resolve("owners").resolve("half.json"), "{}");
-        Files.writeString(root.resolve(CompanionImporter.UNFINISHED_MARKER), "");
-        assertTrue(run(root).imported());
-        assertEquals(expected, ImportFixtures.contents(root));
-    }
-
-    /** A large world has thousands of snapshots; the check decodes a bounded sample that misses no kind. */
-    @Test
-    void theSnapshotSampleIsBoundedAndCoversEveryFormatAndLocationKind() {
-        List<CompanionRecord> records = new ArrayList<>();
-        Map<UUID, SnapshotEnvelope> snapshots = new LinkedHashMap<>();
-        for (int i = 0; i < 600; i++) {
-            UUID id = new UUID(7L, i);
-            // The last two are the only DEAD record and the only format 1 snapshot.
-            CompanionLocation location = i == 598 ? CompanionLocation.dead(null)
-                    : i == 599 ? CompanionLocation.live("world", 0, 0, 0) : CompanionLocation.lost(null);
-            records.add(CompanionRecord.builder(id, "Tamed_Wolf", location).build());
-            snapshots.put(id, i == 599
-                    ? new SnapshotEnvelope(id, 1, 0L, new BsonDocument())
-                    : SnapshotEnvelope.importedState(id, 0L, "{}"));
-        }
-
-        List<UUID> sampled = CompanionImporter.snapshotSample(records, snapshots).stream()
-                .map(SnapshotEnvelope::profileId).toList();
-
-        assertTrue(sampled.size() <= CompanionImporter.SNAPSHOT_SAMPLE_MAX && sampled.size() > 100, "" + sampled.size());
-        assertTrue(sampled.containsAll(List.of(new UUID(7L, 0), new UUID(7L, 598), new UUID(7L, 599))));
     }
 }
