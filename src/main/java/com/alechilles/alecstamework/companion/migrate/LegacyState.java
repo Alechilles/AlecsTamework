@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.migrate;
 
+import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
@@ -56,7 +57,8 @@ final class LegacyState {
     /**
      * One readable entity checkpoint.
      *
-     * @param entity the serialized entity, the same document a format 1 snapshot holds
+     * @param entity the serialized entity, the same document a format 1 snapshot holds; for a
+     *               dying body, with its death state removed ({@code SnapshotPatch.forRevive})
      * @param dying  whether the body had a death component when the checkpoint was taken
      */
     record Checkpoint(@Nonnull BsonDocument entity, @Nullable String worldKey, double x, double y, double z,
@@ -163,8 +165,12 @@ final class LegacyState {
                 component(components, "TameworkTraits", TameworkTraitsComponent.CODEC),
                 component(components, "TameworkLifeStage", TameworkLifeStageComponent.CODEC),
                 0f, 0f, observedAtMs);
-        return new Checkpoint(entity, string(root, "worldKey"), coordinate(root, "x"), coordinate(root, "y"),
-                coordinate(root, "z"), observedAtMs, summary, customName(name), components.containsKey("Death"));
+        // A checkpoint taken while the body was dying would only serve a revive, and its record is
+        // LIVE, so the death state is taken out the way a revive does: a recover can then use it.
+        boolean dying = SnapshotPatch.isDeathSnapshot(entity);
+        return new Checkpoint(dying ? SnapshotPatch.forRevive(entity) : entity, string(root, "worldKey"),
+                coordinate(root, "x"), coordinate(root, "y"), coordinate(root, "z"), observedAtMs, summary,
+                customName(name), dying);
     }
 
     private static CompanionSummary summary(CoopResidentStateSnapshot state) {

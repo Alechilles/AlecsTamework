@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.migrate;
 
+import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
@@ -119,6 +120,25 @@ class LegacyMapperTest {
         assertEquals("Tamed_Wolf", CompanionSnapshots.entity(snapshot).getDocument("Components")
                 .getDocument("NPC").getString("RoleName").getValue());
         assertEquals(List.of(), result.report().liveWithoutCheckpoint());
+    }
+
+    @Test
+    void aCheckpointOfADyingBodyIsMadeRestorable() {
+        UUID id = rows.profile("ACTIVE", "LIVE_ENTITY", NPC.toString(), "world-a");
+        rows.checkpoint(id, NPC, "world-a", "1.0", "2.0", "3.0", "7000", 4, "\"Death\": {\"DeathCause\": \"Fall\"},"
+                + " \"EntityStats\": {\"Stats\": {\"Health\": {\"Id\": \"Health\", \"Value\": 0.0}}},");
+
+        ImportResult result = rows.map();
+
+        assertEquals(LocationKind.LIVE, record(result, id).location().kind(), "the lifecycle row is the truth");
+        SnapshotEnvelope snapshot = result.snapshots().get(id);
+        assertEquals(RestoreRules.Verdict.ALLOWED, RestoreRules.forSnapshot(
+                record(result, id).toBuilder().location(CompanionLocation.lost(null)).build(), snapshot,
+                RestoreRules.Reason.RECOVER), "if the body is gone, a recover can use the snapshot");
+        assertTrue(CompanionSnapshots.entity(snapshot).getDocument("Components").getDocument("EntityStats")
+                .getDocument("Stats").getDocument("Health").getNumber("Value").doubleValue() > 0.0);
+        assertEquals(4, record(result, id).summary().level());
+        assertEquals(List.of(id), result.report().checkpointsOfDyingBodies());
     }
 
     @Test
@@ -500,7 +520,14 @@ class LegacyMapperTest {
         /** A checkpoint as the old runtime wrote it: numbers as strings, the body as extended JSON. */
         void checkpoint(UUID profileId, UUID alias, String worldKey, String x, String y, String z,
                         String capturedAtMs, int level) {
-            String holder = "{\\\"Components\\\": {\\\"NPC\\\": {\\\"RoleName\\\": \\\"Tamed_Wolf\\\"},"
+            checkpoint(profileId, alias, worldKey, x, y, z, capturedAtMs, level, "");
+        }
+
+        /** {@code extraComponents} is extended JSON placed first inside {@code Components}, ending with a comma. */
+        void checkpoint(UUID profileId, UUID alias, String worldKey, String x, String y, String z,
+                        String capturedAtMs, int level, String extraComponents) {
+            String holder = "{\\\"Components\\\": {" + extraComponents.replace("\"", "\\\"")
+                    + "\\\"NPC\\\": {\\\"RoleName\\\": \\\"Tamed_Wolf\\\"},"
                     + " \\\"TameworkNpcName\\\": {\\\"Name\\\": \\\"Rex\\\"},"
                     + " \\\"TameworkLeveling\\\": {\\\"ConfigId\\\": \\\"Leveling_A\\\", \\\"Level\\\": " + level + "}}}";
             checkpoints.add(new LegacyRows.EntityCheckpoint(profileId.toString(), "alias:" + alias,

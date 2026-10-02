@@ -70,7 +70,8 @@ public record ImportResult(
      * @param withoutState            records other than LIVE whose old rows held no readable
      *                                state; they come back from their role at level 1
      * @param checkpointsOfDyingBodies LIVE records whose checkpoint was taken as the body died;
-     *                                their snapshot can only serve a revive, so a recover is refused
+     *                                the death state was removed from their snapshot so that a
+     *                                recover can use it if the body is gone
      */
     public record Report(
             @Nonnull Map<LocationKind, Integer> recordsByLocation,
