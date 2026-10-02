@@ -31,6 +31,17 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug persistence [status|health|detail|export]`
 - `/tw debug persistence reviveready`
+- `/tw bonded grant <self|player|UUID> <rosterId> <roleId> [name]`
+
+`/tw bonded grant` gives an online player one stored bonded companion for
+testing and support, for example
+`/tw bonded grant Alec hydragon:dragon_horn Tamed_RockDrakeT1 Boulder`. The
+role must be an allowed role of exactly one family of that bonded roster, and
+the family's `MaximumOwned` and the general owned companion limits still apply.
+The grant does not need the family's `Provision` feature, which only controls
+integrations. Each use creates a new companion. It has no body until its first
+summon, which spawns it from the role. Without a name the companion shows its
+role's name. The command works from the console and needs the `/tw` permission.
 
 The life-stage setter updates juvenile growth timing, role, and scale together.
 `baby` and `adolescent` require an enabled offspring lifecycle. `prime` requires

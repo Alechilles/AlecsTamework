@@ -90,11 +90,15 @@ public final class IndexBondedCompanionApi
     static final String NOT_OWNER = "bonded-transition-not_owner";
     static final String INVALID_STATE = "bonded-transition-invalid_state";
     static final String REVISION_CONFLICT = "bonded-transition-revision_conflict";
-    static final String ROLE_NOT_ALLOWED = "bonded-transition-role_not_allowed";
+    public static final String ROLE_NOT_ALLOWED = "bonded-transition-role_not_allowed";
     static final String FEATURE_DISABLED = "bonded-transition-feature_disabled";
     static final String COOLDOWN_ACTIVE = "bonded-transition-cooldown_active";
     static final String ACTIVE_CAPACITY = "bonded-transition-active_capacity_reached";
-    static final String OWNED_CAPACITY = "bonded-transition-owned_capacity_reached";
+    public static final String OWNED_CAPACITY = "bonded-transition-owned_capacity_reached";
+    /** Only {@link #grantByAdmin} reports this; {@link #provision} reports a full family as {@link #OWNED_CAPACITY}. */
+    public static final String FAMILY_CAPACITY = "bonded-transition-family_capacity_reached";
+    /** Origin key prefix of a companion an operator granted; the origin namespace is Tamework's own. */
+    static final String ADMIN_GRANT_KEY_PREFIX = "admin-grant:";
     static final String POLICY_DENIED = "bonded-policy-denied";
     static final String PLACEMENT_REQUIRED = "bonded-placement-context-required";
     static final String PLACEMENT_UNAVAILABLE = "bonded-projection-placement-unavailable";
@@ -316,80 +320,101 @@ public final class IndexBondedCompanionApi
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> provision(
             @Nonnull BondedCompanionProvisionRequest request) {
         Objects.requireNonNull(request, "request");
-        return guarded(() -> {
-            if (!BondedRecords.publicNamespace(request.callerNamespace())) {
+        return guarded(() -> BondedRecords.publicNamespace(request.callerNamespace())
+                ? provision(request, false)
+                : done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID)));
+    }
+
+    /**
+     * {@link #provision} for an operator command: one new companion per call, with an origin in
+     * Tamework's own namespace that marks it as an admin grant. The role must belong to one family
+     * of the roster and both owned limits apply, as for any provision; a full family is reported
+     * as {@link #FAMILY_CAPACITY} and a full built-in cap as {@link #OWNED_CAPACITY}. Unlike a
+     * public provision it does not need the family's {@code Provision} feature, which only says
+     * whether integrations may provision. With no display name the companion has none.
+     */
+    @Nonnull
+    public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> grantByAdmin(
+            @Nonnull UUID ownerUuid, @Nonnull String rosterId, @Nonnull String roleId,
+            @Nullable String displayName) {
+        BondedCompanionProvisionRequest request = new BondedCompanionProvisionRequest(
+                ExtensionEntries.TAMEWORK_NAMESPACE, ADMIN_GRANT_KEY_PREFIX + UUID.randomUUID(),
+                ownerUuid, rosterId, roleId, displayName, null, null, Map.of());
+        return guarded(() -> provision(request, true));
+    }
+
+    private CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> provision(
+            BondedCompanionProvisionRequest request, boolean adminGrant) {
+        BondedCompanionPolicy family = families.resolve(request.rosterId(), request.roleId());
+        if (family == null || request.familyId() != null && !request.familyId().equals(family.familyId())) {
+            return done(failure(BondedCompanionResultCode.POLICY_DENIED, ROLE_NOT_ALLOWED));
+        }
+        if (!adminGrant && !family.features().provision()) {
+            return done(failure(BondedCompanionResultCode.POLICY_DENIED, FEATURE_DISABLED));
+        }
+        CompanionRecord fresh = CompanionRecord.builder(UUID.randomUUID(), request.roleId(),
+                        CompanionLocation.stored(StoredReason.PROVISIONED))
+                .ownerUuid(request.ownerUuid())
+                .displayName(request.displayName() != null ? request.displayName() : request.species())
+                .bonded(true)
+                .rosterId(request.rosterId())
+                .origin(request.callerNamespace(), request.idempotencyKey())
+                .build();
+        Object outcome = index.atomically(() -> {
+            CompanionRecord existing = index.byOrigin(request.callerNamespace(), request.idempotencyKey());
+            if (existing != null && existing.countsAsOwned()) {
+                return existing;
+            }
+            // The tombstone of an abandoned or released companion still holds the origin. It
+            // gives it up here, so the same request provisions a new companion.
+            if (existing != null && !index.update(existing.profileId(), existing.revision(),
+                    b -> b.origin(null, null)).applied()) {
+                return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+            }
+            if (BondedAdmission.check(index.fileRecords(request.ownerUuid()), null, fresh, families)
+                    == BondedAdmission.Refusal.OWNED_CAPACITY) {
+                return failure(BondedCompanionResultCode.POLICY_DENIED,
+                        adminGrant ? FAMILY_CAPACITY : OWNED_CAPACITY);
+            }
+            CompanionAdmissionGate.Check caps = builtInCaps;
+            CompanionAdmissionGate.Denial denied = caps == null ? null
+                    : caps.deny(null, fresh, CompanionAdmission.Provided.none());
+            if (denied != null) {
+                return failure(BondedCompanionResultCode.POLICY_DENIED,
+                        denied.refusal() == CompanionAdmission.Refusal.OWNED
+                                || denied.refusal() == CompanionAdmission.Refusal.GROUP_OWNED
+                                ? OWNED_CAPACITY : POLICY_DENIED);
+            }
+            CompanionIndex.Mutation inserted = index.insert(fresh);
+            return inserted.applied() ? new Provisioned(inserted.after())
+                    : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
+        });
+        if (outcome instanceof CompanionRecord existing) {
+            if (!request.ownerUuid().equals(existing.ownerUuid())
+                    || !request.rosterId().equals(existing.rosterId())) {
+                // The same key was used for another owner or roster: not this request's companion.
                 return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
             }
-            BondedCompanionPolicy family = families.resolve(request.rosterId(), request.roleId());
-            if (family == null || request.familyId() != null && !request.familyId().equals(family.familyId())) {
-                return done(failure(BondedCompanionResultCode.POLICY_DENIED, ROLE_NOT_ALLOWED));
+            // The first request's owner file may still be unwritten, so this caller waits for a flush too.
+            return flush.apply(request.ownerUuid()).handle((ignored, failure) -> failure == null
+                    ? viewResult(existing.profileId())
+                    : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED));
+        }
+        if (!(outcome instanceof Provisioned provisioned)) {
+            @SuppressWarnings("unchecked")
+            BondedCompanionResult<BondedCompanionProfileView> refused =
+                    (BondedCompanionResult<BondedCompanionProfileView>) outcome;
+            return done(refused);
+        }
+        CompanionRecord inserted = provisioned.record();
+        return flush.apply(request.ownerUuid()).handle((ignored, failure) -> {
+            if (failure == null) {
+                return viewResult(inserted.profileId());
             }
-            if (!family.features().provision()) {
-                return done(failure(BondedCompanionResultCode.POLICY_DENIED, FEATURE_DISABLED));
-            }
-            CompanionRecord fresh = CompanionRecord.builder(UUID.randomUUID(), request.roleId(),
-                            CompanionLocation.stored(StoredReason.PROVISIONED))
-                    .ownerUuid(request.ownerUuid())
-                    .displayName(request.displayName() != null ? request.displayName() : request.species())
-                    .bonded(true)
-                    .rosterId(request.rosterId())
-                    .origin(request.callerNamespace(), request.idempotencyKey())
-                    .build();
-            Object outcome = index.atomically(() -> {
-                CompanionRecord existing = index.byOrigin(request.callerNamespace(), request.idempotencyKey());
-                if (existing != null && existing.countsAsOwned()) {
-                    return existing;
-                }
-                // The tombstone of an abandoned or released companion still holds the origin. It
-                // gives it up here, so the same request provisions a new companion.
-                if (existing != null && !index.update(existing.profileId(), existing.revision(),
-                        b -> b.origin(null, null)).applied()) {
-                    return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
-                }
-                if (BondedAdmission.check(index.fileRecords(request.ownerUuid()), null, fresh, families)
-                        == BondedAdmission.Refusal.OWNED_CAPACITY) {
-                    return failure(BondedCompanionResultCode.POLICY_DENIED, OWNED_CAPACITY);
-                }
-                CompanionAdmissionGate.Check caps = builtInCaps;
-                CompanionAdmissionGate.Denial denied = caps == null ? null
-                        : caps.deny(null, fresh, CompanionAdmission.Provided.none());
-                if (denied != null) {
-                    return failure(BondedCompanionResultCode.POLICY_DENIED,
-                            denied.refusal() == CompanionAdmission.Refusal.OWNED
-                                    || denied.refusal() == CompanionAdmission.Refusal.GROUP_OWNED
-                                    ? OWNED_CAPACITY : POLICY_DENIED);
-                }
-                CompanionIndex.Mutation inserted = index.insert(fresh);
-                return inserted.applied() ? new Provisioned(inserted.after())
-                        : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
-            });
-            if (outcome instanceof CompanionRecord existing) {
-                if (!request.ownerUuid().equals(existing.ownerUuid())
-                        || !request.rosterId().equals(existing.rosterId())) {
-                    // The same key was used for another owner or roster: not this request's companion.
-                    return done(failure(BondedCompanionResultCode.VALIDATION_FAILED, REQUEST_INVALID));
-                }
-                // The first request's owner file may still be unwritten, so this caller waits for a flush too.
-                return flush.apply(request.ownerUuid()).handle((ignored, failure) -> failure == null
-                        ? viewResult(existing.profileId())
-                        : failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED));
-            }
-            if (!(outcome instanceof Provisioned provisioned)) {
-                @SuppressWarnings("unchecked")
-                BondedCompanionResult<BondedCompanionProfileView> refused =
-                        (BondedCompanionResult<BondedCompanionProfileView>) outcome;
-                return done(refused);
-            }
-            CompanionRecord inserted = provisioned.record();
-            return flush.apply(request.ownerUuid()).handle((ignored, failure) -> {
-                if (failure == null) {
-                    return viewResult(inserted.profileId());
-                }
-                LOGGER.at(Level.WARNING).withCause(failure).log(
-                        "Provisioned bonded companion %s was not written; it is withdrawn", inserted.profileId());
-                withdraw(inserted);
-                return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
-            });
+            LOGGER.at(Level.WARNING).withCause(failure).log(
+                    "Provisioned bonded companion %s was not written; it is withdrawn", inserted.profileId());
+            withdraw(inserted);
+            return failure(BondedCompanionResultCode.INTERNAL_FAILURE, OPERATION_FAILED);
         });
     }
 
@@ -829,6 +854,10 @@ public final class IndexBondedCompanionApi
         LinkedHashMap<String, String> data = new LinkedHashMap<>();
         if (summary.roleId() != null && !summary.roleId().isBlank()) {
             data.put("roleId", summary.roleId());
+        }
+        // A captured companion has no stored name; the panel names it by its role name key.
+        if (summary.nameKey() != null && !summary.nameKey().isBlank()) {
+            data.put(BondedCompanionNames.NAME_KEY, summary.nameKey());
         }
         if (summary.levelingConfigId() != null) {
             data.put("levelingConfigId", summary.levelingConfigId());

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -121,6 +122,30 @@ class BondedCompanionPanelFeatureBinderTest {
         assertTrue(feature.managesPaidRevival());
         assertTrue(LinkedNpcPanelFeatureBinder.paidReviveVisible(feature));
         assertTrue(feature.managesRosterRow());
+    }
+
+    /** A generic roster card hides Summon until it can be used, and binds it only then. */
+    @Test
+    void genericRosterSummonButtonShowsOnlyWhileSummonIsPossible() {
+        UUID npcUuid = UUID.randomUUID();
+        for (boolean cooling : new boolean[] {true, false}) {
+            CommandRosterStatusPresentation stored = new CommandRosterStatusPresentation(
+                    "profile", "test:horn", CommandTimedSummoningState.ROSTER_STORED, 1L, null,
+                    60_000L, false, cooling ? 30_000L : 0L, 0, 0, null, null);
+            UICommandBuilder commands = new UICommandBuilder();
+            UIEventBuilder events = new UIEventBuilder();
+
+            LinkedNpcPanelFeatureBinder.bind(commands, events, "#Card", npcUuid,
+                    new CommandPanelFeaturePresentation(stored, null), bindingConfig(), "en-US");
+
+            String expected = Boolean.toString(!cooling);
+            assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                            "#Card #RosterSummonButton.Visible".equals(command.selector)
+                                    && command.data.contains(expected)),
+                    "cooling=" + cooling);
+            assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(event ->
+                    event.data.contains("summon:" + npcUuid)) == !cooling, "cooling=" + cooling);
+        }
     }
 
     private static LinkedNpcPanelCardBinder.CardBindingConfig bindingConfig() {

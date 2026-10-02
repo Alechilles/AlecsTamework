@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
@@ -155,10 +156,11 @@ final class BondedCompanionCardPresenter {
             ProgressionSummary progression,
             @Nullable String language
     ) {
-        commands.set(entrySelector + " #BondedName.Text", displayName(row, language));
-        commands.set(entrySelector + " #BondedName.TooltipText", displayName(row, language));
+        String name = displayName(row, language);
+        commands.set(entrySelector + " #BondedName.Text", name);
+        commands.set(entrySelector + " #BondedName.TooltipText", name);
         commands.set(entrySelector + " #BondedSpecies.Text",
-                identityLine(row));
+                identityLine(row, language));
         String levelLabel = progression.visible() ? LocalizedText.format(language,
                 "tamework.ui.linkedPanel.bonded.talents.level", progression.level())
                 : LocalizedText.resolve(language, "tamework.ui.roster.talents");
@@ -436,8 +438,8 @@ final class BondedCompanionCardPresenter {
         BondedCompanionStatusPresentation status = row.status();
         String label = actionLabel(status.action(), language);
         String tooltip = actionTooltip(row, status, language);
-        boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
-        boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
+        boolean visible = primaryActionVisible(status);
+        boolean enabled = visible && primaryActionClickable(row) && !pendingUnlink;
         boolean tooltipVisible = !tooltip.isBlank();
         commands.set(entrySelector + " #BondedPrimaryAction.Visible",
                 enabled && tooltipVisible);
@@ -487,8 +489,8 @@ final class BondedCompanionCardPresenter {
     ) {
         BondedCompanionStatusPresentation status = row.status();
         String tooltip = actionTooltip(row, status, language);
-        boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
-        boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
+        boolean enabled = primaryActionVisible(status) && primaryActionClickable(row)
+                && !pendingUnlink;
         boolean tooltipVisible = !tooltip.isBlank();
         if (!enabled) {
             return;
@@ -506,6 +508,40 @@ final class BondedCompanionCardPresenter {
                     entrySelector + actionSelector,
                     EventData.of(config.eventCommandId(), command), false);
         }
+    }
+
+    /** Summon is shown only while it can be used; the state line says why it cannot. */
+    private static boolean primaryActionVisible(BondedCompanionStatusPresentation status) {
+        return switch (status.action()) {
+            case NONE -> false;
+            case SUMMON -> status.actionEnabled();
+            case DISMISS, REVIVE -> true;
+        };
+    }
+
+    /**
+     * Whether the primary button takes a click. Revive opens the cost page, which blocks its own
+     * Confirm, so it stays clickable when the only thing missing is the cost items. A revive
+     * blocked for another reason (cooldown, a full family, a stale snapshot) stays disabled:
+     * the cost page could not explain it.
+     */
+    private static boolean primaryActionClickable(BondedCompanionPanelPresentation row) {
+        BondedCompanionStatusPresentation status = row.status();
+        if (status.actionEnabled()) {
+            return true;
+        }
+        BondedCompanionReviveQuote quote = row.reviveQuote();
+        return status.action() == BondedCompanionStatusPresentation.Action.REVIVE
+                && status.blockReason() == BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE
+                && quote != null && quote.enabled() && quote.cooldownRemainingSeconds() == 0L
+                && !quote.affordable() && !activeCapacityReached(row.attributes());
+    }
+
+    private static boolean activeCapacityReached(Map<String, String> attributes) {
+        int limit = positiveRoundedInt(attributes.get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT), 0);
+        return limit > 0 && nonNegativeInt(attributes.get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT)) >= limit;
     }
 
     private static void bindFlightToggle(
@@ -593,6 +629,17 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         if (status.action() == BondedCompanionStatusPresentation.Action.REVIVE) {
+            // A revived companion comes back active, so a full family blocks it; say so
+            // instead of listing a price the player could pay without getting a revive.
+            if (!status.actionEnabled() && status.cooldownRemainingMs() == 0L
+                    && row.reviveQuote() != null
+                    && row.reviveQuote().cooldownRemainingSeconds() == 0L
+                    && activeCapacityReached(row.attributes())) {
+                String capacity = capacityTooltip(row, language);
+                if (!capacity.isEmpty()) {
+                    return capacity;
+                }
+            }
             return reviveTooltip(row.reviveQuote(), status.action(), language);
         }
         if (status.actionEnabled()) {
@@ -721,18 +768,21 @@ final class BondedCompanionCardPresenter {
     }
 
     private static String displayName(BondedCompanionPanelPresentation row, @Nullable String language) {
-        if (row.displayName() != null) {
-            return row.displayName();
-        }
+        return BondedCompanionNames.displayName(row.displayName(), row.species(),
+                row.attributes().get(BondedCompanionNames.NAME_KEY), row.roleId(), language);
+    }
+
+    /** The species under the name. A companion named by its role shows that text once, as the name. */
+    private static String identityLine(BondedCompanionPanelPresentation row, @Nullable String language) {
         if (row.species() != null) {
             return row.species();
         }
-        return LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.subtitle.defaultNpcName");
-    }
-
-    private static String identityLine(BondedCompanionPanelPresentation row) {
-        return row.species() == null ? "" : row.species();
+        if (row.displayName() == null) {
+            return "";
+        }
+        String label = BondedCompanionNames.speciesLabel(null,
+                row.attributes().get(BondedCompanionNames.NAME_KEY), row.roleId(), language);
+        return label == null ? "" : label;
     }
 
     private static String progressionTooltip(

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
@@ -77,7 +78,9 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         snapshot = withLivePresentation(player, store, snapshot);
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(
                 snapshot.records().size());
-        for (var record : snapshot.records()) entries.add(entry(record));
+        String language = player.getPlayerRef() == null
+                ? null : player.getPlayerRef().getLanguage();
+        for (var record : snapshot.records()) entries.add(entry(record, language));
         return new CommandPanelEntrySourceService.CommandPanelSnapshot(
                 List.copyOf(entries), presentations.snapshot(
                         player.getUuid(), worldKey, snapshot,
@@ -91,15 +94,19 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             @Nonnull UUID ownerUuid, @Nullable String worldKey,
             @Nonnull BondedCompanionPanelRecordSource.PanelSnapshot snapshot) {
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(snapshot.records().size());
-        for (var record : snapshot.records()) entries.add(entry(record));
+        // No viewer is known here, so role names resolve in the default language. The bonded
+        // card itself names the companion in the viewer's language.
+        for (var record : snapshot.records()) entries.add(entry(record, null));
         return new CommandPanelEntrySourceService.CommandPanelSnapshot(
                 List.copyOf(entries),
                 presentations.snapshot(ownerUuid, worldKey, snapshot),
                 emptyStateKey(snapshot));
     }
 
-    private LinkedNpcEntry entry(BondedCompanionPanelRecordSource.PanelRecord record) {
+    private LinkedNpcEntry entry(BondedCompanionPanelRecordSource.PanelRecord record,
+                                 @Nullable String language) {
         var profile = record.profile();
+        String nameKey = profile.snapshotPresentationData().get(BondedCompanionNames.NAME_KEY);
         int maxHealth = healthValue(profile.snapshotPresentationData(), "maxHealth", 100);
         int currentHealth = healthValue(profile.snapshotPresentationData(), "currentHealth", -1);
         if (currentHealth < 0) currentHealth = percentValue(
@@ -112,14 +119,16 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                 profile.snapshotPresentationData().get("thirst"), 100);
         boolean dead = profile.state() == BondedCompanionStateView.DEAD;
         return new LinkedNpcEntry(
-                record.presentationUuid(), fallback(profile.displayName(), profile.species()),
+                record.presentationUuid(), BondedCompanionNames.displayName(
+                        profile.displayName(), profile.species(), nameKey, profile.roleId(), language),
                 profile.gender(), currentHealth, maxHealth, happiness, 100,
                 happiness, "", hunger, 100, thirst, 100,
                 !dead && maxHealth > 0, false, dead, false, false, false,
                 0L, null, null, null, new LinkedNpcTraitIndicator[0],
                 false, false, false, false,
                 false, profile.state() == BondedCompanionStateView.ACTIVE,
-                null, profile.species(), null, null, null,
+                null, BondedCompanionNames.speciesLabel(
+                        profile.species(), nameKey, profile.roleId(), language), null, null, null,
                 false, false, false, 0L, 0D, false,
                 false, 0L, 0D, false, false, 0L);
     }
@@ -334,12 +343,6 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             return (int) Math.round(Math.max(0D, Math.min(100D, normalized))
                     * Math.max(1, scale) / 100D);
         } catch (RuntimeException ignored) { return 0; }
-    }
-
-    private static String fallback(String primary, String secondary) {
-        if (primary != null && !primary.isBlank()) return primary;
-        if (secondary != null && !secondary.isBlank()) return secondary;
-        return "Bonded Companion";
     }
 
     void evictOwner(@Nullable UUID ownerUuid) {

@@ -74,7 +74,7 @@ public final class CompanionTransitions {
                 || !body.world().equals(at.world())
                 || !body.npcUuid().equals(record.currentNpcUuid())
                 || body.roleId() != null && !body.roleId().equals(record.roleId())
-                || !Objects.equals(body.displayName(), record.displayName())
+                || body.displayName() != null && !body.displayName().equals(record.displayName())
                 || !sameTools(record.toolIds(), body.toolIds())
                 || Math.abs(at.x() - body.x()) > MOVE_THRESHOLD
                 || Math.abs(at.y() - body.y()) > MOVE_THRESHOLD
@@ -84,10 +84,14 @@ public final class CompanionTransitions {
     @Nonnull
     public static UnaryOperator<CompanionRecord.Builder> seenAt(@Nonnull BodyFacts body) {
         // The body is the authority for its role, name and tool links (they change on growth,
-        // rename and linking). An unknown role (parked body) keeps the record's role.
+        // rename and linking). An unknown role (parked body) keeps the record's role. A body
+        // with no name component keeps the record's name: a provisioned companion is named in
+        // its record only, and its first summon must not erase that.
         return b -> {
-            b.location(live(body)).currentNpcUuid(body.npcUuid())
-                    .displayName(body.displayName()).toolIds(body.toolIds());
+            b.location(live(body)).currentNpcUuid(body.npcUuid()).toolIds(body.toolIds());
+            if (body.displayName() != null) {
+                b.displayName(body.displayName());
+            }
             if (body.roleId() != null) {
                 b.roleId(body.roleId());
             }

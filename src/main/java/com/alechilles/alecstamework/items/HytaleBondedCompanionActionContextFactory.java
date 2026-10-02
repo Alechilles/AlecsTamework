@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  * Freezes the panel placement of a bonded action and gives it the player's inventory to pay from
  * (plan 6 R19: charge, then refund on failure; no escrow). Call on the player's world thread.
  */
-final class HytaleBondedCompanionActionContextFactory {
+class HytaleBondedCompanionActionContextFactory {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final ThrottledWarnings WARNINGS = new ThrottledWarnings(System::currentTimeMillis, 60_000L);
     private static final double DEFAULT_DISTANCE = 5D;

@@ -55,7 +55,8 @@ final class LinkedNpcPanelFeatureBinder {
             return;
         }
         CommandRosterStatusPresentation roster = row.roster();
-        builder.set(summonSelector + ".Visible", roster.summonVisible());
+        // Summon shows only when it can be used; the status and capacity lines say why it cannot.
+        builder.set(summonSelector + ".Visible", roster.summonEnabled());
         builder.set(dismissSelector + ".Visible", roster.dismissVisible());
         // The caption and bold line match the status text of generic cards (#InlineLocation). The
         // styles and anchors are set here so bonded rows keep the defaults of the shared labels.
@@ -128,7 +129,7 @@ final class LinkedNpcPanelFeatureBinder {
                 == BondedCompanionStatusPresentation.Action.SUMMON;
         boolean dismiss = status.action()
                 == BondedCompanionStatusPresentation.Action.DISMISS;
-        builder.set(summonSelector + ".Visible", summon);
+        builder.set(summonSelector + ".Visible", summon && status.actionEnabled());
         builder.set(dismissSelector + ".Visible", dismiss);
         if (summon && status.actionEnabled()) {
             events.addEventBinding(CustomUIEventBindingType.Activating,

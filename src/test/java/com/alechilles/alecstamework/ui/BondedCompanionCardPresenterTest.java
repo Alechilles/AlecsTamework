@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.awt.image.BufferedImage;
@@ -196,9 +198,10 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedStateDetailValue.Text", "1m");
     }
 
+    /** Summon is hidden, not shown disabled, until a summon is possible. */
     @Test
-    void disabledSummonHidesGenericCardTextAndExplainsCapacityOnHover() {
-        BondedCompanionPanelPresentation row = presentation(
+    void summonIsHiddenWhileTheFamilyIsFullOrOnCooldownAndTheCooldownBarStays() {
+        BondedCompanionPanelPresentation full = presentation(
                 new BondedCompanionStatusPresentation(
                         BondedCompanionStateView.STORED,
                         BondedCompanionStatusPresentation.Action.SUMMON,
@@ -209,16 +212,117 @@ class BondedCompanionCardPresenterTest {
                         "bonded.activeCapacity.limit", "1",
                         "bonded.activeCapacity.label", "Full Dragons"
                 ), null);
+        BondedCompanionPanelPresentation cooling = presentation(
+                new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.SUMMON,
+                        false, BondedCompanionActionBlockReason.COOLDOWN_ACTIVE,
+                        null, 40_000L),
+                Map.of("cooldownDurationMs", "80000"), null);
+
+        for (BondedCompanionPanelPresentation row : List.of(full, cooling)) {
+            UICommandBuilder commands = new UICommandBuilder();
+            UIEventBuilder events = new UIEventBuilder();
+            UUID cardUuid = UUID.randomUUID();
+            BondedCompanionCardPresenter.bind(commands, events,
+                    "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+
+            for (String button : List.of("#BondedPrimaryAction", "#BondedPrimaryActionNoTooltip",
+                    "#BondedPrimaryActionDisabled", "#BondedPrimaryActionDisabledNoTooltip",
+                    "#BondedActionContent")) {
+                assertCommand(commands, "#Card " + button + ".Visible", "false");
+            }
+            assertFalse(java.util.Arrays.stream(events.getEvents())
+                    .anyMatch(event -> event.data.contains("summon:" + cardUuid)));
+        }
         UICommandBuilder commands = new UICommandBuilder();
-
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+                "#Card", UUID.randomUUID(), cooling, false, bindingConfig(), "en-US");
+        assertCommand(commands, "#Card #BondedSessionFrame.Visible", "true");
+        assertCommand(commands, "#Card #BondedSessionFill.Visible", "true");
+    }
 
-        assertCommand(commands, "#Card #BondedStateDetail.Text", "\"\"");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",
-                "Max Nordic Drakes already summoned (1/1)");
+    /** The cost page shows what is missing, so Revive opens it even when the player cannot pay. */
+    @Test
+    void reviveStaysClickableWhenOnlyTheCostItemsAreMissing() {
+        BondedCompanionPanelPresentation row = presentation(
+                new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.DEAD,
+                        BondedCompanionStatusPresentation.Action.REVIVE,
+                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE,
+                        null, 0L), Map.of(), new BondedCompanionReviveQuote(
+                        "profile-7", true, List.of(
+                        new BondedCompanionReviveQuote.CostLine(
+                                "Ingredient_Life_Essence", 2, 1)), 0L, 4L));
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        UUID cardUuid = UUID.randomUUID();
+
+        BondedCompanionCardPresenter.bind(commands, events,
+                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "true");
+        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "false");
+        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(event ->
+                        "#Card #BondedPrimaryAction".equals(event.selector)
+                                && event.data.contains("respawn:" + cardUuid)),
+                "Revive must open the cost page.");
+    }
+
+    /** A full family blocks a revive too; the cost page could not explain that. */
+    @Test
+    void reviveBlockedByAFullFamilyStaysDisabledAndSaysWhy() {
+        BondedCompanionPanelPresentation row = presentation(
+                new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.DEAD,
+                        BondedCompanionStatusPresentation.Action.REVIVE,
+                        false, BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE,
+                        null, 0L),
+                Map.of(
+                        "bonded.activeCapacity.count", "1",
+                        "bonded.activeCapacity.limit", "1",
+                        "bonded.activeCapacity.label", "Full Dragons"
+                ), new BondedCompanionReviveQuote(
+                        "profile-7", true, List.of(
+                        new BondedCompanionReviveQuote.CostLine(
+                                "Ingredient_Life_Essence", 2, 1)), 0L, 4L));
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        UUID cardUuid = UUID.randomUUID();
+
+        BondedCompanionCardPresenter.bind(commands, events,
+                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabledNoTooltip.Visible", "false");
+        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText", "(1/1)");
+        assertFalse(java.util.Arrays.stream(events.getEvents())
+                .anyMatch(event -> event.data.contains("respawn:" + cardUuid)));
+    }
+
+    /** A captured companion has no stored name or species; its role name key names it. */
+    @Test
+    void anUnnamedCompanionIsTitledByItsRoleNameInTheViewersLanguage() {
+        // Any key the language files hold stands in for another mod's role name key.
+        String nameKey = "tamework.ui.shared.item";
+        for (String language : List.of("en-US", "de-DE")) {
+            String roleName = LocalizedText.resolve(language, nameKey);
+            BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
+                    "profile-7", "hydragon:dragons", "Tamed_RockDrakeT1", 4L,
+                    null, null, null, null,
+                    Map.of(BondedCompanionNames.NAME_KEY, nameKey), Map.of(),
+                    new BondedCompanionStatusPresentation(
+                            BondedCompanionStateView.STORED,
+                            BondedCompanionStatusPresentation.Action.SUMMON,
+                            true, null, 0L), null);
+            UICommandBuilder commands = new UICommandBuilder();
+
+            BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                    "#Card", UUID.randomUUID(), row, false, bindingConfig(), language);
+
+            assertFalse(roleName.equals(nameKey));
+            assertCommand(commands, "#Card #BondedName.Text", roleName);
+        }
     }
 
     @Test

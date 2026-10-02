@@ -51,6 +51,21 @@ class CompanionTransitionsTest {
         assertTrue(CompanionTransitions.needsRefresh(record, body("other", 10)));
     }
 
+    /** A provisioned companion is named in its record only; its body has no name component. */
+    @Test
+    void aBodyWithoutANameKeepsTheStoredNameAndARenameReplacesIt() {
+        CompanionRecord record = CompanionTransitions.newLive(PROFILE, 0, body("default", 10));
+        CompanionTransitions.BodyFacts unnamed = new CompanionTransitions.BodyFacts(NPC, OWNER, "Alec",
+                "Tamed_Sheep", null, "default", 10, 64, 5, List.of("tool-1"), CompanionSummary.EMPTY);
+        CompanionTransitions.BodyFacts renamed = new CompanionTransitions.BodyFacts(NPC, OWNER, "Alec",
+                "Tamed_Sheep", "Fluffy", "default", 10, 64, 5, List.of("tool-1"), CompanionSummary.EMPTY);
+
+        assertFalse(CompanionTransitions.needsRefresh(record, unnamed));
+        assertEquals("Wooly", apply(record, CompanionTransitions.seenAt(unnamed)).displayName());
+        assertTrue(CompanionTransitions.needsRefresh(record, renamed));
+        assertEquals("Fluffy", apply(record, CompanionTransitions.seenAt(renamed)).displayName());
+    }
+
     @Test
     void deathRaisesTheGenerationSoTheDyingBodyIsFencedWhenItReloads() {
         CompanionRecord live = CompanionTransitions.newLive(PROFILE, 3, body("default", 10));

@@ -593,6 +593,51 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
+    void everyAdminGrantMakesOneNewStoredCompanionEvenWhereIntegrationsMayNotProvision() {
+        policy = dragons(0, new BondedCompanionPolicy.FeatureFlags(true, false, true, true, true));
+
+        BondedCompanionResult<BondedCompanionProfileView> first = api.grantByAdmin(owner, ROSTER, DRAGON, null).join();
+        BondedCompanionResult<BondedCompanionProfileView> second =
+                api.grantByAdmin(owner, ROSTER, DRAGON, "Ember").join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, first.code());
+        assertEquals(BondedCompanionResultCode.SUCCESS, second.code());
+        assertEquals(2, index.fileRecords(owner).size());
+        CompanionRecord unnamed = index.get(UUID.fromString(first.value().profileId()));
+        assertEquals(owner, unnamed.ownerUuid());
+        assertEquals(DRAGON, unnamed.roleId());
+        assertEquals(ROSTER, unnamed.rosterId());
+        assertTrue(unnamed.bonded());
+        assertEquals(LocationKind.STORED, unnamed.location().kind());
+        assertEquals(StoredReason.PROVISIONED, unnamed.location().reason());
+        assertNull(unnamed.displayName(), "no stored name, so the panel shows the role's translated name");
+        assertEquals("Ember", index.get(UUID.fromString(second.value().profileId())).displayName());
+    }
+
+    @Test
+    void anAdminGrantOfARoleOutsideTheRosterFamiliesIsRefusedAndAddsNothing() {
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, IndexBondedCompanionApi.ROLE_NOT_ALLOWED,
+                api.grantByAdmin(owner, ROSTER, "Tamed_Sheep", null).join());
+        assertTrue(index.fileRecords(owner).isEmpty());
+    }
+
+    @Test
+    void anAdminGrantAtAnOwnedLimitIsRefusedWithTheLimitThatStoppedItAndAddsNothing() {
+        policy = dragons(1, ALL);
+        stored();
+
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, IndexBondedCompanionApi.FAMILY_CAPACITY,
+                api.grantByAdmin(owner, ROSTER, DRAGON, null).join());
+
+        policy = dragons(0, ALL);
+        api.useBuiltInCaps((before, after, provided) ->
+                CompanionAdmissionGate.Denial.of(CompanionAdmission.Refusal.OWNED));
+        assertRefused(BondedCompanionResultCode.POLICY_DENIED, IndexBondedCompanionApi.OWNED_CAPACITY,
+                api.grantByAdmin(owner, ROSTER, DRAGON, null).join());
+        assertEquals(1, index.fileRecords(owner).size());
+    }
+
+    @Test
     void theEvidenceOfACaptureIntoStorageIsFoundByItsSourceNpcUntilTheCompanionIsAbandoned() {
         UUID sourceNpc = UUID.randomUUID();
         UUID attempt = UUID.randomUUID();

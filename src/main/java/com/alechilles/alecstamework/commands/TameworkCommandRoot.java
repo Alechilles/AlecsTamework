@@ -161,4 +161,14 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     public void addCompanionCommands(@Nullable CaptureItemFlows flows, @Nullable CompanionQueries companions) {
         addSubCommand(new TameworkCompanionsCommandGroup(flows, companions));
     }
+
+    /**
+     * Adds {@code /tw bonded grant}. Called once before registration; {@code api} gives null
+     * while bonded persistence is not running.
+     */
+    public void addBondedCommands(
+            @Nonnull java.util.function.Supplier<com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi> api,
+            @Nonnull java.util.function.Predicate<String> rosterKnown) {
+        addSubCommand(new TameworkBondedCommandGroup(api, rosterKnown));
+    }
 }
