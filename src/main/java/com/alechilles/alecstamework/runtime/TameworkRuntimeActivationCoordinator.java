@@ -4,10 +4,6 @@ import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationEvidence;
-import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationProbe;
-import com.alechilles.alecstamework.persistence.bonded.BondedCompanionDataPath;
-import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPersistenceActivationProbe;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.runtime.activation.TameworkActivationEvidence;
 import com.alechilles.alecstamework.runtime.activation.TameworkAssetActivationEvidenceCollector;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
@@ -20,14 +16,18 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /** Builds one fail-closed startup plan from content, requests, and durable state. */
 public final class TameworkRuntimeActivationCoordinator {
     private static final String GENERIC_WRITABLE = "generic-persistence-writable";
     private static final String BONDED_WRITABLE = "bonded-persistence-writable";
     private static final String COMPANION_STORE = "companion-store";
+    private static final String BONDED_FILE = "bonded-companions.sqlite";
 
     private final TameworkRuntimeActivationPlanner planner =
             new TameworkRuntimeActivationPlanner(TameworkRuntimeModuleCatalog.standard());
@@ -41,7 +41,10 @@ public final class TameworkRuntimeActivationCoordinator {
     ) {
     }
 
-    /** Probes storage read-only and builds one immutable startup plan. */
+    /**
+     * Looks for saved data by file name only and builds one immutable startup plan. No old
+     * database is opened here: only the companion importer loads the SQLite driver (plan 7 R24).
+     */
     public Preparation prepare(
             Path pluginDataDirectory,
             HytaleLogger logger,
@@ -49,14 +52,9 @@ public final class TameworkRuntimeActivationCoordinator {
     ) {
         TameworkDataPathLayout layout = new TameworkDataPathService(logger)
                 .resolveDataPathLayout(pluginDataDirectory);
-        TameworkPersistenceActivationEvidence generic = new TameworkPersistenceActivationProbe(
-                PersistenceFiles.replacementDatabase(layout.targetDirectory()),
-                layout.persistenceSourceDirectories()
-        ).probe();
-        TameworkPersistenceActivationEvidence bonded =
-                new BondedCompanionPersistenceActivationProbe(
-                        BondedCompanionDataPath.resolve(layout)
-                ).probe();
+        List<Path> legacyDirs = layout.persistenceSourceDirectories();
+        TameworkPersistenceActivationEvidence generic = legacyDataEvidence(legacyDirs, Files::exists);
+        TameworkPersistenceActivationEvidence bonded = legacyBondedEvidence(legacyDirs, Files::exists);
         boolean companionStore = companionStoreExists();
         if (Universe.get() == null) {
             logger.at(java.util.logging.Level.FINE).log(
@@ -79,6 +77,43 @@ public final class TameworkRuntimeActivationCoordinator {
                 requestedCapabilities, genericPersistence, bondedPersistence, companionStoreExists()
         ));
         return TameworkReloadTopologyReport.compare(startup, candidate);
+    }
+
+    /**
+     * Durable work for the companion store whenever any old Tamework save file exists: 3.x/4.x
+     * databases, a 2.x database, or 2.x {@code .dat} bundles. Persistence must start for such a
+     * world even when no asset asks for it, or neither the importer nor
+     * {@code /tw persistence start-fresh} could ever run.
+     */
+    static TameworkPersistenceActivationEvidence legacyDataEvidence(
+            Collection<Path> legacyDirs, Predicate<Path> exists
+    ) {
+        for (CompanionStorage.LegacyKind kind : CompanionStorage.LegacyKind.values()) {
+            for (String name : kind.files()) {
+                if (anyExists(legacyDirs, name, exists)) {
+                    return TameworkPersistenceActivationEvidence.active(Set.of("legacy-companion-data"));
+                }
+            }
+        }
+        return TameworkPersistenceActivationEvidence.dormant(false, false);
+    }
+
+    /** Durable work for bonded companions when the old bonded database exists. */
+    static TameworkPersistenceActivationEvidence legacyBondedEvidence(
+            Collection<Path> legacyDirs, Predicate<Path> exists
+    ) {
+        return anyExists(legacyDirs, BONDED_FILE, exists)
+                ? TameworkPersistenceActivationEvidence.active(Set.of("legacy-bonded-data"))
+                : TameworkPersistenceActivationEvidence.dormant(false, false);
+    }
+
+    private static boolean anyExists(Collection<Path> dirs, String name, Predicate<Path> exists) {
+        for (Path dir : dirs) {
+            if (dir != null && exists.test(dir.resolve(name))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static TameworkActivationEvidence evidence(

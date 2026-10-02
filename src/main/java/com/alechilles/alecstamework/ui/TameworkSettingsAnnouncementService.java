@@ -45,6 +45,7 @@ public final class TameworkSettingsAnnouncementService {
     private final Set<UUID> migrationNoticeShownThisSession = ConcurrentHashMap.newKeySet();
     /** Set once during plugin setup, before any player event; null when no conversion is needed. */
     @Nullable private volatile CompanionStorage.LegacyKind migrationNotice;
+    private volatile String migrationNoticeValue = "";
 
     public TameworkSettingsAnnouncementService(@Nonnull Tamework plugin) {
         this.plugin = plugin;
@@ -58,8 +59,13 @@ public final class TameworkSettingsAnnouncementService {
         clearSessionState(event != null && event.getPlayerRef() != null ? event.getPlayerRef().getUuid() : null);
     }
 
-    /** Makes admins, operators and the local singleplayer owner get the conversion notice for {@code kind} on every login from now on. */
-    public void requireMigrationNotice(@Nonnull CompanionStorage.LegacyKind kind) {
+    /**
+     * Makes admins, operators and the local singleplayer owner get the conversion notice for
+     * {@code kind} on every login from now on. {@code noticeValue} fills the notice's {@code {0}}:
+     * the Tamework version that converts 2.x data, or the report file of a failed 3.x/4.x import.
+     */
+    public void requireMigrationNotice(@Nonnull CompanionStorage.LegacyKind kind, @Nonnull String noticeValue) {
+        this.migrationNoticeValue = noticeValue;
         this.migrationNotice = kind;
     }
 
@@ -125,7 +131,7 @@ public final class TameworkSettingsAnnouncementService {
         TameworkSettingsAnnouncementPage page = TameworkSettingsAnnouncementPage.notice(
                 uiPlayerRef,
                 LocalizedText.resolve(uiPlayerRef, MIGRATION_TITLE_KEY),
-                LocalizedText.format(uiPlayerRef, migrationNoticeKey(kind), kind.converterVersion()));
+                LocalizedText.format(uiPlayerRef, migrationNoticeKey(kind), migrationNoticeValue));
         try {
             player.getPageManager().openCustomPage(playerRef, store, page);
         } catch (Throwable throwable) {

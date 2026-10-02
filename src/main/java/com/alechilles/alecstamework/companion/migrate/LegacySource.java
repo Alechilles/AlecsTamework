@@ -17,9 +17,13 @@ import javax.annotation.Nullable;
 
 /**
  * One old SQLite file, opened for the importer without touching the original (plan 7 Global
- * Constraints, R2). The file and its {@code -wal} are copied into a scratch folder and only the
- * copy is opened, so a write-ahead log left by a crashed server is replayed there and no file
- * appears beside the original. Closing deletes the copy.
+ * Constraints, R2). No file ever appears beside the original and the original is never written.
+ *
+ * <p>A file with no write-ahead log (or an empty one) is opened in place, read-only and
+ * {@code immutable}, which makes SQLite create no lock, {@code -wal} or {@code -shm} file. That
+ * needs no copy, which matters for a database of a gigabyte or more. A file with a non-empty
+ * {@code -wal}, as a crashed server leaves it, is copied with its log into a scratch folder and
+ * only the copy is opened, so the log is replayed there. Closing deletes the copy.</p>
  */
 public final class LegacySource implements AutoCloseable {
     public static final String STATE_FILE = "tamework-state.sqlite";
@@ -36,10 +40,12 @@ public final class LegacySource implements AutoCloseable {
     public enum Reason {
         /** The schema history is missing or names a version this importer does not know. */
         UNKNOWN_VERSION,
-        /** {@code PRAGMA integrity_check} reported damage. */
+        /** {@code PRAGMA quick_check} reported damage. */
         INTEGRITY_FAILED,
         /** The file could not be copied, opened or queried. */
-        UNREADABLE
+        UNREADABLE,
+        /** The file has a write-ahead log and the scratch folder's disk has no room for the copy. */
+        NOT_ENOUGH_DISK_SPACE
     }
 
     /** A source the importer must not use. {@link #file()} is the original, never the copy. */
@@ -65,10 +71,11 @@ public final class LegacySource implements AutoCloseable {
     }
 
     private final LegacyRows.SourceFile original;
-    private final Path copy;
+    /** The scratch copy, or {@code null} when the original is open in place. */
+    @Nullable private final Path copy;
     private final Connection connection;
 
-    private LegacySource(LegacyRows.SourceFile original, Path copy, Connection connection) {
+    private LegacySource(LegacyRows.SourceFile original, @Nullable Path copy, Connection connection) {
         this.original = original;
         this.copy = copy;
         this.connection = connection;
@@ -95,8 +102,9 @@ public final class LegacySource implements AutoCloseable {
     }
 
     /**
-     * Copies {@code file} into {@code scratchDir}, opens the copy read-only and checks its
-     * integrity. {@code file} must be named {@link #STATE_FILE} or {@link #BONDED_FILE}.
+     * Opens {@code file} read-only and checks its integrity: in place when it has no pending
+     * write-ahead log, otherwise through a copy in {@code scratchDir}. {@code file} must be named
+     * {@link #STATE_FILE} or {@link #BONDED_FILE}.
      */
     @Nonnull
     public static LegacySource open(@Nonnull Path file, @Nonnull Path scratchDir) throws Refused {
@@ -104,22 +112,40 @@ public final class LegacySource implements AutoCloseable {
         if (!name.equals(STATE_FILE) && !name.equals(BONDED_FILE)) {
             throw new Refused(Reason.UNREADABLE, file, "not an import source name", null);
         }
-        Path copy = scratchDir.resolve(name);
+        Path copy = null;
         Connection connection = null;
         try {
             LegacyRows.SourceFile original = new LegacyRows.SourceFile(
                     file, Files.size(file), Files.getLastModifiedTime(file).toMillis());
-            Files.createDirectories(scratchDir);
-            deleteCopy(copy);
-            Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
-            for (String suffix : COPIED_SIDECARS) {
-                Path sidecar = file.resolveSibling(name + suffix);
-                if (Files.isRegularFile(sidecar)) {
-                    Files.copy(sidecar, copy.resolveSibling(name + suffix), StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
+            Path wal = file.resolveSibling(name + "-wal");
             Class.forName("org.sqlite.JDBC");
-            connection = DriverManager.getConnection("jdbc:sqlite:" + copy.toUri() + "?mode=ro");
+            if (Files.isRegularFile(wal) && Files.size(wal) > 0L) {
+                copy = scratchDir.resolve(name);
+                Files.createDirectories(scratchDir);
+                deleteCopy(copy);
+                long needed = original.sizeBytes();
+                for (String suffix : COPIED_SIDECARS) {
+                    Path sidecar = file.resolveSibling(name + suffix);
+                    needed += Files.isRegularFile(sidecar) ? Files.size(sidecar) : 0L;
+                }
+                long free = Files.getFileStore(scratchDir).getUsableSpace();
+                if (free < needed) {
+                    throw new Refused(Reason.NOT_ENOUGH_DISK_SPACE, file, "the file has a write-ahead log and must "
+                            + "be copied before it is read; the copy needs " + needed + " bytes in " + scratchDir
+                            + " and " + free + " bytes are free", null);
+                }
+                Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
+                for (String suffix : COPIED_SIDECARS) {
+                    Path sidecar = file.resolveSibling(name + suffix);
+                    if (Files.isRegularFile(sidecar)) {
+                        Files.copy(sidecar, copy.resolveSibling(name + suffix), StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+                connection = DriverManager.getConnection("jdbc:sqlite:" + sqliteUri(copy) + "?mode=ro");
+            } else {
+                // immutable=1: SQLite takes no lock and creates no file beside the original.
+                connection = DriverManager.getConnection("jdbc:sqlite:" + sqliteUri(file) + "?mode=ro&immutable=1");
+            }
             List<String> problems = integrityProblems(connection);
             if (!problems.isEmpty()) {
                 throw new Refused(Reason.INTEGRITY_FAILED, file, String.join("; ", problems), null);
@@ -134,10 +160,15 @@ public final class LegacySource implements AutoCloseable {
         }
     }
 
+    /**
+     * {@code quick_check}, not {@code integrity_check}: it finds damaged pages and broken table
+     * structure but skips the index cross-checks, which take minutes on a database of several
+     * gigabytes. The importer reads tables by primary key order and writes nothing back.
+     */
     private static List<String> integrityProblems(Connection connection) throws SQLException {
         List<String> problems = new ArrayList<>();
         try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("PRAGMA integrity_check")) {
+             ResultSet rows = statement.executeQuery("PRAGMA quick_check")) {
             while (rows.next()) {
                 String line = rows.getString(1);
                 if (!"ok".equalsIgnoreCase(line)) {
@@ -146,6 +177,17 @@ public final class LegacySource implements AutoCloseable {
             }
         }
         return problems;
+    }
+
+    /**
+     * A SQLite {@code file:} URI for {@code file} with an empty authority. {@link Path#toUri} puts
+     * the server of a Windows network (UNC) path into the authority, which SQLite
+     * refuses; here it stays in the path, as {@code file:////server/share/...}.
+     */
+    static String sqliteUri(Path file) {
+        String path = file.toAbsolutePath().toString().replace('\\', '/')
+                .replace("%", "%25").replace("?", "%3f").replace("#", "%23").replace(" ", "%20");
+        return "file://" + (path.startsWith("/") ? path : "/" + path);
     }
 
     /** The original file's path, size and modified time, taken before the copy. */
@@ -211,13 +253,13 @@ public final class LegacySource implements AutoCloseable {
         return new Refused(Reason.UNKNOWN_VERSION, original.path(), detail, null);
     }
 
-    /** Closes the connection and deletes the scratch copy with its sidecars. */
+    /** Closes the connection and deletes the scratch copy, when there is one, with its sidecars. */
     @Override
     public void close() {
         release(connection, copy);
     }
 
-    private static void release(@Nullable Connection connection, Path copy) {
+    private static void release(@Nullable Connection connection, @Nullable Path copy) {
         if (connection != null) {
             try {
                 connection.close();
@@ -226,7 +268,9 @@ public final class LegacySource implements AutoCloseable {
             }
         }
         try {
-            deleteCopy(copy);
+            if (copy != null) {
+                deleteCopy(copy);
+            }
         } catch (IOException ignored) {
             // A leftover copy is harmless: the caller owns and removes the scratch folder.
         }

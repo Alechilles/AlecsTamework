@@ -1490,7 +1490,8 @@ public class Tamework extends JavaPlugin {
                 Files::exists,
                 companionIo,
                 System::currentTimeMillis,
-                version);
+                version,
+                runtimeDataDirectory);
         // Only a world blocked by old saves may start fresh (spec 12.3).
         if (companionModule.state() == CompanionPersistenceModule.State.MIGRATION_REQUIRED) {
             companionStartFresh = () -> CompanionPersistenceModule.startFresh(companionRoot, legacyDirectories,
@@ -1830,7 +1831,10 @@ public class Tamework extends JavaPlugin {
         if (legacyKind == null || service == null) {
             return;
         }
-        service.requireMigrationNotice(legacyKind);
+        // 2.x: the Tamework version that converts the data. 3.x/4.x: the report of the failed import.
+        String reportName = companionModule == null ? null : companionModule.importReportName();
+        String noticeValue = reportName != null ? reportName : legacyKind.converterVersion();
+        service.requireMigrationNotice(legacyKind, noticeValue);
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerConnectEvent.class,
@@ -1841,7 +1845,7 @@ public class Tamework extends JavaPlugin {
                     }
                     player.sendMessage(Message.translation("server."
                                     + TameworkSettingsAnnouncementService.migrationNoticeKey(legacyKind))
-                            .param("0", legacyKind.converterVersion()));
+                            .param("0", noticeValue));
                 },
                 "companion migration chat notice"
         );

@@ -2,15 +2,22 @@ package com.alechilles.alecstamework.companion.runtime;
 
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.migrate.ImportFixtures;
+import com.alechilles.alecstamework.companion.migrate.ImportResult;
+import com.alechilles.alecstamework.companion.migrate.LegacyMapper;
+import com.alechilles.alecstamework.companion.migrate.LegacyReader;
 import com.alechilles.alecstamework.companion.store.CompanionFileIo;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
+import com.alechilles.alecstamework.companion.store.DiskCompanionFileIo;
 import com.alechilles.alecstamework.companion.store.MemoryCompanionFileIo;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -57,15 +64,86 @@ class CompanionPersistenceModuleTest {
     }
 
     @Test
-    void oldSavesLeaveTheStoreUntouched() {
+    void oldSavesThatCannotBeConvertedLeaveTheStoreUntouched() {
         MemoryCompanionFileIo io = new MemoryCompanionFileIo();
 
         CompanionPersistenceModule module = CompanionPersistenceModule.open(ROOT, List.of(DATA),
-                p -> p.equals(DATA.resolve("tamework-state.sqlite")), io, System::currentTimeMillis, "test");
+                p -> p.equals(DATA.resolve("tamework.sqlite")), io, System::currentTimeMillis, "test");
+
+        assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, module.state());
+        assertEquals(CompanionStorage.LegacyKind.LEGACY_2X, module.legacyKind());
+        assertTrue(io.writtenPaths().isEmpty(), "nothing may be written, not even meta.json");
+        module.shutdown(System.currentTimeMillis() + 1_000L);
+    }
+
+    @Test
+    void aWorldWithOldDatabasesIsImportedOnceAndThenLoadsNormally(@TempDir Path temp) throws Exception {
+        Path data = temp.resolve("Data");
+        Path root = temp.resolve("universe").resolve("Tamework").resolve("Companions");
+        Files.createDirectories(root.getParent());
+        ImportFixtures.state(data);
+        ImportFixtures.bonded(data);
+        Map<String, String> oldFiles = ImportFixtures.contents(data);
+        ImportResult mapped = LegacyMapper.map(LegacyReader.read(List.of(data), temp.resolve("scratch")), 5_000L);
+        DiskCompanionFileIo io = new DiskCompanionFileIo();
+        Path reports = temp.resolve("reports");
+
+        CompanionPersistenceModule first = CompanionPersistenceModule.open(root, List.of(data), Files::exists, io,
+                () -> 5_000L, "test", reports);
+        try {
+            assertEquals(CompanionPersistenceModule.State.READY, first.state(), String.valueOf(first.failure()));
+            assertNull(first.legacyKind());
+            for (CompanionRecord record : mapped.records()) {
+                assertEquals(record, first.queries().get(record.profileId()));
+            }
+            assertEquals(mapped.aliases().size(), first.legacyAliases().size());
+            assertTrue(first.legacyAliases().size() > 0);
+            assertEquals(mapped.snapshots().get(ImportFixtures.BONDED_DEAD),
+                    first.readSnapshot(ImportFixtures.BONDED_DEAD).join());
+        } finally {
+            assertTrue(first.shutdown(System.currentTimeMillis() + 5_000L));
+        }
+        Map<String, String> store = ImportFixtures.contents(root);
+        assertEquals(1, ImportFixtures.contents(reports).size());
+
+        // Review Focus 5: the old files are still there, but the store now exists.
+        CompanionPersistenceModule second = CompanionPersistenceModule.open(root, List.of(data), Files::exists, io,
+                () -> 9_000_000L, "test", reports);
+        try {
+            assertEquals(CompanionPersistenceModule.State.READY, second.state());
+            for (CompanionRecord record : mapped.records()) {
+                assertEquals(record, second.queries().get(record.profileId()));
+            }
+            assertEquals(mapped.aliases().size(), second.legacyAliases().size());
+        } finally {
+            assertTrue(second.shutdown(System.currentTimeMillis() + 5_000L));
+        }
+        assertEquals(store, ImportFixtures.contents(root), "a second start does not import or rewrite anything");
+        assertEquals(1, ImportFixtures.contents(reports).size(), "no second import report");
+        assertEquals(oldFiles, ImportFixtures.contents(data), "the old files are byte for byte the same");
+    }
+
+    @Test
+    void aFailedImportWritesNothingAndRequiresMigrationWithTheReason(@TempDir Path temp) throws Exception {
+        Path data = Files.createDirectories(temp.resolve("Data"));
+        Path root = temp.resolve("universe").resolve("Tamework").resolve("Companions");
+        Files.createDirectories(root.getParent());
+        Files.write(data.resolve("tamework-state.sqlite"), "this is not a database, only text".repeat(60).getBytes());
+        Map<String, String> oldFiles = ImportFixtures.contents(data);
+        DiskCompanionFileIo io = new DiskCompanionFileIo();
+        Path reports = temp.resolve("reports");
+
+        CompanionPersistenceModule module = CompanionPersistenceModule.open(root, List.of(data), Files::exists, io,
+                System::currentTimeMillis, "test", reports);
 
         assertEquals(CompanionPersistenceModule.State.MIGRATION_REQUIRED, module.state());
         assertEquals(CompanionStorage.LegacyKind.LEGACY_3X_4X, module.legacyKind());
-        assertTrue(io.writtenPaths().isEmpty(), "nothing may be written, not even meta.json");
+        assertTrue(module.failure().contains("tamework-state.sqlite"), module.failure());
+        assertEquals(Map.of(), ImportFixtures.contents(root.getParent()), "no store and no importing folder is left");
+        assertEquals(oldFiles, ImportFixtures.contents(data));
+        assertEquals(List.of(module.importReportName()), List.copyOf(ImportFixtures.contents(reports).keySet()));
+        assertEquals(CompanionPersistenceModule.FreshStart.CREATED, CompanionPersistenceModule.startFresh(root,
+                List.of(data), Files::exists, io, () -> 1L, "test"), "the operator can still start fresh");
         module.shutdown(System.currentTimeMillis() + 1_000L);
     }
 

@@ -118,4 +118,24 @@ public final class CompanionStorage {
         return meta(createdBy).append("FreshStart",
                 new BsonDocument("FoundData", new BsonString(found.name())).append("AtMs", new BsonInt64(atMs)));
     }
+
+    /**
+     * The folder the 3.x/4.x importer builds a store in before it becomes {@code root} (spec 12.2):
+     * {@code Companions.importing} beside {@code Companions}. It never holds a usable store; a
+     * folder left by a killed import is deleted at the next start.
+     */
+    @Nonnull
+    public static Path importingDir(@Nonnull Path root) {
+        return root.resolveSibling(root.getFileName() + ".importing");
+    }
+
+    /**
+     * {@code meta.json} for a store the importer made from old saves. The {@code Import} section is
+     * the receipt (source kind, each source file's path, size, modified time and schema, and the
+     * counts); {@code CompanionImporter} builds it.
+     */
+    @Nonnull
+    public static BsonDocument importMeta(@Nonnull String createdBy, @Nonnull BsonDocument receipt) {
+        return meta(createdBy).append("Import", Objects.requireNonNull(receipt, "receipt"));
+    }
 }

@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.companion.runtime;
 
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.migrate.CompanionImporter;
+import com.alechilles.alecstamework.companion.migrate.LegacyAliases;
 import com.alechilles.alecstamework.companion.store.CompanionFileIo;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.CompanionStore;
@@ -36,9 +38,10 @@ import javax.annotation.Nullable;
 
 /**
  * Builds and owns the companion store, index, writer and loaded-body map (spec 6.7 to 7).
- * {@link #open} reads every owner file before worlds start. When the world has old saves and no
- * new store, or the store cannot be read, the module is not usable: {@link #state()} says why,
- * nothing is written, and companion features refuse (spec 10).
+ * {@link #open} reads every owner file before worlds start. A world with 3.x/4.x saves and no
+ * new store is imported first (spec 12.2). When the import fails, the world has 2.x saves, or the
+ * store cannot be read, the module is not usable: {@link #state()} says why, nothing is written,
+ * and companion features refuse (spec 10).
  */
 public final class CompanionPersistenceModule {
     public enum State { READY, MIGRATION_REQUIRED, FAILED }
@@ -64,6 +67,8 @@ public final class CompanionPersistenceModule {
     private final LongSupplier clock;
     private final ThrottledWarnings warnings;
     @Nullable private final Path root;
+    private final LegacyAliases legacyAliases;
+    @Nullable private final String importReportName;
     private final AtomicBoolean folderSizeRefreshing = new AtomicBoolean();
     private volatile long folderBytes;
     private volatile long folderBytesAtMs;
@@ -72,9 +77,12 @@ public final class CompanionPersistenceModule {
                                        @Nullable CompanionStorage.LegacyKind legacyKind, @Nullable CompanionIndex index,
                                        @Nullable CompanionWriter writer, @Nullable CompanionStore store,
                                        List<CompanionIndex.ChangeListener> changeListeners,
-                                       Set<UUID> unreadable, LongSupplier clock, @Nullable Path root) {
+                                       Set<UUID> unreadable, LongSupplier clock, @Nullable Path root,
+                                       LegacyAliases legacyAliases, @Nullable String importReportName) {
         this.state = state;
         this.root = root;
+        this.legacyAliases = legacyAliases;
+        this.importReportName = importReportName;
         this.failure = failure;
         this.legacyKind = legacyKind;
         this.index = index;
@@ -102,7 +110,8 @@ public final class CompanionPersistenceModule {
 
     /**
      * Opens the store at {@code root}. Blocks on file I/O, so call it before worlds start and
-     * never on a world thread. Never throws for store problems; check {@link #state()}.
+     * never on a world thread. Never throws for store problems; check {@link #state()}. Import
+     * reports go into the folder that holds {@code root}.
      *
      * @param legacyDirs directories that may hold old Tamework saves (spec 12.1)
      * @param exists     file-existence check used for old-save detection and {@code meta.json}
@@ -111,9 +120,38 @@ public final class CompanionPersistenceModule {
     public static CompanionPersistenceModule open(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs,
                                                   @Nonnull Predicate<Path> exists, @Nonnull CompanionFileIo io,
                                                   @Nonnull LongSupplier clock, @Nonnull String createdBy) {
+        Path parent = root.toAbsolutePath().getParent();
+        return open(root, legacyDirs, exists, io, clock, createdBy, parent == null ? root : parent);
+    }
+
+    /**
+     * {@link #open(Path, Collection, Predicate, CompanionFileIo, LongSupplier, String)} with the
+     * folder for the import report. A world with 3.x/4.x saves and no store is imported here, on
+     * the caller's thread, before the normal load (spec 12.2); that can take minutes on a large
+     * world. A failed import writes nothing and leaves the module {@link State#MIGRATION_REQUIRED}
+     * with the reason in {@link #failure()} (plan 7 R2).
+     *
+     * @param reportDir where an import report is written (the Tamework data folder)
+     */
+    @Nonnull
+    public static CompanionPersistenceModule open(@Nonnull Path root, @Nonnull Collection<Path> legacyDirs,
+                                                  @Nonnull Predicate<Path> exists, @Nonnull CompanionFileIo io,
+                                                  @Nonnull LongSupplier clock, @Nonnull String createdBy,
+                                                  @Nonnull Path reportDir) {
         Objects.requireNonNull(clock, "clock");
         CompanionStorage.LegacyKind legacy = CompanionStorage.detectLegacy(root, legacyDirs, exists);
-        if (legacy != null) {
+        boolean imported = false;
+        if (legacy == CompanionStorage.LegacyKind.LEGACY_3X_4X) {
+            CompanionImporter.Outcome outcome = CompanionImporter.run(root, legacyDirs, io, clock, createdBy, reportDir);
+            if (!outcome.imported()) {
+                LOGGER.at(Level.WARNING).log("Companion persistence is disabled until the %s companion data on this "
+                        + "world is imported. Fix the cause and restart, or run /tw persistence start-fresh to "
+                        + "start with an empty store. See %s.", legacy.dataVersions(), outcome.reportName());
+                return new CompanionPersistenceModule(State.MIGRATION_REQUIRED, outcome.failure(), legacy, null, null,
+                        null, List.of(), Set.of(), clock, null, LegacyAliases.EMPTY, outcome.reportName());
+            }
+            imported = true;
+        } else if (legacy != null) {
             LOGGER.at(Level.WARNING).log("Tamework found companion data from version %s (%s) on this world and no "
                     + "store at %s. This version cannot convert it. Stop the server, run Tamework %s once on this "
                     + "world to convert it, then update to this version again. Companion persistence is disabled "
@@ -124,8 +162,12 @@ public final class CompanionPersistenceModule {
         }
         CompanionStore store = new CompanionStore(root, io, clock);
         CompanionStore.LoadResult result;
+        LegacyAliases aliases;
         try {
             result = store.loadAll();
+            // Old bodies are matched to imported records through this file. Without it they would
+            // be adopted as new companions, so an unreadable one stops the store like an owner file.
+            aliases = LegacyAliases.load(io, root);
         } catch (IOException | RuntimeException e) {
             // RuntimeException covers UncheckedIOException and DirectoryIteratorException from
             // listing, and a missing StorageManager.
@@ -136,7 +178,7 @@ public final class CompanionPersistenceModule {
         // meta.json goes first so a failure here leaves no writer thread behind. It marks the
         // store as created; the old-save importer (phase 7) skips worlds that have it.
         Path meta = CompanionStorage.metaFile(root);
-        if (!exists.test(meta)) {
+        if (!imported && !exists.test(meta)) {
             try {
                 io.write(meta, CompanionStorage.meta(createdBy)).join();
             } catch (RuntimeException e) {
@@ -171,7 +213,7 @@ public final class CompanionPersistenceModule {
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
         return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
-                result.unreadableIds(), clock, root);
+                result.unreadableIds(), clock, root, aliases, null);
     }
 
     /** What {@link #startFresh} did. */
@@ -218,7 +260,7 @@ public final class CompanionPersistenceModule {
                                                      @Nullable CompanionStorage.LegacyKind legacyKind,
                                                      LongSupplier clock) {
         return new CompanionPersistenceModule(state, failure, legacyKind, null, null, null, List.of(), Set.of(), clock,
-                null);
+                null, LegacyAliases.EMPTY, null);
     }
 
     @Nonnull public State state() { return state; }
@@ -227,6 +269,17 @@ public final class CompanionPersistenceModule {
     /** The old saves that block this world; non-null exactly when the state is {@link State#MIGRATION_REQUIRED}. */
     @Nullable public CompanionStorage.LegacyKind legacyKind() { return legacyKind; }
     public boolean ready() { return state == State.READY; }
+    /**
+     * Every NPC UUID an imported 3.x/4.x world knew, for matching old bodies to their records
+     * (plan 7 R10). Loaded once by {@link #open}; {@link LegacyAliases#EMPTY} for a world that was
+     * never imported and whenever the module is not {@link State#READY}. Immutable; any thread.
+     */
+    @Nonnull public LegacyAliases legacyAliases() { return legacyAliases; }
+    /**
+     * The file name of the report a failed 3.x/4.x import wrote into the Tamework data folder, for
+     * the operator notice; {@code null} unless the import failed at this start.
+     */
+    @Nullable public String importReportName() { return importReportName; }
 
     /** @throws IllegalStateException when the module is not {@link State#READY}. */
     @Nonnull public CompanionIndex index() { return require(index); }
