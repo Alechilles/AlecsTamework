@@ -30,14 +30,18 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nonnull List<Lifecycle> lifecycles,
             @Nonnull List<Alias> aliases,
             /**
-             * Rows with {@code is_current = 1} (at most one per profile and kind), plus any row a
-             * {@code coop_residency} names, which holds a coop resident's state even when not current.
+             * Every snapshot row, current or not. At most one per profile and kind is current. Older
+             * rows are kept because they can be the only saved state of a companion: a coop residency
+             * may name one, and a profile whose body is live, or was quarantined, has no current row.
              */
-            @Nonnull List<Snapshot> currentSnapshots,
-            /** {@code profile_extension_data} rows in the entity checkpoint namespace, tombstones skipped. */
+            @Nonnull List<Snapshot> snapshots,
+            /**
+             * At most one entity checkpoint per profile, and only for profiles whose lifecycle state
+             * is ACTIVE or UNLOADED: the row keyed by the profile's CURRENT alias, else the row
+             * updated last. Tombstones are skipped.
+             */
             @Nonnull List<EntityCheckpoint> entityCheckpoints,
             @Nonnull List<ToolLink> toolLinks,
-            @Nonnull List<RosterFamily> rosterFamilies,
             @Nonnull List<RosterMembership> rosterMemberships,
             @Nonnull List<TimedLease> timedLeases,
             @Nonnull List<CoopSlot> coopSlots,
@@ -46,9 +50,7 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             /** Tombstones and the entity checkpoint namespace are excluded. */
             @Nonnull List<ExtensionData> extensionData,
             /** Operations whose phase is not PUBLISHED, COMPENSATED or FAILED. Reported, never replayed. */
-            int unfinishedOperations,
-            /** Lifecycle rows that name a quarantine incident. */
-            int quarantinedProfiles) {
+            int unfinishedOperations) {
     }
 
     /** {@code companion_profile}. Owner name and custom name are inside {@code metadataJson}. */
@@ -64,7 +66,7 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             long metadataRevision) {
     }
 
-    /** {@code companion_lifecycle}. */
+    /** {@code companion_lifecycle}. A row that names a quarantine incident is a quarantined profile. */
     public record Lifecycle(
             @Nonnull String profileId,
             @Nullable String ownerUuid,
@@ -89,7 +91,7 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nullable Long retiredAtMs) {
     }
 
-    /** A {@code companion_snapshot} row that is current or named by a coop residency. */
+    /** A {@code companion_snapshot} row. */
     public record Snapshot(
             @Nonnull String snapshotId,
             @Nonnull String profileId,
@@ -97,7 +99,8 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             int payloadVersion,
             @Nonnull String payloadJson,
             long sourceLifecycleRevision,
-            long createdAtMs) {
+            long createdAtMs,
+            boolean current) {
     }
 
     /** One entity checkpoint. {@code dataKey} is {@code alias:<npcUuid>}; the JSON holds the body. */
@@ -114,15 +117,6 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nonnull String profileId,
             @Nonnull String toolUuid,
             @Nonnull String linkType,
-            long createdAtMs,
-            long updatedAtMs) {
-    }
-
-    /** {@code command_family}. */
-    public record RosterFamily(
-            @Nonnull String ownerUuid,
-            @Nonnull String familyId,
-            long rosterRevision,
             long createdAtMs,
             long updatedAtMs) {
     }
@@ -145,23 +139,13 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
     }
 
     /**
-     * {@code timed_summon_lease}. A running summon has {@code sessionId} and
-     * {@code checkpointedAtMs}; {@code remainingMs} is time left at that checkpoint, not an
-     * absolute end. A stored one may have {@code cooldownUntilMs}.
+     * {@code timed_summon_lease}. {@code remainingMs} is the time a running summon had left when
+     * it was last checkpointed, not an absolute end. A stored one may have {@code cooldownUntilMs}.
      */
     public record TimedLease(
             @Nonnull String profileId,
-            long leaseRevision,
-            @Nullable String sessionId,
             @Nullable Long remainingMs,
-            @Nullable Long cooldownUntilMs,
-            @Nullable String configId,
-            long activeDurationMs,
-            long resummonCooldownMs,
-            boolean autoStoreOnOwnerLogout,
-            @Nullable Long checkpointedAtMs,
-            long createdAtMs,
-            long updatedAtMs) {
+            @Nullable Long cooldownUntilMs) {
     }
 
     /** {@code coop_slot}, including empty registrations. */
@@ -220,29 +204,20 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
     }
 
     /**
-     * {@code bonded_companion_profile}. {@code snapshotJson} is the {@code {encoding, payload}}
-     * envelope as stored. {@code summonCooldownUntilMs} uses 0 for unset.
+     * {@code bonded_companion_profile}, the columns the import uses. {@code snapshotJson} is the
+     * {@code {encoding, payload}} envelope as stored. {@code summonCooldownUntilMs} uses 0 for unset.
      */
     public record BondedProfile(
             @Nonnull String profileId,
             @Nonnull String ownerUuid,
             @Nonnull String rosterId,
-            @Nonnull String familyId,
             @Nonnull String roleId,
             @Nonnull String state,
             long revision,
             @Nonnull String snapshotJson,
-            long createdAtMs,
             long updatedAtMs,
-            @Nonnull String policyJson,
-            @Nullable String displayName,
-            @Nullable String species,
-            @Nullable String gender,
             @Nullable Long diedAtMs,
-            long summonCooldownUntilMs,
-            long reviveCount,
-            @Nullable String quarantineReason,
-            @Nullable Long quarantinedAtMs) {
+            long summonCooldownUntilMs) {
     }
 
     /** {@code bonded_companion_lease}: the live body of an ACTIVE bonded companion. */
@@ -250,9 +225,7 @@ public record LegacyRows(@Nullable State state, @Nullable Bonded bonded) {
             @Nonnull String profileId,
             @Nonnull String liveNpcUuid,
             @Nonnull String worldKey,
-            long startedAtMs,
-            long expiresAtMs,
-            @Nonnull String projectionState) {
+            long expiresAtMs) {
     }
 
     /** {@code bonded_companion_extension_data}; {@code jsonPayload} is the stored envelope. */

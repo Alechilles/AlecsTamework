@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
-import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
 import org.bson.BsonString;
@@ -20,58 +19,65 @@ import org.bson.BsonValue;
 /**
  * Every NPC UUID a 3.x/4.x world knew for a companion, mapped to its profile id (plan 7 R10):
  * every alias in any state, bonded live bodies, bonded cleanup targets, bonded capture sources
- * and the {@code npcUuid} of every imported snapshot. Bodies saved in the world are matched to
- * their imported record through it as their chunks load.
+ * and the {@code npcUuid} of every snapshot. Bodies saved in the world are matched to their
+ * imported record through it as their chunks load.
  *
- * <p>An entry is current when the UUID is the body the imported record names as its live body;
- * every other entry is stale, so a body with that UUID is a leftover. Immutable. The file
- * {@link #FILE_NAME} is written once by the importer inside the store folder, loaded once at
- * start and never changed afterwards.</p>
+ * <p>Immutable. The file {@link #FILE_NAME} is written once by the importer inside the store
+ * folder, loaded once at start and never changed afterwards.</p>
+ *
+ * @param entries every entry by NPC UUID, in insertion order; unmodifiable
  */
-public final class LegacyAliases {
+public record LegacyAliases(@Nonnull Map<UUID, Entry> entries) {
     public static final String FILE_NAME = "legacy-aliases.json";
     public static final LegacyAliases EMPTY = new LegacyAliases(Map.of());
     private static final int FORMAT = 1;
 
-    /** One known NPC UUID: the profile it belonged to, and whether it is that profile's live body. */
-    public record Entry(@Nonnull UUID profileId, boolean current) {
+    /** What a body with a known NPC UUID is to its profile. */
+    public enum Kind {
+        /** The body of a record imported LIVE: stamp it and register it. */
+        CURRENT,
+        /**
+         * The last body of a record imported LOST because the old rows could not place it (cause
+         * {@code IMPORTED_UNRESOLVED} or {@code IMPORTED_NO_BODY}). If this body shows up it is
+         * the companion, and its record goes back to LIVE.
+         */
+        REJOIN,
+        /** A leftover body: an old alias, a cleanup target, a capture source, a snapshot's source. */
+        STALE
+    }
+
+    /** One known NPC UUID: the profile it belonged to, and what the body is to that profile. */
+    public record Entry(@Nonnull UUID profileId, @Nonnull Kind kind) {
         public Entry {
             Objects.requireNonNull(profileId, "profileId");
+            Objects.requireNonNull(kind, "kind");
+        }
+
+        /** True when the body is the live body of its record. */
+        public boolean current() {
+            return kind == Kind.CURRENT;
         }
     }
 
-    private final Map<UUID, Entry> byNpcUuid;
-
-    private LegacyAliases(Map<UUID, Entry> byNpcUuid) {
-        this.byNpcUuid = Collections.unmodifiableMap(new LinkedHashMap<>(byNpcUuid));
-    }
-
-    @Nonnull
-    public static LegacyAliases of(@Nonnull Map<UUID, Entry> byNpcUuid) {
-        return byNpcUuid.isEmpty() ? EMPTY : new LegacyAliases(byNpcUuid);
+    public LegacyAliases {
+        entries = Collections.unmodifiableMap(new LinkedHashMap<>(entries));
     }
 
     @Nonnull
     public Optional<Entry> byNpcUuid(@Nonnull UUID npcUuid) {
-        return Optional.ofNullable(byNpcUuid.get(npcUuid));
-    }
-
-    /** Every entry by NPC UUID, in insertion order; unmodifiable. */
-    @Nonnull
-    public Map<UUID, Entry> entries() {
-        return byNpcUuid;
+        return Optional.ofNullable(entries.get(npcUuid));
     }
 
     public int size() {
-        return byNpcUuid.size();
+        return entries.size();
     }
 
     @Nonnull
     public BsonDocument toBson() {
         BsonDocument aliases = new BsonDocument();
-        byNpcUuid.forEach((npcUuid, entry) -> aliases.put(npcUuid.toString(),
+        entries.forEach((npcUuid, entry) -> aliases.put(npcUuid.toString(),
                 new BsonDocument("ProfileId", new BsonString(entry.profileId().toString()))
-                        .append("Current", BsonBoolean.valueOf(entry.current()))));
+                        .append("Kind", new BsonString(entry.kind().name()))));
         return new BsonDocument("Format", new BsonInt32(FORMAT)).append("Aliases", aliases);
     }
 
@@ -89,12 +95,12 @@ public final class LegacyAliases {
                 BsonDocument entry = alias.getValue().asDocument();
                 entries.put(UUID.fromString(alias.getKey()), new Entry(
                         UUID.fromString(entry.getString("ProfileId").getValue()),
-                        entry.getBoolean("Current").getValue()));
+                        Kind.valueOf(entry.getString("Kind").getValue())));
             }
         } catch (RuntimeException malformed) {
             throw new IllegalArgumentException("malformed legacy alias file", malformed);
         }
-        return of(entries);
+        return new LegacyAliases(entries);
     }
 
     /** Writes {@link #FILE_NAME} into {@code storeRoot} with the companion store's file access. */
@@ -121,20 +127,5 @@ public final class LegacyAliases {
         } catch (IllegalArgumentException malformed) {
             throw new IOException("unreadable legacy alias file " + file, malformed);
         }
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        return other instanceof LegacyAliases aliases && byNpcUuid.equals(aliases.byNpcUuid);
-    }
-
-    @Override
-    public int hashCode() {
-        return byNpcUuid.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return "LegacyAliases" + byNpcUuid;
     }
 }

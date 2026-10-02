@@ -5,33 +5,53 @@ import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.persistence.LegacyDeathV1Payload;
+import com.alechilles.alecstamework.items.persistence.LegacyDeathV1SnapshotCodec;
+import com.alechilles.alecstamework.items.persistence.LegacyLostV1Payload;
+import com.alechilles.alecstamework.items.persistence.LegacyLostV1SnapshotCodec;
+import com.alechilles.alecstamework.items.persistence.SnapshotVector3;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
+import org.joml.Vector3d;
 
 /**
  * Reads the companion state the old runtime stored as JSON: allow-list state snapshots (plain,
  * or inside a death or bonded wrapper) and per-alias entity checkpoints. Pure; every reader
  * returns null for a payload it cannot use, so the mapper can fall back.
+ *
+ * <p>Payload version 1 of the kinds {@code death} and {@code lost} is the shape the 2.x public
+ * persistence wrote: a flat list of facts, with the companion's identity kept in the profile
+ * tables. {@link #legacyState} rebuilds the full state from both, as the 4.x restore did
+ * ({@code LegacyRestorationFullStateMapper}), but never refuses over a disagreement: the profile
+ * rows win and unreadable details are left out, because the import must not drop saved state.
+ * A version 1 {@code capture} payload holds no state at all; that state is in the capture item.
  *
  * <p>Summaries are built with {@link CompanionSummaries#build}, the same clamp a live body's
  * summary goes through. The role's name key, the icon and the harvest alarm need engine or
@@ -40,6 +60,23 @@ import org.bson.BsonDocument;
  */
 final class LegacyState {
     private static final CoopResidentStateSnapshotCodec STATE_CODEC = new CoopResidentStateSnapshotCodec();
+    private static final LegacyDeathV1SnapshotCodec DEATH_V1 = new LegacyDeathV1SnapshotCodec();
+    private static final LegacyLostV1SnapshotCodec LOST_V1 = new LegacyLostV1SnapshotCodec();
+    static final String KIND_DEATH = "death";
+    static final String KIND_LOST = "lost";
+    static final String KIND_CAPTURE = "capture";
+    private static final char BACKSLASH = 92;
+
+    /**
+     * What the profile tables say about a companion; a version 1 payload is completed from it.
+     *
+     * @param npcUuid the profile's current alias, else its profile id
+     * @param toolIds every tool linked to the profile, of any link type
+     */
+    record Identity(@Nonnull UUID npcUuid, @Nonnull String roleId, @Nullable UUID ownerUuid,
+                    @Nullable String ownerName, @Nullable String customName, @Nullable Boolean tamed,
+                    @Nonnull List<String> toolIds) {
+    }
 
     /**
      * One readable state snapshot.
@@ -91,6 +128,206 @@ final class LegacyState {
             return null;
         }
         return new State(json, state.npcUuid(), summary(state), customName(state.npcName()));
+    }
+
+    /**
+     * The state of a version 1 {@code death} or {@code lost} payload, written as the plain state
+     * JSON. A lost payload carries only a home position, so its state is the identity alone.
+     * Null for any other kind and for a payload that is not JSON.
+     */
+    @Nullable
+    static State legacyState(@Nonnull String kind, @Nonnull String payloadJson, long createdAtMs,
+                             @Nonnull Identity identity) {
+        try {
+            CoopResidentStateSnapshot state;
+            if (KIND_DEATH.equals(kind)) {
+                state = deathState(decodeDeath(payloadJson), createdAtMs, identity);
+            } else if (KIND_LOST.equals(kind)) {
+                LegacyLostV1Payload lost = LOST_V1.decode(payloadJson);
+                state = new CoopResidentStateSnapshot(identity.npcUuid(), null, -1, identity.roleId(),
+                        commandLinks(identity, lost.homePosition()), owner(identity, null),
+                        identity.tamed() == null ? null : new TameworkTamedComponent(identity.tamed()),
+                        name(identity.customName(), identity.ownerUuid()), null, null, null, null, null, null,
+                        null, null, null, createdAtMs);
+            } else {
+                return null;
+            }
+            return new State(STATE_CODEC.encode(state), state.npcUuid(), summary(state), customName(state.npcName()));
+        } catch (RuntimeException | LinkageError unreadable) {
+            return null;
+        }
+    }
+
+    /** The codec refuses a death cause it does not know; the state must survive that, so the cause is dropped. */
+    private static LegacyDeathV1Payload decodeDeath(String payloadJson) {
+        try {
+            return DEATH_V1.decode(payloadJson);
+        } catch (IllegalArgumentException refused) {
+            JsonObject root = object(payloadJson);
+            if (root == null || root.remove("deathCauseKind") == null) {
+                throw refused;
+            }
+            return DEATH_V1.decode(root.toString());
+        }
+    }
+
+    private static CoopResidentStateSnapshot deathState(LegacyDeathV1Payload death, long createdAtMs,
+                                                        Identity identity) {
+        String role = death.roleId() != null && death.roleId().trim().equalsIgnoreCase(identity.roleId())
+                ? death.roleId().trim() : identity.roleId();
+        String customName = identity.customName() != null ? identity.customName() : death.customName();
+        boolean happinessPresent = death.happinessConfigId() != null || death.happinessValue() != null
+                || death.happinessLastUpdateMs() != 0L || death.breedingHappiness() != null;
+        double happinessValue = death.happinessValue() != null ? death.happinessValue()
+                : death.breedingHappiness() != null ? death.breedingHappiness() : 0.0;
+        TameworkHappinessComponent happiness = happinessPresent ? new TameworkHappinessComponent(
+                death.happinessConfigId(), happinessValue, death.happinessLastUpdateMs()) : null;
+        boolean breedingPresent = death.breedingConfigId() != null || death.breedingHappiness() != null
+                || death.breedingEnabled() || death.breedingCooldownUntilMs() != 0L
+                || death.breedingLastPartnerUuid() != null;
+        TameworkBreedingComponent breeding = breedingPresent ? new TameworkBreedingComponent(
+                death.breedingConfigId(), happinessValue, death.happinessLastUpdateMs(), false,
+                death.breedingEnabled(), death.breedingCooldownUntilMs(), death.breedingLastPartnerUuid(), 0L, 0L)
+                : null;
+        boolean levelingPresent = death.levelingConfigId() != null || death.levelingLevel() > 1
+                || death.levelingTotalXp() != 0.0;
+        TameworkLevelingComponent leveling = levelingPresent ? new TameworkLevelingComponent(
+                death.levelingConfigId(), death.levelingLevel(), 0.0, death.levelingTotalXp(), 0L) : null;
+        boolean traitsPresent = death.traitsConfigId() != null || death.traitsRollSeed() != 0L
+                || death.traitsValues() != null;
+        TameworkTraitsComponent traits = traitsPresent ? new TameworkTraitsComponent(
+                death.traitsConfigId(), death.traitsRollSeed(), traitValues(death.traitsValues())) : null;
+        boolean talentsPresent = death.talentsConfigId() != null || death.talentsSpentPoints() != 0
+                || death.purchasedTalentIds() != null;
+        TameworkTalentsComponent talents = talentsPresent ? new TameworkTalentsComponent(
+                death.talentsConfigId(), death.talentsSpentPoints(), talentIds(death.purchasedTalentIds())) : null;
+        boolean lifeStagePresent = death.lifeStage() != null || death.lifeStageBornAtMs() != 0L
+                || death.lifeStageAdolescentAtMs() != 0L || death.lifeStageAdultAtMs() != 0L
+                || death.lifeStageFullyGrownAtMs() != 0L || death.lifeStageGender() != null;
+        TameworkLifeStageComponent lifeStage = null;
+        if (lifeStagePresent) {
+            lifeStage = new TameworkLifeStageComponent(death.lifeStage(), death.lifeStageBornAtMs(),
+                    death.lifeStageAdolescentAtMs(), death.lifeStageAdultAtMs(), death.lifeStageFullyGrownAtMs(),
+                    death.lifeStageBabyScale(), death.lifeStageAdolescentScale(),
+                    death.lifeStageAdolescentSwitchScale(), death.lifeStageAdultStartScale(),
+                    death.lifeStageAdultSwitchScale(), death.lifeStageAdultScale(),
+                    death.lifeStageGrowthScalingEnabled());
+            lifeStage.setGender(death.lifeStageGender());
+        }
+        Map<String, String> attachmentIds = attachmentIds(death.attachmentsValues());
+        TameworkAttachmentsComponent attachments = death.attachmentsConfigId() == null && attachmentIds.isEmpty()
+                ? null : new TameworkAttachmentsComponent(death.attachmentsConfigId(), attachmentIds);
+        return new CoopResidentStateSnapshot(identity.npcUuid(), null, -1, role,
+                commandLinks(identity, death.homePosition()), owner(identity, death.ownerName()),
+                new TameworkTamedComponent(death.tamed()), name(customName, identity.ownerUuid()), happiness, null,
+                breeding, leveling, traits, talents, lifeStage, attachments, null, createdAtMs);
+    }
+
+    private static TameworkCommandLinksComponent commandLinks(Identity identity, @Nullable SnapshotVector3 home) {
+        return new TameworkCommandLinksComponent(identity.ownerUuid(), identity.toolIds().toArray(new String[0]),
+                home == null ? null : new Vector3d(home.x(), home.y(), home.z()));
+    }
+
+    @Nullable
+    private static TameworkOwnerComponent owner(Identity identity, @Nullable String payloadOwnerName) {
+        String ownerName = identity.ownerName() != null ? identity.ownerName()
+                : identity.ownerUuid() != null ? payloadOwnerName : null;
+        return identity.ownerUuid() == null && ownerName == null
+                ? null : new TameworkOwnerComponent(identity.ownerUuid(), ownerName);
+    }
+
+    @Nullable
+    private static TameworkNpcNameComponent name(@Nullable String customName, @Nullable UUID ownerUuid) {
+        return customName == null || customName.isBlank() ? null
+                : new TameworkNpcNameComponent(customName, ownerUuid, 0L, TameworkNpcNameComponent.NameSource.System);
+    }
+
+    /** Version 1 trait values: a JSON array of {@code {id, value}}. Entries that are not that are left out. */
+    private static TameworkTraitsComponent.TraitValue[] traitValues(@Nullable String raw) {
+        List<TameworkTraitsComponent.TraitValue> values = new ArrayList<>();
+        try {
+            JsonElement parsed = raw == null || raw.isBlank() ? null : JsonParser.parseString(raw);
+            for (JsonElement element : parsed != null && parsed.isJsonArray() ? parsed.getAsJsonArray() : new JsonArray()) {
+                JsonObject trait = element.isJsonObject() ? element.getAsJsonObject() : new JsonObject();
+                String id = string(trait, "id");
+                JsonElement value = trait.get("value");
+                if (id != null && !id.isBlank() && value != null && value.isJsonPrimitive()
+                        && value.getAsJsonPrimitive().isNumber() && Double.isFinite(value.getAsDouble())) {
+                    values.add(new TameworkTraitsComponent.TraitValue(id, value.getAsDouble()));
+                }
+            }
+        } catch (RuntimeException malformed) {
+            // Keep the values read so far.
+        }
+        return values.toArray(new TameworkTraitsComponent.TraitValue[0]);
+    }
+
+    /** Version 1 talent ids: separated by a bar, with a backslash escaping a bar or a backslash. */
+    private static String[] talentIds(@Nullable String raw) {
+        List<String> ids = new ArrayList<>();
+        if (raw != null) {
+            StringBuilder current = new StringBuilder();
+            boolean escaping = false;
+            for (int index = 0; index <= raw.length(); index++) {
+                boolean end = index == raw.length();
+                char value = end ? '|' : raw.charAt(index);
+                if (escaping && !end) {
+                    current.append(value);
+                    escaping = false;
+                } else if (value == BACKSLASH && !end) {
+                    escaping = true;
+                } else if (value == '|') {
+                    String id = current.toString().trim();
+                    current.setLength(0);
+                    if (!id.isEmpty() && !ids.contains(id)) {
+                        ids.add(id);
+                    }
+                } else {
+                    current.append(value);
+                }
+            }
+        }
+        return ids.toArray(new String[0]);
+    }
+
+    /** Version 1 attachments: {@code key,value} pairs separated by {@code ;}, each token base64url text. */
+    private static Map<String, String> attachmentIds(@Nullable String raw) {
+        Map<String, String> ids = new LinkedHashMap<>();
+        if (raw == null || raw.isBlank()) {
+            return ids;
+        }
+        for (String part : raw.split(";")) {
+            int separator = part.indexOf(',');
+            if (separator <= 0 || separator == part.length() - 1) {
+                continue;
+            }
+            try {
+                String key = new String(Base64.getUrlDecoder().decode(part.substring(0, separator)), StandardCharsets.UTF_8);
+                String value = new String(Base64.getUrlDecoder().decode(part.substring(separator + 1)), StandardCharsets.UTF_8);
+                if (!key.isBlank() && !value.isBlank()) {
+                    ids.putIfAbsent(key, value);
+                }
+            } catch (IllegalArgumentException malformed) {
+                // Skip this pair; the others still apply.
+            }
+        }
+        return ids;
+    }
+
+    /** The {@code npcUuid} a payload names at its root or inside {@code fullState}; null when it names none. */
+    @Nullable
+    static UUID npcUuid(@Nonnull String payloadJson) {
+        JsonObject root = object(payloadJson);
+        if (root == null) {
+            return null;
+        }
+        JsonElement full = root.get("fullState");
+        String value = string(full != null && full.isJsonObject() ? full.getAsJsonObject() : root, "npcUuid");
+        try {
+            return value == null ? null : UUID.fromString(value);
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
     }
 
     /** The death timers of a death snapshot payload; null when it has no {@code diedAtMs}. */

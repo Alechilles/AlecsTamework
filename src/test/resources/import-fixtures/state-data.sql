@@ -114,6 +114,14 @@ VALUES ('p-live', 'Alechilles:Tamework:EntityCheckpoint', 'alias:aaaaaaaa-0000-0
     '{"profileId":"p-live"}', hex(zeroblob(32)), 2, 1000, 1200, 1200);
 INSERT INTO profile_extension_data (profile_id, namespace, data_key, payload_version, json_payload, payload_hash,
     revision, created_at_ms, updated_at_ms, deleted_at_ms)
+VALUES ('p-live', 'Alechilles:Tamework:EntityCheckpoint', 'alias:aaaaaaaa-0000-0000-0000-000000000009', 1,
+    '{"profileId":"p-live","capturedAtMs":1495}', hex(zeroblob(32)), 1, 1495, 1495, NULL);
+INSERT INTO profile_extension_data (profile_id, namespace, data_key, payload_version, json_payload, payload_hash,
+    revision, created_at_ms, updated_at_ms, deleted_at_ms)
+VALUES ('p-dead', 'Alechilles:Tamework:EntityCheckpoint', 'alias:aaaaaaaa-0000-0000-0000-000000000008', 1,
+    '{"profileId":"p-dead","capturedAtMs":2300}', hex(zeroblob(32)), 1, 2300, 2300, NULL);
+INSERT INTO profile_extension_data (profile_id, namespace, data_key, payload_version, json_payload, payload_hash,
+    revision, created_at_ms, updated_at_ms, deleted_at_ms)
 VALUES ('p-live', 'Mod:Thing', 'k1', 1, '{"level":4}', hex(zeroblob(32)), 12, 1100, 1490, NULL);
 INSERT INTO profile_extension_data (profile_id, namespace, data_key, payload_version, json_payload, payload_hash,
     revision, created_at_ms, updated_at_ms, deleted_at_ms)

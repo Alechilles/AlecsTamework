@@ -19,7 +19,8 @@ import javax.annotation.Nonnull;
  * @param records   one record per imported companion, state-file profiles first, then bonded
  *                  ones, each in profile id order; all at generation 0 with no domain claims
  * @param snapshots the snapshot of each record that has one, by profile id. Format 1 for a live
- *                  companion with an entity checkpoint, format 0 otherwise. A RELEASED record has none
+ *                  companion with an entity checkpoint, format 0 otherwise. A RELEASED record has
+ *                  none, and neither has an ITEM record listed in {@code stateInItem}
  */
 public record ImportResult(
         @Nonnull List<CompanionRecord> records,
@@ -37,6 +38,13 @@ public record ImportResult(
     public static final String SKIP_BONDED_PROFILE = "ALSO_BONDED";
     /** Extension data whose namespace contains "/", which the new store refuses (R12). */
     public static final String SKIP_NAMESPACE_SLASH = "NAMESPACE_HAS_SLASH";
+    /** Extension data in a namespace Tamework reserves for itself, such as the 4.x coop production watermark. */
+    public static final String SKIP_RESERVED_NAMESPACE = "RESERVED_NAMESPACE";
+    /**
+     * A profile whose mapping threw. The key is the profile id followed by the exception class and
+     * message in brackets. The other profiles are still imported.
+     */
+    public static final String SKIP_MAPPING_FAILED = "MAPPING_FAILED";
     /** A snapshot, checkpoint or bonded payload that holds no readable companion state. */
     public static final String SKIP_UNREADABLE = "UNREADABLE";
 
@@ -64,7 +72,8 @@ public record ImportResult(
      *                                the body is seen, and a recover respawns from the role unless
      *                                an older state snapshot existed (R5)
      * @param importedLost            records imported LOST because the old row named no usable
-     *                                body, world or coop slot, or had state UNRESOLVED or unknown
+     *                                body or coop slot, or had state UNRESOLVED or unknown. The
+     *                                last body of such a record is a REJOIN alias
      * @param npcUuidCollisions       both sides of every current NPC UUID claimed twice: the
      *                                newer record kept it, the other is LOST (R9)
      * @param withoutState            records other than LIVE whose old rows held no readable
@@ -72,6 +81,14 @@ public record ImportResult(
      * @param checkpointsOfDyingBodies LIVE records whose checkpoint was taken as the body died;
      *                                the death state was removed from their snapshot so that a
      *                                recover can use it if the body is gone
+     * @param liveWorldGuessed        LIVE records whose old rows named no world (the old runtime
+     *                                cleared it for an unloaded body); they carry the world most
+     *                                other rows name until the body is seen
+     * @param stateInItem             ITEM records with no snapshot: the old rows hold no state
+     *                                for them, because a 2.x capture kept it in the capture item
+     * @param liveUsedHistory         LIVE records with no checkpoint whose snapshot is an old,
+     *                                non-current row (never a death): the best saved state of a
+     *                                body that is out in the world
      */
     public record Report(
             @Nonnull Map<LocationKind, Integer> recordsByLocation,
@@ -83,8 +100,14 @@ public record ImportResult(
             @Nonnull List<UUID> importedLost,
             @Nonnull List<UUID> npcUuidCollisions,
             @Nonnull List<UUID> withoutState,
-            @Nonnull List<UUID> checkpointsOfDyingBodies) {
+            @Nonnull List<UUID> checkpointsOfDyingBodies,
+            @Nonnull List<UUID> liveWorldGuessed,
+            @Nonnull List<UUID> stateInItem,
+            @Nonnull List<UUID> liveUsedHistory) {
         public Report {
+            liveUsedHistory = List.copyOf(liveUsedHistory);
+            liveWorldGuessed = List.copyOf(liveWorldGuessed);
+            stateInItem = List.copyOf(stateInItem);
             recordsByLocation = Collections.unmodifiableMap(new LinkedHashMap<>(recordsByLocation));
             quarantinedProfiles = List.copyOf(quarantinedProfiles);
             skippedRows = List.copyOf(skippedRows);

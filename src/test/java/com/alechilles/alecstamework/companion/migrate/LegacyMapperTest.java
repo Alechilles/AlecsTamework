@@ -95,7 +95,7 @@ class LegacyMapperTest {
     @Test
     void aLiveCompanionWithACheckpointGetsAnEntitySnapshotAndItsPosition() {
         UUID id = rows.profile("ACTIVE", "LIVE_ENTITY", NPC.toString(), "world-a");
-        rows.profiles.set(0, new LegacyRows.Profile(id.toString(), null, "tamed_wolf", null, null, 1, 1, 1, 0));
+        rows.profiles.set(0, new LegacyRows.Profile(id.toString(), null, "Wolf_Pup", null, null, 1, 1, 1, 0));
         rows.alias(OLD_NPC, id, "RETIRED");
         rows.alias(NPC, id, "CURRENT");
         // The old body's checkpoint is newer, but the current alias's checkpoint is the one to use.
@@ -109,7 +109,7 @@ class LegacyMapperTest {
         assertEquals(NPC, imported.currentNpcUuid());
         assertEquals(7000L, imported.lastSnapshotAtMs());
         assertEquals("Tamed_Wolf", imported.summary().roleId());
-        assertEquals("Tamed_Wolf", imported.roleId(), "a role the old table lower-cased is spelled as the body has it");
+        assertEquals("Tamed_Wolf", imported.roleId(), "the body is the authority for its role: it grew up since the row was written");
         assertEquals(4, imported.summary().level());
         assertEquals("Rex", imported.displayName(), "the body's name component names the companion");
         SnapshotEnvelope snapshot = result.snapshots().get(id);
@@ -218,10 +218,12 @@ class LegacyMapperTest {
     void theSummaryComesFromTheStoredState() {
         UUID id = rows.profile("LOST", "NONE", null, null);
         rows.snapshot(id, "snap-lost", "lost", plainState(STATE_NPC, 7), 1, 2000);
+        rows.profiles.set(0, new LegacyRows.Profile(id.toString(), null, "Wolf_Pup", null, null, 1, 1, 1, 0));
 
         CompanionRecord imported = record(rows.map(), id);
 
         CompanionSummary summary = imported.summary();
+        assertEquals("Tamed_Wolf", imported.roleId(), "the snapshot of its own kind has the role the body had");
         assertEquals("Rex", summary.customName());
         assertEquals("Rex", imported.displayName());
         assertEquals("Tamed_Wolf", summary.roleId());
@@ -292,8 +294,12 @@ class LegacyMapperTest {
         rows.rosters.add(new LegacyRows.RosterMembership("slot-1", id.toString(), OWNER.toString(), "wolves", 2,
                 "pack", true, null, null, null, null, 1, 1));
         rows.origins.add(new LegacyRows.Provisioning(id.toString(), "Mod:Spawner", "wolf-1", null, 1));
-        rows.tool(id, "tool-b");
-        rows.tool(id, "tool-a");
+        // Every link type names a command tool; the 2.x import typed a link by the table it came from.
+        rows.tool(id, "tool-b", "command");
+        rows.tool(id, "tool-a", "profile");
+        rows.tool(id, "tool-c", "death");
+        rows.tool(id, "tool-a", "capture");
+        rows.tool(id, "tool-b", "coop");
         UUID bonded = rows.bonded("STORED", plainState(STATE_NPC, 3));
 
         ImportResult result = rows.map();
@@ -308,7 +314,7 @@ class LegacyMapperTest {
         assertFalse(imported.bonded());
         assertEquals("Mod:Spawner", imported.originNamespace());
         assertEquals("wolf-1", imported.originKey());
-        assertEquals(List.of("tool-b", "tool-a"), imported.toolIds());
+        assertEquals(List.of("tool-b", "tool-a", "tool-c"), imported.toolIds());
         assertEquals(2500L, imported.updatedAtMs());
         CompanionRecord bondedRecord = record(result, bonded);
         assertEquals("dragons", bondedRecord.rosterId());
@@ -316,7 +322,9 @@ class LegacyMapperTest {
         assertEquals(29L, bondedRecord.revision());
         assertEquals(OWNER, bondedRecord.ownerUuid());
         assertEquals(-400L, bondedRecord.summonCooldownUntilMs());
-        assertEquals("Rex", bondedRecord.displayName(), "an unnamed bonded row takes the name its body carried");
+        assertEquals("Rex", bondedRecord.displayName(), "a bonded companion is named by its body's name component");
+        assertEquals("Tamed_Wolf", bondedRecord.roleId(),
+                "the state has the form the companion is in now; the row keeps the role it was bonded as");
         assertEquals(plainState(STATE_NPC, 3), result.snapshots().get(bonded).importedStateJson(),
                 "the bonded base64 and version wrappers are removed");
     }
@@ -326,8 +334,8 @@ class LegacyMapperTest {
         UUID id = rows.profile("LOST", "NONE", null, null);
         rows.extensions.add(new LegacyRows.ExtensionData(id.toString(), "Mod:Thing", "k1", 1, "{\"level\":4}", 12, 1, 1));
         rows.extensions.add(new LegacyRows.ExtensionData(id.toString(), "Mod/Bad", "k1", 1, "{}", 3, 1, 1));
-        rows.extensions.add(new LegacyRows.ExtensionData(id.toString(), LegacyReader.ENTITY_CHECKPOINT_NAMESPACE,
-                "alias:" + NPC, 1, "{}", 3, 1, 1));
+        rows.extensions.add(new LegacyRows.ExtensionData(id.toString(), "Alechilles:Tamework",
+                "managed-coop-production-v1", 1, "{\"eligibleMs\":5,\"version\":1}", 3, 1, 1));
         UUID bonded = rows.bonded("STORED", plainState(STATE_NPC, 3));
         String hyDragon = "{\"schemaVersion\":1,\"speciesId\":\"miniwyvern\"}";
         rows.bondedExtensions.add(new LegacyRows.BondedExtension(bonded.toString(), "Alechilles:HyDragon",
@@ -348,6 +356,9 @@ class LegacyMapperTest {
         assertEquals(List.of(
                 new ImportResult.Skipped("profile_extension_data", id + "|Mod/Bad|k1",
                         ImportResult.SKIP_NAMESPACE_SLASH),
+                // The 4.x coop production watermark: a 5.0 coop keeps its own on the coop block.
+                new ImportResult.Skipped("profile_extension_data",
+                        id + "|Alechilles:Tamework|managed-coop-production-v1", ImportResult.SKIP_RESERVED_NAMESPACE),
                 new ImportResult.Skipped("bonded_companion_extension_data", bonded + "|Bad/Namespace",
                         ImportResult.SKIP_NAMESPACE_SLASH)),
                 result.report().skippedRows());
@@ -358,7 +369,7 @@ class LegacyMapperTest {
         UUID older = rows.profile("ACTIVE", "LIVE_ENTITY", NPC.toString(), "world-a");
         rows.leases.add(lease(older, 45_000L, null));
         UUID bonded = rows.bonded("ACTIVE", plainState(STATE_NPC, 3));
-        rows.bondedLeases.add(new LegacyRows.BondedLease(bonded.toString(), NPC.toString(), "world-a", 1, 0, "LIVE"));
+        rows.bondedLeases.add(new LegacyRows.BondedLease(bonded.toString(), NPC.toString(), "world-a", 0));
 
         ImportResult result = rows.map();
 
@@ -368,7 +379,7 @@ class LegacyMapperTest {
         assertNull(record(result, older).currentNpcUuid());
         assertEquals(0L, record(result, older).summonedUntilMs());
         assertEquals(List.of(older, bonded), result.report().npcUuidCollisions());
-        assertEquals(Optional.of(new LegacyAliases.Entry(bonded, true)), result.aliases().byNpcUuid(NPC));
+        assertEquals(Optional.of(new LegacyAliases.Entry(bonded, LegacyAliases.Kind.CURRENT)), result.aliases().byNpcUuid(NPC));
     }
 
     @Test
@@ -426,13 +437,13 @@ class LegacyMapperTest {
         LegacyAliases aliases = rows.map().aliases();
 
         assertEquals(Map.of(
-                NPC, new LegacyAliases.Entry(live, true),
-                OLD_NPC, new LegacyAliases.Entry(live, false),
-                lostBody, new LegacyAliases.Entry(lost, false),
-                STATE_NPC, new LegacyAliases.Entry(lost, false),
-                UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001"), new LegacyAliases.Entry(bonded, false),
-                cleanup, new LegacyAliases.Entry(bonded, false),
-                source, new LegacyAliases.Entry(bonded, false)), aliases.entries());
+                NPC, new LegacyAliases.Entry(live, LegacyAliases.Kind.CURRENT),
+                OLD_NPC, new LegacyAliases.Entry(live, LegacyAliases.Kind.STALE),
+                lostBody, new LegacyAliases.Entry(lost, LegacyAliases.Kind.STALE),
+                STATE_NPC, new LegacyAliases.Entry(lost, LegacyAliases.Kind.STALE),
+                UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001"), new LegacyAliases.Entry(bonded, LegacyAliases.Kind.STALE),
+                cleanup, new LegacyAliases.Entry(bonded, LegacyAliases.Kind.STALE),
+                source, new LegacyAliases.Entry(bonded, LegacyAliases.Kind.STALE)), aliases.entries());
         assertEquals(Optional.empty(), aliases.byNpcUuid(UUID.randomUUID()));
 
         // The file the importer writes loads back to the same map; a world never imported has none.
@@ -442,6 +453,197 @@ class LegacyMapperTest {
         aliases.save(io, store).join();
         assertTrue(io.exists(store.resolve("legacy-aliases.json")));
         assertEquals(aliases, LegacyAliases.load(io, store));
+    }
+
+    @Test
+    void aVersion1DeathPayloadBecomesAFullStateWithItsTimers() {
+        UUID id = rows.profile("DEAD_REVIVABLE", "NONE", null, null);
+        rows.profiles.set(0, new LegacyRows.Profile(id.toString(), "Wolf", "tamed_wolf",
+                "{\"owner_name\":\"Alec\",\"custom_name\":\"Rex\",\"tamed\":true}", null, 1, 1, 1, 0));
+        rows.alias(NPC, id, "CURRENT");
+        rows.tool(id, "tool-a", "death");
+        String skin = Base64.getUrlEncoder().encodeToString("Skin".getBytes(StandardCharsets.UTF_8)) + ","
+                + Base64.getUrlEncoder().encodeToString("Blue".getBytes(StandardCharsets.UTF_8));
+        // The flat shape the 2.x persistence wrote: no npcUuid, identity kept in the profile rows.
+        rows.snapshot(id, "snap-death", "death", 1, "{\"ownerId\":\"" + OWNER + "\",\"roleId\":\"Tamed_Wolf\","
+                + "\"tamed\":true,\"diedAtMs\":5000,\"respawnAvailableAtMs\":6000,\"deathCauseKind\":\"PLAYER\","
+                + "\"deathSourceName\":\"Bob\",\"levelingConfigId\":\"Leveling_A\",\"levelingLevel\":9,"
+                + "\"levelingTotalXp\":300.0,\"traitsConfigId\":\"Traits_A\",\"traitsRollSeed\":7,"
+                + "\"traitsValues\":\"[{\\\"id\\\":\\\"Trait_Health\\\",\\\"value\\\":1.25}]\","
+                + "\"talentsConfigId\":\"Talents_A\",\"talentsSpentPoints\":2,\"purchasedTalentIds\":\"Bite|Howl\","
+                + "\"attachmentsValues\":\"" + skin + "\",\"breedingConfigId\":\"Breeding_A\","
+                + "\"breedingCooldownUntilMs\":-700,\"lifeStage\":\"Adult\",\"lifeStageGender\":\"Female\"}", 3, 2400, true);
+
+        ImportResult result = rows.map();
+
+        CompanionRecord imported = record(result, id);
+        assertEquals(CompanionLocation.dead("PLAYER:Bob"), imported.location());
+        assertEquals(5000L, imported.diedAtMs());
+        assertEquals(6000L, imported.reviveAvailableAtMs());
+        assertEquals("Tamed_Wolf", imported.roleId());
+        assertEquals(9, imported.summary().level());
+        assertEquals(Map.of("Trait_Health", 1.25), imported.summary().traits());
+        assertEquals(-700L, imported.summary().breedingCooldownUntilMs());
+        var state = new CoopResidentStateSnapshotCodec().decode(result.snapshots().get(id).importedStateJson())
+                .snapshotOrNull();
+        assertNotNull(state, "the restore path can read the rebuilt state");
+        assertEquals(NPC, state.npcUuid());
+        assertEquals(9, state.leveling().getLevel());
+        assertEquals(300.0, state.leveling().getTotalXp());
+        assertEquals(List.of("Bite", "Howl"), List.of(state.talents().getPurchasedTalentIds()));
+        assertEquals(Map.of("Skin", "Blue"), state.attachments().getAttachmentIds());
+        assertEquals("Female", state.lifeStage().getGender());
+        assertEquals(OWNER, state.owner().getOwnerId());
+        assertEquals("Rex", state.npcName().getName());
+        assertEquals(List.of("tool-a"), List.of(state.commandLinks().getToolIds()));
+        assertEquals(List.of(), result.report().skippedRows());
+        assertEquals(List.of(), result.report().withoutState());
+    }
+
+    @Test
+    void aVersion1LostPayloadKeepsIdentityAndAnOlderFullStateIsPreferred() {
+        String lostV1 = "{\"lastKnownPosition\":{\"x\":1.0,\"y\":2.0,\"z\":3.0},\"homePosition\":{\"x\":4.0,"
+                + "\"y\":5.0,\"z\":6.0},\"lostAtMs\":900,\"relocationRetryAttempts\":2,\"recoveredAtMs\":0}";
+        UUID identityOnly = rows.profile("LOST", "NONE", null, null);
+        rows.profiles.set(0, new LegacyRows.Profile(identityOnly.toString(), null, "Tamed_Wolf",
+                "{\"owner_name\":\"Alec\",\"custom_name\":\"Jade\",\"tamed\":true}", null, 1, 1, 1, 0));
+        rows.snapshot(identityOnly, "lost-1", "lost", 1, lostV1, 4, 2000, true);
+        UUID withHistory = rows.profile("LOST", "NONE", null, null);
+        rows.snapshot(withHistory, "lost-2", "lost", 1, lostV1, 9, 3000, true);
+        rows.snapshot(withHistory, "older-capture", "capture", 2, plainState(STATE_NPC, 6), 5, 1000, false);
+
+        ImportResult result = rows.map();
+
+        var state = new CoopResidentStateSnapshotCodec().decode(
+                result.snapshots().get(identityOnly).importedStateJson()).snapshotOrNull();
+        assertEquals(identityOnly, state.npcUuid(), "with no alias the profile id stands in for the body");
+        assertEquals(OWNER, state.owner().getOwnerId());
+        assertEquals("Jade", state.npcName().getName());
+        assertTrue(state.tamed().isTamed());
+        assertEquals(5.0, state.commandLinks().getHomePosition().y());
+        assertEquals("Jade", record(result, identityOnly).displayName());
+        assertEquals(6, record(result, withHistory).summary().level(),
+                "an older snapshot with progression beats a current one that holds only identity");
+        assertEquals(List.of(), result.report().withoutState());
+        assertEquals(List.of(), result.report().skippedRows());
+    }
+
+    @Test
+    void aCapturedCompanionIsAnItemAndA2xCaptureHasItsStateInTheItem() {
+        UUID owned = rows.profile("CAPTURED", "CAPTURE_ITEM", "capture-v1", null);
+        rows.alias(NPC, owned, "CURRENT");
+        rows.snapshot(owned, "capture-v1", "capture", 1, "{\"capturedAtMs\":1000,\"roleId\":\"Tamed_Wolf\","
+                + "\"displayName\":\"Wolf\",\"lastKnownPosition\":{\"x\":1.0,\"y\":2.0,\"z\":3.0}}", 2, 1000, true);
+        UUID unowned = rows.profile("CAPTURED", "CAPTURE_ITEM", "capture-v2", null);
+        rows.lifecycles.set(1, new LegacyRows.Lifecycle(unowned.toString(), null, "CAPTURED", "CAPTURE_ITEM",
+                "capture-v2", null, null, 1, null, 0, null));
+        rows.snapshot(unowned, "capture-v2", "capture", 2, plainState(STATE_NPC, 5), 1, 1000, true);
+
+        ImportResult result = rows.map();
+
+        assertEquals(CompanionLocation.item(), record(result, owned).location());
+        assertNull(record(result, owned).currentNpcUuid());
+        assertNull(result.snapshots().get(owned), "an empty state would let a release replace what the item holds");
+        assertEquals(List.of(owned), result.report().stateInItem());
+        assertEquals(CompanionLocation.item(), record(result, unowned).location());
+        assertNull(record(result, unowned).ownerUuid());
+        assertEquals(RecordScope.WORLD_BOUND, record(result, unowned).scope());
+        assertEquals(5, record(result, unowned).summary().level());
+        assertEquals(plainState(STATE_NPC, 5), result.snapshots().get(unowned).importedStateJson());
+        assertEquals(List.of(), result.report().skippedRows());
+        assertEquals(Optional.of(new LegacyAliases.Entry(owned, LegacyAliases.Kind.STALE)), result.aliases().byNpcUuid(NPC),
+                "the captured body's alias is stale");
+    }
+
+    @Test
+    void anUnloadedBodyWithNoWorldOnRecordStaysLive() {
+        rows.profile("ACTIVE", "LIVE_ENTITY", UUID.randomUUID().toString(), "world-a");
+        UUID withCheckpoint = rows.profile("UNLOADED", "NONE", null, null);
+        rows.alias(NPC, withCheckpoint, "CURRENT");
+        rows.checkpoint(withCheckpoint, NPC, "world-b", "1.0", "2.0", "3.0", "7000", 4);
+        UUID bare = rows.profile("UNLOADED", "NONE", null, null);
+        rows.alias(OLD_NPC, bare, "CURRENT");
+        UUID withHistory = rows.profile("UNLOADED", "NONE", null, null);
+        rows.alias(STATE_NPC, withHistory, "CURRENT");
+        rows.snapshot(withHistory, "old-capture", "capture", 2, plainState(STATE_NPC, 8), 3, 1500, false);
+        UUID diedBefore = rows.profile("UNLOADED", "NONE", null, null);
+        UUID revivedBody = UUID.randomUUID();
+        rows.alias(revivedBody, diedBefore, "CURRENT");
+        rows.snapshot(diedBefore, "old-death", "death", 2, "{\"fullState\":" + plainState(STATE_NPC, 9)
+                + ",\"diedAtMs\":1,\"respawnAvailableAtMs\":2,\"deathCauseKind\":\"NPC\"}", 3, 1500, false);
+
+        ImportResult result = rows.map();
+
+        assertEquals(CompanionLocation.live("world-b", 1.0, 2.0, 3.0), record(result, withCheckpoint).location());
+        assertEquals(NPC, record(result, withCheckpoint).currentNpcUuid());
+        // The old runtime cleared the world of an unloaded body; the world most rows name stands in.
+        assertEquals(CompanionLocation.live("world-a", 0, 0, 0), record(result, bare).location());
+        assertEquals(OLD_NPC, record(result, bare).currentNpcUuid());
+        assertEquals("{\"npcUuid\":\"" + OLD_NPC + "\"}", result.snapshots().get(bare).importedStateJson());
+        assertEquals(8, record(result, withHistory).summary().level(),
+                "an old snapshot is the best saved state of a body that is out in the world");
+        assertEquals(List.of(withHistory), result.report().liveUsedHistory());
+        assertEquals("{\"npcUuid\":\"" + revivedBody + "\"}", result.snapshots().get(diedBefore).importedStateJson(),
+                "an old death snapshot is the state of a life the body has left behind");
+        assertEquals(List.of(bare, withHistory, diedBefore), result.report().liveWorldGuessed());
+        assertEquals(List.of(), result.report().importedLost());
+        assertEquals(Optional.of(new LegacyAliases.Entry(bare, LegacyAliases.Kind.CURRENT)), result.aliases().byNpcUuid(OLD_NPC));
+    }
+
+    @Test
+    void withNoWorldInAnyRowTheDefaultWorldIsAssumed() {
+        UUID id = rows.profile("UNLOADED", "NONE", null, null);
+        rows.alias(NPC, id, "CURRENT");
+
+        assertEquals(CompanionLocation.live("default", 0, 0, 0), record(rows.map(), id).location());
+    }
+
+    @Test
+    void aRecallRecoverySnapshotIsTheStateOfALiveBodyWithNoCheckpoint() {
+        UUID id = rows.profile("ACTIVE", "LIVE_ENTITY", NPC.toString(), "world-a");
+        rows.snapshot(id, "recovery", "public_import_recovery", 1, plainState(NPC, 11), 0, 1200, true);
+
+        ImportResult result = rows.map();
+
+        assertEquals(LocationKind.LIVE, record(result, id).location().kind());
+        assertEquals(11, record(result, id).summary().level());
+        assertEquals(plainState(NPC, 11), result.snapshots().get(id).importedStateJson());
+        assertEquals(1200L, record(result, id).lastSnapshotAtMs());
+    }
+
+    @Test
+    void aQuarantinedUnresolvedProfileKeepsTheStateOfItsOldSnapshots() {
+        UUID id = rows.profile("UNRESOLVED", "UNRESOLVED", null, null);
+        rows.alias(NPC, id, "CURRENT");
+        rows.snapshot(id, "old-death", "death", 1, "{\"tamed\":true,\"diedAtMs\":5,\"respawnAvailableAtMs\":6,"
+                + "\"levelingConfigId\":\"Leveling_A\",\"levelingLevel\":4,\"levelingTotalXp\":50.0}", 2, 1000, false);
+        rows.snapshot(id, "old-lost", "lost", 1, "{\"lostAtMs\":900}", 5, 2000, false);
+
+        ImportResult result = rows.map();
+
+        assertEquals(CompanionLocation.lost(LegacyMapper.CAUSE_UNRESOLVED), record(result, id).location());
+        assertEquals(4, record(result, id).summary().level());
+        assertEquals(List.of(), result.report().withoutState());
+        assertEquals(Optional.of(new LegacyAliases.Entry(id, LegacyAliases.Kind.REJOIN)), result.aliases().byNpcUuid(NPC),
+                "if its last body turns up, that body is the companion");
+    }
+
+    @Test
+    void oneProfileThatCannotBeMappedDoesNotStopTheImport() {
+        UUID bad = rows.profile("LOST", "NONE", null, null);
+        // A record refuses an origin with no key; any such refusal must cost only this profile.
+        rows.origins.add(new LegacyRows.Provisioning(bad.toString(), "Mod:Spawner", null, null, 1));
+        UUID good = rows.profile("LOST", "NONE", null, null);
+
+        ImportResult result = rows.map();
+
+        assertEquals(List.of(good), result.records().stream().map(CompanionRecord::profileId).toList());
+        assertNull(result.snapshots().get(bad));
+        assertEquals(List.of(good), result.report().withoutState());
+        assertEquals(1, result.report().skippedRows().size());
+        ImportResult.Skipped skipped = result.report().skippedRows().get(0);
+        assertEquals(ImportResult.SKIP_MAPPING_FAILED, skipped.reason());
+        assertTrue(skipped.key().startsWith(bad + " (IllegalArgumentException: "), skipped.key());
     }
 
     private static CompanionRecord record(ImportResult result, UUID id) {
@@ -465,15 +667,12 @@ class LegacyMapperTest {
     }
 
     private static LegacyRows.TimedLease lease(UUID id, Long remainingMs, Long cooldownUntilMs) {
-        return new LegacyRows.TimedLease(id.toString(), 1, remainingMs == null ? null : "session", remainingMs,
-                cooldownUntilMs, "Timed_Wolf", 60_000, 30_000, true, remainingMs == null ? null : 1L, 1, 1);
+        return new LegacyRows.TimedLease(id.toString(), remainingMs, cooldownUntilMs);
     }
 
     private static LegacyRows.BondedProfile withDeath(LegacyRows.BondedProfile p, long diedAtMs) {
-        return new LegacyRows.BondedProfile(p.profileId(), p.ownerUuid(), p.rosterId(), p.familyId(), p.roleId(),
-                p.state(), p.revision(), p.snapshotJson(), p.createdAtMs(), p.updatedAtMs(), p.policyJson(),
-                p.displayName(), p.species(), p.gender(), diedAtMs, p.summonCooldownUntilMs(), p.reviveCount(),
-                p.quarantineReason(), p.quarantinedAtMs());
+        return new LegacyRows.BondedProfile(p.profileId(), p.ownerUuid(), p.rosterId(), p.roleId(), p.state(),
+                p.revision(), p.snapshotJson(), p.updatedAtMs(), diedAtMs, p.summonCooldownUntilMs());
     }
 
     /** Old rows under construction; every profile is owned by {@link #OWNER} and has role Tamed_Wolf. */
@@ -511,10 +710,16 @@ class LegacyMapperTest {
             aliases.add(new LegacyRows.Alias(npcUuid.toString(), profileId.toString(), aliases.size(), state, 1, null));
         }
 
+        /** A current snapshot with payload version 2. */
         void snapshot(UUID profileId, String snapshotId, String kind, String payloadJson, long lifecycleRevision,
                       long createdAtMs) {
-            snapshots.add(new LegacyRows.Snapshot(snapshotId, profileId.toString(), kind, 2, payloadJson,
-                    lifecycleRevision, createdAtMs));
+            snapshot(profileId, snapshotId, kind, 2, payloadJson, lifecycleRevision, createdAtMs, true);
+        }
+
+        void snapshot(UUID profileId, String snapshotId, String kind, int version, String payloadJson,
+                      long lifecycleRevision, long createdAtMs, boolean current) {
+            snapshots.add(new LegacyRows.Snapshot(snapshotId, profileId.toString(), kind, version, payloadJson,
+                    lifecycleRevision, createdAtMs, current));
         }
 
         /** A checkpoint as the old runtime wrote it: numbers as strings, the body as extended JSON. */
@@ -533,27 +738,31 @@ class LegacyMapperTest {
             checkpoints.add(new LegacyRows.EntityCheckpoint(profileId.toString(), "alias:" + alias,
                     "{\"version\":\"1\",\"worldKey\":\"" + worldKey + "\",\"x\":\"" + x + "\",\"y\":\"" + y
                             + "\",\"z\":\"" + z + "\",\"capturedAtMs\":\"" + capturedAtMs
-                            + "\",\"holderExtendedJson\":\"" + holder + "\"}", 1, 1));
+                            + "\",\"holderExtendedJson\":\"" + holder + "\"}", 1, Long.parseLong(capturedAtMs)));
         }
 
         void tool(UUID profileId, String toolUuid) {
-            tools.add(new LegacyRows.ToolLink(profileId.toString(), toolUuid, "command", 1, 1));
+            tool(profileId, toolUuid, "command");
+        }
+
+        void tool(UUID profileId, String toolUuid, String linkType) {
+            tools.add(new LegacyRows.ToolLink(profileId.toString(), toolUuid, linkType, 1, 1));
         }
 
         /** A bonded profile whose snapshot is {@code state} inside the version and base64 wrappers. */
         UUID bonded(String state, String stateJson) {
             UUID id = new UUID(0x2000L, ++next);
-            bondedProfiles.add(new LegacyRows.BondedProfile(id.toString(), OWNER.toString(), "dragons", "fire",
+            bondedProfiles.add(new LegacyRows.BondedProfile(id.toString(), OWNER.toString(), "dragons",
                     "Bonded_Dragon", state, 29, envelope("{\"version\":1,\"fullState\":" + stateJson
-                    + ",\"extensions\":{}}"), 100, 9000 + next, "{}", null, "dragon", null, null, -400, 0, null, null));
+                    + ",\"extensions\":{}}"), 9000 + next, null, -400));
             return id;
         }
 
         ImportResult map() {
             return LegacyMapper.map(new LegacyRows(
                     new LegacyRows.State(SOURCE, LegacyRows.StateSchema.V2, profiles, lifecycles, aliases, snapshots,
-                            checkpoints, tools, List.of(), rosters, leases, coopSlots, residencies, origins,
-                            extensions, unfinishedOperations, 0),
+                            checkpoints, tools, rosters, leases, coopSlots, residencies, origins,
+                            extensions, unfinishedOperations),
                     new LegacyRows.Bonded(SOURCE, bondedProfiles, bondedLeases, bondedExtensions, cleanupTargets,
                             captureSources)), IMPORT_TIME);
         }

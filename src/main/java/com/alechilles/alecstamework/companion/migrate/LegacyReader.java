@@ -100,18 +100,30 @@ public final class LegacyReader {
                         nullableLong(r, 6))),
                 query(db, """
                         SELECT snapshot_id, profile_id, snapshot_kind, payload_version, payload_json,
-                               source_lifecycle_revision, created_at_ms
-                        FROM companion_snapshot
-                        WHERE is_current = 1 OR snapshot_id IN (SELECT snapshot_id FROM coop_residency)
-                        ORDER BY snapshot_id
+                               source_lifecycle_revision, created_at_ms, is_current
+                        FROM companion_snapshot ORDER BY snapshot_id
                         """, r -> new LegacyRows.Snapshot(
                         r.getString(1), r.getString(2), r.getString(3), r.getInt(4), r.getString(5),
-                        r.getLong(6), r.getLong(7))),
+                        r.getLong(6), r.getLong(7), r.getInt(8) != 0)),
+                // A busy server holds thousands of checkpoints, about 20 KB each, and only a body
+                // that is out in the world needs one: one row per ACTIVE or UNLOADED profile.
                 query(db, """
-                        SELECT profile_id, data_key, json_payload, revision, updated_at_ms
-                        FROM profile_extension_data
-                        WHERE deleted_at_ms IS NULL AND namespace = '%s'
-                        ORDER BY profile_id, data_key
+                        SELECT e.profile_id, e.data_key, e.json_payload, e.revision, e.updated_at_ms
+                        FROM profile_extension_data e
+                        JOIN companion_lifecycle c ON c.profile_id = e.profile_id
+                        WHERE c.lifecycle_state IN ('ACTIVE', 'UNLOADED')
+                          AND e.deleted_at_ms IS NULL AND e.namespace = '%1$s'
+                          AND e.data_key = (
+                              SELECT x.data_key FROM profile_extension_data x
+                              WHERE x.profile_id = e.profile_id AND x.namespace = '%1$s'
+                                AND x.deleted_at_ms IS NULL
+                              ORDER BY x.data_key = 'alias:' || (
+                                           SELECT a.npc_uuid FROM companion_alias a
+                                           WHERE a.profile_id = x.profile_id AND a.alias_state = 'CURRENT'
+                                           LIMIT 1) DESC,
+                                       x.updated_at_ms DESC, x.data_key
+                              LIMIT 1)
+                        ORDER BY e.profile_id
                         """.formatted(ENTITY_CHECKPOINT_NAMESPACE), r -> new LegacyRows.EntityCheckpoint(
                         r.getString(1), r.getString(2), r.getString(3), r.getLong(4), r.getLong(5))),
                 query(db, """
@@ -119,11 +131,6 @@ public final class LegacyReader {
                         FROM companion_tool_link ORDER BY profile_id, tool_uuid, link_type
                         """, r -> new LegacyRows.ToolLink(
                         r.getString(1), r.getString(2), r.getString(3), r.getLong(4), r.getLong(5))),
-                query(db, """
-                        SELECT owner_uuid, family_id, roster_revision, created_at_ms, updated_at_ms
-                        FROM command_family ORDER BY owner_uuid, family_id
-                        """, r -> new LegacyRows.RosterFamily(
-                        r.getString(1), r.getString(2), r.getLong(3), r.getLong(4), r.getLong(5))),
                 query(db, """
                         SELECT slot_id, profile_id, owner_uuid, family_id, membership_revision, group_id,
                                active_for_bulk_commands, home_world_key, home_x, home_y, home_z,
@@ -135,14 +142,10 @@ public final class LegacyReader {
                         nullableDouble(r, 9), nullableDouble(r, 10), nullableDouble(r, 11),
                         r.getLong(12), r.getLong(13))),
                 query(db, """
-                        SELECT profile_id, lease_revision, session_id, remaining_ms, cooldown_until_ms,
-                               config_id, active_duration_ms, resummon_cooldown_ms,
-                               auto_store_on_owner_logout, checkpointed_at_ms, created_at_ms, updated_at_ms
+                        SELECT profile_id, remaining_ms, cooldown_until_ms
                         FROM timed_summon_lease ORDER BY profile_id
                         """, r -> new LegacyRows.TimedLease(
-                        r.getString(1), r.getLong(2), r.getString(3), nullableLong(r, 4), nullableLong(r, 5),
-                        r.getString(6), r.getLong(7), r.getLong(8), r.getInt(9) != 0,
-                        nullableLong(r, 10), r.getLong(11), r.getLong(12))),
+                        r.getString(1), nullableLong(r, 2), nullableLong(r, 3))),
                 query(db, """
                         SELECT coop_key, world_key, coop_id, x, y, z, resident_slot, residency_revision,
                                active_operation_id, reserved_profile_id
@@ -173,8 +176,7 @@ public final class LegacyReader {
                 count(db, """
                         SELECT COUNT(*) FROM operation_envelope
                         WHERE phase NOT IN ('PUBLISHED', 'COMPENSATED', 'FAILED')
-                        """),
-                count(db, "SELECT COUNT(*) FROM companion_lifecycle WHERE quarantine_incident_id IS NOT NULL"));
+                        """));
     }
 
     private static LegacyRows.Bonded bonded(LegacySource source) throws SQLException {
@@ -182,23 +184,17 @@ public final class LegacyReader {
         return new LegacyRows.Bonded(
                 source.original(),
                 query(db, """
-                        SELECT profile_id, owner_uuid, roster_id, family_id, role_id, state, revision,
-                               snapshot_json, created_at_ms, updated_at_ms, policy_json, display_name,
-                               species, gender, died_at_ms, summon_cooldown_until_ms, revive_count,
-                               quarantine_reason, quarantined_at_ms
+                        SELECT profile_id, owner_uuid, roster_id, role_id, state, revision,
+                               snapshot_json, updated_at_ms, died_at_ms, summon_cooldown_until_ms
                         FROM bonded_companion_profile ORDER BY profile_id
                         """, r -> new LegacyRows.BondedProfile(
                         r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5),
-                        r.getString(6), r.getLong(7), r.getString(8), r.getLong(9), r.getLong(10),
-                        r.getString(11), r.getString(12), r.getString(13), r.getString(14),
-                        nullableLong(r, 15), r.getLong(16), r.getLong(17), r.getString(18),
-                        nullableLong(r, 19))),
+                        r.getLong(6), r.getString(7), r.getLong(8), nullableLong(r, 9), r.getLong(10))),
                 query(db, """
-                        SELECT profile_id, live_npc_uuid, world_key, started_at_ms, expires_at_ms, projection_state
+                        SELECT profile_id, live_npc_uuid, world_key, expires_at_ms
                         FROM bonded_companion_lease ORDER BY profile_id
                         """, r -> new LegacyRows.BondedLease(
-                        r.getString(1), r.getString(2), r.getString(3), r.getLong(4), r.getLong(5),
-                        r.getString(6))),
+                        r.getString(1), r.getString(2), r.getString(3), r.getLong(4))),
                 query(db, """
                         SELECT profile_id, namespace, json_payload, revision, updated_at_ms
                         FROM bonded_companion_extension_data ORDER BY profile_id, namespace

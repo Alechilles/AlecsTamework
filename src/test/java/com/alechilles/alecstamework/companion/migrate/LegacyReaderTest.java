@@ -76,14 +76,13 @@ class LegacyReaderTest {
         assertEquals(data.resolve(LegacySource.BONDED_FILE), bonded.source().path());
         String envelope = "{\"encoding\":\"base64\",\"payload\":\"e30=\"}";
         assertEquals(List.of(
-                new LegacyRows.BondedProfile("b-active", OWNER, "dragons", "fire", "Bonded_Dragon", "ACTIVE", 6,
-                        envelope, 100, 600, "{\"maxActive\":1}", "Ember", "dragon", "FEMALE", null, 0, 0,
-                        null, null),
-                new LegacyRows.BondedProfile("b-dead", OWNER, "dragons", "frost", "Bonded_Dragon", "DEAD", 9,
-                        envelope, 200, 700, "{}", null, null, null, -650L, -400, 2, "damaged", 690L)),
+                new LegacyRows.BondedProfile("b-active", OWNER, "dragons", "Bonded_Dragon", "ACTIVE", 6,
+                        envelope, 600, null, 0),
+                new LegacyRows.BondedProfile("b-dead", OWNER, "dragons", "Bonded_Dragon", "DEAD", 9,
+                        envelope, 700, -650L, -400)),
                 bonded.profiles());
         assertEquals(List.of(new LegacyRows.BondedLease(
-                "b-active", "cccccccc-0000-0000-0000-000000000001", "world-a", 550, 0, "LIVE")), bonded.leases());
+                "b-active", "cccccccc-0000-0000-0000-000000000001", "world-a", 0)), bonded.leases());
         assertEquals(List.of(new LegacyRows.BondedExtension("b-active", "Alechilles:HyDragon",
                 "{\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ==\"}", 1952, 600)), bonded.extensionData());
         assertEquals(List.of(new LegacyRows.BondedCleanupTarget("cleanup-1", "b-dead", "PROJECTION",
@@ -215,15 +214,16 @@ class LegacyReaderTest {
                 new LegacyRows.Alias(LEASED_NPC, "p-prov", 0, "LEASED", 4400, null)),
                 state.aliases());
         assertEquals(List.of(
-                new LegacyRows.Snapshot("snap-coop", "p-coop", "coop", 1, "{\"roleId\":\"Tamed_Chicken\"}", 4, 3400),
-                new LegacyRows.Snapshot("snap-dead", "p-dead", "death", 2, DEATH_JSON, 2, 2400)),
-                state.currentSnapshots(),
-                "current snapshots, and the one a coop residency names although it is not current");
+                new LegacyRows.Snapshot("snap-coop", "p-coop", "coop", 1, "{\"roleId\":\"Tamed_Chicken\"}", 4, 3400,
+                        false),
+                new LegacyRows.Snapshot("snap-dead", "p-dead", "death", 2, DEATH_JSON, 2, 2400, true),
+                new LegacyRows.Snapshot("snap-dead-old", "p-dead", "death", 2, "{\"old\":true}", 1, 2100, false)),
+                state.snapshots(), "every snapshot is returned, marked current or not");
         assertEquals(List.of(new LegacyRows.EntityCheckpoint("p-live", "alias:" + NPC, CHECKPOINT_JSON, 9, 1480)),
-                state.entityCheckpoints(), "a tombstoned checkpoint is skipped");
+                state.entityCheckpoints(), "one checkpoint per live profile: the current alias's row, not the newer "
+                        + "row of an old alias, a tombstoned row, or the row of a profile with no body");
         assertEquals(List.of(new LegacyRows.ToolLink(
                 "p-live", "bbbbbbbb-0000-0000-0000-000000000001", "COMMAND", 1300, 1350)), state.toolLinks());
-        assertEquals(List.of(new LegacyRows.RosterFamily(OWNER, "wolves", 5, 1000, 1500)), state.rosterFamilies());
         assertEquals(List.of(
                 new LegacyRows.RosterMembership("slot-1", "p-live", OWNER, "wolves", 2, "pack", true,
                         "world-home", 1.5, 64.0, -2.25, 1000, 1500),
@@ -231,10 +231,8 @@ class LegacyReaderTest {
                         null, null, null, null, 4000, 4500)),
                 state.rosterMemberships());
         assertEquals(List.of(
-                new LegacyRows.TimedLease("p-live", 3, "session-1", 45000L, null, "Timed_Wolf", 60000, 30000, true,
-                        1450L, 1000, 1450),
-                new LegacyRows.TimedLease("p-prov", 1, null, null, -7000L, null, 60000, 30000, false,
-                        null, 4000, 4500)),
+                new LegacyRows.TimedLease("p-live", 45000L, null),
+                new LegacyRows.TimedLease("p-prov", null, -7000L)),
                 state.timedLeases());
         assertEquals(List.of(
                 new LegacyRows.CoopSlot(COOP_KEY, "world-a", "coop", 10, 64, -20, 0, 2, null, null),
@@ -249,7 +247,6 @@ class LegacyReaderTest {
                 "p-live", "Mod:Thing", "k1", 1, "{\"level\":4}", 12, 1100, 1490)),
                 state.extensionData(), "tombstones and entity checkpoints are not extension data");
         assertEquals(1, state.unfinishedOperations());
-        assertEquals(1, state.quarantinedProfiles());
 
         assertEquals(before, listing(data), "the original folder is unchanged");
         assertEquals(Map.of(), listing(scratch), "the private copy is deleted after the read");
