@@ -55,8 +55,9 @@ public final class BondedCompanionTalentTimerPolicyModifier {
                 policy.revision(), policy.rosterId(), policy.familyId(),
                 policy.allowedRoles(), policy.maximumOwned(),
                 policy.maximumActive(), sessionDurationSeconds,
-                summonCooldownSeconds, policy.summonAuraEffectId(),
-                policy.revivePrice(), policy.features()
+                summonCooldownSeconds, policy.reviveCooldownSeconds(),
+                policy.summonAuraEffectId(), policy.expiryWarningEffectId(),
+                policy.revivePrice(), policy.features(), policy.nameKey()
         );
     }
 

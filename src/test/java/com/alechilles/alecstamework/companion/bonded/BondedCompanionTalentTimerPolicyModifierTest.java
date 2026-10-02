@@ -36,6 +36,25 @@ class BondedCompanionTalentTimerPolicyModifierTest {
         assertEquals(0L, adjusted.summonCooldownSeconds());
     }
 
+    @Test
+    void aTimerTalentKeepsTheFamilysOtherSettings() {
+        BondedCompanionPolicy family = new BondedCompanionPolicy(
+                1L, "test:roster", "test:family", Set.of("test:role"),
+                1, 1, 300L, 1_800L, 120L, "Aura", "Fading", null,
+                new BondedCompanionPolicy.FeatureFlags(true, true, true, true, true),
+                "test.family.name");
+
+        BondedCompanionPolicy adjusted = BondedCompanionTalentTimerPolicyModifier.apply(
+                family,
+                new TameworkTalentsComponent("test:talents", 10, new String[] { "longer", "faster" }),
+                talents());
+
+        assertEquals(600L, adjusted.sessionDurationSeconds());
+        assertEquals(120L, adjusted.reviveCooldownSeconds());
+        assertEquals("Fading", adjusted.expiryWarningEffectId());
+        assertEquals("test.family.name", adjusted.nameKey());
+    }
+
     private static BondedCompanionPolicy policy(long duration, long cooldown) {
         return new BondedCompanionPolicy(
                 1L, "test:roster", "test:family", Set.of("test:role"),
