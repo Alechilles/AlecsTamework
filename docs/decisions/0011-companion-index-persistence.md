@@ -3,6 +3,8 @@
 - Status: Accepted; implementation in progress on `refactor/persistence-rework`
 - Date: 2026-09-30
 - Supersedes: ADRs 0001, 0002, 0003, 0007, 0008 and 0010 when the rework ships (Tamework 5.0.0)
+- Supersedes: ADR 0006 (public persistence import policy) for the 2.x path. 5.0 does not read
+  2.x SQLite or DAT sources; those worlds run 4.3.x once first.
 
 ## Context
 
@@ -41,3 +43,13 @@ The full design, evidence and review record are in the external spec
   a crash in the same second. This is accepted.
 - The 2.x import path is removed. Those saves get a localized
   "run 4.3.x first" notice.
+
+## Migration
+
+5.0 imports a 3.x or 4.x world by itself at the first start. The import only
+reads the old databases, writes the new store all or nothing, and leaves a
+report file and a receipt in `meta.json`. A world that cannot be converted can
+start empty with `/tw persistence start-fresh`. A later release removes the
+importer; after that, 3.x and 4.x worlds must run 5.0.x once. The operator
+guide is the wiki page
+[World Migration for Server Admins](../../wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md).

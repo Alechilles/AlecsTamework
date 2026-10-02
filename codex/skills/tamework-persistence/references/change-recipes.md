@@ -1,5 +1,8 @@
 # Persistence Change Recipes
 
+> Outdated on branch `refactor/persistence-rework`: this describes the 4.x SQLite runtime.
+> See the note at the top of `../SKILL.md`. Phase 8 rewrites it.
+
 Choose one primary recipe. Add another recipe only when the change crosses a
 real public boundary.
 

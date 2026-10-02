@@ -203,7 +203,9 @@ public final class ImportReport {
                                 + "They are imported at position 0,0,0 and fill in when their body loads. If the "
                                 + "body is gone, the owner can recover the companion as lost; it then comes back "
                                 + "from its older saved state when one existed, otherwise new from its role at "
-                                + "level 1."),
+                                + "level 1. A recover before the body has loaded replaces it: the original "
+                                + "body is removed as a leftover copy when it loads later. Owners should "
+                                + "visit such animals before they use Recover."),
                 line("Live world guessed", report.liveWorldGuessed(),
                         "The old data named no world for these live companions. They carry the world most other "
                                 + "rows name until their body loads and corrects it. On a server with several "

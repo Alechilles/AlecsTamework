@@ -1,5 +1,8 @@
 # Persistence Verification Matrix
 
+> Outdated on branch `refactor/persistence-rework`: this describes the 4.x SQLite runtime.
+> See the note at the top of `../SKILL.md`. Phase 8 rewrites it.
+
 Name the production regression before adding a test. A useful test exercises
 production behavior and observes a result, durable state, effect, event,
 authorization decision, recovery outcome, or player-visible output.

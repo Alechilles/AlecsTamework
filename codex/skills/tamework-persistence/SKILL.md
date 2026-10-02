@@ -5,6 +5,13 @@ description: Use when Tamework work touches saved companion state, SQLite, tamew
 
 # Tamework Persistence
 
+> **Outdated on `refactor/persistence-rework`.** This skill describes the 4.x SQLite
+> persistence runtime (`tamework-state.sqlite`, operations, outbox, quarantine). On branch
+> `refactor/persistence-rework` (Tamework 5.0) that runtime is being replaced by the companion
+> index and file store under `companion/` (ADR 0011), with a one-time importer in
+> `companion/migrate`. Do not apply this guidance to 5.0 code. Phase 8 of the rework rewrites
+> this skill; until then use ADR 0011 and the current source.
+
 Keep each change inside its owning persistence authority. Use current source,
 accepted ADRs, and behavior tests as evidence; do not design from memory.
 

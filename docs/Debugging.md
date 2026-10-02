@@ -20,14 +20,15 @@ the server-global `debug*` logging toggles. Patchwork administration requires
 the `patchwork.admin` permission.
 `/tw debug telemetry crash` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
-`/tw debug persistence [status|health|detail|export]` is console-safe.
-Status and detail actions are read-only. `export` writes a bounded, redacted
-support ZIP without changing persistence state. Every response line is sent to
-the command caller and written to the server log. This includes the export
-bundle path.
-`/tw debug persistence simulateerror` is also console-safe. It sends one
+`/tw debug persistence simulateerror` is console-safe. It sends one
 synthetic failure through the real automatic diagnostic path and prints a
-unique token. It does not read or change the SQLite database.
+unique token. It does not read or change saved companion data.
+The older `/tw debug persistence` subcommands `status`, `health`, `detail`,
+`export`, `reviveready` and `compact` served the SQLite persistence that
+Tamework 5.0 replaced. They are no longer registered.
+`/tw persistence start-fresh [confirm]` is console-safe. It only applies while
+old companion data blocks the world; see the wiki page "World Migration for
+Server Admins".
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw config reload`,
@@ -87,41 +88,26 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 - For death or Lost recovery, verify the linked panel shows the recorded state
   and exact cooldown. Roster-backed paid revival must show every configured
   cost; legacy item-linked restoration remains free.
-- Released schema v2-v4 sources and released DAT records import into
-  `tamework-state.sqlite` without modifying the source. A v5-v9 source is a
-  deliberate refusal: restore a public backup or create a new world instead of
-  trying to repair or migrate that tester-only database.
-- A migration retest must begin without an existing replacement target. Stop
-  the server, back up the complete data directory, and restore the complete
-  pre-upgrade directory (or move `tamework-state.sqlite` with its WAL/SHM
-  sidecars, `persistence-engine.json`, and the prior import report out of the
-  active directory). Restoring only `tamework.sqlite` leaves the previous target
-  authoritative. The first clean import reports `IMPORTED_PUBLIC`; `EXISTING`
-  means no import ran during that startup.
-- After a clean import, wait for `/tw debug persistence status` to report storage mode
-  `READ_WRITE` and startup readiness `MUTATION_READY` before testing capture,
-  release, or recovery. `STARTING` with `RECONCILE_WORLD` running is a transient
-  safety gate: an attempted mutation is rejected with `world_evidence_pending`,
-  the source item remains untouched, and the player should retry after startup
-  becomes mutation-ready.
-- Use `/tw debug persistence status` for engine, target-origin, schema, startup,
-  operation, validation, and checkpoint state. `health` is an alias for the
-  same bounded summary.
-- Use `/tw debug persistence detail` for bounded feature, outbox, operation-phase,
-  incident, quarantine, and `openCircuits` counts. It does not repair or retry
-  persistence work. Circuit evidence comes from the one replacement feature
-  registry and shared `feature_circuit` table, not an old failure catalog;
-  there is no separate persistence rehearsal runtime.
-- Use `/tw debug persistence export` to create a bounded support ZIP under the universe's
-  Tamework `Data/diagnostics` directory. It contains sanitized operational
-  status, counters, and durable diagnostic summaries. It excludes the SQLite
-  database, save data, player identities, coordinates, inventory payloads,
-  secrets, and unrestricted logs.
+- Tamework 5.0 imports a 3.x or 4.x world by itself at the first start and
+  never changes the old files. A 2.x world must run Tamework 4.3.x once first.
+  The wiki page "World Migration for Server Admins"
+  (`wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md`)
+  covers the console lines, the report file, a failed import and
+  `/tw persistence start-fresh`.
+- To retest an import, stop the server and delete `universe/Tamework/Companions`
+  while the old database files are still in `universe/Tamework/Data`. The next
+  start imports again. `meta.json` in the new folder holds the import receipt;
+  while it exists no import runs.
+- There is no persistence status, detail or export command in 5.0. The
+  `status`, `health`, `detail`, `export`, `reviveready` and `compact`
+  subcommands of `/tw debug persistence` are no longer registered. For support,
+  collect the server log and, after an import, the `import-report-*.txt` file
+  from `universe/Tamework/Data`.
 - When Tamework telemetry and `Diag` consent are enabled, a terminal persistence error creates the
   automatic evidence in memory and sends it to Beacon as a diagnostic
   bundle. The report includes a safe error classification and a ZIP of at most
-  512 KiB. It does not write a local export file. Its status data uses a strict
-  allowlist and omits the durable detail snapshot from the manual export.
+  512 KiB. It does not write a local file. Its status data uses a strict
+  allowlist.
 - Automatic diagnostics cover generic and bonded persistence. They run on a
   separate bounded worker and cannot change a read, write, startup, checkpoint,
   or shutdown result. Set `telemetry.enabled` to `false` in Tamework's global

@@ -6,6 +6,13 @@ draft: false
 ---
 # Persistence, SQLite, and Data Paths
 
+> This page describes the SQLite persistence of Tamework 3.x and 4.x. Tamework 5.0
+> replaces it with a file-based companion store under `universe/Tamework/Companions`
+> and imports 3.x and 4.x data at the first start. The `/tw debug persistence`
+> subcommands named below (`status`, `health`, `detail`, `export` and `compact`) are
+> not registered in 5.0. For the 5.0 update path, see
+> [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).
+
 Tamework uses one replacement persistence lineage. Its canonical database is
 `tamework-state.sqlite`, and that lineage begins at schema version 1.
 
@@ -68,8 +75,8 @@ skip this pass. If maintenance fails, the server log records the cause and a lat
 startup retries while the database still needs conversion. Integrity failures
 retain the existing read-only protection.
 
-An administrator can also reclaim file space with `/tw debug persistence compact` on the running
-server. This temporarily pauses Tamework saves and companion mutations, drains
+On 3.x and 4.x, an administrator can also reclaim file space with `/tw debug persistence compact` on the running
+server. Tamework 5.0 does not register this command. This temporarily pauses Tamework saves and companion mutations, drains
 accepted work, removes eligible history, and rebuilds the database. Automatic
 profile snapshots and unload checkpoints wait in their existing save coordinators
 and resume afterward. Completion
@@ -93,7 +100,7 @@ later checkpoint cleanup returns free pages in small batches. Small retry record
 still accumulate; this reduces growth rather than imposing a fixed size cap.
 
 
-### Checking compaction in game
+### Checking compaction in game (3.x and 4.x only)
 
 Use a disposable copy of a world with a backed-up database. Keep its player
 inventories, world data, and Tamework database from the same save: filled capture
@@ -230,6 +237,9 @@ owned by the same player. At startup, matching older owner-wide admission locks
 are narrowed only after the saved reservation and remaining locks are verified.
 The incident stays open; this repair does not assume the animal was created or
 cancel the reservation. Incomplete evidence remains protected.
+
+The commands in this section exist only on 3.x and 4.x. Tamework 5.0 does not
+register them.
 
 `/tw debug persistence status` and `health` print the same bounded
 replacement status: engine lineage, storage mode, target origin, schema

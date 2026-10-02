@@ -157,18 +157,13 @@ generic API as a fallback for one bonded profile.
 
 ## Diagnostics and failure handling
 
-Use:
-
-```text
-/tw debug persistence status
-/tw debug persistence detail
-/tw debug persistence export
-```
-
-The export includes a redacted `bonded-companions.json` member containing only
-readiness, schema version, state counts, lease/cleanup counts, and a fixed
-failure category. It excludes owners, profile IDs, NPC UUIDs, snapshots, and
-extension payloads.
+Tamework 5.0 has no persistence status, detail or export command. The
+`/tw debug persistence status`, `detail` and `export` subcommands that earlier
+versions offered are no longer registered. Use the server log to diagnose a
+bonded companion problem. For a world updated from 3.x or 4.x, the import
+report described in
+[World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins)
+lists the bonded companions that were imported.
 
 HyDragon should report its missing capability or bonded availability reason.
 It must not infer readiness from a version string, diagnostic count, live NPC,

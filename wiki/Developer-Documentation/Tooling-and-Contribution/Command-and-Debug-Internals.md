@@ -30,18 +30,19 @@ Additional diagnostics that are command-driven (not startup-toggle defaults) inc
 - `/tw debug view hitboxes`
 - `/tw debug view spawn-beacons [radius|off]`
 - `/tw debug telemetry crash`
-- `/tw debug persistence [status|health|detail|export]`
+- `/tw debug persistence simulateerror`
 
 `TameworkShowSpawnBeaconsCommand` maintains per-player radius sessions while
 `SpawnBeaconVisualizationService` owns one non-persistent visual proxy per
 covered natural beacon. Proxies deliberately omit every beacon and gameplay
 component, so they cannot enter Hytale's spawning systems.
 
-`TameworkDebugDbCommand` reads bounded status, metrics, and detail snapshots
-from the replacement `PersistenceBootstrap`. Status and detail actions are
-observational: they do not repair data, retry operations, clear incidents, or
-change circuits. `export` writes a bounded redacted ZIP from the same read-only
-diagnostic seam; it never copies the SQLite database or save.
+Tamework 5.0 no longer registers the `status`, `health`, `detail`, `export`,
+`reviveready` and `compact` subcommands of `/tw debug persistence`. They served
+the SQLite persistence that 5.0 replaced. Only `simulateerror` remains. The
+operator command `/tw persistence start-fresh [confirm]` lives in
+`TameworkPersistenceCommandGroup`; see
+[World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).
 
 ## Supporting systems
 - `CompanionDespawnDiagnosticsSystem`

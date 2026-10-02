@@ -38,6 +38,7 @@ Tamework does not add a full gameplay expansion by itself. Players usually exper
 
 ## Recommended Starting Points
 - Players using a Tamework-powered mod should start with [Getting Started](/mod/alecs-tamework/getting-started) and [Companion Controls](/mod/alecs-tamework/companion-controls).
+- Server admins updating a world from Tamework 3.x or 4.x should read [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins) first.
 - Modders adding Tamework to a project should start with [Start Here](/mod/alecs-tamework/start-here) and [Public API Overview](/mod/alecs-tamework/public-api-overview).
 - Developers working inside the Tamework codebase should start with [Core Architecture](/mod/alecs-tamework/core-architecture) and [Data and Persistence](/mod/alecs-tamework/data-and-persistence).
 

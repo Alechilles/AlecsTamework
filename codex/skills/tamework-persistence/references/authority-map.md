@@ -1,5 +1,8 @@
 # Persistence Authority Map
 
+> Outdated on branch `refactor/persistence-rework`: this describes the 4.x SQLite runtime.
+> See the note at the top of `../SKILL.md`. Phase 8 rewrites it.
+
 Use this map before broad source searches. Verify all paths and names against
 the current commit.
 

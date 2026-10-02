@@ -157,6 +157,8 @@ free.
   limits.
 - SimpleClaims damage integration errors fail open; they do not make a target
   invulnerable.
-- Use `/tw debug persistence [status|health|detail|export]` for bounded
-  replacement persistence diagnostics. None of these actions repairs or
-  mutates saved persistence state; `export` writes only a redacted support ZIP.
+- Tamework 5.0 has no persistence status or export command. The older
+  `/tw debug persistence` subcommands `status`, `health`, `detail` and `export`
+  are no longer registered. Collect the server log when you report a problem.
+  For a world updated from 3.x or 4.x, see
+  [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).
