@@ -194,7 +194,8 @@ public final class StoreFlow<R> {
             }
             CompanionRecord now = index.get(profileId);
             removeBodySafely(profileId, body);
-            return now != null && now.revision() == after.revision() ? Result.STORED : Result.CONFLICT;
+            // A change the store does not own (an extension write, say) does not undo it.
+            return RestoreFlow.sameHolder(after, now) ? Result.STORED : Result.CONFLICT;
         });
     }
 
@@ -214,7 +215,7 @@ public final class StoreFlow<R> {
     private boolean revertCommit(CompanionRecord before, Commit commit, @Nullable R body, @Nullable CapturedBody fresh) {
         UUID profileId = before.profileId();
         return index.atomically(() -> {
-            if (!index.revert(profileId, commit.after().revision(), before).applied()) {
+            if (!RestoreFlow.revertHolder(index, commit.after(), before)) {
                 return false;
             }
             if (commit.unregistered()) {

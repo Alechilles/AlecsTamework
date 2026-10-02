@@ -72,6 +72,23 @@ class StoreFlowTest {
     }
 
     @Test
+    void anExtensionWriteWhileTheStoreIsBeingWrittenDoesNotMakeTheStoreAConflict() {
+        CompanionRecord live = insertLive(2);
+        loaded.put(live.profileId(), "body");
+        flush = new CompletableFuture<>();
+        CompletableFuture<StoreFlow.Result> store = flow().store(live.profileId(), StoredReason.ROSTER, 0L);
+        CompanionRecord committed = index.get(live.profileId());
+
+        index.update(live.profileId(), committed.revision(), b -> b.extension("hydragon/bonded",
+                new com.alechilles.alecstamework.companion.index.ExtensionEntry(1L, "{}")));
+        flush.complete(null);
+
+        assertEquals(StoreFlow.Result.STORED, store.join());
+        assertEquals(LocationKind.STORED, index.get(live.profileId()).location().kind());
+        assertEquals(1, index.get(live.profileId()).extensions().size());
+    }
+
+    @Test
     void anUnloadedBodyUsesTheStoredSnapshotAndRemovesNothing() {
         CompanionRecord live = insertLive(2);
         stored = new SnapshotEnvelope(live.profileId(), CompanionSnapshots.FORMAT, 2, ENTITY);

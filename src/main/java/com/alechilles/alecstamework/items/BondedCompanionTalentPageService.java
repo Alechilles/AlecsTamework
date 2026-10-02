@@ -189,7 +189,8 @@ final class BondedCompanionTalentPageService {
             // only need to reach the state object; that touches no entity.
             stored.thenAccept(read -> {
                 if (read != null && read.leveling() != null) {
-                    state.apply(read);
+                    // The state object belongs to the owner's world thread; apply it there.
+                    dispatcher.dispatch(state.ownerUuid, (ref, store) -> state.apply(read));
                 }
             });
         }
@@ -313,21 +314,22 @@ final class BondedCompanionTalentPageService {
 
     /**
      * A change that finished after its click. Runs on the thread that finished it, so it touches
-     * only the page's own state object, then tells the owner on the owner's current world thread:
+     * nothing itself: on the owner's current world thread it updates the page's state object and
+     * tells the owner:
      * the unlocked or refunded text for a change that worked ({@code changed} is its view), the
      * failure text otherwise. An owner who has left gets nothing.
      */
     private void announce(State state, BondedCompanionTalentActionRequest.Action action,
                           @Nullable Consumer<String> refreshPage, @Nullable BondedCompanionProfileView changed) {
-        if (changed != null) {
-            state.apply(changed);
-        }
         boolean purchase = action == BondedCompanionTalentActionRequest.Action.PURCHASE;
         String key = changed != null
                 ? purchase ? "tamework.ui.talents.mutation.unlocked" : "tamework.ui.talents.mutation.refunded"
                 : purchase ? "tamework.ui.talents.mutation.bondedUnlockFailed"
                         : "tamework.ui.talents.mutation.bondedRefundFailed";
         dispatcher.dispatch(state.ownerUuid, (ref, store) -> {
+            if (changed != null) {
+                state.apply(changed);
+            }
             Player current = currentPlayer(ref, store);
             if (current == null) {
                 return;

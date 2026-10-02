@@ -163,13 +163,6 @@ public final class ProviderAdmission {
         return NONE;
     }
 
-    /** The managed profile id of a role, or null when the role is not managed. */
-    @Nullable
-    public String managedProfileId(@Nonnull String roleId) {
-        Managed managed = managedForRole.apply(roleId);
-        return managed == null ? null : managed.managedProfileId();
-    }
-
     /**
      * The managed profile, family and config revision of a role, as one key for cached decisions,
      * or null when the role is not managed. The family is part of it because a provider gates and

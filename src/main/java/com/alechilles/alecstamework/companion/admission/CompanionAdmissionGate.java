@@ -34,11 +34,6 @@ public final class CompanionAdmissionGate {
     private final Supplier<CompanionAdmission.Rules> rules;
     @Nullable private final ProviderDecisionCache providerDecisions;
 
-    /** A gate with no admission providers. {@code groups} is as in the other constructor. */
-    public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups) {
-        this(index, groups, null);
-    }
-
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
      * {@code providerDecisions} gives the synchronous sites the cached provider decision; null

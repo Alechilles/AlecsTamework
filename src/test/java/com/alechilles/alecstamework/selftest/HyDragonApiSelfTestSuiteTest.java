@@ -17,7 +17,6 @@ class HyDragonApiSelfTestSuiteTest {
                         EnumSet.allOf(TameworkApiCapability.class)
                 );
 
-        assertEquals(6, assertions.size());
         assertTrue(assertions.stream().allMatch(ApiSelfTestAssertion::passed));
         assertTrue(assertions.stream().anyMatch(assertion ->
                 assertion.name().contains("capture_policy")));

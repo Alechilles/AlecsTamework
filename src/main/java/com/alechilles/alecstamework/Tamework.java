@@ -702,6 +702,9 @@ public class Tamework extends JavaPlugin {
         CompanionRestoreRecallSink recallRestore = null;
         CompanionAdmissionGate admissionGate = null;
         ProviderAdmission providerAdmission = ProviderAdmission.none();
+        // Bonded families come from the roster config on every call, so a reload applies at once.
+        com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies =
+                com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
         if (companionModule != null && companionModule.ready()) {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
@@ -712,9 +715,6 @@ public class Tamework extends JavaPlugin {
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot,
                     providerDecisions);
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
-            // Bonded families come from the roster config on every call, so a reload applies at once.
-            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies =
-                    com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
             restoreFlow = createRestoreFlow(companionModule, providerAdmission, admissionGate, bondedFamilies);
             captureItemFlows = new CaptureItemFlows(companionModule.index(),
                     companionModule.writer()::queueSnapshotDelete, restoreFlow);
@@ -840,8 +840,6 @@ public class Tamework extends JavaPlugin {
         // index it is not built, and capture and spawner interactions fail before changing anything.
         if (restoreFlow != null) {
             CompanionPersistenceModule module = companionModule;
-            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families captureFamilies =
-                    com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
             spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, translationRegistry,
                     capturePolicyRegistry, interactionExtensionRegistry, module.index(), module.loaded(),
                     new CaptureFlow<>(module.index(), module.loaded(),
@@ -849,11 +847,11 @@ public class Tamework extends JavaPlugin {
                             module.writer()::flushNow, providerAdmission,
                             // A capture into bonded storage re-checks the family's owned limit under the index lock.
                             com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
-                                    admissionGate::deny, module.index()::fileRecords, captureFamilies)),
+                                    admissionGate::deny, module.index()::fileRecords, bondedFamilies)),
                     restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.production(),
                             module.writer()::queueSnapshot),
                     CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
-                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, captureFamilies);
+                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, bondedFamilies);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);

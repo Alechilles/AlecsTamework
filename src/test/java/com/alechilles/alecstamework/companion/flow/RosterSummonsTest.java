@@ -75,7 +75,7 @@ class RosterSummonsTest {
     void aBondedCompanionIsNeverSummonedAsARosterCompanion() {
         UUID bonded = addBonded(CompanionLocation.stored(StoredReason.BONDED), 0L);
 
-        assertEquals(RestoreFlow.Result.NOT_ALLOWED, summons().summon(bonded, DEST).join());
+        assertEquals(RestoreFlow.Result.NOT_ALLOWED, summons().summonOutcome(bonded, -1L, DEST).join().result());
         assertEquals(List.of(), restores);
     }
 
@@ -132,8 +132,8 @@ class RosterSummonsTest {
         UUID timed = add("Timed_Wolf", CompanionLocation.stored(StoredReason.TIMED), 0L);
         UUID untimed = add("Untimed_Sheep", CompanionLocation.stored(StoredReason.ROSTER), 0L);
 
-        summons().summon(timed, DEST).join();
-        summons().summon(untimed, DEST).join();
+        summons().summonOutcome(timed, -1L, DEST).join();
+        summons().summonOutcome(untimed, -1L, DEST).join();
 
         assertEquals(RestoreRules.Reason.SUMMON, restores.get(0).reason());
         assertEquals(NOW + 60_000L, restores.get(0).summonedUntilMs());

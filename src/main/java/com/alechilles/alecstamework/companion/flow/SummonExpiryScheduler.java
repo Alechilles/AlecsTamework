@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  *
  * <p>{@link #onChange} runs under the index lock, so it only updates small maps under this
  * object's own lock. {@link #due} takes only this lock, never the index lock. A store that ends
- * in anything but STORED, NOT_LIVE or NOT_FOUND is tried again {@link #RETRY_DELAY_MS} after the
+ * in anything but STORED, NOT_LIVE, NOT_FOUND or NO_SNAPSHOT (logged once, not retried) is tried again {@link #RETRY_DELAY_MS} after the
  * poll that started it; the store action re-checks the record, so a leftover retry is harmless.
  */
 public final class SummonExpiryScheduler {
@@ -121,6 +121,13 @@ public final class SummonExpiryScheduler {
                     stored = CompletableFuture.failedFuture(failure);
                 }
                 stored.whenComplete((result, error) -> {
+                    if (error == null && result == StoreFlow.Result.NO_SNAPSHOT) {
+                        // Nothing a retry could change: no body is loaded and no snapshot exists.
+                        // The timer is dropped; the owner's next summon recovers the companion.
+                        LOGGER.at(Level.WARNING).log("Expired companion %s has no loaded body and no snapshot to "
+                                + "store; its summon timer is dropped", profileId);
+                        return;
+                    }
                     if (error != null || !finished(result)) {
                         retryAt(profileId, nowMs + RETRY_DELAY_MS);
                     }

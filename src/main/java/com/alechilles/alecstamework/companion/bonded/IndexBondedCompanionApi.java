@@ -130,15 +130,24 @@ public final class IndexBondedCompanionApi
                                                           @Nonnull BondedCompanionPolicy family);
     }
 
-    /**
-     * Unregisters a profile's loaded body. Called under the index lock, so the body's removal is
-     * not seen as a loss. Returns the action that removes the body from its world (it must hop
-     * to the body's world thread itself), or null when no body is loaded.
-     */
+    /** The loaded bodies of bonded companions; {@link #bodies(LoadedBodies, Consumer)} in production. */
     @FunctionalInterface
     public interface Bodies {
+        /**
+         * Unregisters a profile's loaded body. Called under the index lock, so the body's removal
+         * is not seen as a loss. Returns the action that removes the body from its world (it must
+         * hop to the body's world thread itself), or null when no body is loaded.
+         */
         @Nullable
         Runnable unregister(@Nonnull UUID profileId);
+
+        /**
+         * Whether a body is registered for the profile. A registry read; safe from any thread.
+         * The default suits a source that tracks no bodies at all.
+         */
+        default boolean loaded(@Nonnull UUID profileId) {
+            return false;
+        }
     }
 
     private final CompanionIndex index;
@@ -199,13 +208,21 @@ public final class IndexBondedCompanionApi
     public static <R> Bodies bodies(@Nonnull LoadedBodies<R> loaded, @Nonnull Consumer<R> remove) {
         Objects.requireNonNull(loaded, "loaded");
         Objects.requireNonNull(remove, "remove");
-        return profileId -> {
-            R body = loaded.get(profileId);
-            if (body == null) {
-                return null;
+        return new Bodies() {
+            @Override
+            public Runnable unregister(@Nonnull UUID profileId) {
+                R body = loaded.get(profileId);
+                if (body == null) {
+                    return null;
+                }
+                loaded.removeIfSame(profileId, body);
+                return () -> remove.accept(body);
             }
-            loaded.removeIfSame(profileId, body);
-            return () -> remove.accept(body);
+
+            @Override
+            public boolean loaded(@Nonnull UUID profileId) {
+                return loaded.get(profileId) != null;
+            }
         };
     }
 
@@ -393,7 +410,8 @@ public final class IndexBondedCompanionApi
 
     /**
      * Summons a stored companion at the action context's placement. A companion whose body was
-     * lost is listed as stored and comes back through a recover. The session timer comes from the
+     * lost is listed as stored and comes back through a recover, and so does an active one whose
+     * body is not loaded; an active one with a loaded body is refused as already live. The session timer comes from the
      * family's {@code SessionDurationSeconds} with the companion's talent modifiers.
      *
      * <p>A provisioned companion has no snapshot until it has been out once (plan 6 R16): the
@@ -417,10 +435,14 @@ public final class IndexBondedCompanionApi
                 return done(refusal);
             }
             LocationKind kind = record.location().kind();
-            if (kind == LocationKind.LIVE) {
+            // An active record with no loaded body (its chunk is unloaded, or a stop left it
+            // without one) is brought back as a recover. The new generation fences the old body
+            // if it ever loads again.
+            boolean bodiless = kind == LocationKind.LIVE && !bodies.loaded(record.profileId());
+            if (kind == LocationKind.LIVE && !bodiless) {
                 return done(failure(BondedCompanionResultCode.INVALID_STATE, ALREADY_LIVE));
             }
-            if (kind != LocationKind.STORED && kind != LocationKind.LOST) {
+            if (kind != LocationKind.STORED && kind != LocationKind.LOST && !bodiless) {
                 return done(failure(BondedCompanionResultCode.INVALID_STATE, INVALID_STATE));
             }
             if (record.generation() != request.expectedRevision()) {
@@ -436,12 +458,13 @@ public final class IndexBondedCompanionApi
             if (clock.getAsLong() < record.summonCooldownUntilMs()) {
                 return done(failure(BondedCompanionResultCode.POLICY_DENIED, COOLDOWN_ACTIVE));
             }
-            if (!activePlaceFree(record, family)) {
+            // An active record already holds its active place.
+            if (!bodiless && !activePlaceFree(record, family)) {
                 return done(failure(BondedCompanionResultCode.POLICY_DENIED, ACTIVE_CAPACITY));
             }
             // A lost body has no stored location to summon from; RestoreRules restores it as a recover.
-            RestoreRules.Reason reason = kind == LocationKind.LOST
-                    ? RestoreRules.Reason.RECOVER : RestoreRules.Reason.SUMMON;
+            RestoreRules.Reason reason = kind == LocationKind.STORED
+                    ? RestoreRules.Reason.SUMMON : RestoreRules.Reason.RECOVER;
             return restoreTimed(record, family, reason, placement);
         });
     }
@@ -863,10 +886,13 @@ public final class IndexBondedCompanionApi
     /**
      * Sets a caller namespace's one value on a companion when its revision is the expected one.
      * {@link BondedCompanionExtensionDataUpdate#MISSING_REVISION} expects no value; the first
-     * value has revision 0 and each write adds one. Completes only after the owner file is
-     * written and undoes the change when that write fails. Repeating a request whose value is
-     * already the current one succeeds, after the same wait for the owner file. A payload that
-     * is not valid JSON is refused.
+     * value has revision 0 and each write adds one. Repeating a request whose value is already
+     * the current one succeeds. A payload that is not valid JSON is refused.
+     *
+     * <p>The returned future is already complete when this method returns, as in 4.x: callers
+     * read it at once. The change is in the index then, and it is on disk at the writer's next
+     * write-behind flush, not before. {@code profileData().compareAndSet} is the call that waits
+     * for the owner file.
      */
     @Override
     @Nonnull
@@ -884,7 +910,8 @@ public final class IndexBondedCompanionApi
                 return done(failure(BondedCompanionResultCode.NOT_FOUND, NOT_FOUND));
             }
             // A stored entry's revision is the public revision plus one: 0 is "no value" on disk.
-            return ExtensionEntries.compareAndSet(index, flush, found.profileId(), extensionKey(key),
+            return ExtensionEntries.compareAndSet(index, owner -> CompletableFuture.completedFuture(null),
+                    found.profileId(), extensionKey(key),
                     update.expectedRevision() + 1L, update.jsonPayload(),
                     current -> BondedRecords.state(current) != null && key.ownerUuid().equals(current.ownerUuid()))
                     .thenApply(outcome -> switch (outcome.status()) {

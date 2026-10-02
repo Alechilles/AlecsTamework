@@ -109,28 +109,11 @@ public final class RosterSummons {
     /**
      * Summons a stored roster companion to {@code destination}, timed when its role has a summon
      * duration. COOLDOWN, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED and PROVIDER_UNAVAILABLE come
-     * back from the restore as they are. A bonded companion is NOT_ALLOWED: the bonded API summons
-     * it with its roster's timers.
-     */
-    @Nonnull
-    public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId,
-                                                        @Nonnull RestoreFlow.Destination destination) {
-        return summon(profileId, -1L, destination);
-    }
-
-    /**
-     * As {@link #summon(UUID, RestoreFlow.Destination)}, bound to the record generation the caller
-     * checked: a record changed since then ends STALE. {@code expectedGeneration} -1 accepts any.
-     */
-    @Nonnull
-    public CompletableFuture<RestoreFlow.Result> summon(@Nonnull UUID profileId, long expectedGeneration,
-                                                        @Nonnull RestoreFlow.Destination destination) {
-        return summonOutcome(profileId, expectedGeneration, destination).thenApply(RestoreFlow.Outcome::result);
-    }
-
-    /**
-     * As {@link #summon(UUID, long, RestoreFlow.Destination)}, with the message key of a population
-     * refusal (a cap, an admission provider's denial or a domain limit).
+     * back from the restore as they are, with the message key of a population refusal (a cap, an
+     * admission provider's denial or a domain limit). A bonded companion is NOT_ALLOWED: the
+     * bonded API summons it with its roster's timers. The summon is bound to the record
+     * generation the caller checked: a record changed since then ends STALE.
+     * {@code expectedGeneration} -1 accepts any.
      */
     @Nonnull
     public CompletableFuture<RestoreFlow.Outcome> summonOutcome(@Nonnull UUID profileId, long expectedGeneration,

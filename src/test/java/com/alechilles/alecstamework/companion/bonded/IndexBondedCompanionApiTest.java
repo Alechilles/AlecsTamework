@@ -268,6 +268,7 @@ class IndexBondedCompanionApiTest {
         CompanionRecord otherRole = insert("Tamed_Sheep", CompanionLocation.stored(StoredReason.BONDED));
         CompanionRecord ready = stored();
         CompanionRecord live = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
+        loaded.put(live.profileId(), "body");
         BondedCompanionActionRequest noPlacement = new BondedCompanionActionRequest("tamework-panel", "k", owner,
                 ROSTER, ready.profileId().toString(), ready.generation(), WORLD);
         BondedCompanionActionRequest stale = new BondedCompanionActionRequest("tamework-panel", "k", owner, ROSTER,
@@ -698,7 +699,7 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
-    void extensionDataIsComparedAndSetPerNamespaceAndAReplayWaitsForTheOwnerFile() {
+    void extensionDataIsComparedAndSetPerNamespaceAndCompletesBeforeItReturns() {
         CompanionRecord stored = stored();
         BondedCompanionExtensionDataKey key =
                 new BondedCompanionExtensionDataKey(owner, stored.profileId().toString(), "hydragon");
@@ -715,38 +716,51 @@ class IndexBondedCompanionApiTest {
         assertEquals(0L, first.revision());
         assertEquals("{\"xp\":1}", api.getExtensionData(key).join().value().jsonPayload());
 
-        // The same request again: its value is current, but it still waits for the owner file.
+        // Callers read the result at once, so it never waits for the owner file: not for the
+        // same request again, and not for a new write.
         flush = new CompletableFuture<>();
         CompletableFuture<BondedCompanionResult<BondedCompanionExtensionData>> replay =
                 api.compareAndSetExtensionData(new BondedCompanionExtensionDataUpdate(
                         "hydragon", "op-1", key, "{\"xp\":1}", BondedCompanionExtensionDataUpdate.MISSING_REVISION));
-        assertFalse(replay.isDone());
-        flush.complete(null);
-        assertEquals(BondedCompanionResultCode.SUCCESS, replay.join().code());
-        assertEquals(0L, replay.join().value().revision());
+        assertTrue(replay.isDone());
+        assertEquals(BondedCompanionResultCode.SUCCESS, replay.getNow(null).code());
+        assertEquals(0L, replay.getNow(null).value().revision());
+        CompletableFuture<BondedCompanionResult<BondedCompanionExtensionData>> written =
+                api.compareAndSetExtensionData(new BondedCompanionExtensionDataUpdate(
+                        "hydragon", "op-1b", key, "{\"xp\":1,\"lvl\":2}", 0L));
+        assertTrue(written.isDone());
+        assertEquals(BondedCompanionResultCode.SUCCESS, written.getNow(null).code());
+        assertEquals(1L, written.getNow(null).value().revision());
+        flush = CompletableFuture.completedFuture(null);
 
         assertEquals(BondedCompanionResultCode.REVISION_CONFLICT, api.compareAndSetExtensionData(
                 new BondedCompanionExtensionDataUpdate("hydragon", "op-2", key, "{\"xp\":9}",
                         BondedCompanionExtensionDataUpdate.MISSING_REVISION)).join().code());
-        assertEquals(1L, api.compareAndSetExtensionData(
-                new BondedCompanionExtensionDataUpdate("hydragon", "op-3", key, "{\"xp\":2}", 0L))
+        assertEquals(2L, api.compareAndSetExtensionData(
+                new BondedCompanionExtensionDataUpdate("hydragon", "op-3", key, "{\"xp\":2}", 1L))
                 .join().value().revision());
         assertEquals("{\"xp\":2}", api.getExtensionData(key).join().value().jsonPayload());
     }
 
     @Test
-    void anExtensionWriteThatIsNotSavedIsUndone() {
-        CompanionRecord stored = stored();
-        BondedCompanionExtensionDataKey key =
-                new BondedCompanionExtensionDataKey(owner, stored.profileId().toString(), "hydragon");
-        flush = CompletableFuture.failedFuture(new RuntimeException("disk"));
+    void anActiveCompanionWithNoLoadedBodyIsSummonedBackInsteadOfBeingStuck() {
+        policy = dragons(1);
+        CompanionRecord live = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
+        loaded.put(live.profileId(), "body");
 
-        BondedCompanionResult<BondedCompanionExtensionData> result = api.compareAndSetExtensionData(
-                new BondedCompanionExtensionDataUpdate("hydragon", "op-1", key, "{\"xp\":1}",
-                        BondedCompanionExtensionDataUpdate.MISSING_REVISION)).join();
+        assertRefused(BondedCompanionResultCode.INVALID_STATE, "bonded-summon-already-live",
+                api.summon(action(live)).join());
 
-        assertEquals(BondedCompanionResultCode.INTERNAL_FAILURE, result.code());
-        assertTrue(index.get(stored.profileId()).extensions().isEmpty());
+        // Its chunk unloaded, or a stop left it without a body: it holds its own active place.
+        loaded.removeIfSame(live.profileId(), "body");
+        BondedCompanionResult<BondedCompanionProfileView> result = api.summon(action(live)).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, result.code());
+        assertEquals(BondedCompanionStateView.ACTIVE, result.value().state());
+        assertEquals(List.of(live.profileId()), spawned);
+        assertEquals(live.generation() + 1, index.get(live.profileId()).generation(),
+                "the new generation fences the old body if it loads again");
+        assertEquals(now + 600_000L, index.get(live.profileId()).summonedUntilMs());
     }
 
     @Test

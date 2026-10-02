@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.flow.CaptureFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Release;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.UUID;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
@@ -31,10 +33,11 @@ class SpawnerFeatureHandlerTest {
     void aProviderKeyWithNoTranslationIsShownAsTheBuiltInDenialNotAsTheKey() {
         String shown = SpawnerFeatureHandler.populationText("en-US", "othermod.husbandry.denied.levelTooLow");
 
-        assertEquals("You do not meet the Husbandry requirements for this companion.", shown);
+        assertEquals(LocalizedText.resolve("en-US", CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY), shown);
+        assertFalse(shown.equals(CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY), "the fallback itself resolves");
         // A key that resolves is shown as its own text.
-        assertEquals("Your owned companion limit has been reached.",
-                SpawnerFeatureHandler.populationText("en-US", "tamework.ui.population.ownedLimit"));
+        assertEquals(LocalizedText.resolve("en-US", CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY),
+                SpawnerFeatureHandler.populationText("en-US", CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY));
         assertFalse(SpawnerFeatureHandler.populationText("en-US", null).isBlank());
     }
 

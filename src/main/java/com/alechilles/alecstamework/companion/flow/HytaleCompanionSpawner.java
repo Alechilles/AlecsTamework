@@ -202,7 +202,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         long worldGameTimeMs = 0L;
         try {
             CompanionRecord now = currentRecord.apply(profileId);
-            if (now == null || now.revision() != committed.revision()) {
+            if (!RestoreFlow.sameHolder(committed, now)) {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }
@@ -271,7 +271,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         boolean[] stamped = new boolean[1];
         try {
             CompanionRecord now = currentRecord.apply(profileId);
-            if (now == null || now.revision() != committed.revision()) {
+            if (!RestoreFlow.sameHolder(committed, now)) {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }

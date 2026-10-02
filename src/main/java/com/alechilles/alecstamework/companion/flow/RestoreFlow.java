@@ -122,8 +122,8 @@ public final class RestoreFlow<R> {
      * <p>Contract the flow relies on: completing false or exceptionally means no body of
      * {@code committed}'s generation was added and none will be. No late world task (for example
      * one still queued after a timeout) may add it, because the flow then reverts the record.
-     * On the world thread, before adding the body, the spawner re-checks that the record's
-     * revision still equals {@code committed.revision()}, and completes false when it does not.
+     * On the world thread, before adding the body, the spawner re-checks that the record is still
+     * the committed one ({@link #sameHolder}), and completes false when it is not.
      */
     public interface Spawner {
         @Nonnull
@@ -276,8 +276,7 @@ public final class RestoreFlow<R> {
                         }
                         return done(Result.COMMIT_FAILED);
                     }
-                    CompanionRecord now = index.get(profileId);
-                    if (now == null || now.revision() != commit.after().revision()) {
+                    if (!sameHolder(commit.after(), index.get(profileId))) {
                         removeStaleOldBody(commit);
                         return done(Result.CONFLICT);
                     }
@@ -287,7 +286,10 @@ public final class RestoreFlow<R> {
                                 if (ok) {
                                     return new Outcome(Result.RESTORED, null);
                                 }
-                                index.revert(profileId, commit.after().revision(), before);
+                                if (!revertHolder(index, commit.after(), before)) {
+                                    LOGGER.at(Level.WARNING).log("Companion %s changed while its spawn failed; "
+                                            + "the newer change stands", profileId);
+                                }
                                 return new Outcome(Result.SPAWN_FAILED, null);
                             });
                 });
@@ -337,13 +339,39 @@ public final class RestoreFlow<R> {
      */
     private boolean revertCommit(Commit<R> commit, CompanionRecord before) {
         return index.atomically(() -> {
-            if (!index.revert(before.profileId(), commit.after().revision(), before).applied()) {
+            if (!revertHolder(index, commit.after(), before)) {
                 return false;
             }
             if (commit.oldBody() != null) {
                 loaded.put(before.profileId(), commit.oldBody());
             }
             return true;
+        });
+    }
+
+    /**
+     * Whether {@code now} is still the record a flow committed as {@code committed}: the same
+     * generation, location kind and NPC UUID, which are what a restore or a store owns. The
+     * record revision is not compared, because a change the flow does not own (an extension
+     * write, a rename) raises it and must not strand the committed companion without a body.
+     */
+    static boolean sameHolder(@Nonnull CompanionRecord committed, @Nullable CompanionRecord now) {
+        return now != null && now.generation() == committed.generation()
+                && now.location().kind() == committed.location().kind()
+                && Objects.equals(now.currentNpcUuid(), committed.currentNpcUuid());
+    }
+
+    /**
+     * Undoes a flow's commit while the record is still {@link #sameHolder the committed one}:
+     * {@code before} comes back, with the extension entries the record has now, since those are
+     * not the flow's to undo. Returns false, changing nothing, when a newer change holds the record.
+     */
+    static boolean revertHolder(@Nonnull CompanionIndex index, @Nonnull CompanionRecord committed,
+                                @Nonnull CompanionRecord before) {
+        return index.atomically(() -> {
+            CompanionRecord now = index.get(committed.profileId());
+            return sameHolder(committed, now) && index.revert(committed.profileId(), now.revision(),
+                    before.toBuilder().extensions(now.extensions()).build()).applied();
         });
     }
 

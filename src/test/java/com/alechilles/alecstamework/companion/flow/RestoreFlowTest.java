@@ -244,6 +244,47 @@ class RestoreFlowTest {
     }
 
     @Test
+    void anExtensionWriteBetweenTheCommitAndTheSpawnDoesNotStrandTheCompanionWithoutABody() {
+        CompanionRecord live = insertLive();
+        CompletableFuture<Void> flush = new CompletableFuture<>();
+        CompletableFuture<RestoreFlow.Result> restore = flow(flush, true)
+                .restore(live.profileId(), RestoreRules.Reason.RECALL, there);
+        CompanionRecord committed = index.get(live.profileId());
+
+        // Another mod saves its data on the companion while the owner file is being written.
+        index.update(live.profileId(), committed.revision(), b -> b.extension("hydragon/bonded",
+                new com.alechilles.alecstamework.companion.index.ExtensionEntry(1L, "{}")));
+        flush.complete(null);
+
+        assertEquals(RestoreFlow.Result.RESTORED, restore.join());
+        assertEquals(List.of("flush", "spawn gen1"), events);
+        assertEquals(1, index.get(live.profileId()).extensions().size());
+    }
+
+    @Test
+    void aFailedSpawnAfterAnExtensionWriteStillPutsTheRecordBackAndKeepsTheWrite() {
+        CompanionRecord live = insertLive();
+        RestoreFlow<String> writesDuringSpawn = new RestoreFlow<>(index, loaded,
+                id -> CompletableFuture.completedFuture(snapshot(index.get(id))),
+                who -> CompletableFuture.completedFuture(null),
+                (committed, snap, dest, reason) -> {
+                    index.update(committed.profileId(), committed.revision(), b -> b.extension("hydragon/bonded",
+                            new com.alechilles.alecstamework.companion.index.ExtensionEntry(1L, "{}")));
+                    return CompletableFuture.completedFuture(false);
+                },
+                (id, body) -> { }, System::currentTimeMillis, admission);
+
+        RestoreFlow.Result result = writesDuringSpawn.restore(live.profileId(), RestoreRules.Reason.RECALL, there).join();
+
+        assertEquals(RestoreFlow.Result.SPAWN_FAILED, result);
+        CompanionRecord after = index.get(live.profileId());
+        assertEquals(live.generation(), after.generation());
+        assertEquals(live.location(), after.location());
+        assertEquals(live.currentNpcUuid(), after.currentNpcUuid());
+        assertEquals(1, after.extensions().size(), "the other mod's write is not undone with the restore");
+    }
+
+    @Test
     void aRecallOfATimedSummonKeepsItsTimer() {
         CompanionRecord live = insertLive();
         index.update(live.profileId(), live.revision(), b -> b.summonedUntilMs(9_000));

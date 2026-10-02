@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.DomainClaim;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionBodyCallbacks;
 import com.alechilles.alecstamework.companion.live.CompanionSaves;
@@ -159,7 +160,13 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
         });
     }
 
-    /** The owner component of a stamped body changed (for example the set-owner command). */
+    /**
+     * The owner component of a stamped body changed (for example the set-owner command). The
+     * body already has its new owner, so this cannot refuse. The old owner's domain claims never
+     * move with the companion: the new owner gets the claims the gate's check admits for them
+     * (the cached provider decision of a managed role), and none when that check denies or has
+     * no decision yet.
+     */
     public void ownerChanged(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                              @Nullable UUID owner, @Nullable String ownerName) {
         TameworkCompanionComponent stamp = store.getComponent(ref, stampType);
@@ -167,7 +174,17 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
             return;
         }
         update(stamp.getProfileId(), r -> !Objects.equals(r.ownerUuid(), owner) || !Objects.equals(r.ownerName(), ownerName),
-                r -> CompanionTransitions.ownerChanged(owner, ownerName));
+                r -> {
+                    UnaryOperator<CompanionRecord.Builder> changed = CompanionTransitions.ownerChanged(owner, ownerName);
+                    if (Objects.equals(r.ownerUuid(), owner)) {
+                        return changed;
+                    }
+                    CompanionRecord candidate = changed.apply(r.toBuilder()).domainClaims(List.of()).build();
+                    CompanionAdmissionGate.Admission admitted = admission.apply(r, candidate);
+                    List<DomainClaim> claims = admitted == null || admitted.denial() != null
+                            ? List.of() : admitted.record().domainClaims();
+                    return b -> changed.apply(b).domainClaims(claims);
+                });
     }
 
     /**
