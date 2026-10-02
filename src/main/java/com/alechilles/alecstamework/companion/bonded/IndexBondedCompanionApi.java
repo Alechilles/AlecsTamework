@@ -311,9 +311,10 @@ public final class IndexBondedCompanionApi
      * repeated request; when the first write fails the record is withdrawn and the request can
      * be repeated.
      *
-     * <p>A request with no display name names the companion after its species. The request's
-     * gender and presentation data are not stored: the view of a companion reports what its
-     * body and record hold.
+     * <p>The record's display name is only a name the caller gave: a request with none leaves
+     * the companion unnamed, and it is shown under its role's name in each viewer's language.
+     * The request's species, gender and presentation data are not stored: the view of a
+     * companion reports what its body and record hold.
      */
     @Override
     @Nonnull
@@ -355,7 +356,7 @@ public final class IndexBondedCompanionApi
         CompanionRecord fresh = CompanionRecord.builder(UUID.randomUUID(), request.roleId(),
                         CompanionLocation.stored(StoredReason.PROVISIONED))
                 .ownerUuid(request.ownerUuid())
-                .displayName(request.displayName() != null ? request.displayName() : request.species())
+                .displayName(request.displayName())
                 .bonded(true)
                 .rosterId(request.rosterId())
                 .origin(request.callerNamespace(), request.idempotencyKey())

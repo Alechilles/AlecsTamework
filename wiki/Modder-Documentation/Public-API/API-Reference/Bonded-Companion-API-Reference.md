@@ -193,8 +193,9 @@ extension namespace rules below.
   After that companion is abandoned, the same request makes a new one.
 - The family's `MaximumOwned` and the ordinary owner and population-group
   limits are checked in the step that adds the record.
-- A request with no display name uses the species as the name.
-- The request's gender and presentation data are not stored.
+- The display name is stored only when the request gives one. A companion
+  without one is shown under its role's name in each viewer's language.
+- The request's species, gender and presentation data are not stored.
 - When the save fails the companion is withdrawn and the request can be
   repeated.
 

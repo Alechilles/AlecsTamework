@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -45,10 +46,19 @@ public final class StoreFlow<R> {
         CompletableFuture<CapturedBody> capture(@Nonnull R body);
     }
 
-    public record CapturedBody(@Nonnull BsonDocument snapshotData, @Nonnull CompanionSummary summary) {
+    /**
+     * @param displayName the name the body carries when it is stored; null or blank when it has
+     *                    none, and the record then keeps the name it has
+     */
+    public record CapturedBody(@Nonnull BsonDocument snapshotData, @Nonnull CompanionSummary summary,
+                               @Nullable String displayName) {
         public CapturedBody {
             Objects.requireNonNull(snapshotData, "snapshotData");
             Objects.requireNonNull(summary, "summary");
+        }
+
+        public CapturedBody(@Nonnull BsonDocument snapshotData, @Nonnull CompanionSummary summary) {
+            this(snapshotData, summary, null);
         }
     }
 
@@ -153,6 +163,11 @@ public final class StoreFlow<R> {
         }
         Long snapshotAtMs = fresh == null ? null : clock.getAsLong();
         CompanionSummary summary = fresh == null ? null : fresh.summary();
+        // The body is the authority for its name: a rename the record has not seen is stored with it.
+        String name = fresh == null || fresh.displayName() == null || fresh.displayName().isBlank()
+                ? null : fresh.displayName();
+        UnaryOperator<CompanionRecord.Builder> stored =
+                CompanionTransitions.stored(before, reason, summary, snapshotAtMs, cooldownUntilMs);
         // The revision check makes a change made while the snapshot was taken or read win. Without a
         // fresh capture, a body that registered meanwhile is not covered by the stored snapshot.
         Commit commit = index.atomically(() -> {
@@ -160,7 +175,7 @@ public final class StoreFlow<R> {
                 return null;
             }
             CompanionIndex.Mutation m = index.update(profileId, before.revision(),
-                    CompanionTransitions.stored(before, reason, summary, snapshotAtMs, cooldownUntilMs));
+                    name == null ? stored : b -> stored.apply(b).displayName(name));
             if (!m.applied()) {
                 return null;
             }

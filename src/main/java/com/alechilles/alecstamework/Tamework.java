@@ -1449,8 +1449,8 @@ public class Tamework extends JavaPlugin {
                     companions
             );
             root.addCompanionCommands(captureItemFlows, companions);
-            root.addBondedCommands(() -> bondedCompanionApi, rosterId -> bondedCompanionRosterRegistry != null
-                    && bondedCompanionRosterRegistry.snapshot().containsRoster(rosterId));
+            root.addBondedCommands(() -> bondedCompanionApi, () -> bondedCompanionRosterRegistry == null
+                    ? null : bondedCompanionRosterRegistry.snapshot());
             getCommandRegistry().registerCommand(root);
         }
     }

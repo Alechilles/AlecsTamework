@@ -168,7 +168,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
      */
     public void addBondedCommands(
             @Nonnull java.util.function.Supplier<com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi> api,
-            @Nonnull java.util.function.Predicate<String> rosterKnown) {
-        addSubCommand(new TameworkBondedCommandGroup(api, rosterKnown));
+            @Nonnull java.util.function.Supplier<com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry.Snapshot> rosters) {
+        addSubCommand(new TameworkBondedCommandGroup(api, rosters));
     }
 }

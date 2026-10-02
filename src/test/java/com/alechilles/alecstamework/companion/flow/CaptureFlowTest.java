@@ -95,6 +95,19 @@ class CaptureFlowTest {
     }
 
     @Test
+    void aCaptureOfABodyRenamedSinceItsRecordLastSawItKeepsTheNewName() {
+        CompanionRecord live = insertLive(2);
+        CompanionTransitions.BodyFacts renamed = new CompanionTransitions.BodyFacts(live.currentNpcUuid(), owner,
+                "Alec", "Tamed_Sheep", "Snowy", "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY);
+
+        CaptureFlow.Outcome outcome = flow(CompletableFuture.completedFuture(null)).capture(
+                new CaptureFlow.Capture<>(live.profileId(), live.generation(), "body", renamed, owner, "Alec", DATA)).join();
+
+        assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
+        assertEquals("Snowy", index.get(live.profileId()).displayName());
+    }
+
+    @Test
     void aStaleStampIsRefusedAndNothingChanges() {
         CompanionRecord live = insertLive(2);
         CaptureFlow.Capture<String> stale = new CaptureFlow.Capture<>(live.profileId(), 1, "body",

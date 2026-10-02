@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
@@ -12,7 +13,6 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -29,26 +29,28 @@ public final class TameworkBondedCommandGroup extends AbstractCommandCollection 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     /**
-     * @param api         the current bonded API; gives null when bonded persistence is not running
-     * @param rosterKnown whether a roster id is configured, for a clearer refusal than "role not allowed"
+     * @param api     the current bonded API; gives null when bonded persistence is not running
+     * @param rosters the current bonded roster snapshot, which gives the configured ids for the
+     *                typed roster and role; gives null when no rosters are loaded
      */
     public TameworkBondedCommandGroup(@Nonnull Supplier<IndexBondedCompanionApi> api,
-                                      @Nonnull Predicate<String> rosterKnown) {
+                                      @Nonnull Supplier<BondedCompanionRosterRegistry.Snapshot> rosters) {
         super("bonded", PREFIX + "description");
         requirePermission(TameworkCommandRoot.ROOT_PERMISSION);
-        addSubCommand(new Grant(api, rosterKnown));
+        addSubCommand(new Grant(api, rosters));
     }
 
     private static final class Grant extends AbstractTameworkServerCommand {
         private final Supplier<IndexBondedCompanionApi> api;
-        private final Predicate<String> rosterKnown;
+        private final Supplier<BondedCompanionRosterRegistry.Snapshot> rosters;
 
-        Grant(@Nonnull Supplier<IndexBondedCompanionApi> api, @Nonnull Predicate<String> rosterKnown) {
+        Grant(@Nonnull Supplier<IndexBondedCompanionApi> api,
+              @Nonnull Supplier<BondedCompanionRosterRegistry.Snapshot> rosters) {
             super("grant", PREFIX + "grant.description");
             requirePermission(TameworkCommandRoot.ROOT_PERMISSION);
             setAllowsExtraArguments(true);
             this.api = api;
-            this.rosterKnown = rosterKnown;
+            this.rosters = rosters;
         }
 
         @Override
@@ -68,10 +70,17 @@ public final class TameworkBondedCommandGroup extends AbstractCommandCollection 
                 context.sendMessage(Message.translation(PREFIX + "unavailable"));
                 return;
             }
-            String rosterId = args[1];
-            String roleId = args[2];
-            if (!rosterKnown.test(rosterId)) {
-                context.sendMessage(Message.translation(PREFIX + "grant.unknownRoster").param("roster", rosterId));
+            // The typed ids match the configured ones ignoring case; the companion stores the configured ids.
+            BondedCompanionRosterRegistry.Snapshot snapshot = rosters.get();
+            String rosterId = snapshot == null ? null : snapshot.canonicalRosterId(args[1]).orElse(null);
+            if (rosterId == null) {
+                context.sendMessage(Message.translation(PREFIX + "grant.unknownRoster").param("roster", args[1]));
+                return;
+            }
+            String roleId = snapshot.canonicalRoleId(rosterId, args[2]).orElse(null);
+            if (roleId == null) {
+                context.sendMessage(Message.translation(PREFIX + "grant.roleNotAllowed")
+                        .param("role", args[2]).param("roster", rosterId));
                 return;
             }
             // A player-authored name stays as typed; with none the companion shows its role's name.

@@ -36,6 +36,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 `/tw bonded grant` gives an online player one stored bonded companion for
 testing and support, for example
 `/tw bonded grant Alec hydragon:dragon_horn Tamed_RockDrakeT1 Boulder`. The
+player name, roster ID and role ID match without regard to case. The
 role must be an allowed role of exactly one family of that bonded roster, and
 the family's `MaximumOwned` and the general owned companion limits still apply.
 The grant does not need the family's `Provision` feature, which only controls

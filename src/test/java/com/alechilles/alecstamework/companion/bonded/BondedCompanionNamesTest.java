@@ -37,6 +37,13 @@ class BondedCompanionNamesTest {
             assertEquals(roleName, BondedCompanionNames.displayName(record(null, KNOWN_KEY), language));
         }
 
+        // The role name in the viewer's language comes before a stored species, which is in one
+        // language only; the species still names a companion whose role has no translation.
+        assertEquals(LocalizedText.resolve("de-DE", KNOWN_KEY),
+                BondedCompanionNames.displayName(null, "Rock Drake", KNOWN_KEY, "Tamed_RockDrakeT1", "de-DE"));
+        assertEquals("Rock Drake",
+                BondedCompanionNames.displayName(null, "Rock Drake", UNKNOWN_KEY, "Tamed_RockDrakeT1", "de-DE"));
+
         // A key no language file holds is never shown raw.
         String generic = BondedCompanionNames.displayName(record(null, null), "en-US");
         assertEquals(generic, BondedCompanionNames.displayName(record(null, UNKNOWN_KEY), "en-US"));

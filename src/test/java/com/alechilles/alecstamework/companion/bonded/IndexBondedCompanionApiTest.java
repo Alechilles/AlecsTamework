@@ -313,6 +313,21 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
+    void storingACompanionRenamedWhileActiveKeepsTheNameItsBodyHas() {
+        CompanionRecord live = insert(DRAGON, CompanionLocation.live(WORLD, 0, 0, 0));
+        loaded.put(live.profileId(), "body");
+        // The body was renamed after the record last saw it.
+        captured = CompletableFuture.completedFuture(
+                new StoreFlow.CapturedBody(BODY, CompanionSummary.EMPTY, "Cinder"));
+
+        BondedCompanionResult<BondedCompanionProfileView> result = api.store(action(live)).join();
+
+        assertEquals(BondedCompanionResultCode.SUCCESS, result.code());
+        assertEquals("Cinder", index.get(live.profileId()).displayName());
+        assertEquals("Cinder", result.value().displayName());
+    }
+
+    @Test
     void aPaidReviveChargesThePriceAndBringsTheCompanionBackActive() {
         CompanionRecord dead = dead();
         Purse purse = new Purse(5);
@@ -496,12 +511,13 @@ class IndexBondedCompanionApiTest {
     }
 
     @Test
-    void aProvisionedCompanionWithNoNameIsNamedAfterItsSpecies() {
+    void aProvisionedCompanionWithNoNameHasNoStoredNameEvenWhenTheRequestGivesASpecies() {
         BondedCompanionResult<BondedCompanionProfileView> result = api.provision(new BondedCompanionProvisionRequest(
                 "hydragon", "soul-bond-1", owner, ROSTER, DRAGON, null, "Miniwyvern", null, Map.of())).join();
 
         assertEquals(BondedCompanionResultCode.SUCCESS, result.code());
-        assertEquals("Miniwyvern", result.value().displayName());
+        assertNull(result.value().displayName(), "a species is not a given name; the role's name is shown");
+        assertNull(index.get(UUID.fromString(result.value().profileId())).displayName());
     }
 
     @Test

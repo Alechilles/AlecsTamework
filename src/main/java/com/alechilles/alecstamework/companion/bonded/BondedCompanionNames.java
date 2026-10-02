@@ -9,9 +9,9 @@ import javax.annotation.Nullable;
 /**
  * The name a bonded companion is shown under, resolved for one viewer's language.
  *
- * <p>Order: the name the player gave it, then the species stored with it, then its role name
- * translated for the viewer, then the generic "Companion" text. A captured companion often has no
- * stored name, so the role name key of its last body is what names it.</p>
+ * <p>Order: the name the player gave it, then its role name translated for the viewer, then the
+ * species text stored with it, then the generic "Companion" text. A captured or provisioned
+ * companion often has no given name, so its role name is what names it.</p>
  */
 public final class BondedCompanionNames {
     /** Presentation key of the role name translation key the companion's last body had. */
@@ -40,16 +40,13 @@ public final class BondedCompanionNames {
     }
 
     /**
-     * The species text of a companion for a viewer: the stored species, else the role name key
-     * (then the role id's own name key) translated in the viewer's language. Null when neither
-     * is known, so a raw key or role id is never shown.
+     * The species text of a companion for a viewer: the role name key (then the role id's own
+     * name key) translated in the viewer's language, else the stored species, which is in one
+     * language only. Null when neither is known, so a raw key or role id is never shown.
      */
     @Nullable
     public static String speciesLabel(@Nullable String species, @Nullable String nameKey,
                                       @Nullable String roleId, @Nullable String language) {
-        if (species != null && !species.isBlank()) {
-            return species.trim();
-        }
         // LocalizedText returns the key itself when no language file has it.
         RoleNameResolver.TranslationLookup lookup = key -> {
             if (key == null || key.isBlank()) {
@@ -62,6 +59,9 @@ public final class BondedCompanionNames {
         if (translated == null) {
             translated = RoleNameResolver.translateNameKey(lookup, roleId);
         }
-        return translated;
+        if (translated != null) {
+            return translated;
+        }
+        return species == null || species.isBlank() ? null : species.trim();
     }
 }

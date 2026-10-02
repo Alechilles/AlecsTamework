@@ -88,6 +88,9 @@ public final class TameworkCompanionRuntimeParticipants {
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionlinkschangedsystem",
                 () -> new CompanionOwnershipSystems.LinksChanged(lifecycle, NPCEntity.getComponentType(),
                         plugin.getCommandLinksComponentType(), TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionnamechangedsystem",
+                () -> new CompanionOwnershipSystems.NameChanged(lifecycle, NPCEntity.getComponentType(),
+                        plugin.getNpcNameComponentType(), TameworkCompanionComponent.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiontamedchangedsystem",
                 () -> new CompanionOwnershipSystems.TamedChanged(lifecycle, NPCEntity.getComponentType(),
                         plugin.getOwnerComponentType(), plugin.getTamedComponentType()));

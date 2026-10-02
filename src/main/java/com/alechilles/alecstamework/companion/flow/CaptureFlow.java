@@ -273,7 +273,15 @@ public final class CaptureFlow<R> {
         UnaryOperator<CompanionRecord.Builder> toItem = CompanionTransitions.capturedToItem(
                 before, capture.facts().summary(), capture.owner(), capture.ownerName());
         UnaryOperator<CompanionRecord.Builder> target = target(capture);
-        return b -> target.apply(toItem.apply(b));
+        // The body is the authority for its name: a rename the record has not seen goes with it.
+        String name = capture.facts().displayName();
+        return b -> {
+            toItem.apply(b);
+            if (name != null) {
+                b.displayName(name);
+            }
+            return target.apply(b);
+        };
     }
 
     /**

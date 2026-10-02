@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -73,6 +75,9 @@ public final class HytaleStoreCapture implements StoreFlow.BodyCapture<Ref<Entit
             throw new IllegalStateException("Snapshot failed for companion " + stamp.getProfileId());
         }
         CompanionSummary summary = summaries.capture(body, store, System.currentTimeMillis());
-        return new StoreFlow.CapturedBody(envelope.data(), summary == null ? CompanionSummary.EMPTY : summary);
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        TameworkNpcNameComponent name = nameType == null ? null : store.getComponent(body, nameType);
+        return new StoreFlow.CapturedBody(envelope.data(), summary == null ? CompanionSummary.EMPTY : summary,
+                name == null ? null : name.getName());
     }
 }

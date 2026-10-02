@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -313,6 +314,29 @@ class TwBondedCompanionRosterConfigTest {
                         Map.of("hydragon:horn", Map.of())
                 )
         );
+    }
+
+    @Test
+    void typedRosterAndRoleIdsResolveToTheConfiguredIdsIgnoringCase() throws Exception {
+        BondedCompanionRosterRegistry.Snapshot snapshot = registryWith(roster(
+                "Roster", minimalRosterJson("hydragon:Dragons")
+        )).snapshot();
+
+        assertEquals(Optional.of("hydragon:Dragons"), snapshot.canonicalRosterId("HYDRAGON:dragons"));
+        assertEquals(Optional.of("Tamed_Dragon_Fire"),
+                snapshot.canonicalRoleId("hydragon:Dragons", "tamed_dragon_fire"));
+        assertEquals(Optional.empty(), snapshot.canonicalRosterId("hydragon:wyverns"));
+        assertEquals(Optional.empty(), snapshot.canonicalRoleId("hydragon:Dragons", "Tamed_Dragon_Ice"));
+    }
+
+    @Test
+    void aTypedRosterIdThatTwoConfiguredIdsMatchIgnoringCaseResolvesToNeither() throws Exception {
+        BondedCompanionRosterRegistry registry = new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(
+                roster("Upper", minimalRosterJson("hydragon:Dragons")),
+                roster("Lower", minimalRosterJson("hydragon:dragons"))), 1L).applied());
+
+        assertEquals(Optional.empty(), registry.snapshot().canonicalRosterId("hydragon:dragons"));
     }
 
     @Test

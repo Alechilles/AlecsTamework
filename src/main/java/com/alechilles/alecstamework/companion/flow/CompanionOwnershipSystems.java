@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.flow;
 
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.AddReason;
@@ -168,6 +169,52 @@ public final class CompanionOwnershipSystems {
         public void onComponentRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkCommandLinksComponent component,
                                        @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
             lifecycle.linksChanged(ref, store, null);
+        }
+
+        @Override
+        @Nonnull
+        public Query<EntityStore> getQuery() {
+            return query;
+        }
+    }
+
+    /** Name put on or changed on a stamped NPC (a rename): the record's display name follows. */
+    public static final class NameChanged extends RefChangeSystem<EntityStore, TameworkNpcNameComponent> {
+        private final CompanionBodyLifecycle lifecycle;
+        private final ComponentType<EntityStore, TameworkNpcNameComponent> nameType;
+        private final Query<EntityStore> query;
+
+        public NameChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+                           @Nonnull ComponentType<EntityStore, TameworkNpcNameComponent> name,
+                           @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
+            this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
+            this.nameType = Objects.requireNonNull(name, "name");
+            this.query = Query.and(npc, name, stamp);
+        }
+
+        @Override
+        @Nonnull
+        public ComponentType<EntityStore, TameworkNpcNameComponent> componentType() {
+            return nameType;
+        }
+
+        @Override
+        public void onComponentAdded(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkNpcNameComponent component,
+                                     @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+            lifecycle.nameChanged(ref, store, component.getName());
+        }
+
+        @Override
+        public void onComponentSet(@Nonnull Ref<EntityStore> ref, @Nullable TameworkNpcNameComponent oldComponent,
+                                   @Nonnull TameworkNpcNameComponent newComponent, @Nonnull Store<EntityStore> store,
+                                   @Nonnull CommandBuffer<EntityStore> buffer) {
+            lifecycle.nameChanged(ref, store, newComponent.getName());
+        }
+
+        @Override
+        public void onComponentRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull TameworkNpcNameComponent component,
+                                       @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
+            // A body that lost its name component keeps the record's name, as on a body sighting.
         }
 
         @Override

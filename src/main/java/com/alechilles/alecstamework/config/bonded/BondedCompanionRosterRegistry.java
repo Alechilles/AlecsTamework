@@ -314,6 +314,45 @@ public final class BondedCompanionRosterRegistry {
             return familiesByRosterId.keySet();
         }
 
+        /**
+         * The configured roster id that equals {@code typed} ignoring case, for ids an operator
+         * types. Empty when none does, or when several configured ids differ only by case.
+         */
+        @Nonnull
+        public Optional<String> canonicalRosterId(@Nullable String typed) {
+            return soleIgnoringCase(familiesByRosterId.keySet(), typed);
+        }
+
+        /**
+         * The allowed role id of {@code rosterId}'s families that equals {@code typed} ignoring
+         * case. Empty when none does, or when several allowed ids differ only by case.
+         */
+        @Nonnull
+        public Optional<String> canonicalRoleId(@Nullable String rosterId, @Nullable String typed) {
+            Set<String> roles = new java.util.HashSet<>();
+            for (RosterDefinition family : families(rosterId)) {
+                roles.addAll(family.allowedRoles());
+            }
+            return soleIgnoringCase(roles, typed);
+        }
+
+        private static Optional<String> soleIgnoringCase(Set<String> ids, @Nullable String typed) {
+            if (typed == null) {
+                return Optional.empty();
+            }
+            String match = null;
+            for (String id : ids) {
+                if (!id.equalsIgnoreCase(typed.trim())) {
+                    continue;
+                }
+                if (match != null) {
+                    return Optional.empty();
+                }
+                match = id;
+            }
+            return Optional.ofNullable(match);
+        }
+
         /** Returns the number of logical rosters, not configured families. */
         public int rosterCount() { return familiesByRosterId.size(); }
 

@@ -203,6 +203,24 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                 r -> CompanionTransitions.toolsChanged(tools));
     }
 
+    /**
+     * The name component of a stamped body was put or replaced (a rename). The body is the
+     * authority for its name, so the LIVE record follows it at once and every later transition
+     * (store, capture, coop, death) keeps the new name. A blank name changes nothing: a companion
+     * named in its record only keeps that name.
+     */
+    public void nameChanged(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                            @Nullable String displayName) {
+        TameworkCompanionComponent stamp = store.getComponent(ref, stampType);
+        if (displayName == null || displayName.isBlank() || stamp == null || stamp.getProfileId() == null
+                || !ref.equals(loaded.get(stamp.getProfileId()))) {
+            return;
+        }
+        update(stamp.getProfileId(), r -> r.location().kind() == LocationKind.LIVE
+                        && !displayName.equals(r.displayName()),
+                r -> CompanionTransitions.nameChanged(displayName));
+    }
+
     /** Spec 8.6: record the death when DeathComponent is added, and drop the body from the loaded map. */
     public void died(@Nonnull Ref<EntityStore> ref, @Nonnull DeathComponent death, @Nonnull Store<EntityStore> store) {
         TameworkCompanionComponent stamp = store.getComponent(ref, stampType);

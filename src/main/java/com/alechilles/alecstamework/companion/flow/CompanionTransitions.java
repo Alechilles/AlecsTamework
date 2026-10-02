@@ -283,6 +283,12 @@ public final class CompanionTransitions {
         return b -> b.toolIds(toolIds);
     }
 
+    /** A live body was renamed; the body is the authority for its name. */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> nameChanged(@Nonnull String displayName) {
+        return b -> b.displayName(displayName);
+    }
+
     /** Tool links compare as sets: their order carries no meaning. */
     public static boolean sameTools(@Nonnull List<String> a, @Nonnull List<String> b) {
         return new HashSet<>(a).equals(new HashSet<>(b));
