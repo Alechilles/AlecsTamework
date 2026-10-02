@@ -1437,6 +1437,7 @@ public class Tamework extends JavaPlugin {
         initializeRuntimeServices();
         registerRuntimeParticipants();
         admitCompanionsAlreadyLoaded();
+        startLegacyBodyLocate();
         runtimeActivationState = TameworkRuntimeActivationState.of(
                 runtimeStartupPlan, runtimeStartupDiagnostics
         );
@@ -1757,6 +1758,56 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companion-timed-summon-owner-death",
                 () -> new CompanionOwnerDeathSystem(owner -> summons.storeTimedSummons(owner, false)));
         return summons;
+    }
+
+    /**
+     * Starts the background search for imported companions in the worlds' saved chunks (plan 7
+     * task 13) when the companion module has one: only on a world imported from 3.x/4.x that still
+     * has companions nobody has seen since. It reads the worlds that are loaded once the universe
+     * is ready, and any world started while it runs. Worlds that are deleted when removed
+     * (instances) are not read. It is stopped before the worlds shut down, so no storage read of
+     * its own is running when a world's storage closes.
+     */
+    private void startLegacyBodyLocate() {
+        CompanionPersistenceModule module = companionModule;
+        Universe universe = Universe.get();
+        com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator locator =
+                module == null || !module.ready() ? null : module.legacyLocator();
+        if (locator == null || universe == null
+                || !runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return;
+        }
+        locator.begin();
+        java.util.function.Consumer<World> offer = world -> {
+            if (world != null && world.getWorldConfig() != null && !world.getWorldConfig().isDeleteOnRemove()) {
+                locator.offer(new com.alechilles.alecstamework.companion.migrate.SavedChunks(world));
+            }
+        };
+        TameworkEventRegistrationSupport.registerGlobal(this,
+                com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent.class,
+                (com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent event) ->
+                        offer.accept(event.getWorld()),
+                "companion locate world start");
+        TameworkEventRegistrationSupport.registerGlobal(this, Short.MAX_VALUE, RemoveWorldEvent.class,
+                (RemoveWorldEvent event) -> {
+                    if (event.getWorld() != null && (!event.isCancelled()
+                            || event.getRemovalReason() == RemoveWorldEvent.RemovalReason.EXCEPTIONAL)) {
+                        locator.worldRemoved(event.getWorld().getName());
+                    }
+                }, "companion locate world removal");
+        // Between UNBIND_LISTENERS (-40) and SHUTDOWN_WORLDS (-32).
+        getEventRegistry().register((short) -36, ShutdownEvent.class, event -> locator.stop());
+        java.util.concurrent.CompletableFuture<Void> ready = universe.getUniverseReady();
+        Runnable begin = () -> {
+            universe.getWorlds().values().forEach(offer);
+            locator.start();
+        };
+        if (ready == null) {
+            begin.run();
+        } else {
+            // Also after a failed world load: the worlds that did load are still read.
+            ready.whenComplete((ignored, failure) -> begin.run());
+        }
     }
 
     /** Registers the companion index systems, world-removal listener and final flush. */

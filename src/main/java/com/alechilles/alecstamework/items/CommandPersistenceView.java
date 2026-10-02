@@ -123,6 +123,18 @@ final class CommandPersistenceView {
         };
     }
 
+    /**
+     * True for a companion imported from 3.x or 4.x whose body has not been seen or located yet:
+     * its recorded position (exactly 0, 0, 0) and world are placeholders and must not be shown.
+     */
+    boolean neverSighted(@Nullable LinkedNpcRecord record) {
+        if (companions == null) {
+            return false;
+        }
+        return find(record).map(profile -> companions.get(profile.profileId().value()))
+                .map(CompanionRecord::neverSighted).orElse(false);
+    }
+
     CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
         if (companions != null) {
             return find(record).map(profile -> companions.get(profile.profileId().value()))

@@ -15,8 +15,10 @@ import javax.annotation.Nullable;
  * <p>A companion imported from 3.x or 4.x whose body has not been seen since
  * ({@link LegacyBodyResolution#neverSighted}) is not recalled while its body is unloaded: its world
  * may be a guess and it has no position to load, and a restore would replace the real animal with
- * one built from an empty or older state. The player is told to visit it first. Recover from the
- * companion panel stays available.
+ * one built from an empty or older state. While the saved-chunk pass
+ * ({@code LegacyBodyLocator}) runs the player is told the companion is still being located and
+ * Recover is refused the same way; otherwise the player is told to visit it first and Recover from
+ * the companion panel stays available.
  */
 enum RecallRoute {
     MOVE_LOADED,

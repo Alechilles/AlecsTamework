@@ -236,6 +236,25 @@ class LegacyItemAdoptionTest {
                 adoption(aliases).adopt(item.getMetadata(), PLAYER, "Player", bodies::contains).result());
     }
 
+    /** The saved-chunk pass found no body for such a record and listed it as lost; its item still holds it. */
+    @Test
+    void aRecordListedAsLostBecauseNoBodyWasFoundIsStillReleasedFromItsItem() {
+        UUID profileId = UUID.randomUUID();
+        index.insert(CompanionRecord.builder(profileId, "Tamed_Sheep", CompanionLocation.live("default", 0, 0, 0))
+                .ownerUuid(OWNER).ownerName("Alec").currentNpcUuid(NPC).build());
+        LegacyAliases aliases = new LegacyAliases(Map.of(NPC, new LegacyAliases.Entry(profileId, LegacyAliases.Kind.CURRENT)));
+        new LegacyBodyLocate(index, aliases, bodies::contains, snapshot -> { }, () -> 5_000L).markNotFound();
+        assertEquals(LocationKind.LOST, index.get(profileId).location().kind());
+
+        LegacyItemAdoption.Adoption adopted =
+                adoption(aliases).adopt(oldItem(6).getMetadata(), PLAYER, "Player", bodies::contains);
+
+        assertEquals(new CaptureItemKeys.Ref(profileId, 0L), adopted.ref());
+        assertEquals(LocationKind.ITEM, index.get(profileId).location().kind());
+        assertEquals(6, storedState(profileId).leveling().getLevel());
+        assertEquals(RestoreFlow.Result.RESTORED, release(adopted.ref()));
+    }
+
     @Test
     void anImportedLiveRecordWithADifferentBodyOrStoredStateIsNotTakenFromTheWorld() {
         UUID otherBody = UUID.randomUUID();

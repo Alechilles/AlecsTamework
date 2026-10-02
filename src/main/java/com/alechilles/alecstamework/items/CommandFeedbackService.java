@@ -112,6 +112,7 @@ final class CommandFeedbackService {
                     "tamework.ui.notifications.command.destination.npcsFrozen";
             case UNAVAILABLE, INVALID_CONTEXT ->
                     "tamework.ui.notifications.command.respawn.unavailable";
+            case STILL_LOCATING -> CommandRelocationDispatchService.KEY_STILL_LOCATING;
             case STARTED -> null;
         };
     }

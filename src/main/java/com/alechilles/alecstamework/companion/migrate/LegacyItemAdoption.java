@@ -181,6 +181,12 @@ public final class LegacyItemAdoption {
             case LIVE -> new Decision(stateInItem && npcUuid.equals(record.currentNpcUuid())
                     && LegacyBodyResolution.neverSighted(record) && !hasBody.test(profileId)
                     ? Kind.RESTORE_FROM_ITEM : Kind.REFUSE, profileId, npcUuid);
+            // The saved-chunk pass found no body for such a record and listed it as lost. With its
+            // state in this item and no body anywhere the pass could read, the companion is in the item.
+            case LOST -> new Decision(stateInItem && !hasBody.test(profileId)
+                    && LegacyBodyResolution.rejoins(aliases.byNpcUuid(npcUuid).orElse(null), record)
+                    && LegacyBodyResolution.CAUSE_BODY_NOT_FOUND.equals(record.location().cause())
+                    ? Kind.RESTORE_FROM_ITEM : Kind.REFUSE, profileId, npcUuid);
             default -> new Decision(Kind.REFUSE, profileId, npcUuid);
         };
     }

@@ -290,6 +290,21 @@ final class CommandRelocationDispatchService {
 
     /** Told to a player whose recall skipped a companion that has not been seen since the import. */
     static final String KEY_UNSEEN_IMPORT = "tamework.ui.notifications.command.recall.notSeenSinceUpdate";
+    /** Told instead while the background search of the saved chunks is still running. */
+    static final String KEY_STILL_LOCATING = "tamework.ui.notifications.command.recall.stillLocating";
+
+    /**
+     * The message for a companion that was not recalled or recovered because it has not been seen
+     * since the import: it is still being located while the saved-chunk pass runs, and must be
+     * visited otherwise (no pass ran, or it stopped on an error).
+     */
+    static String unseenImportKey() {
+        return unseenImportKey(com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator.pending());
+    }
+
+    static String unseenImportKey(boolean locating) {
+        return locating ? KEY_STILL_LOCATING : KEY_UNSEEN_IMPORT;
+    }
 
     /**
      * @param unseenImports recalled companions that were skipped because their body has not been

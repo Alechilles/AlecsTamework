@@ -32,10 +32,19 @@ import javax.annotation.Nullable;
  * <p>The rule of this class is "when in doubt, do not remove". A body the importer marked as the
  * companion's own is removed only when the record proves another body holds the companion now: it
  * names a different NPC UUID, or its generation is above 0 (it was restored after the import).</p>
+ *
+ * <p>A record imported LIVE that the saved-chunk pass moved to LOST with
+ * {@link #CAUSE_BODY_NOT_FOUND} is rejoined by its own body like a record imported LOST.</p>
  */
 public final class LegacyBodyResolution {
     /** Causes of records the importer could not place start with this (see {@code LegacyMapper}). */
     private static final String IMPORTED_CAUSE_PREFIX = "IMPORTED_";
+    /**
+     * LOST cause of a record imported LIVE whose body the saved-chunk pass ({@link LegacyBodyLocator})
+     * did not find in any world it could read. The record stays at generation 0, so the body still
+     * rejoins it if it turns up later, for example in a world that was not loaded during the pass.
+     */
+    public static final String CAUSE_BODY_NOT_FOUND = "IMPORTED_BODY_NOT_FOUND";
 
     private LegacyBodyResolution() {
     }
@@ -111,7 +120,7 @@ public final class LegacyBodyResolution {
             return anotherBodyLoaded ? leave(record, "another body is loaded for its profile")
                     : new Decision(Action.STAMP_CURRENT, profileId, record.generation(), "current body");
         }
-        if (alias != null && alias.kind() == LegacyAliases.Kind.REJOIN && awaitsItsBody(record)) {
+        if (rejoins(alias, record)) {
             return anotherBodyLoaded ? leave(record, "another body is loaded for its profile")
                     : new Decision(Action.REJOIN, profileId, record.generation(), "body of a companion imported as lost");
         }
@@ -145,6 +154,21 @@ public final class LegacyBodyResolution {
      */
     public static boolean neverSighted(@Nonnull CompanionRecord record) {
         return record.neverSighted();
+    }
+
+    /**
+     * True when a body with this alias brings {@code record} back to LIVE: the last body of a record
+     * imported LOST ({@link LegacyAliases.Kind#REJOIN}), or the body of a record imported LIVE that
+     * the saved-chunk pass could not find ({@link #CAUSE_BODY_NOT_FOUND}). In both cases only while
+     * the record is still exactly as it was left: LOST at generation 0 and naming no body.
+     */
+    static boolean rejoins(@Nullable LegacyAliases.Entry alias, @Nonnull CompanionRecord record) {
+        if (alias == null || !alias.profileId().equals(record.profileId()) || !awaitsItsBody(record)) {
+            return false;
+        }
+        return alias.kind() == LegacyAliases.Kind.REJOIN
+                || alias.kind() == LegacyAliases.Kind.CURRENT
+                && CAUSE_BODY_NOT_FOUND.equals(record.location().cause());
     }
 
     /** True for a record still exactly as it was imported LOST with no known place. */

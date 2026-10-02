@@ -699,6 +699,7 @@ tamework.ui.notifications.command.cull.success=Seleccionado: {0}
 tamework.ui.notifications.command.cull.unavailable=Acción de eliminación no disponible.
 tamework.ui.notifications.command.destination.npcsFrozen=Los compañeros no pueden ingresar a este mundo porque los NPC están deshabilitados aquí.
 tamework.ui.notifications.command.recall.notSeenSinceUpdate=No se ha llamado a un compañero porque no se le ha visto desde la actualización. Visita primero el lugar donde lo dejaste.
+tamework.ui.notifications.command.recall.stillLocating=Todavía se está localizando a un compañero tras la actualización. Vuelve a intentarlo dentro de un rato.
 tamework.ui.notifications.command.execution.applied={0}: aplicado a {1} NPC(s).
 tamework.ui.notifications.command.execution.appliedAndQueued={0}: aplicado a {1} NPC(s), en cola para {2}.
 tamework.ui.notifications.command.execution.none=Ningún NPC se vio afectado.
@@ -1718,6 +1719,7 @@ tamework.traits.description.fertilityNeutral=Este animal no tiene bonificación 
 tamework.traits.description.productYield={direction} el rendimiento de lana, huevos y leche en un {percent}%.
 
 tamework.ui.linkedLocation.captured=Capturado
+tamework.ui.linkedLocation.beingLocated=Se está localizando tras la actualización. Vuelve a comprobarlo más tarde.
 tamework.ui.linkedLocation.relative.here=A menos de 1 m
 tamework.ui.linkedLocation.relative.north={0} m al norte
 tamework.ui.linkedLocation.relative.south={0} m al sur

@@ -444,7 +444,17 @@ final class LegacyState {
             return null;
         }
         Long capturedAtMs = number(root, "capturedAtMs");
-        long observedAtMs = capturedAtMs == null ? fallbackCapturedAtMs : capturedAtMs;
+        return checkpoint(entity, string(root, "worldKey"), coordinate(root, "x"), coordinate(root, "y"),
+                coordinate(root, "z"), capturedAtMs == null ? fallbackCapturedAtMs : capturedAtMs);
+    }
+
+    /**
+     * A checkpoint from a serialized entity and the place it was saved at. The saved-chunk pass
+     * ({@code LegacyBodyLocate}) builds one from a body it finds in a chunk on disk.
+     */
+    @Nonnull
+    static Checkpoint checkpoint(@Nonnull BsonDocument entity, @Nullable String worldKey, double x, double y,
+                                 double z, long observedAtMs) {
         BsonDocument components = entity.isDocument("Components") ? entity.getDocument("Components") : new BsonDocument();
         TameworkNpcNameComponent name = component(components, "TameworkNpcName", TameworkNpcNameComponent.CODEC);
         String roleId = components.isDocument("NPC") && components.getDocument("NPC").isString("RoleName")
@@ -461,9 +471,8 @@ final class LegacyState {
         // A checkpoint taken while the body was dying would only serve a revive, and its record is
         // LIVE, so the death state is taken out the way a revive does: a recover can then use it.
         boolean dying = SnapshotPatch.isDeathSnapshot(entity);
-        return new Checkpoint(dying ? SnapshotPatch.forRevive(entity) : entity, string(root, "worldKey"),
-                coordinate(root, "x"), coordinate(root, "y"), coordinate(root, "z"), observedAtMs, summary,
-                customName(name), dying);
+        return new Checkpoint(dying ? SnapshotPatch.forRevive(entity) : entity, worldKey, x, y, z, observedAtMs,
+                summary, customName(name), dying);
     }
 
     private static CompanionSummary summary(CoopResidentStateSnapshot state) {

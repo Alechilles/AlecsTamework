@@ -9,6 +9,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandRecallRoutingTest {
     private static CompanionRecord liveIn(String world) {
@@ -49,5 +51,28 @@ class CommandRecallRoutingTest {
         // Restored once by 5.0 (generation above 0): its snapshot is its own again.
         assertEquals(RecallRoute.RESTORE,
                 RecallRoute.decide(elsewhere.toBuilder().generation(1L).build(), false, "default"));
+    }
+
+    /**
+     * While the saved-chunk pass is looking for a never-seen import, Recover is refused and both
+     * refusals say it is still being located. Once it is located, or when no pass runs, Recover
+     * is open again.
+     */
+    @Test
+    void recoverWaitsWhileANeverSeenImportIsStillBeingLocated() {
+        CompanionRecord unseen = liveIn("default").toBuilder()
+                .location(CompanionLocation.live("default", 0.0, 0.0, 0.0)).build();
+
+        assertTrue(CommandCompanionRestorationService.stillLocating(unseen, false, true));
+        assertFalse(CommandCompanionRestorationService.stillLocating(unseen, false, false));
+        assertFalse(CommandCompanionRestorationService.stillLocating(unseen, true, true));
+        assertFalse(CommandCompanionRestorationService.stillLocating(liveIn("default"), false, true));
+        assertEquals(CommandRelocationDispatchService.KEY_STILL_LOCATING,
+                CommandRelocationDispatchService.unseenImportKey(true));
+        assertEquals(CommandRelocationDispatchService.KEY_STILL_LOCATING,
+                CommandFeedbackService.restorationRequestFeedbackKey(
+                        CommandCompanionRestorationService.RequestStatus.STILL_LOCATING));
+        assertEquals(CommandRelocationDispatchService.KEY_UNSEEN_IMPORT,
+                CommandRelocationDispatchService.unseenImportKey(false));
     }
 }

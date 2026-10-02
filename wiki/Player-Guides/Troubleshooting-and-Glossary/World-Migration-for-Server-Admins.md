@@ -86,7 +86,7 @@ that is empty shows a count of 0.
 | Quarantined profiles | Companions the old version had set aside after an error. They are imported like any other. Check them in game. |
 | Skipped rows | Old rows that could not be used. Each line has the table, the key and the reason. A skipped `companion_profile` row is a companion that was not imported. The other skipped rows are extra data, not companions. |
 | Live without checkpoint | Companions that were out in a world with no saved copy of their body. See "Companions with no saved stats" below. |
-| Live world guessed | The old data named no world for these. They show the most common world until their animal loads. On a server with several worlds the companion panel may show the wrong world until then. |
+| Live world guessed | The old data named no world for these. The real world is filled in when their animal is located or loads. |
 | Live used history | No saved copy of the body existed, so an older saved state is kept as the fallback. It is used only if the animal is gone and the owner recovers the companion. |
 | Live used old death state | As above, but the only older state was from an earlier death. The companion is alive and has no death timer. |
 | Checkpoints of dying bodies | The only saved copy was taken as the animal died. The death was removed from the copy, so the companion can be recovered if its animal is gone. |
@@ -118,6 +118,8 @@ animals and old command links to their companions.
 4. Join the server. Open a companion panel and check that names, levels and owners
    look right, including dead and lost companions.
 5. Walk to a place where companions were left out. Each one should be there once.
+   Wait for the console line `Finished locating imported companions` before you
+   judge companions that show as being located.
 6. Restart once. The console must not show a second import.
 
 Keep the old database files. Tamework does not use them again, but they are your only
@@ -140,7 +142,7 @@ by companions they have stored. Set an owned limit in `/tw settings` if you want
 one.
 
 An imported companion that has not been seen since the import does not count as
-out in the world until its animal is found. It still counts as owned.
+out in the world until its animal is seen or located. It still counts as owned.
 
 ## Animals in the world
 
@@ -204,22 +206,73 @@ the old database. Its level, traits and inventory exist only on the animal, in t
 world save. On a long-running server this can be a large share of the companions that
 are out in the world. The report lists them under **Live without checkpoint**.
 
-- These companions are imported with an empty state and position 0,0,0.
-- When a player loads the chunk, the animal is matched and its real stats fill in.
-  Nothing is lost.
-- If the owner uses **Recover** on such a companion before its animal has been seen,
-  Tamework has nothing to restore from. The owner gets a fresh animal of that role.
-  If the original animal loads later, it is removed as a leftover copy, and its level
-  and traits are gone.
+- These companions are imported with an empty state and no position.
+- Tamework then looks for their animals in the saved chunks of each world. See
+  "Locating imported companions" below.
+- When the animal is found, or when a player loads its chunk first, its real position
+  and stats fill in. Nothing is lost.
 
-Tell players to visit their animals before they use Recover on a companion that shows
-no level or stats. The import report lists these companions under "Live without
-checkpoint", so you can see how many your world has.
+## Locating imported companions
 
-**Recall is refused for these companions.** A recall command on a companion that has
-not been seen since the update is refused with a message that asks the player to visit
-it first. Once its animal has loaded, recall works again. Recover in the companion
-panel is still allowed, with the effect described above.
+4.x stored no position for a companion in a chunk that was not loaded. After the
+import, Tamework finds these animals by reading the chunks each world has saved on
+disk. It starts by itself once the worlds are loaded. You do not run a command.
+
+- It runs only on a world that was imported from 3.x or 4.x, and only while it has
+  companions nobody has seen since the import. On any other world it does nothing.
+- It runs in the background on one low-priority thread. It reads one chunk at a
+  time and waits after each one. The wait gets longer while the server is busy. It
+  never loads a chunk into the world and never changes or saves a chunk.
+- It reads every world that is loaded when it starts, and any world that starts
+  while it runs. Worlds that are deleted when they close, such as instances, are
+  not read.
+- It stops as soon as every such companion is found. On a world with only a few of
+  them it can end long before it has read every chunk.
+- It survives restarts. Its place is kept in `locate-progress.json` in the
+  `Companions` folder, and the next start goes on from there. After a crash it
+  repeats at most a few hundred chunks.
+
+How long it takes depends on the number of saved chunks, not on the number of
+companions. Expect a few minutes for a small world and hours for a very large one.
+Players can play normally meanwhile.
+
+### Console lines
+
+When a world's read starts, about once a minute while it runs, and when it ends:
+
+```text
+Locating imported companions in the saved chunks of world <world>: <n> chunks, starting at chunk <n>, <n> companions to find
+Locating imported companions in world <world>: <n> of <n> chunks read, <n> located, <n> still missing
+Locating imported companions in world <world> ended after <time> (<reason>): <n> of <n> chunks read, <n> located so far
+```
+
+When the whole search is done:
+
+```text
+Finished locating imported companions in saved chunks after <time>: <n> located, <n> not found and now listed as lost (their owners can recover them), <n> leftover old bodies seen, <n> chunks could not be read
+```
+
+### What players see
+
+- While the search runs, the companion panel shows **Being located after the
+  update** in place of a position for a companion that has not been found yet.
+- **Recall** and **Recover** are refused for such a companion with a message that it
+  is still being located. Players do not need to walk to their animals. They only
+  need to wait.
+- Once a companion is located, the panel shows its real world and position, recall
+  works normally, and Recover restores the real animal with its level and traits.
+- A companion whose animal is in no saved chunk is listed as **lost** when the
+  search ends. Its owner can use Recover. It comes back from its old saved state
+  when it has one, else as a fresh animal of its role. If the animal turns up later,
+  for example in a world that was not loaded during the search, and the owner has
+  not recovered the companion yet, the companion goes back to normal by itself.
+- A companion whose state is in a 2.x capture item can still be released from that
+  item, during the search and after it.
+
+If the search stops on an error, the console says so and it runs again at the next
+start. Until then recall asks the player to visit the animal first, and Recover is
+allowed again: Recover on a companion that was never found gives a fresh animal of
+the role, and the original animal is removed as a leftover copy if it loads later.
 
 ## If the import fails
 

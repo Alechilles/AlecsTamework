@@ -379,7 +379,7 @@ final class CommandMenuMoveService {
                 return;
             }
             if (relocationResult.unseenImports() > 0) {
-                feedbackService.showWarningKey(player, CommandRelocationDispatchService.KEY_UNSEEN_IMPORT);
+                feedbackService.showWarningKey(player, CommandRelocationDispatchService.unseenImportKey());
             }
             if (affected <= 0 && queued <= 0) {
                 if (relocationResult.unseenImports() <= 0) {

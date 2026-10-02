@@ -320,7 +320,7 @@ final class CommandItemUseOrchestrator {
         int queued = relocations.queued();
         use.synchronizeFrom(context);
         if (relocations.unseenImports() > 0) {
-            feedbackService.showWarningKey(use.player, CommandRelocationDispatchService.KEY_UNSEEN_IMPORT);
+            feedbackService.showWarningKey(use.player, CommandRelocationDispatchService.unseenImportKey());
         }
         if (loaded.affected() <= 0 && queued <= 0) {
             use.flushHeldItem();

@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.migrate.CompanionImporter;
 import com.alechilles.alecstamework.companion.migrate.LegacyAliases;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyLocate;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator;
 import com.alechilles.alecstamework.companion.store.CompanionFileIo;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.companion.store.CompanionStore;
@@ -69,6 +71,7 @@ public final class CompanionPersistenceModule {
     @Nullable private final Path root;
     private final LegacyAliases legacyAliases;
     @Nullable private final String importReportName;
+    @Nullable private final LegacyBodyLocator legacyLocator;
     private final AtomicBoolean folderSizeRefreshing = new AtomicBoolean();
     private volatile long folderBytes;
     private volatile long folderBytesAtMs;
@@ -78,7 +81,8 @@ public final class CompanionPersistenceModule {
                                        @Nullable CompanionWriter writer, @Nullable CompanionStore store,
                                        List<CompanionIndex.ChangeListener> changeListeners,
                                        Set<UUID> unreadable, LongSupplier clock, @Nullable Path root,
-                                       LegacyAliases legacyAliases, @Nullable String importReportName) {
+                                       LegacyAliases legacyAliases, @Nullable String importReportName,
+                                       @Nullable CompanionFileIo io) {
         this.state = state;
         this.root = root;
         this.legacyAliases = legacyAliases;
@@ -106,6 +110,13 @@ public final class CompanionPersistenceModule {
         this.unreadable = Set.copyOf(unreadable);
         this.clock = clock;
         this.warnings = new ThrottledWarnings(clock, WARNING_INTERVAL_MS);
+        // The background search for imported bodies in saved chunks. Null on every world that was
+        // never imported and whenever nothing is left to find: then no thread and no chunk read.
+        this.legacyLocator = index == null || writer == null || root == null || io == null ? null
+                : LegacyBodyLocator.create(new LegacyBodyLocate(index, legacyAliases, profileId -> {
+                    Ref<EntityStore> body = loaded.get(profileId);
+                    return body != null && body.isValid();
+                }, writer::queueSnapshot, clock), io, root, clock);
     }
 
     /**
@@ -136,7 +147,7 @@ public final class CompanionPersistenceModule {
                         + "world is imported. Fix the cause and restart, or run /tw persistence start-fresh to "
                         + "start with an empty store. See %s.", legacy.dataVersions(), outcome.reportName());
                 return new CompanionPersistenceModule(State.MIGRATION_REQUIRED, outcome.failure(), legacy, null, null,
-                        null, List.of(), Set.of(), clock, null, LegacyAliases.EMPTY, outcome.reportName());
+                        null, List.of(), Set.of(), clock, null, LegacyAliases.EMPTY, outcome.reportName(), null);
             }
             imported = true;
         } else if (legacy != null) {
@@ -202,7 +213,7 @@ public final class CompanionPersistenceModule {
                     result.quarantinedFiles().size(), result.unreadableIds().size());
         }
         return new CompanionPersistenceModule(State.READY, null, null, index, writer, store, listeners,
-                result.unreadableIds(), clock, root, aliases, null);
+                result.unreadableIds(), clock, root, aliases, null, io);
     }
 
     /**
@@ -278,7 +289,7 @@ public final class CompanionPersistenceModule {
                                                      @Nullable CompanionStorage.LegacyKind legacyKind,
                                                      LongSupplier clock) {
         return new CompanionPersistenceModule(state, failure, legacyKind, null, null, null, List.of(), Set.of(), clock,
-                null, LegacyAliases.EMPTY, null);
+                null, LegacyAliases.EMPTY, null, null);
     }
 
     @Nonnull public State state() { return state; }
@@ -298,6 +309,13 @@ public final class CompanionPersistenceModule {
      * the operator notice; {@code null} unless the import failed at this start.
      */
     @Nullable public String importReportName() { return importReportName; }
+    /**
+     * The background pass that finds imported companions in the world's saved chunks (plan 7 task
+     * 13), or null when it has nothing to do: the world was never imported, or every imported
+     * companion has been seen or located and no earlier pass is unfinished. The caller starts it
+     * once the worlds are loaded; {@link #shutdown} stops it.
+     */
+    @Nullable public LegacyBodyLocator legacyLocator() { return legacyLocator; }
 
     /** @throws IllegalStateException when the module is not {@link State#READY}. */
     @Nonnull public CompanionIndex index() { return require(index); }
@@ -433,6 +451,10 @@ public final class CompanionPersistenceModule {
      * Returns true when nothing was left unwritten, and always true when there is no writer.
      */
     public boolean shutdown(long deadlineMs) {
+        // Usually stopped already, before the worlds shut down; a second stop does nothing.
+        if (legacyLocator != null) {
+            legacyLocator.stop();
+        }
         // No timer may start a store once the final flush begins.
         if (timers != null) {
             timers.shutdownNow();

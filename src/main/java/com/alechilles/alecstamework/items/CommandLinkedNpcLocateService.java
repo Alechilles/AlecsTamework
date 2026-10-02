@@ -154,6 +154,11 @@ final class CommandLinkedNpcLocateService {
         if (name == null || name.isBlank()) name = companion.displayName();
         if (name == null || name.isBlank()) name = LocalizedText.resolve(player, "tamework.ui.linkedPanel.subtitle.defaultNpcName");
         CompanionLocation location = companion.location();
+        if (companion.neverSighted() && companions.loadedBody(companion.profileId()) == null) {
+            // An import nobody has seen yet has no real place: never report its 0, 0, 0.
+            feedbackService.showWarningKey(player, CommandRelocationDispatchService.unseenImportKey());
+            return;
+        }
         switch (location.kind()) {
             case LIVE -> showLiveLocation(player, new LinkedNpcRecord(
                     companion.currentNpcUuid() == null ? record.npcUuid : companion.currentNpcUuid(),

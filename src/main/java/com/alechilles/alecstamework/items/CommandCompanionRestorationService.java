@@ -55,7 +55,9 @@ final class CommandCompanionRestorationService {
         UNAVAILABLE,
         INVALID_CONTEXT,
         NOT_DORMANT,
-        DESTINATION_NPCS_FROZEN
+        DESTINATION_NPCS_FROZEN,
+        /** An imported companion the saved-chunk pass has not located yet; it is refused until the pass ends. */
+        STILL_LOCATING
     }
 
     /** What the button does for one companion. */
@@ -136,6 +138,10 @@ final class CommandCompanionRestorationService {
             return RequestStatus.UNAVAILABLE;
         }
         UUID profileId = profile.profileId().value();
+        if (stillLocating(companions.get(profileId), companions.loadedBody(profileId) != null,
+                com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator.pending())) {
+            return RequestStatus.STILL_LOCATING;
+        }
         String roleId = profile.roleId() != null
                 ? profile.roleId()
                 : record.cachedRoleId;
@@ -247,6 +253,17 @@ final class CommandCompanionRestorationService {
             case STALE -> RestoreFlow.Result.STALE;
             case ALLOWED -> RestoreFlow.Result.RESTORED;
         };
+    }
+
+    /**
+     * True for a companion imported from 3.x or 4.x whose body has not been seen yet while the
+     * saved-chunk pass is still looking for it. A recover now would build the animal from an empty
+     * or old state and make its real body a leftover; once the pass ends the companion is either
+     * located with its real state or listed as lost, and Recover works again.
+     */
+    static boolean stillLocating(@Nullable com.alechilles.alecstamework.companion.index.CompanionRecord record,
+                                 boolean bodyLoaded, boolean locating) {
+        return locating && !bodyLoaded && record != null && record.neverSighted();
     }
 
     /**

@@ -497,6 +497,13 @@ final class CommandLinkedPanelEntryService {
         return new ResolvedEntries(entries, renderedIds);
     }
 
+    /** What stands in for the location of an imported companion that has not been seen or located yet. */
+    static String unseenImportStatus(Player player, String displayName) {
+        return com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator.pending()
+                ? LocalizedText.resolve(player, "tamework.ui.linkedLocation.beingLocated")
+                : LocalizedText.format(player, "tamework.ui.notifications.command.locate.noLocation", displayName);
+    }
+
     /** Uses saved evidence and observed item holders without querying live inventories. */
     private LinkedNpcEntry.Location location(Player player, LinkedNpcRecord record, LinkedNpcEntry entry,
                                              CommandSavedNpcPanelSnapshot saved,
@@ -537,7 +544,10 @@ final class CommandLinkedPanelEntryService {
             }
         } else {
             status = "";
-            if (record.lastKnownPosition != null) {
+            if (persistenceView != null && persistenceView.neverSighted(record)) {
+                // An import nobody has seen yet has no real place: never show its 0, 0, 0.
+                status = unseenImportStatus(player, entry.displayName());
+            } else if (record.lastKnownPosition != null) {
                 world = record.lastKnownWorldName;
                 targetX = record.lastKnownPosition.x;
                 targetZ = record.lastKnownPosition.z;
