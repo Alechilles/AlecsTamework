@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.ProgressionView;
-import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
@@ -11,28 +9,12 @@ import com.alechilles.alecstamework.companion.live.SummaryLifeStage;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
-import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
-import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
-import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
 import com.alechilles.alecstamework.localization.LocalizedText;
-import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
-import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
-import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
-import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
@@ -41,36 +23,26 @@ import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
-import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.bson.BsonDocument;
-import org.bson.BsonValue;
 
 /**
- * Immutable last-known companion card values decoded away from the world thread.
+ * Immutable last-known companion card values for an unloaded companion.
  *
- * <p>The decoder reads only presentation components from an exact checkpoint. It never creates
- * an entity holder or retains mutable component state. Config resolution is intentionally delayed
- * until {@link #apply(LinkedNpcEntry, String)}, which the caller runs on the owning world thread.</p>
+ * <p>Values come from the companion index summary captured from the live body. Config resolution
+ * is intentionally delayed until {@link #apply(LinkedNpcEntry, String)}, which the caller runs on
+ * the owning world thread.</p>
  */
 final class CommandSavedNpcPanelSnapshot {
-    private static final String COMPONENTS = "Components";
-    private static final com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry
-            SNAPSHOT_CODECS = TameworkSnapshotCodecs.create();
     private final long observedAtMs;
     private final String roleId;
     private final Facts facts;
     private final Appearance appearance;
     private final boolean exactCheckpoint;
-    private final boolean savedTalentsEditable;
     private final StoredLocation storedLocation;
 
     /** Where a stored companion is: its coop block (world and block position) or its capture item key. */
@@ -78,12 +50,7 @@ final class CommandSavedNpcPanelSnapshot {
                           @Nullable CaptureKey capture) { }
 
     /** A coop block's world and position. */
-    record CoopLocation(String world, int x, int y, int z) {
-        @Nullable
-        static CoopLocation of(@Nullable CoopSlotKey slot) {
-            return slot == null ? null : new CoopLocation(slot.worldKey(), slot.x(), slot.y(), slot.z());
-        }
-    }
+    record CoopLocation(String world, int x, int y, int z) { }
 
     StoredLocation storedLocation() { return storedLocation; }
 
@@ -128,19 +95,11 @@ final class CommandSavedNpcPanelSnapshot {
         this.facts = source == null ? null : source.facts;
         this.appearance = source == null ? null : source.appearance;
         this.exactCheckpoint = source != null && source.exactCheckpoint;
-        this.savedTalentsEditable = source != null && source.savedTalentsEditable;
         this.storedLocation = location;
     }
 
     private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
                                          Appearance appearance, boolean exactCheckpoint) {
-        this(observedAtMs, roleId, facts, appearance, exactCheckpoint, false);
-    }
-
-    private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
-                                        Appearance appearance, boolean exactCheckpoint,
-                                        boolean savedTalentsEditable) {
-        this.savedTalentsEditable = savedTalentsEditable;
         this.storedLocation = null;
         this.observedAtMs = observedAtMs;
         this.roleId = trimToNull(roleId);
@@ -149,38 +108,12 @@ final class CommandSavedNpcPanelSnapshot {
         this.exactCheckpoint = exactCheckpoint;
     }
 
-    /** Decodes the newest valid full-state snapshot. Callers with checkpoint evidence use the overload. */
-    @Nullable
-    static CommandSavedNpcPanelSnapshot decode(CompanionProfileReadModel profile) {
-        return decode(profile, null);
-    }
-
-    /**
-     * Decodes the newest valid persisted presentation evidence.
-     *
-     * <p>Malformed optional evidence is ignored. A checkpoint is considered only after its
-     * integrity envelope validates, then only named component documents are decoded.</p>
-     */
-    @Nullable
-    static CommandSavedNpcPanelSnapshot decode(
-            CompanionProfileReadModel profile,
-            @Nullable String checkpointJson
-    ) {
-        if (profile == null) return null;
-        var state = decodeState(profile, checkpointJson);
-        var coop = CoopLocation.of(profile.currentCoopSlot() == null ? null : profile.currentCoopSlot().key());
-        var capture = CommandLinkedNpcLocateService.captureKey(profile, profile.identity().profileId().value());
-        return coop == null && capture == null ? state
-                : new CommandSavedNpcPanelSnapshot(state, new StoredLocation(coop, capture));
-    }
-
     /**
      * Builds the unloaded panel from the index summary (spec 6.6) without decoding a snapshot.
      * The summary was captured from the live body, so its absent sections follow exact-checkpoint
      * semantics. A COOP record also carries its coop block from the record's location, even when
      * the summary was never captured, and an ITEM record carries the key of the capture item made
      * at its generation. Returns null otherwise when the summary was never captured.
-     * Restoration-snapshot talent editing is not carried by the summary.
      */
     @Nullable
     static CommandSavedNpcPanelSnapshot fromSummary(CompanionRecord record) {
@@ -229,35 +162,6 @@ final class CommandSavedNpcPanelSnapshot {
                 new Appearance(null, Map.of(), s.iconId()), true);
     }
 
-    private static CommandSavedNpcPanelSnapshot decodeState(
-            CompanionProfileReadModel profile, @Nullable String checkpointJson) {
-        if (profile == null) {
-            return null;
-        }
-        var restoration = com.alechilles.alecstamework.companion.progression.SavedCompanionTalentSnapshot.find(profile);
-        if (restoration != null) {
-            // Purchases update the restoration snapshot; an older entity checkpoint must not mask them.
-            var saved = fromState(restoration.fullState(), restoration.snapshot().createdAtMs());
-            return new CommandSavedNpcPanelSnapshot(saved.observedAtMs, saved.roleId, saved.facts,
-                    saved.appearance, false, true);
-        }
-        ArrayList<CommandSavedNpcPanelSnapshot> candidates = new ArrayList<>();
-        for (CompanionSnapshot snapshot : profile.currentSnapshots()) {
-            CommandSavedNpcPanelSnapshot decoded = decodeFullState(snapshot);
-            if (decoded != null) {
-                candidates.add(decoded);
-            }
-        }
-        CommandSavedNpcPanelSnapshot checkpoint = decodeCheckpoint(profile, checkpointJson);
-        if (checkpoint != null) {
-            candidates.add(checkpoint);
-        }
-        CommandSavedNpcPanelSnapshot latest = candidates.stream()
-                .max(Comparator.comparingLong(value -> value.observedAtMs)).orElse(null);
-        if (latest == null) return null;
-        return latest;
-    }
-
     /** Applies only known saved fields and leaves unavailable legacy fields as supplied by the base entry. */
     LinkedNpcEntry apply(LinkedNpcEntry base, @Nullable String language) {
         return apply(base, language, BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(null));
@@ -291,8 +195,7 @@ final class CommandSavedNpcPanelSnapshot {
                 base.deadRespawnRemainingMs(), base.deathCauseHint(), progression.level,
                 progression.talents, traits, facts.traits != null || base.isTraitsActionVisible(),
                 base.loaded() && base.isTraitsActionEnabled(), progression.talents != null || base.isTalentsActionVisible(),
-                base.loaded() ? base.isTalentsActionEnabled()
-                        : savedTalentsEditable && progression.talents != null && (base.dead() || base.lost()),
+                base.loaded() && base.isTalentsActionEnabled(),
                 base.linked(), base.active(),
                 base.speciesId(), base.speciesLabel(), base.groupId(), base.groupName(),
                 base.groupColorHex(), breedingEnabled, breedingAvailable, breeding.active,
@@ -331,118 +234,6 @@ final class CommandSavedNpcPanelSnapshot {
         long pending = active >= settled ? active - settled : 0L;
         long lifeNow = BreedingTimeService.saturatingAdd(lifeStage.getLifecycleNowMs(), pending);
         return lifeNow < lifeStage.getAdultAtMs();
-    }
-
-    private static CommandSavedNpcPanelSnapshot decodeFullState(CompanionSnapshot snapshot) {
-        if (snapshot == null) {
-            return null;
-        }
-        try {
-            SnapshotDecodeResult<CoopResidentStateSnapshot> state = SNAPSHOT_CODECS
-                    .decode(snapshot, CoopResidentStateSnapshot.class);
-            if (state instanceof SnapshotDecodeResult.Decoded<CoopResidentStateSnapshot> found) {
-                return fromState(found.value(), snapshot.createdAtMs());
-            }
-            SnapshotDecodeResult<DeathSnapshotV2Payload> death = SNAPSHOT_CODECS
-                    .decode(snapshot, DeathSnapshotV2Payload.class);
-            if (death instanceof SnapshotDecodeResult.Decoded<DeathSnapshotV2Payload> found) {
-                return fromState(found.value().fullState(), snapshot.createdAtMs());
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // Optional card presentation must not fail profile processing.
-        }
-        return null;
-    }
-
-    private static CommandSavedNpcPanelSnapshot fromState(CoopResidentStateSnapshot state, long observedAtMs) {
-        return new CommandSavedNpcPanelSnapshot(observedAtMs, state.roleId(), Facts.from(
-                state.currentHealth() == null || state.maximumHealth() == null ? null : new Health(state.currentHealth(), state.maximumHealth()),
-                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms()), state.lifeStage()),
-                Appearance.from(state.attachments(), null), false);
-    }
-
-    @Nullable
-    private static CommandSavedNpcPanelSnapshot decodeCheckpoint(
-            CompanionProfileReadModel profile,
-            @Nullable String encoded
-    ) {
-        if (encoded == null || encoded.isBlank()) {
-            return null;
-        }
-        try {
-            CompanionEntityCheckpoint checkpoint = new CompanionEntityCheckpointCodec().decode(encoded);
-            if (!checkpoint.profileId().equals(profile.identity().profileId())) {
-                return null;
-            }
-            BsonValue rawComponents = checkpoint.holder().get(COMPONENTS);
-            if (rawComponents == null || !rawComponents.isDocument()) {
-                return null;
-            }
-            BsonDocument components = rawComponents.asDocument();
-            Health health = health(component(components, "EntityStats"));
-            TameworkHappinessComponent happiness = component(components, "TameworkHappiness", TameworkHappinessComponent.CODEC);
-            TameworkNeedsComponent needs = component(components, "TameworkNeeds", TameworkNeedsComponent.CODEC);
-            TameworkBreedingComponent breeding = component(components, "TameworkBreeding", TameworkBreedingComponent.CODEC);
-            TameworkLevelingComponent leveling = component(components, "TameworkLeveling", TameworkLevelingComponent.CODEC);
-            TameworkTraitsComponent traits = component(components, "TameworkTraits", TameworkTraitsComponent.CODEC);
-            TameworkTalentsComponent talents = component(components, "TameworkTalents", TameworkTalentsComponent.CODEC);
-            TameworkAttachmentsComponent attachments = component(
-                    components, "TameworkAttachments", TameworkAttachmentsComponent.CODEC);
-            TameworkAlarmComponent alarms = component(components, "TameworkAlarm", TameworkAlarmComponent.CODEC);
-            TameworkLifeStageComponent lifeStage = component(components, "TameworkLifeStage", TameworkLifeStageComponent.CODEC);
-            return new CommandSavedNpcPanelSnapshot(checkpoint.capturedAtMs(), profile.identity().roleId(),
-                    Facts.from(health, happiness, needs, breeding, leveling, traits, talents, harvest(alarms), lifeStage),
-                    Appearance.from(attachments, component(components, "Model")), true);
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static BsonDocument component(@Nullable BsonDocument components, String name) {
-        BsonValue value = components == null ? null : components.get(name);
-        return value != null && value.isDocument() ? value.asDocument() : null;
-    }
-
-    @Nullable
-    private static <T> T component(BsonDocument components, String name, com.hypixel.hytale.codec.Codec<T> codec) {
-        BsonDocument value = component(components, name);
-        if (value == null) {
-            return null;
-        }
-        try {
-            return codec.decode(value, new ExtraInfo());
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Health health(@Nullable BsonDocument value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            EntityStatMap map = EntityStatMap.CODEC.decode(value, new ExtraInfo());
-            EntityStatValue health = map.get("Health");
-            return health == null ? null : new Health(health.get(), health.getMax());
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Harvest harvest(@Nullable TameworkAlarmComponent alarms) {
-        if (alarms == null) {
-            return null;
-        }
-        ArrayList<Alarm> values = new ArrayList<>();
-        for (TameworkAlarmComponent.AlarmEntry alarm : alarms.getAlarms()) {
-            if (alarm != null && trimToNull(alarm.getName()) != null) {
-                values.add(new Alarm(alarm.getName().trim(), alarm.getUntilMs(), alarm.getStartedAtMs(), alarm.getDurationMs()));
-            }
-        }
-        return new Harvest(List.copyOf(values));
     }
 
     private Meter resolveHappiness(@Nullable Happiness saved, String role, LinkedNpcEntry base) {
@@ -598,51 +389,13 @@ final class CommandSavedNpcPanelSnapshot {
         }
     }
 
-    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) {
-        static Facts from(@Nullable Health health, @Nullable TameworkHappinessComponent happiness, @Nullable TameworkNeedsComponent needs, @Nullable TameworkBreedingComponent breeding, @Nullable TameworkLevelingComponent leveling, @Nullable TameworkTraitsComponent traits, @Nullable TameworkTalentsComponent talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) {
-            return new Facts(health, happiness == null ? null : new Happiness(happiness.getConfigId(), happiness.getValue()), needs == null ? null : new Needs(needs.getConfigId(), needs.getHunger(), needs.getThirst()), breeding == null ? null : new Breeding(breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(), breeding.getCooldownDurationMs()), leveling == null ? null : new Leveling(leveling.getConfigId(), leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp()), traits == null ? null : Traits.from(traits), talents == null ? null : new Talents(talents.getConfigId(), talents.getSpentPoints()), harvest, lifeStage);
-        }
-    }
+    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) { }
     /** {@code icon} is a portrait already resolved from the live body (summary path); it wins when set. */
     private record Appearance(@Nullable String modelId, Map<String, String> attachments, @Nullable String icon) {
         private Appearance {
             modelId = trimToNull(modelId);
             icon = trimToNull(icon);
             attachments = attachments == null || attachments.isEmpty() ? Map.of() : Map.copyOf(attachments);
-        }
-
-        static Appearance from(@Nullable TameworkAttachmentsComponent saved,
-                               @Nullable BsonDocument model) {
-            Map<String, String> attachmentIds = saved == null ? Map.of() : saved.getAttachmentIds();
-            BsonDocument modelState = component(model, "Model");
-            String modelId = string(modelState, "Id");
-            if (attachmentIds == null || attachmentIds.isEmpty()) {
-                attachmentIds = stringMap(component(modelState, "RandomAttachments"));
-            }
-            return new Appearance(modelId, attachmentIds, null);
-        }
-
-        @Nullable
-        private static String string(@Nullable BsonDocument document, String key) {
-            BsonValue value = document == null ? null : document.get(key);
-            return value != null && value.isString() ? trimToNull(value.asString().getValue()) : null;
-        }
-
-        private static Map<String, String> stringMap(@Nullable BsonDocument document) {
-            if (document == null || document.isEmpty()) {
-                return Map.of();
-            }
-            Map<String, String> values = new LinkedHashMap<>();
-            for (Map.Entry<String, BsonValue> entry : document.entrySet()) {
-                String key = trimToNull(entry.getKey());
-                BsonValue value = entry.getValue();
-                String attachment = value != null && value.isString()
-                        ? trimToNull(value.asString().getValue()) : null;
-                if (key != null && attachment != null) {
-                    values.put(key, attachment);
-                }
-            }
-            return values.isEmpty() ? Map.of() : Map.copyOf(values);
         }
     }
     private record Health(int current, int maximum) { Health(double current, double maximum) { this(round(current), Math.max(1, round(maximum))); } }
@@ -707,7 +460,7 @@ final class CommandSavedNpcPanelSnapshot {
     private record Leveling(String configId, int level, double currentXp, double totalXp) { }
     private record Talents(String configId, int spentPoints) { }
     private record Trait(String id, double value) { }
-    private record Traits(String configId, List<Trait> values) { static Traits from(TameworkTraitsComponent source) { ArrayList<Trait> values = new ArrayList<>(); for (TameworkTraitsComponent.TraitValue value : source.getTraitValues()) if (value != null && trimToNull(value.getId()) != null) values.add(new Trait(value.getId().trim(), value.getValue())); return new Traits(source.getConfigId(), List.copyOf(values)); } }
+    private record Traits(String configId, List<Trait> values) { }
     private record Alarm(String name, long untilMs, long startedAtMs, long durationMs) { }
     private record Harvest(List<Alarm> alarms) { }
     private record Cooldown(boolean known, boolean active, long remainingMs, double ratio) { static Cooldown from(boolean known, boolean active, long remainingMs, double ratio) { return new Cooldown(known, active, remainingMs, ratio); } }

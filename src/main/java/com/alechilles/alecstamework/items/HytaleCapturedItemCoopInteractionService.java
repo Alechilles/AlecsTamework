@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.coop.CoopCapturedItemInventoryPosition;
-import com.alechilles.alecstamework.companion.coop.CoopCapturedItemSourceEvidence;
 import com.alechilles.alecstamework.companion.coop.CoopIntakeFlow;
 import com.alechilles.alecstamework.companion.coop.HytaleCoopIntake;
 import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
@@ -132,7 +131,7 @@ public final class HytaleCapturedItemCoopInteractionService {
         }
         try {
             return item.getFromMetadataOrNull(
-                    CoopCapturedItemSourceEvidence.RECEIPT_METADATA_KEY,
+                    TameworkMetadataKeys.COOP_CAPTURE_RECEIPT,
                     Codec.STRING
             ) != null;
         } catch (RuntimeException | LinkageError invalidReceipt) {

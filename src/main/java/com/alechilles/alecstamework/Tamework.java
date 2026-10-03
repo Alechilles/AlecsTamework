@@ -24,7 +24,7 @@ import com.alechilles.alecstamework.api.internal.IndexProfileDataApi;
 import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
+import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
@@ -702,9 +702,6 @@ public class Tamework extends JavaPlugin {
                 .resolveAndInitializeDataPathLayout(getDataDirectory());
         runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
-        if (diagnosticRuntime != null) {
-            diagnosticRuntime.preparePersistence(runtimeDataDirectory);
-        }
         openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
         CompanionQueries companionQueries = null;
@@ -816,7 +813,7 @@ public class Tamework extends JavaPlugin {
         } else {
             // No public API without the companion index; activity producers and care credits
             // still need their runtime.
-            ReplacementTameworkApiFactory.installStandaloneActivityRuntime(managedActivityConfigRegistry);
+            ActivityRuntime.install(LiveActivityFeed.standalonePublisher(), managedActivityConfigRegistry);
         }
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> null,
@@ -828,8 +825,7 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-npc-relocation-on-load", () -> new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
-                        commandLinkedNpcStateSnapshotService,
-                        null
+                        commandLinkedNpcStateSnapshotService
                 )
         );
         // Initial assets load before deferred subscriptions; publish portraits even without spawners.
@@ -876,7 +872,6 @@ public class Tamework extends JavaPlugin {
                 commandItemRegistry,
                 commandNpcRelocationService,
                 commandLinkedNpcStateSnapshotService,
-                null,
                 restoreFlow,
                 // The bonded panel reads the index-backed API; after shutdown it reports unavailable.
                 bondedCompanionApi == null ? null : () -> {
@@ -1460,8 +1455,6 @@ public class Tamework extends JavaPlugin {
                     ? companionModule.queries() : null;
             var root = TameworkCommandRootFactory.create(
                     spawnBeaconVisualizationService,
-                    diagnosticRuntime == null
-                            ? null : diagnosticRuntime.failureSink(),
                     companionReleaseFlow,
                     companions
             );

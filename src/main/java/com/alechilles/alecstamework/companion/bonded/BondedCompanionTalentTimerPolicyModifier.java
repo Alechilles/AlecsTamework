@@ -15,15 +15,6 @@ public final class BondedCompanionTalentTimerPolicyModifier {
     private BondedCompanionTalentTimerPolicyModifier() {
     }
 
-    @Nonnull
-    static BondedCompanionPolicy apply(@Nonnull BondedCompanionPolicy policy,
-                                       @Nonnull BondedCompanionProfile profile) {
-        TameworkTalentsComponent talents = profile.snapshot()
-                .fullState().talents();
-        TwTalentConfig config = TwTalentConfig.resolveForRole(profile.roleId());
-        return apply(policy, talents, config);
-    }
-
     /** Shares the lifecycle timer calculation with saved-profile presentation. */
     @Nonnull
     public static BondedCompanionPolicy apply(@Nonnull BondedCompanionPolicy policy,

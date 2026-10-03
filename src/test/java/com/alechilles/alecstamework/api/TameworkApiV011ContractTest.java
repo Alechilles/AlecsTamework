@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.api;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
-import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
@@ -42,19 +41,13 @@ class TameworkApiV011ContractTest {
     }
 
     @Test
-    void productionAndDegradedFacadesHoldBackNewCapabilitiesUntilReady() throws Exception {
+    void productionFacadeHoldsBackNewCapabilitiesUntilReady() throws Exception {
         try (TameworkApiImpl base = newBaseApi()) {
             assertNewCapabilitiesAbsent(base);
             assertCommandUiCapabilities(base);
             assertActivityFeedUnavailable(base);
             assertAdmissionDefaultsUnavailable(base.policies());
         }
-
-        TameworkApi degraded = new BondedOnlyTameworkApi(
-                BondedCompanionApi.unavailable());
-        assertNewCapabilitiesAbsent(degraded);
-        assertCommandUiUnavailable(degraded);
-        assertActivityFeedUnavailable(degraded);
     }
 
     @Test
@@ -160,17 +153,6 @@ class TameworkApiV011ContractTest {
                         8L,
                         4L
                 ));
-    }
-
-    @Test
-    void degradedFacadeReportsV2VersionWithoutAdvertisingTheUnavailableFeed() {
-        TameworkApi api = new BondedOnlyTameworkApi(
-                BondedCompanionApi.unavailable());
-
-        assertEquals("2.0.0", api.getApiVersion());
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.ACTIVITY_FEED_V2));
-        assertFalse(api.activities().status("contract-consumer").available());
     }
 
     private static void assertNewCapabilitiesAbsent(TameworkApi api) {

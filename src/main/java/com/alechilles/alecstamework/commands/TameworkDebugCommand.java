@@ -1,29 +1,16 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticContributor;
-import com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosticExporter;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDiagnosticsReader;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
-import java.util.function.Consumer;
 
 /**
  * Groups Tamework's developer-facing NPC inspection and mutation commands.
  */
 public final class TameworkDebugCommand extends AbstractCommandCollection {
     public TameworkDebugCommand(
-            PersistenceDiagnosticsReader persistenceDiagnostics,
-            PersistenceDiagnosticExporter persistenceExporter,
-            BondedCompanionDiagnosticContributor bondedDiagnostics,
             SpawnBeaconVisualizationService spawnBeaconVisualizationService,
-            @Nullable PublicPersistenceQueries persistenceQueries,
-            @Nullable PublicPersistenceOperations persistenceOperations,
-            @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink,
             @Nullable ReleaseFlow releaseFlow,
             @Nullable CompanionQueries companions
     ) {
@@ -35,14 +22,6 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());
         addSubCommand(new TameworkDebugClearOwnedCommand(releaseFlow, companions));
         addSubCommand(new TameworkDebugTelemetryCommand());
-        addSubCommand(new TameworkDebugPersistenceCommand(
-                persistenceDiagnostics,
-                persistenceExporter,
-                bondedDiagnostics,
-                persistenceQueries,
-                persistenceOperations,
-                persistenceFailureSink
-        ));
         addSubCommand(new TameworkDebugAvatarCommand());
     }
 }

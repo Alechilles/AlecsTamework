@@ -7,6 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
@@ -191,11 +197,9 @@ class CommandFreshTamePanelSelectionTest {
             scope.world.references.put(NPC, npcRef);
 
             var profileId = new com.alechilles.alecstamework.companion.identity.ProfileId(UUID.randomUUID());
-            var profile = new com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState(
-                    profileId, new com.alechilles.alecstamework.companion.identity.NpcAlias(NPC),
-                    com.alechilles.alecstamework.companion.lifecycle.LifecycleState.ACTIVE,
-                    new com.alechilles.alecstamework.companion.identity.OwnerId(OWNER), null,
-                    "Cow", "Cow", "My animal", true, null, null, java.util.Set.of(), java.util.Set.of(), 1L);
+            CompanionQueries companions = queries(CompanionTransitions.newLive(profileId.value(), 0,
+                    new CompanionTransitions.BodyFacts(NPC, OWNER, "Owner", "Cow", "Cow", scope.world.getName(),
+                            0, 0, 0, List.of(), CompanionSummary.EMPTY)));
             UUID retired = UUID.randomUUID();
             ItemStack stack = new CommandLinkedNpcRecordStore().write(
                     new MetadataStack("test:flute", new BsonDocument()),
@@ -205,7 +209,7 @@ class CommandFreshTamePanelSelectionTest {
             var liveIndex = new com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex();
             liveIndex.observe(NPC, OWNER, scope.world.getName());
             CommandPanelEntrySourceService source = entrySource(liveIndex,
-                    new CommandOwnedPanelRecordSource(() -> Map.of(profileId, profile)));
+                    new CommandOwnedPanelRecordSource(companions));
 
             var page = new com.alechilles.alecstamework.ui.LinkedNpcPanelPageState();
             page.setPageSize(10);
@@ -222,7 +226,15 @@ class CommandFreshTamePanelSelectionTest {
 
     private static CommandPanelEntrySourceService entrySource(
             com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex liveIndex) {
-        return entrySource(liveIndex, new CommandOwnedPanelRecordSource(Map::of));
+        return entrySource(liveIndex, new CommandOwnedPanelRecordSource(queries()));
+    }
+
+    private static CompanionQueries queries(CompanionRecord... records) {
+        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (before, after) -> { });
+        for (CompanionRecord record : records) {
+            index.insert(record);
+        }
+        return new CompanionQueries(index, new LoadedBodies<>());
     }
 
     private static CommandPanelEntrySourceService entrySource(
@@ -230,19 +242,7 @@ class CommandFreshTamePanelSelectionTest {
             CommandOwnedPanelRecordSource owned) {
         var names = new CommandNpcNameResolver();
         var policy = new CommandLinkPolicyService();
-        var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
-            @Override
-            public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                    com.alechilles.alecstamework.companion.identity.ProfileId id) {
-                return java.util.Optional.empty();
-            }
-
-            @Override
-            public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                    com.alechilles.alecstamework.companion.identity.NpcAlias alias) {
-                return java.util.Optional.empty();
-            }
-        });
+        var persistence = new CommandPersistenceView(queries());
         var linked = new CommandLinkedPanelEntryService(
                 new CommandLinkedNpcRecordStore(), null, names, null,
                 persistence, policy, new CommandGroupService(), null);

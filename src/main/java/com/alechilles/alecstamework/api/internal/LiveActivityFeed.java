@@ -77,6 +77,15 @@ public final class LiveActivityFeed implements ActivityFeedApi, AutoCloseable {
         }
     }
 
+    /**
+     * Returns the publisher of a new feed that no consumer can reach. Activity producers and care
+     * credits use it when Tamework runs without a public API.
+     */
+    @Nonnull
+    public static Publisher standalonePublisher() {
+        return new LiveActivityFeed().publisher();
+    }
+
     /** Returns the narrow internal publisher seam for composition wiring. */
     @Nonnull
     Publisher publisher() {

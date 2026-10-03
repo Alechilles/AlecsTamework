@@ -18,6 +18,11 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_ITEM_QUALITY_ID = "Tamework.CaptureItemQualityId";
     /** Exact captured-artifact receipt, equal to the authoritative capture snapshot ID. */
     public static final String CAPTURE_SNAPSHOT_ID = "Tamework.CaptureSnapshotId";
+    /**
+     * Retirement receipt a 4.x captured-item coop intake wrote on the item. An item that carries
+     * it was already consumed, so it is never taken into a coop again.
+     */
+    public static final String COOP_CAPTURE_RECEIPT = "Tamework.CoopCaptureReceipt";
     /** Operation-scoped receipt proving a captured artifact was consumed for release. */
     public static final String CAPTURE_RELEASE_RECEIPT =
             "Tamework.CaptureReleaseReceipt";

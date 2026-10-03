@@ -35,7 +35,6 @@ final class CommandTalentPageService {
     private final CommandToolInventoryService toolInventoryService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
-    private CommandSavedTalentPageService savedTalentPages;
 
     CommandTalentPageService(@Nonnull CommandLinkPolicyService linkPolicyService,
                              @Nonnull CommandToolInventoryService toolInventoryService,
@@ -59,23 +58,17 @@ final class CommandTalentPageService {
                 backCallback);
     }
 
-    void configureSavedTalents(com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades persistence) {
-        savedTalentPages = persistence == null ? null
-                : new CommandSavedTalentPageService(persistence, toolInventoryService, this);
-    }
-
     java.util.concurrent.CompletionStage<com.alechilles.alecstamework.api.commandui.CommandUiActionResult> openSavedTalents(
             CommandUiSessionImpl session, UUID rowId, Player player, String toolId, UUID npcId,
             java.util.function.BooleanSupplier authority) {
-        return savedTalentPages == null
-                ? java.util.concurrent.CompletableFuture.completedFuture(
-                        com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
-                                LocalizedText.resolve(
-                                        resolveLanguage(player),
-                                        "tamework.ui.talents.saved.unavailable"
-                                )
-                        ))
-                : savedTalentPages.open(session, rowId, player, toolId, npcId, authority);
+        // Saved talents of an unloaded companion have no page on the companion index.
+        return java.util.concurrent.CompletableFuture.completedFuture(
+                com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
+                        LocalizedText.resolve(
+                                resolveLanguage(player),
+                                "tamework.ui.talents.saved.unavailable"
+                        )
+                ));
     }
 
     /** Opens the shared talent page for a caller-authorized live companion. */

@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.npc.components;
 
-import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -56,24 +54,6 @@ public final class TameworkPersistenceRetirementComponent
         setOperationKind(operationKind);
     }
 
-    /** Creates an exact marker from one prepared profile-scoped operation. */
-    @Nonnull
-    public static TameworkPersistenceRetirementComponent exact(
-            @Nonnull ProfileId profileId,
-            @Nonnull OperationEnvelope operation
-    ) {
-        if (profileId == null || operation == null) {
-            throw new IllegalArgumentException(
-                    "Retirement profile and operation are required"
-            );
-        }
-        return new TameworkPersistenceRetirementComponent(
-                operation.operationId().toString(),
-                profileId.toString(),
-                operation.kind().value()
-        );
-    }
-
     public String getOperationId() {
         return operationId;
     }
@@ -98,18 +78,6 @@ public final class TameworkPersistenceRetirementComponent
         this.operationKind = requireText(
                 operationKind, "Retirement operation kind"
         );
-    }
-
-    /** Returns whether this marker is the exact suppression evidence expected. */
-    public boolean matches(
-            @Nonnull ProfileId expectedProfile,
-            @Nonnull OperationEnvelope expectedOperation
-    ) {
-        return expectedProfile != null
-                && expectedOperation != null
-                && expectedProfile.toString().equals(profileId)
-                && expectedOperation.operationId().toString().equals(operationId)
-                && expectedOperation.kind().value().equals(operationKind);
     }
 
     @Override

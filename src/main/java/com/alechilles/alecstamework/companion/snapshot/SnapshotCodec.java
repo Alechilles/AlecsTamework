@@ -2,11 +2,8 @@ package com.alechilles.alecstamework.companion.snapshot;
 
 import javax.annotation.Nonnull;
 
-/** One immutable codec for one registered snapshot kind and payload version. */
+/** One immutable codec for one snapshot payload version. */
 public interface SnapshotCodec<T> {
-    @Nonnull
-    SnapshotKind kind();
-
     int version();
 
     @Nonnull

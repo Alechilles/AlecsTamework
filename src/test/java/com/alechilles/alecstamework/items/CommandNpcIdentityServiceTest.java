@@ -1,12 +1,13 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +22,7 @@ class CommandNpcIdentityServiceTest {
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(profileUuid, currentUuid, LifecycleState.ACTIVE),
+                view(profileUuid, currentUuid, LifecycleState.ACTIVE),
                 this::absent
         );
 
@@ -48,7 +49,7 @@ class CommandNpcIdentityServiceTest {
         UUID actualProfile = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(actualProfile, currentUuid, LifecycleState.ACTIVE),
+                view(actualProfile, currentUuid, LifecycleState.ACTIVE),
                 this::absent
         );
 
@@ -68,9 +69,8 @@ class CommandNpcIdentityServiceTest {
     @Test
     void projectionAbsenceWithoutExactLiveEvidenceFailsClosed() {
         UUID npcUuid = UUID.randomUUID();
-        CommandPersistenceView empty = new CommandPersistenceView(
-                new EmptyProjectionLookup()
-        );
+        CommandPersistenceView empty = new CommandPersistenceView(new CompanionQueries(
+                new CompanionIndex(System::currentTimeMillis, (before, after) -> { }), new LoadedBodies<>()));
         CommandNpcIdentityService service =
                 new CommandNpcIdentityService(empty, this::absent);
 
@@ -91,7 +91,7 @@ class CommandNpcIdentityServiceTest {
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(profileUuid, currentUuid, LifecycleState.ACTIVE),
+                view(profileUuid, currentUuid, LifecycleState.ACTIVE),
                 this::oneLocation
         );
 
@@ -114,11 +114,7 @@ class CommandNpcIdentityServiceTest {
         UUID profileUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(
-                        profileUuid,
-                        currentUuid,
-                        LifecycleState.DEAD_REVIVABLE
-                ),
+                view(profileUuid, currentUuid, LifecycleState.DEAD_REVIVABLE),
                 this::absent
         );
 
@@ -136,7 +132,7 @@ class CommandNpcIdentityServiceTest {
         UUID profileUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(profileUuid, currentUuid, LifecycleState.RELEASED),
+                view(profileUuid, currentUuid, LifecycleState.RELEASED),
                 this::absent
         );
 
@@ -151,36 +147,26 @@ class CommandNpcIdentityServiceTest {
     }
 
     private CommandNpcIdentityService service(
-            CompanionProfileProjectionState projection,
+            CommandPersistenceView view,
             CommandNpcIdentityService.LiveNpcProbe probe
     ) {
-        CommandPersistenceView view = new CommandPersistenceView(
-                new SingleProjectionLookup(projection)
-        );
         return new CommandNpcIdentityService(view, probe);
     }
 
-    private CompanionProfileProjectionState projection(
-            UUID profileUuid,
-            UUID currentUuid,
-            LifecycleState lifecycleState
-    ) {
-        return new CompanionProfileProjectionState(
-                new ProfileId(profileUuid),
-                new NpcAlias(currentUuid),
-                lifecycleState,
-                null,
-                null,
-                "Tamed_Chicken",
-                "Chicken",
-                null,
-                true,
-                null,
-                null,
-                Set.of(),
-                Set.of(),
-                100L
-        );
+    private static CommandPersistenceView view(UUID profileUuid, UUID currentUuid, LifecycleState state) {
+        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (before, after) -> { });
+        CompanionRecord live = CompanionTransitions.newLive(profileUuid, 0, new CompanionTransitions.BodyFacts(
+                currentUuid, null, null, "Tamed_Chicken", "Chicken", "default", 0, 0, 0, List.of(),
+                CompanionSummary.EMPTY));
+        index.insert(live);
+        switch (state) {
+            case ACTIVE -> { }
+            case DEAD_REVIVABLE -> index.update(profileUuid, live.revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            case RELEASED -> index.update(profileUuid, live.revision(), CompanionTransitions.released(live));
+            default -> throw new IllegalArgumentException(state.name());
+        }
+        return new CommandPersistenceView(new CompanionQueries(index, new LoadedBodies<>()));
     }
 
     private LinkedNpcRecord record(UUID npcUuid, String profileId) {
@@ -216,44 +202,5 @@ class CommandNpcIdentityServiceTest {
                         "default", "store-a"
                 ))
         );
-    }
-
-    private record SingleProjectionLookup(
-            CompanionProfileProjectionState projection
-    ) implements CommandPersistenceView.ProjectionLookup {
-        @Override
-        public Optional<CompanionProfileProjectionState> find(
-                ProfileId profileId
-        ) {
-            return projection.profileId().equals(profileId)
-                    ? Optional.of(projection)
-                    : Optional.empty();
-        }
-
-        @Override
-        public Optional<CompanionProfileProjectionState> find(
-                NpcAlias alias
-        ) {
-            return projection.currentAlias().equals(alias)
-                    ? Optional.of(projection)
-                    : Optional.empty();
-        }
-    }
-
-    private static final class EmptyProjectionLookup
-            implements CommandPersistenceView.ProjectionLookup {
-        @Override
-        public Optional<CompanionProfileProjectionState> find(
-                ProfileId profileId
-        ) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<CompanionProfileProjectionState> find(
-                NpcAlias alias
-        ) {
-            return Optional.empty();
-        }
     }
 }

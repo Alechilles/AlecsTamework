@@ -1,12 +1,13 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -191,46 +192,21 @@ class CommandNpcProfileActionResolverTest {
             CommandNpcIdentityService.LiveNpcProbe probe,
             UUID historicalUuid
     ) {
-        CompanionProfileProjectionState projection =
-                new CompanionProfileProjectionState(
-                        new ProfileId(profileUuid),
-                        new NpcAlias(currentUuid),
-                        lifecycleState,
-                        null,
-                        null,
-                        "Tamed_Chicken",
-                        "Chicken",
-                        null,
-                        true,
-                        null,
-                        null,
-                        Set.of(),
-                        Set.of(),
-                        100L
-                );
+        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (before, after) -> { });
+        CompanionRecord live = CompanionTransitions.newLive(profileUuid, 0, new CompanionTransitions.BodyFacts(
+                currentUuid, null, null, "Tamed_Chicken", "Chicken", "default", 0, 0, 0, List.of(),
+                CompanionSummary.EMPTY));
+        index.insert(live);
+        switch (lifecycleState) {
+            case ACTIVE -> { }
+            case DEAD_REVIVABLE -> index.update(profileUuid, live.revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            default -> throw new IllegalArgumentException(lifecycleState.name());
+        }
+        // A historical body resolves to its profile the way an imported 3.x/4.x alias does.
         CommandPersistenceView view = new CommandPersistenceView(
-                new CommandPersistenceView.ProjectionLookup() {
-                    @Override
-                    public Optional<CompanionProfileProjectionState> find(
-                            ProfileId profileId
-                    ) {
-                        return projection.profileId().equals(profileId)
-                                ? Optional.of(projection)
-                                : Optional.empty();
-                    }
-
-                    @Override
-                    public Optional<CompanionProfileProjectionState> find(
-                            NpcAlias alias
-                    ) {
-                        return projection.currentAlias().equals(alias)
-                                || (historicalUuid != null
-                                && historicalUuid.equals(alias.value()))
-                                ? Optional.of(projection)
-                                : Optional.empty();
-                    }
-                }
-        );
+                new CompanionQueries(index, new LoadedBodies<>()),
+                alias -> historicalUuid != null && historicalUuid.equals(alias) ? profileUuid : null);
         return new CommandNpcProfileActionResolver(
                 new CommandNpcIdentityService(view, probe)
         );

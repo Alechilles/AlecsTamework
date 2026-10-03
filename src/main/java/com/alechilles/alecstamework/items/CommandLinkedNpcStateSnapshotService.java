@@ -1,9 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCapture;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCaptureService;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointSink;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -18,8 +14,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -37,53 +31,25 @@ public final class CommandLinkedNpcStateSnapshotService {
             new CommandLiveNpcSnapshotFactory();
     private final CompanionProfileSnapshotSink profileSnapshots;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
-    private final CompanionEntityCheckpointCaptureService checkpointCaptures;
-    private final RoutineCheckpointContinuationGate routineCheckpointGate =
-            new RoutineCheckpointContinuationGate();
 
     public CommandLinkedNpcStateSnapshotService() {
-        this(
-                CompanionProfileSnapshotSink.ignore(),
-                new LoadedNpcIdentityIndex(),
-                CompanionEntityCheckpointSink.IGNORE
-        );
+        this(CompanionProfileSnapshotSink.ignore(), new LoadedNpcIdentityIndex());
     }
 
     public CommandLinkedNpcStateSnapshotService(
             @Nonnull CompanionProfileSnapshotSink profileSnapshots
     ) {
-        this(
-                profileSnapshots,
-                new LoadedNpcIdentityIndex(),
-                CompanionEntityCheckpointSink.IGNORE
-        );
+        this(profileSnapshots, new LoadedNpcIdentityIndex());
     }
 
     public CommandLinkedNpcStateSnapshotService(
             @Nonnull CompanionProfileSnapshotSink profileSnapshots,
             @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex
     ) {
-        this(
-                profileSnapshots,
-                loadedNpcIdentityIndex,
-                CompanionEntityCheckpointSink.IGNORE
-        );
-    }
-
-    public CommandLinkedNpcStateSnapshotService(
-            @Nonnull CompanionProfileSnapshotSink profileSnapshots,
-            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
-            @Nonnull CompanionEntityCheckpointSink checkpointSink
-    ) {
         this.profileSnapshots = Objects.requireNonNull(
                 profileSnapshots, "profileSnapshots"
         );
         this.loadedNpcIdentityIndex = Objects.requireNonNull(loadedNpcIdentityIndex, "loadedNpcIdentityIndex");
-        this.checkpointCaptures =
-                new CompanionEntityCheckpointCaptureService(
-                        Objects.requireNonNull(checkpointSink, "checkpointSink"),
-                        System::currentTimeMillis
-                );
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -91,15 +57,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         indexNpcAdded(reference, store);
-        CompletionStage<Void> profile = refreshFromEntityStage(
-                reference, store
-        );
-        CompanionEntityCheckpointCapture checkpoint = checkpointCaptures.capture(
-                reference,
-                store,
-                CompanionEntityCheckpoint.CaptureBoundary.LOADED
-        );
-        publishCheckpointAfterProfile(profile, checkpoint);
+        refreshFromEntityStage(reference, store);
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference,
@@ -121,20 +79,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             return null;
         }
         if (reason == RemoveReason.REMOVE || reason == RemoveReason.UNLOAD) {
-            CompletionStage<Void> profile = refreshFromEntityStage(
-                    reference, store
-            );
-            CompanionEntityCheckpointCapture checkpoint =
-                    checkpointCaptures.capture(
-                            reference,
-                            store,
-                            reason == RemoveReason.UNLOAD
-                                    ? CompanionEntityCheckpoint.CaptureBoundary
-                                    .UNLOAD
-                                    : CompanionEntityCheckpoint.CaptureBoundary
-                                    .DESTRUCTIVE_REMOVE
-                    );
-            publishCheckpointAfterProfile(profile, checkpoint);
+            refreshFromEntityStage(reference, store);
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
         UUID componentUuid = resolveComponentUuid(reference, store);
@@ -162,9 +107,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             snapshotsByNpc.remove(npcUuid);
             return;
         }
-        // beginNpcRemoval already froze and published the terminal checkpoint.
-        // Retain the final presentation refresh without admitting another
-        // routine capture for the same unload boundary.
+        // Retain the final presentation refresh for the unload boundary.
         refreshFromEntityStage(reference, store);
     }
 
@@ -264,54 +207,7 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (reference == null || store == null) {
             return;
         }
-        CompletionStage<Void> profile = refreshFromEntityStage(reference, store);
-        CompanionEntityCheckpointCapture checkpoint = hasCurrentSnapshot(
-                reference, store
-        ) ? checkpointCaptures.capture(
-                reference,
-                store,
-                CompanionEntityCheckpoint.CaptureBoundary.LOADED
-        ) : null;
-        publishCheckpointAfterProfile(profile, checkpoint);
-    }
-
-    /** Publishes the profile created by one admitted admin spawn. */
-    public CompletionStage<Void> publishAdminSpawnProfile(
-            Ref<EntityStore> reference,
-            Store<EntityStore> store
-    ) {
-        if (reference == null || !reference.isValid() || store == null) {
-            return failedRequiredAdminCapture("missing entity reference or store");
-        }
-        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
-        UUID npcUuid = npc == null ? null : npc.getUuid();
-        if (npcUuid == null) {
-            return failedRequiredAdminCapture("missing NPC or NPC UUID");
-        }
-        LiveLinkedNpcSnapshot snapshot = snapshotFactory.captureAdminSpawn(
-                reference, store, npc, snapshotsByNpc.get(npcUuid)
-        );
-        if (snapshot == null) {
-            return failedRequiredAdminCapture("NPC snapshot could not be captured");
-        }
-        String worldKey = worldKey(store);
-        if (worldKey == null) {
-            return failedRequiredAdminCapture("missing world key");
-        }
-        snapshotsByNpc.put(npcUuid, snapshot);
-        CompletionStage<Void> publication = profileSnapshots.publish(snapshot, worldKey);
-        if (publication == null) {
-            return failedRequiredAdminCapture("profile sink returned no publication stage");
-        }
-        CompanionEntityCheckpointCapture checkpoint = checkpointCaptures.capture(
-                reference,
-                store,
-                CompanionEntityCheckpoint.CaptureBoundary.LOADED
-        );
-        publishCheckpointAfterProfile(publication, checkpoint);
-        // Checkpoints remain best-effort maintenance; their failure must not
-        // roll back a successfully published admin profile/population admission.
-        return publication;
+        refreshFromEntityStage(reference, store);
     }
 
     /**
@@ -342,30 +238,6 @@ public final class CommandLinkedNpcStateSnapshotService {
         return upsertProfile(snapshot, worldKey(store));
     }
 
-    /**
-     * A routine checkpoint belongs only to the snapshot captured by this exact
-     * refresh. Unlinked NPCs without an owned tame state leave no snapshot
-     * and no checkpoint.
-     */
-    private boolean hasCurrentSnapshot(
-            @Nonnull Ref<EntityStore> reference,
-            @Nonnull Store<EntityStore> store
-    ) {
-        if (!reference.isValid()) {
-            return false;
-        }
-        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
-        UUID npcUuid = npc == null ? null : npc.getUuid();
-        return npcUuid != null && snapshotsByNpc.containsKey(npcUuid);
-    }
-
-    @Nonnull
-    private CompletionStage<Void> failedRequiredAdminCapture(@Nonnull String reason) {
-        return CompletableFuture.failedFuture(new IllegalStateException(
-                "Required admin spawn profile capture failed: " + reason
-        ));
-    }
-
     @Nullable
     public LiveLinkedNpcSnapshot getSnapshot(UUID npcUuid) {
         if (npcUuid == null) {
@@ -389,60 +261,6 @@ public final class CommandLinkedNpcStateSnapshotService {
             return CompletableFuture.completedFuture(null);
         }
         return profileSnapshots.publish(snapshot, worldKey);
-    }
-
-    /**
-     * Sequences immutable checkpoint data after its profile publication.
-     * Only the newest routine observation may enter checkpoint admission.
-     */
-    void publishCheckpointAfterProfile(
-            @Nonnull CompletionStage<Void> profilePublication,
-            @Nullable CompanionEntityCheckpointCapture checkpoint
-    ) {
-        Objects.requireNonNull(profilePublication, "profilePublication");
-        if (checkpoint == null) {
-            return;
-        }
-        UUID alias = checkpoint.alias().value();
-        boolean routine = checkpoint.boundary()
-                == CompanionEntityCheckpoint.CaptureBoundary.LOADED;
-        RoutineCheckpointContinuationGate.Ticket ticket = routine
-                ? routineCheckpointGate.register(alias) : null;
-        CompletionStage<Void> chained = publishCheckpointAfterProfile(
-                profilePublication,
-                checkpoint,
-                checkpointCaptures::publish,
-                () -> ticket == null
-                        || routineCheckpointGate.markProfilePublished(ticket)
-        );
-        chained.whenComplete((ignored, failure) -> {
-            if (ticket != null) {
-                routineCheckpointGate.complete(ticket);
-            }
-        });
-    }
-
-    /** Sequences one immutable checkpoint behind a successful profile stage. */
-    static CompletableFuture<Void> publishCheckpointAfterProfile(
-            CompletionStage<Void> profilePublication,
-            CompanionEntityCheckpointCapture checkpoint,
-            Function<CompanionEntityCheckpointCapture,
-                    CompletionStage<Void>> publisher,
-            BooleanSupplier stillCurrent
-    ) {
-        Objects.requireNonNull(profilePublication, "profilePublication");
-        Objects.requireNonNull(checkpoint, "checkpoint");
-        Objects.requireNonNull(publisher, "publisher");
-        Objects.requireNonNull(stillCurrent, "stillCurrent");
-        return profilePublication.thenCompose(ignored -> {
-            if (!stillCurrent.getAsBoolean()) {
-                return CompletableFuture.completedFuture(null);
-            }
-            CompletionStage<Void> publication = publisher.apply(checkpoint);
-            return Objects.requireNonNull(
-                    publication, "Checkpoint publisher returned null"
-            );
-        }).toCompletableFuture();
     }
 
     @Nullable

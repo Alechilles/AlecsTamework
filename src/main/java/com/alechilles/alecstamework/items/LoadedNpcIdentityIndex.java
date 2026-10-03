@@ -173,16 +173,6 @@ public final class LoadedNpcIdentityIndex {
     public boolean isMutationRevisionCurrent(long expectedRevision) {
         synchronized (lock) { return mutationRevision == expectedRevision; }
     }
-    /** Atomically snapshots completeness and every detailed loaded-NPC observation. */
-    @Nonnull
-    public LoadedNpcIdentitySnapshot snapshot() {
-        synchronized (lock) {
-            List<LoadedNpcObservation> observations = observationsByLocation.values().stream()
-                    .flatMap(Collection::stream).sorted(LoadedNpcObservationOrder.COMPARATOR).toList();
-            return new LoadedNpcIdentitySnapshot(
-                    mutationRevision, initializationComplete, observations);
-        }
-    }
     /** Replaces one scan snapshot only when no lifecycle callback changed that location. */
     public boolean replaceLocationObservationsIfUnchanged(@Nonnull Location location,
             @Nonnull Collection<LoadedNpcObservation> observations,
@@ -265,33 +255,6 @@ public final class LoadedNpcIdentityIndex {
                     ? ProbeStatus.ONE_LOCATION
                     : ProbeStatus.MULTIPLE_LOCATIONS;
             return new Probe(npcUuid, status, ordered);
-        }
-    }
-    /** Returns all loaded entities carrying one exact durable projection marker. */
-    @Nonnull
-    public ProjectionProbe probeProjection(@Nonnull ProjectionKey key) {
-        Objects.requireNonNull(key, "key");
-        synchronized (lock) {
-            List<LoadedNpcObservation> matches = new ArrayList<>();
-            for (Set<LoadedNpcObservation> observations : observationsByLocation.values()) {
-                for (LoadedNpcObservation observation : observations) {
-                    if (key.equals(observation.projectionKey())) {
-                        matches.add(observation);
-                    }
-                }
-            }
-            matches.sort(LoadedNpcObservationOrder.COMPARATOR);
-            ProjectionProbeStatus status;
-            if (matches.isEmpty()) {
-                status = initializationComplete
-                        ? ProjectionProbeStatus.ABSENT
-                        : ProjectionProbeStatus.UNKNOWN;
-            } else if (matches.size() == 1) {
-                status = ProjectionProbeStatus.ONE_MATCH;
-            } else {
-                status = ProjectionProbeStatus.MULTIPLE_MATCHES;
-            }
-            return new ProjectionProbe(key, status, matches);
         }
     }
     /** Returns the only loaded NPC for a stable profile or historical source alias. */
@@ -502,9 +465,6 @@ public final class LoadedNpcIdentityIndex {
     /** Completeness/conflict state for one UUID probe. */
     public enum ProbeStatus { UNKNOWN, ABSENT, ONE_LOCATION, MULTIPLE_LOCATIONS }
 
-    /** Completeness/conflict state for one exact projection-marker probe. */
-    public enum ProjectionProbeStatus { UNKNOWN, ABSENT, ONE_MATCH, MULTIPLE_MATCHES }
-
     private record ObservationIdentity(@Nonnull Location location, @Nonnull UUID stableIdentity) {
         private static ObservationIdentity of(@Nonnull LoadedNpcObservation observation) {
             return new ObservationIdentity(observation.location(), observation.stableIdentity());
@@ -585,34 +545,6 @@ public final class LoadedNpcIdentityIndex {
         public UUID legacyUuid() { return legacyNpcUuid; }
     }
 
-    /** Immutable exact-marker probe result with deterministic entity ordering. */
-    public record ProjectionProbe(@Nonnull ProjectionKey key,
-                                  @Nonnull ProjectionProbeStatus status,
-                                  @Nonnull List<LoadedNpcObservation> matches) {
-        public ProjectionProbe {
-            key = Objects.requireNonNull(key, "key");
-            status = Objects.requireNonNull(status, "status");
-            matches = List.copyOf(Objects.requireNonNull(matches, "matches"));
-            for (LoadedNpcObservation match : matches) {
-                if (match == null || !key.equals(match.projectionKey())) {
-                    throw new IllegalArgumentException(
-                            "Every projection match must carry the probed key."
-                    );
-                }
-            }
-            int matchCount = matches.size();
-            boolean validCount = switch (status) {
-                case UNKNOWN, ABSENT -> matchCount == 0;
-                case ONE_MATCH -> matchCount == 1;
-                case MULTIPLE_MATCHES -> matchCount > 1;
-            };
-            if (!validCount) {
-                throw new IllegalArgumentException(
-                        "Projection probe status does not match its observation count."
-                );
-            }
-        }
-    }
     /** Immutable probe result with deterministic location ordering and presentation metadata. */
     public record Probe(@Nullable UUID npcUuid,
                         @Nonnull ProbeStatus status,

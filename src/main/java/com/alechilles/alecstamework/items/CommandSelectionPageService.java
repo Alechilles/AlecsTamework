@@ -1283,13 +1283,7 @@ final class CommandSelectionPageService {
                 CommandTravelSettings.isRecallTeleportingEnabled());
     }
 
-    private java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> savedPanelSignals =
-            ignored -> LinkedPanelRefreshSignalSource.none();
     private final CommandPanelOwnerSignals ownerSignals = new CommandPanelOwnerSignals();
-
-    void configureSavedPanelSignals(java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> signals) {
-        savedPanelSignals = signals;
-    }
 
     LinkedPanelRefreshSignalSource pageSignals(Player player,
                                                 TwCommandItemConfig config) {
@@ -1301,8 +1295,7 @@ final class CommandSelectionPageService {
         return ownerUuid != null && config != null && config.usesBondedCompanionRoster()
                 && bondedRefreshSignals != null
                 ? bondedRefreshSignals.forRoster(ownerUuid, config.getBondedRosterId())
-                : ownerSignals.forOwner(ownerUuid, savedPanelSignals == null
-                        ? LinkedPanelRefreshSignalSource.none() : savedPanelSignals.apply(ownerUuid));
+                : ownerSignals.forOwner(ownerUuid, LinkedPanelRefreshSignalSource.none());
     }
 
     /**

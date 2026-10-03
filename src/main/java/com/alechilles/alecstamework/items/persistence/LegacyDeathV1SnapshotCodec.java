@@ -1,18 +1,11 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodec;
-import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.google.gson.JsonObject;
 import javax.annotation.Nonnull;
 
 /** Strict deterministic codec for the released June death snapshot payload. */
 public final class LegacyDeathV1SnapshotCodec implements SnapshotCodec<LegacyDeathV1Payload> {
-    @Override
-    @Nonnull
-    public SnapshotKind kind() {
-        return TameworkSnapshotCodecs.DEATH;
-    }
-
     @Override
     public int version() {
         return 1;

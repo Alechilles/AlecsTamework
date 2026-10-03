@@ -30,7 +30,6 @@ import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBu
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RosterSummons;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -124,12 +123,13 @@ public final class CommandItemFeatureHandler {
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this(registry, relocationService, stateSnapshotService, null, null, null, null, null, null,
-                null, null);
+                null);
     }
 
     /**
      * Full constructor. When {@code companions} is set, the panel, owned rows, owned actions,
-     * locate, release and cull read the companion index instead of {@code persistence}. With
+     * locate, release and cull read the companion index; without it they report that tracking is
+     * unavailable. With
      * {@code restoreFlow} and {@code companions}, the panel's Revive and Recover buttons and
      * world-change follow restore through the flow; without them, those buttons report that
      * tracking is unavailable and nothing follows across worlds. With {@code companions}, an
@@ -141,7 +141,6 @@ public final class CommandItemFeatureHandler {
             CommandItemRegistry registry,
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
             @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
             @Nullable CompanionProgressionSignalBus progressionSignals,
@@ -163,8 +162,6 @@ public final class CommandItemFeatureHandler {
                 : new CommandNpcExistenceService();
         this.persistenceView = companions != null
                 ? new CommandPersistenceView(companions)
-                : persistence != null
-                ? new CommandPersistenceView(persistence)
                 : null;
         CommandRosterPanelRecordSource rosterPanelRecordSource =
                 companions != null
@@ -210,15 +207,7 @@ public final class CommandItemFeatureHandler {
                 rosterPanelRecordSource,
                 featurePresentations,
                 BondedCompanionPanelEntrySourceService.production(bondedCompanions),
-                companions != null ? new CommandOwnedPanelRecordSource(companions)
-                        : persistence == null ? null : new CommandOwnedPanelRecordSource(
-                        persistence.queries()::projectedProfileSnapshot,
-                        () -> {
-                            var managed = new java.util.HashSet<>(
-                                    persistence.queries().projectedCommandRosterActions().keySet());
-                            managed.addAll(persistence.queries().projectedLaggingCommandRosterProfiles());
-                            return managed;
-                        })
+                companions != null ? new CommandOwnedPanelRecordSource(companions) : null
         );
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());
@@ -245,7 +234,6 @@ public final class CommandItemFeatureHandler {
                 feedbackService,
                 npcNameResolver
         );
-        this.talentPageService.configureSavedTalents(persistence);
         this.bondedTalentPageService = new BondedCompanionTalentPageService(
                 bondedCompanions, feedbackService);
         this.companionPlacementService = new CommandCompanionPlacementService();
@@ -295,11 +283,8 @@ public final class CommandItemFeatureHandler {
                         companions
                 )
                 : null;
-        this.ownedActions = companions != null
-                ? new CommandOwnedActionService(companions, toolInventoryService,
-                        panelPreferenceService, feedbackService, linkMutationService)
-                : new CommandOwnedActionService(persistence, toolInventoryService,
-                        panelPreferenceService, feedbackService, linkMutationService);
+        this.ownedActions = new CommandOwnedActionService(companions, toolInventoryService,
+                panelPreferenceService, feedbackService, linkMutationService);
         this.freeRestorationActions =
                 new CommandFreeRestorationActionService(
                         restorationService,
@@ -344,7 +329,6 @@ public final class CommandItemFeatureHandler {
                 feedbackService,
                 npcNameResolver,
                 toolInventoryService,
-                persistence,
                 companions,
                 persistenceView,
                 capturedItemTracker
@@ -412,9 +396,6 @@ public final class CommandItemFeatureHandler {
                 bondedRefreshSignals,
                 new CommandLinkedFlightToggleActionService()::toggle
         );
-        if (persistenceView != null) {
-            this.selectionPageService.configureSavedPanelSignals(persistenceView::savedPanelSignals);
-        }
         if (restorationService != null) {
             restorationService.usePanelRefresh(this.selectionPageService::signalOwnerPanels);
         }
@@ -561,7 +542,6 @@ public final class CommandItemFeatureHandler {
         locateService.close();
         capturedItemTracker.close();
         bondedPanelLifecycle.close();
-        if (persistenceView != null) persistenceView.close();
     }
 
     /** Internal event observers share the command feature's bounded location cache. */

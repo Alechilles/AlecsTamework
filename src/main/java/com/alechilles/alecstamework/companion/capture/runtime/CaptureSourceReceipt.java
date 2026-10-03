@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.companion.capture.runtime;
 
-import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -61,24 +60,5 @@ record CaptureSourceReceipt(
                     "Legacy capture receipt must be a singleton"
             );
         }
-    }
-
-    static CaptureSourceReceipt exact(CompanionCaptureRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException(
-                    "Capture request is required"
-            );
-        }
-        return new CaptureSourceReceipt(
-                request.source().receiptKey(),
-                request.profileId(),
-                request.targetAlias(),
-                request.source().slot(),
-                request.source().sourceItemId(),
-                request.source().quantity(),
-                request.source().beforeFingerprint(),
-                request.source().remainingQuantity(),
-                request.source().remainingFingerprint()
-        );
     }
 }

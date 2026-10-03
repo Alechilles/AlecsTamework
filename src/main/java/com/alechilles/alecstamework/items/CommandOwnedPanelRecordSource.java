@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.items.CommandPersistenceView.ProfileSnapshot;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -15,29 +14,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
-/** Reads owned companions across worlds from the companion index or the old profile projection. */
+/** Reads owned companions across worlds from the companion index. */
 final class CommandOwnedPanelRecordSource {
     /** Candidate profiles for one owner; a null owner asks for the unowned captured profiles. */
     private final Function<UUID, Collection<ProfileSnapshot>> profiles;
     /** Profiles an owner's generic items show read-only, because another authority manages them. */
     private final Function<UUID, java.util.Set<ProfileId>> managedProfiles;
-    /** Index path only: one profile id to its record when that is an unowned capture item, else null. */
+    /** One profile id to its record when that is an unowned capture item, else null. */
     private final Function<UUID, ProfileSnapshot> unownedCapture;
-
-    CommandOwnedPanelRecordSource(
-            Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles) {
-        this(profiles, java.util.Set::of);
-    }
-
-    CommandOwnedPanelRecordSource(
-            Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles,
-            Supplier<java.util.Set<ProfileId>> managedProfiles) {
-        this.profiles = ignoredOwner -> profiles.get().values().stream().map(ProfileSnapshot::from).toList();
-        this.managedProfiles = ignoredOwner -> managedProfiles.get();
-        this.unownedCapture = null;
-    }
 
     /**
      * Owned rows from the companion index, plus the unowned captured rows this viewer knows: the
@@ -63,10 +48,9 @@ final class CommandOwnedPanelRecordSource {
         };
     }
 
-    /** The index path's unowned captured rows for the profile ids this viewer carries or has linked. */
+    /** The unowned captured rows for the profile ids this viewer carries or has linked. */
     private List<ProfileSnapshot> knownUnownedCaptures(List<LinkedNpcRecord> linkedRecords,
                                                        java.util.Set<String> carriedProfiles) {
-        if (unownedCapture == null) return List.of();
         var ids = new java.util.LinkedHashSet<String>(carriedProfiles);
         for (var linked : linkedRecords) if (linked.profileId != null) ids.add(linked.profileId);
         var found = new ArrayList<ProfileSnapshot>();

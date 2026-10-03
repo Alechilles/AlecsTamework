@@ -1,29 +1,17 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
-import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
 import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
 import com.hypixel.hytale.assetstore.TestItemAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -36,7 +24,6 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -47,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The unloaded panel built from the index summary must show what the decoded checkpoint showed. */
+/** The unloaded panel built from the index summary shows the saved place, countdowns and life stage. */
 class CommandSavedNpcPanelSummaryTest {
     private static final String ROLE = "Tamed_Summary_Sheep";
     private static final double GAME_RATE = 3.0;
@@ -92,7 +79,7 @@ class CommandSavedNpcPanelSummaryTest {
     }
 
     @Test
-    void summaryPanelMatchesTheDecodedCheckpointForCountdownsAndLifeStage() throws Exception {
+    void summaryPanelShowsRunningCountdownsAndLifeStage() throws Exception {
         try (var ignored = new AgingConfig(ROLE)) {
             long worldMs = -1_000_000L;
             TameworkLifeStageComponent lifeStage = new TameworkLifeStageComponent();
@@ -114,7 +101,6 @@ class CommandSavedNpcPanelSummaryTest {
                     alarms.getAlarm(CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName());
 
             ProfileId profileId = new ProfileId(UUID.randomUUID());
-            CommandSavedNpcPanelSnapshot decoded = decode(profileId, lifeStage, breeding, alarms, needs);
             CompanionSummary summary = CompanionSummaries.build(new CompanionSummaries.Inputs(null, null, ROLE, null,
                     0f, 0f, null, 0.0, needs.getConfigId(), needs.getHunger(), needs.getThirst(),
                     true, breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(),
@@ -124,57 +110,15 @@ class CommandSavedNpcPanelSummaryTest {
             CompanionRecord record = CompanionRecord.builder(profileId.value(), ROLE,
                     CompanionLocation.live("world", 0, 0, 0)).summary(summary).build();
 
-            LinkedNpcEntry base = baseCard();
-            LinkedNpcEntry expected = decoded.apply(base, null, GAME_RATE);
-            LinkedNpcEntry actual = CommandSavedNpcPanelSnapshot.fromSummary(record).apply(base, null, GAME_RATE);
+            LinkedNpcEntry actual = CommandSavedNpcPanelSnapshot.fromSummary(record).apply(baseCard(), null, GAME_RATE);
 
-            // Guards against a vacuous comparison: the decoded panel shows running timers and a prime adult.
-            assertEquals(6_000L, expected.breedingCooldownRemainingMs());
-            assertTrue(expected.harvestCooldownActive());
-            assertTrue(expected.animalLifecycle().prime());
-
-            assertEquals(expected.breedingCooldownKnown(), actual.breedingCooldownKnown());
-            assertEquals(expected.breedingCooldownActive(), actual.breedingCooldownActive());
-            assertEquals(expected.breedingCooldownRemainingMs(), actual.breedingCooldownRemainingMs());
-            assertEquals(expected.breedingCooldownRatio(), actual.breedingCooldownRatio());
-            assertEquals(expected.harvestCooldownKnown(), actual.harvestCooldownKnown());
-            assertEquals(expected.harvestCooldownActive(), actual.harvestCooldownActive());
-            assertEquals(expected.harvestCooldownRemainingMs(), actual.harvestCooldownRemainingMs());
-            assertEquals(expected.harvestCooldownRatio(), actual.harvestCooldownRatio());
-            assertEquals(expected.animalLifecycle().stage(), actual.animalLifecycle().stage());
-            assertEquals(expected.animalLifecycle().prime(), actual.animalLifecycle().prime());
-            assertEquals(expected.animalLifecycle().frozen(), actual.animalLifecycle().frozen());
-            assertEquals(expected.animalLifecycle().nextDeath(), actual.animalLifecycle().nextDeath());
-            assertEquals(expected.animalLifecycle().yieldMultiplier(), actual.animalLifecycle().yieldMultiplier());
-            assertEquals(expected.animalLifecycle().remainingMs(), actual.animalLifecycle().remainingMs());
+            assertTrue(actual.breedingCooldownKnown());
+            assertTrue(actual.breedingCooldownActive());
+            assertEquals(6_000L, actual.breedingCooldownRemainingMs());
+            assertTrue(actual.harvestCooldownKnown());
+            assertTrue(actual.harvestCooldownActive());
+            assertTrue(actual.animalLifecycle().prime());
         }
-    }
-
-    private static CommandSavedNpcPanelSnapshot decode(ProfileId profileId, TameworkLifeStageComponent lifeStage,
-                                                       TameworkBreedingComponent breeding,
-                                                       TameworkAlarmComponent alarms, TameworkNeedsComponent needs) {
-        BsonDocument components = new BsonDocument()
-                .append("TameworkBreeding", TameworkBreedingComponent.CODEC.encode(breeding, new ExtraInfo()))
-                .append("TameworkAlarm", TameworkAlarmComponent.CODEC.encode(alarms, new ExtraInfo()))
-                .append("TameworkNeeds", TameworkNeedsComponent.CODEC.encode(needs, new ExtraInfo()))
-                .append("TameworkLifeStage", TameworkLifeStageComponent.CODEC.encode(lifeStage, new ExtraInfo()));
-        CompanionEntityCheckpointCodec codec = new CompanionEntityCheckpointCodec();
-        CompanionEntityCheckpoint checkpoint = CompanionEntityCheckpoint.create(
-                profileId, new NpcAlias(UUID.randomUUID()), 0L, new OwnerId(UUID.randomUUID()),
-                LifecycleRevision.INITIAL, ReconciliationGeneration.INITIAL, "world", 1.0, 2.0,
-                3.0, CompanionEntityCheckpoint.CaptureBoundary.UNLOAD, -15L,
-                new BsonDocument().append("Components", components), codec);
-        CompanionProfileReadModel profile = new CompanionProfileReadModel(
-                new CompanionIdentity(profileId, "Sheep", ROLE, null, null, "world", -20L, -20L, -20L, 0L),
-                new CompanionAlias(new NpcAlias(UUID.randomUUID()), profileId, 0L,
-                        CompanionAlias.State.CURRENT, null, -20L, null),
-                new CompanionLifecycle(profileId, new OwnerId(UUID.randomUUID()), LifecycleState.UNLOADED,
-                        LifecycleLocation.none(), LifecycleRevision.INITIAL, null, -20L,
-                        ReconciliationGeneration.INITIAL, null, null),
-                List.of(), List.of(), null);
-        CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.decode(profile, codec.encode(checkpoint));
-        assertNotNull(saved);
-        return saved;
     }
 
     private static LinkedNpcEntry baseCard() {

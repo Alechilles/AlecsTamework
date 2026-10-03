@@ -28,24 +28,4 @@ public record CoopCaptureReceipt(
         }
         receiptKey = receiptKey.trim();
     }
-
-    /** Builds the only receipt accepted for the supplied prepared operation. */
-    @Nonnull
-    public static CoopCaptureReceipt exact(
-            @Nonnull CompanionCoopCaptureRequest request,
-            @Nonnull OperationId operationId
-    ) {
-        if (request == null || operationId == null) {
-            throw new IllegalArgumentException(
-                    "Coop capture request and operation are required"
-            );
-        }
-        return new CoopCaptureReceipt(
-                operationId,
-                request.profileId(),
-                request.source().sourceAlias(),
-                request.targetSlot(),
-                request.source().retirementReceiptKey()
-        );
-    }
 }

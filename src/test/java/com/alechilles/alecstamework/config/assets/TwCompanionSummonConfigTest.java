@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonTime;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.exception.CodecException;
 import java.util.Map;
@@ -73,20 +72,8 @@ class TwCompanionSummonConfigTest {
                   }
                 }
                 """).getCommand().getSummon();
-        assertEquals(
-                -500L,
-                TimedSummonTime.saturatingAdd(
-                        -2_000L,
-                        summon.getActiveDurationMs()
-                )
-        );
-        assertEquals(
-                -1_750L,
-                TimedSummonTime.saturatingAdd(
-                        -2_000L,
-                        summon.getResummonCooldownMs()
-                )
-        );
+        assertEquals(1_500L, summon.getActiveDurationMs());
+        assertEquals(250L, summon.getResummonCooldownMs());
     }
 
     @Test

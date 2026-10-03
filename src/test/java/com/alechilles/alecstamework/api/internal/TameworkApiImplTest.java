@@ -7,42 +7,19 @@ import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.ProfileDataApi;
-import com.alechilles.alecstamework.api.ProgressionMutationStatus;
-import com.alechilles.alecstamework.api.TameworkApiCapability;
-import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
-import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
-import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
-import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
-import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
-import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkApiImplTest {
@@ -54,8 +31,6 @@ class TameworkApiImplTest {
             "30000000-0000-0000-0000-000000000003");
     private static final UUID TOOL_UUID = UUID.fromString(
             "30000000-0000-0000-0000-000000000004");
-    @TempDir
-    Path tempDir;
 
     @Test
     void ownerCapV2CountsEveryRequestedSlotAndNeedsAWorldForAPerWorldCap() {
@@ -76,142 +51,6 @@ class TameworkApiImplTest {
         assertEquals(1L, two.remainingHeadroom());
         assertFalse(noWorld.allowed());
         assertEquals(OwnerPopulationCapDecisionViewV2.Readiness.UNAVAILABLE, noWorld.readiness());
-    }
-    @Test
-    void replacementCompositionExposesStableReleasedApiContracts()
-            throws Exception {
-        AtomicLong clock = new AtomicLong(-10_000L);
-        TameworkEventBus events = new TameworkEventBus(null);
-        try (PersistenceBootstrap persistence =
-                     new PersistenceBootstrap(configuration(clock, events))) {
-            assertTrue(persistence.start().toCompletableFuture().join().complete());
-            var created = persistence.facades().operations().mutateProfile(
-                    OperationId.create(),
-                    new IdempotencyKey("api-profile-adoption"),
-                    profileAdoption(clock.incrementAndGet())
-            );
-            assertTrue(created.accepted());
-            assertEquals(
-                    OperationWorkflowResult.Status.PUBLISHED,
-                    created.completion().toCompletableFuture()
-                            .get(5, TimeUnit.SECONDS).status()
-            );
-
-            try (TameworkApiImpl api = ReplacementTameworkApiFactory.create(
-                    persistence,
-                    Duration.ofSeconds(5),
-                    clock::incrementAndGet,
-                    events,
-                    null,
-                    new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, null),
-                    new SimpleClaimsTamedDamagePolicy()
-            )) {
-                assertEquals("3.0.0", api.getApiVersion());
-                assertTrue(api.getCapabilities().containsAll(requiredCapabilities()),
-                        "Released capabilities must remain available; additive capabilities are compatible.");
-
-                assertEquals(
-                        PROFILE_ID.toString(),
-                        api.profiles().resolveProfileId(NPC_UUID).orElseThrow()
-                );
-                NpcProfileView profile = api.profiles()
-                        .getByProfileId(PROFILE_ID.toString())
-                        .orElseThrow();
-                assertEquals(OWNER_UUID, profile.ownerUuid());
-                assertEquals("Owner A", profile.ownerName());
-                assertEquals("Custom A", profile.customName());
-                assertTrue(profile.tamed());
-                assertTrue(api.profiles().getByNpcUuid(NPC_UUID).isPresent());
-
-                assertTrue(api.progression()
-                        .getByProfileId(PROFILE_ID.toString()).isEmpty());
-                assertEquals(
-                        ProgressionMutationStatus.NOT_LOADED,
-                        api.progression().setHappiness(
-                                PROFILE_ID.toString(), 75.0
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.INVALID_ARGUMENT,
-                        api.progression().setNeeds(
-                                PROFILE_ID.toString(), null, null
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.INVALID_ARGUMENT,
-                        api.progression().setHappiness(
-                                PROFILE_ID.toString(), Double.NaN
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.INVALID_ARGUMENT,
-                        api.progression().applyHappinessDelta(
-                                PROFILE_ID.toString(),
-                                Double.POSITIVE_INFINITY
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.INVALID_ARGUMENT,
-                        api.progression().setTraits(
-                                PROFILE_ID.toString(), null
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.INVALID_ARGUMENT,
-                        api.progression().setStoredAttachments(
-                                PROFILE_ID.toString(), null
-                        ).status()
-                );
-                assertEquals(
-                        ProgressionMutationStatus.NOT_FOUND,
-                        api.progression().setHappiness(
-                                UUID.randomUUID(), 10.0
-                        ).status()
-                );
-
-                assertTrue(api.policies()
-                        .getOwnershipByProfileId(PROFILE_ID.toString())
-                        .isPresent());
-                assertTrue(api.policies().isOwner(
-                        PROFILE_ID.toString(), OWNER_UUID
-                ));
-                assertEquals(
-                        Set.of(TOOL_UUID.toString()),
-                        api.commandLinks().listLinkedToolIds(
-                                PROFILE_ID.toString()
-                        )
-                );
-                assertFalse(api.commandLinks()
-                        .hasHomePosition(PROFILE_ID.toString()));
-
-                assertTrue(api.profileData().put(
-                        PROFILE_ID.toString(),
-                        "example.plugin",
-                        "state",
-                        "{\"level\":2}"
-                ));
-                awaitProfileData(api, "{\"level\":2}");
-                assertFalse(api.profileData().put(
-                        PROFILE_ID.toString(),
-                        "example.plugin",
-                        "state",
-                        "not json"
-                ));
-                assertFalse(api.profileData().put(
-                        PROFILE_ID.toString(),
-                        "Alechilles:Tamework",
-                        "state",
-                        "{\"level\":3}"
-                ));
-
-                assertNotNull(api.traitEffects());
-                assertNotNull(api.configs().getGlobalConfig());
-                assertNotNull(api.diagnostics().getPersistenceDiagnostics());
-            }
-        } finally {
-            events.close();
-        }
     }
     @Test
     void commandLinksReadCanonicalSnapshotProjectionWithoutLegacyStore() {
@@ -295,113 +134,6 @@ class TameworkApiImplTest {
                 ))
         );
     }
-    private PublicPersistenceRuntimeConfiguration configuration(
-            AtomicLong clock,
-            TameworkEventBus events
-    ) {
-        return new PublicPersistenceRuntimeConfiguration(
-                tempDir,
-                "replacement-api-impl-test",
-                clock::incrementAndGet,
-                (claim, operation) -> confirmed("refund"),
-                events::publishProfileChanged,
-                boundaries(),
-                PublicPersistenceWorldReconciliation.alreadyComplete(),
-                Duration.ofSeconds(5)
-        );
-    }
-    private PublicPersistenceLiveBoundaries boundaries() {
-        return new PublicPersistenceLiveBoundaries(
-                (request, operation) -> confirmed("capture"),
-                (request, operation) -> confirmed("capture_release"),
-                (request, operation) -> confirmed("restoration"),
-                (request, operation) -> confirmed("coop_capture"),
-                (request, operation) -> confirmed("coop_release")
-        );
-    }
-    private java.util.concurrent.CompletionStage<LiveOperationResult> confirmed(
-            String code
-    ) {
-        return LiveOperationResult.confirmed(code).completed();
-    }
-    private CompanionProfileMutation.AdoptLive profileAdoption(long now) {
-        String metadata = """
-                {"owner_name":"Owner A","custom_name":"Custom A","tamed":true}
-                """.trim();
-        CompanionIdentity identity = new CompanionIdentity(
-                PROFILE_ID,
-                "Display A",
-                "Mob_Test",
-                metadata,
-                Sha256Hash.ofUtf8(metadata),
-                "world",
-                now,
-                now,
-                now,
-                0L
-        );
-        return new CompanionProfileMutation.AdoptLive(
-                identity,
-                new NpcAlias(NPC_UUID),
-                new OwnerId(OWNER_UUID),
-                "world",
-                List.of(new CompanionToolLink(
-                        PROFILE_ID,
-                        TOOL_UUID,
-                        "command",
-                        now,
-                        now
-                )),
-                now
-        );
-    }
-
-    private EnumSet<TameworkApiCapability> requiredCapabilities() {
-        return EnumSet.of(
-                TameworkApiCapability.PROFILES,
-                TameworkApiCapability.COMMAND_LINKS,
-                TameworkApiCapability.PROGRESSION,
-                TameworkApiCapability.PROGRESSION_MUTATIONS,
-                TameworkApiCapability.POLICY,
-                TameworkApiCapability.INTERACTION_EXTENSIONS,
-                TameworkApiCapability.TRAIT_EFFECTS,
-                TameworkApiCapability.PROFILE_DATA,
-                TameworkApiCapability.EVENTS,
-                TameworkApiCapability.COMPANION_XP_EVENTS,
-                TameworkApiCapability.CONFIG_READ,
-                TameworkApiCapability.DIAGNOSTICS,
-                TameworkApiCapability.PROFILE_DATA_TRANSACTIONS,
-                TameworkApiCapability.COMMAND_UI_RENDERERS,
-                TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
-                TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
-                TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
-                TameworkApiCapability.COMMAND_HUD_RENDERERS,
-                TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
-                TameworkApiCapability.HUSBANDRY_OUTCOMES,
-                TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT,
-                TameworkApiCapability.HUSBANDRY_TOOL_BONUSES,
-                TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
-                TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS,
-                TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
-        );
-    }
-
-    private void awaitProfileData(TameworkApiImpl api, String expected)
-            throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (System.nanoTime() < deadline) {
-            if (api.profileData().get(
-                    PROFILE_ID.toString(),
-                    "example.plugin",
-                    "state"
-            ).filter(expected::equals).isPresent()) {
-                return;
-            }
-            Thread.sleep(10L);
-        }
-        throw new AssertionError("Profile data did not reach expected state");
-    }
-
     private NpcProfilesApi snapshotProfiles(NpcProfileView profile) {
         return new NpcProfilesApi() {
             @Override

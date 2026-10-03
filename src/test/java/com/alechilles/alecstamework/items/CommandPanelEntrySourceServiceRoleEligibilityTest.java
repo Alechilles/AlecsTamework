@@ -3,6 +3,12 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcPanelPageState;
@@ -51,38 +57,24 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
                     BsonDocument.parse("""
                             {"AllowedRoles":{"Mode":"Allowlist","Allowlist":["Cow"]}}
                             """), new ExtraInfo());
-            var allowedProfile = profile(OWNER, ALLOWED, "Cow", com.alechilles.alecstamework.companion.lifecycle.LifecycleState.UNLOADED);
-            var unsupportedProfile = profile(OWNER, UNSUPPORTED, "Chicken", com.alechilles.alecstamework.companion.lifecycle.LifecycleState.UNLOADED);
             UUID storedId = UUID.randomUUID();
-            var storedProfile = profile(null, storedId, "Cow", com.alechilles.alecstamework.companion.lifecycle.LifecycleState.CAPTURED);
-            var profiles = java.util.Map.of(allowedProfile.profileId(), allowedProfile,
-                    unsupportedProfile.profileId(), unsupportedProfile, storedProfile.profileId(), storedProfile);
+            var storedProfile = captured(null, storedId, "Cow");
+            CompanionQueries companions = queries(List.of(live(OWNER, ALLOWED, "Cow"),
+                    live(OWNER, UNSUPPORTED, "Chicken"), storedProfile));
+            // A capture whose owner was cleared is known to this viewer through the item's link.
             stack = new CommandLinkedNpcRecordStore().write(stack, List.of(
-                    record(ALLOWED, "Cow"), record(UNSUPPORTED, "Chicken"), record(storedId, "Cow")));
-            var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
-                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                        com.alechilles.alecstamework.companion.identity.ProfileId id) {
-                    return java.util.Optional.ofNullable(profiles.get(id));
-                }
-                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                        com.alechilles.alecstamework.companion.identity.NpcAlias alias) {
-                    return profiles.values().stream().filter(profile -> alias.equals(profile.currentAlias())).findFirst();
-                }
-            });
+                    record(ALLOWED, "Cow"), record(UNSUPPORTED, "Chicken"),
+                    new LinkedNpcRecord(storedId, storedProfile.profileId().toString(), null, null, null,
+                            "Companion", null, "Cow", null, true, false, null)));
+            var persistence = new CommandPersistenceView(companions);
             var names = new CommandNpcNameResolver();
             var policy = new CommandLinkPolicyService();
             var linked = new CommandLinkedPanelEntryService(new CommandLinkedNpcRecordStore(),
                     null, names, null, persistence, policy, new CommandGroupService(), null);
-            var profileReads = new java.util.concurrent.atomic.AtomicInteger();
             CommandPanelEntrySourceService source = new CommandPanelEntrySourceService(linked,
                     new CommandPanelPreferenceService(), policy, names, null, null, null,
-                    new CommandOwnedPanelRecordSource(() -> {
-                        profileReads.incrementAndGet();
-                        return profiles;
-                    }));
+                    new CommandOwnedPanelRecordSource(companions));
             var snapshot = source.buildSnapshot(player, store, stack, config, "flute");
-            org.junit.jupiter.api.Assertions.assertEquals(1, profileReads.get(),
-                    "Cards, group identities, captures and protected controls must share one profile read");
             List<LinkedNpcEntry> entries = snapshot.entries();
             var captured = entries.stream().filter(row -> storedId.equals(row.npcUuid())).findFirst().orElseThrow();
             assertTrue(captured.captured(), "A capture whose owner was cleared must reach the Stored filter.");
@@ -121,43 +113,24 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             player.setLegacyUUID(OWNER);
             player.loadIntoWorld(world);
             List<LinkedNpcRecord> records = new java.util.ArrayList<>();
-            java.util.Map<com.alechilles.alecstamework.companion.identity.ProfileId,
-                    com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> profiles =
-                    new java.util.HashMap<>();
+            List<CompanionRecord> profiles = new java.util.ArrayList<>();
             for (int index = 0; index < 120; index++) {
                 UUID id = new UUID(0L, index + 10L);
                 String role = index % 2 == 0 ? "Cow" : "Chicken";
                 records.add(record(id, role));
-                var value = profile(OWNER, id, role,
-                        index < 60
-                                ? com.alechilles.alecstamework.companion.lifecycle.LifecycleState.UNLOADED
-                                : com.alechilles.alecstamework.companion.lifecycle.LifecycleState.CAPTURED);
-                profiles.put(value.profileId(), value);
+                profiles.add(index < 60 ? live(OWNER, id, role) : captured(OWNER, id, role));
             }
             ItemStack stack = new CommandLinkedNpcRecordStore().write(
                     new MetadataStack("test:flute", new BsonDocument()), records);
             stack = CommandCompanionPreferences.state(stack, "All");
-            var persistence = new CommandPersistenceView(new CommandPersistenceView.ProjectionLookup() {
-                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                        com.alechilles.alecstamework.companion.identity.ProfileId id) {
-                    return java.util.Optional.ofNullable(profiles.get(id));
-                }
-                public java.util.Optional<com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState> find(
-                        com.alechilles.alecstamework.companion.identity.NpcAlias alias) {
-                    return profiles.values().stream().filter(value -> alias.equals(value.currentAlias())).findFirst();
-                }
-            });
+            CompanionQueries companions = queries(profiles);
+            var persistence = new CommandPersistenceView(companions);
             var names = new CommandNpcNameResolver();
             var policy = new CommandLinkPolicyService();
             var linked = new CommandLinkedPanelEntryService(new CommandLinkedNpcRecordStore(),
                     null, names, null, persistence, policy, new CommandGroupService(), null);
-            var detailReads = new java.util.concurrent.atomic.AtomicInteger();
-            setField(persistence, "savedPanels", new CommandSavedNpcPanelCache(id -> {
-                detailReads.incrementAndGet();
-                return java.util.concurrent.CompletableFuture.completedFuture(null);
-            }));
             var source = new CommandPanelEntrySourceService(linked, new CommandPanelPreferenceService(),
-                    policy, names, null, null, null, new CommandOwnedPanelRecordSource(() -> profiles));
+                    policy, names, null, null, null, new CommandOwnedPanelRecordSource(companions));
             TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(new BsonDocument(), new ExtraInfo());
             LinkedNpcPanelPageState page = new LinkedNpcPanelPageState();
             page.setPageSize(50);
@@ -165,8 +138,6 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
             var first = source.buildSnapshot(player, store, stack, config, "flute", page);
             org.junit.jupiter.api.Assertions.assertEquals(50, first.entries().size(),
                     "Only one page may reach detailed card assembly.");
-            org.junit.jupiter.api.Assertions.assertEquals(50, detailReads.get(),
-                    "Default ordering must request saved detail only for the visible page.");
             org.junit.jupiter.api.Assertions.assertEquals(120, first.selectionEntries().size(),
                     "Group selection still describes every owned companion.");
             assertTrue(page.move(1));
@@ -208,25 +179,31 @@ class CommandPanelEntrySourceServiceRoleEligibilityTest {
         return new LinkedNpcRecord(id, null, null, "Companion", null, roleId);
     }
 
-    private static com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState profile(
-            UUID owner, UUID alias, String role, com.alechilles.alecstamework.companion.lifecycle.LifecycleState state) {
-        return new com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState(
-                new com.alechilles.alecstamework.companion.identity.ProfileId(UUID.randomUUID()),
-                new com.alechilles.alecstamework.companion.identity.NpcAlias(alias), state,
-                owner == null ? null : new com.alechilles.alecstamework.companion.identity.OwnerId(owner),
-                null, role, role, null, true, null, null, java.util.Set.of(), java.util.Set.of(), 1L);
+    private static CompanionRecord live(UUID owner, UUID npc, String role) {
+        return CompanionTransitions.newLive(UUID.randomUUID(), 0, body(owner, npc, role));
+    }
+
+    private static CompanionRecord captured(UUID owner, UUID npc, String role) {
+        return CompanionTransitions.newItem(UUID.randomUUID(), body(owner, npc, role), owner, null);
+    }
+
+    private static CompanionTransitions.BodyFacts body(UUID owner, UUID npc, String role) {
+        return new CompanionTransitions.BodyFacts(npc, owner, null, role, role, "default", 0, 0, 0, List.of(),
+                CompanionSummary.EMPTY);
+    }
+
+    private static CompanionQueries queries(List<CompanionRecord> records) {
+        CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (before, after) -> { });
+        for (CompanionRecord record : records) {
+            index.insert(record);
+        }
+        return new CompanionQueries(index, new LoadedBodies<>());
     }
 
     private static Unsafe unsafe() throws Exception {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
         return (Unsafe) field.get(null);
-    }
-
-    private static void setField(Object target, String name, Object value) throws Exception {
-        Field field = target.getClass().getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
     }
 
     private static final class MetadataStack extends ItemStack {

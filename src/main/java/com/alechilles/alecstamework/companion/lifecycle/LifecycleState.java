@@ -26,18 +26,4 @@ public enum LifecycleState {
     public LifecycleLocationKind requiredLocation() {
         return requiredLocation;
     }
-
-    /** Validates and returns a state/location pair for use at public boundaries. */
-    @Nonnull
-    public LifecycleLocation requireCompatible(@Nonnull LifecycleLocation location) {
-        if (location == null) {
-            throw new IllegalArgumentException("Lifecycle location is required");
-        }
-        if (location.kind() != requiredLocation) {
-            throw new IllegalArgumentException(
-                    name() + " requires " + requiredLocation + ", not " + location.kind()
-            );
-        }
-        return location;
-    }
 }

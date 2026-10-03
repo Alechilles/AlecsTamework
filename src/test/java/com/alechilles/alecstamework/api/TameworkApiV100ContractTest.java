@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.api;
 
 import com.alechilles.alecstamework.api.commandhud.CommandHudApi;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRegistrationResult;
-import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
@@ -92,25 +91,6 @@ class TameworkApiV100ContractTest {
             api.close();
             events.close();
         }
-    }
-
-    @Test
-    void bondedOnlyRuntimeReportsVersionButFailsClosedForCommandHud() {
-        TameworkApi api = new BondedOnlyTameworkApi(BondedCompanionApi.unavailable());
-
-        assertEquals("2.0.0", api.getApiVersion());
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.COMMAND_HUD_RENDERERS));
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS));
-        assertFalse(api.commandHud().available());
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.HUSBANDRY_OUTCOMES));
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT));
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.HUSBANDRY_TOOL_BONUSES));
-        assertFalse(api.husbandryOutcomes().available());
     }
 
     private static TameworkApiImpl newBaseApi(TameworkEventBus events) {
