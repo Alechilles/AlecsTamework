@@ -13,8 +13,8 @@ duplicated across content packs.
 
 It writes universe-local JSON under
 `universe/Tamework/Settings/tamework-settings.json`. That settings file is
-separate from the canonical companion database, `tamework-state.sqlite`;
-settings do not form a second companion-lifecycle authority.
+separate from the companion store under `universe/Tamework/Companions`;
+settings never decide where a companion is.
 
 Edits remain pending until you click **Apply**. A bright amber warning below the
 button row marks unsaved changes, with warning icons flashing on and off every
@@ -168,22 +168,24 @@ adds the safe defaults `FREEZE_AT_PRIME` and old-age death disabled. Existing
 needs-policy API names remain available for integrations and resolve the same
 shared policy.
 
-Revive enablement controls whether exact `DEAD_REVIVABLE` or `LOST` profiles
-may restore. Role-scoped `TwCompanionConfig.Command.Revive` supplies the
-gameplay cooldown, exact AND item-cost recipe, and optional insufficient-cost
-message for roster-backed revival. Legacy item-linked restoration remains
-free.
+Revive enablement controls whether dead companions may be revived and lost
+companions recovered. Role-scoped `TwCompanionConfig.Command.Revive` supplies
+the gameplay cooldown, the exact AND item-cost recipe, and the optional
+insufficient-cost message for a revive. Recover is free.
 
 ## Troubleshooting
 
-- If the owner cap appears wrong, inspect canonical lifecycle ownership and
-  reconciliation readiness; nearby loaded NPCs are not the complete count.
+- If a limit appears wrong, remember what each one counts. The owned limit
+  counts every owned companion, including those stored, in capture items, in
+  coops, dead and lost. The deployed limit counts companions out in the world,
+  loaded or not. Nearby loaded NPCs are not the complete count. A companion
+  stuck in a capture item that no longer exists can be resolved with Recall or
+  Forget in the panel, or `/tw companions forget|restore`.
 - If breeding is denied, verify the SimpleClaims claim and configured breeding
   limits.
 - SimpleClaims damage integration errors fail open; they do not make a target
   invulnerable.
-- Tamework 5.0 has no persistence status or export command. The older
-  `/tw debug persistence` subcommands `status`, `health`, `detail` and `export`
-  are no longer registered. Collect the server log when you report a problem.
+- Tamework 5.0 has no `/tw debug persistence` command; all its subcommands were
+  removed. Collect the server log when you report a problem.
   For a world updated from 3.x or 4.x, see
   [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).

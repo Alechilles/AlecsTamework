@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
+> **API `3.0.0`**
 > This page describes the supported `TameworkApi.commandHud()` contract.
 
 `CommandHudApi` exposes two independent presentation surfaces:
@@ -386,7 +386,7 @@ stacks, private contribution values, or exception objects. Use the snapshot to
 diagnose registration conflicts, fallback, unavailable contributors, and
 slow composition without coupling to Tamework internals.
 
-## Version 1.0.0 non-goals
+## Non-goals
 
 This API is passive in v1. It does not add custom HUD event handlers, custom
 server actions, confirmation flows, or multi-step UI flows. It only lets a Java

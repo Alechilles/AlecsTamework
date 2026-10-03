@@ -99,10 +99,11 @@ Fields:
   `ResolvedAttempt` spends one exact source item after either terminal success
   or terminal failure.
 - `SuccessDisposition`: `CapturedItem` creates the configured filled item;
-  `TameAndCommandLink` keeps the target live and atomically establishes its
-  canonical tame/owner/role/profile, population groups, roster membership, and
-  first timed lease; `StoreBondedCompanion` creates a durable `STORED` profile
-  in the separate bonded authority before retiring the source NPC.
+  `TameAndCommandLink` keeps the target in the world, tames it for the
+  capturing player, links it to the item's command family and registers it as a
+  member of that family's roster, after the population limits pass;
+  `StoreBondedCompanion` saves the target as a `STORED` bonded companion in the
+  capturing player's bonded roster, then removes the source NPC.
 - `BondedRosterId`: required only for `StoreBondedCompanion`; names the
   receiving bonded roster.
 - `CommandFamilyId`: required stable owner-scoped family for
@@ -117,19 +118,22 @@ Fields:
 requires the `CAPTURE_POLICY` capability before an integration treats the flow
 as available. `ResolvedAttempt` additionally requires
 `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, and `TameAndCommandLink` requires
-`CAPTURE_TAME_AND_LINK` plus its population/roster/timed dependencies.
+`CAPTURE_TAME_AND_LINK`.
 
 `StoreBondedCompanion` instead requires `BONDED_COMPANIONS`. The selected
 target role must resolve to exactly one enabled family inside
-`BondedRosterId`. A successful operation stores the full snapshot and exact
-capture evidence before source cleanup, creates no filled item, and does not
-touch the generic command-family, population, timed-summon, generic profile,
-or outbox authorities. Missing or ambiguous bonded policy fails closed before
-the roll or source spend.
+`BondedRosterId`. A successful capture saves the full snapshot and the capture
+evidence on the companion's record before it removes the source NPC, and gives
+no filled item. The capturing player always owns the result. One source item is
+spent before the save and given back when the save does not go through. The
+family's `MaximumOwned` and the ordinary owner and population-group limits
+apply, and the stored companion starts with the family's summon cooldown.
+Missing or ambiguous bonded policy fails closed before the roll or source
+spend.
 
 For a channeled bonded-capture item, use `ChannelAuraEffectId` and
 `ChannelSoundEvent` for Begin-phase feedback and author one completion effect.
-Completion feedback is dispatched only after the durable result publishes;
+Completion feedback is dispatched only after the capture is saved;
 do not author the same completion particle/sound in two paths.
 
 ### `Spawn`
@@ -199,8 +203,8 @@ Appearance header.
   Install and explicitly enable `Alec's Tamework! Examples` before using it;
   the main Tamework jar does not ship enabled sample assets.
 - Captured Tamework names and progression metadata are preserved on the item and restored on spawn.
-- Capture owner clearing and spawn owner assignment are settings-owned runtime policy.
-- Spawner capture and release preserve canonical profile identity and tool-link
+- Who owns a captured companion is decided by the server's captured companion ownership mode, not by this config.
+- Spawner capture and release preserve the companion's profile identity and tool-link
   state through the replacement full-state snapshot. This config only defines
   the author-facing item policy.
 

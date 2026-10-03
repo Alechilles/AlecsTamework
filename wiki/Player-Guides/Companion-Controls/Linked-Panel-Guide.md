@@ -37,8 +37,8 @@ panel without changing its filters or selection.
 - Every owned companion in the current panel, including animals not yet selected on
   that flute. Unsupported roles remain visible with their restriction explained.
 - Selected and unselected status, with selected companions listed first
-- Loaded, unloaded, captured, housed in a coop, roster-stored,
-  provisioned-dormant, dead, or `LOST` state
+- Where each companion is: loaded, unloaded, captured in an item, housed in a
+  coop, stored, dead, or `LOST`
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
@@ -51,9 +51,10 @@ panel without changing its filters or selection.
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
 - A thin red mark on the happiness meter shows the NPC's configured breeding happiness requirement. Hover over the breeding toggle to see the required happiness on the next line.
 
-The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
-`LOST` status from one saved companion lifecycle. Item metadata and an expired
-recall timer do not override that status.
+The panel reads each companion's status from the server's saved companion
+data. Every companion is in exactly one place: out in the world, in a capture
+item, in a coop, stored, dead, or `LOST`. Old item data and an expired recall
+timer do not override that status.
 
 ## Animal images
 
@@ -92,13 +93,14 @@ dead companions continue to show their saved progression snapshot.
 You can open the talent tree for your loaded, tamed companions as soon as you
 tame them. They do not need to be selected on the command flute first.
 
-You can open the talent tree and spend or reset points for your dead and `LOST`
-companions when Tamework has a complete saved restoration snapshot. Changes are
-saved immediately and carry through revival or recovery. In Owned mode, an item
-link is not required. Normal talent requirements still apply.
+You can also open the talent tree and spend or reset points for your dead and
+`LOST` ordinary companions. The changes are saved with the companion and are
+applied when you revive or recover it. In Owned mode, an item link is not
+required. Normal talent requirements still apply. Bonded companions use the
+talent controls on their own roster cards.
 
-Ordinary unloaded companions must load before you can spend their points. Older
-records without a complete saved talent snapshot cannot use offline spending.
+A living companion that is not loaded must load before you can spend its
+points.
 
 ## Companion tabs and selection
 
@@ -132,13 +134,24 @@ The separate bonded-companion panel keeps its own roster states and controls.
 Capture and cooping preserve the flute's selection. Stored companions do not
 receive commands; selection resumes when they return to the world under your
 ownership. Carrying a new captured animal does not automatically select it.
-Captured cards still let you view and edit your groups, even when capture has
-temporarily cleared the animal's ownership. These groups belong to you and do
-not grant command control over another player's animal.
+Captured cards still let you view and edit your groups. These groups belong to
+you and do not grant command control over another player's animal.
 
 Captured and cooped cards show saved health when current and maximum health are
 available. Older coop records that saved only a percentage show the storage
 label until the animal returns to the world and enters a coop again.
+
+## Being located after the update
+
+After a server updates from Tamework 3.x or 4.x to 5.0, Tamework looks for each
+companion that was left out in the world. Until one is found, its card shows
+**Being located after the update** in place of a position, and **Recall** and
+**Recover** are refused for it with a message. You do not need to walk to your
+animals. On a large world this can take a while.
+
+Once a companion is located, its card shows its world and position and
+everything works normally. A companion that cannot be found anywhere becomes
+`LOST`, and you can **Recover** it.
 
 ## Finding captured animals
 
@@ -166,8 +179,9 @@ update with the card and use the saved or observed location. Captured animals us
 the heading **Captured**. Cards do not load distant chunks or check inventories as they refresh.
 The Locate action verifies the recorded holder when available. **Unknown** means
 no usable item sighting is available; it does not mean the
-animal died or the item was destroyed. Older capture items without a capture receipt
-and storage provided by other mods may have no known location.
+animal died or the item was destroyed. Capture items filled on older versions
+that have not been seen since, and storage provided by other mods, may have no
+known location.
 
 Item sightings survive normal restarts, but are only hints until verified again.
 The tracker uses load and item-change events, with no recurring world or inventory
@@ -196,40 +210,61 @@ scans. It keeps a bounded cache, so older sightings can expire from the cache.
   is hidden while someone rides the companion and returns after dismount.
 
 ## Per-row actions
-- `Recall`
+- `Recall` brings a living companion to you. One in your world is moved; one in
+  another world reappears next to you from its saved state. On a captured card,
+  `Recall` takes the companion out of its capture item and puts it next to you
+  (see "Captured companions" below).
 - `Set Home`
 - `Return Home`
-- `Revive`, a restoration action for dead or `LOST` companions when the
-  companion policy and death cooldown allow it. Roster-backed companions can
-  show a confirmation with exact item costs; legacy item-linked flows may be
-  free.
+- `Revive` brings back a dead companion when the companion policy and death
+  cooldown allow it. It can show a confirmation with exact item costs.
+- `Recover` brings back a `LOST` companion from its saved state. It is free.
 - The red X opens `Release` in the generic companion tabs. `Cull` also appears for loaded, living animals. Use the selection toggle to leave an animal out of commands without releasing it.
-- `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Loaded animals are removed immediately. Captured animals and coop occupants must leave storage first.
+- `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Loaded animals are removed immediately. Coop occupants must leave the coop first. For a captured companion the red X offers `Forget` instead.
 - Action buttons share normal and hovered frames. Flight, shoulder, and breeding icons show the current mode.
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.
-- `Captured` means the companion is stored in its filled capture item. Release
-  that item normally or use a supported managed-coop item intake; recall and
-  return-home do not replace it.
-- `In Coop` means the companion is housed in a configured coop. Release it
-  through that coop.
-- `Attempting recall` means the tool is retrying relocation for an unloaded
-  companion. The timer shows only the remaining retry window. When it ends,
-  the attempt stops without inventing a new `LOST` state from timeout or
-  absence.
-- `Dead` means Tamework saved a confirmed death state. `Revive` becomes
-  available when restoration is enabled and the configured cooldown ends.
-- `LOST` means Tamework saved a restorable state after confirmed destructive
-  removal or world-deletion evidence. It is not inferred solely because the
-  companion is off-screen, absent, or took too long to recall.
+- `Captured` means the companion is in its filled capture item. Release that
+  item normally or use a supported managed-coop item intake.
+- `In Coop` means the companion is housed in a configured coop. It comes out
+  when the coop lets its residents roam, or when the coop block is broken.
+- `Attempting recall` means Tamework is loading the area where an unloaded
+  companion was last seen so it can move it to you. The timer shows the time
+  left. If the animal does not turn up in that time, the companion reappears
+  next to you from its saved state. A recall never makes a companion `LOST`.
+- `Being located after the update` is explained above.
+- `Dead` means the companion died. `Revive` becomes available when revival is
+  enabled and the configured cooldown ends.
+- `LOST` means the companion's animal is gone without a death, and Tamework
+  kept its saved state. This happens when the animal was removed from the
+  world, when a portal or instance world it was in closed, when its filled
+  capture item despawned or fell out of the world, or when it could not be
+  found after an update from an older version. Use `Recover`. A companion is
+  never `LOST` just because it is off-screen or far away.
 
-Captured companions whose ownership was cleared remain visible when carried in your
-inventory or already tracked by that flute. These cards are read-only until the
-companion is released from storage and owned again. If another player releases a
-traded captured companion with ownership reassignment, the former owner's command
-links are retired and its old card disappears. The title total includes these
-read-only stored records while they are still displayed.
+### Captured companions
+
+A captured companion always keeps an owner while it is in its item, and it
+still counts toward that owner's "companions owned" limit. Who the owner is
+when the item changes hands depends on your server's captured companion
+ownership setting; see
+[Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items).
+When the owner changes, the card moves to the new owner's panel.
+
+Tamework cannot see every way an item can disappear. If a capture item is gone
+(deleted, lost in a rollback, destroyed by another mod) but its companion still
+shows as `Captured`, use its card:
+
+- `Recall` restores the companion next to you from its saved state. If the
+  item still exists somewhere, it becomes an empty capture item.
+- `Forget` (the red X on a captured card) permanently gives up the companion
+  and frees its ownership slot. Any surviving copy of the item becomes empty.
+  It asks for confirmation.
+
+A wild animal caught with an item that does not tame it has no owner. Its card
+appears only while you carry the item, and it is read-only until the animal is
+released.
 
 ## Group tools
 - Groups are shared by the player's ordinary compatible flutes.
@@ -246,13 +281,14 @@ read-only stored records while they are still displayed.
 - Groups organize the command UI. They do not change companion storage or owner limits.
 
 ## Practical tips
-- If a companion is dead or `LOST`, use `Revive` when it becomes available
-  instead of repeatedly using recall. Review the exact cost confirmation when
-  one is configured.
+- If a companion is dead, use `Revive` when it becomes available. Review the
+  exact cost confirmation when one is configured. If it is `LOST`, use
+  `Recover`.
 - If a row says `Attempting recall`, let the current attempt finish before
-  trying again. An expired countdown is not proof that the companion is lost.
-- If a row says `Captured` or `In Coop`, use the matching filled-item or coop
-  release interaction.
+  trying again.
+- If a row says `Captured`, release the filled item. If the item is gone, use
+  `Recall` or `Forget` on the card. If a row says `In Coop`, wait for the coop
+  to let the companion out, or break the coop block.
 - If the row stays unselected, check whether you intentionally toggled it off for bulk commands.
 - If nearby actions appear only sometimes, move closer and confirm the creature is loaded and owned by you.
 
@@ -261,8 +297,8 @@ read-only stored records while they are still displayed.
 - [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
 
-> [Screenshot Placeholder: Linked panel showing active, unloaded, captured,
-> coop, roster-stored, provisioned-dormant, dead, and Lost rows]
+> [Screenshot Placeholder: Linked panel showing loaded, unloaded, captured,
+> coop, stored, dead, and Lost rows]
 
 
 

@@ -1,297 +1,262 @@
 ---
-title: "Persistence, SQLite, and Data Paths"
+title: "Companion Store and Data Paths"
 order: 1
 published: true
 draft: false
 ---
-# Persistence, SQLite, and Data Paths
+# Companion Store and Data Paths
 
-> This page describes the SQLite persistence of Tamework 3.x and 4.x. Tamework 5.0
-> replaces it with a file-based companion store under `universe/Tamework/Companions`
-> and imports 3.x and 4.x data at the first start. The `/tw debug persistence`
-> subcommands named below (`status`, `health`, `detail`, `export` and `compact`) are
-> not registered in 5.0. For the 5.0 update path, see
-> [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).
+Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
-Tamework uses one replacement persistence lineage. Its canonical database is
-`tamework-state.sqlite`, and that lineage begins at schema version 1.
+Tamework 5.0 keeps every companion in an in-memory index and saves it as plain
+JSON files under the world's `universe` folder. There is no database. This page
+describes the folder, how writes reach disk, how stale bodies and items are
+refused, and what operators can check. The design record is ADR 0011
+(`docs/decisions/0011-companion-index-persistence.md` in the repository).
 
-`TameworkPersistenceComposition` owns the only production bootstrap and facade
-bundle. Gameplay code submits typed operations through focused authors; it does
-not open connections or write tables directly.
+Tamework 3.x and 4.x used SQLite databases (`tamework-state.sqlite` and
+`bonded-companions.sqlite`). 5.0 imports them once at the first start and never
+writes them. See
+[World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins)
+for the import, the report file, `/tw persistence start-fresh` and 2.x worlds.
 
-## Canonical companion model
+## Folder layout
 
-Each persisted companion has one stable profile ID. Live entity UUIDs are
-replaceable aliases and must not be used as cross-mod identity keys. One
-canonical lifecycle row answers where the companion is; feature detail and
-snapshots cannot independently declare a competing lifecycle.
+All companion data lives in `universe/Tamework/Companions`
+(`CompanionStorage.root`, resolved from the server's universe path):
 
-The replacement persistence-backed flows are:
+```text
+universe/Tamework/Companions/
+  meta.json                   format version, created-by version, import or fresh-start receipt
+  owners/<ownerUuid>.json     every record owned by that player
+  owners/_unowned.json        records with no owner (rare)
+  snapshots/<profileId>.json  latest saved body of one companion
+  legacy-aliases.json         old 3.x/4.x body UUIDs to profile IDs (written once by the import)
+  locate-progress.json        where the post-import locate pass stopped (only while it has work)
+```
 
-- canonical profile identity and live UUID aliases;
-- command links and canonical profile snapshots;
-- filled-spawner capture and release;
-- configured-coop capture/release of live NPCs and eligible captured items;
-- durable owner population and role-defined population groups;
-- command-family rosters and timed summon/storage leases;
-- idempotent dormant provisioning and activation;
-- resolved capture-attempt consumption and tame-and-command-link capture;
-- free legacy restoration and exact paid roster revival;
-- namespaced profile extension data.
+- **`meta.json`** marks the store as created. While it exists, Tamework never
+  imports old data again. An imported store has an `Import` section; a store made
+  by `/tw persistence start-fresh` has a `FreshStart` section.
+- **Owner files** (`CompanionStore`) hold `Format`, `Owner`, `Version` and three
+  arrays: `WorldBound`, `Portable` and `Unreadable`. Each record entry is written
+  by `CompanionRecordBson` and holds the profile ID, revision, generation, owner,
+  role, display name, location, last known body UUID, presentation summary,
+  roster and timer fields, provider claims, linked tool IDs and extension data.
+  An owner file is rewritten whole when any of its records changes, and deleted
+  when the owner has nothing left.
+- **Snapshot files** (`SnapshotEnvelope`) hold `Format`, `Generation` and `Data`.
+  Format 1 is the full serialized entity. Format 0 is a companion state imported
+  from 3.x or 4.x; it becomes format 1 the first time the companion is restored.
+  Only the latest snapshot is kept. Releasing a companion deletes it.
+- **`legacy-aliases.json`** lets old bodies in the world be matched to their
+  imported records. Never delete it. If `meta.json` says the import wrote aliases
+  and the file is missing or empty, the store refuses to load.
 
-There is one capture operation kind, one filled-item release operation, one
-coop-capture operation for live and item sources, and shared restoration
-machinery. Feature variants add typed participants and frozen evidence rather
-than their own transaction/recovery protocols.
+A released companion keeps a small `RELEASED` record (a tombstone) so an old body
+that loads later is removed instead of being adopted again. Tombstones do not
+count toward any limit.
 
-The filled-item release operation also has a narrow backward-compatible
-recovery variant for already-migrated v2.16.1 artifacts. On exact item use it
-can correlate one non-current capture-v1 history row with an initial imported
-`UNLOADED/NONE` profile, recheck that evidence transactionally, and complete
-through the ordinary receipt-first release boundary. It operates only on the
-existing schema-1 target and never consults the legacy database, import
-manifest, or transient `targetOrigin`.
+## Other Tamework files
 
-The canonical lifecycle vocabulary is `ACTIVE`, `UNLOADED`, `CAPTURED`,
-`COOP`, `ROSTER_STORED`, `PROVISIONED_DORMANT`, `DEAD_REVIVABLE`, `LOST`,
-`RELEASED`, and `UNRESOLVED`. Command presentation, restoration, capture,
-provisioning, roster, and coop code read that lifecycle; they do not maintain
-separate status authorities.
+These files are not part of the companion store:
 
-## Entity checkpoint history retention
+- `universe/Tamework/Settings`: `tamework-settings.json` (`/tw settings`,
+  `TameworkSettingsStore`), `tamework-settings-announcement.json` and
+  `tamework-settings-announcement-state.json`.
+- `universe/Tamework/Data` (`TameworkDataPathService`):
+  `animal-progression-clock.json`, the advisory
+  `cache/captured-item-locations.json`, and the import reports
+  (`import-report-<UTC time>.txt` and `import-report-failed.txt`). The old 3.x
+  and 4.x databases also sit here and are left unchanged.
 
-Internal entity checkpoints retain current canonical state and small permanent
-idempotency records. Superseded checkpoints published at least one hour ago can
-discard their large operation payload and consumed outbox event after the
-extension index acknowledges them. Incomplete operations, active quarantine,
-public extension data, and other operation families keep their evidence.
+When Tamework cannot find the server's runtime root, the `Data` folder falls
+back to the plugin's own data folder. The companion store never does: it always
+uses the universe path.
 
-Cleanup runs in bounded batches as new checkpoints publish. On startup, Tamework
-automatically compacts older databases after recovery and projection startup,
-before world reconciliation and normal saves. Databases already using incremental
-vacuum, including fresh databases and those previously compacted by the command,
-skip this pass. If maintenance fails, the server log records the cause and a later
-startup retries while the database still needs conversion. Integrity failures
-retain the existing read-only protection.
+## Locations
 
-On 3.x and 4.x, an administrator can also reclaim file space with `/tw debug persistence compact` on the running
-server. Tamework 5.0 does not register this command. This temporarily pauses Tamework saves and companion mutations, drains
-accepted work, removes eligible history, and rebuilds the database. Automatic
-profile snapshots and unload checkpoints wait in their existing save coordinators
-and resume afterward. Completion
-reports the before/after disk usage. Allow several minutes for large databases and
-up to twice the database size in additional free disk space. Keep a current backup.
+Each record has one location kind (`LocationKind`). The panel, the API and the
+limits read it; nothing else decides where a companion is.
 
-The rebuild image is created beside `tamework-state.sqlite`, on the volume whose
-free space is checked. Tamework validates that copy and copies it back through
-SQLite's transactional backup API, then removes the temporary image. It does not
-change the server's global SQLite temporary-directory setting or replace database
-files underneath open connections. The large rebuild image therefore does not
-depend on a hosting container's separate system temporary-storage allowance.
-
-If work cannot drain, unfinished operations remain, or a reader blocks the final
-WAL checkpoint, the command reports failure in the server log; retry after the
-cause clears. Database integrity failures keep mutations blocked. Avoid stopping
-the server during maintenance.
-
-The command also enables incremental vacuum. New databases already enable it, so
-later checkpoint cleanup returns free pages in small batches. Small retry records
-still accumulate; this reduces growth rather than imposing a fixed size cap.
-
-
-### Checking compaction in game (3.x and 4.x only)
-
-Use a disposable copy of a world with a backed-up database. Keep its player
-inventories, world data, and Tamework database from the same save: filled capture
-items require their matching persisted companion records. Do not replace only the
-database with an empty fixture when checking companion behavior. After the world has
-loaded, run `/tw debug persistence compact` and check the completion message's
-before/after MiB. A database with few free pages may shrink very little, and zero
-compacted operations is valid when no checkpoint history is eligible. Afterward,
-use a companion and reopen the test world to check that ordinary saves still work.
-Retain the server log if maintenance fails.
-
-## Dormant transitions require positive evidence
-
-Tamework authors a dormant transition only when it has one of these exact
-facts:
-
-- a saved death event;
-- an explicit destructive entity removal with `RemoveReason.REMOVE`; or
-- terminal removal of a world configured as delete-on-remove, while the NPC's
-  complete live state is still available.
-
-Ordinary unload, temporary absence, and timeout are not death or Lost evidence.
-Tamework does not infer a destructive lifecycle change just because an entity
-is not currently loaded.
-
-Startup recovery retires a `PREPARED` dormant transition as `FAILED` when its
-preparation validation reports `operation_prepared_detail_missing`. Later
-companion changes, such as a coop capture and release, can invalidate that
-operation's frozen source revision or alias. This database-only operation has
-no intermediate live effect or preparation reservation to undo. Recovery keeps
-the current lifecycle, aliases, snapshots, and outbox unchanged and continues
-with unrelated operations. `EXPLICIT_RECALL_EXHAUSTED` retains its existing
-failure handling because its snapshot validation can also reject unreadable
-evidence. Other operation kinds, phases, and failure causes retain their
-existing failure handling.
-
-## Target and source files
-
-The canonical write target is `tamework-state.sqlite` in Tamework's
-universe-scoped data directory. If that target already exists, Tamework verifies
-and opens it.
-
-That existing-target precedence is deliberate: Tamework never merges later
-changes from `tamework.sqlite` into an established replacement target. When
-retesting migration from a recovered pre-upgrade database, stop the server and
-back up the complete data directory first. Restore the complete pre-upgrade
-directory, or move the existing `tamework-state.sqlite` target and its WAL/SHM
-sidecars, `persistence-engine.json`, and prior `persistence-import-*.json` report
-out of the active directory before starting the migration candidate. Restoring
-only `tamework.sqlite` does not create a fresh migration. On the first successful
-startup, `/tw debug persistence status` reports target origin `IMPORTED_PUBLIC`; `EXISTING`
-means a replacement target was reused and no import ran during that startup.
-
-Do not test capture, filled-item release, or recovery until that status also
-reports storage mode `READ_WRITE` and startup readiness `MUTATION_READY`. During
-a direct import, `STARTING` with `RECONCILE_WORLD` running is expected while
-Tamework seals world evidence. A click in that window is rejected with
-`world_evidence_pending` and leaves the source item unchanged; retry the action
-after mutation readiness is published.
-
-When no replacement target exists, startup discovers at most one immutable
-source across the current, legacy, and historical Tamework data directories:
-
-| Source | Startup action |
+| Kind | Holder |
 | --- | --- |
-| no source | Create an empty schema-v1 replacement target. |
-| released SQLite schema v2, v3, or v4 | Import from a read-only consistent snapshot into a temporary schema-v1 target, verify it, then publish it atomically. |
-| released five-file DAT bundle | Import the immutable bundle through the same verified target publication path. |
-| unreleased development schema v5-v9 | Refuse startup without changing the source or creating a target. |
-| malformed, split, or ambiguous sources | Refuse startup without guessing which source wins. |
+| `LIVE` | A body in a world, loaded or not. |
+| `ITEM` | A filled capture item. The item carries only the profile ID, the generation and a few presentation keys. |
+| `COOP` | A coop block slot. |
+| `STORED` | Nobody: a roster, bonded storage, timed-summon storage or a provisioned companion. |
+| `DEAD` | Nobody. Revivable from its snapshot. |
+| `LOST` | Nobody. Recoverable from its snapshot. Causes include a removal without death, a deleted portal or instance world, a destroyed capture item, and an imported companion whose body was not found. |
+| `RELEASED` | Tombstone. |
 
-The accepted SQLite compatibility boundary is the public v2-v4 lineage from
-the last public release. The unreleased v5-v9 development lineage is
-intentionally not migrated. Test worlds on those builds must restore a public
-backup or start with a new world.
+Whether a `LIVE` body is loaded is runtime state only (`LoadedBodies`).
 
-Source databases, DAT files, WAL files, and SHM files are never migrated in
-place, renamed, moved, or deleted. A successful public import writes a
-`persistence-import-<id>.json` report beside the replacement target.
+## Writes: write-behind and flush
 
-## Process lock files
+One writer thread, `tamework-companion-writer` (`CompanionWriter`), does all
+file writes. The world thread never reads or writes companion files.
 
-Tamework keeps its active process-ownership files in Hytale's backup-excluded
-`LOCK` layout. `Tamework/Data/LOCK` protects the active persistence engine,
-and `Tamework/Data/.tamework-import-lock/LOCK` serializes replacement-import
-publication. These files are ephemeral: Tamework recreates them when needed,
-and Hytale excludes them from world backups.
+- A record change marks its owner file dirty. A new snapshot is queued for its
+  companion.
+- The writer flushes every 250 ms, or at once when a flow asks for it. Each flush
+  writes queued snapshots first, then the dirty owner files, then pending
+  snapshot deletes. A snapshot is deleted only after the owner file that pointed
+  at it no longer needs it.
+- When a record moves to another owner, the new owner's file is written before
+  the old owner's file. If a crash leaves the same profile in two files, the load
+  keeps the higher revision.
+- Every file goes through Hytale's `StorageManager` (`HytaleCompanionFileIo`), so
+  each write is atomic, keeps a `.bak` copy, and waits while a Hytale backup
+  runs. A file whose main copy cannot be parsed is read from its `.bak` copy, with
+  one WARN per file.
+- A failed write keeps its work pending and retries with backoff from 1 second up
+  to 30 seconds. Nothing unwritten is dropped. Memory stays authoritative for the
+  running server, and the failure shows in diagnostics.
 
-At startup, Tamework waits up to three seconds for a previous server process
-to release its persistence lock. If the lock remains held, startup fails
-closed. The error reports `path=active` or `path=legacy` and
-`scope=same_process` or `scope=external_process`. For `external_process`,
-close the other Hytale server process and restart. For `same_process`, close
-the Hytale client or server process fully and then restart it. Do not delete or
-replace a held lock file.
+**Flows that commit before a live effect.** Capture, release from an item, store,
+summon, recall restore, revive, coop intake and coop release change the record in
+memory, then ask the writer to flush that owner's file and wait up to 5 seconds.
+Only after the write completes, and only if the record has not changed since,
+does the flow remove or spawn a body, or consume an item. On a failure or timeout
+the flow undoes the record change and shows the player a message. An unwritten
+state therefore never drives a removal or a spawn.
 
-After an upgrade, `Tamework/Data/.tamework-persistence-engine.lock/` may
-remain as an empty upgrade sentinel. It contains no gameplay data and
-intentionally prevents older Tamework builds from reopening the upgraded
-world.
+**Background changes** (stats, needs, progression, names, positions) reach disk
+through the change detector (`CompanionChangeDetectorSystem`). It checks loaded
+companions every 2 seconds for discrete changes (owner, name, links, traits,
+talents, attachments, alarms, levels, life stage, breeding settings) and every
+60 seconds for slowly drifting values (needs, happiness, XP, timers). A change
+marks the body dirty so Hytale saves its chunk. New flow code that needs an
+immediate save calls `CompanionSaves.markChanged`.
 
-## Public extension data
+**Snapshots** are taken on the world thread whenever a companion leaves a world
+(capture, coop intake, store, death, loss, removal of a delete-on-remove world).
+On a chunk unload a snapshot is taken only if the last one is at least 5 minutes
+old; the presentation summary is refreshed on every unload. If a snapshot cannot
+be taken, capture, coop intake and store stop with a message and change nothing;
+death, loss and unload keep the previous snapshot and log a WARN.
 
-Integrations should use `ProfileDataApi` for namespaced data attached to a
-canonical profile. The transactional extension adds versioned reads,
-revision-fenced compare-and-set, stable idempotency keys, and operation lookup
-after restart.
+**Shutdown.** A `ShutdownEvent` handler at priority -28 (after worlds shut down
+and before universe resources flush) runs a final flush with a 10 second
+deadline. It writes only what the index already holds and reads no ECS state.
+On a crash, up to about 2 seconds of discrete changes and 60 seconds of drift can
+be lost.
 
-Do not write Tamework tables, internal metadata, or entity UUID aliases
-directly.
+**Startup.** Every owner file is read into memory before any world starts.
+Snapshots are read on demand on the `tamework-companion-reader` thread and are
+not cached.
 
-## Data safety
+## Generation fence
 
-- Stop the server before copying persistence data.
-- Back up the complete Hytale world through the host or Hytale tooling.
-- Tamework's database alone is not a complete world backup.
-- Copy `tamework-state.sqlite` with its WAL/SHM sidecars and engine manifest
-  when collecting a persistence support snapshot.
-- Preserve any unreadable or refused source for diagnosis. Do not hand-edit
-  profile identity, lifecycle, operation, or snapshot rows.
+Every companion body carries `TameworkCompanionComponent` with its profile ID and
+generation. Every capture item carries the same pair. The record's generation
+goes up by one each time the holder changes (capture, release, store, summon,
+restore, coop intake and release, death, loss). The stamp is committed before the
+new holder exists. `CompanionFence` then decides what to do with a body as it is
+added to a world:
 
-## Operator diagnostics
+| Situation | Result |
+| --- | --- |
+| The record is `LIVE`, the generations match, and no other body of this companion is loaded | Accepted and registered as the loaded body. |
+| The body's generation is newer than the record | Accepted; the record's generation is raised and a WARN is logged. An older loaded body is removed. |
+| Another body of this companion is already loaded | The newcomer is removed. |
+| The record is not `LIVE`, or the body's generation is older | Removed. |
+| The record is `RELEASED` | Removed. |
+| No record, but the profile ID was in a record that could not be read at startup | Left alone. |
+| No record at all, and the body is owned and tamed | Adopted as a new `LIVE` record (covers a tame that had not been written before a crash). |
+| No record at all otherwise | Removed. |
 
-Managed-coop production waits while a resident's slot has an unfinished capture
-or release operation. If persistence rejects a production checkpoint before
-submission, production for that animal pauses until the Tamework runtime restarts;
-the rejection is logged once for that animal. Restarting does not clear durable
-quarantine. An uncertain coop release still needs exact entity/receipt evidence
-before it can be resolved safely.
+Fence removals are saved, drop nothing and do not count as a death or a loss.
+The removal callback acts only on the registered body, so it ignores bodies the
+fence or a flow removed.
 
-An uncertain new single-animal population admission keeps its capacity reserved
-and blocks its exact operation and profile. It does not block unrelated animals
-owned by the same player. At startup, matching older owner-wide admission locks
-are narrowed only after the saved reservation and remaining locks are verified.
-The incident stays open; this repair does not assume the animal was created or
-cancel the reservation. Incomplete evidence remains protected.
+The same rule applies elsewhere:
 
-The commands in this section exist only on 3.x and 4.x. Tamework 5.0 does not
-register them.
+- **Capture items.** An item releases its companion only when the record is
+  `ITEM` and the generations match. Any other copy becomes an empty capture item
+  with a message. A duplicated item can release its companion only once.
+- **Coop slots.** A slot entry counts only while the record is `COOP` at that
+  block and slot with the same generation.
 
-`/tw debug persistence status` and `health` print the same bounded
-replacement status: engine lineage, storage mode, target origin, schema
-version, startup state, operation counters, schema validation, and checkpoint
-status.
+Bodies from 3.x and 4.x have no stamp. Those are matched through
+`legacy-aliases.json` as their chunks load; see the migration page.
 
-`/tw debug persistence detail` adds bounded feature, outbox, operation-phase, incident,
-quarantine, and circuit counts. It does not repair data, retry an operation,
-clear evidence, import coop residents, or change feature state.
+## Unreadable files and records
 
-`/tw debug persistence export` writes a bounded redacted support ZIP under
-`Data/diagnostics`. The bundle contains the same sanitized replacement status,
-metrics, and durable detail exposed by the diagnostic reader. It excludes the
-SQLite database, saves, player identities, coordinates, inventory payloads,
-secrets, and unrestricted logs. All persistence diagnostic response lines also go to the
-server log so operators can collect them after command chat closes.
+- **Owner file that cannot be parsed** (both the main file and `.bak`), or that
+  uses a newer format: it is renamed to `<name>.json.unreadable-<timestamp>` so it
+  is never overwritten, a WARN reports the count, and that owner starts empty. An
+  admin can restore the file from a backup while the server is stopped.
+- **One record that cannot be decoded** inside a readable file: its raw entry is
+  kept in the file's `Unreadable` array and written back unchanged on every
+  rewrite. Its profile ID is added to the unreadable set, so the fence never
+  adopts or removes its body. `unreadableRecords` in diagnostics counts these.
+- **A file that cannot be read at all** (an I/O error, not a parse error), or an
+  unreadable `legacy-aliases.json`: the store does not load. Companion saving
+  stays off for the whole server, a SEVERE log line names the cause, and nothing
+  is written. Admins who join see a notice. Fix the cause and restart.
+- **Snapshot that cannot be read**: the flow that needed it fails with a message
+  and changes nothing.
 
-### Automatic failure evidence
+## Extension data
 
-Starting with 4.2.0, automatic failure bundles also include `failure-records.json`.
-The shared SQLite writer and reader collect a bounded diagnostic snapshot at the
-failure boundary, before rollback or connection close. The reporter receives
-immutable evidence, so startup shutdown cannot make it disappear before upload.
-Submission still follows the existing Beacon reporting settings.
+`ProfileDataApi` stores namespaced values on the companion record itself, in its
+`Extensions` map (`namespace/key` to a revision and a JSON string). The values
+travel with the record through every location and owner change, and are deleted
+when the companion is released.
 
-Write evidence targets the failing operation. Read failures can include a bounded
-sample of unfinished operations; the sample is context, not proof that those
-operations caused the read failure. Recovery failures outside a database callback
-can still include the claimed operation's saved metadata. Reports include safe
-operation, participant, lifecycle, alias, snapshot, and related-record metadata
-when available. They preserve revisions and relationships needed to compare
-expected state with saved state.
+- `put` and `delete` return at once; the next flush writes the owner file.
+- `compareAndSet` completes only after the owner file is written and undoes its
+  change if that write fails.
+- Large values slow down every rewrite of that owner's file. Keep them small.
 
-Record identifiers use consistent pseudonyms within each capture. Automatic
-evidence excludes raw identities, names, coordinates, full snapshot and inventory
-payloads, arbitrary extension data, and unrestricted exception messages. Nested
-causes include exception classes, source frame line numbers, recognized machine
-error codes, and SQLite numeric error codes. Different underlying failures are
-grouped separately even when their outer classification is `sqlite_unknown`.
+See [Profile Data API Reference](/mod/alecs-tamework/profile-data-api-reference).
+Do not edit owner or snapshot files from another mod; use the public API.
 
-Collection has row, byte, and execution bounds. Partial, unavailable, skipped,
-and truncated evidence is marked explicitly; a missing section does not prove
-that the database contained no records. Transaction-local evidence may include
-uncommitted changes and is not proof of a successful commit. Capture does not
-repair records, retry operations, or change persistence failure handling. If
-the connection cannot open, a minimal report still includes the failure evidence
-available without database access. Bonded-companion diagnostics retain their
-separate aggregate view and authority.
+## Backups
 
-Each database capture uses at most three sampled operations, four related
-profiles, and twelve rows per section, with a 150 ms SQLite work budget and a
-96 KiB serialized evidence limit. Busy, timeout, and corrupt-database failures
-skip further database queries. A bundle can retain up to four captures and is
-limited to 512 KiB compressed. `collection-limits.json` identifies members
-dropped to fit; record evidence takes priority over aggregate detail.
+- Hytale's own backups zip the `universe` folder, so they include
+  `Tamework/Companions`. Because every write goes through `StorageManager`, a
+  backup never holds a half-written file.
+- Back up and restore the whole `universe` folder together. Restoring only the
+  `Companions` folder, or only the world chunks, pairs records with bodies or
+  items from a different time. The generation fence then removes bodies it sees
+  as stale.
+- Stop the server before copying files by hand.
+- Do not move companion data into the plugin's data folder. Hytale backups do
+  not include it, and a folder-installed mod is replaced on update.
+
+## Diagnostics
+
+There is no persistence debug command in 5.0. Use the server log and
+`TameworkApi.diagnostics().getPersistenceDiagnostics()`
+([Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)):
+
+| Field | Meaning |
+| --- | --- |
+| `databasePath` | The `Companions` folder. |
+| `totalBytes` | The folder's size, measured off the world thread and up to about 30 seconds old. |
+| `recordsByLocation` | Records per location kind, including `RELEASED`. |
+| `lastFlushAtMs` | Wall-clock time of the last successful flush. |
+| `lastFailure` | The writer's current failure, or null while writes succeed. |
+| `unreadableRecords` | Records that could not be decoded at load. |
+| `queueMetrics.queueDepth` | Owner files and snapshots waiting to be written. |
+| `health.status` | `HEALTHY` while writes succeed, `DEGRADED` while the writer has a failure. |
+
+Useful log lines:
+
+- `Companion store loaded with <n> quarantined files and <n> unreadable records`
+  (WARN): see "Unreadable files and records" above.
+- `Companion store at <path> could not be read; companion persistence is disabled`
+  (SEVERE): the store did not load.
+- `Companion persistence is disabled until the ... companion data on this world is
+  imported` (WARN): a failed import; read the import report.
+
+For a support request, send the server log, the import report if the update
+failed, and a copy of the `Companions` folder taken while the server is stopped.
+
+## Related Pages
+- [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins)
+- [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
+- [Profile Data API Reference](/mod/alecs-tamework/profile-data-api-reference)
+- [Architecture Overview](/mod/alecs-tamework/architecture-overview)

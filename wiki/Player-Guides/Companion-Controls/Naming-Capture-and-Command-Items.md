@@ -20,10 +20,14 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Capture an NPC into a filled item and later release that same companion from
   the item
 - Can preserve name, role, attachment choices, tame state, owner state, and progression data
-- May optionally clear ownership on capture and reassign ownership on spawn
+- Keep the companion's owner while it is in the item. Your server's captured
+  companion ownership setting decides whether the owner changes when the item
+  changes hands (see "Player expectations" below)
 - Can have different empty and filled item variants
-- A successful capture and release move one saved companion between its live
-  and filled-item states; they do not create a second copy
+- A successful capture and release move one saved companion between the world
+  and the item; they do not create a second copy. A copied or duplicated filled
+  item cannot release the companion a second time: the extra copy turns into an
+  empty capture item with a message when it is used
 - Normal capture items preserve current health instead of healing the
   companion. An NPC that is already dead or at zero health cannot be captured.
 
@@ -33,15 +37,14 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Each physical flute stores its own selected companions. Left-click an owned NPC
   while holding that flute, or use the card selection button, to select or deselect it.
   Separate flutes can keep separate working sets.
-- Owner/command-family tools read durable roster membership from the world instead
-  of treating the item as roster authority. Bonded tools keep their separate roster
-  and lease controls.
+- Owner/command-family tools read their roster from the server's saved companion
+  data, so every matching item shows the same roster. Bonded tools keep their
+  separate roster and summon controls.
 - Open the radial menu and linked panel for deeper management
 - Can limit how many selected companions stay active at once
 - Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
-- Read captured, coop, roster-stored, provisioned-dormant, dead, and `LOST`
-  status from the companion's saved lifecycle rather than deciding those states
-  from stale item metadata
+- Read captured, coop, stored, dead, and `LOST` status from the companion's
+  saved record rather than from stale item metadata
 
 The optional `Alec's Tamework! Examples` pack contains a development/reference
 command whistle and has no recipe. Enable the pack and give the item directly
@@ -65,23 +68,36 @@ command item and acquisition method.
   current flute without changing memberships. Right-click adds a group while keeping
   the animals already selected.
 - A captured companion keeps its owner while it is in a capture item, and the
-  item's tooltip names that owner. Your server chooses how the owner changes:
-  it follows whoever holds the item (the default), the item is bound to its
-  owner, or the owner changes when someone else releases the companion. When
-  the owner changes, the former owner's flute link and card are removed.
+  item's tooltip shows an **Owner:** line. Your server chooses how the owner
+  changes:
+  - **Follows the item** (the default): whoever takes the filled item into
+    their inventory becomes the owner, if their companion limits allow it. The
+    owner line updates.
+  - **Owner only**: other players cannot pick up, take or release the item.
+  - **Changes on release**: the owner stays the same while the companion is in
+    the item; whoever releases it becomes the owner.
+
+  When the owner changes, the companion leaves the former owner's panel.
+- A captured companion still counts toward its owner's "companions owned"
+  limit. If you are at your limit, you may be unable to pick up another
+  player's filled capture item; a message tells you why, and the item stays
+  where it is.
+- If a filled capture item despawns on the ground or falls out of the world,
+  its companion becomes `LOST` and you can **Recover** it from the companion
+  panel. If the item vanished some other way and the companion still shows as
+  captured, use **Recall** or **Forget** on its card; see the
+  [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide).
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
-- A supported managed-coop interaction can place an eligible canonical filled
-  capture item directly into an available coop slot. Other filled items still
-  use their normal release interaction.
-- If a v2.16.1 filled item became stranded after upgrading to Tamework
-  3.0.0-3.0.2, use that exact item again after the fixed build reports
-  `MUTATION_READY`. Tamework can recover its preserved imported capture state
-  directly; you do not need to rerun migration. Keep a complete save backup
-  before upgrading.
-- Restoring a command-linked dead or `LOST` companion may be free or may
-  require the exact item recipe shown by the confirmation. The configured
-  policy or cooldown can still delay or disable the action.
+- A supported managed-coop interaction can place an eligible filled capture
+  item directly into an available coop slot. Other filled items still use their
+  normal release interaction.
+- Capture items filled on an older Tamework version still work after the update
+  to 5.0. Each one releases its companion once.
+- **Revive** brings back a dead companion and may require the exact item recipe
+  shown by the confirmation. **Recover** brings back a `LOST` companion and is
+  free. The configured policy or cooldown can still delay or disable either
+  action.
 
 ## Related Pages
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)

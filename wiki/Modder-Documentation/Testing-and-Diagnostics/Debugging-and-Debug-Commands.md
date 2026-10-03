@@ -29,8 +29,9 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
 - `/tw debug view spawn-beacons [radius|off]`
-- `/tw debug persistence simulateerror`
 - `/tw persistence start-fresh [confirm]`
+- `/tw companions forget <self|player|UUID> <companion name or id> [confirm]`
+- `/tw companions restore <self|player|UUID> <companion name or id> [confirm]`
 - `/tw bonded grant <self|player|UUID> <rosterId> <roleId> [name]`
 
 `/tw bonded grant` gives an online player one stored bonded companion for
@@ -67,16 +68,38 @@ then `/tw debug clear-owned self confirm` to permanently clear them. Administrat
 can replace `self` with an online player name or any player UUID. The command uses
 the `tamework.command.tw` permission and also works from the console with a target.
 
-Cleanup includes live, unloaded, dead, and lost ordinary animals. It removes their
-ownership and command links through durable lifecycle operations, then removes
-loaded entities. Unloaded entities are removed when they next load. Terminal
-history remains in the database, but these animals are no longer owned or revivable.
-Operations run one at a time; keep the companion menu closed until cleanup finishes.
+Cleanup includes live, unloaded, dead, and lost ordinary animals. It releases
+each companion in the companion store, which removes its ownership, command
+links and saved state, then removes loaded animals. Unloaded animals are removed
+when they next load. These animals are no longer owned or revivable. Keep the
+companion menu closed until cleanup finishes.
 
 Captured, cooped, and managed roster companions are skipped and reported. Bonded
 companions are also preserved and are not included in the ordinary-profile counts.
 Inventory items are untouched. Completion reports cleared, skipped, and failed
 counts; busy or changed profiles are not forcibly deleted.
+
+## Resolving a companion Tamework cannot reach
+
+A companion in a capture item counts toward its owner's limit. Tamework cannot
+see an item that was deleted by another mod, a cleared container or a rollback,
+so such a companion would stay "captured" forever. The owner can fix this from
+the companion panel with **Recall** or **Forget** on the captured card. Admins
+have the same two actions for any player:
+
+- `/tw companions forget <self|player|UUID> <companion name or id> [confirm]`
+  releases a companion that is in a capture item for good and frees the owner's
+  slot. It works from the console.
+- `/tw companions restore <self|player|UUID> <companion name or id> [confirm]`
+  restores a companion that is in a capture item, in a coop or lost, next to
+  the admin who runs it. Run it in game, standing somewhere open.
+
+Without `confirm` each command only says what it would do. The companion is
+named by its display name or its profile ID; when several companions share a
+name, the reply lists their IDs. After either command, any surviving copy of
+the capture item, or the old coop entry, stops working: an item becomes an empty
+capture item. Bonded companions are refused; use the bonded roster panel for
+those. Both commands need the `tamework.command.tw` permission.
 
 ## Starting fresh when old data cannot be converted
 
@@ -141,36 +164,39 @@ Additional runtime diagnostics include:
 - `/tw debug avatar input [on|off|status]`
 - `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
 
-`/tw debug log respawn-trace` logs the stored and normalized health/needs projection,
+`/tw debug log respawn-trace` logs the stored and normalized health and needs values,
 the immediate live entity health and death-component state, first damage within
 the trace window, and delayed 250 ms and 1 second probes. It covers Soul
 Collector capture and release, free and paid companion restoration, and bonded
 roster summons. Bonded summon traces also record the planned full-health
-snapshot, profile, lease, world, projection result, and early placement, world,
+snapshot, profile, generation, world, spawn result, and early placement, world,
 thread, or exception failure. Enable it only for a short reproduction because
 each return operation emits several correlated lines.
 
 Dead-target capture denials always log the player, target, role, item, exact
 health, and death-component state, even when the respawn trace is disabled.
 
-Every newly inserted companion projection clears stale fall distance and
-velocity and receives brief spawn-time fall protection. This gameplay guard is
+Every companion body that Tamework spawns from saved state clears stale fall
+distance and velocity and receives brief spawn-time fall protection. This gameplay guard is
 active even when `/tw debug log respawn-trace` is disabled. A cancelled invalid fall
 can appear under `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on
 active trace evidence.
 
-Death and Lost restoration is a gameplay flow. Roster-backed companions can
-use role-configured exact item costs, while legacy item-linked paths remain
-free.
+Revive (dead) and Recover (lost) are gameplay flows. Both restore the companion
+from its saved snapshot. A revive can have a role-configured item cost; Recover
+is free.
 
 For coops, test direct live capture, direct captured-item intake through the
 supported managed-coop interaction, and resident release independently.
 
-Command status comes from the canonical lifecycle projection. A relocation
-timeout only drops the pending retry; it cannot manufacture `LOST`, and none of
-the debug toggles changes that rule.
+Command status comes from the location on the companion's record in the
+companion store (out in the world, in an item, in a coop, stored, dead or lost).
+A recall of an unloaded companion that times out does not make it lost: Tamework
+restores it near the player from its saved state. None of the debug toggles
+changes that rule.
 
-`/tw debug persistence simulateerror` sends one harmless synthetic failure
-through the persistence diagnostic path. The older `status`, `health`, `detail`,
-`export`, `reviveready` and `compact` subcommands served the SQLite persistence
-that Tamework 5.0 replaced and are no longer registered.
+Tamework 5.0 has no `/tw debug persistence` command. The `status`, `health`,
+`detail`, `export`, `reviveready`, `compact` and `simulateerror` subcommands
+served the SQLite persistence that 5.0 replaced and were removed. To check the
+store, read the server log and
+[Companion Store and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths).

@@ -60,7 +60,8 @@ Tamework.getInstance().requestRuntimeCapability(
 After startup, the provider reads the immutable activation state and fails
 closed when a required module is unavailable. Output and XP paths remain
 event-driven. Tamework does not contain RuneProfessions-specific profession
-logic, and integrations must not write Tamework SQLite rows directly.
+logic, and integrations must not edit Tamework's companion files directly; they
+use the public API.
 
 The activation seam does not yet define Husbandry admission, activity, or
 durable output APIs. Those public contracts must join this module plan when

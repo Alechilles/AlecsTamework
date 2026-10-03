@@ -13,8 +13,19 @@ Tamework 5.0 keeps companion data in a new place: plain files under
 `universe/Tamework/Data`. This page explains what happens when a world saved by an
 older version first starts on 5.0, and what a server admin should check.
 
-Back up the whole world before you update. Tamework never changes the old files,
-but a full backup is the only way to go back to the old version.
+## Before you update
+
+- **Back up first.** Copy the world's whole `universe` folder while the server
+  is stopped. Tamework never changes the old files, but a full backup is the only
+  way to go back to the old version.
+- **Server version.** Tamework 5.0 requires Hytale server 0.6.0 or later. It
+  does not load on 0.5.x.
+- **Other mods.** Tamework 5.0 ships public API 3.0.0, which is not compatible
+  with 2.x. Update mods that use the Tamework API to versions built for 5.0 at
+  the same time.
+
+From 5.0 on, companion data is part of the `universe` folder, so Hytale's own
+world backups include it.
 
 ## Which path applies to your world
 

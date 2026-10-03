@@ -54,22 +54,20 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 
 ## Release checklist
 
-The persistence replacement uses the normal Tamework release workflow; it does
-not have a separate candidate builder or rehearsal runtime.
+Releases use the normal Tamework workflow described in
+`docs/Build-and-Packaging.md` in the repository.
 
-1. Update `pom.xml`, filtered manifests, `CHANGELOG.md`, and user-facing docs to
-   the same version.
-2. Run `./mvnw test`, including the replacement architecture, migration, and
-   crash-recovery gates in the normal suite.
-3. Build the ordinary release artifact and verify its embedded assets and
-   manifest version.
-4. Smoke-test a new world, one public v2-v4 import, direct-live coop
-   capture/release, filled-spawner capture/release, and exact Death/Lost
-   restoration.
-5. Confirm an unreleased v5-v9 source is refused unchanged before publishing.
+1. Set `mod_version` in `gradle.properties` and let the build refresh the
+   manifest. Update `CHANGELOG.md` and user-facing docs to the same version.
+2. Run the full test suite and the packaged behavior tests.
+3. Build the release artifact and verify its embedded assets and manifest
+   version.
+4. Smoke-test a new world, one import of a 3.x or 4.x world, coop intake and
+   release, capture and release with a capture item, and Revive and Recover.
+5. Confirm a 2.x world is refused unchanged with the "run 4.3.x once" notice.
 
 Whole-world backups remain the server operator's responsibility. The importer
-never modifies a public source database or tester-only refused source.
+only reads the old database files and never changes them.
 
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)

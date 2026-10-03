@@ -15,10 +15,11 @@ companion roster. The policy controls eligible roles, owned and active limits,
 optional session duration and summon cooldown, paid revive costs, and which
 bonded actions are enabled.
 
-This config applies only to Tamework's dedicated bonded lease model. It does
-not alter permanent world-animal persistence, coops, ordinary command links,
-generic owner/command-family rosters, generic timed summoning, or generic paid
-revival.
+This config applies only to bonded companions. It does not change permanent
+world animals, coops, ordinary command links, owner/command-family rosters,
+timed summoning for those rosters, or their paid revival. Bonded companions are
+stored with every other companion in the companion store; a server's ordinary
+owned and population-group limits also apply to them.
 
 ## Asset location and resolution
 
@@ -98,13 +99,13 @@ is rejected and the last accepted generation remains active.
   name of the family's role if it allows a single role; otherwise it shows the
   counts without names. The key may live in any loaded mod's language files.
 - `AllowedRoles`: required non-empty array of exact, unique role IDs.
-- `MaximumOwned`: maximum stored, active, and dead profiles in this family for
-  one owner. `0` means unlimited.
-- `MaximumActive`: maximum active leases in this family for one owner. `0`
+- `MaximumOwned`: maximum stored, active, and dead companions in this family
+  for one owner. `0` means unlimited.
+- `MaximumActive`: maximum active companions in this family for one owner. `0`
   means unlimited.
-- `SessionDurationSeconds`: duration of one active lease. `0` disables expiry;
-  positive values expire to `STORED`.
-- `SummonCooldownSeconds`: cooldown applied when an active projection is
+- `SessionDurationSeconds`: length of one summon session. `0` disables expiry;
+  when a positive session ends the companion is stored.
+- `SummonCooldownSeconds`: cooldown applied when an active companion is
   stored. `0` disables the cooldown.
 - `ReviveCooldownSeconds`: cooldown applied after a bonded companion dies.
   The panel shows the remaining time and blocks revival until it ends. `0`
@@ -127,8 +128,9 @@ Every `RevivePrice.Costs` entry requires:
 - `Quantity`: positive integer.
 
 Every line is required. The bonded panel quotes the complete recipe, checks all
-current quantities, and reserves the recipe as one atomic payment operation.
-Do not split a multi-item recipe into independent external charges.
+current quantities, and takes the whole recipe at once. If the revive does not
+bring the companion back, the items are refunded. Do not split a multi-item
+recipe into independent external charges.
 
 If `RevivePrice` is absent, no price is available. If `Features.Revive` is
 `false`, the revive action is disabled even when a recipe exists.
@@ -139,11 +141,12 @@ If `RevivePrice` is absent, no price is available. If `Features.Revive` is
 - `Provision`: permits direct `BondedCompanionApi.provision` creation.
 - `Summon`: permits `STORED -> ACTIVE`.
 - `Dismiss`: permits explicit `ACTIVE -> STORED` through the panel/API.
-- `Revive`: permits paid `DEAD -> STORED`.
+- `Revive`: permits `DEAD -> ACTIVE`. The companion comes back at the chosen
+  place and needs a free active place in its family.
 
-Lifecycle recovery may still store an active projection after a non-death
-exit even when explicit Dismiss is disabled. The toggle controls the player
-action, not the runtime's obligation to converge safely.
+Tamework may still store an active companion (session expiry, owner logout,
+owner world change) even when explicit Dismiss is disabled. The toggle controls
+the player action only.
 
 ## Shared-roster example
 
@@ -201,8 +204,9 @@ time this reference was written.
 - Avoid overlapping allowed roles when role-only capture or provisioning must
   choose a family.
 - `MaximumOwned: 0` and `MaximumActive: 0` mean unlimited, not disabled.
-- `SessionDurationSeconds: 0` means the lease never expires.
-- Revival returns a profile to `STORED`; it never summons automatically.
+- `SessionDurationSeconds: 0` means the session never expires.
+- Revival returns the companion `ACTIVE`, not `STORED`. This changed in
+  Tamework 5.0.
 - Removing or invalidating a currently referenced family causes dependent
   positive actions to fail closed. It does not authorize generic fallback.
 

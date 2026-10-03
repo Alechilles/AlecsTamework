@@ -78,8 +78,8 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `RosterStorage`: `ItemMetadata` for the standard ordinary-flute flow. Its panel
   automatically discovers owned companions; per-item metadata retains
   only that physical flute's selected recipients and panel preferences.
-  `OwnerCommandFamily` uses a durable owner/family roster, and
-  `BondedCompanions` uses the separate bonded profile-and-lease authority.
+  `OwnerCommandFamily` uses an owner/family roster saved on the companion
+  records, and `BondedCompanions` uses a bonded roster.
 - `CommandFamilyId`: stable namespaced family shared by equivalent access
   items; required for `OwnerCommandFamily`.
 - `UiRendererId`: optional namespaced Java command-menu renderer ID. Omit it or
@@ -131,17 +131,17 @@ Accepted `MembershipMode` values:
 With `RosterStorage: ItemMetadata`, linked membership remains on that command
 item as the flute's active-recipient selection; it is not the ordinary panel's
 browsing source. The standard panel discovers owned companions even
-without an existing item record. With `OwnerCommandFamily`, membership and stable slots are durable for
+without an existing item record. With `OwnerCommandFamily`, membership and stable slots are saved for
 the owner/family and equivalent access items see the same roster. Optional item
-metadata is only a disposable projection. Both modes resolve canonical profile
-IDs and read lifecycle status from replacement persistence; neither item cache
-may invent death, Lost, captured, coop, stored, or provisioned state.
+metadata is only a disposable copy. Both modes resolve stable profile IDs and
+read each companion's status from the companion store; neither item cache may
+invent death, Lost, captured, coop, or stored state.
 
 With `RosterStorage: BondedCompanions`, the command item is only an access,
 panel, and live-command surface for `BondedRosterId`. Cards are keyed by stable
-bonded profile ID and are loaded from the separate bonded database. The public
-states are exactly `STORED`, `ACTIVE`, and `DEAD`; only an exact current
-projection can receive normal NPC commands.
+profile ID and are read from the companion store. The public states are exactly
+`STORED`, `ACTIVE`, and `DEAD`; only the current body of an active companion can
+receive normal NPC commands.
 
 A bonded config must not declare `CommandFamilyId` or
 `ProjectRosterToItemMetadata`, even as explicit `false`. It does not create
@@ -254,7 +254,7 @@ Fields:
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 - For an ordinary `ItemMetadata` flute, `LinkEnabled` does not control which
   owned companions appear in the standard panel. The per-item active records
-  control command recipients; the owned projection controls browsing. Keep this
+  control command recipients; the owner's companion records control browsing. Keep this
   distinction when replacing the standard UI or handling card events.
 - `UiRendererId` changes only the menu controller and layout.
   `UiContributors` adds isolated presentation, server actions, and custom
@@ -270,7 +270,7 @@ Fields:
 - `OwnerCommandFamily` requires `RequireOwner: true` and a non-blank
   `CommandFamilyId`.
 - `BondedCompanions` requires a non-blank, currently defined
-  `BondedRosterId`, rejects generic family/projection fields, and routes
+  `BondedRosterId`, rejects `CommandFamilyId` and `ProjectRosterToItemMetadata`, and routes
   summon/store/revive actions by profile ID plus expected revision.
 
 ## Bonded roster example

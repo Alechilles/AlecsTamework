@@ -8,15 +8,17 @@ draft: false
 
 Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-HyDragon uses Tamework's dedicated bonded-companion lease model for full
-dragons and bonded Miniwyverns. Durable profile state lives in Tamework while
-each summoned NPC is a temporary world projection.
+HyDragon uses Tamework's bonded companions for full dragons and bonded
+Miniwyverns. Each one is an ordinary companion record in Tamework's companion
+store, flagged as bonded and tied to a bonded roster. A summoned dragon is a body
+in the world for as long as it is active; the record keeps its state while it is
+stored or dead.
 
 ## Required boundary
 
-The current HyDragon manifest requires Tamework `>=3.1.0 <4.0.0`, so it needs
-a compatible release before use with Tamework 4.0.0. HyDragon also checks public
-API capability names at runtime. Bonded features require both:
+Tamework 5.0 ships public API 3.0.0, which is not compatible with 2.x. Use a
+HyDragon release built for Tamework 5.0. HyDragon also checks public API
+capability names at runtime. Bonded features require both:
 
 - advertised `BONDED_COMPANIONS`; and
 - `TameworkApi.bondedCompanions().availability().available()`.
@@ -45,8 +47,8 @@ The Dragon Horn command config uses:
 ```
 
 Full dragons and `Tamed_Wyvern_Mini` appear in this same panel. The Horn is an
-access and command surface, not durable storage. Every card is keyed by the
-stable bonded profile ID rather than an item-metadata row or live NPC UUID.
+access and command surface, not storage. Every card is keyed by the stable
+profile ID rather than an item-metadata row or live NPC UUID.
 
 Two family policy assets share the roster:
 
@@ -60,17 +62,19 @@ cooldown values when a family should be unlimited/no-cooldown.
 
 ## Lifecycle
 
-Bonded companions have exactly three states:
+Bonded companions have exactly three public states:
 
-- `STORED`: durable snapshot, no live projection;
-- `ACTIVE`: one exact lease and matching projection; and
-- `DEAD`: confirmed death, paid revival required.
+- `STORED`: saved snapshot, no body in a world;
+- `ACTIVE`: summoned, with one body; and
+- `DEAD`: confirmed death, revival required.
 
-Dismissal, expiration, logout, world transfer, missing projection, and
-duplicate cleanup all become `STORED`. Bonded profiles never become generic
-Unloaded, Lost, Captured, Cooped, roster-stored, or provisioned-dormant.
+Dismissal, session expiry, owner logout and owner world change store the
+companion. An owner's death does not. A body that vanished without a confirmed
+death is listed as `STORED` and can be summoned again. Bonded companions never
+appear as captured, cooped or lost in the ordinary panels, and the ordinary
+command items and `/tw companions` commands refuse them.
 
-Revival returns `DEAD` to `STORED` and never summons automatically.
+Revival brings a `DEAD` companion back `ACTIVE` at the chosen place.
 
 ## Full-dragon capture
 
@@ -78,38 +82,41 @@ The Draconic Stone keeps its tranquilized-state requirement, channel behavior,
 role mappings, capture probability, Horn access requirement, and resolved-
 attempt consumption. It no longer requires a health threshold.
 
-On success, `StoreBondedCompanion` durably creates one stored profile with the
-complete NPC snapshot before retiring the source. No filled Stone, generic
-command-family membership, generic population row, generic timed lease, or
-generic profile is created. One completion effect is emitted after the durable
-result.
+On success, `StoreBondedCompanion` saves one `STORED` bonded companion with the
+complete NPC snapshot, then removes the body. No filled Stone is given. One
+source item is spent before the save and given back when the save does not go
+through. One completion effect is emitted after the save.
 
-The exact original source UUID is retained as profile-lifetime capture proof.
-HyDragon listens for `BondedCompanionCaptureResolvedEvent` during normal play
-and calls `BondedCompanionApi.findCapture` for restart recovery.
+The original source NPC UUID is kept on the companion's record as capture
+proof for as long as the companion exists. HyDragon listens for
+`BondedCompanionCaptureResolvedEvent` during normal play and calls
+`BondedCompanionApi.findCapture` after a restart.
 
 ## Summon, store, and command behavior
 
-Summon validates owner, roster/family, role, profile revision, cooldown,
-family active capacity, snapshot, world, and safe placement. It creates one
-lease token and one exact projection. Every summoned dragon or Miniwyvern
-starts at full health, regardless of the health stored on its roster profile.
+Summon checks owner, roster and family, role, expected revision, cooldown,
+the family's active limit, the ordinary population limits, the snapshot, the
+world and a safe placement. The active limit is checked again in the step that
+saves the change. The record becomes `LIVE` with a new generation, and the body
+is spawned from the snapshot. The lease token in the API is that generation as
+text. Every summoned dragon or Miniwyvern starts at full health, regardless of
+the health in its snapshot.
 
-Dismiss/store captures the latest complete state before retiring that exact
-projection. Automatic non-death cleanup follows the same stored convergence
-rule. Normal Follow, Hold, Recall, Attack Target, and other command steps target
-only the exact current-world NPC whose bonded marker matches the profile and
-lease.
+Store snapshots the body, saves the companion as `STORED` with a new
+generation, then removes the body. A copy of the body left in an unloaded chunk
+is removed by Tamework's generation fence when it loads. Normal Follow, Hold,
+Recall, Attack Target, and other command steps target only the current body of
+the active companion.
 
-The panel renders name, species, gender, health, state, extension fields, and
-buttons from the durable profile immediately after capture, summon, store,
-revive, and relog. Live lookup can enrich volatile data but is not required for
-a complete card.
+The panel renders name, species, health, state, extension fields, and buttons
+from the companion's record right after capture, summon, store, revive, and
+relog. Live lookup can enrich volatile data but is not required for a complete
+card.
 
 ## Death and revival
 
-Only a positively confirmed death creates `DEAD`. A missing or unloaded
-projection stores instead.
+Only a confirmed death creates `DEAD`. A body that vanished or unloaded
+does not.
 
 Current full-dragon revive recipe:
 
@@ -121,53 +128,55 @@ Current Miniwyvern revive recipe:
 - 1 `Revitalizing_Essence`;
 - 2 `Draconic_Essence`.
 
-The panel quotes every line and reserves the complete recipe atomically. It
-charges all lines once or refunds/contains the exact operation. Success changes
-the same profile to `STORED`; the player summons separately.
+The panel quotes every line and takes the complete recipe at once. If the
+revive does not bring the companion back, the items are refunded. A revive
+needs a free active place in the family, because the companion comes back
+`ACTIVE` at the chosen place with a new session.
 
 ## Miniwyvern Soul Bond and extension data
 
-Soul Bond acquisition provisions one deterministic stored profile in family
-`hydragon:soulbound_mini`. The one-lifetime rule is HyDragon policy; Tamework
-provides idempotent profile/family admission and does not hardcode the Egg or
-Soul Bond source.
+Soul Bond acquisition provisions one stored companion in family
+`hydragon:soulbound_mini`. The one-lifetime rule is HyDragon policy. Tamework
+treats a repeat of the same caller namespace and idempotency key as the same
+request, checks the family and population limits, and does not hardcode the Egg
+or Soul Bond source. Provisioned companions count toward the owned limit.
 
 Miniwyvern archetype, attunement, ability scheduler, and progression fields are
-stored in owner/profile/namespace-qualified bonded extension data. HyDragon
-uses revision-fenced compare-and-set updates. The extension survives summon,
-store, logout, transfer, expiration, death, revive, and relog.
+stored as bonded extension data on the companion's record, one value per
+namespace. HyDragon uses compare-and-set updates on the value's revision. The
+value survives summon, store, logout, world change, expiry, death, revive, and
+relog, and goes away only when the companion is abandoned.
 
-Ability runtime binds only to the exact active projection and detaches when the
-profile becomes stored or dead. Detaching never deletes the extension.
+Ability runtime binds only to the current body of the active companion and
+detaches when the companion is stored or dead. Detaching never deletes the
+extension data.
 
 ## Encounter and flight eligibility
 
-HyDragon lists `hydragon:dragon_horn` and accepts only a profile in family
-`hydragon:full_dragons` whose state is `ACTIVE` and whose active lease is
-present. Stored/dead full dragons, active Miniwyverns, stale projections, and
-old generic population evidence do not qualify.
+HyDragon lists `hydragon:dragon_horn` and accepts only a companion in family
+`hydragon:full_dragons` whose state is `ACTIVE` and that has a lease. Stored or
+dead full dragons, active Miniwyverns, and stale bodies do not qualify.
 
-## Generic APIs remain available
+## Generic APIs
 
-HyDragon bonded profiles do not use `CommandFamilyRosterApi`,
-`CommandTimedSummoningApi`, `CompanionProvisioningApi`,
-`PaidCommandRevivalApi`, `PopulationGroupApi`, or generic `ProfileDataApi`.
-Those APIs remain supported for ordinary Tamework integrations. Do not call a
-generic API as a fallback for one bonded profile.
+Use `BondedCompanionApi` for bonded companions. Do not call a generic API, such
+as `ProfileDataApi`, as a fallback for one bonded companion. API 3.0.0 removed
+the generic command-family roster, timed summoning, companion provisioning and
+paid revival APIs; see the
+[Public API Overview](/mod/alecs-tamework/public-api-overview).
 
 ## Diagnostics and failure handling
 
-Tamework 5.0 has no persistence status, detail or export command. The
-`/tw debug persistence status`, `detail` and `export` subcommands that earlier
-versions offered are no longer registered. Use the server log to diagnose a
-bonded companion problem. For a world updated from 3.x or 4.x, the import
+Tamework 5.0 has no persistence debug commands; `/tw debug persistence` and
+all its subcommands were removed. Use the server log to diagnose a bonded
+companion problem. For a world updated from 3.x or 4.x, the import
 report described in
 [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins)
 lists the bonded companions that were imported.
 
 HyDragon should report its missing capability or bonded availability reason.
-It must not infer readiness from a version string, diagnostic count, live NPC,
-or old generic row.
+It must not infer readiness from a version string, diagnostic count, or live
+NPC.
 
 ## Validation scope
 

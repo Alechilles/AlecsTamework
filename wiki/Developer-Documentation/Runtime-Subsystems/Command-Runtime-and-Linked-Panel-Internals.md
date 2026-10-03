@@ -44,20 +44,22 @@ the existing E/R roots for Update 5 and Update 6.
 - Group flows: `CommandGroupService`, `CommandGroupAssignPageService`, `CommandGroupManagerPageService`
 - Relocation: `CommandRelocationDispatchService`, `CommandNpcRelocationService`,
   `CommandRelocationRetryCoordinator`
-- Canonical status and restoration: `CommandPersistenceView`,
-  `CommandNpcProfileActionResolver`, `CommandCompanionRestorationService`
+- Status and restoration: `CommandPersistenceView` (reads the companion index
+  through `CompanionQueries`), `CommandNpcProfileActionResolver`,
+  `CommandCompanionRestorationService`
 
 ## UI layer
 
-Generic item-linked cards resolve membership from the canonical profile's tool
-links; unresolved legacy records remain visible. Owned and command-family
-roster views retain their own membership rules. A captured item that records
-cleared ownership and its former owner revokes those tool links when a
-different player successfully releases it with owner assignment enabled.
-Release clears both the restored NPC's tool IDs and the durable links in the
-existing release transaction. Capture and failed release leave the links
-intact. The normal panel refresh reads the published membership, so stale item
-records cannot restore a card after transfer or a later recapture.
+Generic item-linked cards resolve membership from the tool IDs on the
+companion's index record; unresolved legacy records remain visible. Owned and
+command-family roster views keep their own membership rules. The owned panel
+lists the companions the index records for the viewer
+(`CommandOwnedPanelRecordSource`), so a card follows the record's current owner
+when a captured companion changes hands. Releasing a companion to the wild
+clears its tool links. Capture and a failed release leave them intact. The
+panel refresh reads the index, so stale item records cannot restore a card after
+a transfer or a later recapture. Bonded companions never appear in ordinary
+panels, and command-family roster members are read-only there.
 
 - `TameworkCommandSelectionPage`
 - `TameworkCommandGroupManagerPage`
@@ -87,7 +89,7 @@ document contains no literal guide text.
 ## Persistence model
 Ordinary `ItemMetadata` command tools persist their per-item selection records and
 panel preferences on the physical item. The owned panel discovers all owned
-companions from the player's profile projection, then uses those records only to
+companions from the companion index, then uses the flute's records only to
 decide which rows are selected for that flute. A selected row is eligible for
 dispatch only after the held item's owner, tame, role, command, and capacity checks.
 Named view definitions live in the player's saved `TameworkCompanionViewsComponent`,
@@ -103,33 +105,31 @@ before slicing, and hydrates details only for the selected page. Select all matc
 fresh owned entries, revalidates each candidate, and applies the flute's existing capacity.
 No generic or bonded lifecycle storage is added.
 
-Legacy link records remain readable and preserve their existing active flags during
-migration; a record may also carry the stable profile ID so an old entity UUID can
-be canonicalized.
+Legacy link records remain readable and keep their existing active flags; a record
+may also carry the stable profile ID. A link that names an old body UUID from a
+3.x or 4.x world resolves to its companion through `legacy-aliases.json`.
 Live owned companions awaiting profile discovery also read their selected state
 from the current flute's records, so newly tamed animals show selection immediately.
-Managed admin-spawned companions use the ordinary command path; their admin-spawn
-projection marker does not exclude them from owned panels or generic commands.
+Managed admin-spawned companions use the ordinary command path and appear in owned
+panels like any other companion.
 Player-owned group definitions and multi-membership assignments live in
 `TameworkCompanionGroupsComponent`, shared by compatible ordinary flutes. Group
 selection is a one-time mutation of the current flute's per-item records; browsing
 the group or changing its memberships does not become a new persistence authority.
-Owner/command-family rosters instead persist membership and summon state in the
-replacement store; command items are interfaces to that durable roster rather
-than its authority.
+Owner/command-family rosters keep membership and summon state on the companion
+records (`STORED` with reason `ROSTER`, plus the roster ID and slot); command
+items are interfaces to that roster rather than its authority.
 
-The replacement profile projection is the authority for lifecycle status,
-canonical name, and restorable state. Entity UUIDs are replaceable aliases:
-historical UUIDs resolve back to the same profile before relocation,
-restoration, or spawn decisions.
+The companion index record is the authority for location, name, and restorable
+state. An entity UUID is only the current body's ID: a UUID the record no longer
+names resolves back to the same profile before relocation, restoration, or spawn
+decisions.
 
-Offline command cards read saved full-state snapshots and exact entity checkpoints
-through the existing persistence queries. A bounded read-only cache retains at most
-256 profiles and admits at most 16 reads at once. Profile updates invalidate cached
-values; unchanged results expire after one minute and unavailable results retry after
-ten seconds. Completion signals refresh subscribed owner menus through the existing
-world-thread dispatcher. The command feature handler closes the cache and subscriptions
-at shutdown. Saved card values never authorize a live action or mutate persistence.
+Cards for unloaded companions read the record's in-memory presentation summary
+(health, needs, happiness, breeding and harvest timers, level, XP, traits, life
+stage). They read no files, decode no snapshot, and need no cache or refresh
+signal. Loaded companions read their live components. Saved card values never
+authorize a live action or change a record.
 
 ## Important runtime seams
 - Standard command pages own a world-thread-local pagination state. The server setting
@@ -157,13 +157,13 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   card build, so later component or configuration changes are read normally. Hidden
   location controls receive no child updates until visible, and ordinary level
   buttons no longer create or update unused ring widgets.
-- Each ordinary panel refresh shares one profile projection snapshot, one managed-profile
-  snapshot, and one decoded flute-record list across owned/captured records, row identities,
+- Each ordinary panel refresh shares one read of the owner's index records, one
+  managed-profile snapshot, and one decoded flute-record list across owned/captured records, row identities,
   and protected controls. Canonical tool membership determines selection without building
   the linked cards first. These display snapshots live only for the current refresh;
   command actions still resolve fresh authority.
 - Live owned discovery uses the existing owner/world index, including newly tamed NPCs
-  awaiting profile publication. The menu resolves those UUIDs on the viewer's world thread
+  whose record was just created. The menu resolves those UUIDs on the viewer's world thread
   and rechecks current ownership and generic-target eligibility. Nearby mode uses the
   engine spatial index with the same exact distance and role checks. Neither path scans
   every loaded world entity on each menu refresh. Entity/owner events maintain the owner
@@ -173,12 +173,11 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   Distant roles do not invoke family resolution. Each card shares its happiness result
   between the meter and explanation. The querying animal's breeding config, config
   reload invalidation, and snapshot lifetime are unchanged.
-- Saved-card extension queries select the companion and namespace directly in the
-  existing synchronous projection. They do not scan other companions' extensions;
-  revision checks, deletion, and canonical rebuilds still own projection updates.
+- Saved-card extension queries read one companion's namespace directly from its
+  index record. They do not scan other companions' extensions.
 - Countdown-only wakes update timer presentation from the current page snapshot. State
   mutations, progression polling, safety wakes, and timer expiration still request fresh
-  data. Countdown presentation never enables an action or changes canonical lifecycle.
+  data. Countdown presentation never enables an action or changes a record.
 - Standard panel refreshes reuse their entry snapshot for group-selection controls.
   Text-filtered cards and unfiltered selection rows come from one entry build, so
   searching the list does not change the group-selection summary. Row decoration
@@ -191,24 +190,27 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
 - Selected rows sort before unselected rows for every supported sort.
 - Nearby and legacy linked modes remain separate entry sources where those modes are
   still exposed.
-- The canonical lifecycle alone determines active, unloaded, captured, cooped,
-  roster-stored, provisioned-dormant, dead, Lost, released, or unresolved
-  status. Command-item display caches cannot override it.
-- Death and Lost restoration require the matching canonical lifecycle plus its
-  persisted snapshot and companion policy.
-- Ordinary unloaded presentation resolves the latest live state snapshot, then
-  durable profile metadata, before the older display name cached on the command
-  item.
-- Legacy item-metadata link restoration remains free. Dead and Lost
-  owner/command-family roster entries use the exact server-authoritative paid
-  revival quote. Neither path may create a second live alias.
-- Relocation retry exhaustion removes the pending relocation and reports a
-  warning. It does not create `LOST`; only positive destructive-removal
-  evidence can author that lifecycle.
-- Explicit Recall can continue automatically after checkpoint recovery loads
-  the source entity. Recovery logs identify that retry; the drop warning alone
-  does not mean Recall has finished. Linked and Owned cards retain their recall
+- The record's location kind (`LocationKind`: `LIVE`, `ITEM`, `COOP`,
+  `STORED`, `DEAD`, `LOST`, `RELEASED`) alone determines the card status; a
+  `LIVE` record shows as loaded or unloaded from the runtime loaded-body map.
+  Command-item display caches cannot override it.
+- `CommandCompanionRestorationService` backs **Revive** (`DEAD`) and
+  **Recover** (`LOST`, or `LIVE` with no loaded body). Both restore from the
+  saved snapshot through `RestoreFlow`, which raises the generation, so a stale
+  body or item copy is refused afterwards. A revive with an item cost takes the
+  exact items first and refunds them on any result other than restored.
+- Ordinary unloaded presentation reads the record's summary and display name
+  before the older display name cached on the command item.
+- Recall follows `RecallRoute`: a `LIVE` companion in the player's world is
+  moved (its chunk is loaded first when needed); one in another world is
+  restored near the player from its snapshot. Other locations refuse recall and
+  use their own action. A same-world relocation that runs out before the body
+  appears is restored near the player from its snapshot
+  (`CompanionRestoreRecallSink`). Linked and Owned cards keep their recall
   countdown alongside inline location details while relocation is pending.
+- An imported 3.x/4.x companion that has not been seen since the import is not
+  recalled while its body is unloaded. While the saved-chunk locate pass runs,
+  its card shows the "being located" status and Recall and Recover are refused.
 - Selection and command execution apply the command tool's role and command policy.
   A role or command restriction produces a localized explanation; ownership alone
   does not make a companion eligible for every command tool.
@@ -246,7 +248,7 @@ Sightings retain optional item asset IDs and container block IDs,
 resolved to localized names when displayed. Older cache entries remain readable
 with generic item and container labels.
 
-`CommandLinkedNpcLocateService` reads the canonical profile on demand. Coop addresses
+`CommandLinkedNpcLocateService` reads the companion record on demand. Coop addresses
 come from its `CoopSlotKey`; capture sightings must match the profile and current
 capture snapshot ID. Sightings cannot change ownership, lifecycle, or recovery state.
 Owned-mode authorization permits stored states only for Locate.
@@ -274,7 +276,7 @@ player, block-container, and dropped-item observations are made on the owning wo
 thread; deferred work carries only stable IDs and immutable sightings.
 
 ## Related Pages
-- [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
+- [Companion Store and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
 - [Command and Debug Internals](/mod/alecs-tamework/command-and-debug-internals)
 
 

@@ -10,8 +10,8 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 
 ## What It Controls
 
-`TwPopulationGroupConfig` classifies exact canonical role IDs into a stable,
-namespaced logical group and sets atomic per-owner owned/active limits.
+`TwPopulationGroupConfig` classifies exact role IDs into a stable, namespaced
+logical group and sets per-owner owned and active limits.
 Multiple groups may match one role; admission must satisfy every matching
 group.
 
@@ -28,18 +28,26 @@ group.
 - `Enabled`: disabled assets are inert.
 - `Priority`: winner priority for duplicate logical group IDs.
 - `GroupId`: namespaced identity such as `hydragon:full_dragons`.
-- `RoleIds`: nonempty exact canonical role list. An explicit array replaces
-  the inherited list.
-- `Limits.MaxOwnedPerOwner`: maximum canonical owned profiles; `0` is
+- `RoleIds`: nonempty exact role list. An explicit array replaces the
+  inherited list.
+- `Limits.MaxOwnedPerOwner`: maximum owned companions in the group; `0` is
   unlimited.
-- `Limits.MaxActivePerOwner`: maximum active profiles; `0` is unlimited.
+- `Limits.MaxActivePerOwner`: maximum companions of the group out in the
+  world; `0` is unlimited.
 - `Limits.Scope`: `Global` or `PerWorld`.
 
-Owned limits include canonical profiles across active, unloaded, captured,
-cooped, roster-stored, provisioned-dormant, dead, and Lost states. Active
-limits apply to active projections. Positive admission reserves all affected
-groups atomically, so a companion cannot commit into only part of its
-classification.
+Counts come straight from the companion index; group membership is read from
+the role list at check time, so a config change applies at once. Owned limits
+count every owned companion of the group: out in the world (loaded or not),
+stored in a roster or bonded storage, provisioned, in a capture item, in a coop,
+dead, and lost. Active limits count only companions out in the world, loaded or
+not. An imported companion whose body has not been seen since the update does
+not count as active yet. Released companions count toward neither.
+
+Every matching group is checked in the same locked step that changes the
+companion record, so a companion is never admitted into only part of its
+groups. A change that adds the companion to no new count always passes, even
+for an owner already over a lowered limit.
 
 ## Example
 

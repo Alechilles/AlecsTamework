@@ -67,10 +67,12 @@ What it enables:
 - SimpleClaims-native tamed-target damage policy.
 
 These checks do not create a general claim-population or placement-admission
-system. The ordinary owner cap is a separate durable count of canonical owned
-profiles in its configured global or per-world scope. It includes active,
-unloaded, captured, cooped, roster-stored, provisioned-dormant, dead, and Lost
-companions and uses reservations plus reconciliation to prevent oversubscription.
+system. Tamework's own per-player limits are separate and come from the
+companion index, in their configured global or per-world scope:
+`limitPerPlayerOwnedTotal` counts every owned companion (out in the world,
+stored, in capture items, in coops, dead and lost), and
+`limitPerPlayerDeployedTotal` counts the companions out in the world, loaded or
+not. Both are checked in the same locked step that changes the companion.
 
 Tamework shares reflected SimpleClaims capabilities for the current live
 plugin generation. A stopped or replaced SimpleClaims instance is detected

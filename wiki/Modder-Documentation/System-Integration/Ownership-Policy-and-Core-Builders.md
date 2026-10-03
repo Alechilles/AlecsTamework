@@ -104,14 +104,16 @@ timers, or persistent player state. It does not enforce ownership by itself.
 - Role-specific ownership and command protection belong in `TwCompanionConfig`
 - Item systems should not re-implement their own ownership rules unless the item config explicitly needs a stricter or looser override
 
-`TameworkSetOwner` and Tame check durable owner-population admission before
-assigning a non-null owner. The cap counts canonical owned profiles in the
-configured global/per-world scope and reserves positive capacity within the
-same shared operation. It remains independent from SimpleClaims
-claim-placement policy.
+`TameworkSetOwner` and Tame check the owner's companion limits before
+assigning a non-null owner. The owned limit counts every companion the player
+owns in the configured global or per-world scope, and the deployed limit counts
+those out in the world. The check and the ownership change happen in one locked
+step, so two tames at once cannot both pass a limit. It remains independent from
+SimpleClaims claim-placement policy.
 
-`TameworkOwnerComponent` is authoritative. Clearing or transferring canonical ownership invalidates
-the prior command-link authority, while retained name metadata follows the new canonical owner.
+`TameworkOwnerComponent` is authoritative for a body in the world. Clearing or
+transferring ownership invalidates the prior owner's command links, while
+retained name metadata follows the new owner.
 
 ## Related Pages
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)

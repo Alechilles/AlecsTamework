@@ -33,14 +33,18 @@ Normal capture items do not heal an NPC. Tamework rejects capture if the NPC
 already has a death state or has reached zero health, because releasing that
 terminal snapshot would make the NPC die at once.
 
-Configured capture and spawn particles/sounds are emitted only after the
-canonical persistence operation publishes successfully. A failed or retryable
-operation does not play success feedback.
+Capture and release save the companion record first and change the world
+second. Configured capture and spawn particles and sounds play only after that
+save completes. A failed save leaves the NPC or the item as it was and plays no
+success feedback.
 
 ## Important design choices
-- Whether ownership is cleared on capture
-- Whether ownership is re-assigned on spawn
-- Whether the item is owner-restricted
+- Who owns a captured companion while it is in an item. The server's captured
+  companion ownership mode decides this (`FOLLOWS_ITEM`, `OWNER_ONLY` or
+  `CHANGES_ON_RELEASE`). The old `Capture.ClearsOwner`, `Spawn.AssignsOwner`,
+  `Spawn.OwnerRestricted` and `Spawn.RequireOwner` fields still load but are
+  ignored. See
+  [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference).
 - Whether you want additive or replacement captured-spawner item descriptions
 - Whether icon overrides should reflect captured role or attachments
 
