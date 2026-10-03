@@ -1,7 +1,9 @@
 # ADR 0006: Public Persistence Import Policy
 
-- Status: Accepted and implemented
+- Status: Superseded by ADR 0011 for the 2.x path (Tamework 5.0.0)
 - Date: 2026-07-23
+
+> Historical: 5.0.0 no longer imports 2.x saves, and the replacement database this ADR imports into is gone. 5.0 imports 3.x and 4.x saves into the companion store; see [ADR 0011](0011-companion-index-persistence.md).
 
 ## Decision
 

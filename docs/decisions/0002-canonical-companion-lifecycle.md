@@ -1,7 +1,9 @@
 # ADR 0002: Canonical Companion Lifecycle Vocabulary
 
-- Status: Accepted and implemented
+- Status: Superseded by ADR 0011 (Tamework 5.0.0)
 - Date: 2026-07-23
+
+> Historical: this ADR describes the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](0011-companion-index-persistence.md).
 
 ## Decision
 

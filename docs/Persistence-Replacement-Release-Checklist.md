@@ -1,5 +1,7 @@
 # Persistence Replacement Release Checklist
 
+> Historical: this checklist covers the SQLite runtime that Tamework 5.0.0 removed. See [ADR 0011](decisions/0011-companion-index-persistence.md).
+
 > **Historical 3.0.0 checklist:** This document preserves the candidate and
 > acceptance notes from the first replacement-persistence release. It is not
 > the release gate for 4.0.0. Unchecked items below retain their recorded status;

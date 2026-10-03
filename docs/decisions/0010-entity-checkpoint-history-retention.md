@@ -1,7 +1,9 @@
 # ADR 0010: Entity checkpoint history retention
 
-- Status: Accepted
+- Status: Superseded by ADR 0011 (Tamework 5.0.0)
 - Date: 2026-09-16
+
+> Historical: this ADR describes the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](0011-companion-index-persistence.md).
 
 ## Problem
 

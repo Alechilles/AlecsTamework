@@ -1,10 +1,11 @@
 # ADR 0011: Companion Index Persistence
 
-- Status: Accepted; implementation in progress on `refactor/persistence-rework`
+- Status: Accepted; implemented in 5.0.0
 - Date: 2026-09-30
-- Supersedes: ADRs 0001, 0002, 0003, 0007, 0008 and 0010 when the rework ships (Tamework 5.0.0)
+- Supersedes: ADRs 0001, 0002, 0003, 0005, 0007, 0008 and 0010 (Tamework 5.0.0)
 - Supersedes: ADR 0006 (public persistence import policy) for the 2.x path. 5.0 does not read
   2.x SQLite or DAT sources; those worlds run 4.3.x once first.
+- Supersedes: the storage part of ADR 0009. Provider claims live on the companion record.
 
 ## Context
 
@@ -43,13 +44,24 @@ The full design, evidence and review record are in the external spec
   a crash in the same second. This is accepted.
 - The 2.x import path is removed. Those saves get a localized
   "run 4.3.x first" notice.
+- The `/tw debug persistence` commands (status, health, detail, export,
+  reviveready, compact, simulateerror) are removed with the old runtime.
+  Server logs, the import report and the Diagnostics API replace them.
 
 ## Migration
 
 5.0 imports a 3.x or 4.x world by itself at the first start. The import only
 reads the old databases, writes the new store all or nothing, and leaves a
 report file and a receipt in `meta.json`. A world that cannot be converted can
-start empty with `/tw persistence start-fresh`. A later release removes the
+start empty with `/tw persistence start-fresh`.
+
+4.x did not save where a companion in an unloaded chunk was. After the import,
+a background locate pass (`companion/migrate/LegacyBodyLocator`) reads each
+world's saved chunks on one low-priority thread to find those bodies. It saves
+its progress in `locate-progress.json` and resumes after a restart. Companions
+it cannot find in any saved chunk become `LOST` and can be recovered.
+
+A later release removes the
 importer; after that, 3.x and 4.x worlds must run 5.0.x once. The operator
 guide is the wiki page
 [World Migration for Server Admins](../../wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md).

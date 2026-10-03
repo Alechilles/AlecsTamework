@@ -9,8 +9,9 @@ Spawner runtime is split into an orchestrator plus focused services:
 - Policy + validation: `SpawnerCapturePolicyService`, `SpawnerRolePolicyService`, `SpawnerOwnershipPolicyService`
 - Metadata + identity/state: `SpawnerCaptureMetadataService`, `SpawnerNpcIdentityService`, `SpawnerNpcStateService`, `SpawnerItemStackMetadataService`
 - Placement/effects/inventory: `SpawnerSpawnPositionService`, `SpawnerEffectService`, `SpawnerPlayerInventoryService`
-- Source-item finalization: `SpawnerCaptureFinalizerService`, `SpawnerSourceItemTransaction`
-- Canonical persistence: `SpawnerCaptureAuthor`, `SpawnerCapturedArtifactReleaseAuthor`
+- Source-item finalization: `SpawnerSourceItemTransaction`
+- Companion persistence: `CaptureFlow`, `ReleaseFlow`, and `CaptureItemFlows`
+  under `companion/flow` and `companion/item`
 
 When extending spawner behavior, add logic to these service domains instead of centralizing it in the orchestrator.
 
@@ -111,18 +112,16 @@ tamed roles, resolved bonded family, capacity, capture policy, distance,
 required effect, and exact config generation before rolling or spending the
 source. On success it:
 
-1. freezes the complete NPC snapshot and capture evidence;
-2. durably creates one `STORED` bonded profile in the separate bonded database;
-3. records the original source NPC identity so replay cannot create another
-   profile;
-4. queues/removes that exact source NPC through bounded cleanup;
-5. finalizes source-item consumption according to `SourceConsumption`; and
-6. emits the completion feedback once.
+1. takes the complete NPC snapshot and capture evidence;
+2. commits one `STORED` bonded record on the companion index, with the
+   original source NPC identity as capture evidence;
+3. removes that exact source NPC;
+4. finalizes source-item consumption according to `SourceConsumption`; and
+5. emits the completion feedback once.
 
-The durable profile commit happens before source retirement. The operation
-does not create a filled spawner, generic profile, command-family membership,
-population-group record, timed-summon lease, or generic outbox operation.
-Retrying the same attempt uses its original idempotency/capture evidence.
+The index commit happens before the source NPC is removed. The capture does
+not create a filled spawner or a command-family membership. The bonded record
+counts toward the owner's owned limit.
 
 When `TamesTarget` is enabled, every eligible source role must have a
 `TamedRoleOverrides` target role. The target role must select exactly one
@@ -193,40 +192,27 @@ release. The old `captureClearsOwner` and `SpawnSetsOwner` values in
 A missing old value counts as `true`. With neither present the mode is
 `FOLLOWS_ITEM`. Saving `/tw settings` writes the mode and drops the old values.
 
-Releasing a filled spawner recreates the stored NPC through the canonical
-captured-spawner release operation and consumes the filled item only after the
-release succeeds. Ordinary use follows that shared release path. A supported
-managed-coop interaction can instead admit an eligible canonical filled item
-directly; it retires the item only after durable coop residency publishes.
+Releasing a filled spawner respawns the stored NPC from its saved snapshot
+(`ReleaseFlow`) and empties the item only after the release succeeds. A filled
+item carries the companion's profile id and generation. Each release or
+recapture raises the generation, so a duplicated or stale copy of the item is
+refused and emptied when it is used. A supported coop interaction can instead
+move a filled item directly into a coop slot.
 
-An exact v2.16.1 filled item can also repair the known 3.0.0-3.0.2 migration
-case where its canonical profile was left `UNLOADED` while the capture-v1
-snapshot survived only as history. Recovery runs when that item is used; it
-reads the existing schema-1 target directly and does not rerun import. It is
-refused if the source UUID is loaded, ownership or role conflicts, capture
-history is ambiguous, or the profile has moved beyond the initial imported
-state.
+A destroyed or despawned filled item makes its companion `LOST`; the owner can
+recover it from the linked panel.
 
-The same migration-only fallback covers the rarer v2.16.1 case where import
-created no companion row at all and the filled item is the only surviving
-capture record. It requires a durable supported-public-import manifest, an
-exact released-public item with its source UUID and captured role, no matching
-profile, alias, or snapshot, and authoritative absence of the source UUID from
-loaded worlds. The release transaction creates the missing initial captured
-profile and immediately releases it. The import manifest persists when later
-startups report `targetOrigin=EXISTING`; a native 3.x world without that
-manifest cannot create a companion through this fallback.
+Capture items written by older versions still work (`LegacyItemAdoption`):
 
-The same operation also handles a complete newer 3.x filled item when a
-restored database still holds an older exact `CAPTURED` snapshot for that same
-profile. Both the item-claimed UUID and the older canonical UUID must be absent
-from loaded worlds; conflicting profiles or non-captured lifecycle states are
-left unchanged.
+- A 4.x item releases its imported companion once; copies are refused.
+- A 2.x item that was never rewritten restores its companion from the item's
+  own data on first use; copies are refused.
+- A tamed companion with no owner in an imported item becomes the releaser's,
+  within their limits.
 
 Configured capture/spawn particles and sounds are success feedback. Tamework
-freezes their asset IDs and position with the operation intent, then emits them
-only after the canonical operation publishes. A rejected, retryable, or failed
-operation does not play success effects.
+commits the index first and plays them only after the capture or release
+succeeds. A refused or failed capture or release plays no success effects.
 
 For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 

@@ -4,8 +4,9 @@ Status: manual acceptance pending
 
 Use this checklist only after both clean builds, manifest/dependency checks,
 packaged-asset checks, local installation, and installed-jar hash verification
-pass. Test in a fresh world; migration from unreleased tester persistence is
-not part of this feature.
+pass. Test in a fresh world. Tamework 5.0 keeps bonded companions as records
+on the shared companion index (ADR 0011); a 4.x world's bonded companions are
+covered by the import, not by this checklist.
 
 Run one numbered pass at a time. The implementing agent must stop before
 waiting for the tester and state the one requested action, expected visible
@@ -47,22 +48,21 @@ Failure collection: the server log from the session.
 ## 2. Summon from the Horn
 
 - [ ] Summon from the Horn. Verify full card details and correct buttons
-  immediately, one active projection, correct commands, and no generic
-  persistence-evidence error.
+  immediately, one live body, correct commands, and no generic error.
 
 Expected visible result:
 
 - exactly one matching dragon appears at a safe player-relative placement;
 - the card becomes `ACTIVE` and shows Dismiss plus complete details immediately;
 - Follow/Hold/other configured Horn commands affect that exact dragon; and
-- no "persistence evidence isn't ready" or "NPC is not linked" message appears.
+- no "NPC is not linked" message appears.
 
 Failure collection: the server log from the session.
 
 ## 3. Dismiss/store
 
 - [ ] Dismiss/store. Verify the complete snapshot persists, card becomes
-  stored, and no live projection remains.
+  stored, and no live body remains.
 
 Expected visible result:
 
@@ -84,49 +84,50 @@ Expected visible result:
 - family `MaximumActive` is enforced without consuming another family's slot;
 - the recently stored profile cannot bypass its family cooldown;
 - an eligible different profile summons only when the family has capacity; and
-- denied clicks do not create a projection, duplicate lease, or generic error.
+- denied clicks do not spawn a body, a second active copy, or a generic error.
 
 Failure collection: the server log from the session.
 
 ## 5. Death and paid revival
 
-- [ ] Kill an active bonded dragon. Verify `DEAD`, revive pricing, no automatic
-  summon after revive, then successful manual summon.
+- [ ] Kill an active bonded dragon. Verify `DEAD`, revive pricing, and that a
+  paid revive brings the dragon back active.
 
 Expected visible result:
 
 - confirmed death changes the same card to `DEAD`;
 - the confirmation shows every exact cost line and owned/required quantity;
 - insufficient payment charges nothing;
-- successful payment consumes the complete recipe once and changes the card to
-  `STORED`;
-- no NPC appears until Summon is clicked; and
-- manual summon creates one projection of the revived profile.
+- with the family at its active limit, revive is refused and charges nothing;
+- successful payment consumes the complete recipe once, and one body of the
+  revived dragon appears at the chosen place with the card `ACTIVE` and a new
+  session timer; and
+- a revive that fails after payment returns the payment.
 
 Failure collection: the server log from the session.
 
 ## 6. Finite and unlimited sessions
 
 - [ ] Test a finite-session policy and a zero-duration policy. Verify
-  expiration stores the projection and zero duration never expires.
+  expiration stores the companion and zero duration never expires.
 
 Expected visible result:
 
-- the finite lease expires once, retires its NPC, stores its complete snapshot,
-  and begins the configured cooldown;
-- the zero-duration lease remains active past the finite test window; and
+- the finite session expires once, removes its NPC, stores its complete
+  snapshot, and begins the configured cooldown;
+- the zero-duration session remains active past the finite test window; and
 - signed world-time values do not make either timer immediately invalid.
 
 Failure collection: the server log from the session.
 
 ## 7. Relog and world transfer
 
-- [ ] Leave/rejoin and transfer worlds with an active projection. Verify it
+- [ ] Leave/rejoin and transfer worlds with an active companion. Verify it
   becomes stored and never lost/unloaded.
 
 Expected visible result:
 
-- logout/rejoin stores the active profile and removes/cleans the projection;
+- logout/rejoin stores the active companion and removes its body;
 - leaving one world and entering another stores it instead of copying it; and
 - the Horn shows `STORED` with full details, never Lost or Unloaded.
 
@@ -146,7 +147,7 @@ Expected visible result:
 - its family-specific timer/cooldown/capacity and revive recipe apply;
 - archetype, attunement, ability, and progression extension fields survive
   summon, store, and relog; and
-- death produces `DEAD`, revival produces `STORED`, and summon is manual.
+- death produces `DEAD`, and a paid revive brings it back `ACTIVE`.
 
 Failure collection: the server log from the session.
 
@@ -158,8 +159,8 @@ Failure collection: the server log from the session.
 
 Expected visible result:
 
-- a profile in family `hydragon:full_dragons` with state `ACTIVE` and a valid
-  lease qualifies;
+- a profile in family `hydragon:full_dragons` with state `ACTIVE` and one live
+  body qualifies;
 - stored and dead full dragons do not qualify;
 - an active Miniwyvern does not qualify; and
 - stale NPCs or old generic population evidence do not qualify.

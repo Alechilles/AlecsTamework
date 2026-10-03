@@ -23,10 +23,10 @@ Command runtime is split to keep the orchestrator thin:
 - Orchestrator: `CommandItemFeatureHandler`
 - Resolution/selection: `CommandResolutionService`, `CommandRecipientService`
 - Item link metadata/mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`
-- Canonical status and identity: `CommandPersistenceView`, `CommandNpcIdentityService`, `CommandNpcProfileActionResolver`
+- Status and identity: `CommandPersistenceView`, `CommandNpcIdentityService`, `CommandNpcProfileActionResolver`
 - Step execution + move/home behavior: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Off-screen relocation + restoration: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandCompanionRestorationService`
-- Live/dormant snapshot assembly: `CommandLiveNpcSnapshotFactory`, `CommandLinkedNpcStateSnapshotService`
+- Live and saved snapshot assembly: `CommandLiveNpcSnapshotFactory`, `CommandLinkedNpcStateSnapshotService`
 - Panel entry assembly/filter/sort: `CommandLinkedPanelEntryService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
 - Group metadata + group manager actions: `CommandGroupService`, `CommandGroupManagerPageService`
 - Player feedback: `CommandFeedbackService`
@@ -37,7 +37,7 @@ Command runtime is split to keep the orchestrator thin:
 
 The bonded collaborators are a delegated subsystem. They do not add bonded
 state branches to generic command-roster persistence or use item metadata as
-canonical roster storage.
+roster storage.
 
 ## Asset and item wiring
 - Assets: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
@@ -203,7 +203,7 @@ player-ready Tamework reward or silently depend on players finding it.
 - `ItemMetadata`: per-item selection records, with the owned companion list resolved
   from the player's profiles;
 - `OwnerCommandFamily`: the owner's durable generic command-family roster; or
-- `BondedCompanions`: the separate bonded profile-and-lease authority.
+- `BondedCompanions`: bonded companion records on the companion index.
 
 A bonded command config must declare an existing namespaced `BondedRosterId`.
 It must not declare `CommandFamilyId` or
@@ -215,20 +215,21 @@ feature switches.
 
 The bonded item is an access and command surface, not companion storage. Its
 cards are keyed by stable bonded profile IDs. Copies of the same access item do
-not fork profiles, leases, or state.
+not fork profiles or state.
 
 ## Recipient selection and linking
 
 Command items using `RosterStorage: BondedCompanions` have a separate recipient
-authority. A command resolves only `ACTIVE` profiles owned by the player in the
-configured `BondedRosterId` whose current-world live UUID, profile ID, and lease
-token exactly match the NPC's bonded projection marker. Stored, dead, expired,
-other-world, duplicate, or stale projections are not command recipients.
+path (`BondedCompanionCommandRecipientSource`). A command resolves only `ACTIVE`
+profiles owned by the player in the configured `BondedRosterId` whose live body
+is in the player's current world and carries the profile ID and the record's
+current generation. Stored, dead, expired, other-world, duplicate, or stale
+bodies are not command recipients. Generic command items refuse bonded bodies.
 
-Bonded commands never create generic NPC links, reconcile or project linked rows
-onto the item, or queue generic unloaded/cross-world relocation. Summon, dismiss,
-and revive remain profile-keyed panel actions. Normal commands still operate on
-an exact loaded projection, and live command state such as a stored home position
+Bonded commands never create generic NPC links, write linked rows onto the
+item, or queue generic unloaded relocation. Summon, dismiss, and revive remain
+profile-keyed panel actions. Normal commands still operate on the exact loaded
+body, and live command state such as a stored home position
 travels with the bonded full snapshot. These rules do not change recipient behavior
 for `OwnerCommandFamily` command items. For ordinary `ItemMetadata` flutes, ownership
 discovers the panel rows and the item's active records determine which rows receive
@@ -239,15 +240,17 @@ Bonded profiles expose exactly three panel states:
 - `STORED`: show Summon only when policy, cooldown, capacity, and current world
   context permit it;
 - `ACTIVE`: show Dismiss/Store and dispatch normal commands only to the exact
-  current projection; and
+  current body; and
 - `DEAD`: show the complete paid-revive quote when revival is enabled.
 
-Revive returns the card to `STORED`; it never automatically summons. Logout,
-world transfer, expiry, missing-projection recovery, and duplicate cleanup also
-converge to `STORED`. Bonded cards never display generic `UNLOADED`, `LOST`,
-`CAPTURED`, `COOPED`, or `ROSTER_STORED` aliases.
+Revive brings the companion back `ACTIVE` at the chosen place and needs a free
+active slot in its family. The price is charged first and refunded if the
+revive fails. Logout, world change, and session expiry store the companion. A
+bonded companion whose body is lost lists as `STORED` and can be summoned again.
+Bonded cards never display generic `UNLOADED`, `LOST`, `CAPTURED`, or `COOPED`
+states.
 
-Every bonded summon gives the new live projection full health. Captured or
+Every bonded summon gives the new live body full health. Captured or
 stored health can describe the durable card while the companion is stored, but
 it does not reduce health on the next live summon.
 
@@ -265,7 +268,7 @@ it does not reduce health on the next live summon.
 
 Link metadata includes:
 - NPC uuid
-- stable profile id when the companion has entered canonical persistence
+- stable profile id
 - last-known position
 - optional home position
 - fallback display/name key/role stored on the item
@@ -277,31 +280,33 @@ Inactive linked rows stay visible in the panel, can still use per-row actions, a
 excluded from bulk dispatch. For an ordinary `ItemMetadata` flute, an inactive row is
 the same companion still owned by the player but deselected on that flute.
 
-Entity UUIDs are projection aliases, not the companion's durable identity. When a stable profile is known, command records and recovery flows resolve historical UUIDs through that profile and deduplicate by profile. Unresolved legacy records continue to fall back to UUID until they can be bound safely; ambiguous bindings fail closed instead of spawning a replacement.
+Entity UUIDs change when a companion respawns; they are not the companion's durable identity. Command records and recovery flows resolve historical UUIDs through the stable profile and deduplicate by profile. Imported links that still name an old body UUID resolve through the import's legacy aliases; ambiguous bindings fail closed instead of spawning a replacement.
 
 For online players, command-item copies in the hotbar, storage, and backpack are lazily canonicalized when the player enters a world and whenever a linked command item moves through those inventory compartments. Offline inventories are not rewritten directly; their records remain safe through profile-first resolution and are normalized on the next load or use.
 
 When a player tames a supported NPC, ordinary `ItemMetadata` flutes discover it through
 the owned roster and do not need a separate link. Left-click selection adds the NPC to
 that flute's per-item recipients after the normal owner, tame, role, and capacity checks.
-Owner/command-family and bonded rosters retain their own membership and lease rules.
+Owner/command-family and bonded rosters retain their own membership rules.
 
 When a linked companion is placed in a compatible handheld capture item, its
 linked-panel row remains available and reports `CAPTURED` as soon as capture
-commits, including when capture clears live ownership. Releasing it as the
-same owner restores its command links and remaps the panel record to the new
-live entity UUID without changing the stable profile. If another player
-releases the item and acquires ownership, the successful release removes the
-former owner's command links. Their card disappears on the next panel refresh
-and stays removed if the new owner captures the companion again. Trading the
-item alone, or a failed release, does not remove the captured card. Items
-without saved evidence of the cleared owner retain their existing links.
+commits. A companion in a capture item always keeps an owner. Releasing it as
+the same owner restores its command links and remaps the panel record to the
+new live entity UUID without changing the stable profile. When ownership moves
+to another player (by the server's captured companion ownership setting:
+follows the item by default, owner only, or changes on release), the former
+owner's command links are removed and their card disappears on the next panel
+refresh. The panel offers Recall and Forget for captured companions; after
+either, the stale capture item empties itself.
 
 ### Owned panel mode
 
-The generic panel now uses one owned-companion list. It reads the existing profile
-projection by owner and supplements it with loaded owned NPCs, including animals with
-no item records. It does not apply the flute's role filter or a radius limit when
+The generic panel now uses one owned-companion list
+(`CommandOwnedPanelRecordSource`). It reads the owner's records from the
+companion index: live components for loaded companions and index summaries for
+the rest, including animals with no item records. Bonded companions are not
+listed; their bonded roster panel owns them. It does not apply the flute's role filter or a radius limit when
 building the list; compatibility is shown on each card and checked when a selection
 or command is applied. Saved unloaded and other-world animals remain visible.
 `In World`, `Stored`, `Lost / Dead`, and `All` tabs filter that list, with selected
@@ -318,10 +323,8 @@ link/storage requirements. Captured and cooped animals must leave their storage
 lifecycle first.
 Managed command-roster companions remain read-only through generic command items;
 their roster controls own removal.
-Terminal removal checks the target profile's authority and pending claims rather
-than requesting owner capacity. An owner-level quarantine caused by another animal
-does not block this cleanup; the target's own quarantine or unfinished operation
-still does. Existing saved owner-scoped removals retain their original scopes on replay.
+Release checks only the target companion's record; it does not request owner
+capacity.
 
 Owned discovery runs inside the existing open-panel refresh on the owning world
 thread. Each pass reads immutable profile data and scans the current world's
@@ -469,13 +472,14 @@ Linked panel supports:
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment dropdown per row, with a group-colored border
 - Group manager flow (create/rename/recolor/delete)
-- Status lanes for loaded, unloaded, captured, cooped, roster-stored,
-  provisioned-dormant, dead, and Lost companions; ordinary unloaded rows keep
-  the latest custom display name from the live snapshot or durable profile,
-  including across restart. Saved health, needs, traits, progression, and applicable
+- Status lanes for loaded, unloaded, captured, cooped, stored, dead, and Lost
+  companions, from the record's location on the companion index; ordinary
+  unloaded rows keep the latest custom display name from the live snapshot or
+  the index summary, including across restart. Imported companions not yet
+  found after the update show "Being located after the update". Saved health, needs, traits, progression, and applicable
   breeding/harvest indicators remain visible with muted last-known values.
   Missing saved timing is marked unknown; live-only actions remain unavailable.
-- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In the generic companion tabs, the red X opens `Release`, plus `Cull` for a loaded, living animal. The selection toggle leaves an animal out of commands without releasing it. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
+- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Revive` for dead and `Recover` for Lost companions (when enabled/ready), and `Forget` for captured companions. In the generic companion tabs, the red X opens `Release`, plus `Cull` for a loaded, living animal. The selection toggle leaves an animal out of commands without releasing it. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
 - Action icons reuse two normal/hover frame textures and sixteen separate glyphs. Flight, shoulder, and breeding toggles show their current state. Larger cards keep passive traits separate and display needs plus applicable cooldowns as horizontal meters.
 - Loaded normal linked rows whose role enables `FlightToggle` show the same
   ground/flight icon button as bonded roster cards. The action is available
@@ -486,12 +490,15 @@ Linked panel supports:
   and limit, with `Summon` and `Dismiss` actions where valid.
 - Dead and Lost owner/command-family roster rows use the server-authoritative
   paid revival quote. The confirmation lists every exact cost component and
-  owned/required quantity; the replacement paid-revival API performs the
-  mutation. Legacy item-metadata links retain their existing free restoration
-  behavior.
+  owned/required quantity. The payment is charged first and refunded if the
+  revive fails. Item-metadata links keep their free restoration behavior.
+- Owners can spend and reset talent points for unloaded dead and Lost ordinary
+  companions from the saved snapshot, through the panel talent button or the
+  command UI. Purchases carry through revive and recover. This does not apply
+  to bonded or roster companions.
 - Bonded roster rows use their own profile-first view. They show complete
   durable details immediately after capture, summon, store, revive, and relog;
-  a live projection is optional enrichment, not the source of the card.
+  a live body is optional enrichment, not the source of the card.
 - Bonded rows use the dedicated final companion card: state accents distinguish
   `IN WORLD`, `STORED`, `DEAD`, and revive-ready states; health is always
   shown from the durable snapshot; a thin XP strip sits above the health bar
@@ -507,16 +514,14 @@ Linked panel supports:
   owned/required quantities, while the existing confirmation overlay remains
   the payment authority.
 - A bonded roster may set `SummonAuraEffectId` to an optional `EntityEffect`.
-  Tamework applies it only after a newly created projection is confirmed; it is
+  Tamework applies it only after a newly created body is confirmed; it is
   cosmetic and never changes the durable summon result.
 - The red unlink control is a two-click permanent abandonment confirmation.
-  It deletes the complete bonded profile and its retained extensions. An active
-  companion is only deleted after its exact live projection has been removed in
-  the current world; if that removal cannot be confirmed, the profile remains
-  intact.
-- Bonded revival quotes every configured cost line and reserves the complete
-  recipe atomically. A successful revive produces a stored card and no live
-  projection.
+  It releases the bonded companion and drops its retained extensions; a loaded
+  body is removed.
+- Bonded revival quotes every configured cost line and charges the complete
+  recipe once. A successful revive brings the companion back active at the
+  chosen place; a failed revive refunds the payment.
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying
 
@@ -538,86 +543,68 @@ Loaded flow:
   standard storage block, or dropped item. Offline/unloaded holders are marked last seen.
   Unknown item locations do not imply death or destruction. No periodic inventory or world scan runs.
 - A linked panel can remain open across a world or generated-instance transfer. Its Recall and Return Home actions resolve the player's current entity/store from the stable player reference at click time, rather than reusing the source-world entity reference captured when the panel opened.
-- Per-row movement actions validate and repair only the selected companion's canonical profile metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
+- Per-row movement actions validate and repair only the selected companion's link metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
 - Successful loaded Hold, Recall, and Return Home commands publish the state actually applied to the NPC into linked-item metadata. Cross-world following also rechecks the live source NPC against the configured state filter, so stored item metadata alone cannot authorize travel.
 
 Unloaded flow:
-- Relocation commands enqueue pending relocations by NPC uuid.
+- Recall reaches only companions whose record is `LIVE` (`RecallRoute`). One in
+  the player's world is moved, loading its chunk first when it is unloaded. One
+  in another world is restored from its snapshot near the player at the next
+  generation, so any old body left there is stale and removed when it loads.
+  Dead, Lost, stored, and other companions use their own Revive, Recover, or
+  release actions.
+- An imported companion whose body has not been seen since the update is not
+  recalled while its body is unloaded. While the locate pass runs, the player is
+  told it is still being located; otherwise the player is told to visit it first.
+- Same-world relocations enqueue pending relocations by NPC uuid.
 - Destination chunks and exact cubic source entity sections are requested
   asynchronously. Source probes do not generate a missing section.
 - Every loaded source or destination chunk is retained for the lifetime of the pending relocation and released on success, timeout, replacement, cancellation, or shutdown.
 - The source NPC is resolved after its chunk loads and checked against its
-  canonical profile and current alias before any move is applied.
-- Canonical roster entries retain the world-qualified home as a durable source
-  hint, so restart does not make Recall request home coordinates in the
-  destination world.
+  stable profile and current body before any move is applied.
+- Roster entries retain the world-qualified home as a durable source hint, so
+  restart does not make Recall request home coordinates in the destination
+  world.
 - Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
 - Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
-- A persistence preflight denial reports its status-specific availability
-  message and leaves the last canonical state intact.
 - On-load relocation resumes through `CommandNpcRelocationOnLoadSystem` after
   the saved source entity becomes available.
 - A relocation that attempted its physical move but remains temporarily
-  unobservable stays `UNLOADED`, not `LOST`. Observing the destination
-  projection restores normal loaded status.
-- If an explicit Recall exhausts every read-only source probe before any
-  physical move, Tamework creates a fenced Lost snapshot from the current
-  durable profile and retires the missing alias. The entry then offers normal
-  Respawn. Role, owner, name, tame state, home, and command links are retained;
-  live-only state that was never persisted uses normal defaults.
-- When available, a public `v2.16.1` recovery snapshot is preferred because it
-  retains more complete state. The importer
-  released coop row retained a complete owner-bound snapshot. The importer
-  normalizes that snapshot to the released current alias. If the companion was
-  absent during its first startup reconciliation and an explicit Recall later
-  exhausts every lookup before any physical move, Tamework consumes that exact
-  one-use artifact and changes the entry to `LOST`, where normal Revive is
-  available. Later lifecycle revisions, malformed or ownerless snapshots,
-  Return Home, and unconfirmed physical transfers cannot use this recovery.
-- An older replacement database can contain profiles quarantined by stale
-  capture, death, Lost, or coop flags from the public database. On startup,
-  Tamework repairs each unchanged profile in place when the original public
-  database still matches the committed import fingerprint and the corrected
-  evidence has one unique newest complete state. The importer leaves that
-  source file untouched; it is read as evidence and is not restored over the
-  current database. No world or database rollback is required. Changed
-  profiles, missing or changed source evidence, tied timestamps, and incomplete
-  evidence remain quarantined.
+  unobservable stays `UNLOADED`, not `LOST`. Observing the destination body
+  restores normal loaded status.
+- If an explicit Recall waits out every retry before any physical move because
+  the body never appeared, Tamework restores the companion from its snapshot
+  near the player instead (`CompanionRestoreRecallSink`). The shipped default
+  wait budget is 10 seconds.
 
 Lost flow:
-- A background timeout alone does not author durable `LOST`. A clean explicit
-  Recall exhaustion can authorize the fenced repair described above. The
-  shipped default wait budget is 10 seconds.
-- A durable Lost transition requires positive evidence. An external destructive
-  command using Hytale's `REMOVE` reason qualifies; ordinary unload, absence,
-  and timeout observations do not.
-- A destructive removal that races startup reconciliation can also author Lost
-  from the exact current alias while its full live state is still available.
-- A delete-on-remove world can also provide terminal Lost evidence while the
-  companion's complete live state is still available.
-- `Recall`/`Return Home` are blocked while `LOST`.
-- `Revive`/`Respawn` uses the canonical paid-revival path for an
-  owner/command-family roster row and the canonical free restoration path for
-  a legacy item-metadata link. Both use the exact saved snapshot, and a
-  successful restoration rotates the live alias without creating a second
+- A timeout or an unloaded chunk never makes a companion `LOST`. `LOST` needs
+  positive evidence: an external destructive removal with Hytale's `REMOVE`
+  reason, a delete-on-remove (portal or instance) world removed while the
+  companion was inside, a destroyed or despawned capture item, or an
+  imported companion the locate pass found in no saved chunk.
+- `Recall`/`Return Home` are refused while `LOST`.
+- `Recover` restores the companion from its saved snapshot. A roster companion
+  uses the paid-revival quote; an item-metadata link restores for free. A
+  successful restore gives the companion a new body without creating a second
   profile.
 
 Configured-coop flow:
 
-- A configured coop captures a live linked companion directly into its
-  canonical coop slot and releases it through the same persistence authority.
+- A configured coop captures a live linked companion directly into a coop slot
+  and releases it again from the saved companion.
 - The released live NPC may have a different entity UUID but remains attached
   to the same stable profile and command links.
-- A supported managed-coop interaction can move an eligible canonical filled
-  spawner directly into a coop slot through the canonical coop-capture
-  operation. Other uses retain the captured-spawner release operation.
+- A supported coop interaction can move a filled capture item directly into a
+  coop slot. Other uses keep the normal capture-item release.
+- Breaking a coop releases its residents beside the block.
 
 Dead companions:
 
-- Saved death is positive dormant evidence and its snapshot persists across
+- A saved death makes the companion `DEAD`, and its snapshot persists across
   relog/restart.
-- `Revive` uses the same roster-scoped paid or legacy free distinction as Lost
-  restoration. Enablement is controlled by `/tw settings`; placement and
+- `Revive` uses the same roster-scoped paid or item-link free distinction as
+  `Recover`. Enablement is controlled by `/tw settings`; placement and
   exact revival-cost tuning remain in `TwCompanionConfig.Command`.
 
 ## Global tuning
@@ -634,7 +621,7 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `RecallSafeSpawnDistance`
 - `RecallForceRelocateDistance`
 - `Travel.CrossWorldRecallEnabled`
-- `Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`)
+- `Travel.OnTransferFailure` (still loads, ignored since 5.0)
 - `Travel.FollowMasterOnWorldChange` (disabled by default; explicit Recall remains available)
 - `Travel.FollowMasterOnWorldChangeStateFilter`
 
@@ -644,16 +631,15 @@ installed in the destination world's entity store, and the source NPC's live sta
 `FollowMasterOnWorldChangeStateFilter` when the relocation is prepared. Explicit Recall remains
 available across worlds when `CrossWorldRecallEnabled` is enabled.
 
-`Travel.OnTransferFailure: MarkLost` is retained as a legacy config spelling
-for stopping the failed transfer path. It does not authorize `LOST` from a
-timeout or missing observation; the canonical lifecycle still requires
-positive destructive-removal evidence.
+`Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`) still loads
+but has no effect. The cross-world transfer it governed was removed in 5.0:
+cross-world Recall and world-change following respawn the companion from its
+saved state, so there is no failed transfer to handle.
 
-Generated portal instances are delete-on-remove worlds. If a linked companion remains inside when
-the instance closes, Tamework marks it during the world-removal event and publishes its complete
-last-live state to Lost recovery when that world removes the NPC. Publication runs after the live
-identity is withdrawn but before the shutdown observer clears the snapshot, so a later Recall uses
-the strict recovery flow instead of leaving an Active/Unloaded row pointing at a nonexistent world.
+Generated portal instances are delete-on-remove worlds. If a companion remains inside when
+the instance closes, Tamework takes a snapshot of each loaded companion during the world-removal
+event and records it `LOST` (`CompanionWorldRemovalListener`). The owner can then use Recover
+instead of seeing an Unloaded row that points at a nonexistent world.
 Permanent worlds are not reclassified by this rule.
 - `DeadRespawnCooldownMs` / `DeadRespawnCooldownMins`
 - `DeadRespawnFollowRetryDelayMs`

@@ -168,13 +168,13 @@ Behavior:
 
 ## Ownership rules
 
-`SetOwner` and Tame check durable owner-population admission when adding a
-non-null owner. The configured global/per-world cap counts canonical owned
-profiles, and positive acquisitions reserve capacity inside the same operation.
-This is independent from SimpleClaims placement and does not create a
-feature-local provisioning or population journal.
+`SetOwner` and Tame check the owner's population limits when adding a non-null
+owner. The owned limit counts every companion the player owns, the deployed
+limit counts summoned companions, and both are checked inside the companion
+index lock together with group limits and admission providers. This is
+independent from SimpleClaims placement.
 
-`TameworkOwnerComponent` is the canonical live authorization source for
+`TameworkOwnerComponent` is the live authorization source for
 ownership mutation and command access. A clear invalidates command-tool links
 and clears name ownership; a transfer invalidates the prior owner's links and
 retargets retained name metadata.
@@ -283,7 +283,7 @@ durability, animation, and optional hold confirmation.
 
 Both fields default to `true`. The interaction rejects missing or non-NPC
 targets, targets that do not meet the selected owner/tame policy, and bonded
-companion projections. It clears ordinary command links before the death path
+companions. It clears ordinary command links before the death path
 and removes the NPC from eligible generic command tools in the hotbar. After a
 successful managed cull, Activity V2 emits `tamework:cull_success` with the
 owner, companion, family, mapped activity ID, and rolled item quantities.
@@ -561,7 +561,7 @@ original companion through the existing persistence authority, and removes the
 replacement if release fails. Use `Param` for the target role and `JsonPayload`
 for `Item` (one held item consumed) and `Message` (a notification translation key).
 The interacting player must own the NPC, crouch, and hold the specified item.
-This effect supports ordinary companions, not command-roster projections.
+This effect supports ordinary companions, not roster members.
 The new NPC starts at full health without the original companion's owner,
 command links, or progression. Other effects should not be combined with this
 asynchronous effect; it owns the item cost and success notification.

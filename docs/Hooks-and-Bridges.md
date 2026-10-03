@@ -94,9 +94,9 @@ tamed-companion damage decision.
   administrator, full-world, permission, and outsider rules.
 - A SimpleClaims lookup failure does not make a companion invulnerable.
 
-The ordinary Tamework owner cap is separate. It counts canonical owned
-profiles in its configured global/per-world scope and uses durable positive
-reservations; it does not use claims or provider selection. There is no
+The ordinary Tamework owner limits are separate. `limitPerPlayerOwnedTotal`
+counts every owned companion and `limitPerPlayerDeployedTotal` counts summoned
+companions; both are checked inside the companion index and do not use claims. There is no
 provider-neutral claims bridge. Tamework resolves the live SimpleClaims plugin
 before each policy use and shares one reflected capability set for that plugin
 generation. A stop, replacement, or Tamework shutdown invalidates the cached

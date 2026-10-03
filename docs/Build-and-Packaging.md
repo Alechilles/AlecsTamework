@@ -118,10 +118,13 @@ cover the ordinary no-claims configuration and the direct SimpleClaims
 integration used for breeding limits and tamed-companion damage.
 
 The [Persistence Replacement Release Checklist](Persistence-Replacement-Release-Checklist.md)
-records the historical first-release acceptance work for 3.0.0. Its candidate
-identity and unchecked items are not a current 4.0.0 release checklist.
+records the historical first-release acceptance work for 3.0.0. It describes
+the SQLite runtime that 5.0.0 removed and is not a current release checklist.
 
 Tamework does not create or restore complete Hytale world backups. Operators
-and hosting platforms remain responsible for consistent world backups.
-Released schema v2-v4 sources are imported read-only into
-`tamework-state.sqlite`; tester-only v5-v9 sources are refused unchanged.
+and hosting platforms remain responsible for consistent world backups. From
+5.0.0, companion data lives in `universe/Tamework/Companions`, so a normal
+world backup includes it. At the first start, 5.0 imports 3.x and 4.x
+databases read-only into that folder and leaves the old files unchanged; 2.x
+saves are refused with a notice to run 4.3.x once first. The release requires
+Hytale server 0.6.0 or later.

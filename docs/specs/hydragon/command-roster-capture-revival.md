@@ -1,5 +1,7 @@
 # Bonded Horn Roster, Capture, Leases, and Revival
 
+> Historical: this design targets the 3.x and 4.x SQLite persistence runtime. Tamework 5.0.0 replaced it with Public API 3.0 and the companion index; see [ADR 0011](../../decisions/0011-companion-index-persistence.md) and [the integration contract](integration-contract.md).
+
 Status: implementation and automated contract coverage complete; clean package
 verification and fresh-world acceptance pending
 

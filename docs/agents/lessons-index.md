@@ -14,11 +14,11 @@ Agents should check these notes when a task matches the topic. Keep this index l
 | `Editor-UX.md` | UI/editor behavior or authoring ergonomics are involved. |
 | `Instruction-Behavior.md` | Hytale instruction/action semantics are ambiguous. |
 | `Limitations.md` | A request may be blocked by known Hytale or Tamework limitations. |
-| `Persistence.md` | Saved state, profile data, SQLite, or override persistence may be involved. |
+| `Persistence.md` | Saved state, profile data, or override persistence may be involved. Its SQLite notes describe Tamework 4.x and the importer's sources; 5.0 stores companions as files (ADR 0011). |
 | `UI.md` | Tamework UI, HUD, or interaction presentation needs design/debug context. |
 | `Hytale Custom HUD Z-Order and Native Ability Overlays.md` | A custom gameplay HUD overlaps native abilities or shortcut hints, or native ability visibility differs between worlds. |
 | `2026-07-15-avatar-flight-mount-session-lifecycle.md` | Avatar-flight session cleanup, player model/skin/equipment presentation ordering, or source-NPC restoration is involved. |
-| `2026-07-25-bonded-companion-lease-boundary.md` | Durable companion profiles, temporary NPC projections, lease/source replay authority, or profile-keyed roster panels are involved. |
+| `2026-07-25-bonded-companion-lease-boundary.md` | Tamework 4.x only: bonded leases and NPC projections. 5.0 keeps bonded companions on the companion index; use it only to read 4.x behavior or imported data. |
 | `2026-08-21-private-model-particle-proxies.md` | A private persistent model particle needs to follow an entity and stop through entity cleanup. |
 
 Record lessons when they are reusable. Update this index if a durable note adds a new file or major topic. External notes are optional context; their availability is not a general completion gate.

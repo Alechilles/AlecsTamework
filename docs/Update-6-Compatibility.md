@@ -4,6 +4,8 @@ Last reviewed: 2026-08-27
 
 Branch: `main`
 
+> Historical: this records the Update 6 port. Tamework 5.0.0 requires Hytale server 0.6.0 or later, so the `0.5.x` range and Update 5 checks below no longer apply. `gradle.properties` holds the current range.
+
 ## Supported baseline
 
 Tamework compiles against stable Hytale `0.6.0`.

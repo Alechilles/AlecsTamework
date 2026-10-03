@@ -151,10 +151,10 @@ Behavior summary:
 Persistence machinery does not have feature-specific asset families.
 Population groups are authored through `TwPopulationGroupConfig`; paid revival
 and timed summon balance are nested role policy in `TwCompanionConfig`.
-Command rosters and companion provisioning are public integration authorities,
-not asset families. The `feature_circuit` control plane is internal and
-registry-derived, not a configurable rehearsal runtime or a return to the old
-per-feature failure catalogs.
+Command rosters, timed summons, and provisioning are config-driven
+(`TwCommandItemConfig` roster storage and bonded roster configs). Public API
+3.0 removed the command-family roster, timed-summoning, companion-provisioning,
+and paid-command-revival APIs.
 
 ## Asset-set gates
 `TwGlobalConfig.AssetSets` gates optional bundled asset sets:

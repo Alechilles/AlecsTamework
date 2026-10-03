@@ -40,23 +40,34 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Coop integration**: configured coops can accept eligible live companions or
   canonical filled capture items and release the same saved companion again;
   other coops retain their normal behavior.
-- **Durable population controls**: owner and role-defined group limits account
-  for canonical companions across unloads, storage, capture, death, travel, and
-  restarts, while direct SimpleClaims checks can still limit breeding by claim
-  and apply its native tamed-companion damage rules.
+- **Durable population controls**: separate per-player limits for companions
+  out in the world and companions owned, plus role-defined group limits, count
+  every saved companion across unloads, capture items, rosters, coops, death,
+  travel, and restarts. Direct SimpleClaims checks can still limit breeding by
+  claim and apply its native tamed-companion damage rules.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
-- **Stable integration data**: the Public API exposes canonical companion
-  profiles and namespaced profile extension data, including revision-fenced
-  compare-and-set operations for integrations that need restart-safe custom
-  state.
-- **Durable integration workflows**: capability-gated APIs expose population
-  groups, command-family rosters, timed summon/storage, idempotent companion
-  provisioning, and exact paid revival without exposing SQLite internals.
-- **A clean persistence upgrade boundary**: released schema v2-v4 saves and
-  released DAT companion records import into the replacement database without
-  modifying the source files. Tester-only v5-v9 databases are refused; testers
-  must restore a public backup or create a new world instead of carrying the
-  unreleased persistence lineage forward.
+- **Stable integration data**: Public API 3.0 exposes companion profiles,
+  bonded companions, population groups, admission providers, and namespaced
+  profile extension data, including revision-fenced compare-and-set writes for
+  integrations that need restart-safe custom state. Command rosters, timed
+  summons, provisioning, and paid revival are configured through `Tw*Config`
+  assets instead of public APIs.
+- **Companion data in the world folder**: Tamework 5.0 saves companions as
+  plain files under `universe/Tamework/Companions`, so normal Hytale world
+  backups include them. There is no database.
+
+## Requirements and Upgrades
+- Tamework 5.0 requires Hytale server 0.6.0 or later.
+- Back up the world's `universe` folder before updating.
+- The first start on a 3.x or 4.x world imports all companion data
+  automatically before worlds load. The old database files are only read and
+  stay unchanged. A later release removes this importer, so 3.x and 4.x worlds
+  must run a 5.0.x release once before they update further.
+- 2.x worlds are not imported. Run Tamework 4.3.x once first, or start fresh
+  with `/tw persistence start-fresh`.
+- Mods that call the Tamework Java API need a version built for Public API 3.0.
+- See [World Migration for Server Admins](https://wiki.hytalemodding.dev/mod/alecs-tamework/world-migration-for-server-admins)
+  for the full upgrade guide.
 
 ## What Integration Looks Like
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
@@ -94,12 +105,11 @@ implementation details can be found in the wiki.
 
 Advanced integrations should use the Public API for canonical profiles and
 namespaced profile extension data instead of writing Tamework metadata or
-SQLite rows directly. Always check the relevant capability before using an
+companion store files directly. Always check the relevant capability before using an
 optional API surface.
 
 Tamework also builds one immutable runtime activation plan at startup. It
-installs no systems, feature listeners, workers, or database runtime for an
-unused module. See [Runtime Activation](docs/Runtime-Activation.md) for
+installs no systems, feature listeners, or workers for an unused module. See [Runtime Activation](docs/Runtime-Activation.md) for
 automatic evidence, restart-bound reloads, `/tw runtime status`, and the
 Runeteria/RuneProfessions activation contract.
 
@@ -123,8 +133,8 @@ If you run into a bug, integration issue, or behavior problem, report it in the 
 https://discord.gg/E8n8RgTTdq
 
 <H2>Telemetry</H2>
-<p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> uses <a href="https://wiki.hytalemodding.dev/mod/beacon/migrate-to-beacon-2-0">Beacon</a> for its own crash, error, performance, usage, and automatic persistence diagnostics. The Patchwork runtime embedded in Tamework reports Patchwork operations through a separate hosted-only project.</p>
-<p>Automatic Tamework persistence diagnostics contain a bounded, redacted debug database ZIP and a safe error classification. They exclude the SQLite database, save data, player identity, coordinates, inventory payloads, secrets, exception messages, and unrestricted logs. Set <code>telemetry.enabled</code> to <code>false</code> in Tamework's global settings, or disable <code>Diag</code> in <code>/beacon consent</code>, to opt out. <code>Diag</code> is separate from Error consent. Existing projects that already reviewed consent must select Save and Close in <code>/beacon consent</code> before Diagnostics can run.</p>
+<p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> uses <a href="https://wiki.hytalemodding.dev/mod/beacon/migrate-to-beacon-2-0">Beacon</a> for its own crash, error, lifecycle, performance, and usage telemetry. The Patchwork runtime embedded in Tamework reports Patchwork operations through a separate hosted-only project.</p>
+<p>Tamework 5.0 no longer sends automatic persistence diagnostics or database attachments. Automatic events never attach save data or companion store files. Set <code>telemetry.enabled</code> to <code>false</code> in Tamework's global settings, or change Tamework's entry in <code>/beacon consent</code>, to opt out.</p>
 <p>Automatic aggregate Tamework and Patchwork telemetry does not include personally identifiable information and is used to diagnose issues and improve the mods. Reports you submit manually can include the contact text and server-log attachments you choose to send; review those fields and files before submitting.</p>
 <p>Tamework and Patchwork have independent consent entries, so disabling Tamework telemetry does not implicitly disable Patchwork telemetry. You may change either entry at any time in the `/beacon consent` menu.</p>
 <p>Alec's Tamework also reports anonymized active user numbers to <a href="https://hstats.dev/">HStats</a> to track active user count summaries.</p>

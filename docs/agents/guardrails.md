@@ -52,23 +52,39 @@ The check verifies that:
 
 The checker does not require exact policy phrases, external lesson directories, or a fresh index. It does not verify policy correctness. Refresh the navigation snapshot after layout changes that affect it with `scripts/tools/build-agent-index.ps1`. To check that snapshot explicitly, add `-CheckGeneratedIndex` to the checker command. Ordinary behavior changes do not require index regeneration.
 
-## Replacement Persistence Architecture
+## Companion Persistence
 
-After changing the replacement kernel, identity, lifecycle, snapshot, operation, recovery, or
-projection code, run:
+The companion index and its file store are described in
+[ADR 0011](../decisions/0011-companion-index-persistence.md). After changing
+`companion/index`, `companion/store`, `companion/live`, `companion/flow`, or
+`companion/migrate`, run the focused checks for the changed area:
 
 ```bash
 bash ../gradlew -p .. :alecstamework:test \
-  --tests '*ReplacementPersistenceArchitectureGuardTest' \
-  --tests '*PersistenceProcessCrashMatrixTest'
+  --tests '*CompanionIndexTest' \
+  --tests '*CompanionStorageTest' \
+  --tests '*CompanionStoreTest' \
+  --tests '*CompanionWriterTest' \
+  --tests '*CompanionRecordBsonTest' \
+  --tests '*CompanionFenceTest' \
+  --tests '*RestoreFlowTest' \
+  --tests '*CompanionImporterTest'
 ```
 
-The architecture guard enforces one canonical lifecycle mutation path, connection-bound stores,
-transaction callback isolation, no dependency on the superseded SQLite package, no premature
-outbox compaction. Class boundaries follow responsibility and runtime ownership;
-there is no fixed class line limit. The forked-process matrix
-verifies recovery from each shared prepare, live-apply, durable, publication, compensation, and
-shutdown crash boundary.
+`CompanionIndexTest` covers revisions, generations, counts, and the index lock.
+`CompanionStoreTest` covers owner and snapshot files and unreadable files.
+`CompanionWriterTest` covers write-behind flushes and their order.
+`CompanionStorageTest` covers startup readiness and old-save detection.
+`CompanionFenceTest` covers the generation fence that removes stale bodies.
+`RestoreFlowTest` covers respawn from a saved snapshot. `CompanionImporterTest`,
+`LegacyReaderTest`, and `LegacyMapperTest` cover the 3.x and 4.x import. After
+changing the bundled SQLite driver or `shadowJar` exclusions, run
+`bash ../gradlew -p .. :alecstamework:packagingTest`; `SqlitePackagingIT` opens
+a database through the packaged driver the importer uses.
+
+Hold these rules: commit the index before any live effect; raise the
+generation on every holder change; do no file I/O or snapshot decoding on the
+world thread; keep world-time signs; and add no second persistence authority.
 
 ## Artifact Freshness Checks
 
