@@ -59,13 +59,6 @@ public final class CommandLinkedNpcStateSnapshotService {
         refreshFromEntityStage(reference, store);
     }
 
-    public void onNpcRemoved(Ref<EntityStore> reference,
-                             RemoveReason reason,
-                             Store<EntityStore> store) {
-        UUID npcUuid = beginNpcRemoval(reference, reason, store);
-        completeNpcRemoval(reference, reason, store, npcUuid);
-    }
-
     /**
      * Refreshes the final linked state and removes live-identity evidence while retaining that state
      * until all removal observers have classified the disappearance.
@@ -113,25 +106,6 @@ public final class CommandLinkedNpcStateSnapshotService {
     @Nonnull
     public LoadedNpcIdentityIndex getLoadedNpcIdentityIndex() {
         return loadedNpcIdentityIndex;
-    }
-
-    /**
-     * Retires only the exact entity-store identity of a removed world.
-     *
-     * <p>The caller must run from an uncancelled, terminal-priority {@code RemoveWorldEvent}.
-     * Full state snapshots intentionally remain available for later Lost recovery after the
-     * store's live identity evidence is withdrawn. The result indicates whether the removed
-     * world is delete-on-remove and therefore needs immediate terminal recovery.</p>
-     */
-    public boolean retireRemovedWorld(@Nullable World world) {
-        if (world == null || world.getEntityStore() == null
-                || world.getEntityStore().getStore() == null) {
-            return false;
-        }
-        loadedNpcIdentityIndex.clearLocation(
-                LoadedNpcLocationResolver.resolve(world.getEntityStore().getStore())
-        );
-        return world.getWorldConfig() != null && world.getWorldConfig().isDeleteOnRemove();
     }
 
     private void indexNpcAdded(@Nonnull Ref<EntityStore> reference,
@@ -213,13 +187,6 @@ public final class CommandLinkedNpcStateSnapshotService {
             return null;
         }
         return snapshotsByNpc.get(npcUuid);
-    }
-
-    public void clearSnapshot(UUID npcUuid) {
-        if (npcUuid == null) {
-            return;
-        }
-        snapshotsByNpc.remove(npcUuid);
     }
 
     private CompletionStage<Void> upsertProfile(

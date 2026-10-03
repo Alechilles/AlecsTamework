@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.store;
 
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -47,7 +49,9 @@ public final class CompanionWriter {
     public record Status(int pendingOwners, int pendingSnapshots, @Nullable String lastFailure, long lastFlushAtMs) {
     }
 
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final long MAX_BACKOFF_MS = 30_000L;
+    private static final long FAILURE_WARN_INTERVAL_MS = 60_000L;
 
     /** Work taken by one flush. */
     private record Batch(
@@ -92,6 +96,8 @@ public final class CompanionWriter {
     private long nextRetryAtMs;
     private volatile String lastFailure;
     private volatile long lastFlushAtMs;
+    /** Earliest time of the next flush-failure WARN. Used only on the executor thread. */
+    private long nextFailureWarnAtMs = Long.MIN_VALUE;
 
     /**
      * @param executor a dedicated single-thread executor. The writer owns it: flushes rely on
@@ -266,7 +272,24 @@ public final class CompanionWriter {
             flush();
         } catch (Throwable t) {
             lastFailure = String.valueOf(t);
+            warnFlushFailed(t);
         }
+    }
+
+    /**
+     * Logs a failed flush at most once a minute (spec 6.9). The unwritten work stays queued and is
+     * retried; {@link #status()} always has the latest failure.
+     */
+    private void warnFlushFailed(Throwable failure) {
+        long now = clock.getAsLong();
+        if (now < nextFailureWarnAtMs) {
+            return;
+        }
+        nextFailureWarnAtMs = now + FAILURE_WARN_INTERVAL_MS;
+        Status status = status();
+        LOGGER.at(Level.WARNING).withCause(failure).log(
+                "Companion data was not written (%d owner files and %d snapshots pending); it stays in memory and the write is retried",
+                status.pendingOwners(), status.pendingSnapshots());
     }
 
     /**
@@ -435,6 +458,7 @@ public final class CompanionWriter {
             }
             if (failure != null) {
                 lastFailure = String.valueOf(failure);
+                warnFlushFailed(failure);
             } else {
                 lastFailure = null;
                 lastFlushAtMs = clock.getAsLong();

@@ -108,6 +108,17 @@ class CaptureFlowTest {
     }
 
     @Test
+    void theSnapshotIsQueuedBeforeTheItemRecordIsVisibleOutsideTheIndexLock() {
+        // A periodic flush takes the index lock; it must never see the ITEM record without its snapshot.
+        CompanionRecord live = insertLive(2);
+        index.addAfterUnlockListener((before, after) -> events.add("unlocked"));
+
+        flow(CompletableFuture.completedFuture(null)).capture(stamped(live, owner)).join();
+
+        assertEquals(List.of("snapshot", "unlocked", "flush"), events);
+    }
+
+    @Test
     void aStaleStampIsRefusedAndNothingChanges() {
         CompanionRecord live = insertLive(2);
         CaptureFlow.Capture<String> stale = new CaptureFlow.Capture<>(live.profileId(), 1, "body",

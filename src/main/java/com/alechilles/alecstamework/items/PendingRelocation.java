@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -24,7 +23,6 @@ final class PendingRelocation {
     final String subState;
     final long executeAfterMs;
     final long queuedAtMs;
-    final TwCompanionConfig.TransferFailurePolicy onTransferFailure;
     final boolean explicitRecall;
     private final Set<String> requiredStateFilter;
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
@@ -51,7 +49,6 @@ final class PendingRelocation {
                       String subState,
                       long executeAfterMs,
                       long queuedAtMs,
-                      @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                       @Nullable String[] requiredStateFilter) {
         this(
                 npcUuid,
@@ -66,7 +63,6 @@ final class PendingRelocation {
                 subState,
                 executeAfterMs,
                 queuedAtMs,
-                onTransferFailure,
                 requiredStateFilter,
                 false
         );
@@ -84,7 +80,6 @@ final class PendingRelocation {
                       String subState,
                       long executeAfterMs,
                       long queuedAtMs,
-                      @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                       @Nullable String[] requiredStateFilter,
                       boolean explicitRecall) {
         this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
@@ -99,8 +94,6 @@ final class PendingRelocation {
         this.subState = subState;
         this.executeAfterMs = executeAfterMs;
         this.queuedAtMs = queuedAtMs;
-        this.onTransferFailure = onTransferFailure == null
-                ? TwCompanionConfig.TransferFailurePolicy.QueueForRecall : onTransferFailure;
         this.explicitRecall = explicitRecall;
         this.requiredStateFilter = normalizeStateFilter(requiredStateFilter);
         this.lastRetryCountedAtMs = queuedAtMs;
@@ -215,7 +208,6 @@ final class PendingRelocation {
                 && clearLockedTarget == other.clearLockedTarget
                 && Objects.equals(state, other.state)
                 && Objects.equals(subState, other.subState)
-                && onTransferFailure == other.onTransferFailure
                 && explicitRecall == other.explicitRecall
                 && requiredStateFilter.equals(other.requiredStateFilter);
     }

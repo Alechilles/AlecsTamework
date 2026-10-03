@@ -1,10 +1,8 @@
 package com.alechilles.alecstamework.companion.flow;
 
 /**
- * Stable death-cause identifiers.
- *
- * <p>{@link CompanionDeathTiming} maps a needs cause to its own {@code Kind} by constant name, so
- * the names must match there.</p>
+ * Why a companion died. The constant names are stable: {@link CompanionDeathTiming.Timing#cause()}
+ * writes them into the companion record.
  */
 public enum DeathCauseKind {
     STARVATION,

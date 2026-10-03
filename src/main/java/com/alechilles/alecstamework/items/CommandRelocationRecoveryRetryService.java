@@ -73,7 +73,6 @@ final class CommandRelocationRecoveryRetryService {
                 0L,
                 pending.sourceHintPosition,
                 pending.alternateSourceHintPosition,
-                pending.onTransferFailure,
                 null,
                 true
         );

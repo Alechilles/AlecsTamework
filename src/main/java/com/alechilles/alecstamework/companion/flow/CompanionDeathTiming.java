@@ -24,22 +24,11 @@ public final class CompanionDeathTiming {
     private static final String REVIVE_COOLDOWN_MULTIPLIER = "ReviveCooldownMultiplier";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
 
-    /** Why the companion died. */
-    public enum Kind {
-        STARVATION,
-        DEHYDRATION,
-        STARVATION_AND_DEHYDRATION,
-        PLAYER,
-        NPC,
-        ENVIRONMENT,
-        UNKNOWN
-    }
-
     /**
      * @param reviveAvailableAtMs wall-clock time the companion can be revived
      * @param attackerName        the recent attacker's name, when one was remembered
      */
-    public record Timing(long reviveAvailableAtMs, @Nonnull Kind kind, @Nullable String attackerName) {
+    public record Timing(long reviveAvailableAtMs, @Nonnull DeathCauseKind kind, @Nullable String attackerName) {
         public Timing {
             Objects.requireNonNull(kind, "kind");
         }
@@ -85,8 +74,8 @@ public final class CompanionDeathTiming {
                 DamageTargetMemoryService.getInstance().getRecentAttacker(npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs);
         DeathCauseKind needs =
                 RecentNeedsDeathCauseService.getInstance().consumeRecent(npcUuid, diedAtMs);
-        Kind kind = needs != null
-                ? Kind.valueOf(needs.name())
+        DeathCauseKind kind = needs != null
+                ? needs
                 : attacker != null
                 ? attackerKind(attacker)
                 : persistedKind(death);
@@ -119,24 +108,24 @@ public final class CompanionDeathTiming {
         return Double.isFinite(scaled) ? Math.max(0L, Math.round(scaled)) : configured;
     }
 
-    private static Kind attackerKind(DamageTargetMemoryService.RecentAttackerSnapshot attacker) {
+    private static DeathCauseKind attackerKind(DamageTargetMemoryService.RecentAttackerSnapshot attacker) {
         return switch (attacker.attackerKind()) {
-            case PLAYER -> Kind.PLAYER;
-            case NPC -> Kind.NPC;
-            case OTHER -> Kind.UNKNOWN;
+            case PLAYER -> DeathCauseKind.PLAYER;
+            case NPC -> DeathCauseKind.NPC;
+            case OTHER -> DeathCauseKind.UNKNOWN;
         };
     }
 
-    private static Kind persistedKind(DeathComponent death) {
+    private static DeathCauseKind persistedKind(DeathComponent death) {
         if (death.getDeathCause() == null) {
-            return Kind.UNKNOWN;
+            return DeathCauseKind.UNKNOWN;
         }
         String id = death.getDeathCause().getId();
         if (id == null || id.isBlank()) {
-            return Kind.UNKNOWN;
+            return DeathCauseKind.UNKNOWN;
         }
         String normalized = id.toLowerCase(Locale.ROOT);
-        return normalized.contains("physical") || normalized.contains("projectile") ? Kind.UNKNOWN : Kind.ENVIRONMENT;
+        return normalized.contains("physical") || normalized.contains("projectile") ? DeathCauseKind.UNKNOWN : DeathCauseKind.ENVIRONMENT;
     }
 
     private static long saturatingAdd(long value, long nonnegativeDelta) {

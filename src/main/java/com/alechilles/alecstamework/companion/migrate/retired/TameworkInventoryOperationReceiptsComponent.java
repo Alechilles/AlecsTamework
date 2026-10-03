@@ -10,16 +10,13 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Bounded persistent inventory-operation receipts attached to one player.
- *
- * <p>Entries are operation-neutral. Paid revival and captured-item coop
- * intake share this receipt-first durability boundary while their immutable
- * operation payloads remain the sole source of exact stack evidence.</p>
+ * Retired 4.x inventory-operation receipts attached to one player. Nothing reads or writes the
+ * receipts any more; the component stays registered, with its codec and id unchanged, so player
+ * data saved by 4.x still loads.
  */
 public final class TameworkInventoryOperationReceiptsComponent
         implements Component<EntityStore> {
@@ -76,98 +73,6 @@ public final class TameworkInventoryOperationReceiptsComponent
             ReceiptEntry[] entries
     ) {
         setEntries(entries);
-    }
-
-    /** Returns the exact durable receipt or {@code null} when absent. */
-    @Nullable
-    public InventoryOperationReceipt receiptFor(@Nonnull String receiptKey) {
-        String key = requireKey(receiptKey);
-        for (ReceiptEntry entry : entries) {
-            InventoryOperationReceipt receipt = decode(entry);
-            if (receipt.receiptKey().equals(key)) {
-                return receipt;
-            }
-        }
-        return null;
-    }
-
-    /** Returns an immutable snapshot of all bounded receipts. */
-    @Nonnull
-    public List<InventoryOperationReceipt> receipts() {
-        ArrayList<InventoryOperationReceipt> snapshot =
-                new ArrayList<>(entries.length);
-        for (ReceiptEntry entry : entries) {
-            snapshot.add(decode(entry));
-        }
-        return List.copyOf(snapshot);
-    }
-
-    /**
-     * Installs one receipt without evicting unresolved operation evidence.
-     *
-     * <p>An exact replay is idempotent; a same-key conflict fails closed.</p>
-     */
-    @Nonnull
-    public TameworkInventoryOperationReceiptsComponent withReceipt(
-            @Nonnull InventoryOperationReceipt receipt
-    ) {
-        if (receipt == null) {
-            throw new IllegalArgumentException(
-                    "Inventory operation receipt is required"
-            );
-        }
-        ArrayList<InventoryOperationReceipt> updated =
-                new ArrayList<>(entries.length + 1);
-        boolean present = false;
-        for (ReceiptEntry entry : entries) {
-            InventoryOperationReceipt existing = decode(entry);
-            if (existing.receiptKey().equals(receipt.receiptKey())) {
-                if (!existing.equals(receipt)) {
-                    throw new IllegalStateException(
-                            "Inventory operation receipt key conflicts"
-                    );
-                }
-                present = true;
-            }
-            updated.add(existing);
-        }
-        if (!present) {
-            if (updated.size() >= MAX_RECEIPTS) {
-                throw new IllegalStateException(
-                        "Inventory operation receipt capacity is exhausted"
-                );
-            }
-            updated.add(receipt);
-        }
-        return from(updated);
-    }
-
-    /** Removes only the exact completed operation's receipt key. */
-    @Nonnull
-    public TameworkInventoryOperationReceiptsComponent withoutReceipt(
-            @Nonnull String receiptKey
-    ) {
-        String key = requireKey(receiptKey);
-        ArrayList<InventoryOperationReceipt> updated =
-                new ArrayList<>(entries.length);
-        for (ReceiptEntry entry : entries) {
-            InventoryOperationReceipt receipt = decode(entry);
-            if (!receipt.receiptKey().equals(key)) {
-                updated.add(receipt);
-            }
-        }
-        return from(updated);
-    }
-
-    private static TameworkInventoryOperationReceiptsComponent from(
-            ArrayList<InventoryOperationReceipt> receipts
-    ) {
-        receipts.sort(Comparator.naturalOrder());
-        ReceiptEntry[] encoded = new ReceiptEntry[receipts.size()];
-        for (int index = 0; index < receipts.size(); index++) {
-            encoded[index] = new ReceiptEntry(receipts.get(index));
-        }
-        return new TameworkInventoryOperationReceiptsComponent(encoded);
     }
 
     private ReceiptEntry[] getEntries() {
@@ -227,15 +132,6 @@ public final class TameworkInventoryOperationReceiptsComponent
                     failure
             );
         }
-    }
-
-    private static String requireKey(String receiptKey) {
-        if (receiptKey == null || receiptKey.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Inventory operation receipt key is required"
-            );
-        }
-        return receiptKey.trim();
     }
 
     @Override

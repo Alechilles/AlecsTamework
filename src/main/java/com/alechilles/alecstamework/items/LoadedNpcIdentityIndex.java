@@ -32,26 +32,18 @@ public final class LoadedNpcIdentityIndex {
     private final Map<Location, Set<LoadedNpcObservation>> observationsByLocation = new HashMap<>();
     private final Map<UUID, Set<LoadedNpcObservation>> observationsByNpc = new HashMap<>();
     private final Map<ObservationIdentity, LoadedNpcObservation> observationByIdentity = new HashMap<>();
-    private final Map<Location, Long> mutationRevisionByLocation = new HashMap<>();
-    private long mutationRevision;
     private boolean initializationComplete;
 
     /** Marks a separately performed store bootstrap complete, making future misses authoritative. */
     public void markInitializationComplete() {
         synchronized (lock) {
-            if (!initializationComplete) {
-                initializationComplete = true;
-                mutationRevision++;
-            }
+            initializationComplete = true;
         }
     }
     /** Revokes authoritative absence while one or more entity stores are being enumerated. */
     public void markInitializationIncomplete() {
         synchronized (lock) {
-            if (initializationComplete) {
-                initializationComplete = false;
-                mutationRevision++;
-            }
+            initializationComplete = false;
         }
     }
     /** Records an NPC at one exact world/store location. Duplicate add replay is harmless. */
@@ -60,7 +52,6 @@ public final class LoadedNpcIdentityIndex {
             return;
         }
         synchronized (lock) {
-            advanceMutationRevisionLocked(location);
             locationsByNpc.computeIfAbsent(npcUuid, ignored -> new HashSet<>()).add(location);
         }
     }
@@ -73,7 +64,6 @@ public final class LoadedNpcIdentityIndex {
             return;
         }
         synchronized (lock) {
-            advanceMutationRevisionLocked(observation.location());
             indexObservationLocked(observation);
         }
     }
@@ -83,7 +73,6 @@ public final class LoadedNpcIdentityIndex {
             return;
         }
         synchronized (lock) {
-            advanceMutationRevisionLocked(location);
             Set<Location> locations = locationsByNpc.get(npcUuid);
             if (locations != null) {
                 locations.remove(location);
@@ -104,7 +93,6 @@ public final class LoadedNpcIdentityIndex {
             return;
         }
         synchronized (lock) {
-            advanceMutationRevisionLocked(observation.location());
             removeExactObservationLocked(observation);
             removeLegacyLocationLocked(observation.componentUuid(), observation.location());
             removeLegacyLocationLocked(observation.legacyNpcUuid(), observation.location());
@@ -122,25 +110,7 @@ public final class LoadedNpcIdentityIndex {
             return;
         }
         synchronized (lock) {
-            advanceMutationRevisionLocked(location);
             clearLocationLocked(location);
-        }
-    }
-    /** Atomically reconciles one store location to exactly the supplied UUID evidence. */
-    public void replaceLocation(@Nonnull Location location, @Nonnull Collection<UUID> npcUuids) {
-        Objects.requireNonNull(location, "location");
-        Set<UUID> replacement = new HashSet<>();
-        for (UUID npcUuid : Objects.requireNonNull(npcUuids, "npcUuids")) {
-            if (npcUuid != null) {
-                replacement.add(npcUuid);
-            }
-        }
-        synchronized (lock) {
-            advanceMutationRevisionLocked(location);
-            clearLocationLocked(location);
-            for (UUID npcUuid : replacement) {
-                locationsByNpc.computeIfAbsent(npcUuid, ignored -> new HashSet<>()).add(location);
-            }
         }
     }
     /** Atomically reconciles one store location to exactly the supplied entity observations. */
@@ -149,40 +119,10 @@ public final class LoadedNpcIdentityIndex {
             @Nonnull Collection<LoadedNpcObservation> observations) {
         Set<LoadedNpcObservation> replacement = validatedObservations(location, observations);
         synchronized (lock) {
-            advanceMutationRevisionLocked(location);
             clearLocationLocked(location);
             for (LoadedNpcObservation observation : replacement) {
                 indexObservationLocked(observation);
             }
-        }
-    }
-    /** Captures the lifecycle-mutation revision used to linearize one location scan. */
-    public long locationMutationRevision(@Nonnull Location location) {
-        synchronized (lock) {
-            return mutationRevisionByLocation.getOrDefault(
-                    Objects.requireNonNull(location, "location"), 0L);
-        }
-    }
-
-    /** Confirms that no loaded identity evidence changed since capture. */
-    public boolean isMutationRevisionCurrent(long expectedRevision) {
-        synchronized (lock) { return mutationRevision == expectedRevision; }
-    }
-    /** Replaces one scan snapshot only when no lifecycle callback changed that location. */
-    public boolean replaceLocationObservationsIfUnchanged(@Nonnull Location location,
-            @Nonnull Collection<LoadedNpcObservation> observations,
-            long expectedRevision) {
-        Set<LoadedNpcObservation> replacement = validatedObservations(location, observations);
-        synchronized (lock) {
-            if (expectedRevision != mutationRevisionByLocation.getOrDefault(location, 0L)) {
-                return false;
-            }
-            advanceMutationRevisionLocked(location);
-            clearLocationLocked(location);
-            for (LoadedNpcObservation observation : replacement) {
-                indexObservationLocked(observation);
-            }
-            return true;
         }
     }
     @Nonnull
@@ -198,10 +138,6 @@ public final class LoadedNpcIdentityIndex {
             replacement.add(required);
         }
         return replacement;
-    }
-    private void advanceMutationRevisionLocked(@Nonnull Location location) {
-        mutationRevision++;
-        mutationRevisionByLocation.merge(location, 1L, Long::sum);
     }
     private void clearLocationLocked(@Nonnull Location location) {
         Iterator<Map.Entry<UUID, Set<Location>>> entries = locationsByNpc.entrySet().iterator();
@@ -391,8 +327,6 @@ public final class LoadedNpcIdentityIndex {
             }
             return Set.of(componentUuid, legacyNpcUuid);
         }
-        @Nullable
-        public UUID legacyUuid() { return legacyNpcUuid; }
     }
 
     /** Immutable probe result with deterministic location ordering and presentation metadata. */

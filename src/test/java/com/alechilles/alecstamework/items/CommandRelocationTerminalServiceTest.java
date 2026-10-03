@@ -29,7 +29,6 @@ class CommandRelocationTerminalServiceTest {
                 0,
                 0,
                 null,
-                null,
                 true
         );
         Map<UUID, PendingRelocation> pendingByNpc =

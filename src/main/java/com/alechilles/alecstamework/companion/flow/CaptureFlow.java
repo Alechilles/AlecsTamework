@@ -197,21 +197,30 @@ public final class CaptureFlow<R> {
     private CompletableFuture<Outcome> commitAndFlush(Capture<R> capture, @Nullable CompanionRecord seen,
                                                       @Nullable CompanionRecord created,
                                                       ProviderAdmission.Outcome provider) {
-        Commit commit = index.atomically(() -> commit(capture, seen, created, provider));
+        // The snapshot is queued under the index lock with the commit, so no flush can write the
+        // record's owner file before its snapshot (the CompanionWriter.queueSnapshot contract).
+        Commit commit = index.atomically(() -> {
+            Commit applied = commit(capture, seen, created, provider);
+            if (applied.refusal() != null) {
+                return applied;
+            }
+            UUID id = applied.after().profileId();
+            try {
+                queueSnapshot.accept(id, new SnapshotEnvelope(id, CompanionSnapshots.FORMAT,
+                        applied.after().generation(), capture.snapshotData()));
+            } catch (RuntimeException failure) {
+                LOGGER.at(Level.WARNING).withCause(failure)
+                        .log("Could not queue the snapshot of captured companion %s; the capture is undone", id);
+                revertSafely(capture, applied);
+                return Commit.refused(Result.COMMIT_FAILED);
+            }
+            return applied;
+        });
         if (commit.refusal() != null) {
             return CompletableFuture.completedFuture(new Outcome(commit.refusal(), null, commit.messageKey()));
         }
         CompanionRecord after = commit.after();
         UUID profileId = after.profileId();
-        try {
-            queueSnapshot.accept(profileId, new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT,
-                    after.generation(), capture.snapshotData()));
-        } catch (RuntimeException failure) {
-            LOGGER.at(Level.WARNING).withCause(failure)
-                    .log("Could not queue the snapshot of captured companion %s; the capture is undone", profileId);
-            revertSafely(capture, commit);
-            return CompletableFuture.completedFuture(new Outcome(Result.COMMIT_FAILED, null));
-        }
         return OwnerFileFlush.flushOwners(flushOwner, commit.before(), after).handle((ignored, error) -> error)
                 .thenApply(error -> {
                     if (error != null) {

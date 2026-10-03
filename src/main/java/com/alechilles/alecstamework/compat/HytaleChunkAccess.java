@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.compat;
 
-import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -8,9 +7,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection;
-import com.hypixel.hytale.server.core.universe.world.chunk.section.EntitySection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.IChunkSaver;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -25,7 +22,6 @@ import javax.annotation.Nullable;
  */
 public final class HytaleChunkAccess {
     private static final MethodHandle LEGACY_GET_CHUNK_REF = bindLegacyGetChunkRef();
-    private static final MethodHandle LEGACY_MARK_CHUNK_DIRTY = bindLegacyMarkChunkDirty();
     private static final MethodHandle LEGACY_TO_HOLDER = bindLegacyToHolder();
 
     private HytaleChunkAccess() {
@@ -65,27 +61,6 @@ public final class HytaleChunkAccess {
         return owner != null && owner.getWorld() == world;
     }
 
-    /** Marks the current source entity section for persistence before an entity is detached. */
-    public static void markNeedsSaving(@Nonnull TransformComponent transform,
-                                       @Nonnull Store<EntityStore> entityStore) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            EntitySection section = resolveUpdate6EntitySection(transform, entityStore);
-            if (section == null) {
-                throw new IllegalStateException("Update 6 source entity section is not available");
-            }
-            section.markNeedsSaving();
-            return;
-        }
-        if (LEGACY_MARK_CHUNK_DIRTY == null) {
-            throw new IllegalStateException("Missing Update 5 TransformComponent.markChunkDirty accessor");
-        }
-        try {
-            LEGACY_MARK_CHUNK_DIRTY.invoke(transform, entityStore);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Could not mark an Update 5 chunk dirty", throwable);
-        }
-    }
-
     /** Uses the Update 6 column snapshot helper and the Update 5 holder save contract. */
     @Nonnull
     public static CompletableFuture<Void> saveColumn(@Nonnull IChunkSaver saver,
@@ -119,22 +94,6 @@ public final class HytaleChunkAccess {
         }
         ChunkSection section = chunks.getComponent(sectionRef, ChunkSection.getComponentType());
         return section != null ? section.getChunkColumnReference() : null;
-    }
-
-    @Nullable
-    private static EntitySection resolveUpdate6EntitySection(
-            @Nonnull TransformComponent transform,
-            @Nonnull Store<EntityStore> entityStore
-    ) {
-        EntityStore externalData = entityStore.getExternalData();
-        World world = externalData != null ? externalData.getWorld() : null;
-        ChunkStore chunkStore = world != null ? world.getChunkStore() : null;
-        Store<ChunkStore> chunks = chunkStore != null ? chunkStore.getStore() : null;
-        Ref<ChunkStore> sectionRef = transform.getSectionRef();
-        if (chunks == null || sectionRef == null || !sectionRef.isValid()) {
-            return null;
-        }
-        return chunks.getComponent(sectionRef, EntitySection.getComponentType());
     }
 
     @SuppressWarnings("unchecked")
@@ -173,21 +132,6 @@ public final class HytaleChunkAccess {
                     TransformComponent.class,
                     "getChunkRef",
                     MethodType.methodType(Ref.class));
-        } catch (NoSuchMethodException | IllegalAccessException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
-
-    @Nullable
-    private static MethodHandle bindLegacyMarkChunkDirty() {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            return null;
-        }
-        try {
-            return MethodHandles.publicLookup().findVirtual(
-                    TransformComponent.class,
-                    "markChunkDirty",
-                    MethodType.methodType(void.class, ComponentAccessor.class));
         } catch (NoSuchMethodException | IllegalAccessException exception) {
             throw new ExceptionInInitializerError(exception);
         }

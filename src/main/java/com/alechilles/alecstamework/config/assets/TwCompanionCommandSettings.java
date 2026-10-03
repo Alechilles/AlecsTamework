@@ -254,6 +254,10 @@ public final class TwCompanionCommandSettings {
             return crossWorldRecallEnabled;
         }
 
+        /**
+         * Ignored since 5.0: nothing reads the policy, because companions no longer transfer
+         * between worlds. The {@code OnTransferFailure} field is still decoded so older configs load.
+         */
         @Nonnull
         public TwCompanionConfig.TransferFailurePolicy
         getOnTransferFailure() {

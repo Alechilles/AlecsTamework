@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Map;
 import java.util.Objects;
@@ -20,7 +19,6 @@ import org.joml.Vector3d;
 final class CommandRelocationQueueCoordinator {
     private final Map<UUID, PendingRelocation> pendingByNpc;
     private final Map<UUID, Vector3d> lastKnownByNpc;
-    private final Map<UUID, World> knownWorldByNpc;
     private final CommandRelocationChunkRequestService chunkRequests;
     private final CommandRelocationApplyScheduler applyScheduler;
     private final DropHandler dropHandler;
@@ -29,7 +27,6 @@ final class CommandRelocationQueueCoordinator {
     CommandRelocationQueueCoordinator(
             @Nonnull Map<UUID, PendingRelocation> pendingByNpc,
             @Nonnull Map<UUID, Vector3d> lastKnownByNpc,
-            @Nonnull Map<UUID, World> knownWorldByNpc,
             @Nonnull CommandRelocationChunkRequestService chunkRequests,
             @Nonnull CommandRelocationApplyScheduler applyScheduler,
             @Nonnull DropHandler dropHandler,
@@ -37,7 +34,6 @@ final class CommandRelocationQueueCoordinator {
     ) {
         this.pendingByNpc = Objects.requireNonNull(pendingByNpc, "pendingByNpc");
         this.lastKnownByNpc = Objects.requireNonNull(lastKnownByNpc, "lastKnownByNpc");
-        this.knownWorldByNpc = Objects.requireNonNull(knownWorldByNpc, "knownWorldByNpc");
         this.chunkRequests = Objects.requireNonNull(chunkRequests, "chunkRequests");
         this.applyScheduler = Objects.requireNonNull(applyScheduler, "applyScheduler");
         this.dropHandler = Objects.requireNonNull(dropHandler, "dropHandler");
@@ -56,7 +52,6 @@ final class CommandRelocationQueueCoordinator {
             long delayMs,
             @Nullable Vector3d sourceHintPosition,
             @Nullable Vector3d alternateSourceHintPosition,
-            @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
             @Nullable String[] requiredStateFilter,
             boolean explicitRecall
     ) {
@@ -77,7 +72,6 @@ final class CommandRelocationQueueCoordinator {
                 subState,
                 queuedAtMs + Math.max(0L, delayMs),
                 queuedAtMs,
-                onTransferFailure,
                 requiredStateFilter,
                 explicitRecall
         );
@@ -118,7 +112,6 @@ final class CommandRelocationQueueCoordinator {
         chunkRequests.release(replaced);
         if (replaced.physicalMutationAttempted()) {
             dropHandler.drop(
-                    knownWorldByNpc.get(npcUuid),
                     npcUuid,
                     replaced,
                     System.currentTimeMillis()
@@ -150,8 +143,6 @@ final class CommandRelocationQueueCoordinator {
                         + pending.npcUuid
                         + ", destinationWorld="
                         + world.getName()
-                        + ", onTransferFailure="
-                        + pending.onTransferFailure
                         + ", requiredStateFilter="
                         + describeStateFilter(requiredStateFilter)
         );
@@ -170,7 +161,6 @@ final class CommandRelocationQueueCoordinator {
     @FunctionalInterface
     interface DropHandler {
         void drop(
-                @Nullable World world,
                 @Nonnull UUID npcUuid,
                 @Nonnull PendingRelocation pending,
                 long droppedAtMs

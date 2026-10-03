@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -85,7 +84,6 @@ public final class CommandNpcRelocationService {
         this.queueCoordinator = new CommandRelocationQueueCoordinator(
                 pendingByNpc,
                 lastKnownByNpc,
-                knownWorldByNpc,
                 chunkRequests,
                 applyScheduler,
                 this::dropUnconfirmedRelocation,
@@ -173,7 +171,6 @@ public final class CommandNpcRelocationService {
                 delayMs,
                 sourceHintPosition,
                 alternateSourceHintPosition,
-                TwCompanionConfig.TransferFailurePolicy.QueueForRecall,
                 null
         );
     }
@@ -189,36 +186,6 @@ public final class CommandNpcRelocationService {
                                 long delayMs,
                                 @Nullable Vector3d sourceHintPosition,
                                 @Nullable Vector3d alternateSourceHintPosition,
-                                @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure) {
-        queueRelocation(
-                world,
-                npcUuid,
-                destination,
-                ownerUuid,
-                assignOwnerAsMasterTarget,
-                clearLockedTarget,
-                state,
-                subState,
-                delayMs,
-                sourceHintPosition,
-                alternateSourceHintPosition,
-                onTransferFailure,
-                null
-        );
-    }
-
-    public void queueRelocation(World world,
-                                UUID npcUuid,
-                                Vector3d destination,
-                                @Nullable UUID ownerUuid,
-                                boolean assignOwnerAsMasterTarget,
-                                boolean clearLockedTarget,
-                                @Nullable String state,
-                                @Nullable String subState,
-                                long delayMs,
-                                @Nullable Vector3d sourceHintPosition,
-                                @Nullable Vector3d alternateSourceHintPosition,
-                                @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                                 @Nullable String[] requiredStateFilter) {
         queueRelocation(
                 world,
@@ -232,7 +199,6 @@ public final class CommandNpcRelocationService {
                 delayMs,
                 sourceHintPosition,
                 alternateSourceHintPosition,
-                onTransferFailure,
                 requiredStateFilter,
                 false
         );
@@ -249,7 +215,6 @@ public final class CommandNpcRelocationService {
                                 long delayMs,
                                 @Nullable Vector3d sourceHintPosition,
                                 @Nullable Vector3d alternateSourceHintPosition,
-                                @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                                 @Nullable String[] requiredStateFilter,
                                 boolean explicitRecall) {
         boolean debugLag = isLagDebugEnabled();
@@ -267,7 +232,6 @@ public final class CommandNpcRelocationService {
                     delayMs,
                     sourceHintPosition,
                     alternateSourceHintPosition,
-                    onTransferFailure,
                     requiredStateFilter,
                     explicitRecall
             );
@@ -400,8 +364,7 @@ public final class CommandNpcRelocationService {
         removePending(npcUuid, pending);
     }
 
-    void dropUnconfirmedRelocation(
-            @Nullable World world, UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
+    void dropUnconfirmedRelocation(UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
         terminalService.finish(npcUuid, pending, droppedAtMs, false);
     }
 
@@ -436,9 +399,7 @@ public final class CommandNpcRelocationService {
 
     private void terminalizeRelocation(PendingRelocation pending, String reason) {
         if (pending.physicalMutationAttempted()) {
-            dropUnconfirmedRelocation(
-                    knownWorldByNpc.get(pending.npcUuid), pending.npcUuid, pending, System.currentTimeMillis()
-            );
+            dropUnconfirmedRelocation(pending.npcUuid, pending, System.currentTimeMillis());
             return;
         }
         removePending(pending.npcUuid, pending);
@@ -483,9 +444,7 @@ public final class CommandNpcRelocationService {
             PendingRelocation pending
     ) {
         if (pending.physicalMutationAttempted()) {
-            dropUnconfirmedRelocation(
-                    world, npcUuid, pending, System.currentTimeMillis()
-            );
+            dropUnconfirmedRelocation(npcUuid, pending, System.currentTimeMillis());
             return;
         }
         terminalizeRelocation(pending, "relocation-confirmation-dispatch-rejected");

@@ -45,20 +45,9 @@ class PersistenceFeatureApiContractTest {
                         -1_000,
                         -2_000
                 );
-        PopulationGroupReconciliationView groups =
-                new PopulationGroupReconciliationView(
-                        PopulationGroupReconciliationView.Readiness.READY,
-                        "ready",
-                        1,
-                        1,
-                        0,
-                        0,
-                        -2_000
-                );
 
         assertEquals(-2_000, roster.updatedAtMs());
         assertEquals(-1_000, timed.cooldownUntilMs());
-        assertEquals(-2_000, groups.updatedAtMs());
     }
 
     @Test

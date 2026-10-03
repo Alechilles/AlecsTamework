@@ -38,8 +38,7 @@ import org.joml.Vector3d;
  * {@link RestoreFlow} (reason RECALL) once its live state passes the follow state filter on its
  * own world thread. A companion whose body is already loaded in the destination world is moved by
  * the in-world relocation. A companion with no loaded body is skipped: it was not near its owner,
- * so it was not following. The old cross-world transfer is never used. Without the flow and the
- * index queries, nothing travels.</p>
+ * so it was not following. Without the flow and the index queries, nothing travels.</p>
  */
 final class CommandWorldChangeTravelCoordinator {
     private static final Logger LOGGER =
@@ -235,8 +234,7 @@ final class CommandWorldChangeTravelCoordinator {
             relocationService.queueRelocation(
                     destinationWorld, record.npcUuid, destination, player.getUuid(),
                     true, true, state.state, state.subState, 0L, sourceHint,
-                    record.homePosition, settings.getOnTransferFailure(),
-                    settings.getFollowMasterOnWorldChangeStateFilter());
+                    record.homePosition, settings.getFollowMasterOnWorldChangeStateFilter());
             queuedProfileIds.add(profileId);
             return true;
         }

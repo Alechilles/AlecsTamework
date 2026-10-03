@@ -8,8 +8,10 @@ import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateRestorer;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -33,6 +35,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -185,6 +188,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 return false;
             }
         }
+        recordSpawn(world, npcUuid, npcUuid, "coop_release_unowned", null, null);
         try {
             CompanionSaves.markChanged(ref.getStore(), ref);
         } catch (RuntimeException | LinkageError failure) {
@@ -207,6 +211,8 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                                        RestoreFlow.Destination destination, RestoreRules.Reason reason) {
         UUID profileId = committed.profileId();
         boolean unowned = committed.location().kind() == LocationKind.RELEASED;
+        // An unowned tombstone carries no NPC UUID: the body is untracked, so it gets a fresh one.
+        UUID npcUuid = unowned ? UUID.randomUUID() : committed.currentNpcUuid();
         Ref<EntityStore> ref = null;
         long worldGameTimeMs = 0L;
         try {
@@ -215,8 +221,6 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 // A newer change to the record won after the commit; it owns the outcome.
                 return false;
             }
-            // An unowned tombstone carries no NPC UUID: the body is untracked, so it gets a fresh one.
-            UUID npcUuid = unowned ? UUID.randomUUID() : committed.currentNpcUuid();
             if (npcUuid == null) {
                 warn(profileId, "committed record has no NPC UUID", null);
                 return false;
@@ -250,6 +254,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 return false;
             }
         }
+        recordSpawn(world, profileId, npcUuid, branch(reason), committed.ownerUuid(), committed.roleId());
         finishAddedBody(ref, ref.getStore(), committed, world.getName(), worldGameTimeMs, reason, snapshots,
                 queueSnapshot, !unowned);
         if (unowned) {
@@ -356,6 +361,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                 warn(profileId, "the imported name, health or attachments could not be applied", failure);
             }
         }
+        recordSpawn(world, profileId, npcUuid, branch(reason), committed.ownerUuid(), committed.roleId());
         // The snapshot taken here is the one every later restore uses; it replaces a format 0 one.
         finishAddedBody(ref, store, committed, world.getName(), worldGameTimeMs, reason, snapshots, queueSnapshot,
                 !unowned);
@@ -454,6 +460,30 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         if (links != null) {
             holder.putComponent(linksType, new TameworkCommandLinksComponent(null, new String[0],
                     links.getHomePosition()));
+        }
+    }
+
+    private static String branch(RestoreRules.Reason reason) {
+        return "restore_" + reason.name().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Records the new body for the short fall-damage grace after a spawn
+     * ({@code RespawnFallDamageGraceSystem}), as 4.x did for every respawned companion, and starts
+     * its respawn trace when {@code /tw debug log respawn-trace} is on. World thread; a failure is
+     * logged and the spawn still counts.
+     */
+    private static void recordSpawn(World world, UUID profileId, UUID npcUuid, String branch,
+                                    @Nullable UUID ownerUuid, @Nullable String roleId) {
+        try {
+            RecentSpawnProtectionService.getInstance().record(npcUuid, branch, roleId, System.currentTimeMillis());
+            if (RespawnTraceLogSupport.isEnabled()) {
+                RespawnTraceLogSupport.logProjectionResult(world, npcUuid,
+                        RespawnTraceLogSupport.startTrace(branch, null, ownerUuid, roleId, null),
+                        branch, "spawned profile=" + profileId, true);
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            warn(profileId, "spawn fall protection could not be recorded", failure);
         }
     }
 

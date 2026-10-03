@@ -94,7 +94,7 @@ public final class TameworkRuntimeActivationCoordinator {
                 }
             }
         }
-        return TameworkPersistenceActivationEvidence.dormant(false, false);
+        return TameworkPersistenceActivationEvidence.dormant();
     }
 
     /** Durable work for bonded companions when the old bonded database exists. */
@@ -103,7 +103,7 @@ public final class TameworkRuntimeActivationCoordinator {
     ) {
         return anyExists(legacyDirs, BONDED_FILE, exists)
                 ? TameworkPersistenceActivationEvidence.active(Set.of("legacy-bonded-data"))
-                : TameworkPersistenceActivationEvidence.dormant(false, false);
+                : TameworkPersistenceActivationEvidence.dormant();
     }
 
     private static boolean anyExists(Collection<Path> dirs, String name, Predicate<Path> exists) {
@@ -164,9 +164,7 @@ public final class TameworkRuntimeActivationCoordinator {
             String writableCapability,
             TameworkPersistenceActivationEvidence persistence
     ) {
-        if (!persistence.readOnly()) {
-            evidence.availableCapability(writableCapability);
-        }
+        evidence.availableCapability(writableCapability);
         if (persistence.hasDurableWork()) {
             evidence.durableState(module, persistence.diagnosticCode());
         }
