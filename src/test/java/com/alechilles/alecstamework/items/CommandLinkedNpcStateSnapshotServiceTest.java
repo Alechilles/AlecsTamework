@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import java.util.UUID;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -74,45 +73,6 @@ class CommandLinkedNpcStateSnapshotServiceTest {
                 );
 
         assertSame(index, service.getLoadedNpcIdentityIndex());
-    }
-
-    @Test
-    void projectionMarkerIsCopiedIntoAnImmutableIndexKey() {
-        UUID sourceUuid = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        TameworkProjectionIdentityComponent marker = new TameworkProjectionIdentityComponent(
-                " profile-a ",
-                " operation-a ",
-                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
-                " slot-a ",
-                sourceUuid,
-                2L
-        );
-
-        LoadedNpcIdentityIndex.ProjectionKey key =
-                CommandLinkedNpcStateSnapshotService.projectionKey(marker);
-
-        assertEquals("profile-a", key.profileId());
-        assertEquals("operation-a", key.operationId());
-        assertEquals(TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
-                key.projectionKind());
-        assertEquals("slot-a", key.slotKey());
-        assertEquals(sourceUuid, key.sourceNpcUuid());
-        assertEquals(2L, key.generation());
-    }
-
-    @Test
-    void incompleteProjectionMarkerIsExcludedFromExactIdentityIndexing() {
-        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(null));
-        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(
-                new TameworkProjectionIdentityComponent(
-                        "profile-a", "operation-a", " ", null, null, 0L
-                )
-        ));
-        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(
-                new TameworkProjectionIdentityComponent(
-                        "profile-a", "operation-a", "RECOVERY", null, null, -1L
-                )
-        ));
     }
 
     private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot(

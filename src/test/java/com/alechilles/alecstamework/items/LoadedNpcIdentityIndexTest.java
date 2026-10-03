@@ -24,15 +24,6 @@ class LoadedNpcIdentityIndexTest {
             new LoadedNpcIdentityIndex.Location("world-b", "store-b");
     private static final UUID OTHER_UUID =
             UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-    private static final LoadedNpcIdentityIndex.ProjectionKey PROJECTION_KEY =
-            new LoadedNpcIdentityIndex.ProjectionKey(
-                    "profile-a",
-                    "operation-a",
-                    "MANAGED_COOP_RELEASE",
-                    "slot-a",
-                    NPC_UUID,
-                    1L
-            );
 
     @Test
     void absenceIsUnknownUntilStoreBootstrapCompletes() {
@@ -142,26 +133,22 @@ class LoadedNpcIdentityIndexTest {
     @Test
     void exactRemovalKeepsTheSameStableIdentityInAnotherLocation() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
-        LoadedNpcIdentityIndex.ProjectionKey replacementKey =
-                new LoadedNpcIdentityIndex.ProjectionKey(
-                        "profile-a", "operation-b", "RECOVERY", null, null, 0L
-                );
-        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
-        index.recordAdded(observation(NPC_UUID, WORLD_B, replacementKey));
+        index.recordAdded(observation(NPC_UUID, WORLD_A));
+        index.recordAdded(observation(NPC_UUID, WORLD_B));
 
-        index.recordRemoved(observation(NPC_UUID, WORLD_A, null));
+        index.recordRemoved(observation(NPC_UUID, WORLD_A));
 
         assertEquals(List.of(WORLD_B), index.probe(NPC_UUID).locations());
     }
 
     @Test
-    void locationReplacementAtomicallyReconcilesProjectionObservations() {
+    void locationReplacementAtomicallyReconcilesObservations() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
-        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+        index.recordAdded(observation(NPC_UUID, WORLD_A));
 
         index.replaceLocationObservations(
                 WORLD_A,
-                List.of(observation(OTHER_UUID, WORLD_A, PROJECTION_KEY))
+                List.of(observation(OTHER_UUID, WORLD_A))
         );
         index.markInitializationComplete();
 
@@ -171,30 +158,16 @@ class LoadedNpcIdentityIndexTest {
                 IllegalArgumentException.class,
                 () -> index.replaceLocationObservations(
                         WORLD_A,
-                        List.of(observation(NPC_UUID, WORLD_B, PROJECTION_KEY))
+                        List.of(observation(NPC_UUID, WORLD_B))
                 )
         );
     }
 
     @Test
-    void projectionRecordsRejectIncompleteOrInconsistentEvidence() {
+    void observationRequiresAnNpcUuid() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new LoadedNpcIdentityIndex.ProjectionKey(
-                        " ", "operation-a", "RECOVERY", null, null, 0L
-                )
-        );
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> new LoadedNpcIdentityIndex.ProjectionKey(
-                        "profile-a", "operation-a", "RECOVERY", null, null, -1L
-                )
-        );
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> new LoadedNpcIdentityIndex.LoadedNpcObservation(
-                        null, null, WORLD_A, null
-                )
+                () -> new LoadedNpcIdentityIndex.LoadedNpcObservation(null, null, WORLD_A)
         );
     }
 
@@ -250,10 +223,7 @@ class LoadedNpcIdentityIndexTest {
 
     private static LoadedNpcIdentityIndex.LoadedNpcObservation observation(
             UUID componentUuid,
-            LoadedNpcIdentityIndex.Location location,
-            LoadedNpcIdentityIndex.ProjectionKey projectionKey) {
-        return new LoadedNpcIdentityIndex.LoadedNpcObservation(
-                componentUuid, componentUuid, location, projectionKey
-        );
+            LoadedNpcIdentityIndex.Location location) {
+        return new LoadedNpcIdentityIndex.LoadedNpcObservation(componentUuid, componentUuid, location);
     }
 }

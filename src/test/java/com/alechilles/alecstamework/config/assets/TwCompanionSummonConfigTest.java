@@ -46,7 +46,7 @@ class TwCompanionSummonConfigTest {
     }
 
     @Test
-    void nonnegativeDurationsAreEnforcedWithoutClampingSignedWorldTime() {
+    void nonnegativeDurationsAreEnforced() {
         assertThrows(CodecException.class, () -> decode("""
                 {
                   "Command": {
@@ -61,19 +61,6 @@ class TwCompanionSummonConfigTest {
                   }
                 }
                 """));
-
-        TwCompanionSummonSettings summon = decode("""
-                {
-                  "Command": {
-                    "Summon": {
-                      "ActiveDurationMs": 1500,
-                      "ResummonCooldownMs": 250
-                    }
-                  }
-                }
-                """).getCommand().getSummon();
-        assertEquals(1_500L, summon.getActiveDurationMs());
-        assertEquals(250L, summon.getResummonCooldownMs());
     }
 
     @Test

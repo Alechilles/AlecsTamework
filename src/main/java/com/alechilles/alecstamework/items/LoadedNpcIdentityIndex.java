@@ -31,8 +31,6 @@ public final class LoadedNpcIdentityIndex {
     private final Map<UUID, Set<Location>> locationsByNpc = new HashMap<>();
     private final Map<Location, Set<LoadedNpcObservation>> observationsByLocation = new HashMap<>();
     private final Map<UUID, Set<LoadedNpcObservation>> observationsByNpc = new HashMap<>();
-    private final Map<String, Set<LoadedNpcObservation>> observationsByProfile = new HashMap<>();
-    private final Map<UUID, Set<LoadedNpcObservation>> observationsBySourceNpc = new HashMap<>();
     private final Map<ObservationIdentity, LoadedNpcObservation> observationByIdentity = new HashMap<>();
     private final Map<Location, Long> mutationRevisionByLocation = new HashMap<>();
     private long mutationRevision;
@@ -67,11 +65,8 @@ public final class LoadedNpcIdentityIndex {
         }
     }
     /**
-     * Records one loaded entity, including its optional durable projection identity.
-     *
-     * <p>Re-observing the same component UUID at the same location replaces its older marker
-     * snapshot. Distinct component UUIDs remain distinct even when they carry the same marker,
-     * allowing projection probes to report duplicate live entities.</p>
+     * Records one loaded entity. Re-observing the same stable UUID at the same location replaces
+     * the older observation; duplicate add replay is harmless.
      */
     public void recordAdded(@Nullable LoadedNpcObservation observation) {
         if (observation == null) {
@@ -169,7 +164,7 @@ public final class LoadedNpcIdentityIndex {
         }
     }
 
-    /** Confirms that no loaded identity or projection evidence changed since capture. */
+    /** Confirms that no loaded identity evidence changed since capture. */
     public boolean isMutationRevisionCurrent(long expectedRevision) {
         synchronized (lock) { return mutationRevision == expectedRevision; }
     }
@@ -222,8 +217,6 @@ public final class LoadedNpcIdentityIndex {
             for (LoadedNpcObservation observation : removed) {
                 observationByIdentity.remove(ObservationIdentity.of(observation), observation);
                 deindexObservationByNpcLocked(observation);
-                deindexObservationByProfileLocked(observation);
-                deindexObservationBySourceNpcLocked(observation);
             }
         }
     }
@@ -257,76 +250,6 @@ public final class LoadedNpcIdentityIndex {
             return new Probe(npcUuid, status, ordered);
         }
     }
-    /** Returns the only loaded NPC for a stable profile or historical source alias. */
-    @Nullable
-    UUID uniqueNpcUuidForRecord(@Nullable String profileId, @Nullable UUID recordedNpcUuid) {
-        String normalized = profileId == null ? null : profileId.trim();
-        synchronized (lock) {
-            Set<LoadedNpcObservation> profileMatches = normalized == null || normalized.isEmpty()
-                    ? null : observationsByProfile.get(normalized);
-            LoadedNpcObservation match = onlyMatch(profileMatches);
-            if (hasMultipleMatches(profileMatches)) {
-                return null;
-            }
-            Set<LoadedNpcObservation> recordedAliasMatches =
-                    observationsBySourceNpc.get(recordedNpcUuid);
-            if (conflictsWith(match, recordedAliasMatches)) {
-                return null;
-            }
-            if (match == null) {
-                match = onlyMatch(recordedAliasMatches);
-            }
-            Set<LoadedNpcObservation> profileAliasMatches =
-                    observationsBySourceNpc.get(parseUuid(normalized));
-            if (conflictsWith(match, profileAliasMatches)) {
-                return null;
-            }
-            if (match == null) {
-                match = onlyMatch(profileAliasMatches);
-            }
-            if (match == null) {
-                return null;
-            }
-            return match.componentUuid() != null
-                    ? match.componentUuid()
-                    : match.legacyUuid();
-        }
-    }
-
-    @Nullable
-    private static LoadedNpcObservation onlyMatch(
-            @Nullable Set<LoadedNpcObservation> candidates) {
-        return candidates != null && candidates.size() == 1
-                ? candidates.iterator().next()
-                : null;
-    }
-
-    private static boolean hasMultipleMatches(
-            @Nullable Set<LoadedNpcObservation> candidates) {
-        return candidates != null && candidates.size() > 1;
-    }
-
-    private static boolean conflictsWith(
-            @Nullable LoadedNpcObservation current,
-            @Nullable Set<LoadedNpcObservation> candidates) {
-        if (hasMultipleMatches(candidates)) {
-            return true;
-        }
-        LoadedNpcObservation candidate = onlyMatch(candidates);
-        return current != null && candidate != null && !current.equals(candidate);
-    }
-
-    @Nullable
-    private static UUID parseUuid(@Nullable String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
     private void indexObservationLocked(@Nonnull LoadedNpcObservation observation) {
         ObservationIdentity identity = ObservationIdentity.of(observation);
         LoadedNpcObservation prior = observationByIdentity.get(identity);
@@ -346,16 +269,6 @@ public final class LoadedNpcIdentityIndex {
         }
         for (UUID npcUuid : observation.identityUuids()) {
             observationsByNpc.computeIfAbsent(npcUuid, ignored -> new HashSet<>()).add(observation);
-        }
-        ProjectionKey projectionKey = observation.projectionKey();
-        if (projectionKey != null) {
-            observationsByProfile.computeIfAbsent(
-                    projectionKey.profileId(), ignored -> new HashSet<>()).add(observation);
-            UUID sourceNpcUuid = projectionKey.sourceNpcUuid();
-            if (sourceNpcUuid != null) {
-                observationsBySourceNpc.computeIfAbsent(
-                        sourceNpcUuid, ignored -> new HashSet<>()).add(observation);
-            }
         }
     }
     private void deindexObservationByNpcLocked(@Nonnull LoadedNpcObservation observation) {
@@ -387,40 +300,8 @@ public final class LoadedNpcIdentityIndex {
             }
         }
         deindexObservationByNpcLocked(observation);
-        deindexObservationByProfileLocked(observation);
-        deindexObservationBySourceNpcLocked(observation);
     }
 
-    private void deindexObservationByProfileLocked(@Nonnull LoadedNpcObservation observation) {
-        ProjectionKey projectionKey = observation.projectionKey();
-        if (projectionKey == null) {
-            return;
-        }
-        Set<LoadedNpcObservation> observations = observationsByProfile.get(projectionKey.profileId());
-        if (observations == null) {
-            return;
-        }
-        observations.remove(observation);
-        if (observations.isEmpty()) {
-            observationsByProfile.remove(projectionKey.profileId());
-        }
-    }
-
-    private void deindexObservationBySourceNpcLocked(@Nonnull LoadedNpcObservation observation) {
-        ProjectionKey projectionKey = observation.projectionKey();
-        UUID sourceNpcUuid = projectionKey != null ? projectionKey.sourceNpcUuid() : null;
-        if (sourceNpcUuid == null) {
-            return;
-        }
-        Set<LoadedNpcObservation> observations = observationsBySourceNpc.get(sourceNpcUuid);
-        if (observations == null) {
-            return;
-        }
-        observations.remove(observation);
-        if (observations.isEmpty()) {
-            observationsBySourceNpc.remove(sourceNpcUuid);
-        }
-    }
     private void removeObservationsLocked(
             @Nonnull Location location,
             @Nonnull java.util.function.Predicate<LoadedNpcObservation> predicate) {
@@ -435,8 +316,6 @@ public final class LoadedNpcIdentityIndex {
                 iterator.remove();
                 observationByIdentity.remove(ObservationIdentity.of(observation), observation);
                 deindexObservationByNpcLocked(observation);
-                deindexObservationByProfileLocked(observation);
-                deindexObservationBySourceNpcLocked(observation);
             }
         }
         if (observations.isEmpty()) {
@@ -488,39 +367,10 @@ public final class LoadedNpcIdentityIndex {
             return value.trim();
         }
     }
-    /** Immutable durable marker identity used to correlate one planned NPC projection. */
-    public record ProjectionKey(@Nonnull String profileId,
-                                @Nonnull String operationId,
-                                @Nonnull String projectionKind,
-                                @Nullable String slotKey,
-                                @Nullable UUID sourceNpcUuid,
-                                long generation) {
-        public ProjectionKey {
-            profileId = requireText(profileId, "profileId");
-            operationId = requireText(operationId, "operationId");
-            projectionKind = requireText(projectionKind, "projectionKind");
-            slotKey = optionalText(slotKey);
-            if (generation < 0L) {
-                throw new IllegalArgumentException("generation must be non-negative");
-            }
-        }
-        @Nonnull
-        private static String requireText(@Nullable String value, @Nonnull String fieldName) {
-            if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException(fieldName + " must not be blank");
-            }
-            return value.trim();
-        }
-        @Nullable
-        private static String optionalText(@Nullable String value) {
-            return value == null || value.isBlank() ? null : value.trim(); }
-    }
-
-    /** Immutable observation of one loaded NPC and its optional durable projection marker. */
+    /** Immutable observation of one loaded NPC at one location. */
     public record LoadedNpcObservation(@Nullable UUID componentUuid,
                                        @Nullable UUID legacyNpcUuid,
-                                       @Nonnull Location location,
-                                       @Nullable ProjectionKey projectionKey) {
+                                       @Nonnull Location location) {
         public LoadedNpcObservation {
             if (componentUuid == null && legacyNpcUuid == null) {
                 throw new IllegalArgumentException("At least one NPC UUID must be present.");

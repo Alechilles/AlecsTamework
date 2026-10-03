@@ -5,7 +5,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Resolves restored active companions through the event-maintained live profile index. */
+/** Resolves the highlight target of an active command record: its recorded NPC while loaded. */
 final class CommandActiveNpcHighlightTargetResolver {
     private final LoadedNpcIdentityIndex identities;
 
@@ -17,13 +17,7 @@ final class CommandActiveNpcHighlightTargetResolver {
     UUID resolve(@Nonnull UUID recordedNpcUuid,
                  @Nullable String profileId,
                  @Nonnull LoadedTargetProbe loadedTargetProbe) {
-        if (loadedTargetProbe.isLoaded(recordedNpcUuid)) {
-            return recordedNpcUuid;
-        }
-        UUID currentNpcUuid = identities.uniqueNpcUuidForRecord(profileId, recordedNpcUuid);
-        return currentNpcUuid != null && loadedTargetProbe.isLoaded(currentNpcUuid)
-                ? currentNpcUuid
-                : null;
+        return loadedTargetProbe.isLoaded(recordedNpcUuid) ? recordedNpcUuid : null;
     }
 
     @FunctionalInterface

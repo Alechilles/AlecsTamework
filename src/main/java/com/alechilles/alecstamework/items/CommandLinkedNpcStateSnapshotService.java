@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -162,37 +161,7 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (componentUuid == null && legacyNpcUuid == null) {
             return null;
         }
-        // No projection key: the retired projection identity is no longer read, and nothing
-        // looks a loaded NPC up by it.
-        return new LoadedNpcIdentityIndex.LoadedNpcObservation(
-                componentUuid,
-                legacyNpcUuid,
-                location,
-                null
-        );
-    }
-
-    /**
-     * Maps a retired projection marker to an index key. Live code no longer reads the marker;
-     * only the unregistered 4.x identity bootstrap still calls this.
-     */
-    @Nullable
-    static LoadedNpcIdentityIndex.ProjectionKey projectionKey(
-            @Nullable TameworkProjectionIdentityComponent marker) {
-        if (marker == null || marker.getProfileId() == null || marker.getProfileId().isBlank()
-                || marker.getOperationId() == null || marker.getOperationId().isBlank()
-                || marker.getProjectionKind() == null || marker.getProjectionKind().isBlank()
-                || marker.getGeneration() < 0L) {
-            return null;
-        }
-        return new LoadedNpcIdentityIndex.ProjectionKey(
-                marker.getProfileId(),
-                marker.getOperationId(),
-                marker.getProjectionKind(),
-                marker.getSlotKey(),
-                marker.getSourceNpcUuid(),
-                marker.getGeneration()
-        );
+        return new LoadedNpcIdentityIndex.LoadedNpcObservation(componentUuid, legacyNpcUuid, location);
     }
 
     @Nullable

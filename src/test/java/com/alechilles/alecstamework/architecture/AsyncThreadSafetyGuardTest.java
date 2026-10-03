@@ -33,6 +33,20 @@ class AsyncThreadSafetyGuardTest {
             "getWorld().getPlayerRefs("
     );
 
+    /**
+     * Calls that wait. Systems run on the world thread, so any of these stalls the whole world
+     * tick until a future, lock or storage call finishes.
+     */
+    private static final List<String> BLOCKING_TOKENS = List.of(
+            ".toCompletableFuture().join(",
+            "Thread.sleep(",
+            "LockSupport.park",
+            "CountDownLatch",
+            ".await(",
+            "java.sql.",
+            "DataSource"
+    );
+
     private static final List<String> DIRECT_PLAYER_COMPONENT_TOKENS = List.of(
             "PlayerRef.getComponent(Player",
             ".getHolder().getComponent(Player.getComponentType())"
@@ -78,6 +92,27 @@ class AsyncThreadSafetyGuardTest {
                 violations.isEmpty(),
                 () -> "System files that schedule async work must not access PlayerRef-affine APIs. "
                         + "Capture UUIDs and resolve components inside world.execute(...).\nViolations:\n"
+                        + String.join("\n", violations)
+        );
+    }
+
+    @Test
+    void systemsNeverBlockTheWorldThread() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path systemFile : listSystemFiles()) {
+            String content = Files.readString(systemFile, StandardCharsets.UTF_8);
+            for (String token : BLOCKING_TOKENS) {
+                if (content.contains(token)) {
+                    violations.add(toUnixRelativePath(systemFile) + " contains " + token);
+                }
+            }
+        }
+
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Tick systems run on the world thread and must not wait on futures, locks, sleeps "
+                        + "or storage. Queue the work and apply its result on a later tick or through "
+                        + "world.execute(...).\nViolations:\n"
                         + String.join("\n", violations)
         );
     }
