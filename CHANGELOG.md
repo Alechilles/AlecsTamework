@@ -117,9 +117,9 @@ Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
 - Owned and group limits count every owned companion, including those in items,
   rosters, coops, dead and lost. Admin tamed spawns of managed roles count
   toward limits like any other new companion.
-- Dead and lost companion cards show a status strip. Dead cards show the time
-  of death and the revive countdown; lost cards show that the companion is
-  missing and ready to recover.
+- Dead and lost companion cards show a status strip. Dead cards show the revive
+  countdown, or that the companion is ready to revive; lost cards show that the
+  companion is missing and ready to recover.
 - Bonded companions are stored with all other companions. A revive brings the
   companion back active at the chosen place and needs a free active slot; the
   cost is charged first and refunded if the revive fails. Bonded companions are
@@ -136,7 +136,7 @@ Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
   mod's check is missing, slow or failing, and a limit of 0 allows none. A
   first attempt may answer "checking requirements, try again". These messages
   no longer mention Husbandry.
-- The mod jar is about 10 MB smaller. The bundled SQLite driver is used only by
+- The mod jar is about half the size (30 MB down to 16 MB). The bundled SQLite driver is used only by
   the importer and keeps native files for Windows x64, Linux x64 and ARM64
   (including Alpine), and macOS x64 and ARM64. On other platforms the import
   fails without changing anything.
@@ -156,6 +156,9 @@ Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
   load but are ignored; the captured companion ownership mode decides. Existing
   capture-clears-owner and spawn-sets-owner settings map to the nearest mode. A
   capture with `TamesTarget` always tames.
+- The companion config field `Travel.OnTransferFailure` still loads but is
+  ignored. Recall across worlds respawns the companion from its saved state, so
+  there is no transfer to fail.
 - Public API entry points `commandFamilyRosters()`, `commandTimedSummoning()`,
   `companionProvisioning()`, `paidCommandRevival()`,
   `policies().populationAdmissions()` with its reservation tokens,
