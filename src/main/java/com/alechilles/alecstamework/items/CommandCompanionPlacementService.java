@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
@@ -381,15 +382,15 @@ public final class CommandCompanionPlacementService {
         if (feetChunk == null || headChunk == null || groundChunk == null) {
             return false;
         }
-        int feetFluid = feetChunk.getFluidId(blockX, blockY, blockZ);
-        int headFluid = headChunk.getFluidId(blockX, blockY + 1, blockZ);
-        int groundFluid = groundChunk.getFluidId(blockX, blockY - 1, blockZ);
+        int feetFluid = HytaleBlockStateAccess.fluidIdAt(feetChunk, blockX, blockY, blockZ);
+        int headFluid = HytaleBlockStateAccess.fluidIdAt(headChunk, blockX, blockY + 1, blockZ);
+        int groundFluid = HytaleBlockStateAccess.fluidIdAt(groundChunk, blockX, blockY - 1, blockZ);
         if (feetFluid != 0 || headFluid != 0) {
             return false;
         }
-        int feetBlockId = feetChunk.getBlock(blockX, blockY, blockZ);
-        int headBlockId = headChunk.getBlock(blockX, blockY + 1, blockZ);
-        int groundBlockId = groundChunk.getBlock(blockX, blockY - 1, blockZ);
+        int feetBlockId = HytaleBlockStateAccess.blockIdAt(feetChunk, blockX, blockY, blockZ);
+        int headBlockId = HytaleBlockStateAccess.blockIdAt(headChunk, blockX, blockY + 1, blockZ);
+        int groundBlockId = HytaleBlockStateAccess.blockIdAt(groundChunk, blockX, blockY - 1, blockZ);
         if (isSolidBlock(feetBlockId, feetFluid) || isSolidBlock(headBlockId, headFluid)) {
             return false;
         }
@@ -422,7 +423,7 @@ public final class CommandCompanionPlacementService {
     }
 
     private boolean isSolidBlock(int blockId, int fluidId) {
-        if (blockId == 0) {
+        if (blockId <= 0) {
             return false;
         }
         BlockType blockType = BlockType.getAssetMap().getAsset(blockId);

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.scarecrow;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -134,19 +135,20 @@ public final class ScarecrowPlacementService {
     }
 
     private static boolean isOpen(WorldChunk chunk, int blockX, int blockY, int blockZ) {
-        return chunk.getBlock(blockX, blockY, blockZ) == 0
-                && chunk.getFluidId(blockX, blockY, blockZ) == 0;
+        return HytaleBlockStateAccess.blockIdAt(chunk, blockX, blockY, blockZ) == 0
+                && HytaleBlockStateAccess.fluidIdAt(chunk, blockX, blockY, blockZ) == 0;
     }
 
     private static boolean isSolid(WorldChunk chunk, int blockX, int blockY, int blockZ) {
-        int blockId = chunk.getBlock(blockX, blockY, blockZ);
-        if (blockId == 0) {
+        int blockId = HytaleBlockStateAccess.blockIdAt(chunk, blockX, blockY, blockZ);
+        if (blockId <= 0) {
             return false;
         }
         BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
         return blockType != null
                 && blockType != BlockType.UNKNOWN
-                && WorldUtil.isSolidOnlyBlock(blockType, chunk.getFluidId(blockX, blockY, blockZ));
+                && WorldUtil.isSolidOnlyBlock(blockType,
+                        HytaleBlockStateAccess.fluidIdAt(chunk, blockX, blockY, blockZ));
     }
 
     private static boolean hasScarecrowAt(@Nonnull World world, @Nonnull Vector3d position) {

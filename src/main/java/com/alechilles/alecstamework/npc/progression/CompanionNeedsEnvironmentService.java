@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -571,7 +572,7 @@ public final class CompanionNeedsEnvironmentService {
                            @Nullable Vector3d consumeOrigin) {
         TargetBlock target = resolveTargetBlock(store, consumeOrigin);
         return target != null
-                && target.worldChunk().getFluidId(
+                && HytaleBlockStateAccess.fluidIdAt(target.worldChunk(),
                         target.x(), target.y(), target.z()) != 0;
     }
 
@@ -2108,7 +2109,7 @@ public final class CompanionNeedsEnvironmentService {
         if (worldChunk == null) {
             return false;
         }
-        if (worldChunk.getFluidId(blockX, blockY, blockZ) != 0) {
+        if (HytaleBlockStateAccess.fluidIdAt(worldChunk, blockX, blockY, blockZ) != 0) {
             return true;
         }
         return isConsumableWaterTroughAt(worldChunk, chunkStore, blockX, blockY, blockZ);
@@ -2122,7 +2123,7 @@ public final class CompanionNeedsEnvironmentService {
         if (worldChunk == null) {
             return false;
         }
-        int blockId = worldChunk.getBlock(blockX, blockY, blockZ);
+        int blockId = HytaleBlockStateAccess.blockIdAt(worldChunk, blockX, blockY, blockZ);
         if (!isWaterTroughBlockId(blockId)) {
             return false;
         }
@@ -2138,7 +2139,7 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     private static boolean isWaterTroughBlockId(int blockId) {
-        if (blockId == 0) {
+        if (blockId <= 0) {
             return false;
         }
         return WATER_TROUGH_BLOCK_ID_CACHE.computeIfAbsent(
