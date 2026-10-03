@@ -306,7 +306,7 @@ class BondedTalentUpdatesTest {
     void anActiveCompanionIsChangedOnItsBodyNotInItsSnapshot() {
         CompanionRecord record = insert(CompanionLocation.live("default", 0, 0, 0));
         liveOutcome = new BondedTalentUpdates.Outcome(BondedTalentUpdates.Status.APPLIED,
-                swiftBought(), 6, null);
+                swiftBought(), 6, null, null);
 
         BondedCompanionResult<BondedCompanionProfileView> result = api.updateTalents(purchase(record, "swift")).join();
 

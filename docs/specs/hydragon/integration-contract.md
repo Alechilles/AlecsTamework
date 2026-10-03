@@ -4,11 +4,10 @@
 - External mod: HyDragon
 - Dependency: HyDragon requires Tamework
 - Public API contract: API `3.0.0` (`TameworkApi.getApiVersion()`)
-- Required range in the HyDragon manifest, build, and runtime bridge: on the
-  local `tamework-api-3` branch it is `>=4.3.1`, because the Tamework branch
-  build still reports 4.3.1. Raise it to `>=5.0.0` when Tamework's
-  `mod_version` becomes 5.0.0. Until then the range also admits the released
-  4.3.1, which has the old API.
+- Tamework floor: `>=5.0.0`. Tamework's `mod_version` is now 5.0.0, the first
+  release with API `3.0.0`. The HyDragon manifest, build, and runtime bridge
+  must require `>=5.0.0`; any lower range (such as `>=4.3.1`) also admits the
+  released 4.3.x, which has the old API.
 - Validation status: HyDragon unit and packaging tests pass against the branch
   jar. The live check with both mods is pending.
 

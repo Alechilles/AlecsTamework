@@ -1260,7 +1260,7 @@ tamework.ui.shared.levelAbbreviation=Nv.
 
 tamework.commands.activationStatus.activation.fingerprint.reload=Activatiativado fingerprint={0}, reload={1}.
 tamework.commands.activationStatus.description=Mostrar Tamework runtime activatiativado estado.
-tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, sistemas={2}, callbacks={3}, ciclosDeTrabalho={4}, trabalhadores={5}, assinaturas={6}, aberturasDeBanco={7}, motivos={8}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, sistemas={2}, callbacks={3}, ciclosDeTrabalho={4}, trabalhadores={5}, assinaturas={6}, motivos={7}.
 tamework.commands.activationStatus.tamework.activation.state.is.not.available=Tamework activatiativado estado não está dispativadoível.
 tamework.commands.addTrait.description=Adiciativadoar ativadoe traço para o NPC Você are looking at.
 tamework.commands.addTrait.no.enabled.trait.config.resolved.for.this=No enabled traço Cativadofiguraçãouração resolved para this NPC (função/config lookup failed).

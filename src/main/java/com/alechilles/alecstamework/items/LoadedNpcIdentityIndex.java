@@ -18,9 +18,9 @@ import javax.annotation.Nullable;
 /**
  * Event-maintained index of loaded NPC UUIDs and their immutable world/store locations.
  *
- * <p>The index deliberately retains no live ECS objects. Probes remain {@link ProbeStatus#UNKNOWN}
- * until an external store bootstrap marks initialization complete, so partial event observation cannot
- * misreport a UUID as absent.
+ * <p>The index deliberately retains no live ECS objects. A UUID with no evidence is
+ * {@link ProbeStatus#UNKNOWN}, never "absent": the index only hears events, so a miss does not
+ * prove the NPC is not loaded.
  */
 public final class LoadedNpcIdentityIndex {
     private static final Comparator<Location> LOCATION_ORDER = Comparator
@@ -32,20 +32,7 @@ public final class LoadedNpcIdentityIndex {
     private final Map<Location, Set<LoadedNpcObservation>> observationsByLocation = new HashMap<>();
     private final Map<UUID, Set<LoadedNpcObservation>> observationsByNpc = new HashMap<>();
     private final Map<ObservationIdentity, LoadedNpcObservation> observationByIdentity = new HashMap<>();
-    private boolean initializationComplete;
 
-    /** Marks a separately performed store bootstrap complete, making future misses authoritative. */
-    public void markInitializationComplete() {
-        synchronized (lock) {
-            initializationComplete = true;
-        }
-    }
-    /** Revokes authoritative absence while one or more entity stores are being enumerated. */
-    public void markInitializationIncomplete() {
-        synchronized (lock) {
-            initializationComplete = false;
-        }
-    }
     /** Records an NPC at one exact world/store location. Duplicate add replay is harmless. */
     public void recordAdded(@Nullable UUID npcUuid, @Nullable Location location) {
         if (npcUuid == null || location == null) {
@@ -173,10 +160,7 @@ public final class LoadedNpcIdentityIndex {
                 }
             }
             if (locations.isEmpty()) {
-                ProbeStatus missingStatus = initializationComplete
-                        ? ProbeStatus.ABSENT
-                        : ProbeStatus.UNKNOWN;
-                return new Probe(npcUuid, missingStatus, List.of());
+                return new Probe(npcUuid, ProbeStatus.UNKNOWN, List.of());
             }
             List<Location> ordered = new ArrayList<>(locations);
             ordered.sort(LOCATION_ORDER);
@@ -271,14 +255,9 @@ public final class LoadedNpcIdentityIndex {
             locationsByNpc.remove(npcUuid);
         }
     }
-    public boolean isInitializationComplete() {
-        synchronized (lock) {
-            return initializationComplete;
-        }
-    }
 
-    /** Completeness/conflict state for one UUID probe. */
-    public enum ProbeStatus { UNKNOWN, ABSENT, ONE_LOCATION, MULTIPLE_LOCATIONS }
+    /** Evidence state for one UUID probe. */
+    public enum ProbeStatus { UNKNOWN, ONE_LOCATION, MULTIPLE_LOCATIONS }
 
     private record ObservationIdentity(@Nonnull Location location, @Nonnull UUID stableIdentity) {
         private static ObservationIdentity of(@Nonnull LoadedNpcObservation observation) {

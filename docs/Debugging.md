@@ -100,7 +100,11 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
   support, collect the server log and, after an import, the
   `import-report-*.txt` file from `universe/Tamework/Data`.
 - Companion store problems show in the server log, such as a failed write or
-  an unreadable owner file (moved aside with an `.unreadable-` suffix). The
+  an unreadable owner file (moved aside with an `.unreadable-` suffix). A
+  failed write logs the WARN `Companion data was not written (<n> owner files
+  and <n> snapshots pending); it stays in memory and the write is retried`, at
+  most once a minute while writes keep failing. The unwritten data stays in
+  memory and the write is retried. The
   Public API
   diagnostics view reports record counts by location, the last flush time,
   the last failure, and unreadable records.

@@ -111,7 +111,8 @@ file writes. The world thread never reads or writes companion files.
   one WARN per file.
 - A failed write keeps its work pending and retries with backoff from 1 second up
   to 30 seconds. Nothing unwritten is dropped. Memory stays authoritative for the
-  running server, and the failure shows in diagnostics.
+  running server. The failure shows in diagnostics and as a WARN in the server
+  log, at most once a minute (see "Useful log lines").
 
 **Flows that commit before a live effect.** Capture, release from an item, store,
 summon, recall restore, revive, coop intake and coop release change the record in
@@ -251,6 +252,10 @@ Useful log lines:
   (SEVERE): the store did not load.
 - `Companion persistence is disabled until the ... companion data on this world is
   imported` (WARN): a failed import; read the import report.
+- `Companion data was not written (<n> owner files and <n> snapshots pending); it
+  stays in memory and the write is retried` (WARN): a save failed. The line is
+  logged at most once a minute while saves keep failing and carries the cause.
+  Check disk space and file permissions under `universe/Tamework/Companions`.
 
 For a support request, send the server log, the import report if the update
 failed, and a copy of the `Companions` folder taken while the server is stopped.

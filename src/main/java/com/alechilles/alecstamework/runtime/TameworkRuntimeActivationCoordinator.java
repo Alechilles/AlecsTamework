@@ -27,16 +27,23 @@ public final class TameworkRuntimeActivationCoordinator {
     private static final String BONDED_WRITABLE = "bonded-persistence-writable";
     private static final String COMPANION_STORE = "companion-store";
     private static final String BONDED_FILE = "bonded-companions.sqlite";
+    /** The activation reason reported when old save files exist. */
+    private static final String LEGACY_DATA_PRESENT = "durable-state-present";
 
     private final TameworkRuntimeActivationPlanner planner =
             new TameworkRuntimeActivationPlanner(TameworkRuntimeModuleCatalog.standard());
 
-    /** Immutable startup inputs that precede construction of active services. */
+    /**
+     * Immutable startup inputs that precede construction of active services.
+     *
+     * @param genericLegacyData whether any old Tamework save file exists
+     * @param bondedLegacyData  whether the old bonded database exists
+     */
     public record Preparation(
             TameworkRuntimeActivationPlan plan,
             TameworkDataPathLayout dataPathLayout,
-            TameworkPersistenceActivationEvidence genericPersistence,
-            TameworkPersistenceActivationEvidence bondedPersistence
+            boolean genericLegacyData,
+            boolean bondedLegacyData
     ) {
     }
 
@@ -52,8 +59,8 @@ public final class TameworkRuntimeActivationCoordinator {
         TameworkDataPathLayout layout = new TameworkDataPathService(logger)
                 .resolveDataPathLayout(pluginDataDirectory);
         List<Path> legacyDirs = layout.persistenceSourceDirectories();
-        TameworkPersistenceActivationEvidence generic = legacyDataEvidence(legacyDirs, Files::exists);
-        TameworkPersistenceActivationEvidence bonded = legacyBondedEvidence(legacyDirs, Files::exists);
+        boolean generic = legacyDataPresent(legacyDirs, Files::exists);
+        boolean bonded = anyExists(legacyDirs, BONDED_FILE, Files::exists);
         boolean companionStore = companionStoreExists();
         if (Universe.get() == null) {
             logger.at(java.util.logging.Level.FINE).log(
@@ -69,41 +76,29 @@ public final class TameworkRuntimeActivationCoordinator {
     public TameworkReloadTopologyReport compare(
             TameworkRuntimeActivationPlan startup,
             Map<TameworkRuntimeModule, Set<String>> requestedCapabilities,
-            TameworkPersistenceActivationEvidence genericPersistence,
-            TameworkPersistenceActivationEvidence bondedPersistence
+            boolean genericLegacyData,
+            boolean bondedLegacyData
     ) {
         TameworkRuntimeActivationPlan candidate = planner.plan(evidence(
-                requestedCapabilities, genericPersistence, bondedPersistence, companionStoreExists()
+                requestedCapabilities, genericLegacyData, bondedLegacyData, companionStoreExists()
         ));
         return TameworkReloadTopologyReport.compare(startup, candidate);
     }
 
     /**
-     * Durable work for the companion store whenever any old Tamework save file exists: 3.x/4.x
-     * databases, a 2.x database, or 2.x {@code .dat} bundles. Persistence must start for such a
-     * world even when no asset asks for it, or neither the importer nor
-     * {@code /tw persistence start-fresh} could ever run.
+     * Whether any old Tamework save file exists: 3.x/4.x databases, a 2.x database, or 2.x
+     * {@code .dat} bundles. Persistence must start for such a world even when no asset asks for
+     * it, or neither the importer nor {@code /tw persistence start-fresh} could ever run.
      */
-    static TameworkPersistenceActivationEvidence legacyDataEvidence(
-            Collection<Path> legacyDirs, Predicate<Path> exists
-    ) {
+    static boolean legacyDataPresent(Collection<Path> legacyDirs, Predicate<Path> exists) {
         for (CompanionStorage.LegacyKind kind : CompanionStorage.LegacyKind.values()) {
             for (String name : kind.files()) {
                 if (anyExists(legacyDirs, name, exists)) {
-                    return TameworkPersistenceActivationEvidence.active();
+                    return true;
                 }
             }
         }
-        return TameworkPersistenceActivationEvidence.dormant();
-    }
-
-    /** Durable work for bonded companions when the old bonded database exists. */
-    static TameworkPersistenceActivationEvidence legacyBondedEvidence(
-            Collection<Path> legacyDirs, Predicate<Path> exists
-    ) {
-        return anyExists(legacyDirs, BONDED_FILE, exists)
-                ? TameworkPersistenceActivationEvidence.active()
-                : TameworkPersistenceActivationEvidence.dormant();
+        return false;
     }
 
     private static boolean anyExists(Collection<Path> dirs, String name, Predicate<Path> exists) {
@@ -117,17 +112,17 @@ public final class TameworkRuntimeActivationCoordinator {
 
     private static TameworkActivationEvidence evidence(
             Map<TameworkRuntimeModule, Set<String>> requests,
-            TameworkPersistenceActivationEvidence generic,
-            TameworkPersistenceActivationEvidence bonded,
+            boolean genericLegacyData,
+            boolean bondedLegacyData,
             boolean companionStore
     ) {
         TameworkActivationEvidence.Builder evidence = baseEvidence(requests)
                 .requiredCapability(TameworkRuntimeModule.GENERIC_PERSISTENCE, GENERIC_WRITABLE)
                 .requiredCapability(TameworkRuntimeModule.BONDED_PERSISTENCE, BONDED_WRITABLE);
         addPersistenceEvidence(evidence, TameworkRuntimeModule.GENERIC_PERSISTENCE,
-                GENERIC_WRITABLE, generic);
+                GENERIC_WRITABLE, genericLegacyData);
         addPersistenceEvidence(evidence, TameworkRuntimeModule.BONDED_PERSISTENCE,
-                BONDED_WRITABLE, bonded);
+                BONDED_WRITABLE, bondedLegacyData);
         if (companionStore) {
             evidence.durableState(TameworkRuntimeModule.GENERIC_PERSISTENCE, COMPANION_STORE);
         }
@@ -162,11 +157,11 @@ public final class TameworkRuntimeActivationCoordinator {
             TameworkActivationEvidence.Builder evidence,
             TameworkRuntimeModule module,
             String writableCapability,
-            TameworkPersistenceActivationEvidence persistence
+            boolean legacyDataPresent
     ) {
         evidence.availableCapability(writableCapability);
-        if (persistence.hasDurableWork()) {
-            evidence.durableState(module, persistence.diagnosticCode());
+        if (legacyDataPresent) {
+            evidence.durableState(module, LEGACY_DATA_PRESENT);
         }
     }
 }

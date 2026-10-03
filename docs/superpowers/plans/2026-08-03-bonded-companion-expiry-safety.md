@@ -1,5 +1,7 @@
 # Bonded Companion Expiry Warnings and Safe Landing Implementation Plan
 
+> Historical: this plan names classes from the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Alert a bonded companion owner before a finite lease expires and prevent fall damage after an expiry-caused dismount.

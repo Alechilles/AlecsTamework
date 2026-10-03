@@ -146,7 +146,7 @@ public final class HytaleBondedBodies implements BondedSummonEffects.Bodies, Bon
         CompanionLevelingService.LevelingSnapshot leveling = CompanionLevelingService.resolveSnapshot(
                 body, store, CompanionRoleIdResolver.resolveRoleId(body, store));
         return new BondedTalentUpdates.Outcome(BondedTalentUpdates.Status.APPLIED, talents.clone(),
-                leveling == null ? 1 : leveling.level(), leveling == null ? null : leveling.configId());
+                leveling == null ? 1 : leveling.level(), leveling == null ? null : leveling.configId(), null);
     }
 
     private boolean onBody(UUID profileId, BiConsumer<World, Ref<EntityStore>> action) {

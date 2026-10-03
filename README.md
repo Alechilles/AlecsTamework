@@ -120,7 +120,7 @@ Player-facing Tamework config strings support `server.lang` keys. Built-in talen
 - [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
-- [HyDragon / API 0.9 Integration Guide](https://wiki.hytalemodding.dev/mod/alecs-tamework/hydragon-integration-guide)
+- [HyDragon / API 3.0 Integration Guide](https://wiki.hytalemodding.dev/mod/alecs-tamework/hydragon-integration-guide)
 
 ## Licensing
 Tamework is licensed under the [GNU General Public License v3.0 with an attribution clause](LICENSE.txt). You may use, modify, and redistribute Tamework under GPLv3.

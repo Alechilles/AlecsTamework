@@ -54,11 +54,6 @@ public final class TameworkRuntimeDiagnostics {
         increment(module, CounterKind.SUBSCRIPTIONS);
     }
 
-    /** Records one database-open attempt for a known module. */
-    public void recordDatabaseOpen(TameworkRuntimeModule module) {
-        increment(module, CounterKind.DATABASE_OPENS);
-    }
-
     /** Returns an immutable value snapshot for one module's counters. */
     public CounterSnapshot countersFor(TameworkRuntimeModule module) {
         return counters(module).snapshot();
@@ -114,8 +109,7 @@ public final class TameworkRuntimeDiagnostics {
         CALLBACKS,
         WORK_CYCLES,
         WORKER_STARTS,
-        SUBSCRIPTIONS,
-        DATABASE_OPENS
+        SUBSCRIPTIONS
     }
 
     private static final class Counters {
@@ -124,7 +118,6 @@ public final class TameworkRuntimeDiagnostics {
         private final AtomicLong workCycles = new AtomicLong();
         private final AtomicLong workerStarts = new AtomicLong();
         private final AtomicLong subscriptions = new AtomicLong();
-        private final AtomicLong databaseOpens = new AtomicLong();
 
         private void increment(CounterKind kind) {
             switch (kind) {
@@ -133,7 +126,6 @@ public final class TameworkRuntimeDiagnostics {
                 case WORK_CYCLES -> workCycles.incrementAndGet();
                 case WORKER_STARTS -> workerStarts.incrementAndGet();
                 case SUBSCRIPTIONS -> subscriptions.incrementAndGet();
-                case DATABASE_OPENS -> databaseOpens.incrementAndGet();
             }
         }
 
@@ -143,8 +135,7 @@ public final class TameworkRuntimeDiagnostics {
                     callbacks.get(),
                     workCycles.get(),
                     workerStarts.get(),
-                    subscriptions.get(),
-                    databaseOpens.get()
+                    subscriptions.get()
             );
         }
     }
@@ -155,19 +146,18 @@ public final class TameworkRuntimeDiagnostics {
             long callbacks,
             long workCycles,
             long workerStarts,
-            long subscriptions,
-            long databaseOpens
+            long subscriptions
     ) {
         public CounterSnapshot {
             if (systemRegistrations < 0L || callbacks < 0L || workCycles < 0L || workerStarts < 0L
-                    || subscriptions < 0L || databaseOpens < 0L) {
+                    || subscriptions < 0L) {
                 throw new IllegalArgumentException("Diagnostic counters cannot be negative");
             }
         }
 
         /** Returns an all-zero counter snapshot. */
         public static CounterSnapshot zero() {
-            return new CounterSnapshot(0L, 0L, 0L, 0L, 0L, 0L);
+            return new CounterSnapshot(0L, 0L, 0L, 0L, 0L);
         }
     }
 

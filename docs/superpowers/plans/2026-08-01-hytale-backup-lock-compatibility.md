@@ -1,5 +1,7 @@
 # Hytale Backup Lock Compatibility Implementation Plan
 
+> Historical: this plan names classes from the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prevent Tamework's held persistence lock files from causing base-game Hytale backups to fail on Windows while preserving single-process ownership and safe upgrades from older Tamework builds.

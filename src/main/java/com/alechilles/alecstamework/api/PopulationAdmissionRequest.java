@@ -49,9 +49,7 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
             throw new IllegalArgumentException("Exact requested slots must be positive.");
         }
         if (exactSlots != 1) {
-            throw new IllegalArgumentException(
-                    "A single-profile admission reserves one slot; use PopulationBatchAdmissionRequest for batches."
-            );
+            throw new IllegalArgumentException("A single-profile admission reserves one slot.");
         }
         validateForce(operation, forcePolicy);
         validateLifecycle(operation, newOwnerUuid, destination, targetLifecycle);

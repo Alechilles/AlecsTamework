@@ -190,7 +190,6 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.settings.TameworkDataPathService;
-import com.alechilles.alecstamework.runtime.TameworkPersistenceActivationEvidence;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
@@ -371,8 +370,9 @@ public class Tamework extends JavaPlugin {
             new TameworkRuntimeCapabilityRequests();
     private TameworkRuntimeParticipantRegistry runtimeParticipants;
     private Runnable runtimeServiceInitializer;
-    private TameworkPersistenceActivationEvidence genericPersistenceActivationEvidence;
-    private TameworkPersistenceActivationEvidence bondedPersistenceActivationEvidence;
+    /** Whether old Tamework save files (any, and the bonded database) existed at startup. */
+    private boolean genericLegacyDataPresent;
+    private boolean bondedLegacyDataPresent;
     private TameworkDiagnosticRuntime diagnosticRuntime;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
@@ -688,10 +688,10 @@ public class Tamework extends JavaPlugin {
         }
         boolean genericPersistenceNeeded = runtimeStartupPlan.isActive(
                 TameworkRuntimeModule.GENERIC_PERSISTENCE
-        ) || genericPersistenceActivationEvidence.hasDurableWork();
+        ) || genericLegacyDataPresent;
         boolean bondedPersistenceNeeded = runtimeStartupPlan.isActive(
                 TameworkRuntimeModule.BONDED_PERSISTENCE
-        ) || bondedPersistenceActivationEvidence.hasDurableWork();
+        ) || bondedLegacyDataPresent;
         if (!genericPersistenceNeeded && !bondedPersistenceNeeded) {
             return;
         }
@@ -1995,8 +1995,8 @@ public class Tamework extends JavaPlugin {
                 runtimeActivationCoordinator.prepare(getDataDirectory(), getLogger(), runtimeCapabilityRequests);
         runtimeStartupPlan = preparation.plan();
         runtimeStartupDiagnostics = new TameworkRuntimeDiagnostics(runtimeStartupPlan);
-        genericPersistenceActivationEvidence = preparation.genericPersistence();
-        bondedPersistenceActivationEvidence = preparation.bondedPersistence();
+        genericLegacyDataPresent = preparation.genericLegacyData();
+        bondedLegacyDataPresent = preparation.bondedLegacyData();
     }
     @Override
     protected void shutdown() {
@@ -2347,8 +2347,8 @@ public class Tamework extends JavaPlugin {
         return runtimeActivationCoordinator.compare(
                 runtimeActivationState.plan(),
                 runtimeCapabilityRequests.snapshot(),
-                genericPersistenceActivationEvidence,
-                bondedPersistenceActivationEvidence
+                genericLegacyDataPresent,
+                bondedLegacyDataPresent
         );
     }
 

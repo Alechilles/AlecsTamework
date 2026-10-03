@@ -77,16 +77,19 @@ public final class BondedTalentUpdates {
      * @param talents          the talents after the change; set when {@code status} is APPLIED
      * @param level            the level the change was checked against
      * @param levelingConfigId the leveling config that level belongs to, or null
+     * @param rejection        the {@link CompanionTalentService} message of the rule that refused
+     *                         a stored change; set when {@code status} is REJECTED by
+     *                         {@link #updateStored} or a stored {@link #update}, else null
      */
     public record Outcome(@Nonnull Status status, @Nullable TameworkTalentsComponent talents, int level,
-                          @Nullable String levelingConfigId) {
+                          @Nullable String levelingConfigId, @Nullable String rejection) {
         public Outcome {
             Objects.requireNonNull(status, "status");
         }
 
         @Nonnull
         public static Outcome of(@Nonnull Status status) {
-            return new Outcome(status, null, 0, null);
+            return new Outcome(status, null, 0, null, null);
         }
     }
 
@@ -246,10 +249,11 @@ public final class BondedTalentUpdates {
             return Outcome.of(Status.NO_LEVEL_DATA);
         }
         TwTalentConfig config = configs.resolve(presentedConfigId, record.roleId());
-        TameworkTalentsComponent updated =
+        Change change =
                 changed(state.talents(), leveling.getLevel(), leveling.getConfigId(), config, action, talentId);
+        TameworkTalentsComponent updated = change.talents();
         if (updated == null) {
-            return Outcome.of(Status.REJECTED);
+            return new Outcome(Status.REJECTED, null, 0, null, change.rejection());
         }
         SnapshotEnvelope patched = withTalents(snapshot, updated);
         CompanionSummary summary = withTalents(record.summary(), updated);
@@ -262,7 +266,7 @@ public final class BondedTalentUpdates {
             queueSnapshot.accept(patched);
             return true;
         });
-        return queued ? new Outcome(Status.APPLIED, updated, leveling.getLevel(), leveling.getConfigId())
+        return queued ? new Outcome(Status.APPLIED, updated, leveling.getLevel(), leveling.getConfigId(), null)
                 : Outcome.of(Status.CONFLICT);
     }
 
@@ -292,31 +296,34 @@ public final class BondedTalentUpdates {
                 s.harvestAlarmDurationMs(), s.traitsConfigId(), talents.getConfigId(), s.progression());
     }
 
+    /** The talents after a change, or the {@link CompanionTalentService} message of the rule that refused it. */
+    private record Change(@Nullable TameworkTalentsComponent talents, @Nullable String rejection) {
+    }
+
     /**
-     * The talents after {@code action}, or null when it is not allowed: no enabled tree, an
+     * The talents after {@code action}, or the refusal when it is not allowed: no enabled tree, an
      * unknown or already bought talent, a level or prerequisite not met, too few points, or a
      * reset with nothing spent. Pure; {@code existing} is not changed.
      */
-    @Nullable
-    static TameworkTalentsComponent changed(@Nullable TameworkTalentsComponent existing, int level,
-                                            @Nullable String levelingConfigId, @Nullable TwTalentConfig config,
-                                            @Nonnull BondedCompanionTalentActionRequest.Action action,
-                                            @Nullable String talentId) {
+    private static Change changed(@Nullable TameworkTalentsComponent existing, int level,
+                                  @Nullable String levelingConfigId, @Nullable TwTalentConfig config,
+                                  @Nonnull BondedCompanionTalentActionRequest.Action action,
+                                  @Nullable String talentId) {
         if (action == BondedCompanionTalentActionRequest.Action.RESET) {
             if (existing == null || existing.getSpentPoints() <= 0 && existing.getPurchasedTalentIds().length == 0) {
-                return null;
+                return new Change(null, "No talent points are spent.");
             }
             // An allocation that no longer fits the tree comes back empty, which is what a reset wants.
             TameworkTalentsComponent reset = CompanionTalentService.reconcileAllocation(existing, config).clone();
             reset.setSpentPoints(0);
             reset.setPurchasedTalentIds(new String[0]);
-            return reset;
+            return new Change(reset, null);
         }
         // An allocation made under another tree or allocation revision is dropped first, as on a live body.
         CompanionTalentService.PurchaseResult purchase = CompanionTalentService.purchase(
                 CompanionTalentService.reconcileAllocation(existing, config), config, level, levelingConfigId,
                 talentId);
-        return purchase.applied() ? purchase.component() : null;
+        return purchase.applied() ? new Change(purchase.component(), null) : new Change(null, purchase.message());
     }
 
     /** The tree the panel showed when it names one that is enabled, else the role's tree. */

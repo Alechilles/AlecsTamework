@@ -45,6 +45,3 @@ Verify all names in current source:
 - `ApiSelfTestRunner`, `HyDragonApiSelfTestSuite`, and API contract tests
 - `ApiSurfaceCompatibilityTest`: add each new call a reflective consumer makes
 - `wiki/Modder-Documentation/Public-API`
-
-`ReplacementTameworkApi` and `BondedOnlyTameworkApi` are dead code kept until
-the old persistence package is deleted. Do not extend them.

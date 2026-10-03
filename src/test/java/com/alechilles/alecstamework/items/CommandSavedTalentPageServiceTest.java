@@ -74,7 +74,7 @@ class CommandSavedTalentPageServiceTest {
         // Another player's companion has no page.
         assertNull(talents.load(UUID.randomUUID(), dead.profileId()).join());
 
-        assertEquals(Status.APPLIED, talents.change(owner, view, Action.PURCHASE, "swift").join());
+        assertEquals(Status.APPLIED, talents.change(owner, view, Action.PURCHASE, "swift").join().status());
 
         assertEquals(1, written.size());
         assertArrayEquals(new String[] {"swift"}, talentsOf(CompanionSnapshots.entity(written.get(0)))
@@ -89,7 +89,7 @@ class CommandSavedTalentPageServiceTest {
         CompanionRecord dead = insertDead();
         queued.put(dead.profileId(), deathSnapshot(dead, 5));
         View view = talents.load(owner, dead.profileId()).join();
-        assertEquals(Status.APPLIED, talents.change(owner, view, Action.PURCHASE, "swift").join());
+        assertEquals(Status.APPLIED, talents.change(owner, view, Action.PURCHASE, "swift").join().status());
         List<SnapshotEnvelope> restoredFrom = new ArrayList<>();
 
         assertEquals(RestoreFlow.Result.RESTORED,
@@ -106,7 +106,7 @@ class CommandSavedTalentPageServiceTest {
         CompanionRecord dead = insertDead();
 
         assertNull(talents.load(owner, dead.profileId()).join());
-        assertEquals(Status.NO_LEVEL_DATA, talents.change(owner, viewOf(dead), Action.PURCHASE, "swift").join());
+        assertEquals(Status.NO_LEVEL_DATA, talents.change(owner, viewOf(dead), Action.PURCHASE, "swift").join().status());
         assertTrue(written.isEmpty());
     }
 
@@ -123,7 +123,7 @@ class CommandSavedTalentPageServiceTest {
                 CompanionTransitions.died(revived, CompanionSummary.EMPTY, 7L, 8L, "STARVED", null));
         queued.put(dead.profileId(), deathSnapshot(index.get(dead.profileId()), 5));
 
-        assertEquals(Status.CONFLICT, talents.change(owner, view, Action.PURCHASE, "swift").join());
+        assertEquals(Status.CONFLICT, talents.change(owner, view, Action.PURCHASE, "swift").join().status());
         assertTrue(written.isEmpty());
     }
 
@@ -133,7 +133,7 @@ class CommandSavedTalentPageServiceTest {
         reads = id -> CompletableFuture.failedFuture(new IOException("unreadable"));
 
         assertNull(talents.load(owner, dead.profileId()).join());
-        assertEquals(Status.FAILED, talents.change(owner, viewOf(dead), Action.PURCHASE, "swift").join());
+        assertEquals(Status.FAILED, talents.change(owner, viewOf(dead), Action.PURCHASE, "swift").join().status());
         assertTrue(written.isEmpty());
     }
 
@@ -146,7 +146,7 @@ class CommandSavedTalentPageServiceTest {
         queued.put(awaiting.profileId(), deathSnapshot(awaiting, 5));
 
         assertNull(talents.load(owner, awaiting.profileId()).join());
-        assertEquals(Status.CONFLICT, talents.change(owner, viewOf(awaiting), Action.PURCHASE, "swift").join());
+        assertEquals(Status.CONFLICT, talents.change(owner, viewOf(awaiting), Action.PURCHASE, "swift").join().status());
         assertTrue(written.isEmpty());
     }
 

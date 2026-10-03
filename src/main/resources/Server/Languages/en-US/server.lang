@@ -1573,7 +1573,7 @@ tamework.ui.spawnerTooltip.owner=Owner: {0}
 
 tamework.commands.activationStatus.tamework.activation.state.is.not.available=Tamework activation state is not available.
 tamework.commands.activationStatus.activation.fingerprint.reload=Activation fingerprint={0}, reload={1}.
-tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, systems={2}, callbacks={3}, workCycles={4}, workers={5}, subscriptions={6}, databaseOpens={7}, reasons={8}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, systems={2}, callbacks={3}, workCycles={4}, workers={5}, subscriptions={6}, reasons={7}.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled=Crash telemetry flush scheduled.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled=Crash telemetry flush was not scheduled (disabled, already running, or no executor available).
 tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.requested=Embedded telemetry error event requested.

@@ -1517,7 +1517,7 @@ tamework.ui.spawnerTooltip.levelWithMax=Nivel {level}/{max}
 tamework.ui.spawnerTooltip.owner=Propietario: {0}
 tamework.commands.activationStatus.tamework.activation.state.is.not.available=El estado de activación de Tamework no está disponible.
 tamework.commands.activationStatus.activation.fingerprint.reload=Huella digital de activación={0}, recarga={1}.
-tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, sistemas={2}, devoluciones de llamada={3}, ciclos de trabajo={4}, trabajadores={5}, suscripciones={6}, apertura de base de datos={7}, motivos={8}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, sistemas={2}, devoluciones de llamada={3}, ciclos de trabajo={4}, trabajadores={5}, suscripciones={6}, motivos={7}.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled=Descarga de telemetría de fallos programada.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled=La descarga de telemetría de fallos no estaba programada (deshabilitada, ya en ejecución o no hay ningún ejecutor disponible).
 tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.requested=Se solicitó un evento de error de telemetría integrado.

@@ -1282,7 +1282,7 @@ tamework.commands.traits.usage.setTraits=Verwendung: /tw debug set traits <Eigen
 tamework.commands.traits.values.missing=Es wurden keine Eigenschaftswerte angegeben.
 tamework.commands.activationStatus.activation.fingerprint.reload=Aktivierungs-Fingerabdruck={0}, Neu laden={1}.
 tamework.commands.activationStatus.description=Zeige Tamework runtime activation status.
-tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, Systeme={2}, Rückrufe={3}, Arbeitszyklen={4}, Worker={5}, Abonnements={6}, Datenbanköffnungen={7}, Gründe={8}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, Systeme={2}, Rückrufe={3}, Arbeitszyklen={4}, Worker={5}, Abonnements={6}, Gründe={7}.
 tamework.commands.activationStatus.tamework.activation.state.is.not.available=Tamework activation state ist nicht verfügbar.
 tamework.commands.addTrait.description=Füge hinzu: one Eigenschaft zu die NPC you sind looking at.
 tamework.commands.addTrait.no.enabled.trait.config.resolved.for.this=Keine aktivierte Eigenschaft config resolved für this NPC (Rolle/config lookup failed).

@@ -29,7 +29,7 @@ public final class TameworkActivationStatusCommand extends AbstractTameworkServe
         for (TameworkRuntimeModule module : state.plan().modules()) {
             TameworkRuntimeDiagnostics.ModuleSnapshot snapshot = state.diagnostics().module(module);
             TameworkRuntimeDiagnostics.CounterSnapshot counters = snapshot.counters();
-            send(context, Message.translation("server.tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons").param("0", String.valueOf(module.id())).param("1", String.valueOf(snapshot.state())).param("2", String.valueOf(counters.systemRegistrations())).param("3", String.valueOf(counters.callbacks())).param("4", String.valueOf(counters.workCycles())).param("5", String.valueOf(counters.workerStarts())).param("6", String.valueOf(counters.subscriptions())).param("7", String.valueOf(counters.databaseOpens())).param("8", String.valueOf(snapshot.reasons())));
+            send(context, Message.translation("server.tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons").param("0", String.valueOf(module.id())).param("1", String.valueOf(snapshot.state())).param("2", String.valueOf(counters.systemRegistrations())).param("3", String.valueOf(counters.callbacks())).param("4", String.valueOf(counters.workCycles())).param("5", String.valueOf(counters.workerStarts())).param("6", String.valueOf(counters.subscriptions())).param("7", String.valueOf(snapshot.reasons())));
         }
     }
 

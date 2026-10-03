@@ -1,5 +1,7 @@
 # Bonded Companion Expiry Warnings and Safe Landing Design
 
+> Historical: this design names classes from the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 Date: 2026-08-03
 
 ## Goal

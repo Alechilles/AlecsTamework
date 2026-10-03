@@ -1542,7 +1542,7 @@ tamework.commands.showSpawnMarkers.and.more.loaded.marker.s=  ...et {0} marqueur
 tamework.commands.showSpawnMarkers.description=Activer ou désactiver le rendu de débogage local des marqueurs d'apparition.
 tamework.commands.activationStatus.tamework.activation.state.is.not.available=L'état d'activation Tamework n'est pas disponible.
 tamework.commands.activationStatus.activation.fingerprint.reload=Empreinte d'activation={0}, rechargement={1}.
-tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, systèmes={2}, rappels={3}, cycles de travail={4}, workers={5}, abonnements={6}, ouvertures de base={7}, raisons={8}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, systèmes={2}, rappels={3}, cycles de travail={4}, workers={5}, abonnements={6}, raisons={7}.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled=Vidage de télémétrie des plantages planifié.
 tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled=Le vidage de télémétrie des plantages n'a pas été planifié (désactivé, déjà en cours ou aucun exécuteur disponible).
 tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.requested=Événement d'erreur de télémétrie intégré demandé.

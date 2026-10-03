@@ -298,24 +298,12 @@ final class CommandSavedNpcPanelSnapshot {
         LinkedNpcEntry.FutureStat level = base.futureStatA();
         LinkedNpcEntry.FutureStat talent = base.futureStatB();
         if (leveling != null) {
-            int maxLevel = 0;
-            TwLevelingConfig config = first(
-                    TwLevelingConfig.resolveById(leveling.configId),
-                    TwLevelingConfig.resolveForRole(role));
-            if (config != null && config.isEnabled()) {
-                maxLevel = config.getLevels().getMaxLevel();
-            }
-            if (maxLevel > 0) {
-                int savedLevel = Math.max(1, Math.min(leveling.level, maxLevel));
-                boolean atMaxLevel = savedLevel >= maxLevel;
-                double levelStartXp = cumulativeXp(config, savedLevel);
-                double nextLevelXp = atMaxLevel ? levelStartXp : cumulativeXp(config, savedLevel + 1);
+            CompanionLevelingService.LevelingSnapshot snapshot = levelingSnapshot(
+                    first(TwLevelingConfig.resolveById(leveling.configId), TwLevelingConfig.resolveForRole(role)),
+                    leveling.level, leveling.currentXp, leveling.totalXp);
+            if (snapshot != null) {
                 level = new CommandLinkedPanelProgressionPresentationService().buildLevelFutureStat(
-                        new CompanionLevelingService.LevelingSnapshot(
-                                config.getId(), savedLevel, leveling.currentXp, leveling.totalXp,
-                                levelStartXp, nextLevelXp, maxLevel, atMaxLevel),
-                        language,
-                        null);
+                        snapshot, language, null);
             }
         }
         if (talents != null && leveling != null) {
@@ -364,11 +352,30 @@ final class CommandSavedNpcPanelSnapshot {
         return TraitPresentationViewMapper.map(saved.configId, 0L, values, config);
     }
 
+    /**
+     * The level line's values for a stored level, which is clamped to the config's range. Null
+     * without an enabled leveling config that has levels.
+     */
+    @Nullable
+    static CompanionLevelingService.LevelingSnapshot levelingSnapshot(@Nullable TwLevelingConfig config, int level,
+                                                                      double currentXp, double totalXp) {
+        if (config == null || !config.isEnabled() || config.getLevels().getMaxLevel() <= 0) {
+            return null;
+        }
+        int maxLevel = config.getLevels().getMaxLevel();
+        int savedLevel = Math.max(1, Math.min(level, maxLevel));
+        boolean atMaxLevel = savedLevel >= maxLevel;
+        double levelStartXp = cumulativeXp(config, savedLevel);
+        double nextLevelXp = atMaxLevel ? levelStartXp : cumulativeXp(config, savedLevel + 1);
+        return new CompanionLevelingService.LevelingSnapshot(config.getId(), savedLevel, currentXp, totalXp,
+                levelStartXp, nextLevelXp, maxLevel, atMaxLevel);
+    }
+
     private static <T> T first(@Nullable T preferred, @Nullable T fallback) { return preferred != null ? preferred : fallback; }
     private static int round(double value) { return Double.isFinite(value) ? Math.max(0, (int) Math.round(value)) : 0; }
     private static int percent(double value, double min, double max) { return max <= min ? 0 : Math.max(0, Math.min(100, (int) Math.round(100.0 * (clamp(value, min, max) - min) / (max - min)))); }
     private static double clamp(double value, double min, double max) { return !Double.isFinite(value) ? min : Math.max(min, Math.min(max, value)); }
-    static double cumulativeXp(TwLevelingConfig config, int level) { double total = 0.0; int cappedLevel = Math.max(1, Math.min(level, config.getLevels().getMaxLevel())); for (int currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) total += config.getLevels().getBaseXp() * Math.pow(config.getLevels().getGrowthFactor(), currentLevel - 2); return Math.max(0.0, total); }
+    private static double cumulativeXp(TwLevelingConfig config, int level) { double total = 0.0; int cappedLevel = Math.max(1, Math.min(level, config.getLevels().getMaxLevel())); for (int currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) total += config.getLevels().getBaseXp() * Math.pow(config.getLevels().getGrowthFactor(), currentLevel - 2); return Math.max(0.0, total); }
     @Nullable private static String trimToNull(@Nullable String value) { return value == null || value.isBlank() ? null : value.trim(); }
     @Nullable private static String firstNonBlank(@Nullable String first, @Nullable String second) { return trimToNull(first) != null ? trimToNull(first) : trimToNull(second); }
 

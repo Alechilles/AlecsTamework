@@ -16,12 +16,11 @@ class TameworkRuntimeActivationCoordinatorTest {
     void anyOldSaveFileAloneStartsCompanionPersistence() {
         for (String name : List.of("tamework-state.sqlite", "bonded-companions.sqlite", "tamework.sqlite",
                 "CommandLinkedNpcDeaths.dat")) {
-            assertTrue(TameworkRuntimeActivationCoordinator.legacyDataEvidence(List.of(CURRENT, OLDER),
-                    OLDER.resolve(name)::equals).hasDurableWork(), name);
+            assertTrue(TameworkRuntimeActivationCoordinator.legacyDataPresent(List.of(CURRENT, OLDER),
+                    OLDER.resolve(name)::equals), name);
         }
-        assertFalse(TameworkRuntimeActivationCoordinator.legacyDataEvidence(List.of(CURRENT, OLDER),
-                CURRENT.resolve("tamework-state.sqlite.v1-backup.1.sqlite")::equals).hasDurableWork());
-        assertFalse(TameworkRuntimeActivationCoordinator.legacyDataEvidence(List.of(CURRENT, OLDER), p -> false)
-                .hasDurableWork());
+        assertFalse(TameworkRuntimeActivationCoordinator.legacyDataPresent(List.of(CURRENT, OLDER),
+                CURRENT.resolve("tamework-state.sqlite.v1-backup.1.sqlite")::equals));
+        assertFalse(TameworkRuntimeActivationCoordinator.legacyDataPresent(List.of(CURRENT, OLDER), p -> false));
     }
 }

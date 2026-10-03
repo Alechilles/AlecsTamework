@@ -91,7 +91,6 @@ class TameworkRuntimeActivationStateTest {
         diagnostics.recordCallback(active);
         diagnostics.recordWorkerStart(active);
         diagnostics.recordSubscription(active);
-        diagnostics.recordDatabaseOpen(active);
         diagnostics.recordSystemRegistration(active);
         diagnostics.recordWorkCycle(active);
         TameworkRuntimeDiagnostics.CounterSnapshot first = diagnostics.countersFor(active);
@@ -99,16 +98,14 @@ class TameworkRuntimeActivationStateTest {
         diagnostics.recordCallback(attemptedDormant);
         diagnostics.recordWorkerStart(attemptedDormant);
         diagnostics.recordSubscription(attemptedDormant);
-        diagnostics.recordDatabaseOpen(attemptedDormant);
         diagnostics.recordCallback(unavailable);
         diagnostics.recordWorkerStart(unavailable);
         diagnostics.recordSubscription(unavailable);
-        diagnostics.recordDatabaseOpen(unavailable);
 
-        assertEquals(new TameworkRuntimeDiagnostics.CounterSnapshot(1, 1, 1, 1, 1, 1), first);
+        assertEquals(new TameworkRuntimeDiagnostics.CounterSnapshot(1, 1, 1, 1, 1), first);
         assertEquals(2, diagnostics.countersFor(active).callbacks());
         TameworkRuntimeDiagnostics.CounterSnapshot attempt =
-                new TameworkRuntimeDiagnostics.CounterSnapshot(0, 1, 0, 1, 1, 1);
+                new TameworkRuntimeDiagnostics.CounterSnapshot(0, 1, 0, 1, 1);
         assertEquals(attempt, diagnostics.countersFor(attemptedDormant));
         assertEquals(attempt, diagnostics.countersFor(unavailable));
         assertEquals(TameworkRuntimeDiagnostics.CounterSnapshot.zero(),

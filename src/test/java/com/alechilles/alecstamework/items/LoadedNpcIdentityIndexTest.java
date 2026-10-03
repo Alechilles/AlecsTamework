@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Regression coverage for loaded-NPC identity completeness and duplicate evidence. */
+/** Regression coverage for loaded-NPC identity evidence and duplicate evidence. */
 class LoadedNpcIdentityIndexTest {
     private static final UUID NPC_UUID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final LoadedNpcIdentityIndex.Location WORLD_A =
@@ -26,7 +26,7 @@ class LoadedNpcIdentityIndexTest {
             UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     @Test
-    void absenceIsUnknownUntilStoreBootstrapCompletes() {
+    void aUuidWithNoEvidenceIsUnknown() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
 
         LoadedNpcIdentityIndex.Probe unknown = index.probe(NPC_UUID);
@@ -45,12 +45,6 @@ class LoadedNpcIdentityIndexTest {
                 WORLD_A
         );
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(NPC_UUID).status());
-
-        index.markInitializationComplete();
-
-        LoadedNpcIdentityIndex.Probe absent = index.probe(NPC_UUID);
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, absent.status());
-        assertFalse(absent.isKnownLive());
     }
 
     @Test
@@ -59,7 +53,6 @@ class LoadedNpcIdentityIndexTest {
 
         index.recordAdded(NPC_UUID, WORLD_A);
         index.recordAdded(NPC_UUID, WORLD_A);
-        index.markInitializationComplete();
 
         LoadedNpcIdentityIndex.Probe present = index.probe(NPC_UUID);
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, present.status());
@@ -69,7 +62,7 @@ class LoadedNpcIdentityIndexTest {
         index.recordRemoved(NPC_UUID, WORLD_A);
         index.recordRemoved(NPC_UUID, WORLD_A);
 
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(NPC_UUID).status());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(NPC_UUID).status());
     }
 
     @Test
@@ -88,7 +81,6 @@ class LoadedNpcIdentityIndexTest {
         assertEquals(List.of("world-a", "world-b"), probe.worldNames());
         assertEquals(List.of("world-a [store-a]", "world-b [store-b]"), probe.locationNames());
         assertThrows(UnsupportedOperationException.class, () -> probe.locations().add(WORLD_A));
-        assertFalse(index.isInitializationComplete());
     }
 
     @Test
@@ -98,7 +90,6 @@ class LoadedNpcIdentityIndexTest {
                 new LoadedNpcIdentityIndex.Location("world-a", "store-b");
         index.recordAdded(NPC_UUID, WORLD_A);
         index.recordAdded(NPC_UUID, sameWorldOtherStore);
-        index.markInitializationComplete();
 
         index.recordRemoved(NPC_UUID, new LoadedNpcIdentityIndex.Location("world-a", "store-missing"));
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.MULTIPLE_LOCATIONS, index.probe(NPC_UUID).status());
@@ -111,19 +102,13 @@ class LoadedNpcIdentityIndexTest {
     }
 
     @Test
-    void incompleteBarrierRevokesAbsenceAndClearLocationDropsOnlyThatStore() {
+    void clearLocationDropsOnlyThatStore() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         UUID otherNpc = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
         index.recordAdded(NPC_UUID, WORLD_A);
         index.recordAdded(otherNpc, WORLD_A);
         index.recordAdded(otherNpc, WORLD_B);
-        index.markInitializationComplete();
 
-        index.markInitializationIncomplete();
-        assertEquals(
-                LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN,
-                index.probe(UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")).status()
-        );
         index.clearLocation(WORLD_A);
 
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(NPC_UUID).status());
@@ -150,9 +135,8 @@ class LoadedNpcIdentityIndexTest {
                 WORLD_A,
                 List.of(observation(OTHER_UUID, WORLD_A))
         );
-        index.markInitializationComplete();
 
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(NPC_UUID).status());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(NPC_UUID).status());
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, index.probe(OTHER_UUID).status());
         assertThrows(
                 IllegalArgumentException.class,

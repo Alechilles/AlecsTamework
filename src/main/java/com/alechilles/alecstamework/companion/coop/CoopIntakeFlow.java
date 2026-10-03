@@ -189,8 +189,6 @@ public final class CoopIntakeFlow<R> {
     private CompletableFuture<Result> live(LiveIntake<R> intake) {
         UUID profileId = intake.profileId();
         Site site = intake.site();
-        boolean[] queueFailed = new boolean[1];
-        boolean[] reverted = new boolean[1];
         Commit<R> commit = index.atomically(() -> {
             CompanionRecord before = index.get(profileId);
             if (before == null || before.location().kind() != LocationKind.LIVE
@@ -217,19 +215,14 @@ public final class CoopIntakeFlow<R> {
             } catch (RuntimeException failure) {
                 LOGGER.at(Level.WARNING).withCause(failure)
                         .log("Could not queue the snapshot of companion %s for its coop; the intake is undone", profileId);
-                queueFailed[0] = true;
-                reverted[0] = undo(applied);
+                // Still under the lock, so the record is exactly the commit and the undo applies.
+                undo(applied);
+                return Commit.refused(Result.COMMIT_FAILED);
             }
             return applied;
         });
         if (commit.refusal() != null) {
             return CompletableFuture.completedFuture(commit.refusal());
-        }
-        if (queueFailed[0]) {
-            if (!reverted[0]) {
-                removeStaleBody(commit);
-            }
-            return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
         }
         return afterCommit(commit, site, () -> removeBodySafely(intake.body()));
     }

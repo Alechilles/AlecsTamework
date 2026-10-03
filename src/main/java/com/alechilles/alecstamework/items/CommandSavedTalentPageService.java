@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiTalentFlowView;
 import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates;
+import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates.Outcome;
 import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates.Status;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -34,9 +35,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
-import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -146,7 +144,7 @@ final class CommandSavedTalentPageService {
             // below when the operation could not be queued at all.
             boolean dispatched = dispatcher.dispatch(owner, (ref, store) -> {
                 page.pending = false;
-                Result result = done != null ? done : new Result(Status.FAILED, null);
+                Result result = done != null ? done : new Result(Outcome.of(Status.FAILED), null);
                 if (result.view() != null) {
                     page.view = result.view();
                 }
@@ -154,8 +152,8 @@ final class CommandSavedTalentPageService {
                 if (current == null) {
                     return;
                 }
-                String message = message(page.language, action, talentId, result, before);
-                if (result.status() == Status.APPLIED) {
+                String message = message(page.language, action, result.outcome());
+                if (result.outcome().status() == Status.APPLIED) {
                     feedback.showSuccess(current, message);
                 } else {
                     feedback.showWarning(current, message);
@@ -174,7 +172,7 @@ final class CommandSavedTalentPageService {
     CompletionStage<CommandUiActionResult> openManaged(@Nonnull CommandUiSessionImpl session, @Nonnull UUID rowId,
                                                        @Nullable Player player, @Nonnull String toolId,
                                                        @Nonnull UUID npcId, @Nonnull BooleanSupplier authority) {
-        String language = player == null || player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage();
+        String language = player == null ? null : language(player);
         if (player == null || !authority.getAsBoolean()) {
             return CompletableFuture.completedFuture(CommandUiActionResult.denied(text(language, SAVED + "unavailable")));
         }
@@ -238,7 +236,7 @@ final class CommandSavedTalentPageService {
                 return CommandUiActionResult.notFound(text(page.language, SAVED + "unavailable"));
             }
             page.view = result.view();
-            return CommandUiActionResult.updated(message(page.language, action, talentId, result, before),
+            return CommandUiActionResult.updated(message(page.language, action, result.outcome()),
                     flow(session, rowId, authority, owner, toolId, page));
         })).whenComplete((result, failure) -> page.pending = false);
     }
@@ -246,35 +244,21 @@ final class CommandSavedTalentPageService {
     /** The change, then the companion read again so the page shows what is stored now. Never fails. */
     private CompletableFuture<Result> changeAndReload(UUID owner, View before, Action action, @Nullable String talentId) {
         return talents.change(owner, before, action, talentId)
-                .thenCompose(status -> talents.load(owner, before.profileId())
-                        .thenApply(view -> new Result(status, view)));
+                .thenCompose(outcome -> talents.load(owner, before.profileId())
+                        .thenApply(view -> new Result(outcome, view)));
     }
 
-    /** The viewer's text for a finished change. World thread (reads talent and leveling configs). */
-    private String message(@Nullable String language, Action action, @Nullable String talentId, Result result,
-                           View before) {
-        return switch (result.status()) {
+    /** The viewer's text for a finished change. */
+    private static String message(@Nullable String language, Action action, Outcome outcome) {
+        return switch (outcome.status()) {
             case APPLIED -> text(language, action == Action.PURCHASE
                     ? "tamework.ui.talents.mutation.unlocked" : "tamework.ui.talents.mutation.refunded");
             case DISABLED -> text(language, "tamework.ui.talents.mutation.disabled");
             case CONFLICT -> text(language, SAVED + "changed");
-            case REJECTED -> rejection(language, action, talentId, result.view() != null ? result.view() : before);
+            // Why the rules refused the change, as the stored change found it.
+            case REJECTED -> CommandTalentPageService.resolveMutationMessage(language, outcome.rejection());
             case NO_LEVEL_DATA, BODY_UNAVAILABLE, FAILED -> text(language, SAVED + "unavailable");
         };
-    }
-
-    /** Why the rules refused the change, checked again against {@code view}. World thread. */
-    private static String rejection(@Nullable String language, Action action, @Nullable String talentId, View view) {
-        if (action == Action.RESET) {
-            return text(language, "tamework.ui.talents.mutation.noPointsSpent");
-        }
-        TwTalentConfig config = roleTree(view.roleId());
-        CompanionTalentService.PurchaseResult purchase = CompanionTalentService.purchase(
-                CompanionTalentService.reconcileAllocation(view.talents(), config), config, view.level(),
-                view.levelingConfigId(), talentId);
-        // Allowed now: the stored state moved between the click and the check.
-        return purchase.applied() ? text(language, SAVED + "changed")
-                : CommandTalentPageService.resolveMutationMessage(language, purchase.message());
     }
 
     /** The page, in the viewer's language, from the role's tree as the stored change checks it. World thread. */
@@ -300,16 +284,7 @@ final class CommandSavedTalentPageService {
         if (config == null) {
             config = TwLevelingConfig.resolveForRole(view.roleId());
         }
-        if (config == null || !config.isEnabled() || config.getLevels().getMaxLevel() <= 0) {
-            return null;
-        }
-        int maxLevel = config.getLevels().getMaxLevel();
-        int level = Math.max(1, Math.min(view.level(), maxLevel));
-        boolean atMax = level >= maxLevel;
-        double start = CommandSavedNpcPanelSnapshot.cumulativeXp(config, level);
-        double next = atMax ? start : CommandSavedNpcPanelSnapshot.cumulativeXp(config, level + 1);
-        return new CompanionLevelingService.LevelingSnapshot(config.getId(), level, view.currentXp(),
-                view.totalXp(), start, next, maxLevel, atMax);
+        return CommandSavedNpcPanelSnapshot.levelingSnapshot(config, view.level(), view.currentXp(), view.totalXp());
     }
 
     /** The role's enabled tree, which {@link BondedTalentUpdates#updateStored} checks against. */
@@ -393,7 +368,7 @@ final class CommandSavedTalentPageService {
         }
     }
 
-    private record Result(Status status, @Nullable View view) { }
+    private record Result(Outcome outcome, @Nullable View view) { }
 
     /**
      * What the page shows of a dead or lost companion, read from its stored snapshot at
@@ -433,18 +408,15 @@ final class CommandSavedTalentPageService {
 
     /**
      * The record gate, the snapshot read and the stored change, without players or worlds. May be
-     * called from any thread; the read, decode and change run on {@code offWorld}.
+     * called from any thread; the read, decode and change run on the common pool.
      */
     static final class SavedTalents {
         private final Function<UUID, CompanionRecord> records;
         private final BondedTalentUpdates updates;
-        private final Executor offWorld;
 
         SavedTalents(@Nonnull Function<UUID, CompanionRecord> records, @Nonnull BondedTalentUpdates updates) {
             this.records = Objects.requireNonNull(records, "records");
             this.updates = Objects.requireNonNull(updates, "updates");
-            // The read completes on the caller when the snapshot is still queued, so it starts here.
-            this.offWorld = ForkJoinPool.commonPool();
         }
 
         /**
@@ -460,7 +432,9 @@ final class CommandSavedTalentPageService {
                     || !CompanionProgressionSettings.isLevelingEnabled()) {
                 return CompletableFuture.completedFuture(null);
             }
-            return CompletableFuture.supplyAsync(() -> updates.read(record), offWorld)
+            // The read completes on the caller when the snapshot is still queued, so it starts off
+            // the world thread (supplyAsync runs on the common pool); the change below does the same.
+            return CompletableFuture.supplyAsync(() -> updates.read(record))
                     .thenCompose(read -> read)
                     .handle((stored, failure) -> failure != null ? null : View.of(record, stored));
         }
@@ -469,18 +443,19 @@ final class CommandSavedTalentPageService {
          * Buys {@code talentId} or resets the talents shown in {@code view}. Ends
          * {@link Status#CONFLICT} with nothing written when the companion moved on since the
          * page read it (revived, recovered, released or died again), and {@link Status#FAILED}
-         * when the snapshot cannot be read. Never fails.
+         * when the snapshot cannot be read. A {@link Status#REJECTED} outcome carries the refusing
+         * rule's message. Never fails.
          */
         @Nonnull
-        CompletableFuture<Status> change(@Nonnull UUID owner, @Nonnull View view, @Nonnull Action action,
+        CompletableFuture<Outcome> change(@Nonnull UUID owner, @Nonnull View view, @Nonnull Action action,
                                          @Nullable String talentId) {
             CompanionRecord record = records.apply(view.profileId());
             if (!editable(owner, record) || record.generation() != view.generation()) {
-                return CompletableFuture.completedFuture(Status.CONFLICT);
+                return CompletableFuture.completedFuture(Outcome.of(Status.CONFLICT));
             }
-            return CompletableFuture.supplyAsync(() -> updates.updateStored(record, action, talentId), offWorld)
+            return CompletableFuture.supplyAsync(() -> updates.updateStored(record, action, talentId))
                     .thenCompose(outcome -> outcome)
-                    .handle((outcome, failure) -> failure != null || outcome == null ? Status.FAILED : outcome.status());
+                    .handle((outcome, failure) -> failure != null || outcome == null ? Outcome.of(Status.FAILED) : outcome);
         }
 
         /**

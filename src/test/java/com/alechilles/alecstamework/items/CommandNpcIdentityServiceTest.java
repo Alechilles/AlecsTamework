@@ -189,7 +189,7 @@ class CommandNpcIdentityServiceTest {
     private LoadedNpcIdentityIndex.Probe absent(UUID npcUuid) {
         return new LoadedNpcIdentityIndex.Probe(
                 npcUuid,
-                LoadedNpcIdentityIndex.ProbeStatus.ABSENT,
+                LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN,
                 List.of()
         );
     }
