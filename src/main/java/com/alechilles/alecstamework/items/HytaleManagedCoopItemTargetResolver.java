@@ -52,9 +52,7 @@ public final class HytaleManagedCoopItemTargetResolver {
         String blockTypeId = normalizeBlockType(
                 blockType == null ? null : blockType.getId()
         );
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(
-                targetBlock.x, targetBlock.y, targetBlock.z
-        );
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, targetBlock.x, targetBlock.y, targetBlock.z);
         if (blockRef == null || !blockRef.isValid()) {
             return null;
         }

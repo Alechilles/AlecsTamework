@@ -1,4 +1,5 @@
 package com.alechilles.alecstamework.npc.progression;
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -239,8 +240,8 @@ public final class NeedsWaterTargetSearchService {
                                               int x,
                                               int y,
                                               int z) {
-        int blockId = chunk.getBlock(x, y, z);
-        if (blockId == 0 || !WATER_TROUGH_BLOCK_ID_CACHE.computeIfAbsent(
+        int blockId = HytaleBlockStateAccess.blockIdAt(chunk, x, y, z);
+        if (blockId <= 0 || !WATER_TROUGH_BLOCK_ID_CACHE.computeIfAbsent(
                 blockId,
                 NeedsWaterTargetSearchService::resolveWaterTroughBlock
         )) {

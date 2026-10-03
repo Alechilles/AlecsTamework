@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -97,7 +98,7 @@ public final class FeedTroughContainerCompat {
         if (componentType == null) {
             return null;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(x, y, z);
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, x, y, z);
         if (blockRef == null || !blockRef.isValid()) {
             return null;
         }

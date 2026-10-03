@@ -7,8 +7,10 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.block.BlockModule;
 import com.hypixel.hytale.server.core.universe.world.chunk.BlockOperations;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockComponentSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -55,12 +57,40 @@ public final class HytaleBlockStateAccess {
         return section == null ? -1 : section.get(x, y, z);
     }
 
+    /** Returns 0 (no fluid) when the requested section is unavailable. Call on the world thread. */
+    public static int fluidIdAt(@Nullable WorldChunk chunk, int x, int y, int z) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return 0;
+        }
+        ChunkStore chunkStore = chunkStore(chunk);
+        Ref<ChunkStore> sectionRef = sectionRefAt(chunkStore, x, y, z);
+        FluidSection section = sectionRef == null ? null
+                : chunkStore.getStore().getComponent(sectionRef, FluidSection.getComponentType());
+        return section == null ? 0 : section.getFluidId(x, y, z);
+    }
+
     public static int rotationAt(@Nullable WorldChunk chunk, int x, int y, int z) {
         if (chunk == null || !sameColumn(chunk, x, z)) {
             return 0;
         }
         BlockSection section = blockSectionAt(chunk, x, y, z);
         return section == null ? 0 : section.getRotationIndex(x, y, z);
+    }
+
+    /**
+     * Returns the block entity reference at the position, or null when the block has none or its
+     * section is not loaded. The reference may be invalid. Call on the world thread.
+     */
+    @Nullable
+    public static Ref<ChunkStore> blockEntityRefAt(@Nullable WorldChunk chunk, int x, int y, int z) {
+        if (chunk == null || !sameColumn(chunk, x, z)) {
+            return null;
+        }
+        ChunkStore chunkStore = chunkStore(chunk);
+        Ref<ChunkStore> sectionRef = sectionRefAt(chunkStore, x, y, z);
+        BlockComponentSection section = sectionRef == null ? null
+                : chunkStore.getStore().getComponent(sectionRef, BlockComponentSection.getComponentType());
+        return section == null ? null : section.getBlockReference(ChunkUtil.indexBlock(x, y, z));
     }
 
     public static boolean setBlock(@Nullable WorldChunk chunk, int x, int y, int z,

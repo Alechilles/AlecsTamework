@@ -137,7 +137,7 @@ public final class CapturedItemTracker implements AutoCloseable {
     private static boolean editLoaded(World world, Holder holder, UnaryOperator<ItemStack> edit) {
         if (holder.kind() == Kind.CONTAINER) {
             var chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
-            var ref = chunk == null ? null : chunk.getBlockComponentEntity((int) holder.x(), (int) holder.y(), (int) holder.z());
+            var ref = chunk == null ? null : HytaleBlockStateAccess.blockEntityRefAt(chunk, (int) holder.x(), (int) holder.y(), (int) holder.z());
             var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
                     .getComponent(ref, ItemContainerBlock.getComponentType());
             ItemContainer container = block == null ? null : block.getItemContainer();
@@ -164,7 +164,7 @@ public final class CapturedItemTracker implements AutoCloseable {
         if (holder.kind() == Kind.CONTAINER) {
             var chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
             if (chunk == null) { index.unload(holder); return; }
-            var ref = chunk.getBlockComponentEntity((int) holder.x(), (int) holder.y(), (int) holder.z());
+            var ref = HytaleBlockStateAccess.blockEntityRefAt(chunk, (int) holder.x(), (int) holder.y(), (int) holder.z());
             var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
                     .getComponent(ref, ItemContainerBlock.getComponentType());
             if (block == null) index.observe(holder, List.of(), System.currentTimeMillis());
