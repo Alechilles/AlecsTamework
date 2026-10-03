@@ -8,11 +8,13 @@ import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.flow.SnapshotPatch;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.live.CompanionRespawn;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyResolution;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.items.CommandSavedTalentPageService.SavedTalents;
@@ -132,6 +134,19 @@ class CommandSavedTalentPageServiceTest {
 
         assertNull(talents.load(owner, dead.profileId()).join());
         assertEquals(Status.FAILED, talents.change(owner, viewOf(dead), Action.PURCHASE, "swift").join());
+        assertTrue(written.isEmpty());
+    }
+
+    /** Its old body's talents replace the stored ones when it rejoins, so a purchase would vanish. */
+    @Test
+    void anImportedLostCompanionStillWaitingForItsOldBodyCannotSpend() {
+        CompanionRecord awaiting = CompanionRecord.builder(UUID.randomUUID(), WOLF,
+                CompanionLocation.lost(LegacyBodyResolution.CAUSE_BODY_NOT_FOUND)).ownerUuid(owner).build();
+        index.insert(awaiting);
+        queued.put(awaiting.profileId(), deathSnapshot(awaiting, 5));
+
+        assertNull(talents.load(owner, awaiting.profileId()).join());
+        assertEquals(Status.CONFLICT, talents.change(owner, viewOf(awaiting), Action.PURCHASE, "swift").join());
         assertTrue(written.isEmpty());
     }
 

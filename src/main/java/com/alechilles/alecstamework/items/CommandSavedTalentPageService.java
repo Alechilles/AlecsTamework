@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates.Status;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyResolution;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
@@ -140,25 +141,31 @@ final class CommandSavedTalentPageService {
         }
         page.pending = true;
         View before = page.view;
-        changeAndReload(owner, before, action, talentId).whenComplete((done, failure) ->
-                dispatcher.dispatch(owner, (ref, store) -> {
-                    page.pending = false;
-                    Result result = done != null ? done : new Result(Status.FAILED, null);
-                    if (result.view() != null) {
-                        page.view = result.view();
-                    }
-                    Player current = currentPlayer(ref, store);
-                    if (current == null) {
-                        return;
-                    }
-                    String message = message(page.language, action, talentId, result, before);
-                    if (result.status() == Status.APPLIED) {
-                        feedback.showSuccess(current, message);
-                    } else {
-                        feedback.showWarning(current, message);
-                    }
-                    opened.refresh(message);
-                }));
+        changeAndReload(owner, before, action, talentId).whenComplete((done, failure) -> {
+            // The saving flag clears first in the operation, before the player is resolved, and
+            // below when the operation could not be queued at all.
+            boolean dispatched = dispatcher.dispatch(owner, (ref, store) -> {
+                page.pending = false;
+                Result result = done != null ? done : new Result(Status.FAILED, null);
+                if (result.view() != null) {
+                    page.view = result.view();
+                }
+                Player current = currentPlayer(ref, store);
+                if (current == null) {
+                    return;
+                }
+                String message = message(page.language, action, talentId, result, before);
+                if (result.status() == Status.APPLIED) {
+                    feedback.showSuccess(current, message);
+                } else {
+                    feedback.showWarning(current, message);
+                }
+                opened.refresh(message);
+            });
+            if (!dispatched) {
+                page.pending = false;
+            }
+        });
         return text(page.language, SAVED + "saving");
     }
 
@@ -177,7 +184,7 @@ final class CommandSavedTalentPageService {
             return CompletableFuture.completedFuture(CommandUiActionResult.notFound(text(language, SAVED + "unavailable")));
         }
         long generation = session.currentManagedGeneration();
-        return talents.load(owner, profileId).thenCompose(view -> onWorld(owner, current -> {
+        return talents.load(owner, profileId).thenCompose(view -> onWorld(owner, language, current -> {
             String currentLanguage = language(current);
             if (!session.isOpen() || session.currentManagedGeneration() != generation
                     || !authority.getAsBoolean() || !hasTool(current, toolId)) {
@@ -221,8 +228,8 @@ final class CommandSavedTalentPageService {
         long generation = session.currentManagedGeneration();
         page.pending = true;
         View before = page.view;
-        return changeAndReload(owner, before, action, talentId).thenCompose(result -> onWorld(owner, current -> {
-            page.pending = false;
+        // The saving flag clears however the result ends, also when the owner cannot be reached with it.
+        return changeAndReload(owner, before, action, talentId).thenCompose(result -> onWorld(owner, page.language, current -> {
             if (!session.isOpen() || session.currentManagedGeneration() != generation
                     || !authority.getAsBoolean() || !hasTool(current, toolId)) {
                 return CommandUiActionResult.denied(text(page.language, SAVED + "unavailable"));
@@ -233,7 +240,7 @@ final class CommandSavedTalentPageService {
             page.view = result.view();
             return CommandUiActionResult.updated(message(page.language, action, talentId, result, before),
                     flow(session, rowId, authority, owner, toolId, page));
-        }));
+        })).whenComplete((result, failure) -> page.pending = false);
     }
 
     /** The change, then the companion read again so the page shows what is stored now. Never fails. */
@@ -327,21 +334,26 @@ final class CommandSavedTalentPageService {
         return stack != null && !stack.isEmpty();
     }
 
-    /** Runs {@code action} with the owner's current player on that player's world thread. */
-    private CompletionStage<CommandUiActionResult> onWorld(UUID owner, Function<Player, CommandUiActionResult> action) {
+    /**
+     * Runs {@code action} with the owner's current player on that player's world thread. When the
+     * owner cannot be reached or the action throws, answers unavailable in {@code language}, the
+     * viewer's language as the click knew it.
+     */
+    private CompletionStage<CommandUiActionResult> onWorld(UUID owner, @Nullable String language,
+                                                           Function<Player, CommandUiActionResult> action) {
         CompletableFuture<CommandUiActionResult> result = new CompletableFuture<>();
         CommandUiHostPage.WorldOperation operation = (ref, store) -> {
             try {
                 Player current = currentPlayer(ref, store);
                 result.complete(current == null
-                        ? CommandUiActionResult.notFound(text(null, SAVED + "unavailable"))
+                        ? CommandUiActionResult.notFound(text(language, SAVED + "unavailable"))
                         : action.apply(current));
             } catch (RuntimeException | LinkageError failure) {
-                result.complete(CommandUiActionResult.failed(text(null, SAVED + "unavailable")));
+                result.complete(CommandUiActionResult.failed(text(language, SAVED + "unavailable")));
             }
         };
         if (!dispatcher.dispatch(owner, operation)) {
-            result.complete(CommandUiActionResult.notFound(text(null, SAVED + "unavailable")));
+            result.complete(CommandUiActionResult.notFound(text(language, SAVED + "unavailable")));
         }
         return result;
     }
@@ -366,7 +378,10 @@ final class CommandSavedTalentPageService {
         return LocalizedText.resolve(language, key);
     }
 
-    /** An open page: its latest model and whether a change is on its way. Owner's world thread only. */
+    /**
+     * An open page: its latest model and whether a change is on its way. Read and set on the
+     * owner's world thread; {@code pending} is also cleared by a result that cannot reach the owner.
+     */
     private static final class Page {
         private volatile View view;
         private volatile boolean pending;
@@ -384,6 +399,7 @@ final class CommandSavedTalentPageService {
      * What the page shows of a dead or lost companion, read from its stored snapshot at
      * {@code generation}. Immutable: {@link #talents} hands out copies.
      *
+     * @param level       the stored level as it is, which the stored change checks purchases against
      * @param displayName the companion's name, or null for the default one
      */
     record View(@Nonnull UUID profileId, long generation, @Nonnull String roleId, @Nullable String displayName,
@@ -411,7 +427,7 @@ final class CommandSavedTalentPageService {
                     : new TameworkTalentsComponent(record.summary().talentsConfigId(), 0, new String[0], 0L);
             return new View(record.profileId(), record.generation(), record.roleId(),
                     name == null || name.isBlank() ? null : name, leveling.getConfigId(),
-                    Math.max(1, leveling.getLevel()), leveling.getCurrentXp(), leveling.getTotalXp(), bought);
+                    leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp(), bought);
         }
     }
 
@@ -433,8 +449,9 @@ final class CommandSavedTalentPageService {
 
         /**
          * The page model of {@code owner}'s companion, or null when there is none to edit here:
-         * not the owner's, bonded or a command-family member, not dead or lost, leveling or talents
-         * turned off, no snapshot, or one that cannot be read. Never fails.
+         * not the owner's, bonded or a command-family member, not dead or lost, an import still
+         * waiting for its old body, leveling or talents turned off, no snapshot, or one that cannot
+         * be read. Never fails.
          */
         @Nonnull
         CompletableFuture<View> load(@Nonnull UUID owner, @Nonnull UUID profileId) {
@@ -466,10 +483,15 @@ final class CommandSavedTalentPageService {
                     .handle((outcome, failure) -> failure != null || outcome == null ? Status.FAILED : outcome.status());
         }
 
-        /** Owned by {@code owner}, an ordinary companion the generic owned actions may change, dead or lost. */
+        /**
+         * Owned by {@code owner}, an ordinary companion the generic owned actions may change, dead
+         * or lost. Not an imported one still waiting for its 3.x or 4.x body: that body's talents
+         * replace the stored ones when it rejoins, so a purchase here would be lost without a word.
+         */
         private static boolean editable(UUID owner, @Nullable CompanionRecord record) {
             return record != null && owner.equals(record.ownerUuid()) && !record.bonded() && record.rosterId() == null
-                    && (record.location().kind() == LocationKind.DEAD || record.location().kind() == LocationKind.LOST);
+                    && (record.location().kind() == LocationKind.DEAD || record.location().kind() == LocationKind.LOST)
+                    && !LegacyBodyResolution.awaitsItsBody(record);
         }
     }
 }

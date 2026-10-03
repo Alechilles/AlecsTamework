@@ -171,8 +171,11 @@ public final class LegacyBodyResolution {
                 && CAUSE_BODY_NOT_FOUND.equals(record.location().cause());
     }
 
-    /** True for a record still exactly as it was imported LOST with no known place. */
-    private static boolean awaitsItsBody(CompanionRecord record) {
+    /**
+     * True for a record still exactly as it was imported LOST with no known place. Its old body
+     * may still rejoin it, and that body's components then replace what the record stores.
+     */
+    public static boolean awaitsItsBody(@Nonnull CompanionRecord record) {
         String cause = record.location().cause();
         return record.location().kind() == LocationKind.LOST && cause != null && cause.startsWith(IMPORTED_CAUSE_PREFIX)
                 && record.generation() == 0 && record.currentNpcUuid() == null;

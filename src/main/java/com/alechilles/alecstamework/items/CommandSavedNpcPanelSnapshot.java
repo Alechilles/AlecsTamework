@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.CompanionSummary;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.SummaryLifeStage;
+import com.alechilles.alecstamework.companion.migrate.LegacyBodyResolution;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
@@ -108,8 +109,8 @@ final class CommandSavedNpcPanelSnapshot {
 
     /**
      * Builds the unloaded panel from the index summary (spec 6.6) without decoding a snapshot.
-     * The summary was captured from the live body, so its absent sections follow exact-checkpoint
-     * semantics. A COOP record also carries its coop block from the record's location, even when
+     * The summary was captured from the live body, so a section it lacks is one the body did not
+     * have. A COOP record also carries its coop block from the record's location, even when
      * the summary was never captured, and an ITEM record carries the key of the capture item made
      * at its generation. Returns null otherwise when the summary was never captured.
      */
@@ -157,8 +158,10 @@ final class CommandSavedNpcPanelSnapshot {
         return new CommandSavedNpcPanelSnapshot(s.observedAtMs(), firstNonBlank(s.roleId(), record.roleId()),
                 new Facts(health, happiness, needs, breeding, leveling, traits, talents, harvest,
                         SummaryLifeStage.of(s.progression()),
-                        // The saved talent page serves the companions the generic owned actions may change.
-                        !record.bonded() && record.rosterId() == null),
+                        // The saved talent page serves the companions the generic owned actions may
+                        // change, except an import whose old body may still rejoin and replace its talents.
+                        !record.bonded() && record.rosterId() == null && !LegacyBodyResolution.awaitsItsBody(record)
+                                ? record.roleId() : null),
                 new Appearance(null, Map.of(), s.iconId()));
     }
 
@@ -195,7 +198,7 @@ final class CommandSavedNpcPanelSnapshot {
                 base.deadRespawnRemainingMs(), base.deathCauseHint(), progression.level,
                 progression.talents, traits, facts.traits != null || base.isTraitsActionVisible(),
                 base.loaded() && base.isTraitsActionEnabled(), progression.talents != null || base.isTalentsActionVisible(),
-                base.loaded() ? base.isTalentsActionEnabled() : savedTalentsEditable(progression, base),
+                base.loaded() ? base.isTalentsActionEnabled() : savedTalentsEditable(base),
                 base.linked(), base.active(),
                 base.speciesId(), base.speciesLabel(), base.groupId(), base.groupName(),
                 base.groupColorHex(), breedingEnabled, breedingAvailable, breeding.active,
@@ -221,9 +224,14 @@ final class CommandSavedNpcPanelSnapshot {
      * A dead or lost companion's points can be spent in its stored snapshot
      * ({@link CommandSavedTalentPageService}); whether that snapshot exists is checked on open.
      */
-    private boolean savedTalentsEditable(Progression progression, LinkedNpcEntry base) {
-        return facts.talentsEditable && progression.talents != null && (base.dead() || base.lost())
-                && CompanionProgressionSettings.isTalentsEnabled() && CompanionProgressionSettings.isLevelingEnabled();
+    private boolean savedTalentsEditable(LinkedNpcEntry base) {
+        if (facts.editableTalentsRole == null || facts.leveling == null || !(base.dead() || base.lost())
+                || !CompanionProgressionSettings.isTalentsEnabled() || !CompanionProgressionSettings.isLevelingEnabled()) {
+            return false;
+        }
+        // The record role's tree, as the page and the stored change use it.
+        TwTalentConfig tree = TwTalentConfig.resolveForRole(facts.editableTalentsRole);
+        return tree != null && tree.isEnabled();
     }
 
     private static boolean isJuvenileLifeStage(@Nullable TameworkLifeStageComponent lifeStage) {
@@ -270,18 +278,11 @@ final class CommandSavedNpcPanelSnapshot {
         return Meter.needs(saved.hunger, values.getHungerMax(), saved.thirst, values.getThirstMax());
     }
 
-    private Cooldown resolveHarvest(@Nullable Harvest saved,
+    private Cooldown resolveHarvest(Harvest saved,
                                     @Nullable TameworkLifeStageComponent lifeStage,
                                     boolean captured,
                                     String role,
                                     LinkedNpcEntry base, double gameRate) {
-        if (saved == null) {
-            if (!new CommandLinkedPanelCooldownSnapshotService().hasEnabledHarvestCapability(role)) {
-                return Cooldown.from(base.harvestCooldownKnown(), base.harvestCooldownActive(), base.harvestCooldownRemainingMs(), base.harvestCooldownRatio());
-            }
-            // An exact holder without the alarm component has the service's ready semantics.
-            return new Cooldown(true, false, 0L, 1.0);
-        }
         String alarmName = CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName();
         for (Alarm alarm : saved.alarms) {
             if (alarmName.equals(alarm.name)) {
@@ -396,7 +397,7 @@ final class CommandSavedNpcPanelSnapshot {
         }
     }
 
-    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage, boolean talentsEditable) { }
+    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage, @Nullable String editableTalentsRole) { }
     /** {@code icon} is a portrait already resolved from the live body (summary path); it wins when set. */
     private record Appearance(@Nullable String modelId, Map<String, String> attachments, @Nullable String icon) {
         private Appearance {
