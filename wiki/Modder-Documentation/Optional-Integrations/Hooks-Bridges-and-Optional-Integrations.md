@@ -46,18 +46,6 @@ Stay in the config layer when:
 Use a hook only when the behavior would otherwise force you back into a large bespoke instruction tree.
 
 ## Optional Integrations
-### NameplateBuilder
-What it enables:
-- overrides NameplateBuilder's built-in `entity-name` segment for NPCs that have a `TameworkNpcNameComponent`
-- shows a Tamework custom pet name through the player's existing `Entity Name` chain entry instead of creating a second pet-name segment
-- registers optional Tamework NPC blocks for `Happiness`, `Hunger`, `Thirst`, `Tranquilizer`, and `Traits` so players can add companion progression data to their chains
-- `Happiness`, `Hunger`, and `Thirst` support compact shortened-label formats such as `Hap 80%` and `Hun 50/100`
-- the `Tranquilizer` block supports `Stacks + Time`, `Stacks`, and `Time` formats; stacks are derived from the peak duration reached during the active debuff
-- the `Traits` block supports shortened or full labels with `Raw Value` and linked-panel-style `Relative %` formats
-
-Fallback behavior:
-- if NameplateBuilder is missing, Tamework naming still works normally and no external nameplate override is registered
-
 ### SimpleClaims
 Relevant family:
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)

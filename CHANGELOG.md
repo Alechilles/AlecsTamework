@@ -173,6 +173,9 @@ Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
   command roster membership.
 - Direct import of 2.x saves.
 - Support for Hytale server 0.5.x.
+- The optional NameplateBuilder integration: the pet-name override for the
+  `entity-name` segment and the Happiness, Hunger, Thirst, Tranquilizer and
+  Traits segments. Tamework pet naming is unchanged.
 
 ### Fixed
 

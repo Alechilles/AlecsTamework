@@ -106,7 +106,6 @@ import com.alechilles.alecstamework.items.OwnedNpcTransformationInteractionServi
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
-import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.TameworkNpcCullService;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
@@ -843,7 +842,6 @@ public class Tamework extends JavaPlugin {
         translationRegistry = new TranslationRegistry();
         int langLoaded = ModLanguageDiscovery.loadAll(translationRegistry, getLogger(), getDataDirectory());
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
-        NameplateBuilderBridgeLoader.initialize(this);
 
         // Capture into an item and release from one (spec 8.2, 8.3). Without a ready companion
         // index it is not built, and capture and spawner interactions fail before changing anything.

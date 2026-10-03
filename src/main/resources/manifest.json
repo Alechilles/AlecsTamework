@@ -16,7 +16,6 @@
         "Hytale:NPC": "*"
     },
     "OptionalDependencies": {
-        "Frotty27:NameplateBuilder": ">=4.260326.7",
         "Buuz135:SimpleClaims": ">=1.0.38 <1.1.0",
         "net.evilcraft:QuestLinesClaims": "=1.3.1"
     },
