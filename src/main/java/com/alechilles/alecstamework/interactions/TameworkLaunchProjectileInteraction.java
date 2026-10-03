@@ -470,7 +470,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
         try {
             emitter.accept(this.landingMarkerParticleSystemId, new Vector3d(targetPosition));
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             LOGGER.at(Level.WARNING).log("Could not emit landing marker %s for projectile %s: %s",
                     this.landingMarkerParticleSystemId, this.projectileId, failure.getMessage());
         }

@@ -36,7 +36,7 @@ public final class CoopEffectService implements CoopTransitionEffectSink {
                     new Vector3d(x, y, z),
                     config.getCapturePolicy()
             );
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
             // Optional presentation must never roll back or block a committed coop transition.
         }
     }

@@ -59,7 +59,7 @@ public final class AvatarFlightParticleEmitter {
                     maxDurationSeconds
             );
             return true;
-        } catch (RuntimeException error) {
+        } catch (RuntimeException | LinkageError error) {
             warnOnce(systemId, "AvatarFlight particle emission failed for " + systemId
                     + ": " + error.getMessage());
             return false;
