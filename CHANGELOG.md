@@ -1,5 +1,186 @@
 # Changelog
 
+## 5.0.0 - Companion Store Rework - 2026-10-02
+
+**Upgrade compatibility:** Back up the world's `universe` folder before
+updating. This release requires Hytale server 0.6.0 or later; 0.5.x is no
+longer supported. The first start on a 3.x or 4.x world imports all companion
+data automatically, before worlds load. The old database files are only read
+and stay unchanged, so rolling back to 4.3.x uses them as they were before the
+update. 2.x worlds are not imported: run Tamework 4.3.x once first, or start
+fresh. A later release will remove the importer, so 3.x and 4.x worlds must run
+a 5.0.x version once before moving past it. The public Java API is now 3.0.0
+and is not compatible with 2.x, so mods that call it, such as HyDragon and
+Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
+[World Migration for Server Admins](wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md).
+
+### Migration
+
+- Each import writes `import-report-<UTC time>.txt` to the `Tamework/Data`
+  folder, prints a one-line summary to the console and records a receipt in
+  the new store's `meta.json`. The report lists the sources, counts, skipped
+  entries with reasons, and companions that need attention.
+- A failed import writes `import-report-failed.txt`, shows operators a notice,
+  changes nothing, keeps companion features off and tries again at every start.
+  A `Companions` folder that is a link or junction, or that holds files but no
+  `meta.json`, is refused with instructions.
+- 2.x worlds show operators a chat notice and a popup that name the version to
+  run first. While old data blocks the world, operators can run
+  `/tw persistence start-fresh [confirm]` instead, also from the console. It
+  creates an empty companion store, leaves the old files alone and takes effect
+  after a restart.
+- After the import, companions that 4.x left in unloaded chunks are located in
+  the background, one chunk at a time on a low-priority thread that slows down
+  under server load and resumes after a restart. Until it finishes, their cards
+  show "Being located after the update" and Recall, Recover and Locate are
+  refused. A companion found in no saved chunk is listed as lost and can be
+  recovered; if its animal loads later, it rejoins.
+- As chunks load, each old animal is matched to its imported companion.
+  Leftover stale copies are removed without a death or drops, and animals that
+  cannot be proved stale are left alone. A player who claimed a removed copy
+  gets a message. Leftover copies cannot be captured or put in a coop.
+- Companions imported as lost because the old data was unclear rejoin when
+  their animal loads. Animals that 4.x had released can be tamed again.
+- Imported dead, lost, stored and bonded companions can be revived, recovered
+  and summoned from their saved state. A companion that starved revives with
+  default needs.
+- 4.x capture items release their companion once; copies are refused. 2.x
+  capture items that were never rewritten restore the animal from their own
+  data on first use; copies are refused. A tamed companion with no owner in an
+  imported item becomes the releaser's, within their limits.
+- Command items keep their links, including links to an old animal. Imported
+  coop residents rejoin their coop when it loads. They wait while a coop block
+  stands without a usable config, and are released beside the block, or listed
+  as lost and recoverable, if the coop is gone or full.
+- Items held by an unfinished 4.x bonded revive payment are returned when the
+  player enters a world. Items that do not fit drop at the player's feet, with
+  a message. Paid or refunded payments are discarded.
+- Retired 4.x data is removed from animals and players as they load.
+- Timed summons that were active at import restart their remaining time from
+  the import.
+- Limits that another mod enforces through Tamework do not count imported
+  companions until their next change.
+- A 4.x settings file's `limitPerPlayerOwnedTotal` value moves to the new
+  `limitPerPlayerDeployedTotal`, and the owned limit becomes unlimited, because
+  4.x counted only loaded companions. Imported companions not seen since the
+  import do not count as deployed. Review both limits in `/tw settings`.
+- A world that needs migration logs a warning at startup instead of a severe
+  error.
+
+### Added
+
+- Separate per-player limits in `/tw settings`. "Max companions out in the
+  world" (`limitPerPlayerDeployedTotal`) counts every summoned companion,
+  loaded or not. "Max companions owned" (`limitPerPlayerOwnedTotal`) counts
+  everything a player owns, including companions in items, rosters and coops,
+  dead and lost. Each limit has its own refusal message.
+- A "Captured companion ownership" setting with three modes: Follows the item
+  (default; whoever takes the filled item into their inventory becomes the
+  owner, within their limits), Owner only, and Changes on release (the releaser
+  becomes the owner). A companion in a capture item always keeps an owner.
+- Filled capture items show an "Owner:" line that updates when the item changes
+  hands.
+- In Follows the item mode, a player at their limit cannot pick up another
+  player's filled capture item. Item configs can turn this off with
+  `BlockIneligibleHolders: false`.
+- Recall and Forget for captured companions in the companion panel. Recall
+  brings the companion out of its item; Forget releases it permanently and
+  frees its slot. Either way, surviving copies of the item become empty.
+- `/tw companions forget <self|player|UUID> <companion> [confirm]` and
+  `/tw companions restore <self|player|UUID> <companion> [confirm]` let admins
+  forget a captured companion or restore one from an item, a coop or lost.
+- `/tw bonded grant <self|player|UUID> <rosterId> <roleId> [name]` gives an
+  online player a stored bonded companion.
+- Admins see a one-time in-game notice about the 5.0 changes, with a reminder
+  to back up and a pointer to the migration guide.
+- Bonded roster configs accept `NameKey` for a translated family name.
+- The optional example pack includes a roster capture item, command item and
+  companion config for testing rosters, timed summons and paid revives.
+
+### Changed
+
+- Companion data is stored as files in `universe/Tamework/Companions`: one file
+  per owner, plus one saved state for each companion that is not in a world.
+  Hytale world backups include it. Tamework no longer uses a database.
+- Each companion and capture item carries a generation. An outdated copy, such
+  as a duplicated capture item or an animal left behind in an unloaded chunk,
+  is refused or removed when it is next seen.
+- Recall and follow across worlds respawn the companion from its saved state,
+  leaving no copy behind.
+- A capture item that despawns or is destroyed leaves its companion lost and
+  recoverable.
+- Breaking a coop releases its residents beside the block.
+- Coop production follows vanilla coop timing: it runs on the world's game
+  clock, produces at the morning roam and catches up missed days.
+- A tamed animal with no owner is claimed only when a player interacts with it,
+  within that player's limits.
+- Owned and group limits count every owned companion, including those in items,
+  rosters, coops, dead and lost. Admin tamed spawns of managed roles count
+  toward limits like any other new companion.
+- Dead and lost companion cards show a status strip. Dead cards show the time
+  of death and the revive countdown; lost cards show that the companion is
+  missing and ready to recover.
+- Bonded companions are stored with all other companions. A revive brings the
+  companion back active at the chosen place and needs a free active slot; the
+  cost is charged first and refunded if the revive fails. Bonded companions are
+  stored when their session expires or the owner logs out or changes world, not
+  when the owner dies. A lost bonded companion is listed as stored and can be
+  summoned again. Provisioned bonded companions count toward the owner's owned
+  and group limits.
+- Redesigned bonded roster cards with a named family header, counts and a full
+  bar, a gender icon, and a family-full line that names the active companion.
+  Bonded names read as given name, translated role, then species.
+- Ordinary command items no longer control bonded companions, and owned-pet
+  transformation refuses roster companions.
+- When a mod limits taming through Tamework, the action is refused if that
+  mod's check is missing, slow or failing, and a limit of 0 allows none. A
+  first attempt may answer "checking requirements, try again". These messages
+  no longer mention Husbandry.
+- The mod jar is about 10 MB smaller. The bundled SQLite driver is used only by
+  the importer and keeps native files for Windows x64, Linux x64 and ARM64
+  (including Alpine), and macOS x64 and ARM64. On other platforms the import
+  fails without changing anything.
+- Public Java API 3.0.0 changes events, diagnostics, profile data, population
+  counts and bonded companions, and the API is available only while the
+  companion store is ready. See
+  [Changes from 2.x](wiki/Modder-Documentation/Public-API/API-Reference/Public-API-Overview.md#changes-from-2x).
+
+### Removed
+
+- `/tw debug persistence` and all its subcommands: `status`, `health`,
+  `detail`, `export`, `reviveready`, `compact` and `simulateerror`. For
+  support, send the server log and, after an import, the import report.
+- Automatic startup database compaction from 4.3.2, along with the database.
+- The "Spawn requires owner" setting. The capture item fields
+  `Spawn.OwnerRestricted`, `Spawn.RequireOwner` and `Capture.ClearsOwner` still
+  load but are ignored; the captured companion ownership mode decides. Existing
+  capture-clears-owner and spawn-sets-owner settings map to the nearest mode. A
+  capture with `TamesTarget` always tames.
+- Public API entry points `commandFamilyRosters()`, `commandTimedSummoning()`,
+  `companionProvisioning()`, `paidCommandRevival()`,
+  `policies().populationAdmissions()` with its reservation tokens,
+  `populationGroups().getReconciliationStatus()`,
+  `profileData().findOperation(...)` and the persistence resilience
+  diagnostics, with their capabilities. Rosters, timed summons and paid revives
+  stay available through roster and companion configs, and bonded companions
+  through `bondedCompanions()`; add limit checks with
+  `policies().admissionProviders()`.
+- Events no longer published: population group membership and limit changes,
+  timed summoning, provisioning, provisioned death and revive, paid revive, and
+  command roster membership.
+- Direct import of 2.x saves.
+- Support for Hytale server 0.5.x.
+
+### Fixed
+
+- Changes to idle companions, such as renames, stats and progression, now
+  always reach the world save. Before, Hytale saved them only when something
+  else also changed the animal.
+- `/tw api test run` and `/tw api test status` no longer fail with "Assert not
+  in thread".
+- German, French, Canadian French and Brazilian Portuguese no longer show
+  leftover English placeholder text, and Spanish uses "Niv." for level.
+
 ## 4.3.2 - Startup Database Compaction Hotfix - 2026-10-01
 
 - Older databases now compact automatically during startup, before normal saves,
