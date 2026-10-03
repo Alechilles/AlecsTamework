@@ -38,9 +38,15 @@
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",
     "releaseChannel": "release",
     "gameVersions": [
-      "0.5.9",
-      "0.5.8",
-      "0.5.7"
+      "0.6.8",
+      "0.6.7",
+      "0.6.6",
+      "0.6.5",
+      "0.6.4",
+      "0.6.3",
+      "0.6.2",
+      "0.6.1",
+      "0.6.0"
     ],
     "versionFieldName": "versionNumber",
     "changelogFieldName": "changelog",
@@ -62,9 +68,15 @@
     "releaseChannel": "release",
     "versionPrefix": "v",
     "gameVersions": [
-      "0.5.9",
-      "0.5.8",
-      "0.5.7"
+      "0.6.8",
+      "0.6.7",
+      "0.6.6",
+      "0.6.5",
+      "0.6.4",
+      "0.6.3",
+      "0.6.2",
+      "0.6.1",
+      "0.6.0"
     ],
     "loaders": ["Vanilla"],
     "dependencies": [
