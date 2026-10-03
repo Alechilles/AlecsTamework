@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.coop;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
@@ -404,7 +405,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         if (chunk == null || !HytaleChunkAccess.isOwnedBy(chunk, world)) {
             return null;
         }
-        Ref<ChunkStore> ref = chunk.getBlockComponentEntity(x, y, z);
+        Ref<ChunkStore> ref = HytaleBlockStateAccess.blockEntityRefAt(chunk, x, y, z);
         ComponentType<ChunkStore, BlockModule.BlockStateInfo> infoType = BlockModule.BlockStateInfo.getComponentType();
         if (ref == null || !ref.isValid() || infoType == null) {
             return null;

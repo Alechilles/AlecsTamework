@@ -126,7 +126,7 @@ public final class HytaleDirectLiveCoopScanner {
         if (block == null || block.isUnknown() || resolveIdentifier(block.getId()) != null) {
             return true;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(x, y, z);
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, x, y, z);
         ComponentType<ChunkStore, ?> type = coopBlockComponentType();
         return blockRef != null && type != null
                 && safeChunkComponent(chunkStore, blockRef, castComponentType(type)) != null;
@@ -150,9 +150,7 @@ public final class HytaleDirectLiveCoopScanner {
         if (slot.coopId().equals(foundId)) {
             return false;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(
-                slot.x(), slot.y(), slot.z()
-        );
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, slot.x(), slot.y(), slot.z());
         if (blockRef == null) {
             return true;
         }
