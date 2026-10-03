@@ -1,7 +1,7 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

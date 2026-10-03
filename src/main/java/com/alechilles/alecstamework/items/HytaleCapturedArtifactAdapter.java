@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;

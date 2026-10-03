@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.companion.migrate.legacy;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

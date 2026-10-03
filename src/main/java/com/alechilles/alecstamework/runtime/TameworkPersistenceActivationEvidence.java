@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.activation;
+package com.alechilles.alecstamework.runtime;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;

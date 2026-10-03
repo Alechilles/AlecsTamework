@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import java.util.UUID;

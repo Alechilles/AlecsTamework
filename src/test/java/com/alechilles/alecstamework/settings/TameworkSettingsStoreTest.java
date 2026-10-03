@@ -1,7 +1,5 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
-import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -1,23 +1,10 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.companion.migrate.legacy;
 
-import com.alechilles.alecstamework.companion.snapshot.SnapshotCodec;
 import com.google.gson.JsonObject;
 import javax.annotation.Nonnull;
 
 /** Strict deterministic codec for the released June death snapshot payload. */
-public final class LegacyDeathV1SnapshotCodec implements SnapshotCodec<LegacyDeathV1Payload> {
-    @Override
-    public int version() {
-        return 1;
-    }
-
-    @Override
-    @Nonnull
-    public Class<LegacyDeathV1Payload> valueType() {
-        return LegacyDeathV1Payload.class;
-    }
-
-    @Override
+public final class LegacyDeathV1SnapshotCodec {
     @Nonnull
     public String encode(@Nonnull LegacyDeathV1Payload value) {
         if (value == null) {
@@ -87,7 +74,6 @@ public final class LegacyDeathV1SnapshotCodec implements SnapshotCodec<LegacyDea
         return root.toString();
     }
 
-    @Override
     @Nonnull
     public LegacyDeathV1Payload decode(@Nonnull String payloadJson) {
         JsonObject root = LegacySnapshotJson.parseRoot(payloadJson);

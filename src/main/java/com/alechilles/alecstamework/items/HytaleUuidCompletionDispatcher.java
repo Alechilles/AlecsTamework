@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;

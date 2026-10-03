@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.companion.migrate.legacy;
 
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.google.gson.JsonElement;

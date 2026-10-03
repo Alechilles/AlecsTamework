@@ -1,8 +1,6 @@
-package com.alechilles.alecstamework.persistence.runtime.player;
+package com.alechilles.alecstamework.companion.migrate.retired;
 
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
-import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;

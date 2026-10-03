@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.items;
 
 import org.junit.jupiter.api.Test;
 

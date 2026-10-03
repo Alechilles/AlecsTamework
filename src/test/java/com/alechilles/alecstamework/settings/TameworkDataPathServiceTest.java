@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;

@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.operation;
+package com.alechilles.alecstamework.companion.migrate.retired;
 
 import java.util.UUID;
 import javax.annotation.Nonnull;

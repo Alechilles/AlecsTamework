@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.kernel;
+package com.alechilles.alecstamework.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

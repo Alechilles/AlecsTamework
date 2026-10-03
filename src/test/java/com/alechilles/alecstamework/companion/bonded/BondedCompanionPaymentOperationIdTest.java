@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.operation;
+package com.alechilles.alecstamework.companion.bonded;
 
 import java.util.Set;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.companion.migrate.legacy;
 
 /**
  * Immutable, engine-neutral three-dimensional vector stored in persistence snapshots.

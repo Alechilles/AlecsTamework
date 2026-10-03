@@ -1,8 +1,6 @@
-package com.alechilles.alecstamework.persistence.runtime.player;
+package com.alechilles.alecstamework.companion.migrate.retired;
 
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
-import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

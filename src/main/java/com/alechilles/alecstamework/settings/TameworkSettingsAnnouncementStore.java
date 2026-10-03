@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
 import com.alechilles.alecstamework.Tamework;
 import com.google.gson.Gson;

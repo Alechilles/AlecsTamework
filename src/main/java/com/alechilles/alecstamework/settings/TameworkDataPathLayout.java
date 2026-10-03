@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

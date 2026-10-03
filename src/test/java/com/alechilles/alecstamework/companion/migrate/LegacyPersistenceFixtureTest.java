@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.migration;
+package com.alechilles.alecstamework.companion.migrate;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

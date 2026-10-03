@@ -1,12 +1,8 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
-import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
-import com.alechilles.alecstamework.settings.NeedsResourceMode;
-import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
-import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;

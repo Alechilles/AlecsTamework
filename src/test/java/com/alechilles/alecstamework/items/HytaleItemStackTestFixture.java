@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.items.persistence;
+package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.lang.reflect.Field;

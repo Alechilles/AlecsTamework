@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.activation;
+package com.alechilles.alecstamework.runtime;
 
 /** Startup disposition for one durable persistence authority. */
 public enum PersistenceActivationMode {

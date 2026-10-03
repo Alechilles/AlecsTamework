@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence;
+package com.alechilles.alecstamework.settings;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.DirectoryStream;

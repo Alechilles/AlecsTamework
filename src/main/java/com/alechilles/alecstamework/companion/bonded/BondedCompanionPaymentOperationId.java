@@ -1,6 +1,6 @@
-package com.alechilles.alecstamework.persistence.operation;
+package com.alechilles.alecstamework.companion.bonded;
 
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
