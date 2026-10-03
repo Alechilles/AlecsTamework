@@ -85,6 +85,17 @@ class CoopIntakeFlowTest {
     }
 
     @Test
+    void theSnapshotIsQueuedBeforeTheCoopRecordIsVisibleOutsideTheIndexLock() {
+        // A periodic flush takes the index lock; it must never see the COOP record without its snapshot.
+        CompanionRecord live = insertLive(2);
+        index.addAfterUnlockListener((before, after) -> events.add("unlocked"));
+
+        flow(CompletableFuture.completedFuture(null)).intakeLive(live(live)).join();
+
+        assertEquals(List.of("snapshot", "unlocked", "flush", "slot", "remove body"), events);
+    }
+
+    @Test
     void aLiveIntakeCommitsBeforeTheSlotWriteAndTheBodyRemoval() {
         CompanionRecord live = insertLive(2);
 

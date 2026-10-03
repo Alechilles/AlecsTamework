@@ -52,6 +52,18 @@ class StoreFlowTest {
     }
 
     @Test
+    void theSnapshotIsQueuedBeforeTheStoredRecordIsVisibleOutsideTheIndexLock() {
+        // A periodic flush takes the index lock; it must never see the STORED record without its snapshot.
+        CompanionRecord live = insertLive(2);
+        loaded.put(live.profileId(), "body");
+        index.addAfterUnlockListener((before, after) -> events.add("unlocked"));
+
+        flow().store(live.profileId(), StoredReason.ROSTER, 0L).join();
+
+        assertEquals(List.of("capture", "snapshot", "unlocked", "flush", "remove"), events);
+    }
+
+    @Test
     void aLoadedBodyIsSnapshottedCommittedStoredFlushedAndOnlyThenRemoved() {
         CompanionRecord live = insertLive(2);
         loaded.put(live.profileId(), "body");

@@ -170,6 +170,10 @@ public final class StoreFlow<R> {
                 CompanionTransitions.stored(before, reason, summary, snapshotAtMs, cooldownUntilMs);
         // The revision check makes a change made while the snapshot was taken or read win. Without a
         // fresh capture, a body that registered meanwhile is not covered by the stored snapshot.
+        // A fresh snapshot is queued under the index lock with the commit, so no flush can write the
+        // record's owner file before its snapshot (the CompanionWriter.queueSnapshot contract).
+        boolean[] queueFailed = new boolean[1];
+        boolean[] reverted = new boolean[1];
         Commit commit = index.atomically(() -> {
             if (fresh == null && loaded.get(profileId) != null) {
                 return null;
@@ -179,25 +183,30 @@ public final class StoreFlow<R> {
             if (!m.applied()) {
                 return null;
             }
-            return new Commit(m.after(), body != null && loaded.removeIfSame(profileId, body));
+            Commit applied = new Commit(m.after(), body != null && loaded.removeIfSame(profileId, body));
+            if (fresh != null) {
+                try {
+                    queueSnapshot.accept(profileId, new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT,
+                            m.after().generation(), fresh.snapshotData()));
+                } catch (RuntimeException failure) {
+                    LOGGER.at(Level.WARNING).withCause(failure)
+                            .log("Could not queue the snapshot of stored companion %s; the store is undone", profileId);
+                    queueFailed[0] = true;
+                    reverted[0] = revertCommit(before, applied, body, fresh);
+                }
+            }
+            return applied;
         });
         if (commit == null) {
             return CompletableFuture.completedFuture(Result.CONFLICT);
         }
-        CompanionRecord after = commit.after();
-        if (fresh != null) {
-            try {
-                queueSnapshot.accept(profileId,
-                        new SnapshotEnvelope(profileId, CompanionSnapshots.FORMAT, after.generation(), fresh.snapshotData()));
-            } catch (RuntimeException failure) {
-                LOGGER.at(Level.WARNING).withCause(failure)
-                        .log("Could not queue the snapshot of stored companion %s; the store is undone", profileId);
-                if (!revertCommit(before, commit, body, fresh)) {
-                    removeBodySafely(profileId, body);
-                }
-                return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
+        if (queueFailed[0]) {
+            if (!reverted[0]) {
+                removeBodySafely(profileId, body);
             }
+            return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
         }
+        CompanionRecord after = commit.after();
         return flush(after).handle((ignored, error) -> error).thenApply(error -> {
             if (error != null) {
                 LOGGER.at(Level.WARNING).withCause(error)
