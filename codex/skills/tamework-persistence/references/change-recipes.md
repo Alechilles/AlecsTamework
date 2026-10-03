@@ -1,98 +1,124 @@
 # Persistence Change Recipes
 
-> Outdated on branch `refactor/persistence-rework`: this describes the 4.x SQLite runtime.
-> See the note at the top of `../SKILL.md`. Phase 8 rewrites it.
-
-Choose one primary recipe. Add another recipe only when the change crosses a
-real public boundary.
+Choose one primary recipe. Copy the nearest existing flow instead of building
+a new mechanism.
 
 ## Diagnose Runtime State
 
-1. Use `docs/agents/runtime-vs-source-checklist.md` to identify the loaded jar,
-   database, save, and staged assets.
-2. Identify the owning database and operation ID, profile ID, or bonded profile
-   ID.
-3. For replacement persistence, capture operation phase, outbox position,
-   incident, quarantine, circuit, and startup readiness from `/tw debugdb`.
-4. For bonded persistence, capture profile state, exact lease, operation probe,
-   cleanup intent, and readiness from bonded diagnostics.
-5. Classify the failure before editing: live effect, durable commit,
-   publication, recovery, projection, schema authority, or stale runtime.
+1. Use `docs/agents/runtime-vs-source-checklist.md` to confirm the loaded jar
+   and the world folder.
+2. Read the server log. Store load and flow failures log WARN or SEVERE with
+   the profile id. A failed background write is not logged; it shows only as
+   the writer's last failure and pending count in diagnostics.
+3. Read `diagnostics().getPersistenceDiagnostics()`: records by location,
+   pending writes, last flush time, last failure, unreadable records.
+4. Read the files in `universe/Tamework/Companions` (plain JSON): the owner
+   file for the record, the snapshot file, `meta.json` for an import or
+   fresh-start receipt, and any `*.unreadable-<timestamp>` files.
+5. For an import problem, read the report in the Tamework data folder.
+6. Classify before editing: record change, file write, fence decision, live
+   effect, snapshot content, admission, importer, or stale runtime.
 
-## Add or Change a Replacement Read
+There is no `/tw debug persistence` command. `/tw persistence start-fresh` only
+creates an empty store while old saves block the world.
 
-1. Identify the canonical table or an existing projection.
-2. Expose the read through the owning store, query facade, and public facade.
-3. Preserve `Found`, `Absent`, and `Failed`; do not turn decode or storage
-   failure into absence.
-4. State the consistency and staleness contract.
-5. Test the consumer-visible result and failure behavior.
+## Add a Record Field
 
-## Add a Replacement Durable Mutation
+1. Add it to `CompanionRecord` and its `Builder`.
+2. Map it in `CompanionRecordBson`: a new field name, read with a default when
+   missing. Never rename or reuse a field name. Old files need no migration.
+3. If the panel needs it for an unloaded companion, add it to
+   `CompanionSummary` and fill it in `CompanionSummaries` instead.
+4. If it is world time, keep the sign and use `0` as unset.
+5. Test the round trip and the default for an old document in
+   `CompanionRecordBsonTest`.
 
-Use an existing operation family when its authority and scope match.
+## Add or Change a Holder-Changing Flow
 
-1. Define an immutable request, outcome, versioned payload codec, stable
-   operation kind, idempotency key, and complete scopes.
-2. Register the definition in `PublicPersistenceFeatureRegistry`.
-3. Implement durable work only through
-   `SqlitePersistenceTransactionContext` authorities.
-4. Commit canonical state, operation evidence, required feature detail, and at
-   least one projection event in one transaction.
-5. Compose the adapter in `SqlitePublicOperationSet` and expose it through
-   `PublicPersistenceOperations` or the owning facade.
-6. Register recovery, containment, readiness, diagnostics, and shutdown
-   ownership through the shared registry.
+Use `CaptureFlow`, `StoreFlow`, `RestoreFlow` or `CoopIntakeFlow` as the
+pattern.
 
-Use a current sibling operation as the pattern. Paid revival is a useful
-pattern for external inventory effects and compensation. Capture is a useful
-pattern for variants and shared participants. Profile extension is a useful
-pattern for a database-only mutation.
+1. On the body's world thread, take the snapshot first if a body is leaving
+   a world (`CompanionSnapshots.capture`, or `HytaleStoreCapture` for a
+   store). If it fails, abort and change nothing.
+2. Ask a managed role's admission provider before taking the index lock
+   (`ProviderAdmission.evaluate`).
+3. Under `index.atomically`: re-check the record (revision or generation),
+   check caps with `CompanionAdmissionGate`, apply a `CompanionTransitions`
+   change (generation + 1), and unregister the loaded body.
+4. Queue the snapshot so the writer writes it no later than the owner file
+   that points at it (see `CompanionWriter.queueSnapshot`).
+5. Release the lock, then write the owner files with `flushNow`
+   (`OwnerFileFlush.flushOwners` writes the new owner first when the owner
+   changes).
+6. On failure, put the record back (`RestoreFlow.revertHolder` or
+   `CompanionIndex.revert`) and re-register the body. Only revert before any
+   holder carries the new generation.
+7. On success, hop to the world thread, confirm the record still holds the
+   committed holder (`RestoreFlow.sameHolder`), then remove the old body, spawn,
+   or change the item or slot. A spawn stamps the committed generation, uses
+   `AddReason.LOAD`, then calls `CompanionSaves.markChanged`.
+8. Return a result enum and show a localized message for refusals.
 
-## Add a Replacement Mutation With a Live Effect
+These changes do not wait for the write: tame and adoption, death, loss,
+unload refresh, owner release, Forget and a destroyed capture item. They
+update the index and the writer saves on its next flush (spec 8.1, 8.6, 8.7,
+8.12 accept the crash window).
 
-Apply the durable-mutation recipe plus these steps:
+## Make a Live Component Change Reach Disk
 
-1. Freeze the complete request and positive evidence on the owning world
-   thread.
-2. Persist `LIVE_APPLYING` before the external effect.
-3. Run ECS, inventory, world, filesystem, and network work through a narrow live
-   boundary outside the transaction.
-4. Make the live result idempotent or retain exact receipt evidence.
-5. Define exact unknown-outcome readback. If positive proof is unavailable,
-   contain the operation instead of replaying it.
-6. Publish from the outbox after commit. Listener failure cannot roll back
-   canonical state.
+1. A codec component on a companion body saves only when the body is marked
+   dirty. `CompanionChangeDetectorSystem` checks fingerprints every 2 s
+   (discrete tier) and 60 s (drift tier).
+2. For a new saved component that changes in place, add it to the right tier
+   in `CompanionFingerprints.production()`.
+3. For new flow code that needs an immediate save, call
+   `CompanionSaves.markChanged(accessor, ref)` on the world thread with the
+   current Store or CommandBuffer.
+4. Do not mirror the value into the record. Only the UI `summary` copies
+   presentation values, refreshed on snapshot and unload.
 
-## Change Replacement Schema or Import
+## Change Snapshot Content or Respawn
 
-1. Read ADRs 0005 and 0006 and inspect `SqliteSchemaV1Manager`.
-2. Preserve the public v2-v4 and legacy `.dat` import boundaries unless a new
-   ADR changes them.
-3. Keep classification read-only and complete before target creation.
-4. Import into an owned temporary target, verify it, and publish atomically.
-5. Preserve UUIDs, zero and negative timestamps, source files, WAL evidence,
-   hashes, and refusal behavior.
-6. Update the exact schema authority and relevant fixture-based behavior tests.
-   Do not add raw SQL text or table-count presence tests.
+1. Capture: `CompanionSnapshots` (format 1). Envelope: `SnapshotEnvelope`.
+2. What a respawn strips or resets: `CompanionRespawn.Types.production`,
+   `CompanionRespawn.stripDocument` and `CompanionRespawn.prepare`.
+3. Edits before deserializing (alarm re-basing to the destination world's game
+   time, revive changes): `SnapshotPatch`. Keep each method pure.
+4. Keep the format 0 restore path in `HytaleCompanionSpawner`: imported
+   companions use it until their first restore.
+5. Test the document edit in `CompanionRespawnTest` or `SnapshotPatchTest`.
+   Engine behavior of the spawned body needs live evidence.
 
-## Change Bonded-Companion Persistence
+## Profile and Extension Data
 
-1. Trace the action from `BondedCompanionApi` through
-   `BondedCompanionApiFacade` to the bonded store and world projection layer.
-2. Preserve the dedicated database and the `STORED`, `ACTIVE`, and `DEAD`
-   lifecycle contract.
-3. Fence live projections with exact leases. A live NPC UUID is lease evidence,
-   not durable profile identity.
-4. Converge non-death exits to `STORED`. Require positive death evidence for
-   `DEAD`.
-5. Preserve complete snapshot state and do not treat an unavailable optional
-   component as deletion.
-6. Reuse the bonded operation, cleanup, payment, and projection-durability
-   services. Do not move the feature into replacement persistence for reuse.
+Extension values live on the record (`ExtensionEntries`) and are written with
+the owner file. `IndexProfileDataApi.compareAndSet` completes after the owner
+file is written and undoes its change if the write fails; `put` and `delete`
+do not wait. Bonded extension data goes through `IndexBondedCompanionApi`.
+Releasing a companion clears its extensions.
 
-## Change a Small Settings or Data-Path Store
+## Admission and Caps
 
-Keep the change in the focused store. Do not introduce the companion operation
-protocol when the data is not companion state. Preserve atomic file behavior,
-path ownership, graceful read failure, and current caller semantics.
+Built-in owned, deployed and group caps are checked under the index lock in
+the step that changes the record (`CompanionAdmission`,
+`CompanionAdmissionGate`). Providers are asked before the lock; synchronous
+sites use `ProviderDecisionCache`, which refuses while a decision is fetched.
+Counts walk one owner's records; do not add counters.
+
+## Change the Importer or Legacy Handling
+
+1. Read `companion/migrate/package-info.java`. Keep importer-only classes
+   separate from the lazy classes that stay while imported worlds exist.
+2. Reading: `LegacySource` (read-only, never writes beside the original) and
+   `LegacyReader`. Mapping: `LegacyMapper` (pure). Running and publishing:
+   `CompanionImporter` (all or nothing through `Companions.importing`).
+3. Keep signed world-time values and `0` as unset.
+4. Add or update a SQL fixture under `src/test/resources/import-fixtures` for
+   each affected schema and test the mapped records.
+
+## Change a Settings or Data-Path Store
+
+Keep the change in its `settings` class. These stores hold no companion state
+and need no index, generation or flow. Preserve atomic file writes, graceful
+read failure and current caller behavior.

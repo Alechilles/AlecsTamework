@@ -24,7 +24,7 @@ not scan for or remove stale names.
 | Skill | Primary responsibility |
 | --- | --- |
 | `tamework-modding` | General Tamework registration and Java/asset wiring |
-| `tamework-persistence` | Durable companion identity, state, operations, and recovery |
+| `tamework-persistence` | Companion index, store, flows, and import |
 | `tamework-config-authoring` | Complete `Tw*Config` family contracts |
 | `tamework-interaction-configurator` | Prompt, sensor, action, state, and cooldown wiring |
 | `tamework-command-runtime` | Command items, panels, authority, HUD, and cleanup |
