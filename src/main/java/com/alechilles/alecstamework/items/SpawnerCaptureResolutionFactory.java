@@ -9,7 +9,7 @@ import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.List;

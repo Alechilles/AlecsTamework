@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

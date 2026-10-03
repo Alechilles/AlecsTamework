@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignal;
-import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -15,7 +14,7 @@ class CommandPanelOwnerSignalsTest {
         CommandPanelOwnerSignals signals = new CommandPanelOwnerSignals();
         UUID owner = UUID.randomUUID();
         List<LinkedPanelRefreshSignal.Kind> received = new ArrayList<>();
-        AutoCloseable page = signals.forOwner(owner, LinkedPanelRefreshSignalSource.none())
+        AutoCloseable page = signals.forOwner(owner)
                 .subscribe(signal -> received.add(signal.kind()));
 
         signals.changed(UUID.randomUUID());

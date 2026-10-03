@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 

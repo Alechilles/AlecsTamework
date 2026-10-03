@@ -110,14 +110,4 @@ class CommandPersistenceViewIndexTest {
         assertTrue(panel.breedingCooldownKnown());
         assertFalse(panel.breedingCooldownActive());
     }
-
-    @Test
-    void aCompanionLinkedOnlyByItemMetadataStaysInThatItemsPanel() {
-        // Generic items keep their selection in item metadata only; the body and record carry no tool id.
-        UUID npc = UUID.randomUUID();
-        CompanionRecord companion = live(npc, List.of());
-        LinkedNpcRecord linked = record(npc, companion.profileId().toString());
-
-        assertEquals(List.of(linked), view.linkedRecordsForTool(List.of(linked), UUID.randomUUID().toString()));
-    }
 }

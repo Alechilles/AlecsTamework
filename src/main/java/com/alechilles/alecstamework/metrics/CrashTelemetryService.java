@@ -7,13 +7,11 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.beacon.api.TelemetryEventContext;
 import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
-import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
-import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
 import com.alechilles.beacon.embedded.EmbeddedTelemetryBootstrap;
 import com.alechilles.beacon.embedded.EmbeddedTelemetryDiagnostics;
 import com.alechilles.beacon.embedded.EmbeddedTelemetryService;
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -225,24 +223,6 @@ public final class CrashTelemetryService {
         telemetry.recordErrorWithContext(eventName, throwable, context);
         syncLastFlushStatus();
         return true;
-    }
-
-    /** Queues one general diagnostic bundle through hosted event telemetry. */
-    @Nonnull
-    public TelemetryDiagnosticBundleResult submitDiagnosticBundle(
-            @Nonnull TelemetryDiagnosticBundle bundle
-    ) {
-        Objects.requireNonNull(bundle, "bundle");
-        if (!canRecordEvents()) {
-            return new TelemetryDiagnosticBundleResult(
-                    TelemetryDiagnosticBundleResult.Status.DISABLED,
-                    "event_telemetry_disabled"
-            );
-        }
-        TelemetryDiagnosticBundleResult result =
-                telemetry.submitDiagnosticBundle(bundle);
-        syncLastFlushStatus();
-        return result;
     }
 
     public boolean recordLifecycle(@Nonnull String eventName,
@@ -621,11 +601,6 @@ public final class CrashTelemetryService {
 
         void recordUsageWithContext(@Nonnull String eventName, @Nullable TelemetryEventContext context);
 
-        @Nonnull
-        TelemetryDiagnosticBundleResult submitDiagnosticBundle(
-                @Nonnull TelemetryDiagnosticBundle bundle
-        );
-
         boolean requestFlush();
 
         @Nonnull
@@ -718,14 +693,6 @@ public final class CrashTelemetryService {
         @Override
         public void recordUsageWithContext(@Nonnull String eventName, @Nullable TelemetryEventContext context) {
             service.recordUsageWithContext(eventName, context);
-        }
-
-        @Nonnull
-        @Override
-        public TelemetryDiagnosticBundleResult submitDiagnosticBundle(
-                @Nonnull TelemetryDiagnosticBundle bundle
-        ) {
-            return service.submitDiagnosticBundle(bundle);
         }
 
         @Override

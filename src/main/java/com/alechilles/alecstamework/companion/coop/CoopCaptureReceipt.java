@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.companion.coop;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.companion.migrate.retired.OperationId;
 import javax.annotation.Nonnull;
 
 /**

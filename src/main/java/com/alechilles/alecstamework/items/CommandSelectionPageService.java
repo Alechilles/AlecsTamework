@@ -1295,7 +1295,7 @@ final class CommandSelectionPageService {
         return ownerUuid != null && config != null && config.usesBondedCompanionRoster()
                 && bondedRefreshSignals != null
                 ? bondedRefreshSignals.forRoster(ownerUuid, config.getBondedRosterId())
-                : ownerSignals.forOwner(ownerUuid, LinkedPanelRefreshSignalSource.none());
+                : ownerSignals.forOwner(ownerUuid);
     }
 
     /**

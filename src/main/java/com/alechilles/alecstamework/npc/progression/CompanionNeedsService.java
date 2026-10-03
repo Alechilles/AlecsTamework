@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
-import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
+import com.alechilles.alecstamework.companion.flow.DeathCauseKind;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -1074,7 +1074,7 @@ public final class CompanionNeedsService {
     }
 
     @Nullable
-    static DeathSnapshotV2Payload.DeathCauseKind resolveNeedsDamageCauseHint(@Nullable TwNeedsConfig config,
+    static DeathCauseKind resolveNeedsDamageCauseHint(@Nullable TwNeedsConfig config,
                                                                                     @Nullable TwNeedsConfig.ValueSettings values,
                                                                                     double hunger,
                                                                                     double thirst,
@@ -1116,26 +1116,26 @@ public final class CompanionNeedsService {
         if (starvationDamage > 0.0 && dehydrationDamage > 0.0) {
             if (damageSettings.getDualNeedRule() == TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY) {
                 if (starvationDamage > dehydrationDamage) {
-                    return DeathSnapshotV2Payload.DeathCauseKind.STARVATION;
+                    return DeathCauseKind.STARVATION;
                 }
                 if (dehydrationDamage > starvationDamage) {
-                    return DeathSnapshotV2Payload.DeathCauseKind.DEHYDRATION;
+                    return DeathCauseKind.DEHYDRATION;
                 }
             }
-            return DeathSnapshotV2Payload.DeathCauseKind.STARVATION_AND_DEHYDRATION;
+            return DeathCauseKind.STARVATION_AND_DEHYDRATION;
         }
         if (starvationDamage > 0.0) {
-            return DeathSnapshotV2Payload.DeathCauseKind.STARVATION;
+            return DeathCauseKind.STARVATION;
         }
         if (dehydrationDamage > 0.0) {
-            return DeathSnapshotV2Payload.DeathCauseKind.DEHYDRATION;
+            return DeathCauseKind.DEHYDRATION;
         }
         return null;
     }
 
     private static void recordRecentNeedsDeathCause(@Nonnull Ref<EntityStore> npcRef,
                                                     @Nonnull Store<EntityStore> store,
-                                                    @Nullable DeathSnapshotV2Payload.DeathCauseKind causeKind,
+                                                    @Nullable DeathCauseKind causeKind,
                                                     double pooledDamageAmount) {
         if (causeKind == null || !Double.isFinite(pooledDamageAmount) || pooledDamageAmount <= MIN_DAMAGE_AMOUNT) {
             return;

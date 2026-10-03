@@ -42,7 +42,6 @@ final class CommandSavedNpcPanelSnapshot {
     private final String roleId;
     private final Facts facts;
     private final Appearance appearance;
-    private final boolean exactCheckpoint;
     private final StoredLocation storedLocation;
 
     /** Where a stored companion is: its coop block (world and block position) or its capture item key. */
@@ -94,18 +93,16 @@ final class CommandSavedNpcPanelSnapshot {
         this.roleId = source == null ? null : source.roleId;
         this.facts = source == null ? null : source.facts;
         this.appearance = source == null ? null : source.appearance;
-        this.exactCheckpoint = source != null && source.exactCheckpoint;
         this.storedLocation = location;
     }
 
     private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
-                                         Appearance appearance, boolean exactCheckpoint) {
+                                         Appearance appearance) {
         this.storedLocation = null;
         this.observedAtMs = observedAtMs;
         this.roleId = trimToNull(roleId);
         this.facts = facts;
         this.appearance = appearance;
-        this.exactCheckpoint = exactCheckpoint;
     }
 
     /**
@@ -159,7 +156,7 @@ final class CommandSavedNpcPanelSnapshot {
         return new CommandSavedNpcPanelSnapshot(s.observedAtMs(), firstNonBlank(s.roleId(), record.roleId()),
                 new Facts(health, happiness, needs, breeding, leveling, traits, talents, harvest,
                         SummaryLifeStage.of(s.progression())),
-                new Appearance(null, Map.of(), s.iconId()), true);
+                new Appearance(null, Map.of(), s.iconId()));
     }
 
     /** Applies only known saved fields and leaves unavailable legacy fields as supplied by the base entry. */
@@ -271,9 +268,7 @@ final class CommandSavedNpcPanelSnapshot {
                 return Cooldown.from(base.harvestCooldownKnown(), base.harvestCooldownActive(), base.harvestCooldownRemainingMs(), base.harvestCooldownRatio());
             }
             // An exact holder without the alarm component has the service's ready semantics.
-            return exactCheckpoint
-                    ? new Cooldown(true, false, 0L, 1.0)
-                    : new Cooldown(true, false, -1L, 0.0);
+            return new Cooldown(true, false, 0L, 1.0);
         }
         String alarmName = CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName();
         for (Alarm alarm : saved.alarms) {

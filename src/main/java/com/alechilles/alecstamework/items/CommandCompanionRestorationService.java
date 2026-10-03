@@ -8,7 +8,6 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionReviveSettings;
-import com.alechilles.alecstamework.items.persistence.HytaleUuidCompletionDispatcher;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;

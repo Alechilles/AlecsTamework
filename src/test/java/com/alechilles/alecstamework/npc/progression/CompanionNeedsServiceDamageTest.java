@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.hypixel.hytale.component.Store;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;

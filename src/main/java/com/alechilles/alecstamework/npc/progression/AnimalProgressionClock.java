@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.persistence.AnimalProgressionClockStore;
+import com.alechilles.alecstamework.settings.AnimalProgressionClockStore;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;

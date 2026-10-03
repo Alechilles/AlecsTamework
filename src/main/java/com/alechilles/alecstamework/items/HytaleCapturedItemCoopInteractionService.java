@@ -11,7 +11,6 @@ import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopAuthor;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
-import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.CommandBuffer;

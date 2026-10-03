@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
-import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -84,7 +83,7 @@ public final class CompanionDeathTiming {
                                  @Nullable BondedCompanionPolicy bondedFamily) {
         DamageTargetMemoryService.RecentAttackerSnapshot attacker =
                 DamageTargetMemoryService.getInstance().getRecentAttacker(npcUuid, RECENT_ATTACKER_MAX_AGE_MS, diedAtMs);
-        DeathSnapshotV2Payload.DeathCauseKind needs =
+        DeathCauseKind needs =
                 RecentNeedsDeathCauseService.getInstance().consumeRecent(npcUuid, diedAtMs);
         Kind kind = needs != null
                 ? Kind.valueOf(needs.name())

@@ -1,9 +1,6 @@
 package com.alechilles.alecstamework.runtime;
 
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
-import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
-import com.alechilles.alecstamework.persistence.TameworkDataPathService;
-import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationEvidence;
 import com.alechilles.alecstamework.runtime.activation.TameworkActivationEvidence;
 import com.alechilles.alecstamework.runtime.activation.TameworkAssetActivationEvidenceCollector;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
@@ -12,6 +9,8 @@ import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivation
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeCapabilityRequests;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModuleCatalog;
+import com.alechilles.alecstamework.settings.TameworkDataPathLayout;
+import com.alechilles.alecstamework.settings.TameworkDataPathService;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
 import java.nio.file.Files;

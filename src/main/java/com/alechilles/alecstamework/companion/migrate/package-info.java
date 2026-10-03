@@ -33,9 +33,13 @@
  *       items.</li>
  *   <li>{@link com.alechilles.alecstamework.companion.migrate.LegacyState}: reads the state in a
  *       2.x item for {@code LegacyItemAdoption} and the state of a body found in a saved chunk for
- *       {@code LegacyBodyLocate} (the importer uses it too).</li>
+ *       {@code LegacyBodyLocate} (the importer uses it too). Its 2.x payload decoders are in
+ *       {@code companion.migrate.legacy}.</li>
  *   <li>{@link com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup}: strips
- *       retired 4.x components from bodies and players as they load.</li>
+ *       retired 4.x components from bodies and players as they load. Retired components stay
+ *       registered under their 4.x ids with codecs that still decode every saved field, so old
+ *       entities load; {@code companion.migrate.retired} holds the ones whose old package was
+ *       deleted.</li>
  *   <li>{@link com.alechilles.alecstamework.companion.migrate.EscrowRefund}: returns items held by
  *       an unfinished 4.x revive payment.</li>
  *   <li>{@code CoopImportedResidents} in {@code companion.coop}: puts imported coop residents back

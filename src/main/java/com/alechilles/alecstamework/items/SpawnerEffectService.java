@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;

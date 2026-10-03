@@ -91,14 +91,6 @@ final class CommandPersistenceView {
     }
 
     /**
-     * Panel membership for one tool. Item metadata decides: generic items keep their selection
-     * only there (commit 11106c9a4), so a record without the tool id still belongs.
-     */
-    List<LinkedNpcRecord> linkedRecordsForTool(List<LinkedNpcRecord> records, @Nullable String toolId) {
-        return records;
-    }
-
-    /**
      * Resolves one command record by stable profile first and known alias second. On the
      * companion index a known alias is the record's current body, else a body an imported world
      * knew for it.

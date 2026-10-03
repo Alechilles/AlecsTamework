@@ -40,6 +40,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySyste
 import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.SpawnBeaconVisualizationService;
+import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -158,7 +159,7 @@ import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTarget;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTelemetry;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationContext;
-import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
+import com.alechilles.alecstamework.companion.migrate.retired.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -188,8 +189,8 @@ import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
-import com.alechilles.alecstamework.persistence.TameworkDataPathService;
-import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationEvidence;
+import com.alechilles.alecstamework.settings.TameworkDataPathService;
+import com.alechilles.alecstamework.runtime.TameworkPersistenceActivationEvidence;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
@@ -262,7 +263,7 @@ import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
-import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
+import com.alechilles.alecstamework.settings.TameworkDataPathLayout;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
@@ -964,8 +965,7 @@ public class Tamework extends JavaPlugin {
                     "command-active-npc-highlight",
                     () -> new CommandActiveNpcHighlightSystem(
                             commandItemRegistry,
-                            commandHighlightActivationTracker,
-                            commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
+                            commandHighlightActivationTracker
                     ));
         }
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
@@ -1453,7 +1453,7 @@ public class Tamework extends JavaPlugin {
         if (getCommandRegistry() != null) {
             CompanionQueries companions = companionModule != null && companionModule.ready()
                     ? companionModule.queries() : null;
-            var root = TameworkCommandRootFactory.create(
+            var root = new TameworkCommandRoot(
                     spawnBeaconVisualizationService,
                     companionReleaseFlow,
                     companions

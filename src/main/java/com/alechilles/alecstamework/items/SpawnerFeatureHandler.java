@@ -50,8 +50,6 @@ import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
 import com.alechilles.alecstamework.items.locate.CapturedItemMetadata;
 import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
-import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
-import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;

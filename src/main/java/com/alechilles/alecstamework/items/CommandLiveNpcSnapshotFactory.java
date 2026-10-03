@@ -34,33 +34,6 @@ final class CommandLiveNpcSnapshotFactory {
             NPCEntity npc,
             @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
     ) {
-        return capture(npcRef, store, npc, previous, false);
-    }
-
-    /**
-     * Captures the required profile observation for an admitted admin spawn.
-     *
-     * <p>Admin-owned companions do not need a command-item link or a completed
-     * tame-state transition.</p>
-     */
-    @Nullable
-    CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot captureAdminSpawn(
-            Ref<EntityStore> npcRef,
-            Store<EntityStore> store,
-            NPCEntity npc,
-            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
-    ) {
-        return capture(npcRef, store, npc, previous, true);
-    }
-
-    @Nullable
-    private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot capture(
-            Ref<EntityStore> npcRef,
-            Store<EntityStore> store,
-            NPCEntity npc,
-            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous,
-            boolean allowUnlinked
-    ) {
         if (npcRef == null || !npcRef.isValid() || store == null
                 || npc == null || npc.getUuid() == null) {
             return null;
@@ -79,7 +52,7 @@ final class CommandLiveNpcSnapshotFactory {
         boolean tamed = TamedStateResolver.isTamed(npcRef, store);
         // Owned animals must remain discoverable after unload even before the
         // player links a command item. Unrelated wild NPCs need no profile.
-        if (!allowUnlinked && toolIds.length == 0) {
+        if (toolIds.length == 0) {
             if (owner == null || owner.getOwnerId() == null || !tamed) {
                 return null;
             }

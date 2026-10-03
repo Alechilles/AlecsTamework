@@ -247,7 +247,7 @@ final class CommandPanelEntrySourceService {
         records.addAll(inputs.owned().ownedRecords());
         records.addAll(inputs.owned().capturedRecords());
         appendFreshOwnedRecords(player, store, records, inputs.linkedRecords());
-        Set<UUID> linkedIds = ownedLinkedIds(inputs, toolId);
+        Set<UUID> linkedIds = ownedLinkedIds(inputs);
         CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
         boolean includeCareValues = sort == CommandPanelPreferenceService.PanelSort.Happiness
                 || sort == CommandPanelPreferenceService.PanelSort.Hunger
@@ -308,8 +308,9 @@ final class CommandPanelEntrySourceService {
     }
 
     /** Item links name an NPC UUID; an owned row that moved to a new body keeps its link through the profile. */
-    private Set<UUID> ownedLinkedIds(RefreshInputs inputs, String toolId) {
-        Set<UUID> ids = new HashSet<>(linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId));
+    private Set<UUID> ownedLinkedIds(RefreshInputs inputs) {
+        Set<UUID> ids = new HashSet<>();
+        for (LinkedNpcRecord record : inputs.linkedRecords()) ids.add(record.npcUuid);
         if (inputs.owned() == null) return ids;
         Set<String> linkedProfiles = new HashSet<>();
         for (LinkedNpcRecord record : inputs.linkedRecords()) {
@@ -377,7 +378,7 @@ final class CommandPanelEntrySourceService {
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (ownedMode) CommandCompanionGroups.importLegacy(player, stack);
         if (ownedMode) {
-            Set<UUID> linkedIds = ownedLinkedIds(inputs, toolId);
+            Set<UUID> linkedIds = ownedLinkedIds(inputs);
             List<LinkedNpcRecord> ownedRecords = new ArrayList<>();
             if (inputs.owned() != null) {
                 ownedRecords.addAll(inputs.owned().ownedRecords());

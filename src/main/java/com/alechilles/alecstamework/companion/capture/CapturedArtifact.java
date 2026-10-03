@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import javax.annotation.Nonnull;
 
 /**

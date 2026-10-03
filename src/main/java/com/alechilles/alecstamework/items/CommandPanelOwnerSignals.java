@@ -17,20 +17,16 @@ import javax.annotation.Nullable;
 final class CommandPanelOwnerSignals {
     private final CopyOnWriteArrayList<Subscription> subscriptions = new CopyOnWriteArrayList<>();
 
-    /** Signals for {@code owner}'s pages, together with those of {@code other}. */
+    /** Signals for {@code owner}'s pages; none when the owner is unknown. */
     @Nonnull
-    LinkedPanelRefreshSignalSource forOwner(@Nullable UUID owner, @Nonnull LinkedPanelRefreshSignalSource other) {
+    LinkedPanelRefreshSignalSource forOwner(@Nullable UUID owner) {
         if (owner == null) {
-            return other;
+            return LinkedPanelRefreshSignalSource.none();
         }
         return listener -> {
-            AutoCloseable otherSubscription = other.subscribe(listener);
             Subscription subscription = new Subscription(owner, listener);
             subscriptions.add(subscription);
-            return () -> {
-                subscriptions.remove(subscription);
-                otherSubscription.close();
-            };
+            return () -> subscriptions.remove(subscription);
         };
     }
 
