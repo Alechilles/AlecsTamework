@@ -130,10 +130,10 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
 - A dead-target capture denial writes the player, target, role, item, exact
   health, and death-component state to the server log.
-- `/tw debug log respawn-trace` logs `[tw-respawn-trace]` lines (first damage
-  and cancelled falls) for spawns that start a trace. In 5.0 the restore flows
-  do not start one, so captured-item releases, recalls, and revives currently
-  log no trace lines.
+- `/tw debug log respawn-trace` logs `[tw-respawn-trace]` lines for every
+  companion body the restore flows spawn (recall, recover, revive, summon,
+  captured-item release, and coop release): the spawn result, probes 250 ms
+  and 1000 ms later, the first damage, and cancelled fall damage.
 - Newly bred offspring receive brief spawn-time fall protection; a cancelled
   fall appears under `[tw-spawn-protection]`.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).

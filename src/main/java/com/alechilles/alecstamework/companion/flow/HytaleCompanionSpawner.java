@@ -483,7 +483,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                         branch, "spawned profile=" + profileId, true);
             }
         } catch (RuntimeException | LinkageError failure) {
-            warn(profileId, "spawn fall protection could not be recorded", failure);
+            warn(profileId, "spawn protection or the respawn trace could not be recorded", failure);
         }
     }
 

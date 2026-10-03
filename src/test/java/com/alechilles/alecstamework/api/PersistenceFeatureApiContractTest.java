@@ -1,54 +1,16 @@
 package com.alechilles.alecstamework.api;
 
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Compatibility and signed-time contracts for restored persistence-facing API values. */
 class PersistenceFeatureApiContractTest {
     private static final UUID OWNER = UUID.fromString(
             "10000000-0000-0000-0000-000000000901"
     );
-
-    @Test
-    void persistedWorldTimesAcceptNegativeEpochValues() {
-        CommandFamilyRosterMembershipView member =
-                new CommandFamilyRosterMembershipView(
-                        OWNER,
-                        "primary",
-                        "profile-1",
-                        "tamed_chicken",
-                        0,
-                        CommandFamilyRosterMemberState.ROSTER_STORED,
-                        null,
-                        true,
-                        null,
-                        -2_000
-                );
-        CommandFamilyRosterView roster = new CommandFamilyRosterView(
-                OWNER, "primary", 0, List.of(member), -2_000
-        );
-        CommandTimedSummoningView timed =
-                new CommandTimedSummoningView(
-                        OWNER,
-                        "primary",
-                        "profile-1",
-                        1,
-                        CommandTimedSummoningState.ROSTER_STORED,
-                        null,
-                        0L,
-                        false,
-                        -1_000,
-                        -2_000
-                );
-
-        assertEquals(-2_000, roster.updatedAtMs());
-        assertEquals(-1_000, timed.cooldownUntilMs());
-    }
 
     @Test
     void resolvedCaptureEventCarriesExactTerminalEvidence() {

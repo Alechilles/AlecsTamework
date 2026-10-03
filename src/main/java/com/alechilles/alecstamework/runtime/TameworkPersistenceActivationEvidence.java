@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.runtime;
 
-import java.util.Set;
 import javax.annotation.Nonnull;
 
 /**
@@ -22,12 +21,9 @@ public final class TameworkPersistenceActivationEvidence {
         return new TameworkPersistenceActivationEvidence(false, "persistence-absent");
     }
 
-    /** Creates evidence for durable state to recover; {@code evidence} must name at least one source. */
+    /** Creates evidence for durable state to recover. */
     @Nonnull
-    public static TameworkPersistenceActivationEvidence active(@Nonnull Set<String> evidence) {
-        if (evidence.isEmpty()) {
-            throw new IllegalArgumentException("Active persistence evidence cannot be empty");
-        }
+    public static TameworkPersistenceActivationEvidence active() {
         return new TameworkPersistenceActivationEvidence(true, "durable-state-present");
     }
 

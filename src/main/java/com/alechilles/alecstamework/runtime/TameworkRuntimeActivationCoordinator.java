@@ -90,7 +90,7 @@ public final class TameworkRuntimeActivationCoordinator {
         for (CompanionStorage.LegacyKind kind : CompanionStorage.LegacyKind.values()) {
             for (String name : kind.files()) {
                 if (anyExists(legacyDirs, name, exists)) {
-                    return TameworkPersistenceActivationEvidence.active(Set.of("legacy-companion-data"));
+                    return TameworkPersistenceActivationEvidence.active();
                 }
             }
         }
@@ -102,7 +102,7 @@ public final class TameworkRuntimeActivationCoordinator {
             Collection<Path> legacyDirs, Predicate<Path> exists
     ) {
         return anyExists(legacyDirs, BONDED_FILE, exists)
-                ? TameworkPersistenceActivationEvidence.active(Set.of("legacy-bonded-data"))
+                ? TameworkPersistenceActivationEvidence.active()
                 : TameworkPersistenceActivationEvidence.dormant();
     }
 

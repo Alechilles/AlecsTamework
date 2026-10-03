@@ -458,7 +458,6 @@ public final class CompanionWriter {
             }
             if (failure != null) {
                 lastFailure = String.valueOf(failure);
-                warnFlushFailed(failure);
             } else {
                 lastFailure = null;
                 lastFlushAtMs = clock.getAsLong();
@@ -466,6 +465,10 @@ public final class CompanionWriter {
             failedWaiters.forEach(Runnable::run);
             Throwable leftover = failure != null ? failure : new IllegalStateException("companion_flush_incomplete");
             taken.values().forEach(w -> complete(w, leftover));
+            // Last, so a failing logger cannot leave a waiter uncompleted.
+            if (failure != null) {
+                warnFlushFailed(failure);
+            }
         }
     }
 

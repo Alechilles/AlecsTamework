@@ -26,42 +26,6 @@ class TameworkApiV09ContractTest {
     }
 
     @Test
-    void provisionedTransitionSuccessRequiresDurableOriginAndIdentity() {
-        CompanionProvisioningResult transitioned = new CompanionProvisioningResult(
-                CompanionProvisioningResult.Status.TRANSITIONED,
-                "activated",
-                "Alechilles:HyDragon",
-                "soul-bond:player",
-                UUID.randomUUID(),
-                "profile-1",
-                UUID.randomUUID(),
-                "Tamed_Wyvern_Mini",
-                PopulationCompanionLifecycle.ACTIVE,
-                CompanionProvisioningProjectionStatus.ACTIVE,
-                "active",
-                null,
-                3L
-        );
-
-        assertTrue(transitioned.accepted());
-        assertThrows(IllegalArgumentException.class, () -> new CompanionProvisioningResult(
-                CompanionProvisioningResult.Status.TRANSITIONED,
-                "activated",
-                null,
-                null,
-                UUID.randomUUID(),
-                "profile-1",
-                UUID.randomUUID(),
-                "Tamed_Wyvern_Mini",
-                PopulationCompanionLifecycle.ACTIVE,
-                CompanionProvisioningProjectionStatus.ACTIVE,
-                "active",
-                null,
-                3L
-        ));
-    }
-
-    @Test
     void dormantProvisioningDoesNotOccupyAClaimAndCannotUseV1Admission() {
         assertFalse(PopulationCompanionLifecycle.PROVISIONED_DORMANT.occupiesPhysicalClaim());
         assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionRequest(

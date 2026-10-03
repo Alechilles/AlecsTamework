@@ -173,7 +173,6 @@ public final class StoreFlow<R> {
         // A fresh snapshot is queued under the index lock with the commit, so no flush can write the
         // record's owner file before its snapshot (the CompanionWriter.queueSnapshot contract).
         boolean[] queueFailed = new boolean[1];
-        boolean[] reverted = new boolean[1];
         Commit commit = index.atomically(() -> {
             if (fresh == null && loaded.get(profileId) != null) {
                 return null;
@@ -191,8 +190,9 @@ public final class StoreFlow<R> {
                 } catch (RuntimeException failure) {
                     LOGGER.at(Level.WARNING).withCause(failure)
                             .log("Could not queue the snapshot of stored companion %s; the store is undone", profileId);
+                    // Still under the lock, so the record is exactly the commit and the revert applies.
                     queueFailed[0] = true;
-                    reverted[0] = revertCommit(before, applied, body, fresh);
+                    revertCommit(before, applied, body, fresh);
                 }
             }
             return applied;
@@ -201,9 +201,6 @@ public final class StoreFlow<R> {
             return CompletableFuture.completedFuture(Result.CONFLICT);
         }
         if (queueFailed[0]) {
-            if (!reverted[0]) {
-                removeBodySafely(profileId, body);
-            }
             return CompletableFuture.completedFuture(Result.COMMIT_FAILED);
         }
         CompanionRecord after = commit.after();
