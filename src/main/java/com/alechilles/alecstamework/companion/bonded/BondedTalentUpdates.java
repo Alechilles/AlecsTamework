@@ -38,6 +38,9 @@ import org.bson.BsonDocument;
  * restored yet keeps them in its format 0 state snapshot, which is read and patched the same way
  * and stays format 0.
  *
+ * <p>The stored half also serves a dead or lost ordinary companion's talent page
+ * ({@link #updateStored}, {@link #read}); nothing in it is specific to bonded records.</p>
+ *
  * <p>The stored change is fenced on the record revision the caller saw. Under the index lock the
  * record's summary gets the new spent points and tree, at that revision, and the patched snapshot
  * is queued only when that update applied. Every other change to the record moves its revision
@@ -134,10 +137,14 @@ public final class BondedTalentUpdates {
                 CompanionProgressionSettings::isTalentsEnabled);
     }
 
-    BondedTalentUpdates(@Nonnull CompanionIndex index,
-                        @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> readSnapshot,
-                        @Nonnull Consumer<SnapshotEnvelope> queueSnapshot, @Nonnull LiveBody live,
-                        @Nonnull Configs configs, @Nonnull BooleanSupplier enabled) {
+    /**
+     * @param configs the tree a change is checked against
+     * @param enabled whether talents are turned on
+     */
+    public BondedTalentUpdates(@Nonnull CompanionIndex index,
+                               @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> readSnapshot,
+                               @Nonnull Consumer<SnapshotEnvelope> queueSnapshot, @Nonnull LiveBody live,
+                               @Nonnull Configs configs, @Nonnull BooleanSupplier enabled) {
         this.index = Objects.requireNonNull(index, "index");
         this.readSnapshot = Objects.requireNonNull(readSnapshot, "readSnapshot");
         this.queueSnapshot = Objects.requireNonNull(queueSnapshot, "queueSnapshot");
@@ -159,7 +166,34 @@ public final class BondedTalentUpdates {
             CompletableFuture<Outcome> changed = live.update(record, request);
             return changed != null ? changed : CompletableFuture.completedFuture(Outcome.of(Status.BODY_UNAVAILABLE));
         }
-        return readSnapshot.apply(record.profileId()).thenApply(snapshot -> stored(record, request, snapshot));
+        return readSnapshot.apply(record.profileId()).thenApply(snapshot -> stored(record, request.action(),
+                request.talentId(), request.talentConfigId(), snapshot));
+    }
+
+    /**
+     * Applies a purchase or reset to the stored snapshot of {@code record}, a companion with no
+     * body (dead, lost or stored), checked against its role's talent tree. The caller has checked
+     * owner and generation; the change is fenced on {@code record.revision()} as a bonded one is.
+     * An active record ends {@link Status#BODY_UNAVAILABLE}: its body holds the talents.
+     *
+     * <p>The snapshot is decoded on the thread that completes its read, which is the caller's
+     * when the snapshot is still queued for writing, so a world-thread caller calls this from
+     * another thread. A failed read fails the returned future.</p>
+     */
+    @Nonnull
+    public CompletableFuture<Outcome> updateStored(@Nonnull CompanionRecord record,
+                                                   @Nonnull BondedCompanionTalentActionRequest.Action action,
+                                                   @Nullable String talentId) {
+        Objects.requireNonNull(record, "record");
+        Objects.requireNonNull(action, "action");
+        if (!enabled.getAsBoolean()) {
+            return CompletableFuture.completedFuture(Outcome.of(Status.DISABLED));
+        }
+        if (record.location().kind() == LocationKind.LIVE) {
+            return CompletableFuture.completedFuture(Outcome.of(Status.BODY_UNAVAILABLE));
+        }
+        return readSnapshot.apply(record.profileId())
+                .thenApply(snapshot -> stored(record, action, talentId, null, snapshot));
     }
 
     /**
@@ -203,16 +237,17 @@ public final class BondedTalentUpdates {
         }
     }
 
-    private Outcome stored(CompanionRecord record, BondedCompanionTalentActionRequest request,
+    private Outcome stored(CompanionRecord record, BondedCompanionTalentActionRequest.Action action,
+                           @Nullable String talentId, @Nullable String presentedConfigId,
                            @Nullable SnapshotEnvelope snapshot) {
         Stored state = snapshot == null ? null : decode(snapshot);
         TameworkLevelingComponent leveling = state == null ? null : state.leveling();
         if (leveling == null) {
             return Outcome.of(Status.NO_LEVEL_DATA);
         }
-        TwTalentConfig config = configs.resolve(request.talentConfigId(), record.roleId());
+        TwTalentConfig config = configs.resolve(presentedConfigId, record.roleId());
         TameworkTalentsComponent updated =
-                changed(state.talents(), leveling.getLevel(), leveling.getConfigId(), config, request);
+                changed(state.talents(), leveling.getLevel(), leveling.getConfigId(), config, action, talentId);
         if (updated == null) {
             return Outcome.of(Status.REJECTED);
         }
@@ -258,15 +293,16 @@ public final class BondedTalentUpdates {
     }
 
     /**
-     * The talents after {@code request}, or null when it is not allowed: no enabled tree, an
+     * The talents after {@code action}, or null when it is not allowed: no enabled tree, an
      * unknown or already bought talent, a level or prerequisite not met, too few points, or a
      * reset with nothing spent. Pure; {@code existing} is not changed.
      */
     @Nullable
     static TameworkTalentsComponent changed(@Nullable TameworkTalentsComponent existing, int level,
                                             @Nullable String levelingConfigId, @Nullable TwTalentConfig config,
-                                            @Nonnull BondedCompanionTalentActionRequest request) {
-        if (request.action() == BondedCompanionTalentActionRequest.Action.RESET) {
+                                            @Nonnull BondedCompanionTalentActionRequest.Action action,
+                                            @Nullable String talentId) {
+        if (action == BondedCompanionTalentActionRequest.Action.RESET) {
             if (existing == null || existing.getSpentPoints() <= 0 && existing.getPurchasedTalentIds().length == 0) {
                 return null;
             }
@@ -279,7 +315,7 @@ public final class BondedTalentUpdates {
         // An allocation made under another tree or allocation revision is dropped first, as on a live body.
         CompanionTalentService.PurchaseResult purchase = CompanionTalentService.purchase(
                 CompanionTalentService.reconcileAllocation(existing, config), config, level, levelingConfigId,
-                request.talentId());
+                talentId);
         return purchase.applied() ? purchase.component() : null;
     }
 

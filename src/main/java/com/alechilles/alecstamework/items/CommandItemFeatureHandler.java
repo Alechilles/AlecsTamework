@@ -560,6 +560,18 @@ public final class CommandItemFeatureHandler {
         }
     }
 
+    /**
+     * Lets owners spend and reset the talent points of dead and lost companions in their stored
+     * snapshots, from the panel's Talents button and the managed talent row. Without either
+     * argument those companions have no talent page.
+     */
+    public void configureSavedTalents(@Nullable CompanionQueries companions,
+                                      @Nullable com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates updates) {
+        talentPageService.useSavedTalents(companions == null || updates == null ? null
+                : new CommandSavedTalentPageService(companions, updates, toolInventoryService,
+                        linkMutationService::readLinkedNpcRecords, feedbackService, talentPageService));
+    }
+
     /** Sets where a recall of a companion in another world is restored; until then it is skipped. */
     public void configureRecallRestore(@Nullable CompanionRestoreRecallSink recallRestore) {
         relocationDispatchService.setRecallRestore(recallRestore);

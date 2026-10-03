@@ -335,6 +335,9 @@ public class Tamework extends JavaPlugin {
     private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bondedCompanionApi;
     /** Summon aura, expiry warning and expiry fall protection of bonded companions; closed with the bonded API. */
     private com.alechilles.alecstamework.companion.bonded.BondedSummonEffects bondedSummonEffects;
+    /** Stored talent changes (bonded API and saved talent pages); null unless the companion module is ready. */
+    @Nullable
+    private com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates storedTalentUpdates;
     private CompanionStartupAdmission companionStartupAdmission;
     /** Retired 3.x/4.x entity component types that nothing reads any more (plan 7 R15). */
     private List<ComponentType<EntityStore, ?>> retiredEntityComponentTypes = List.of();
@@ -887,6 +890,7 @@ public class Tamework extends JavaPlugin {
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
         commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
+        commandItemFeatureHandler.configureSavedTalents(companionQueries, storedTalentUpdates);
         if (captureItemFlows != null && spawnerFeatureHandler != null) {
             // After a Recall or Forget the item turns empty at once in its owner's inventory and
             // where the item locator last saw it (a container, a dropped item or another player).
@@ -1597,8 +1601,12 @@ public class Tamework extends JavaPlugin {
                                 module::readSnapshot),
                         System::currentTimeMillis);
         module.addAfterUnlockListener(bonded::onChanged);
-        bonded.useTalents(new com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates(
-                module.index(), module::readSnapshot, module.writer()::queueSnapshot, bondedBodies));
+        com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates talents =
+                new com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates(
+                        module.index(), module::readSnapshot, module.writer()::queueSnapshot, bondedBodies);
+        bonded.useTalents(talents);
+        // Its stored half also serves the talent pages of dead and lost ordinary companions.
+        storedTalentUpdates = talents;
         return bonded;
     }
 

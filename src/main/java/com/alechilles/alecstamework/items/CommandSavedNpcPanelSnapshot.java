@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSettings;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -155,7 +156,9 @@ final class CommandSavedNpcPanelSnapshot {
                         s.harvestAlarmUntilMs(), s.harvestAlarmStartedAtMs(), s.harvestAlarmDurationMs())));
         return new CommandSavedNpcPanelSnapshot(s.observedAtMs(), firstNonBlank(s.roleId(), record.roleId()),
                 new Facts(health, happiness, needs, breeding, leveling, traits, talents, harvest,
-                        SummaryLifeStage.of(s.progression())),
+                        SummaryLifeStage.of(s.progression()),
+                        // The saved talent page serves the companions the generic owned actions may change.
+                        !record.bonded() && record.rosterId() == null),
                 new Appearance(null, Map.of(), s.iconId()));
     }
 
@@ -192,7 +195,7 @@ final class CommandSavedNpcPanelSnapshot {
                 base.deadRespawnRemainingMs(), base.deathCauseHint(), progression.level,
                 progression.talents, traits, facts.traits != null || base.isTraitsActionVisible(),
                 base.loaded() && base.isTraitsActionEnabled(), progression.talents != null || base.isTalentsActionVisible(),
-                base.loaded() && base.isTalentsActionEnabled(),
+                base.loaded() ? base.isTalentsActionEnabled() : savedTalentsEditable(progression, base),
                 base.linked(), base.active(),
                 base.speciesId(), base.speciesLabel(), base.groupId(), base.groupName(),
                 base.groupColorHex(), breedingEnabled, breedingAvailable, breeding.active,
@@ -212,6 +215,15 @@ final class CommandSavedNpcPanelSnapshot {
         applied = applied.withAnimalLifecycle(AnimalProgressionService.presentation(
                 facts.lifeStage, effectiveRole, base.captured() || base.dead()));
         return base.recoveryHeld() ? applied.withRecoveryHold(base.recoveryIncidentId()) : applied;
+    }
+
+    /**
+     * A dead or lost companion's points can be spent in its stored snapshot
+     * ({@link CommandSavedTalentPageService}); whether that snapshot exists is checked on open.
+     */
+    private boolean savedTalentsEditable(Progression progression, LinkedNpcEntry base) {
+        return facts.talentsEditable && progression.talents != null && (base.dead() || base.lost())
+                && CompanionProgressionSettings.isTalentsEnabled() && CompanionProgressionSettings.isLevelingEnabled();
     }
 
     private static boolean isJuvenileLifeStage(@Nullable TameworkLifeStageComponent lifeStage) {
@@ -355,7 +367,7 @@ final class CommandSavedNpcPanelSnapshot {
     private static int round(double value) { return Double.isFinite(value) ? Math.max(0, (int) Math.round(value)) : 0; }
     private static int percent(double value, double min, double max) { return max <= min ? 0 : Math.max(0, Math.min(100, (int) Math.round(100.0 * (clamp(value, min, max) - min) / (max - min)))); }
     private static double clamp(double value, double min, double max) { return !Double.isFinite(value) ? min : Math.max(min, Math.min(max, value)); }
-    private static double cumulativeXp(TwLevelingConfig config, int level) { double total = 0.0; int cappedLevel = Math.max(1, Math.min(level, config.getLevels().getMaxLevel())); for (int currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) total += config.getLevels().getBaseXp() * Math.pow(config.getLevels().getGrowthFactor(), currentLevel - 2); return Math.max(0.0, total); }
+    static double cumulativeXp(TwLevelingConfig config, int level) { double total = 0.0; int cappedLevel = Math.max(1, Math.min(level, config.getLevels().getMaxLevel())); for (int currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) total += config.getLevels().getBaseXp() * Math.pow(config.getLevels().getGrowthFactor(), currentLevel - 2); return Math.max(0.0, total); }
     @Nullable private static String trimToNull(@Nullable String value) { return value == null || value.isBlank() ? null : value.trim(); }
     @Nullable private static String firstNonBlank(@Nullable String first, @Nullable String second) { return trimToNull(first) != null ? trimToNull(first) : trimToNull(second); }
 
@@ -384,7 +396,7 @@ final class CommandSavedNpcPanelSnapshot {
         }
     }
 
-    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage) { }
+    private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest, @Nullable TameworkLifeStageComponent lifeStage, boolean talentsEditable) { }
     /** {@code icon} is a portrait already resolved from the live body (summary path); it wins when set. */
     private record Appearance(@Nullable String modelId, Map<String, String> attachments, @Nullable String icon) {
         private Appearance {

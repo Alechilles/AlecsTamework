@@ -28,13 +28,18 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Opens and mutates the companion talents page for owned live companions.
+ * Opens and mutates the companion talents page for owned live companions. A dead or lost
+ * companion has no body; its page is served by {@link CommandSavedTalentPageService} once one is
+ * configured ({@link #useSavedTalents}).
  */
 final class CommandTalentPageService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
+    /** Set once at startup when the companion index is ready; null before and without it. */
+    @Nullable
+    private volatile CommandSavedTalentPageService savedTalents;
 
     CommandTalentPageService(@Nonnull CommandLinkPolicyService linkPolicyService,
                              @Nonnull CommandToolInventoryService toolInventoryService,
@@ -53,22 +58,42 @@ final class CommandTalentPageService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        CommandSavedTalentPageService saved = savedTalents;
+        if (saved != null && !hasLoadedBody(player, npcUuid)) {
+            // No body to read: a dead or lost companion's talents are in its stored snapshot.
+            saved.openPage(player, toolId, npcUuid, backCallback);
+            return;
+        }
         openTalentPage(player,
                 () -> resolveLinkedCompanionTalentContext(player, toolId, npcUuid),
                 backCallback);
     }
 
+    /** Serves the saved talent pages of dead and lost companions; null turns them off. */
+    void useSavedTalents(@Nullable CommandSavedTalentPageService saved) {
+        savedTalents = saved;
+    }
+
+    /** The managed command UI's talent flow for a dead or lost companion. Owner's world thread. */
     java.util.concurrent.CompletionStage<com.alechilles.alecstamework.api.commandui.CommandUiActionResult> openSavedTalents(
             CommandUiSessionImpl session, UUID rowId, Player player, String toolId, UUID npcId,
             java.util.function.BooleanSupplier authority) {
-        // Saved talents of an unloaded companion have no page on the companion index.
-        return java.util.concurrent.CompletableFuture.completedFuture(
-                com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
-                        LocalizedText.resolve(
-                                resolveLanguage(player),
-                                "tamework.ui.talents.saved.unavailable"
-                        )
-                ));
+        CommandSavedTalentPageService saved = savedTalents;
+        return saved != null ? saved.openManaged(session, rowId, player, toolId, npcId, authority)
+                : java.util.concurrent.CompletableFuture.completedFuture(
+                        com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
+                                LocalizedText.resolve(
+                                        resolveLanguage(player),
+                                        "tamework.ui.talents.saved.unavailable"
+                                )
+                        ));
+    }
+
+    /** True when {@code npcUuid} is a loaded entity in the player's world. World thread. */
+    private static boolean hasLoadedBody(@Nonnull Player player, @Nonnull UUID npcUuid) {
+        World world = player.getWorld();
+        Ref<EntityStore> ref = world == null ? null : world.getEntityRef(npcUuid);
+        return ref != null && ref.isValid();
     }
 
     /** Opens the shared talent page for a caller-authorized live companion. */
@@ -572,8 +597,9 @@ final class CommandTalentPageService {
         return new TalentTarget(npcRef, store, displayName, roleId);
     }
 
+    /** The viewer's text for a {@link CompanionTalentService} purchase or reset message. */
     @Nonnull
-    private static String resolveMutationMessage(
+    static String resolveMutationMessage(
             @Nullable String language,
             @Nullable String message
     ) {

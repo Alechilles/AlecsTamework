@@ -469,9 +469,11 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
         UUID profileId = committed.profileId();
         try {
             CompanionSaves.markChanged(store, ref);
+            // The saved stats hold the modifiers of the talents the body had when it was
+            // snapshotted; talents bought or reset while it had no body change them. Rebuilt
+            // after every restore, before a revive's full health uses the modified maximum.
+            CompanionStatModifierService.applyTraitModifiers(ref, store);
             if (reason == RestoreRules.Reason.REVIVE) {
-                // Trait modifiers first, so full health uses the modified maximum.
-                CompanionStatModifierService.applyTraitModifiers(ref, store);
                 CompanionHealthStateService.applyStoredHealthPercent(ref, store, 100.0);
             }
         } catch (RuntimeException | LinkageError failure) {
