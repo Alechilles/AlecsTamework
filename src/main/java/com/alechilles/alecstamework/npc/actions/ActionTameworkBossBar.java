@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
 import com.hypixel.hytale.builtin.encountermanager.EncounterManagerPlugin;
 import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
@@ -95,7 +94,7 @@ public final class ActionTameworkBossBar extends TameworkActionBase {
 
         // This reusable list is consumed in this callback and never retained across ticks.
         List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
-        HytaleSpatialAccess.collect(spatial.getSpatialStructure(), transform.getPosition(), range, nearby);
+        spatial.getSpatialStructure().collect(transform.getPosition(), range, nearby);
         for (int i = 0; i < nearby.size(); i++) {
             Ref<EntityStore> playerRef = nearby.get(i);
             if (playerRef != null && playerRef.isValid()) {

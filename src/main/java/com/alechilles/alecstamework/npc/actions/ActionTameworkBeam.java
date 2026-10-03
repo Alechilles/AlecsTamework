@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -19,6 +17,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
@@ -103,7 +102,7 @@ public final class ActionTameworkBeam extends TameworkActionBase {
             if (length <= 0) return true;
             if (emit) {
                 Vector3d midpoint = new Vector3d(direction).mul(length * 0.5).add(origin);
-                HytaleParticleAccess.spawn(particleSystem, midpoint, rotation.yaw(), rotation.pitch(), 0,
+                ParticleUtil.spawnParticleEffect(particleSystem, midpoint, rotation.yaw(), rotation.pitch(), 0,
                         (float) (length / particleNativeLength), PARTICLE_LIFETIME, store);
             }
             if (hurt) damagePlayers(npcRef, store, origin, direction, length);
@@ -139,7 +138,7 @@ public final class ActionTameworkBeam extends TameworkActionBase {
         if (spatial == null) return;
         // Spatial entries use feet positions; include player bounds near the ray endpoint.
         List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
-        HytaleSpatialAccess.collect(spatial.getSpatialStructure(), origin, length + beamRadius + 3.0, nearby);
+        spatial.getSpatialStructure().collect(origin, length + beamRadius + 3.0, nearby);
         // Damage handlers may reuse the spatial scratch list; this copy stays in this callback.
         List<Ref<EntityStore>> candidates = new ArrayList<>(nearby);
         for (int i = 0; i < candidates.size(); i++) {

@@ -463,8 +463,7 @@ Linked panel supports:
   dismounts. It is also removed when the setting is disabled or the equipped
   command tool changes.
   This setting starts disabled and applies only to generic item-metadata
-  rosters on Update 6. Update 5 does not run the indicator system because it
-  lacks the required model-particle cleanup support.
+  rosters.
 - Group shortcuts in the sidebar: `All`, `None`, or one configured group. A group
   shortcut selects its members for the current flute.
 - Shared player groups with multi-membership, native inline multi-select card dropdowns,

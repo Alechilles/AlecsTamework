@@ -12,7 +12,6 @@ import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateRestorer;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
-import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
@@ -35,6 +34,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -380,7 +380,7 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                                                  CoopResidentStateRestorer.PostAddWork work,
                                                  RestoreRules.Reason reason) {
         if (work.hasDisplayNameWork()) {
-            NpcDisplayNameAccess.set(ref, work.displayName(), store);
+            DisplayNameSupport.setDisplayName(ref, work.displayName(), store);
         }
         if (RestoreRules.appliesImportedHealth(reason, work.currentHealth(), work.healthPercent())) {
             // Trait modifiers first, so the stored value meets the modified maximum.

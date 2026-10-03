@@ -24,7 +24,7 @@ public abstract class TameworkSensorBase extends SensorBase {
     }
 
     /**
-     * Update 5 callback retained for one JAR that can run on both supported API generations.
+     * Role-based callback that subclasses implement. The engine callback below delegates here.
      */
     public boolean matches(@Nonnull Ref<EntityStore> ref,
                            @Nonnull Role role,

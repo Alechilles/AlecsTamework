@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework;
 
-import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
 import com.alechilles.alecstamework.companion.flow.CompanionDeathSystem;
 import com.alechilles.alecstamework.companion.flow.CompanionOwnershipSystems;
@@ -104,11 +103,9 @@ public final class TameworkCompanionRuntimeParticipants {
     }
 
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            participants.optionalEntitySystem(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "npcbossbarcleanupsystem",
-                    () -> EncounterManagerPlugin.get() == null ? null : new NpcBossBarCleanupSystem(NPCEntity.getComponentType(),
-                            EncounterMembers.getComponentType(), EncounterBossBarState.getComponentType()));
-        }
+        participants.optionalEntitySystem(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "npcbossbarcleanupsystem",
+                () -> EncounterManagerPlugin.get() == null ? null : new NpcBossBarCleanupSystem(NPCEntity.getComponentType(),
+                        EncounterMembers.getComponentType(), EncounterBossBarState.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockentitysystem",
                 CompanionFollowFlockMembershipSystems.EntityRef::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockmembershipsystem",

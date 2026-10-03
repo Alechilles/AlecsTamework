@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.hypixel.hytale.codec.Codec;
@@ -35,6 +34,7 @@ import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.modules.projectile.config.BallisticData;
 import com.hypixel.hytale.server.core.modules.projectile.config.BallisticDataProvider;
 import com.hypixel.hytale.server.core.modules.time.TimeResource;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -324,7 +324,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
         commandBuffer.addEntity(holder, AddReason.SPAWN);
         emitLandingMarker(targetPosition,
-                (particleId, position) -> HytaleParticleAccess.spawn(particleId, position, commandBuffer));
+                (particleId, position) -> ParticleUtil.spawnParticleEffect(particleId, position, commandBuffer));
     }
 
     @Override

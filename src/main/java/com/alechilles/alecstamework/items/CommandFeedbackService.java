@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandFeedback;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -13,6 +12,7 @@ import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.function.Function;
@@ -240,7 +240,7 @@ final class CommandFeedbackService {
             position.y += offset.y;
             position.z += offset.z;
         }
-        HytaleParticleAccess.spawn(particleSystem, position, store);
+        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
     }
 
     private void show(Player player, String text, NotificationStyle style) {

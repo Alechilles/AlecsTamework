@@ -14,7 +14,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import javax.annotation.Nullable;
 
-/** Loads Update 7 ability slots without linking Update 5/6 to the new classes. */
+/** Loads Update 7 ability slots without linking Update 6 to the new classes. */
 final class NativeRuneSlots {
     static final short[] PRIMARY_SLOTS = {0, 3}; // Update 7 ABILITIES_LINE_WIDTH.
     @Nullable private static final Class<?> ABILITY_CLASS = findAbilityClass();
@@ -37,7 +37,7 @@ final class NativeRuneSlots {
                 primaryAddFilter = filter;
             }
         } catch (ReflectiveOperationException | LinkageError | ClassCastException ignored) {
-            // Update 5/6 have no ability inventory. A later setup pass may initialize Update 7.
+            // Update 6 has no ability inventory. A later setup pass may initialize Update 7.
         }
     }
 

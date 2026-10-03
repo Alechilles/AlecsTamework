@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nullable;
 
 /**
- * Resolves active player hotbar state through Update 5 inventory components.
+ * Resolves active player hotbar state through the inventory components.
  */
 public final class PlayerInventoryAccess {
     private PlayerInventoryAccess() {

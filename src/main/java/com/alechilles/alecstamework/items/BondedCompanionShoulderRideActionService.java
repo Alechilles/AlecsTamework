@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
-import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -31,6 +30,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3f;
 
 /** Revalidates and toggles the built-in NPC-on-player mount used by shoulder companions. */
 final class BondedCompanionShoulderRideActionService {
@@ -287,11 +287,12 @@ final class BondedCompanionShoulderRideActionService {
                     + (isCrouching(playerRef, store)
                     ? settings.getCrouchOffsetY() : 0D);
             store.putComponent(npcRef, mountedType,
-                    HytaleMountedComponentAccess.createEntityMount(
+                    new MountedComponent(
                             playerRef,
-                            (float) settings.getOffsetX(),
-                            (float) offsetY,
-                            (float) settings.getOffsetZ(),
+                            new Vector3f(
+                                    (float) settings.getOffsetX(),
+                                    (float) offsetY,
+                                    (float) settings.getOffsetZ()),
                             MountController.Minecart));
         }
 

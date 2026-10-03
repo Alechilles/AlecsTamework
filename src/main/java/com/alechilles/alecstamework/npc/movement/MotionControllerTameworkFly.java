@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
-import com.alechilles.alecstamework.npc.compat.NpcRoleAccess;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -77,7 +76,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     @Override
     public boolean canSteer(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
-                && NpcRoleAccess.couldBreatheCached(role, ref, componentAccessor)
+                && role.couldBreatheCached(ref, componentAccessor)
                 && externalVelocity.lengthSquared() == 0.0
                 && appliedVelocities.isEmpty()
                 && effectHorizontalSpeedMultiplier != 0.0;

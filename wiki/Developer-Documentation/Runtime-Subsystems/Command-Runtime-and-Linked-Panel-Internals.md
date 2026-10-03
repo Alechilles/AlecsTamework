@@ -29,7 +29,7 @@ Items opt into this route with `Tags.Family: ["TameworkInput"]`, a `Weapon`
 definition, and existing `Ability2` or `Ability3` roots. The supplied Patchwork
 patches add the tag and weapon definition only when the native Update 7 rune
 assets exist, preserving the items' tool classification on older servers. Keep
-the existing E/R roots for Update 5 and Update 6.
+the existing E/R roots for Update 6.
 
 ## Major service clusters
 - Resolution and recipient selection: `CommandResolutionService`, `CommandRecipientService`

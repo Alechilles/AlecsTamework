@@ -7,7 +7,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
-import com.alechilles.alecstamework.npc.compat.NpcMarkedTargetAccess;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -253,13 +252,7 @@ public final class NpcSpawnCommandService {
         }
         Ref<EntityStore> masterRef = playerRef;
         if (npc.getRole() != null) {
-            NpcMarkedTargetAccess.set(
-                    npc.getRole(),
-                    npcRef,
-                    store,
-                    "MasterTarget",
-                    masterRef
-            );
+            npc.getRole().setMarkedTarget(npcRef, store, "MasterTarget", masterRef);
         }
     }
 

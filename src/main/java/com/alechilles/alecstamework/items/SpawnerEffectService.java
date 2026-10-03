@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -9,6 +8,7 @@ import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -68,7 +68,7 @@ public final class SpawnerEffectService {
             if (ParticleSystem.getAssetMap() == null
                     || ParticleSystem.getAssetMap().getAsset(
                     particleSystem) == null) return false;
-            HytaleParticleAccess.spawn(particleSystem, position, store);
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
             invoked = true;
         }
         if (soundEvent == null || soundEvent.isBlank()) {
@@ -123,7 +123,7 @@ public final class SpawnerEffectService {
     ) {
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (particleSystem != null && !particleSystem.isBlank()) {
-            HytaleParticleAccess.spawn(particleSystem, position, store);
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
         }
         if (soundEvent == null || soundEvent.isBlank()) {
             return;

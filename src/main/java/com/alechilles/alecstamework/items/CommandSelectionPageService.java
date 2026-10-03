@@ -16,7 +16,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -1376,7 +1375,7 @@ final class CommandSelectionPageService {
                     resolveCurrentPlayer(context.ownerUuid()), context.toolId()));
         }
         page.configureActiveHighlight(new CommandActiveHighlightBinding(
-                context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
+                context.genericRosterActions(),
                 context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
                                 resolveCurrentPlayer(context.ownerUuid()),

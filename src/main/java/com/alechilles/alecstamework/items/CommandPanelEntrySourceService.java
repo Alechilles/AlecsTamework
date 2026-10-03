@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -518,7 +517,7 @@ final class CommandPanelEntrySourceService {
             var spatial = store.getResource(EntityModule.get().getEntitySpatialResourceType());
             if (spatial != null) {
                 // Own the list: card calculations can perform nested spatial queries on this thread.
-                HytaleSpatialAccess.collect(spatial.getSpatialStructure(), center, radius, result);
+                spatial.getSpatialStructure().collect(center, radius, result);
             }
         }
         return result;

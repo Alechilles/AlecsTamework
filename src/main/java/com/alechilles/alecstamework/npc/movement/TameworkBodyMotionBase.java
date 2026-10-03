@@ -15,14 +15,14 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Adapts Tamework body motions to the Update 5 and Update 6 callback signatures.
+ * Adapts the engine ExecutionSupport callbacks to the Role-based methods Tamework body motions implement.
  */
 public abstract class TameworkBodyMotionBase extends BodyMotionBase {
     protected TameworkBodyMotionBase(@Nonnull BuilderBodyMotionBase builder) {
         super(builder);
     }
 
-    /** Update 5 callback retained for dual-version loading. */
+    /** Role-based callback that subclasses override. */
     public void preComputeSteering(@Nonnull Ref<EntityStore> ref,
                                    @Nonnull Role role,
                                    @Nullable InfoProvider sensorInfo,
@@ -42,7 +42,7 @@ public abstract class TameworkBodyMotionBase extends BodyMotionBase {
         }
     }
 
-    /** Update 5 callback retained for dual-version loading. */
+    /** Role-based callback that subclasses override. */
     public void activate(@Nonnull Ref<EntityStore> ref,
                          @Nonnull Role role,
                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
@@ -60,7 +60,7 @@ public abstract class TameworkBodyMotionBase extends BodyMotionBase {
         }
     }
 
-    /** Update 5 callback retained for dual-version loading. */
+    /** Role-based callback that subclasses override. */
     public void deactivate(@Nonnull Ref<EntityStore> ref,
                            @Nonnull Role role,
                            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
@@ -78,7 +78,7 @@ public abstract class TameworkBodyMotionBase extends BodyMotionBase {
         }
     }
 
-    /** Update 5 steering callback retained for dual-version loading. */
+    /** Role-based steering callback that subclasses implement. */
     public abstract boolean computeSteering(@Nonnull Ref<EntityStore> ref,
                                             @Nonnull Role role,
                                             @Nullable InfoProvider sensorInfo,

@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -16,6 +15,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import java.util.UUID;
 
 /**
@@ -58,7 +58,7 @@ final class SpawnerNpcStateService {
         if (nameType != null) {
             store.putComponent(npcRef, nameType, new TameworkNpcNameComponent(name, ownerId, resolvedUpdatedMs, source));
         }
-        NpcDisplayNameAccess.set(npcRef, name, store);
+        DisplayNameSupport.setDisplayName(npcRef, name, store);
     }
 
     boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSessionRegistry;
@@ -17,6 +16,7 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
@@ -287,7 +287,7 @@ public final class CaptureChannelVfxSystem extends EntityTickingSystem<EntitySto
         if (scale <= 0.0F || maxDuration <= 0.0F) {
             return;
         }
-        HytaleParticleAccess.spawn(
+        ParticleUtil.spawnParticleEffect(
                 session.particleSystem,
                 source,
                 rotation.yaw(),

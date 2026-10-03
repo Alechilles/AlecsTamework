@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.systems;
 
-import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -27,6 +26,7 @@ import com.hypixel.hytale.server.npc.systems.ComputeVelocitySystem;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 /** Pins a shoulder-mounted NPC's authoritative pose to its player mount. */
 public final class ShoulderRideNpcFollowSystem
@@ -109,17 +109,15 @@ public final class ShoulderRideNpcFollowSystem
                 && (states.crouching || states.forcedCrouching);
         float desiredY = (float) (marker.getOffsetY()
                 + (crouching ? marker.getCrouchOffsetY() : 0D));
-        Vector3f current = HytaleMountedComponentAccess.attachmentOffset(mounted);
+        Vector3fc current = mounted == null ? null : mounted.getAttachmentOffset();
         if (current == null
                 || Math.abs(current.y() - desiredY) < 0.0001F) {
             return;
         }
         commands.putComponent(npcRef, mountedType,
-                HytaleMountedComponentAccess.createEntityMount(
+                new MountedComponent(
                         playerRef,
-                        current.x(),
-                        desiredY,
-                        current.z(),
+                        new Vector3f(current.x(), desiredY, current.z()),
                         mounted.getControllerType()));
     }
 

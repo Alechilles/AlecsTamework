@@ -11,7 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nullable;
 
 /**
- * Reads and writes Update 5 NPC display-name components consistently.
+ * Reads and writes NPC display-name components consistently.
  */
 public final class NpcDisplayNameComponentService {
     private NpcDisplayNameComponentService() {

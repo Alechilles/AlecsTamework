@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -12,6 +11,7 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import javax.annotation.Nonnull;
 
 /**
@@ -54,7 +54,7 @@ public final class NpcNamePersistenceSystem extends RefSystem<EntityStore> {
                 return;
             }
             // Keep persistence path consistent with naming/spawner flows.
-            NpcDisplayNameAccess.set(reference, name, bufferStore);
+            DisplayNameSupport.setDisplayName(reference, name, bufferStore);
         });
     }
 
