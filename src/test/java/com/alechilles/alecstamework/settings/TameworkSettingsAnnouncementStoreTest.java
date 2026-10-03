@@ -61,9 +61,9 @@ class TameworkSettingsAnnouncementStoreTest {
         assertTrue(announcement.enabled());
         assertEquals(TameworkSettingsAnnouncementStore.BUILT_IN_ANNOUNCEMENT_ID, announcement.announcementId());
         assertTrue(announcement.useBuiltInText());
-        assertEquals("Alec's Tamework 3.0: Persistence Rework", announcement.title());
+        assertEquals("Alec's Tamework 5.0: New Companion Storage", announcement.title());
         assertEquals(
-                "Tamework's persistence system has been completely reworked.",
+                "Companion data now lives in your world folder, with no database.",
                 announcement.subtitle()
         );
         assertTrue(announcement.bodyLines().size() >= 3);
@@ -130,7 +130,7 @@ class TameworkSettingsAnnouncementStoreTest {
         assertFalse(announcement.useBuiltInText());
         assertEquals("Custom Server Announcement", announcement.title());
         assertEquals(
-                "Tamework's persistence system has been completely reworked.",
+                "Companion data now lives in your world folder, with no database.",
                 announcement.subtitle()
         );
         assertFalse(announcement.bodyLines().isEmpty());

@@ -26,7 +26,7 @@ public final class TameworkSettingsAnnouncementStore {
     public static final String ANNOUNCEMENT_FILE_NAME = "tamework-settings-announcement.json";
     public static final String ANNOUNCEMENT_STATE_FILE_NAME = "tamework-settings-announcement-state.json";
     public static final String WELCOME_ANNOUNCEMENT_ID = "welcome-v1";
-    public static final String BUILT_IN_ANNOUNCEMENT_ID = "persistence-rework-v3";
+    public static final String BUILT_IN_ANNOUNCEMENT_ID = "companion-store-v5";
     public static final String WELCOME_TITLE_KEY = "tamework.ui.settingsAnnouncement.welcome.title";
     public static final String WELCOME_SUBTITLE_KEY = "tamework.ui.settingsAnnouncement.welcome.subtitle";
     public static final String WELCOME_OPT_OUT_LABEL_KEY = "tamework.ui.settingsAnnouncement.welcome.optOut";
@@ -47,9 +47,9 @@ public final class TameworkSettingsAnnouncementStore {
     private static final int CURRENT_VERSION = 1;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object STATE_LOCK = new Object();
-    private static final String DEFAULT_TITLE = "Alec's Tamework 3.0: Persistence Rework";
+    private static final String DEFAULT_TITLE = "Alec's Tamework 5.0: New Companion Storage";
     private static final String DEFAULT_SUBTITLE =
-            "Tamework's persistence system has been completely reworked.";
+            "Companion data now lives in your world folder, with no database.";
     private static final String DEFAULT_OPT_OUT_LABEL = "Don't show again until next announcement";
     private static final String DEFAULT_WELCOME_TITLE = "Welcome to Alec's Tamework";
     private static final String DEFAULT_WELCOME_SUBTITLE =
@@ -61,9 +61,9 @@ public final class TameworkSettingsAnnouncementStore {
             "This welcome appears the first time an eligible player uses Tamework. Future version-specific notices only appear for players who have already used Tamework on an older version."
     };
     private static final String[] DEFAULT_BODY_LINES = {
-            "The new persistence system is designed to make companion data more reliable, but a major rework can still have hiccups. Please keep an eye out for unexpected companion, capture, storage, or restore behavior.",
-            "If you run into an issue, save a copy of the server log before restarting if possible, and note what you were doing when it happened.",
-            "Then create an issue in the Discord server's Issues and Bug Reports channel: https://discord.gg/uP5bNTVSze. Include your full server log."
+            "Tamework 5.0 saves companions as files in the world's universe/Tamework/Companions folder, so Hytale world backups now include them. Worlds from Tamework 3.x and 4.x are imported automatically the first time the server starts, and the old database files are left unchanged. Keep a backup of the world from before the update.",
+            "Player limits changed: your old \"max owned\" value now limits companions out in the world, and the owned limit starts unlimited. Review both in /tw settings. Companions that were in unloaded areas show \"Being located after the update. This can take a while on large worlds.\" until a background search finishes.",
+            "If something looks wrong, save the server log and the import report in the Tamework/Data folder, then open an issue in the Discord server's Issues and Bug Reports channel: https://discord.gg/uP5bNTVSze. The wiki page \"World Migration for Server Admins\" has the full guide."
     };
 
     private TameworkSettingsAnnouncementStore() {
