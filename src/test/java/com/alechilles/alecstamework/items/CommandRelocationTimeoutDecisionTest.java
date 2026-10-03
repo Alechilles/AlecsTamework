@@ -11,7 +11,7 @@ class CommandRelocationTimeoutDecisionTest {
     void exhaustedSameWorldMoveCancelsInsteadOfCommittingDestination() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.CANCEL_CONFIRMED_SAME_WORLD,
-                CommandRelocationTimeoutDecision.decide(true, true, true, false, false)
+                CommandRelocationTimeoutDecision.decide(true, true, true)
         );
     }
 
@@ -19,19 +19,7 @@ class CommandRelocationTimeoutDecisionTest {
     void exhaustedUnobservedSameWorldMoveRemainsUnloaded() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_UNLOADED,
-                CommandRelocationTimeoutDecision.decide(true, true, false, false, false)
-        );
-    }
-
-    @Test
-    void exhaustedCrossWorldMoveRemainsConservative() {
-        assertEquals(
-                CommandRelocationTimeoutDecision.Outcome.DROP_UNCONFIRMED_TRANSFER,
-                CommandRelocationTimeoutDecision.decide(true, true, false, true, false)
-        );
-        assertEquals(
-                CommandRelocationTimeoutDecision.Outcome.DROP_UNCONFIRMED_TRANSFER,
-                CommandRelocationTimeoutDecision.decide(true, true, true, true, true)
+                CommandRelocationTimeoutDecision.decide(true, true, false)
         );
     }
 
@@ -39,11 +27,11 @@ class CommandRelocationTimeoutDecisionTest {
     void nonTerminalRetryAndUnclaimedDropRemainUnchanged() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.RETRY,
-                CommandRelocationTimeoutDecision.decide(false, true, true, false, false)
+                CommandRelocationTimeoutDecision.decide(false, true, true)
         );
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.DROP_RETRY_EXHAUSTED,
-                CommandRelocationTimeoutDecision.decide(true, false, false, false, false)
+                CommandRelocationTimeoutDecision.decide(true, false, false)
         );
     }
 }

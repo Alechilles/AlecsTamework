@@ -235,7 +235,7 @@ final class CommandWorldChangeTravelCoordinator {
             relocationService.queueRelocation(
                     destinationWorld, record.npcUuid, destination, player.getUuid(),
                     true, true, state.state, state.subState, 0L, sourceHint,
-                    record.homePosition, false, settings.getOnTransferFailure(),
+                    record.homePosition, settings.getOnTransferFailure(),
                     settings.getFollowMasterOnWorldChangeStateFilter());
             queuedProfileIds.add(profileId);
             return true;

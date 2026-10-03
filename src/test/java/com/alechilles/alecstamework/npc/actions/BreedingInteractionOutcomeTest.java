@@ -36,18 +36,8 @@ class BreedingInteractionOutcomeTest {
                 new Object[0]
         );
         assertFeedback(
-                BreedingInteractionOutcome.progressionRequired(),
-                "tamework.ui.notifications.breeding.progressionRequired",
-                new Object[0]
-        );
-        assertFeedback(
                 BreedingInteractionOutcome.integrationUnavailable(),
                 "tamework.ui.notifications.breeding.integrationUnavailable",
-                new Object[0]
-        );
-        assertFeedback(
-                BreedingInteractionOutcome.submitted(),
-                "tamework.ui.notifications.breeding.submitted",
                 new Object[0]
         );
     }

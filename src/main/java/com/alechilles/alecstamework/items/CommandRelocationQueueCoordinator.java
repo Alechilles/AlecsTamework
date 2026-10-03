@@ -15,7 +15,7 @@ import org.joml.Vector3d;
  * Builds, coalesces, and schedules relocation requests.
  *
  * <p>This keeps queue ownership separate from the relocation orchestrator's
- * live-entity and cross-world transfer work.</p>
+ * live-entity work.</p>
  */
 final class CommandRelocationQueueCoordinator {
     private final Map<UUID, PendingRelocation> pendingByNpc;
@@ -56,7 +56,6 @@ final class CommandRelocationQueueCoordinator {
             long delayMs,
             @Nullable Vector3d sourceHintPosition,
             @Nullable Vector3d alternateSourceHintPosition,
-            boolean allowCrossWorldTransfer,
             @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
             @Nullable String[] requiredStateFilter,
             boolean explicitRecall
@@ -78,7 +77,6 @@ final class CommandRelocationQueueCoordinator {
                 subState,
                 queuedAtMs + Math.max(0L, delayMs),
                 queuedAtMs,
-                allowCrossWorldTransfer,
                 onTransferFailure,
                 requiredStateFilter,
                 explicitRecall
@@ -118,7 +116,6 @@ final class CommandRelocationQueueCoordinator {
             return;
         }
         chunkRequests.release(replaced);
-        replaced.markCrossWorldTransferFinished();
         if (replaced.physicalMutationAttempted()) {
             dropHandler.drop(
                     knownWorldByNpc.get(npcUuid),
@@ -144,9 +141,7 @@ final class CommandRelocationQueueCoordinator {
             PendingRelocation pending,
             @Nullable String[] requiredStateFilter
     ) {
-        if (!pending.allowCrossWorldTransfer
-                && (requiredStateFilter == null
-                || requiredStateFilter.length == 0)) {
+        if (requiredStateFilter == null || requiredStateFilter.length == 0) {
             return;
         }
         diagnostics.accept(
@@ -155,8 +150,6 @@ final class CommandRelocationQueueCoordinator {
                         + pending.npcUuid
                         + ", destinationWorld="
                         + world.getName()
-                        + ", allowCrossWorldTransfer="
-                        + pending.allowCrossWorldTransfer
                         + ", onTransferFailure="
                         + pending.onTransferFailure
                         + ", requiredStateFilter="

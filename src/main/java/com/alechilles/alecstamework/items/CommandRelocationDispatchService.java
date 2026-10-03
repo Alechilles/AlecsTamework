@@ -97,7 +97,6 @@ final class CommandRelocationDispatchService {
                         0L,
                         record.lastKnownPosition,
                         record.homePosition,
-                        false,
                         TwCompanionConfig.TransferFailurePolicy.QueueForRecall
                 );
                 queued++;
@@ -153,7 +152,6 @@ final class CommandRelocationDispatchService {
                     0L,
                     sourceHint,
                     record.homePosition,
-                    false,
                     settings.getOnTransferFailure(),
                     null,
                     true

@@ -25,7 +25,6 @@ class PendingRelocationSourceProbeTest {
                 null,
                 0,
                 0,
-                true,
                 null,
                 null,
                 true

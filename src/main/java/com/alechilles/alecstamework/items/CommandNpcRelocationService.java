@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.hypixel.hytale.component.AddReason;
-import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -40,8 +38,6 @@ public final class CommandNpcRelocationService {
     private final CommandRelocationRetryCoordinator retryCoordinator;
     private final CommandRelocationChunkRequestService chunkRequests;
     private final CommandRelocationQueueCoordinator queueCoordinator;
-    private final CommandRelocationTransferHolderService transferHolders =
-            new CommandRelocationTransferHolderService();
     private final CommandRelocationDiagnostics diagnostics;
     private final CommandRelocationTerminalService terminalService;
 
@@ -58,7 +54,7 @@ public final class CommandNpcRelocationService {
             ImportedRecallRecoverySink importedRecallRecovery
     ) {
         this.diagnostics = new CommandRelocationDiagnostics(logger);
-        this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
+        this.worldAccess = new CommandRelocationWorldAccess();
         this.locationTracker = new CommandRelocationLocationTracker(
                 lastKnownByNpc,
                 knownWorldByNpc,
@@ -177,7 +173,6 @@ public final class CommandNpcRelocationService {
                 delayMs,
                 sourceHintPosition,
                 alternateSourceHintPosition,
-                false,
                 TwCompanionConfig.TransferFailurePolicy.QueueForRecall,
                 null
         );
@@ -194,7 +189,6 @@ public final class CommandNpcRelocationService {
                                 long delayMs,
                                 @Nullable Vector3d sourceHintPosition,
                                 @Nullable Vector3d alternateSourceHintPosition,
-                                boolean allowCrossWorldTransfer,
                                 @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure) {
         queueRelocation(
                 world,
@@ -208,7 +202,6 @@ public final class CommandNpcRelocationService {
                 delayMs,
                 sourceHintPosition,
                 alternateSourceHintPosition,
-                allowCrossWorldTransfer,
                 onTransferFailure,
                 null
         );
@@ -225,7 +218,6 @@ public final class CommandNpcRelocationService {
                                 long delayMs,
                                 @Nullable Vector3d sourceHintPosition,
                                 @Nullable Vector3d alternateSourceHintPosition,
-                                boolean allowCrossWorldTransfer,
                                 @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                                 @Nullable String[] requiredStateFilter) {
         queueRelocation(
@@ -240,7 +232,6 @@ public final class CommandNpcRelocationService {
                 delayMs,
                 sourceHintPosition,
                 alternateSourceHintPosition,
-                allowCrossWorldTransfer,
                 onTransferFailure,
                 requiredStateFilter,
                 false
@@ -258,7 +249,6 @@ public final class CommandNpcRelocationService {
                                 long delayMs,
                                 @Nullable Vector3d sourceHintPosition,
                                 @Nullable Vector3d alternateSourceHintPosition,
-                                boolean allowCrossWorldTransfer,
                                 @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                                 @Nullable String[] requiredStateFilter,
                                 boolean explicitRecall) {
@@ -277,7 +267,6 @@ public final class CommandNpcRelocationService {
                     delayMs,
                     sourceHintPosition,
                     alternateSourceHintPosition,
-                    allowCrossWorldTransfer,
                     onTransferFailure,
                     requiredStateFilter,
                     explicitRecall
@@ -318,14 +307,6 @@ public final class CommandNpcRelocationService {
             }
             Ref<EntityStore> ref = world.getEntityRef(npcUuid);
             if (ref == null || !ref.isValid()) {
-                if (pending.isCrossWorldTransferInProgress()) {
-                    scheduleTryApply(world, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
-                    return false;
-                }
-                if (pending.allowCrossWorldTransfer && maybeStartCrossWorldTransfer(world, npcUuid, pending)) {
-                    scheduleTryApply(world, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
-                    return false;
-                }
                 retryCoordinator.afterLiveStateUnavailable(world, npcUuid, pending);
                 return false;
             }
@@ -353,7 +334,6 @@ public final class CommandNpcRelocationService {
                                 + ", requiredStateFilter="
                                 + pending.describeStateFilter()
                 );
-                pending.markCrossWorldTransferFinished();
                 removePending(npcUuid, pending);
                 return false;
             }
@@ -441,7 +421,6 @@ public final class CommandNpcRelocationService {
             return;
         }
         pending.markPhysicalMutationCompensated();
-        pending.markCrossWorldTransferFinished();
         logTravelDiagnostic(
                 Level.WARNING,
                 "Relocation timed out with the live NPC confirmed outside the destination; "
@@ -455,436 +434,7 @@ public final class CommandNpcRelocationService {
                 "Relocation rejected for npc=" + pending.npcUuid + ", reason=" + reason);
     }
 
-    private boolean maybeStartCrossWorldTransfer(World destinationWorld,
-                                                 UUID npcUuid,
-                                                 PendingRelocation pending) {
-        if (destinationWorld == null || npcUuid == null || pending == null || !pending.allowCrossWorldTransfer) {
-            return false;
-        }
-        if (pending.crossWorldDestinationInstalled()
-                || !chunkRequests.isDestinationReady(destinationWorld, pending)) {
-            return false;
-        }
-        World sourceWorld = knownWorldByNpc.get(npcUuid);
-        if (sourceWorld == null || worldAccess.isSameWorld(sourceWorld, destinationWorld)) {
-            if (sourceWorld == null && pending.markSourceWorldMissingLogged()) {
-                logTravelDiagnostic(
-                        Level.WARNING,
-                        "Unable to start cross-world transfer for npc="
-                                + npcUuid
-                                + ": source world unknown while destinationWorld="
-                                + destinationWorld.getName()
-                );
-            }
-            return false;
-        }
-        pending.resetSourceWorldMissingLogged();
-        if (!pending.markCrossWorldTransferStarted()) {
-            return true;
-        }
-        logTravelDiagnostic(
-                Level.INFO,
-                "Starting cross-world transfer npc="
-                        + npcUuid
-                        + ", sourceWorld="
-                        + sourceWorld.getName()
-                        + ", destinationWorld="
-                        + destinationWorld.getName()
-        );
-        worldAccess.execute(
-                sourceWorld,
-                () -> transferPendingAcrossWorlds(sourceWorld, destinationWorld, npcUuid, pending),
-                () -> {
-                    pending.markCrossWorldTransferFinished();
-                    pending.resetRelocationIssue();
-                    knownWorldByNpc.remove(npcUuid, sourceWorld);
-                    if (pending.physicalMutationAttempted()) {
-                        dropUnconfirmedRelocation(
-                                destinationWorld, npcUuid, pending, System.currentTimeMillis()
-                        );
-                    } else {
-                        retryPendingFromWorld(destinationWorld, npcUuid, pending);
-                    }
-                    logTravelDiagnostic(
-                            Level.WARNING,
-                            "Unable to transfer npc=" + npcUuid
-                                    + ", reason=world-dispatch-or-task-failure"
-                    );
-                }
-        );
-        return true;
-    }
-
-    private void transferPendingAcrossWorlds(World sourceWorld,
-                                             World destinationWorld,
-                                             UUID npcUuid,
-                                             PendingRelocation pending) {
-        if (sourceWorld == null || destinationWorld == null || pending == null || npcUuid == null) {
-            return;
-        }
-        if (pendingByNpc.get(npcUuid) != pending || !pending.isCrossWorldTransferInProgress()) {
-            return;
-        }
-        if (worldAccess.isSameWorld(sourceWorld, destinationWorld)) {
-            pending.markCrossWorldTransferFinished();
-            return;
-        }
-        if (!destinationWorld.isAlive()) {
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        Store<EntityStore> sourceStore = sourceWorld.getEntityStore() != null ? sourceWorld.getEntityStore().getStore() : null;
-        if (sourceStore == null) {
-            logTravelDiagnostic(
-                    Level.WARNING,
-                    "Cross-world transfer failed before remove for npc="
-                            + npcUuid
-                            + ": source store missing for world="
-                            + sourceWorld.getName()
-            );
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        Ref<EntityStore> sourceRef = sourceWorld.getEntityRef(npcUuid);
-        if (sourceRef == null || !sourceRef.isValid()) {
-            logTravelDiagnostic(
-                    Level.WARNING,
-                    "Cross-world transfer failed before remove for npc="
-                            + npcUuid
-                            + ": source ref missing/invalid in world="
-                            + sourceWorld.getName()
-            );
-            chunkRequests.requestSource(sourceWorld, destinationWorld, pending);
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        NPCEntity sourceNpc = worldAccess.safeGetComponent(
-                sourceStore, sourceRef, NPCEntity.getComponentType());
-        if (sourceNpc == null) {
-            logTravelDiagnostic(
-                    Level.WARNING,
-                    "Cross-world transfer failed before remove for npc="
-                            + npcUuid
-                            + ": source NPC component missing in world="
-                            + sourceWorld.getName()
-            );
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        if (worldAccess.isUnsafeTransferState(sourceStore, sourceRef, sourceNpc)) {
-            String reason = sourceNpc.getRole() == null
-                    ? "role-null"
-                    : "mounted";
-            logTravelDiagnostic(
-                    Level.INFO,
-                    "Cross-world transfer deferred for npc="
-                            + npcUuid
-                            + ", sourceWorld="
-                            + sourceWorld.getName()
-                            + ", destinationWorld="
-                            + destinationWorld.getName()
-                            + ", reason="
-                            + reason
-            );
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        String sourceState = resolveCurrentStateName(sourceRef, sourceNpc, sourceStore);
-        if (!pending.isStateAllowed(sourceState)) {
-            logTravelDiagnostic(
-                    Level.INFO,
-                    "Cross-world transfer cancelled by state filter for npc="
-                            + npcUuid
-                            + ", sourceWorld="
-                            + sourceWorld.getName()
-                            + ", state="
-                            + sourceState
-                            + ", requiredStateFilter="
-                            + pending.describeStateFilter()
-            );
-            cancelPendingForStateFilter(npcUuid, pending);
-            return;
-        }
-        if (!worldAccess.hasExpectedLiveOwner(
-                sourceStore, sourceRef, pending
-        )) {
-            pending.markCrossWorldTransferFinished();
-            rejectRelocation(pending, "relocation-live-owner-changed");
-            return;
-        }
-        pending.markPhysicalMutationAttempted();
-        CommandRelocationTransferHolderService.DrainResult drainResult =
-                transferHolders.drainForDestination(sourceStore, sourceRef, pending.destination);
-        Holder<EntityStore> drainedHolder = drainResult.holder();
-        if (drainedHolder == null) {
-            handleSourceRemoveFailure(
-                    sourceWorld, destinationWorld, npcUuid, pending,
-                    drainResult.failureDetail()
-            );
-            return;
-        }
-        CommandRelocationTransferHolderService.SourceTransform sourceTransform =
-                drainResult.sourceTransform();
-        if (sourceTransform == null) {
-            logTravelDiagnostic(
-                    Level.WARNING,
-                    "Cross-world transfer failed after remove for npc="
-                            + npcUuid
-                            + ": detached transform missing"
-            );
-            restoreSourceEntityAndApplyFailure(
-                    sourceWorld, sourceStore, drainedHolder, null,
-                    destinationWorld, npcUuid, pending
-            );
-            return;
-        }
-        worldAccess.execute(destinationWorld, () -> {
-            if (pendingByNpc.get(npcUuid) != pending) {
-                logTravelDiagnostic(
-                        Level.INFO,
-                        "Cross-world transfer aborted because pending relocation was replaced/cleared for npc=" + npcUuid
-                );
-                worldAccess.execute(
-                        sourceWorld,
-                        () -> restoreSourceEntity(
-                                sourceWorld, sourceStore, drainedHolder, sourceTransform, npcUuid),
-                        () -> terminalizeDrainedTransferAsLost(
-                                npcUuid, pending,
-                                "relocation-replaced-source-restore-dispatch-rejected"
-                        )
-                );
-                return;
-            }
-            Store<EntityStore> destinationStore =
-                    destinationWorld.getEntityStore() != null ? destinationWorld.getEntityStore().getStore() : null;
-            if (destinationStore == null) {
-                logTravelDiagnostic(
-                        Level.WARNING,
-                        "Cross-world transfer failed before add for npc="
-                                + npcUuid
-                                + ": destination store missing for world="
-                                + destinationWorld.getName()
-                );
-                restoreSourceEntityAndApplyFailure(
-                        sourceWorld,
-                        sourceStore,
-                        drainedHolder,
-                        sourceTransform,
-                        destinationWorld,
-                        npcUuid,
-                        pending
-                );
-                return;
-            }
-            Ref<EntityStore> destinationRef = null;
-            try {
-                destinationRef = destinationStore.addEntity(drainedHolder, AddReason.SPAWN);
-            } catch (Exception ex) {
-                if (worldAccess.isEntityPresent(destinationWorld, npcUuid)) {
-                    pending.markCrossWorldDestinationInstalled();
-                    pending.markCrossWorldTransferFinished();
-                    knownWorldByNpc.put(npcUuid, destinationWorld);
-                    logTravelDiagnostic(
-                            Level.INFO,
-                            "Cross-world transfer accepted destination entity after add exception for npc="
-                                    + npcUuid
-                                    + ", sourceWorld="
-                                    + sourceWorld.getName()
-                                    + ", destinationWorld="
-                                    + destinationWorld.getName()
-                    );
-                    scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
-                    return;
-                }
-                logTravelDiagnostic(
-                        Level.WARNING,
-                        "Cross-world transfer failed while adding destination entity for npc="
-                                + npcUuid
-                                + ", destinationWorld="
-                                + destinationWorld.getName()
-                                + ", reason="
-                                + ex.getClass().getSimpleName()
-                                + ": "
-                                + ex.getMessage()
-                );
-                restoreSourceEntityAndApplyFailure(
-                        sourceWorld,
-                        sourceStore,
-                        drainedHolder,
-                        sourceTransform,
-                        destinationWorld,
-                        npcUuid,
-                        pending
-                );
-                return;
-            }
-            if (destinationRef == null || !destinationRef.isValid()
-                    || !worldAccess.isEntityPresent(destinationWorld, npcUuid)) {
-                if (worldAccess.isEntityPresent(destinationWorld, npcUuid)) {
-                    pending.markCrossWorldDestinationInstalled();
-                    pending.markCrossWorldTransferFinished();
-                    knownWorldByNpc.put(npcUuid, destinationWorld);
-                    logTravelDiagnostic(
-                            Level.INFO,
-                            "Cross-world transfer accepted destination entity with non-valid add ref for npc="
-                                    + npcUuid
-                                    + ", sourceWorld="
-                                    + sourceWorld.getName()
-                                    + ", destinationWorld="
-                                    + destinationWorld.getName()
-                    );
-                    scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
-                    return;
-                }
-                logTravelDiagnostic(
-                        Level.WARNING,
-                        "Cross-world transfer failed while adding destination entity for npc="
-                                + npcUuid
-                                + ", destinationWorld="
-                                + destinationWorld.getName()
-                );
-                restoreSourceEntityAndApplyFailure(
-                        sourceWorld,
-                        sourceStore,
-                        drainedHolder,
-                        sourceTransform,
-                        destinationWorld,
-                        npcUuid,
-                        pending
-                );
-                return;
-            }
-            pending.markCrossWorldDestinationInstalled();
-            pending.markCrossWorldTransferFinished();
-            knownWorldByNpc.put(npcUuid, destinationWorld);
-            logTravelDiagnostic(
-                    Level.INFO,
-                    "Cross-world transfer succeeded for npc="
-                            + npcUuid
-                            + ", sourceWorld="
-                            + sourceWorld.getName()
-                            + ", destinationWorld="
-                            + destinationWorld.getName()
-            );
-            scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
-        }, () -> terminalizeDrainedTransferAsLost(
-                npcUuid, pending, "relocation-destination-dispatch-rejected"
-        ));
-    }
-
-    private void restoreSourceEntityAndApplyFailure(World sourceWorld,
-                                                    @Nullable Store<EntityStore> sourceStore,
-                                                    @Nullable Holder<EntityStore> drainedHolder,
-                                                    @Nullable CommandRelocationTransferHolderService.SourceTransform sourceTransform,
-                                                    World destinationWorld,
-                                                    UUID npcUuid,
-                                                    PendingRelocation pending) {
-        if (destinationWorld == null || npcUuid == null || pending == null) {
-            return;
-        }
-        if (sourceWorld == null || sourceStore == null || drainedHolder == null) {
-            dropUnconfirmedRelocation(
-                    destinationWorld, npcUuid, pending, System.currentTimeMillis()
-            );
-            return;
-        }
-        worldAccess.execute(sourceWorld, () -> {
-            if (!restoreSourceEntity(
-                    sourceWorld, sourceStore, drainedHolder, sourceTransform, npcUuid)) {
-                dropUnconfirmedRelocation(
-                        destinationWorld, npcUuid, pending, System.currentTimeMillis()
-                );
-                return;
-            }
-            pending.markPhysicalMutationCompensated();
-            worldAccess.execute(
-                    destinationWorld,
-                    () -> applyTransferFailurePolicy(destinationWorld, npcUuid, pending),
-                    () -> terminalizeRelocation(pending, "relocation-failure-dispatch-rejected")
-            );
-        }, () -> terminalizeDrainedTransferAsLost(
-                npcUuid, pending, "relocation-source-restore-dispatch-rejected"
-        ));
-    }
-
-    private boolean restoreSourceEntity(
-            World sourceWorld,
-            Store<EntityStore> sourceStore,
-            Holder<EntityStore> drainedHolder,
-            @Nullable CommandRelocationTransferHolderService.SourceTransform sourceTransform,
-            UUID npcUuid
-    ) {
-        if (sourceTransform != null && !transferHolders.restoreSource(drainedHolder, sourceTransform)) {
-            return false;
-        }
-        return worldAccess.restoreSourceEntity(sourceWorld, sourceStore, drainedHolder, npcUuid);
-    }
-
-    /**
-     * Closes an already-drained transfer without touching either world's ECS. This method can run
-     * from the lease watchdog, so it only closes the request and reports the loss.
-     */
-    private void terminalizeDrainedTransferAsLost(
-            UUID npcUuid,
-            PendingRelocation pending,
-            String reason
-    ) {
-        pending.markCrossWorldTransferFinished();
-        logTravelDiagnostic(
-                Level.WARNING,
-                "Cross-world transfer became unobservable after source removal for npc="
-                        + npcUuid + ", reason=" + reason
-        );
-        dropUnconfirmedRelocation(
-                null, npcUuid, pending, System.currentTimeMillis()
-        );
-    }
-
-    private void handleSourceRemoveFailure(World sourceWorld,
-                                           World destinationWorld,
-                                           UUID npcUuid,
-                                           PendingRelocation pending,
-                                           String detail) {
-        logTravelDiagnostic(
-                Level.WARNING,
-                "Cross-world source removal requires confirmation for npc=" + npcUuid
-                        + ", sourceWorld=" + sourceWorld.getName() + ", " + detail
-        );
-        if (worldAccess.isEntityPresent(sourceWorld, npcUuid)) {
-            pending.markPhysicalMutationCompensated();
-            pending.markCrossWorldTransferFinished();
-            retryPendingFromWorld(destinationWorld, npcUuid, pending);
-            return;
-        }
-        if (worldAccess.isEntityPresent(destinationWorld, npcUuid)) {
-            pending.markCrossWorldTransferFinished();
-            knownWorldByNpc.put(npcUuid, destinationWorld);
-            scheduleTryApply(destinationWorld, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
-            return;
-        }
-        pending.markCrossWorldTransferFinished();
-        dropUnconfirmedRelocation(
-                destinationWorld, npcUuid, pending, System.currentTimeMillis()
-        );
-    }
-
-    private void retryPendingFromWorld(World world, UUID npcUuid, PendingRelocation pending) {
-        worldAccess.execute(world, () -> {
-            if (pendingByNpc.get(npcUuid) != pending) {
-                return;
-            }
-            pending.resetRelocationIssue();
-            retryCoordinator.retry(world, npcUuid, pending);
-        }, () -> terminalizeRelocation(pending, "relocation-world-dispatch-rejected"));
-    }
-
     private void terminalizeRelocation(PendingRelocation pending, String reason) {
-        pending.markCrossWorldTransferFinished();
         if (pending.physicalMutationAttempted()) {
             dropUnconfirmedRelocation(
                     knownWorldByNpc.get(pending.npcUuid), pending.npcUuid, pending, System.currentTimeMillis()
@@ -895,50 +445,6 @@ public final class CommandNpcRelocationService {
         logTravelDiagnostic(
                 Level.WARNING,
                 "Relocation terminalized for npc=" + pending.npcUuid + ", reason=" + reason
-        );
-    }
-
-    private void applyTransferFailurePolicy(World world, UUID npcUuid, PendingRelocation pending) {
-        if (world == null || npcUuid == null || pending == null) {
-            return;
-        }
-        pending.markCrossWorldTransferFinished();
-        TwCompanionConfig.TransferFailurePolicy policy = pending.onTransferFailure;
-        logTravelDiagnostic(
-                Level.WARNING,
-                "Applying transfer failure policy for npc="
-                        + npcUuid
-                        + ", destinationWorld="
-                        + world.getName()
-                        + ", policy="
-                        + policy
-        );
-        if (policy == TwCompanionConfig.TransferFailurePolicy.Ignore) {
-            removePending(npcUuid, pending);
-            return;
-        }
-        if (policy == TwCompanionConfig.TransferFailurePolicy.MarkLost) {
-            dropUnconfirmedRelocation(
-                    world, npcUuid, pending, System.currentTimeMillis()
-            );
-            return;
-        }
-        pending.resetRelocationIssue();
-        retryCoordinator.retry(world, npcUuid, pending);
-    }
-
-    private void cancelPendingForStateFilter(UUID npcUuid, PendingRelocation pending) {
-        if (npcUuid == null || pending == null) {
-            return;
-        }
-        pending.markCrossWorldTransferFinished();
-        removePending(npcUuid, pending);
-        logTravelDiagnostic(
-                Level.INFO,
-                "Cancelled relocation due to state filter for npc="
-                        + npcUuid
-                        + ", requiredStateFilter="
-                        + pending.describeStateFilter()
         );
     }
 

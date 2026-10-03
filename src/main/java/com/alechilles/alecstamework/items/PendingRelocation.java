@@ -24,26 +24,20 @@ final class PendingRelocation {
     final String subState;
     final long executeAfterMs;
     final long queuedAtMs;
-    final boolean allowCrossWorldTransfer;
     final TwCompanionConfig.TransferFailurePolicy onTransferFailure;
     final boolean explicitRecall;
     private final Set<String> requiredStateFilter;
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
             new ConcurrentHashMap<>();
-    private final Set<ChunkRequestKey> readyChunks = ConcurrentHashMap.newKeySet();
     private final Set<ImportedRecallRecoverySink.RecallSourceSection>
             completedSourceSections = ConcurrentHashMap.newKeySet();
     long nextScheduledApplyAtMs = Long.MAX_VALUE;
     boolean relocationIssued;
     long relocationIssuedAtMs;
     private boolean physicalMutationAttempted;
-    private boolean crossWorldDestinationInstalled;
-    private boolean crossWorldTransferAttempted;
     int retryAttempts;
     int lastLoggedRetryAttempts;
     long lastRetryCountedAtMs;
-    private boolean crossWorldTransferInProgress;
-    private boolean sourceWorldMissingLogged;
 
     PendingRelocation(UUID npcUuid,
                       Vector3d destination,
@@ -57,7 +51,6 @@ final class PendingRelocation {
                       String subState,
                       long executeAfterMs,
                       long queuedAtMs,
-                      boolean allowCrossWorldTransfer,
                       @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                       @Nullable String[] requiredStateFilter) {
         this(
@@ -73,7 +66,6 @@ final class PendingRelocation {
                 subState,
                 executeAfterMs,
                 queuedAtMs,
-                allowCrossWorldTransfer,
                 onTransferFailure,
                 requiredStateFilter,
                 false
@@ -92,7 +84,6 @@ final class PendingRelocation {
                       String subState,
                       long executeAfterMs,
                       long queuedAtMs,
-                      boolean allowCrossWorldTransfer,
                       @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                       @Nullable String[] requiredStateFilter,
                       boolean explicitRecall) {
@@ -108,7 +99,6 @@ final class PendingRelocation {
         this.subState = subState;
         this.executeAfterMs = executeAfterMs;
         this.queuedAtMs = queuedAtMs;
-        this.allowCrossWorldTransfer = allowCrossWorldTransfer;
         this.onTransferFailure = onTransferFailure == null
                 ? TwCompanionConfig.TransferFailurePolicy.QueueForRecall : onTransferFailure;
         this.explicitRecall = explicitRecall;
@@ -128,14 +118,6 @@ final class PendingRelocation {
         }
         lastChunkRequestAtMsByChunk.put(chunkKey, nowMs);
         return true;
-    }
-
-    void markChunkReady(String worldName, int chunkX, int chunkZ) {
-        readyChunks.add(new ChunkRequestKey(worldName, chunkX, chunkZ));
-    }
-
-    boolean isChunkReady(String worldName, int chunkX, int chunkZ) {
-        return readyChunks.contains(new ChunkRequestKey(worldName, chunkX, chunkZ));
     }
 
     void markSourceSectionLoaded(
@@ -204,47 +186,6 @@ final class PendingRelocation {
         return physicalMutationAttempted;
     }
 
-    synchronized void markCrossWorldDestinationInstalled() {
-        crossWorldDestinationInstalled = true;
-    }
-
-    synchronized boolean crossWorldDestinationInstalled() {
-        return crossWorldDestinationInstalled;
-    }
-
-    synchronized boolean markCrossWorldTransferStarted() {
-        if (crossWorldTransferInProgress) {
-            return false;
-        }
-        crossWorldTransferAttempted = true;
-        crossWorldTransferInProgress = true;
-        return true;
-    }
-
-    synchronized boolean crossWorldTransferAttempted() {
-        return crossWorldTransferAttempted;
-    }
-
-    synchronized void markCrossWorldTransferFinished() {
-        crossWorldTransferInProgress = false;
-    }
-
-    synchronized boolean isCrossWorldTransferInProgress() {
-        return crossWorldTransferInProgress;
-    }
-
-    synchronized boolean markSourceWorldMissingLogged() {
-        if (sourceWorldMissingLogged) {
-            return false;
-        }
-        sourceWorldMissingLogged = true;
-        return true;
-    }
-
-    synchronized void resetSourceWorldMissingLogged() {
-        sourceWorldMissingLogged = false;
-    }
-
     boolean isStateAllowed(@Nullable String stateName) {
         if (requiredStateFilter.isEmpty()) {
             return true;
@@ -274,7 +215,6 @@ final class PendingRelocation {
                 && clearLockedTarget == other.clearLockedTarget
                 && Objects.equals(state, other.state)
                 && Objects.equals(subState, other.subState)
-                && allowCrossWorldTransfer == other.allowCrossWorldTransfer
                 && onTransferFailure == other.onTransferFailure
                 && explicitRecall == other.explicitRecall
                 && requiredStateFilter.equals(other.requiredStateFilter);

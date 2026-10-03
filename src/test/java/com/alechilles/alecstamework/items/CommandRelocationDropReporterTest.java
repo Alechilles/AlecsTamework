@@ -41,7 +41,6 @@ class CommandRelocationDropReporterTest {
                 null,
                 0L,
                 100L,
-                false,
                 null,
                 null
         );

@@ -33,10 +33,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
         return new BreedingInteractionOutcome(Status.PAIRED, 0);
     }
 
-    static BreedingInteractionOutcome submitted() {
-        return new BreedingInteractionOutcome(Status.SUBMITTED, 0);
-    }
-
     static BreedingInteractionOutcome waitingForMate() {
         return new BreedingInteractionOutcome(Status.WAITING_FOR_MATE, 0);
     }
@@ -73,10 +69,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
 
     static BreedingInteractionOutcome claimRequired() {
         return new BreedingInteractionOutcome(Status.CLAIM_REQUIRED, 0);
-    }
-
-    static BreedingInteractionOutcome progressionRequired() {
-        return new BreedingInteractionOutcome(Status.PROGRESSION_REQUIRED, 0);
     }
 
     static BreedingInteractionOutcome integrationUnavailable() {
