@@ -547,6 +547,13 @@ final class CommandLinkedPanelEntryService {
             if (persistenceView != null && persistenceView.neverSighted(record)) {
                 // An import nobody has seen yet has no real place: never show its 0, 0, 0.
                 status = unseenImportStatus(player, entry.displayName());
+            } else if (persistenceView != null && persistenceView.livePlace(record).isPresent()) {
+                // The index holds the companion's last recorded place; the item's copy can be stale.
+                var place = persistenceView.livePlace(record).get();
+                world = place.world();
+                targetX = place.x();
+                targetZ = place.z();
+                coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(place.x(), place.y(), place.z());
             } else if (record.lastKnownPosition != null) {
                 world = record.lastKnownWorldName;
                 targetX = record.lastKnownPosition.x;

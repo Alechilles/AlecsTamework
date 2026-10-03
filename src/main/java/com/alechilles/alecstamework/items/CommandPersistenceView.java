@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.index.StoredReason;
 import com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -133,6 +134,20 @@ final class CommandPersistenceView {
         }
         return find(record).map(profile -> companions.get(profile.profileId().value()))
                 .map(CompanionRecord::neverSighted).orElse(false);
+    }
+
+    /**
+     * The index's last recorded place of a companion that is out in the world, for a card whose
+     * body is not loaded. Empty when the record is not out, or is an import not located yet.
+     */
+    Optional<CompanionLocation> livePlace(@Nullable LinkedNpcRecord record) {
+        if (companions == null) {
+            return Optional.empty();
+        }
+        return find(record).map(profile -> companions.get(profile.profileId().value()))
+                .filter(current -> current.location().kind() == LocationKind.LIVE && !current.neverSighted()
+                        && current.location().world() != null)
+                .map(CompanionRecord::location);
     }
 
     CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {

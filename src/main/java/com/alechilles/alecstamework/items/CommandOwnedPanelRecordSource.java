@@ -43,11 +43,13 @@ final class CommandOwnedPanelRecordSource {
      * Owned rows from the companion index, plus the unowned captured rows this viewer knows: the
      * index lists records by owner only, so the profiles of carried capture items and of the
      * item's linked records are looked up one by one. Command-family roster members (a roster id,
-     * not bonded) are read-only here: their family item's panel owns their actions.
+     * not bonded) are read-only here: their family item's panel owns their actions. Bonded
+     * companions are never listed: they belong to their bonded roster's own panel.
      */
     CommandOwnedPanelRecordSource(CompanionQueries companions) {
         this.profiles = owner -> owner == null ? List.of()
-                : companions.owned(owner).stream().map(CommandPersistenceView::from).toList();
+                : companions.owned(owner).stream().filter(record -> !record.bonded())
+                        .map(CommandPersistenceView::from).toList();
         this.managedProfiles = owner -> owner == null ? java.util.Set.of()
                 : companions.owned(owner).stream()
                         .filter(record -> record.rosterId() != null && !record.bonded())

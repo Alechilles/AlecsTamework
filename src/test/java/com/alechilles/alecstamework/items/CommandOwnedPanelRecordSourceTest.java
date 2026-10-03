@@ -199,6 +199,10 @@ class CommandOwnedPanelRecordSourceTest {
         assertTrue(features.get(member.currentNpcUuid()).managesRosterRow());
         assertFalse(features.containsKey(bonded.currentNpcUuid()));
         assertFalse(features.containsKey(ordinary.currentNpcUuid()));
+        var listed = source.recordsFor(owner).stream().map(record -> record.profileId)
+                .collect(java.util.stream.Collectors.toSet());
+        assertFalse(listed.contains(bonded.profileId().toString()), "a bonded companion belongs to its own panel");
+        assertTrue(listed.contains(ordinary.profileId().toString()));
     }
 
     /** With capture clearing the owner, the index files the item unowned; the holder still sees what they carry. */
