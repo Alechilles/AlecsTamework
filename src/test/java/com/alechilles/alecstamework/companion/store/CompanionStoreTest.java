@@ -192,6 +192,8 @@ class CompanionStoreTest {
         Path owners = root.resolve("owners");
         List<CompanionRecord> expected = new java.util.ArrayList<>();
         CompanionRecord shared = null;
+        UUID firstOwner = null;
+        UUID earlierTiedOwner = null;
         UUID brokenOwner = null;
         UUID brokenRecordOwner = null;
         UUID brokenRecordId = UUID.randomUUID();
@@ -204,7 +206,11 @@ class CompanionStoreTest {
                 continue;
             }
             List<CompanionRecord> records = new java.util.ArrayList<>(List.of(record(owner, i), record(owner, i)));
+            if (i == 1) {
+                firstOwner = owner;
+            }
             if (i == 2) {
+                earlierTiedOwner = owner;
                 shared = record(owner, 7, CompanionLocation.stored(StoredReason.ROSTER));
                 records.add(shared);
             }
@@ -229,7 +235,11 @@ class CompanionStoreTest {
             expected.addAll(i == 9 ? records.subList(0, 2) : records);
         }
 
-        CompanionStore.LoadResult loaded = store().loadAll();
+        // The first file and the earlier tied file finish reading last, so a loader that merged
+        // files as they complete would put them last and keep the later tied copy.
+        java.util.Set<Path> slow = java.util.Set.of(
+                owners.resolve(firstOwner + ".json"), owners.resolve(earlierTiedOwner + ".json"));
+        CompanionStore.LoadResult loaded = new CompanionStore(root, new SlowReads(io, slow, 10), () -> 1234L).loadAll();
 
         assertEquals(expected, loaded.records());
         assertEquals(java.util.Set.of(brokenRecordId), loaded.unreadableIds());
@@ -238,6 +248,56 @@ class CompanionStoreTest {
         assertEquals(List.of(owners.resolve(brokenOwner + ".json.unreadable-1234")), loaded.quarantinedFiles());
         assertEquals(11, loaded.versions().size());
         assertEquals(3L, loaded.versions().get(brokenRecordOwner.toString()));
+    }
+
+    /**
+     * Holds back the read of each {@code slow} file until {@code others} other files were read.
+     * The wait is capped so a host with too few load threads to read the others meanwhile still
+     * finishes.
+     */
+    private record SlowReads(CompanionFileIo io, java.util.Set<Path> slow,
+                             java.util.concurrent.CountDownLatch othersRead) implements CompanionFileIo {
+        SlowReads(CompanionFileIo io, java.util.Set<Path> slow, int others) {
+            this(io, slow, new java.util.concurrent.CountDownLatch(others));
+        }
+
+        @Override
+        public BsonDocument readNow(Path file) throws IOException {
+            if (!slow.contains(file)) {
+                try {
+                    return io.readNow(file);
+                } finally {
+                    othersRead.countDown();
+                }
+            }
+            BsonDocument document = io.readNow(file);
+            try {
+                othersRead.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return document;
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<Void> write(Path file, BsonDocument document) {
+            return io.write(file, document);
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<Void> delete(Path file) {
+            return io.delete(file);
+        }
+
+        @Override
+        public List<Path> list(Path directory) throws IOException {
+            return io.list(directory);
+        }
+
+        @Override
+        public void moveAside(Path file, String suffix) throws IOException {
+            io.moveAside(file, suffix);
+        }
     }
 
     @Test

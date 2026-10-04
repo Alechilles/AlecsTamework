@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.companion.index;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -53,11 +51,7 @@ public record CompanionSummary(
 ) {
     public CompanionSummary {
         // Insertion order keeps saved files stable across restarts; Map.copyOf order is per-JVM.
-        Objects.requireNonNull(traits, "traits").forEach((id, value) -> {
-            Objects.requireNonNull(id, "trait id");
-            Objects.requireNonNull(value, "trait value");
-        });
-        traits = Collections.unmodifiableMap(new LinkedHashMap<>(traits));
+        traits = TraitValues.copyOf(Objects.requireNonNull(traits, "traits"));
     }
 
     @Nonnull

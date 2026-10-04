@@ -114,7 +114,8 @@ public final class CompanionRecordBson {
                     decodeLocation(requireDocument(d, "Location")));
             b.revision(getStrictLong(d, "Revision")).generation(getStrictLong(d, "Generation"));
             b.ownerUuid(getUuid(d, "Owner")).ownerName(share(getString(d, "OwnerName")));
-            b.displayName(getString(d, "Name"));
+            String displayName = getString(d, "Name");
+            b.displayName(displayName);
             // The scope is derived from the location; the stored value is still validated so a
             // malformed or future value keeps the record unreadable and preserved.
             String scope = getStrictString(d, "Scope");
@@ -123,7 +124,7 @@ public final class CompanionRecordBson {
             }
             b.homeWorld(share(getString(d, "HomeWorld"))).currentNpcUuid(getUuid(d, "NpcUuid"));
             if (d.isDocument("Summary")) {
-                b.summary(decodeSummary(d.getDocument("Summary")));
+                b.summary(decodeSummary(d.getDocument("Summary"), displayName));
             }
             if (d.isDocument("Roster")) {
                 BsonDocument roster = d.getDocument("Roster");
@@ -274,7 +275,16 @@ public final class CompanionRecordBson {
                 getBoolean(d, "ProgressionPaused"), getLong(d, "ActiveProgress", 0));
     }
 
-    private static CompanionSummary decodeSummary(BsonDocument d) {
+    /**
+     * {@code displayName} is the record's name. A named companion usually has the same text as
+     * its summary's custom name, and the summary then takes the record's instance so the text
+     * is held once.
+     */
+    private static CompanionSummary decodeSummary(BsonDocument d, @Nullable String displayName) {
+        String customName = getString(d, "CustomName");
+        if (customName != null && customName.equals(displayName)) {
+            customName = displayName;
+        }
         Map<String, Double> traits = new LinkedHashMap<>();
         if (d.isDocument("Traits")) {
             for (Map.Entry<String, BsonValue> e : d.getDocument("Traits").entrySet()) {
@@ -283,7 +293,7 @@ public final class CompanionRecordBson {
                 }
             }
         }
-        return new CompanionSummary(getString(d, "CustomName"), share(getString(d, "NameKey")),
+        return new CompanionSummary(customName, share(getString(d, "NameKey")),
                 share(getString(d, "Role")), share(getString(d, "Icon")), (float) getDouble(d, "HealthCurrent"), (float) getDouble(d, "HealthMax"),
                 share(getString(d, "HappinessConfig")), getDouble(d, "Happiness"), share(getString(d, "NeedsConfig")),
                 getDouble(d, "Hunger"), getDouble(d, "Thirst"), getBoolean(d, "BreedingPresent"),
