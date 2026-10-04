@@ -14,6 +14,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,6 +37,8 @@ public final class CompanionStore {
     private static final int SNAPSHOT_FORMAT = 1;
     private static final List<String> SECTIONS = List.of("WorldBound", "Portable", "Unreadable");
     public static final String UNOWNED_KEY = "_unowned";
+    /** Upper bound for the startup load pool; more threads gain little on parse and decode. */
+    private static final int MAX_LOAD_THREADS = 8;
 
     /** Result of reading every owner file at startup. */
     public record LoadResult(
@@ -72,57 +77,134 @@ public final class CompanionStore {
      * whose every copy fails to parse is moved aside. A file that cannot be read at the I/O
      * level aborts the whole load with {@link CompanionFileAccessException} and is left in place,
      * so the caller disables companion persistence (spec 10) instead of starting that owner empty.
+     *
+     * <p>Files are read, parsed and decoded on a short-lived pool that is gone when this returns.
+     * Results are merged on the calling thread in the order {@link CompanionFileIo#list} gave, so
+     * the outcome is the same as reading the files one after another.</p>
      */
     @Nonnull
     public LoadResult loadAll() throws IOException {
+        List<Path> files = io.list(ownersDir);
+        List<OwnerFile> loaded = readOwnerFiles(files);
         Map<UUID, CompanionRecord> best = new LinkedHashMap<>();
         Map<String, List<BsonDocument>> unreadable = new HashMap<>();
         Set<UUID> unreadableIds = new HashSet<>();
         Map<String, Long> versions = new HashMap<>();
         List<Path> quarantined = new ArrayList<>();
-        for (Path file : io.list(ownersDir)) {
+        for (int i = 0; i < files.size(); i++) {
+            Path file = files.get(i);
+            OwnerFile owner = loaded.get(i);
+            if (owner.readFailure() instanceof CompanionFileAccessException access) {
+                throw access;
+            }
+            if (owner.readFailure() != null || owner.unsupported()) {
+                // No copy parses, or readable but not a layout this build can rewrite without losing data.
+                quarantined.add(moveAside(file));
+                continue;
+            }
+            if (owner.missing()) {
+                continue;
+            }
             String name = file.getFileName().toString();
             String key = name.substring(0, name.length() - ".json".length());
-            BsonDocument doc;
-            try {
-                doc = io.readNow(file);
-            } catch (CompanionFileAccessException e) {
-                throw e;
-            } catch (IOException | RuntimeException e) {
-                quarantined.add(moveAside(file));
+            versions.put(key, owner.version());
+            for (CompanionRecord record : owner.records()) {
+                CompanionRecord existing = best.get(record.profileId());
+                if (existing == null || record.revision() > existing.revision()) {
+                    best.put(record.profileId(), record);
+                }
+            }
+            if (owner.unreadable().isEmpty()) {
                 continue;
             }
-            if (doc == null) {
-                continue;
-            }
-            List<BsonDocument> raw = entries(doc);
-            if (raw == null) {
-                // Readable, but not a layout this build can rewrite without losing data.
-                quarantined.add(moveAside(file));
-                continue;
-            }
-            BsonValue version = doc.get("Version");
-            versions.put(key, version != null && version.isNumber() ? version.asNumber().longValue() : 0L);
-            for (BsonDocument entry : raw) {
-                try {
-                    CompanionRecord record = CompanionRecordBson.decode(entry);
-                    CompanionRecord existing = best.get(record.profileId());
-                    if (existing == null || record.revision() > existing.revision()) {
-                        best.put(record.profileId(), record);
-                    }
-                } catch (IllegalArgumentException e) {
-                    unreadable.computeIfAbsent(key, k -> new ArrayList<>()).add(entry);
-                    if (entry.isString("ProfileId")) {
-                        try {
-                            unreadableIds.add(UUID.fromString(entry.getString("ProfileId").getValue()));
-                        } catch (IllegalArgumentException ignored) {
-                            // An entry without a usable id is still preserved; it just cannot be fenced by id.
-                        }
+            unreadable.put(key, owner.unreadable());
+            for (BsonDocument entry : owner.unreadable()) {
+                if (entry.isString("ProfileId")) {
+                    try {
+                        unreadableIds.add(UUID.fromString(entry.getString("ProfileId").getValue()));
+                    } catch (IllegalArgumentException ignored) {
+                        // An entry without a usable id is still preserved; it just cannot be fenced by id.
                     }
                 }
             }
         }
         return new LoadResult(new ArrayList<>(best.values()), unreadable, unreadableIds, versions, quarantined);
+    }
+
+    /**
+     * One owner file after read and decode. {@code readFailure} is what {@code readNow} threw;
+     * {@code missing} means no copy exists; {@code unsupported} means {@link #entries} refused it.
+     */
+    private record OwnerFile(@Nullable Exception readFailure, boolean missing, boolean unsupported, long version,
+                             List<CompanionRecord> records, List<BsonDocument> unreadable) {
+        static OwnerFile withoutRecords(@Nullable Exception readFailure, boolean missing, boolean unsupported) {
+            return new OwnerFile(readFailure, missing, unsupported, 0L, List.of(), List.of());
+        }
+    }
+
+    /**
+     * Reads and decodes every file, one result per file in the same order. Nothing here moves or
+     * writes a file or touches shared state, so one file's failure cannot affect another.
+     */
+    private List<OwnerFile> readOwnerFiles(List<Path> files) {
+        List<OwnerFile> loaded = new ArrayList<>(files.size());
+        if (files.isEmpty()) {
+            return loaded;
+        }
+        int threads = Math.min(files.size(), Math.min(Runtime.getRuntime().availableProcessors(), MAX_LOAD_THREADS));
+        // close() waits for every task, also when a join below throws, so no thread outlives the load.
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads, task -> {
+            Thread thread = new Thread(task, "tamework-companion-load");
+            thread.setDaemon(true);
+            return thread;
+        })) {
+            List<CompletableFuture<OwnerFile>> pending = new ArrayList<>(files.size());
+            for (Path file : files) {
+                pending.add(CompletableFuture.supplyAsync(() -> readOwnerFile(file), pool));
+            }
+            for (CompletableFuture<OwnerFile> future : pending) {
+                try {
+                    loaded.add(future.join());
+                } catch (CompletionException e) {
+                    if (e.getCause() instanceof RuntimeException unexpected) {
+                        throw unexpected;
+                    }
+                    if (e.getCause() instanceof Error error) {
+                        throw error;
+                    }
+                    throw e;
+                }
+            }
+        }
+        return loaded;
+    }
+
+    private OwnerFile readOwnerFile(Path file) {
+        BsonDocument doc;
+        try {
+            doc = io.readNow(file);
+        } catch (IOException | RuntimeException e) {
+            return OwnerFile.withoutRecords(e, false, false);
+        }
+        if (doc == null) {
+            return OwnerFile.withoutRecords(null, true, false);
+        }
+        List<BsonDocument> raw = entries(doc);
+        if (raw == null) {
+            return OwnerFile.withoutRecords(null, false, true);
+        }
+        BsonValue version = doc.get("Version");
+        List<CompanionRecord> records = new ArrayList<>(raw.size());
+        List<BsonDocument> unreadable = new ArrayList<>();
+        for (BsonDocument entry : raw) {
+            try {
+                records.add(CompanionRecordBson.decode(entry));
+            } catch (IllegalArgumentException e) {
+                unreadable.add(entry);
+            }
+        }
+        return new OwnerFile(null, false, false,
+                version != null && version.isNumber() ? version.asNumber().longValue() : 0L, records, unreadable);
     }
 
     /**

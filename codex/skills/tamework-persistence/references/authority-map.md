@@ -55,6 +55,9 @@ Tamework data folder (`import-report-<UTC time>.txt`, or
 - `tamework-companion-reader`: snapshot file reads (`readSnapshot`) and the
   folder size for diagnostics.
 - `tamework-companion-timers`: summon expiry.
+- `tamework-companion-load` (up to 8 threads): reads and decodes owner files
+  inside `CompanionStore.loadAll` at startup. The results are merged on the
+  calling thread in file order, and the pool is gone when `loadAll` returns.
 - Shutdown: the `ShutdownEvent` handler at priority -28 runs the final flush
   while `StorageManager` still runs; it reads no ECS state.
 - After-unlock index listeners (`addAfterUnlockListener`) run on the thread

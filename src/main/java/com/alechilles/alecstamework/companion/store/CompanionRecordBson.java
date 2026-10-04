@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,6 +35,21 @@ import org.bson.BsonValue;
  */
 public final class CompanionRecordBson {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /**
+     * Decoded values that repeat across records (role, config, world, trait and domain ids, owner
+     * names, namespaces) are replaced by one shared instance, so 20,000 records do not hold
+     * 20,000 copies of the same role id. A process-wide map rather than a per-load map because
+     * owner files are decoded on several threads and later decodes should share too, and rather
+     * than {@code String.intern()} because a lookup here is cheaper and does not grow the JVM
+     * string table. It stops taking new values at {@link #MAX_SHARED_STRINGS}, so a field that
+     * turns out to be unique per record costs a bounded amount of memory and is then left alone.
+     * Values unique to one record (ids, custom names, extension payloads) do not go through it.
+     * Records built at runtime are not touched: their strings come from live components and
+     * configs, and sharing them in the record constructor would add lookups to every index change.
+     */
+    private static final ConcurrentHashMap<String, String> SHARED_STRINGS = new ConcurrentHashMap<>();
+    private static final int MAX_SHARED_STRINGS = 16_384;
 
     private CompanionRecordBson() {
     }
@@ -94,10 +110,10 @@ public final class CompanionRecordBson {
     public static CompanionRecord decode(@Nonnull BsonDocument d) {
         try {
             UUID profileId = UUID.fromString(requireString(d, "ProfileId"));
-            CompanionRecord.Builder b = CompanionRecord.builder(profileId, requireString(d, "Role"),
+            CompanionRecord.Builder b = CompanionRecord.builder(profileId, share(requireString(d, "Role")),
                     decodeLocation(requireDocument(d, "Location")));
             b.revision(getStrictLong(d, "Revision")).generation(getStrictLong(d, "Generation"));
-            b.ownerUuid(getUuid(d, "Owner")).ownerName(getString(d, "OwnerName"));
+            b.ownerUuid(getUuid(d, "Owner")).ownerName(share(getString(d, "OwnerName")));
             b.displayName(getString(d, "Name"));
             // The scope is derived from the location; the stored value is still validated so a
             // malformed or future value keeps the record unreadable and preserved.
@@ -105,13 +121,13 @@ public final class CompanionRecordBson {
             if (scope != null) {
                 RecordScope.valueOf(scope);
             }
-            b.homeWorld(getString(d, "HomeWorld")).currentNpcUuid(getUuid(d, "NpcUuid"));
+            b.homeWorld(share(getString(d, "HomeWorld"))).currentNpcUuid(getUuid(d, "NpcUuid"));
             if (d.isDocument("Summary")) {
                 b.summary(decodeSummary(d.getDocument("Summary")));
             }
             if (d.isDocument("Roster")) {
                 BsonDocument roster = d.getDocument("Roster");
-                b.rosterId(getString(roster, "Id")).rosterSlot((int) getLong(roster, "Slot", -1))
+                b.rosterId(share(getString(roster, "Id"))).rosterSlot((int) getLong(roster, "Slot", -1))
                         .bonded(getBoolean(roster, "Bonded"));
             }
             if (d.isDocument("Timers")) {
@@ -124,7 +140,7 @@ public final class CompanionRecordBson {
             }
             if (d.isDocument("Origin")) {
                 BsonDocument o = d.getDocument("Origin");
-                b.origin(requireString(o, "Namespace"), requireString(o, "Key"));
+                b.origin(share(requireString(o, "Namespace")), requireString(o, "Key"));
             }
             if (d.isArray("ToolIds")) {
                 List<String> tools = new ArrayList<>();
@@ -137,7 +153,7 @@ public final class CompanionRecordBson {
                 Map<String, ExtensionEntry> extensions = new LinkedHashMap<>();
                 for (Map.Entry<String, BsonValue> e : d.getDocument("Extensions").entrySet()) {
                     BsonDocument entry = e.getValue().asDocument();
-                    extensions.put(e.getKey(), new ExtensionEntry(getLong(entry, "Revision", 0), requireString(entry, "Value")));
+                    extensions.put(share(e.getKey()), new ExtensionEntry(getLong(entry, "Revision", 0), requireString(entry, "Value")));
                 }
                 b.extensions(extensions);
             }
@@ -153,7 +169,7 @@ public final class CompanionRecordBson {
                                 c.get("Domain"), profileId, weight);
                         continue;
                     }
-                    claims.add(new DomainClaim(requireString(c, "Domain"), (int) weight,
+                    claims.add(new DomainClaim(share(requireString(c, "Domain")), (int) weight,
                             getBoolean(c, "Owned"), getBoolean(c, "Deployable")));
                 }
                 b.domainClaims(claims);
@@ -188,8 +204,8 @@ public final class CompanionRecordBson {
     private static CompanionLocation decodeLocation(BsonDocument d) {
         LocationKind kind = LocationKind.valueOf(requireString(d, "Kind"));
         String reason = getString(d, "Reason");
-        return new CompanionLocation(kind, getString(d, "World"), getDouble(d, "X"), getDouble(d, "Y"), getDouble(d, "Z"),
-                (int) getLong(d, "Slot", -1), reason == null ? null : StoredReason.valueOf(reason), getString(d, "Cause"));
+        return new CompanionLocation(kind, share(getString(d, "World")), getDouble(d, "X"), getDouble(d, "Y"), getDouble(d, "Z"),
+                (int) getLong(d, "Slot", -1), reason == null ? null : StoredReason.valueOf(reason), share(getString(d, "Cause")));
     }
 
     private static BsonDocument encodeSummary(CompanionSummary s) {
@@ -250,9 +266,9 @@ public final class CompanionRecordBson {
     }
 
     private static CompanionSummary.Progression decodeProgression(BsonDocument d) {
-        return new CompanionSummary.Progression(getString(d, "Stage"), getLong(d, "BornAt", 0),
+        return new CompanionSummary.Progression(share(getString(d, "Stage")), getLong(d, "BornAt", 0),
                 getLong(d, "AdolescentAt", 0), getLong(d, "AdultAt", 0), getBoolean(d, "GrowthScaling"),
-                getDouble(d, "AgeProgress"), getString(d, "ProgressionOwner"), getLong(d, "ProgressionClock", 0),
+                getDouble(d, "AgeProgress"), share(getString(d, "ProgressionOwner")), getLong(d, "ProgressionClock", 0),
                 getBoolean(d, "ProgressionInitialized"), getLong(d, "LastProgressionWorld", 0),
                 getLong(d, "LifecycleNow", 0), getBoolean(d, "JuvenileClockInitialized"),
                 getBoolean(d, "ProgressionPaused"), getLong(d, "ActiveProgress", 0));
@@ -263,23 +279,40 @@ public final class CompanionRecordBson {
         if (d.isDocument("Traits")) {
             for (Map.Entry<String, BsonValue> e : d.getDocument("Traits").entrySet()) {
                 if (e.getValue().isNumber()) {
-                    traits.put(e.getKey(), e.getValue().asNumber().doubleValue());
+                    traits.put(share(e.getKey()), e.getValue().asNumber().doubleValue());
                 }
             }
         }
-        return new CompanionSummary(getString(d, "CustomName"), getString(d, "NameKey"), getString(d, "Role"),
-                getString(d, "Icon"), (float) getDouble(d, "HealthCurrent"), (float) getDouble(d, "HealthMax"),
-                getString(d, "HappinessConfig"), getDouble(d, "Happiness"), getString(d, "NeedsConfig"),
+        return new CompanionSummary(getString(d, "CustomName"), share(getString(d, "NameKey")),
+                share(getString(d, "Role")), share(getString(d, "Icon")), (float) getDouble(d, "HealthCurrent"), (float) getDouble(d, "HealthMax"),
+                share(getString(d, "HappinessConfig")), getDouble(d, "Happiness"), share(getString(d, "NeedsConfig")),
                 getDouble(d, "Hunger"), getDouble(d, "Thirst"), getBoolean(d, "BreedingPresent"),
                 getBoolean(d, "BreedingEnabled"),
                 getLong(d, "BreedingCooldownUntil", 0), getLong(d, "BreedingCooldownStartedAt", 0),
                 getLong(d, "BreedingCooldownDuration", 0), getLong(d, "HarvestAlarmUntil", 0),
-                getString(d, "LevelingConfig"), (int) getLong(d, "Level", 0), getDouble(d, "CurrentXp"),
+                share(getString(d, "LevelingConfig")), (int) getLong(d, "Level", 0), getDouble(d, "CurrentXp"),
                 getDouble(d, "TotalXp"), (int) getLong(d, "TalentPointsSpent", 0), traits,
                 getLong(d, "ObservedAt", 0),
                 getLong(d, "HarvestAlarmStartedAt", 0), getLong(d, "HarvestAlarmDuration", 0),
-                getString(d, "TraitsConfig"), getString(d, "TalentsConfig"),
+                share(getString(d, "TraitsConfig")), share(getString(d, "TalentsConfig")),
                 d.isDocument("Progression") ? decodeProgression(d.getDocument("Progression")) : null);
+    }
+
+    /** The shared instance equal to {@code value}; see {@link #SHARED_STRINGS}. */
+    @Nullable
+    private static String share(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String shared = SHARED_STRINGS.get(value);
+        if (shared != null) {
+            return shared;
+        }
+        if (SHARED_STRINGS.size() >= MAX_SHARED_STRINGS) {
+            return value;
+        }
+        shared = SHARED_STRINGS.putIfAbsent(value, value);
+        return shared == null ? value : shared;
     }
 
     private static void putString(BsonDocument d, String key, @Nullable String value) {

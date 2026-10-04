@@ -186,6 +186,61 @@ class CompanionStoreTest {
     }
 
     @Test
+    void manyOwnerFilesWithABrokenFileAndABrokenRecordLoadInFileOrder() throws Exception {
+        CompanionStore store = store();
+        HytaleCompanionFileIo io = new HytaleCompanionFileIo(() -> new StorageManager(() -> false));
+        Path owners = root.resolve("owners");
+        List<CompanionRecord> expected = new java.util.ArrayList<>();
+        CompanionRecord shared = null;
+        UUID brokenOwner = null;
+        UUID brokenRecordOwner = null;
+        UUID brokenRecordId = UUID.randomUUID();
+        for (int i = 1; i <= 12; i++) {
+            UUID owner = UUID.fromString(String.format("00000000-0000-0000-0000-0000000001%02d", i));
+            if (i == 4) {
+                brokenOwner = owner;
+                Files.createDirectories(owners);
+                Files.writeString(owners.resolve(owner + ".json"), "{ broken");
+                continue;
+            }
+            List<CompanionRecord> records = new java.util.ArrayList<>(List.of(record(owner, i), record(owner, i)));
+            if (i == 2) {
+                shared = record(owner, 7, CompanionLocation.stored(StoredReason.ROSTER));
+                records.add(shared);
+            }
+            if (i == 9) {
+                // Same profile and revision as in file 2: the copy in the earlier file is kept.
+                records.add(shared.toBuilder().ownerUuid(owner).build());
+            }
+            if (i == 6) {
+                brokenRecordOwner = owner;
+                org.bson.BsonArray entries = new org.bson.BsonArray();
+                records.forEach(r -> entries.add(CompanionRecordBson.encode(r)));
+                entries.add(1, new BsonDocument("ProfileId", new BsonString(brokenRecordId.toString()))
+                        .append("Role", new BsonString("Sheep"))
+                        .append("Location", new BsonDocument("Kind", new BsonString("TELEPORTING"))));
+                io.write(owners.resolve(owner + ".json"), new BsonDocument("Format", new org.bson.BsonInt32(1))
+                        .append("Owner", new BsonString(owner.toString()))
+                        .append("Version", new org.bson.BsonInt64(3))
+                        .append("WorldBound", entries)).join();
+            } else {
+                store.writeOwner(CompanionStore.ownerKey(owner), i, records, List.of()).join();
+            }
+            expected.addAll(i == 9 ? records.subList(0, 2) : records);
+        }
+
+        CompanionStore.LoadResult loaded = store().loadAll();
+
+        assertEquals(expected, loaded.records());
+        assertEquals(java.util.Set.of(brokenRecordId), loaded.unreadableIds());
+        assertEquals(java.util.Set.of(brokenRecordOwner.toString()), loaded.unreadableRecords().keySet());
+        assertEquals(1, loaded.unreadableRecords().get(brokenRecordOwner.toString()).size());
+        assertEquals(List.of(owners.resolve(brokenOwner + ".json.unreadable-1234")), loaded.quarantinedFiles());
+        assertEquals(11, loaded.versions().size());
+        assertEquals(3L, loaded.versions().get(brokenRecordOwner.toString()));
+    }
+
+    @Test
     void snapshotsRoundTripAndDelete() throws Exception {
         CompanionStore store = store();
         UUID id = UUID.randomUUID();
