@@ -116,8 +116,8 @@ Changed behavior:
   full body snapshot, and `commandLinks().getHomePosition(...)` is reliable
   only while the companion's body is loaded.
 
-The record and view classes of the removed APIs are still in the jar for now.
-They will be deleted. Do not build on them.
+The record and view classes of the removed APIs are deleted. Code that still
+imports them does not compile against 5.0.0.
 
 ## Threading
 
