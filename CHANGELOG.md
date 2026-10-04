@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.0.0 - Companion Store Rework - 2026-10-02
+## 5.0.0 - Companion Store Rework - 2026-10-04
 
 **Upgrade compatibility:** Back up the world's `universe` folder before
 updating. This release requires Hytale server 0.6.0 or later; 0.5.x is no
