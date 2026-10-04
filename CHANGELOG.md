@@ -179,6 +179,8 @@ Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
 
 ### Fixed
 
+- Updated embedded Beacon to 2.0.3 to remove mod archive scans during player
+  joins and world transfers, and reduce repeated consent-file reads.
 - Changes to idle companions, such as renames, stats and progression, now
   always reach the world save. Before, Hytale saved them only when something
   else also changed the animal.
