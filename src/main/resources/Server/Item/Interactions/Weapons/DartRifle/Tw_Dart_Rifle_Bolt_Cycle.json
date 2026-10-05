@@ -1,6 +1,6 @@
 {
   "Type": "Simple",
-  "RunTime": 0.67,
+  "RunTime": 1.0,
   "HorizontalSpeedMultiplier": 0.85,
   "Effects": {
     "ItemAnimationId": "BoltCycle",

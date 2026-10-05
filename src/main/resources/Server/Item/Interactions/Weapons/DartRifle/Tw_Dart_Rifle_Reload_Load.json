@@ -1,6 +1,6 @@
 {
   "Type": "Simple",
-  "RunTime": 0.5,
+  "RunTime": 0.75,
   "HorizontalSpeedMultiplier": 0.75,
   "Effects": {
     "ItemAnimationId": "ReloadLoad",

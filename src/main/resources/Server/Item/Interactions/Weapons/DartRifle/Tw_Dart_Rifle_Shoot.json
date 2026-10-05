@@ -1,5 +1,5 @@
 {
-  "$Comment": "Launches the dart with the vanilla rifle shot, then works the bolt.",
+  "$Comment": "Launches the dart with the rifle shot, then works the bolt. With darts left the next one comes up into the port.",
   "Type": "Projectile",
   "RunTime": 0.33,
   "Effects": {
@@ -7,5 +7,12 @@
     "ClearAnimationOnFinish": true
   },
   "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4",
-  "Next": "Tw_Dart_Rifle_Bolt_Cycle"
+  "Next": {
+    "Type": "StatsCondition",
+    "Costs": {
+      "Ammo": 1
+    },
+    "Next": "Tw_Dart_Rifle_Bolt_Cycle",
+    "Failed": "Tw_Dart_Rifle_Bolt_Cycle_Empty"
+  }
 }

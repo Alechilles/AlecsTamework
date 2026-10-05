@@ -1,9 +1,9 @@
 {
   "Type": "Simple",
-  "RunTime": 0.5,
-  "HorizontalSpeedMultiplier": 0.75,
+  "RunTime": 1.0,
+  "HorizontalSpeedMultiplier": 0.85,
   "Effects": {
-    "ItemAnimationId": "ReloadClose",
+    "ItemAnimationId": "BoltCycleEmpty",
     "ClearAnimationOnFinish": true,
     "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start",
     "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start_Local"

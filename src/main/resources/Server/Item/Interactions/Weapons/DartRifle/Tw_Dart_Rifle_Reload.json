@@ -1,7 +1,7 @@
 {
   "$Comment": "Opens the bolt, loads one dart per loop until the rifle is full, the darts run out or the player fires, then closes the bolt.",
   "Type": "Simple",
-  "RunTime": 0.33,
+  "RunTime": 0.5,
   "HorizontalSpeedMultiplier": 0.75,
   "Effects": {
     "ItemAnimationId": "ReloadOpen",
