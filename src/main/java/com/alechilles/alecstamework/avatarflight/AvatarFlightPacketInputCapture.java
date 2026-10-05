@@ -59,12 +59,6 @@ public final class AvatarFlightPacketInputCapture {
         LAST_MOVING_STATE_AT_MS.remove(playerUuid);
     }
 
-    /** Returns the body orientation the player's client last reported, or null before the first report. */
-    @Nullable
-    static MovementIntentProjector.DirectionSnapshot lastBodyDirection(@Nonnull UUID playerUuid) {
-        return LAST_BODY_DIRECTIONS.get(playerUuid);
-    }
-
     private void captureOnWorld(@Nonnull ClientMovement packet,
                                 @Nonnull UUID playerUuid,
                                 @Nonnull Ref<EntityStore> ref,
