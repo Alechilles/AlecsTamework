@@ -1,5 +1,22 @@
 # Changelog
 
+## 5.1.0 - Tranquilizer Dart Rifle - Unreleased
+
+### Changed
+
+- The Tranquilizer Shortbow is now the Tranquilizer Dart Rifle and Tranquilizer
+  Arrows are now Tranquilizer Darts. Both keep their item IDs, so bows and
+  arrows already in a world become the rifle and darts, and recipes are
+  unchanged.
+- The rifle is bolt-action and holds 3 darts. The primary action fires and
+  works the bolt, and starts a reload when the rifle is empty. The reload key
+  loads one dart at a time and firing interrupts it. Loaded darts return to the
+  inventory when the rifle is put away, and the loaded count shows on the HUD.
+
+### Removed
+
+- The shortbow's charged shot, guard and volley are gone with the bow.
+
 ## 5.0.0 - Companion Store Rework - 2026-10-04
 
 **Upgrade compatibility:** Back up the world's `universe` folder before
