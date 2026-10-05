@@ -7,8 +7,8 @@
         "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": -3,
-        "MaxPitch": -1,
+        "MinPitch": -1,
+        "MaxPitch": 1,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -22,8 +22,8 @@
         "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": -2,
-        "MaxPitch": 0,
+        "MinPitch": -1,
+        "MaxPitch": 1,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -32,6 +32,7 @@
     }
   ],
   "Volume": 0.0,
+  "Pitch": -1.5,
   "PreventSoundInterruption": true,
   "MaxInstance": 6,
   "AudioCategory": "AudioCat_Weapons",

@@ -7,8 +7,8 @@
         "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": 2,
-        "MaxPitch": 5,
+        "MinPitch": -1.5,
+        "MaxPitch": 1.5,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -17,6 +17,7 @@
     }
   ],
   "Volume": 0.0,
+  "Pitch": 3.0,
   "PreventSoundInterruption": true,
   "MaxInstance": 6,
   "AudioCategory": "AudioCat_Weapons",

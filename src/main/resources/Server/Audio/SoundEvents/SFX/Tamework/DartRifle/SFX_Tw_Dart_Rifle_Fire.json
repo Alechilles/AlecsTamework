@@ -7,8 +7,8 @@
         "Sounds/Projectiles/Scarak_Spitball/Scarak_Spitball_Fire_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": 3,
-        "MaxPitch": 6,
+        "MinPitch": -1,
+        "MaxPitch": 2,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -21,8 +21,8 @@
         "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": 0,
-        "MaxPitch": 2,
+        "MinPitch": -2,
+        "MaxPitch": 0,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -30,6 +30,7 @@
     }
   ],
   "Volume": 0.0,
+  "Pitch": 3.0,
   "PreventSoundInterruption": true,
   "MaxInstance": 6,
   "AudioCategory": "AudioCat_Weapons",

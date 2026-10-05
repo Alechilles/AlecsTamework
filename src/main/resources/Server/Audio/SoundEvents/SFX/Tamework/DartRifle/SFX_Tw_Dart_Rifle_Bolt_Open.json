@@ -7,8 +7,8 @@
         "Sounds/Weapons/Hand_Crossbow/Reload/Hand_Crossbow_T2_Reload_Start_03.ogg"
       ],
       "RandomSettings": {
-        "MinPitch": -2,
-        "MaxPitch": 0,
+        "MinPitch": -1,
+        "MaxPitch": 1,
         "MinVolume": -1,
         "MaxVolume": 0
       },
@@ -17,6 +17,7 @@
     }
   ],
   "Volume": 0.0,
+  "Pitch": -1.0,
   "PreventSoundInterruption": true,
   "MaxInstance": 6,
   "AudioCategory": "AudioCat_Weapons",
