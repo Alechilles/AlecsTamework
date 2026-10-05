@@ -112,9 +112,25 @@
       {
         "Condition": [
           1,
+          1
+        ],
+        "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_1.blockymodel",
+        "Texture": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Texture.png"
+      },
+      {
+        "Condition": [
+          2,
+          2
+        ],
+        "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_2.blockymodel",
+        "Texture": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Texture.png"
+      },
+      {
+        "Condition": [
+          3,
           3
         ],
-        "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Loaded.blockymodel",
+        "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_3.blockymodel",
         "Texture": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Texture.png"
       }
     ]

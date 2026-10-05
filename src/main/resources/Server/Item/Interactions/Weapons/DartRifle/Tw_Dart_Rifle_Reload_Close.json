@@ -5,7 +5,7 @@
   "Effects": {
     "ItemAnimationId": "ReloadClose",
     "ClearAnimationOnFinish": true,
-    "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start",
-    "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start_Local"
+    "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Close",
+    "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Close"
   }
 }

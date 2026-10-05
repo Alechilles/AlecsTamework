@@ -1,0 +1,37 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Projectiles/Scarak_Spitball/Scarak_Spitball_Fire_01.ogg",
+        "Sounds/Projectiles/Scarak_Spitball/Scarak_Spitball_Fire_02.ogg",
+        "Sounds/Projectiles/Scarak_Spitball/Scarak_Spitball_Fire_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": 3,
+        "MaxPitch": 6,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": -4.0
+    },
+    {
+      "Files": [
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_01.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_02.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": 0,
+        "MaxPitch": 2,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": 2.0
+    }
+  ],
+  "Volume": 0.0,
+  "PreventSoundInterruption": true,
+  "MaxInstance": 6,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

@@ -1,0 +1,39 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_01.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_02.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -3,
+        "MaxPitch": -1,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": 4.0,
+      "StartDelay": 0.22
+    },
+    {
+      "Files": [
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_01.ogg",
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_02.ogg",
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -2,
+        "MaxPitch": 0,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": 4.0,
+      "StartDelay": 0.33
+    }
+  ],
+  "Volume": 0.0,
+  "PreventSoundInterruption": true,
+  "MaxInstance": 6,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

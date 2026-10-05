@@ -6,7 +6,7 @@
     "ItemAnimationId": "Shoot",
     "ClearAnimationOnFinish": true
   },
-  "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4",
+  "Config": "Projectile_Config_Tw_Dart_Tranquilizer",
   "Next": {
     "Type": "StatsCondition",
     "Costs": {

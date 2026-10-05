@@ -1,0 +1,5 @@
+{
+  "Parent": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4",
+  "LaunchLocalSoundEventId": "SFX_Tw_Dart_Rifle_Fire",
+  "LaunchWorldSoundEventId": "SFX_Tw_Dart_Rifle_Fire"
+}

@@ -4,8 +4,8 @@
   "HorizontalSpeedMultiplier": 0.75,
   "Effects": {
     "ItemAnimationId": "ReloadLoad",
-    "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Load",
-    "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Load_Local"
+    "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Load",
+    "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Load"
   },
   "Next": "Common_StatAmmoReload_StatModifier"
 }
