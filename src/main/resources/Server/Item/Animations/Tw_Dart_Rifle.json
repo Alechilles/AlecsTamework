@@ -1,0 +1,37 @@
+{
+  "Parent": "Rifle",
+  "Animations": {
+    "BoltCycle": {
+      "ThirdPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Bolt_Cycle.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Bolt_Cycle.blockyanim",
+      "FirstPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Bolt_Cycle_FPS.blockyanim",
+      "Speed": 1,
+      "BlendingDuration": 0.1,
+      "Looping": false
+    },
+    "ReloadOpen": {
+      "ThirdPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Open.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Open.blockyanim",
+      "FirstPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Open_FPS.blockyanim",
+      "Speed": 1,
+      "BlendingDuration": 0.1,
+      "Looping": false
+    },
+    "ReloadLoad": {
+      "ThirdPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Load.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Load.blockyanim",
+      "FirstPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Load_FPS.blockyanim",
+      "Speed": 1,
+      "BlendingDuration": 0.1,
+      "Looping": false
+    },
+    "ReloadClose": {
+      "ThirdPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Close.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Close.blockyanim",
+      "FirstPerson": "Characters/Animations/Items/Dual_Handed/Tw_Dart_Rifle/Reload_Close_FPS.blockyanim",
+      "Speed": 1,
+      "BlendingDuration": 0.1,
+      "Looping": false
+    }
+  }
+}
