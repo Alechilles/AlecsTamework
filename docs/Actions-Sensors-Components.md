@@ -55,7 +55,7 @@ wandering or formation travel. It falls through while inactive. Defaults:
 - `KettleDurationRange`: `[180, 420]` seconds per episode.
 - `DayTimePeriod`: `[6.01, 17.99]`.
 
-The first cooldown is 60–120 seconds; subsequent cooldowns use
+The first cooldown is 60ï¿½120 seconds; subsequent cooldowns use
 `KettleCooldownRange`. The cooldown pauses during an episode and resumes when
 eligible idle flight next observes the duration timer stopped. Hosts with timed idle landing should defer
 that landing while `Tw_Kettle_Duration` is running, while retaining threat and
@@ -67,6 +67,13 @@ heading, and pitch to the acting NPC. Use an entity-producing sensor such as
 `FlockLeader`. For target-based `TameworkFlyingOrbit` movement,
 `UseTargetLeashPoint: true` anchors movement to that target NPC's home point
 instead of its live position; it defaults to `false`.
+
+`DesiredAltitudeRange` is a vertical offset from the target. Two flyers that
+each try to stay above the other never settle, so set the optional
+`AirborneTargetAltitudeRange` (for example `[-3, 4]`) to use a different offset
+while the target is flying. Include `0` in it so both can hold a similar
+height. Without it, `DesiredAltitudeRange` always applies. `Kettle` mode
+ignores it.
 
 `TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
 (the bird's own home when alone). Each member keeps a deterministic orbit: its
