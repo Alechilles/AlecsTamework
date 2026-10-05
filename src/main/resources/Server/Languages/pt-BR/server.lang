@@ -19,10 +19,10 @@ interactionHints.openTrough=Pressione [{key}] para abrir o cocho
 interactionHints.removeScarecrow=Segure [{key}] para remover o espantalho.
 
 # === Tamework Tranquilizer ===
-items.Weapon_Shortbow_Tranquilizer.name=Arco Curto Tranquilizante
-items.Weapon_Arrow_Tranquilizer.name=Flecha Tranquilizante
+items.Weapon_Shortbow_Tranquilizer.name=Rifle de Dardos Tranquilizantes
+items.Weapon_Arrow_Tranquilizer.name=Dardo Tranquilizante
 items.Potion_Tranquilizer.name=Poção Tranquilizante
-items.Potion_Tranquilizer.description=Usada para fabricar flechas e equipamentos tranquilizantes.
+items.Potion_Tranquilizer.description=Usada para fabricar dardos e equipamentos tranquilizantes.
 # === Tamework Feed Items ===
 items.Tw_Feed_Trough.name=Cocho
 items.Tw_Feed_Trough.description=Um cocho para alimentar e dar água aos seus animais.\n- Insira comida para alimentar animais próximos.\n- Clique com o botão direito com um balde de água para dar água aos animais próximos.

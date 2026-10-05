@@ -1,7 +1,7 @@
 {
   "RequireNewClick": true,
   "Interactions": [
-    "Weapon_Shortbow_Tranquilizer_Primary_Shoot"
+    "Tw_Dart_Rifle_Primary"
   ],
   "Tags": {
     "Attack": [

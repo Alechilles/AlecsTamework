@@ -4,7 +4,8 @@
   },
   "Parent": "Weapon_Arrow_Crude",
   "Quality": "Rare",
-  "Texture": "Items/Weapons/Arrow/Tranquilizer_Texture.png",
+  "Model": "Items/Tamework/TranquilizerDart/Tranquilizer_Dart.blockymodel",
+  "Texture": "Items/Tamework/TranquilizerDart/Tranquilizer_Dart_Texture.png",
   "Icon": "Icons/ItemsGenerated/Weapon_Arrow_Tranquilizer.png",
   "Recipe": {
     "KnowledgeRequired": false,
@@ -46,7 +47,7 @@
     {
       "SystemId": "Effect_Tranquilizer",
       "TargetEntityPart": "Self",
-      "TargetNodeName": "Arrow-Head",
+      "TargetNodeName": "Needle",
       "Scale": 0.15,
       "PositionOffset": {
         "X": 0.15,
@@ -62,7 +63,7 @@
   "Particles": [
     {
       "SystemId": "Effect_Tranquilizer",
-      "TargetNodeName": "Arrow-Head",
+      "TargetNodeName": "Needle",
       "Scale": 0.15,
       "RotationOffset": {
         "Roll": 180

@@ -1,0 +1,59 @@
+{
+  "$Comment": "Hands loaded darts back when the rifle is put away.",
+  "Type": "Condition",
+  "RequiredGameMode": "Adventure",
+  "Failed": {
+    "Type": "ChangeActiveSlot"
+  },
+  "Next": {
+    "Type": "StatsCondition",
+    "Costs": {
+      "Ammo": 3
+    },
+    "Next": {
+      "Type": "ModifyInventory",
+      "ItemToAdd": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 3
+      },
+      "Next": {
+        "Type": "ChangeActiveSlot"
+      }
+    },
+    "Failed": {
+      "Type": "StatsCondition",
+      "Costs": {
+        "Ammo": 2
+      },
+      "Next": {
+        "Type": "ModifyInventory",
+        "ItemToAdd": {
+          "Id": "Weapon_Arrow_Tranquilizer",
+          "Quantity": 2
+        },
+        "Next": {
+          "Type": "ChangeActiveSlot"
+        }
+      },
+      "Failed": {
+        "Type": "StatsCondition",
+        "Costs": {
+          "Ammo": 1
+        },
+        "Next": {
+          "Type": "ModifyInventory",
+          "ItemToAdd": {
+            "Id": "Weapon_Arrow_Tranquilizer",
+            "Quantity": 1
+          },
+          "Next": {
+            "Type": "ChangeActiveSlot"
+          }
+        },
+        "Failed": {
+          "Type": "ChangeActiveSlot"
+        }
+      }
+    }
+  }
+}

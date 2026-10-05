@@ -1,0 +1,11 @@
+{
+  "$Comment": "Launches the dart with the vanilla rifle shot, then works the bolt.",
+  "Type": "Projectile",
+  "RunTime": 0.33,
+  "Effects": {
+    "ItemAnimationId": "Shoot",
+    "ClearAnimationOnFinish": true
+  },
+  "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4",
+  "Next": "Tw_Dart_Rifle_Bolt_Cycle"
+}

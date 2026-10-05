@@ -19,7 +19,7 @@ interactionHints.openTrough=Drücke [{key}] zum Öffnen des Trogs
 interactionHints.removeScarecrow=Halte [{key}], um die Vogelscheuche zu entfernen.
 
 # === Tamework Betäubung ===
-items.Weapon_Shortbow_Tranquilizer.name=Betäubungs-Kurzbogen
+items.Weapon_Shortbow_Tranquilizer.name=Betäubungsgewehr
 items.Weapon_Arrow_Tranquilizer.name=Betäubungspfeil
 items.Potion_Tranquilizer.name=Betäubungstrank
 items.Potion_Tranquilizer.description=Wird zur Herstellung von Betäubungspfeilen und Ausrüstung verwendet.

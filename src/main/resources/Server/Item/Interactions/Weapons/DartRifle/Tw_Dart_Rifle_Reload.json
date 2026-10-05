@@ -1,0 +1,43 @@
+{
+  "$Comment": "Opens the bolt, loads one dart per loop until the rifle is full, the darts run out or the player fires, then closes the bolt.",
+  "Type": "Simple",
+  "RunTime": 0.33,
+  "HorizontalSpeedMultiplier": 0.75,
+  "Effects": {
+    "ItemAnimationId": "ReloadOpen",
+    "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start",
+    "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start_Local"
+  },
+  "Next": {
+    "Type": "Repeat",
+    "Repeat": -1,
+    "Rules": {
+      "InterruptedBy": [
+        "Primary",
+        "Secondary"
+      ]
+    },
+    "ForkInteractions": {
+      "Interactions": [
+        {
+          "Type": "StatsCondition",
+          "LessThan": true,
+          "Costs": {
+            "Ammo": 100
+          },
+          "ValueType": "Percent",
+          "Next": {
+            "Type": "ModifyInventory",
+            "RequiredGameMode": "Adventure",
+            "ItemToRemove": {
+              "Id": "Weapon_Arrow_Tranquilizer",
+              "Quantity": 1
+            },
+            "Next": "Tw_Dart_Rifle_Reload_Load"
+          }
+        }
+      ]
+    },
+    "Failed": "Tw_Dart_Rifle_Reload_Close"
+  }
+}

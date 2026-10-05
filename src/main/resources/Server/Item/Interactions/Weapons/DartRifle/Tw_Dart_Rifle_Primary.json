@@ -1,0 +1,15 @@
+{
+  "$Comment": "Fire when a dart is loaded, otherwise start loading.",
+  "Type": "StatsCondition",
+  "Costs": {
+    "Ammo": 1
+  },
+  "Failed": "Tw_Dart_Rifle_Reload",
+  "Next": {
+    "Type": "ChangeStat",
+    "StatModifiers": {
+      "Ammo": -1
+    },
+    "Next": "Tw_Dart_Rifle_Shoot"
+  }
+}

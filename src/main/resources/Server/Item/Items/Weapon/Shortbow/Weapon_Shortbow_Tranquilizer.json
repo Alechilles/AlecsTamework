@@ -2,11 +2,28 @@
   "TranslationProperties": {
     "Name": "server.items.Weapon_Shortbow_Tranquilizer.name"
   },
-  "Parent": "Weapon_Shortbow_Cobalt",
-  "Model": "Items/Weapons/Bow/Cobalt_Tranquilizer.blockymodel",
-  "Texture": "Items/Weapons/Bow/Cobalt_Texture_Tranquilizer.png",
-  "Icon": "Icons/ItemsGenerated/Weapon_Shortbow_Tranquilizer.png",
+  "Categories": [
+    "Items.Weapons"
+  ],
   "Quality": "Rare",
+  "ItemLevel": 35,
+  "PlayerAnimationsId": "Tw_Dart_Rifle",
+  "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle.blockymodel",
+  "Texture": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Weapon_Shortbow_Tranquilizer.png",
+  "IconProperties": {
+    "Scale": 0.38,
+    "Translation": [
+      -14,
+      -25
+    ],
+    "Rotation": [
+      320,
+      90,
+      0
+    ]
+  },
+  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
   "Recipe": {
     "KnowledgeRequired": false,
     "Input": [
@@ -57,86 +74,49 @@
     ],
     "TimeSeconds": 4
   },
+  "Tags": {
+    "Type": [
+      "Weapon"
+    ],
+    "Family": [
+      "Gun"
+    ]
+  },
   "Interactions": {
-    "Primary": "Root_Weapon_Shortbow_Tranquilizer_Primary_Shoot",
-    "Secondary": "Root_Weapon_Shortbow_Secondary_Guard",
-    "Ability1": "Root_Weapon_Shortbow_Signature_Volley",
-    "SwapFrom": {
-      "Interactions": [
+    "Primary": "Root_Tw_Dart_Rifle_Primary",
+    "Ability3": "Root_Tw_Dart_Rifle_Reload",
+    "SwapFrom": "Root_Tw_Dart_Rifle_Swap_From"
+  },
+  "Weapon": {
+    "EntityStatsToClear": [
+      "Ammo"
+    ],
+    "StatModifiers": {
+      "Ammo": [
         {
-          "Type": "StatsCondition",
-          "Costs": {
-            "Ammo": 1
-          },
-          "Next": {
-            "Type": "ModifyInventory",
-            "RequiredGameMode": "Adventure",
-            "ItemToAdd": {
-              "Id": "Weapon_Arrow_Tranquilizer",
-              "Quantity": 1
-            }
-          }
-        },
-        {
-          "Type": "ChangeActiveSlot"
+          "Amount": 3,
+          "CalculationType": "Additive"
         }
       ]
     }
   },
-  "InteractionVars": {
-    "Primary_Shoot_Charge": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Tranquilizer_Primary_Shoot_Charge"
-        }
-      ]
-    },
-    "No_Ammo_Effects": {
-      "Interactions": [
-        {
-          "Parent": "Common_Bow_No_Ammo"
-        }
-      ]
-    },
-    "Primary_Shoot_Strength_0": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_0",
-          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_0"
-        }
-      ]
-    },
-    "Primary_Shoot_Strength_1": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_1",
-          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_1"
-        }
-      ]
-    },
-    "Primary_Shoot_Strength_2": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_2",
-          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_2"
-        }
-      ]
-    },
-    "Primary_Shoot_Strength_3": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_3",
-          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_3"
-        }
-      ]
-    },
-    "Primary_Shoot_Strength_4": {
-      "Interactions": [
-        {
-          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_4",
-          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4"
-        }
-      ]
-    }
+  "DisplayEntityStatsHUD": [
+    "Ammo"
+  ],
+  "MaxStack": 1,
+  "MaxDurability": 350,
+  "DurabilityLossOnHit": 0.35,
+  "ItemSoundSetId": "ISS_Weapons_Wood",
+  "ItemAppearanceConditions": {
+    "Ammo": [
+      {
+        "Condition": [
+          1,
+          3
+        ],
+        "Model": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Loaded.blockymodel",
+        "Texture": "Items/Tamework/DartRifle/Tranquilizer_Dart_Rifle_Texture.png"
+      }
+    ]
   }
 }

@@ -1,0 +1,11 @@
+{
+  "Type": "Simple",
+  "RunTime": 0.5,
+  "HorizontalSpeedMultiplier": 0.75,
+  "Effects": {
+    "ItemAnimationId": "ReloadLoad",
+    "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Load",
+    "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Load_Local"
+  },
+  "Next": "Common_StatAmmoReload_StatModifier"
+}

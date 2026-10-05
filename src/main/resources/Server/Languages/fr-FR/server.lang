@@ -19,10 +19,10 @@ interactionHints.openTrough=Appuyez sur [{key}] pour ouvrir la mangeoire
 interactionHints.removeScarecrow=Maintenez [{key}] pour retirer l'épouvantail.
 
 # === Tamework Tranquilizer ===
-items.Weapon_Shortbow_Tranquilizer.name=Arc court tranquilisant
-items.Weapon_Arrow_Tranquilizer.name=Flèche tranquilisante
+items.Weapon_Shortbow_Tranquilizer.name=Fusil à fléchettes tranquilisantes
+items.Weapon_Arrow_Tranquilizer.name=Fléchette tranquilisante
 items.Potion_Tranquilizer.name=Potion tranquilisante
-items.Potion_Tranquilizer.description=Utilisée pour fabriquer des flèches et de l'équipement tranquilisants.
+items.Potion_Tranquilizer.description=Utilisée pour fabriquer des fléchettes et de l'équipement tranquilisants.
 # === Tamework Feed Items ===
 items.Tw_Feed_Trough.name=Mangeoire
 items.Tw_Feed_Trough.description=Une mangeoire pour nourrir et abreuver vos animaux.\n- Insérez de la nourriture pour nourrir les animaux proches.\n- Faites un clic droit avec un seau d'eau pour abreuver les animaux proches.

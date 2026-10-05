@@ -19,10 +19,10 @@ interactionHints.openTrough=Press [{key}] to open Trough | [RMB] with Water Buck
 interactionHints.removeScarecrow=Hold [{key}] to remove.
 
 # === Tamework Tranquilizer ===
-items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow
-items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Arrow
+items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Dart Rifle
+items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Dart
 items.Potion_Tranquilizer.name=Tranquilizer Potion
-items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equipment.
+items.Potion_Tranquilizer.description=Used to craft tranquilizer darts and equipment.
 # === Tamework Feed Items ===
 items.Tw_Feed_Trough.name=Feed Trough
 items.Tw_Feed_Trough.description=A trough for feeding and watering your animals.\n- Insert food to feed nearby animals.\n- Right-click with water bucket to water nearby animals.
