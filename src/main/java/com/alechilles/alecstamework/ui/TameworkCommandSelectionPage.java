@@ -56,6 +56,8 @@ public final class TameworkCommandSelectionPage
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandSelectionOptionSource.Option[] options;
+    /** LMB accepts every command, including hotswap-only entries hidden from the radial. */
+    private final CommandSelectionOptionSource.Option[] primaryOptions;
     final TwCommandItemConfig config;
     final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final CommandSelectionRosterEventBoundary rosterEventBoundary;
@@ -334,6 +336,8 @@ public final class TameworkCommandSelectionPage
                 resolveLanguage(),
                 MAX_COMMAND_BUTTONS
         );
+        this.primaryOptions = CommandSelectionOptionSource.build(
+                config, commandOptionPredicate, resolveLanguage(), Integer.MAX_VALUE);
         this.cardBindingConfig = LinkedNpcPanelCardBindingFactory.create(
                 recallActionEnabled,
                 config != null && config.usesOwnerCommandFamilyRoster()
@@ -488,10 +492,10 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(
                     "#TameworkCommandMenuCurrent.Text",
                     CommandSelectionOptionSource.currentLabel(
-                            options, selectedCommandId, resolveLanguage()
+                            primaryOptions, selectedCommandId, resolveLanguage()
                     )
             );
-            hotswapController.build(commandBuilder, options, selectedCommandId);
+            hotswapController.build(commandBuilder, primaryOptions, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.append("#TameworkLinkedPanelRoot",
                     "TameworkLinkedNpcPanelRemovalConfirm.ui");
@@ -583,7 +587,7 @@ public final class TameworkCommandSelectionPage
         }
         if (viewBinding != null && viewControls.blocksWhileEditing(data)) return;
         if (data.primaryCommandValue != null) {
-            if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(options, data.primaryCommandValue)) {
+            if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(primaryOptions, data.primaryCommandValue)) {
                 selectionCallback.accept(data.primaryCommandValue);
                 selectedCommandId = data.primaryCommandValue;
             }

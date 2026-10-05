@@ -170,8 +170,8 @@ group memberships. `Add group` opens group creation and `Clear selection` remove
 selected recipients from that flute. Legacy single-group item metadata remains readable
 and is imported into the owner group state.
 
-Set `ShowInRadial: false` on a command entry to offer it through the hotswap
-selectors without consuming one of the primary selector's eight slots.
+Set `ShowInRadial: false` on a command entry to keep it out of the radial's
+eight slots. It stays assignable through the LMB, Q, E, and R selectors.
 
 Generic command rosters also offer a `Cycle Group` hotswap action. Assign it to
 Q, E, or R to cycle `All Companions`, then each non-empty named group in its

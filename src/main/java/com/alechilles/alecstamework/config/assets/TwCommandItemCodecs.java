@@ -374,7 +374,7 @@ final class TwCommandItemCodecs {
                     entry -> entry.showInRadial
             )
             .documentation("Whether this command consumes one of the eight radial-menu slots. "
-                    + "Omission defaults true; false keeps it available for hotswaps only.")
+                    + "Omission defaults true; false keeps it assignable to LMB, Q, E, and R only.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Default", Codec.BOOLEAN),

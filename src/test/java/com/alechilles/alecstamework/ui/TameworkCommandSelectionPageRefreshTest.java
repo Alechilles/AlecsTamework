@@ -500,7 +500,7 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void primaryAssignmentsReuseSelectionWithoutClosingOrAcceptingHiddenCommands() throws Exception {
+    void primaryAssignmentsAcceptRadialHiddenCommandsWithoutClosingOrAcceptingForgedIds() throws Exception {
         for (String roster : List.of("", "\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",")) {
             TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse(
                     "{" + roster + "\"CommandList\":[{\"Id\":\"Follow\",\"ShowInRadial\":true},"
@@ -514,7 +514,7 @@ class TameworkCommandSelectionPageRefreshTest {
                 data.primaryCommandValue = value;
                 page.handleDataEvent(null, null, data);
             }
-            assertEquals(List.of("Follow", "Stay"), fixture.selections);
+            assertEquals(List.of("Follow", "Hidden", "Stay"), fixture.selections);
             assertEquals(0, fixture.source.closes);
             page.onDismiss(null, null);
         }
