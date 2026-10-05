@@ -7,7 +7,6 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -50,11 +49,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     private final double passThroughDistance;
     private final double passThroughStopDistance;
     private final double relativeSpeed;
-    private final double[] groundTargetAltitudeRange;
-    @Nullable
-    private final double[] airborneTargetAltitudeRange;
-    /** Range in effect this tick; switches to the airborne range while the target is flying. */
-    private double[] desiredAltitudeRange;
+    private final double[] desiredAltitudeRange;
     private final double climbRelativeSpeed;
     private final double sinkRelativeSpeed;
     private final boolean avoidObstacles;
@@ -115,9 +110,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         passThroughDistance = builder.getPassThroughDistance(support);
         passThroughStopDistance = builder.getPassThroughStopDistance(support);
         relativeSpeed = builder.getRelativeSpeed(support);
-        groundTargetAltitudeRange = builder.getDesiredAltitudeRange(support);
-        airborneTargetAltitudeRange = builder.getAirborneTargetAltitudeRange(support);
-        desiredAltitudeRange = groundTargetAltitudeRange;
+        desiredAltitudeRange = builder.getDesiredAltitudeRange(support);
         climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
         sinkRelativeSpeed = builder.getSinkRelativeSpeed(support);
         avoidObstacles = builder.isAvoidObstacles(support);
@@ -184,16 +177,6 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                     wanderRadiusRange[0], wanderRadiusRange[1]);
             obstacleAvoidance.reset();
             return true;
-        }
-
-        if (airborneTargetAltitudeRange != null && !kettling) {
-            double[] range = selectAltitudeRange(
-                    isTargetFlying(sensorInfo, componentAccessor),
-                    groundTargetAltitudeRange, airborneTargetAltitudeRange);
-            if (range != desiredAltitudeRange) {
-                desiredAltitudeRange = range;
-                hasWanderDestination = false;
-            }
         }
 
         Vector3d selfPosition = transform.getPosition();
@@ -638,31 +621,6 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                                                           double sinkSpeed) {
         return resolveAltitudeCorrection(
                 selfY, targetY + altitudeRange[0], targetY + altitudeRange[1], climbSpeed, sinkSpeed);
-    }
-
-    /**
-     * A fixed offset above the target has no stable answer when two flyers target each other, so
-     * a flying target uses the airborne range when the asset provides one.
-     */
-    static double[] selectAltitudeRange(boolean targetFlying,
-                                        @Nonnull double[] groundRange,
-                                        @Nullable double[] airborneRange) {
-        return targetFlying && airborneRange != null ? airborneRange : groundRange;
-    }
-
-    private static boolean isTargetFlying(@Nullable InfoProvider sensorInfo,
-                                          @Nonnull ComponentAccessor<EntityStore> accessor) {
-        if (sensorInfo == null || sensorInfo.getPositionProvider() == null) {
-            return false;
-        }
-        Ref<EntityStore> targetRef = sensorInfo.getPositionProvider().getTarget();
-        if (targetRef == null || !targetRef.isValid()) {
-            return false;
-        }
-        MovementStatesComponent movement = accessor.getComponent(
-                targetRef, MovementStatesComponent.getComponentType());
-        return movement != null && movement.getMovementStates() != null
-                && movement.getMovementStates().flying;
     }
 
     static Vector3d resolveTargetDirection(double selfX,

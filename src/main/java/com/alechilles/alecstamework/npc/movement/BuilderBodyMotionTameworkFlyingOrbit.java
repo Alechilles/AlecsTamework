@@ -13,7 +13,6 @@ import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSingleValida
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /** Builds target-relative orbit and approach steering for flying NPCs. */
 public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotionBase {
@@ -35,8 +34,6 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final DoubleHolder passThroughStopDistance = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
     private final NumberArrayHolder desiredAltitudeRange = new NumberArrayHolder();
-    private final NumberArrayHolder airborneTargetAltitudeRange = new NumberArrayHolder();
-    private boolean hasAirborneTargetAltitudeRange;
     private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
     private final DoubleHolder sinkRelativeSpeed = new DoubleHolder();
     private final BooleanHolder avoidObstacles = new BooleanHolder();
@@ -91,14 +88,6 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
                 DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
                 BuilderDescriptorState.WorkInProgress,
                 "Vertical offset range maintained relative to the target while steering.", null);
-        hasAirborneTargetAltitudeRange = data.isJsonObject()
-                && data.getAsJsonObject().has("AirborneTargetAltitudeRange");
-        getDoubleRange(data, "AirborneTargetAltitudeRange", airborneTargetAltitudeRange,
-                new double[] { 0.0, Double.MAX_VALUE },
-                DoubleSequenceValidator.betweenWeaklyMonotonic(-Double.MAX_VALUE, Double.MAX_VALUE),
-                BuilderDescriptorState.WorkInProgress,
-                "Optional vertical offset range used instead of DesiredAltitudeRange while the target is flying. "
-                        + "Include 0 so two flyers targeting each other can settle at a similar height.", null);
         getDouble(data, "ClimbRelativeSpeed", climbRelativeSpeed, 1.0,
                 DoubleRangeValidator.between(0, 2), BuilderDescriptorState.WorkInProgress,
                 "Upward steering strength while below the desired altitude range.", null);
@@ -200,13 +189,6 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
 
     double[] getDesiredAltitudeRange(BuilderSupport support) {
         return desiredAltitudeRange.get(support.getExecutionContext());
-    }
-
-    /** Returns the range used against a flying target, or null when the asset does not set one. */
-    @Nullable
-    double[] getAirborneTargetAltitudeRange(BuilderSupport support) {
-        return hasAirborneTargetAltitudeRange
-                ? airborneTargetAltitudeRange.get(support.getExecutionContext()) : null;
     }
 
     double getClimbRelativeSpeed(BuilderSupport support) {
