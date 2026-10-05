@@ -33,6 +33,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.entity.Frozen;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.*;
@@ -164,6 +165,11 @@ public final class TameworkCompanionRuntimeParticipants {
                 () -> new AvatarFlightEquipmentVisualSystem(plugin.getAvatarFlightComponentType(),
                         plugin.getAvatarFlightRiderVisualComponentType(),
                         EntityTrackerSystems.Visible.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.AVATAR_FLIGHT, "avatarflightownerheadingsyncsystem",
+                () -> new AvatarFlightOwnerHeadingSyncSystem(plugin.getAvatarFlightComponentType(),
+                        EntityTrackerSystems.Visible.getComponentType(),
+                        HeadRotation.getComponentType(),
+                        UUIDComponent.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.AVATAR_FLIGHT, "avatarflightridervisualcleanupsystem",
                 () -> new AvatarFlightRiderVisualCleanupSystem(plugin.getAvatarFlightRiderVisualComponentType(),
                         plugin.getAvatarFlightComponentType()));
