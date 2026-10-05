@@ -367,15 +367,18 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         }
     }
 
-    /** Returns one currently trusted durable profile without blocking for a refresh. */
+    /**
+     * Returns one currently trusted durable profile without blocking for a refresh.
+     * A scheduled cache refresh keeps the last published profile trusted, as it
+     * does for the card's own actions; only a real profile change revokes it.
+     */
     @Nullable
     BondedCompanionProfileView currentTrustedProfile(UUID ownerUuid,
                                                       String rosterId,
                                                       String profileId) {
         var snapshot = records.snapshotFor(ownerUuid, rosterId,
                 cache.peek(ownerUuid, rosterId));
-        if (!snapshot.trusted() || snapshot.state()
-                != BondedCompanionPanelSnapshotCache.State.READY) return null;
+        if (!snapshot.trusted()) return null;
         return snapshot.records().stream()
                 .map(BondedCompanionPanelRecordSource.PanelRecord::profile)
                 .filter(profile -> profileId.equals(profile.profileId()))
