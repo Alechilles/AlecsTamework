@@ -1,4 +1,4 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
@@ -6,48 +6,51 @@ $C.@PageOverlay {
 
   Group #TameworkGroupManagerRoot {
     Anchor: (Width: 380, Height: 440);
-    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+
+    AssetImage { Anchor: (Full: 0); AssetPath: "Tamework/UI/Slate/page_groups.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
 
     Group #Title {
-      Anchor: (Top: 4, Left: 4, Right: 4, Height: 40);
-      Background: #252b27;
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 44);
       Group {
-        Anchor: (Top: 7, Right: 10, Width: 28, Height: 28);
-        TextButton #TameworkGroupCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
-        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); }
+        Anchor: (Top: 8, Right: 14, Width: 28, Height: 28);
+        TextButton #TameworkGroupCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@ActionQuiet; }
+        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #c2ccd6); }
       }
       Label #TameworkGroupManagerTitle {
-        Anchor: (Left: 12, Right: 50, Height: 40);
+        Anchor: (Left: 22, Right: 52, Height: 44);
         Text: %server.tamework.ui.groupManager.title;
-        Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center);
+        Style: $A.@SlateTitle;
       }
     }
 
     Group #Content {
-      Anchor: (Top: 46, Left: 4, Right: 4, Bottom: 8);
+      Anchor: (Top: 52, Left: 12, Right: 12, Bottom: 14);
       LayoutMode: Top;
-      Padding: (Left: 0, Right: 0, Top: 0, Bottom: 8);
 
       Label #TameworkGroupManagerSubtitle {
-        Anchor: (Top: 4, Left: 10, Right: 10, Height: 18);
+        Anchor: (Height: 18);
         Text: %server.tamework.ui.groupManager.subtitle.default;
         Style: (
-          FontSize: 13,
-          TextColor: #b9beb8,
+          FontSize: 12,
+          TextColor: #8794a4,
           HorizontalAlignment: Start,
           VerticalAlignment: Center
         );
       }
 
       Group #TameworkGroupManagerInputRow {
-        Anchor: (Top: 2, Left: 10, Right: 10, Height: 26);
+        Anchor: (Top: 8, Height: 26);
         LayoutMode: Left;
 
         TextField #TameworkGroupNameInput {
           Style: $A.@PanelInputFieldStyle;
           PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-          Background: #181e1a;
-          Anchor: (Width: 238, Height: 24);
+          Background: $A.@SlateQuiet;
+          Decoration: (
+            Default: (Background: $A.@SlateQuiet),
+            Focused: (Background: $A.@SlateQuietFocus)
+          );
+          Anchor: (Width: 238, Height: 26);
           Padding: (Horizontal: 8);
           PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
           MaxLength: 24;
@@ -55,30 +58,39 @@ $C.@PageOverlay {
 
         Group { Anchor: (Width: 6); }
 
-        ColorPickerDropdownBox #TameworkGroupColorInput {
-          Style: $A.@PanelColorPicker;
-          Anchor: (Width: 24, Height: 24);
+        // The colour picker sits in a small plate so the swatch reads as a button.
+        Group {
+          Anchor: (Width: 26, Height: 26);
+          Background: $A.@SlateNormal;
+
+          ColorPickerDropdownBox #TameworkGroupColorInput {
+            Style: $A.@PanelColorPicker;
+            Anchor: (Top: 5, Left: 5, Width: 16, Height: 16);
+          }
         }
 
         Group { Anchor: (Width: 6); }
 
         TextButton #TameworkGroupCreateButton {
-          Anchor: (Width: 72, Height: 24);
+          Anchor: (Width: 80, Height: 26);
           Text: %server.tamework.ui.shared.button.create;
-          Style: $A.@PanelButton;
+          Style: $A.@PanelButtonPrimary;
         }
       }
 
+      // The group list scrolls inside an inset well.
       Group #TameworkGroupManagerBody {
-        Anchor: (Top: 2, Left: 8, Right: 8);
+        Anchor: (Top: 10);
         FlexWeight: 1;
+        Background: $A.@SlateTray;
+        Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
 
         Group #TameworkGroupManagerListViewport {
           Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
           LayoutMode: TopScrolling;
           KeepScrollPosition: true;
           ScrollbarStyle: $C.@DefaultScrollbarStyle;
-          Padding: (Left: 2, Right: 2, Top: 0, Bottom: 2);
+          Padding: (Right: 2);
 
           Group #TameworkGroupManagerList {
             LayoutMode: Top;
@@ -87,11 +99,11 @@ $C.@PageOverlay {
         }
 
         Label #TameworkGroupManagerEmptyState {
-          Anchor: (Top: 4, Left: 2, Right: 2, Height: 22);
+          Anchor: (Top: 4, Left: 6, Right: 6, Height: 22);
           Text: %server.tamework.ui.groupManager.emptyState;
           Style: (
-            FontSize: 13,
-            TextColor: #afb6b0,
+            FontSize: 12,
+            TextColor: #8794a4,
             HorizontalAlignment: Start,
             VerticalAlignment: Center
           );
@@ -100,10 +112,10 @@ $C.@PageOverlay {
       }
 
       Group #TameworkGroupManagerFooter {
-        Anchor: (Top: 4, Left: 10, Right: 10, Height: 24);
+        Anchor: (Top: 8, Height: 26);
 
         TextButton #TameworkGroupBackButton {
-          Anchor: (Left: 0, Width: 100, Height: 24);
+          Anchor: (Left: 0, Width: 100, Height: 26);
           Text: %server.tamework.ui.shared.button.back;
           Style: $A.@PanelButton;
         }
@@ -112,4 +124,3 @@ $C.@PageOverlay {
     }
   }
 }
-

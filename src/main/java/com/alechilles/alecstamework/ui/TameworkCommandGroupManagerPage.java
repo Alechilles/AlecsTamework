@@ -336,6 +336,7 @@ public final class TameworkCommandGroupManagerPage
             commandBuilder.set(root + " #GroupColorPicker.Color", entry.colorHex);
 
             boolean editing = isRowEditing(entry.groupId);
+            commandBuilder.set(root + " #GroupEditPlate.Visible", editing);
             commandBuilder.set(root + " #GroupName.Visible", !editing);
             commandBuilder.set(root + " #GroupNameInput.Visible", editing);
             commandBuilder.set(root + " #GroupColorSwatch.Visible", !editing);

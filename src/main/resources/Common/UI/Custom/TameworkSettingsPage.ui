@@ -1,7 +1,11 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 @SettingsLabelTooltipStyle = $C.@DefaultTextTooltipStyle;
+
+// Section headers: a teal marker, an uppercase label and a faint rule under it.
+@SettingsSectionLabel = LabelStyle(FontSize: 13, FontName: "Secondary", RenderUppercase: true, LetterSpacing: 1, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+@SettingsSubsectionLabel = LabelStyle(FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center);
 
 @SettingsLabelTooltipButtonStyle = TextButtonStyle(
   Default: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
@@ -15,51 +19,51 @@ $C.@PageOverlay {
 
   Group #TwSettingsRoot {
     Anchor: (Width: 740, Height: 760);
-    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+
+    AssetImage { Anchor: (Full: 0); AssetPath: "Tamework/UI/Slate/page_settings.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
 
     Group #Title {
-      Anchor: (Top: 3, Left: 3, Right: 3, Height: 48);
-      Background: #252b27;
-      Group { Anchor: (Top: 7, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; }
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 48);
+      Group { Anchor: (Top: 7, Left: 18, Width: 34, Height: 34); Background: "Tamework/Slate/Badge.png"; HitTestVisible: false; }
       Label #TwSettingsTitle {
-        Anchor: (Left: 56, Right: 278, Height: 48);
+        Anchor: (Left: 64, Right: 280, Height: 48);
         Text: %server.tamework.ui.settings.title;
-        Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+        Style: $A.@SlateTitle;
       }
       TextButton #TwSettingsRefreshButton {
         Anchor: (Top: 9, Right: 164, Width: 96, Height: 30);
         Text: %server.tamework.ui.shared.button.refresh;
-        Style: $A.@PanelButton;
+        Style: $A.@PanelButtonQuiet;
       }
       TextButton #TwSettingsApplyButton {
         Anchor: (Top: 9, Right: 58, Width: 96, Height: 30);
         Text: %server.tamework.ui.shared.button.apply;
-        Style: $A.@PanelButtonSelected;
+        Style: $A.@PanelButtonPrimary;
       }
       Group {
-        Anchor: (Top: 9, Right: 14, Width: 30, Height: 30);
+        Anchor: (Top: 10, Right: 16, Width: 28, Height: 28);
         TextButton #TwSettingsCloseButton {
           Anchor: (Full: 0);
-          Text: %server.tamework.ui.shared.button.close;
+          Text: "";
           TooltipText: %server.tamework.ui.shared.button.close;
-          Style: $A.@Remove;
+          TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+          Style: $A.@ActionQuiet;
         }
-        Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); }
+        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #c2ccd6); }
       }
     }
 
     Group #Content {
-      Anchor: (Top: 56, Left: 10, Right: 10, Bottom: 12);
+      Anchor: (Top: 52, Left: 12, Right: 12, Bottom: 12);
       LayoutMode: Top;
-      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Group #TwSettingsUnsavedWarning {
-        Anchor: (Height: 20);
+        Anchor: (Left: 8, Right: 8, Height: 20);
         Visible: false;
 
         // One visible frame and one transparent frame, each held for one second.
         Sprite {
-          Anchor: (Left: 0, Width: 20, Height: 20);
+          Anchor: (Left: 130, Width: 20, Height: 20);
           TexturePath: "Tamework/PanelActions/UnsavedWarning.png";
           Frame: (Width: 32, Height: 32, PerRow: 2, Count: 2);
           FramesPerSecond: 1;
@@ -69,11 +73,11 @@ $C.@PageOverlay {
         Label #TwSettingsUnsavedText {
           Anchor: (Left: 26, Right: 26, Height: 20);
           Text: "";
-          Style: (FontSize: 14, RenderBold: true, TextColor: #ffcf40, HorizontalAlignment: Center, VerticalAlignment: Center);
+          Style: (FontSize: 12, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
 
         Sprite {
-          Anchor: (Right: 0, Width: 20, Height: 20);
+          Anchor: (Right: 130, Width: 20, Height: 20);
           TexturePath: "Tamework/PanelActions/UnsavedWarning.png";
           Frame: (Width: 32, Height: 32, PerRow: 2, Count: 2);
           FramesPerSecond: 1;
@@ -82,23 +86,24 @@ $C.@PageOverlay {
       }
 
       Label #TwSettingsStatusLine {
-        Anchor: (Top: 0, Height: 20);
+        Anchor: (Left: 8, Right: 8, Height: 20);
         Text: "";
-        Style: (FontSize: 12, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       }
 
+      // The scrolling rows sit in an inset well.
       Group {
         Anchor: (Top: 6);
         FlexWeight: 1;
-        Background: #181c1a;
-        Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
+        Background: $A.@SlateTray;
+        Padding: (Left: 12, Right: 6, Top: 8, Bottom: 8);
 
         Group #TwSettingsViewport {
           Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
           LayoutMode: TopScrolling;
           KeepScrollPosition: true;
           ScrollbarStyle: $C.@DefaultScrollbarStyle;
-          Padding: (Left: 4, Right: 0, Top: 2, Bottom: 2);
+          Padding: (Left: 2, Right: 0, Top: 2, Bottom: 2);
 
           Group #TwSettingsRows {
             LayoutMode: Top;
@@ -110,7 +115,7 @@ $C.@PageOverlay {
               Label #TwSettingsAnnouncementsLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.announcements;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsAnnouncementsTooltip {
@@ -123,9 +128,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsAnnouncementsEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -133,17 +136,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsExperiencePresetsLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.experiencePresets;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsExperiencePresetsTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.experiencePresets;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -157,7 +161,7 @@ $C.@PageOverlay {
               Label #TwSettingsLoadPresetLabel {
                 Anchor: (Left: 0, Width: 120, Height: 28);
                 Text: %server.tamework.ui.settings.label.loadPreset;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLoadPresetTooltip {
@@ -183,7 +187,7 @@ $C.@PageOverlay {
               Label #TwSettingsPresetNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: %server.tamework.ui.settings.note.presetScope;
-                Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+                Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
 
               TextButton #TwSettingsPresetNoteTooltip {
@@ -199,17 +203,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsRecallSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.recallSection;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsRecallSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.recallSection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -223,7 +228,7 @@ $C.@PageOverlay {
               Label #TwSettingsRecallTeleportingLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.recallTeleporting;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsRecallTeleportingTooltip {
@@ -236,9 +241,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsRecallTeleportingEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -250,7 +253,7 @@ $C.@PageOverlay {
               Label #TwSettingsCommandPanelCardsPerPageLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.commandPanelCardsPerPage;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCommandPanelCardsPerPageTooltip {
@@ -265,9 +268,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
               }
             }
@@ -276,17 +278,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsCompanionSystemsLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.companionSystems;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsCompanionSystemsTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.companionSystems;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -300,7 +303,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsEnabledTooltip {
@@ -313,9 +316,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsNeedsEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -327,7 +328,7 @@ $C.@PageOverlay {
               Label #TwSettingsHappinessEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.happinessEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsHappinessEnabledTooltip {
@@ -340,9 +341,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsHappinessEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -354,7 +353,7 @@ $C.@PageOverlay {
               Label #TwSettingsPassiveBreedingEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.passiveBreedingEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPassiveBreedingTooltip {
@@ -367,9 +366,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsPassiveBreedingEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -381,7 +378,7 @@ $C.@PageOverlay {
               Label #TwSettingsBreedingRequiresHappinessLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.breedingRequiresHappiness;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresHappinessTooltip {
@@ -394,9 +391,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsBreedingRequiresHappinessCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -408,7 +403,7 @@ $C.@PageOverlay {
               Label #TwSettingsLevelingEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.levelingEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLevelingEnabledTooltip {
@@ -421,9 +416,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsLevelingEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -435,7 +428,7 @@ $C.@PageOverlay {
               Label #TwSettingsTalentsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.talentsEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTalentsEnabledTooltip {
@@ -448,9 +441,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsTalentsEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -462,7 +453,7 @@ $C.@PageOverlay {
               Label #TwSettingsBreedingGenderEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.breedingGenderEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingGenderTooltip {
@@ -475,9 +466,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsBreedingGenderEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -489,7 +478,7 @@ $C.@PageOverlay {
               Label #TwSettingsTraitsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.traitsEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTraitsEnabledTooltip {
@@ -502,9 +491,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsTraitsEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -514,17 +501,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsNeedsSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.needsSection;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsNeedsSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.needsSection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -538,7 +526,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsResourceModeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsResourceMode;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsResourceModeTooltip {
@@ -563,7 +551,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsDamageEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsDamageEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageEnabledTooltip {
@@ -576,9 +564,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsNeedsDamageEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -588,17 +574,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsAnimalProgressionSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.animalProgression;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsAnimalProgressionSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.animalProgression;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -612,7 +599,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsTickPolicyModeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsTickPolicy;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsTickPolicyTooltip {
@@ -637,7 +624,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsOwnerOfflineGraceHoursLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.ownerOfflineGraceHours;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineGraceTooltip {
@@ -652,9 +639,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "72";
                 MaxLength: 12;
@@ -667,7 +653,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsOwnerOfflineDecayMultiplierLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.ownerOfflineDecayMultiplier;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineDecayMultiplierTooltip {
@@ -682,9 +668,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "1";
                 MaxLength: 12;
@@ -697,7 +682,7 @@ $C.@PageOverlay {
               Label #TwSettingsAnimalAgingModeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.animalAgingMode;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsAnimalAgingModeTooltip {
@@ -722,7 +707,7 @@ $C.@PageOverlay {
               Label #TwSettingsAnimalOldAgeDeathLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.animalOldAgeDeath;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsAnimalOldAgeDeathTooltip {
@@ -735,9 +720,8 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsAnimalOldAgeDeathCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -749,7 +733,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsDamageModelLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsDamageModel;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageModelTooltip {
@@ -774,7 +758,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsDamageDualNeedRuleLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.dualNeedRule;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDualNeedRuleTooltip {
@@ -799,7 +783,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsStarvationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.starvationDamagePerMinute;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsStarvationDamageTooltip {
@@ -814,9 +798,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "2";
                 MaxLength: 12;
@@ -829,7 +812,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsDehydrationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.dehydrationDamagePerMinute;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsDehydrationDamageTooltip {
@@ -844,9 +827,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "3";
                 MaxLength: 12;
@@ -859,7 +841,7 @@ $C.@PageOverlay {
               Label #TwSettingsNeedsDamageLethalLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.needsDamageLethal;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageLethalTooltip {
@@ -872,9 +854,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsNeedsDamageLethalCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -884,17 +864,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsOwnershipSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.ownership;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsOwnershipSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.ownership;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -908,7 +889,7 @@ $C.@PageOverlay {
               Label #TwSettingsDamageProtectionSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: %server.tamework.ui.settings.label.damageProtection;
-                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSubsectionLabel;
               }
 
               TextButton #TwSettingsOwnershipDamageProtectionTooltip {
@@ -926,7 +907,7 @@ $C.@PageOverlay {
               Label #TwSettingsBlockOwnerDamageLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.blockOwnerDamage;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockOwnerDamageTooltip {
@@ -939,9 +920,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsBlockOwnerDamageCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -953,7 +932,7 @@ $C.@PageOverlay {
               Label #TwSettingsBlockAllDamageIfOwnedLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.blockAllDamageIfOwned;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockAllPlayerDamageTooltip {
@@ -966,9 +945,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsBlockAllDamageIfOwnedCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -980,7 +957,7 @@ $C.@PageOverlay {
               Label #TwSettingsInvulnerableIfOwnedLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.invulnerableIfOwned;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInvulnerableIfOwnedTooltip {
@@ -993,9 +970,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsInvulnerableIfOwnedCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1007,7 +982,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: %server.tamework.ui.settings.label.capture;
-                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSubsectionLabel;
               }
 
               TextButton #TwSettingsOwnershipCaptureTooltip {
@@ -1025,7 +1000,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.captureRequiresOwner;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureRequiresOwnerTooltip {
@@ -1038,9 +1013,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsCaptureRequiresOwnerCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1052,7 +1025,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureItemOwnershipLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.captureItemOwnership;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureItemOwnershipTooltip {
@@ -1077,7 +1050,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureItemOwnershipNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: %server.tamework.ui.settings.captureItemOwnership.followsItem.description;
-                Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
             }
 
@@ -1087,7 +1060,7 @@ $C.@PageOverlay {
               Label #TwSettingsGeneralSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: %server.tamework.ui.settings.label.general;
-                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSubsectionLabel;
               }
 
               TextButton #TwSettingsOwnershipGeneralTooltip {
@@ -1105,7 +1078,7 @@ $C.@PageOverlay {
               Label #TwSettingsInteractionRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.interactionRequiresOwner;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInteractionRequiresOwnerTooltip {
@@ -1118,9 +1091,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsInteractionRequiresOwnerCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1132,7 +1103,7 @@ $C.@PageOverlay {
               Label #TwSettingsLinkingRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.linkingRequiresOwner;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLinkingRequiresOwnerTooltip {
@@ -1145,9 +1116,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsLinkingRequiresOwnerCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1157,17 +1126,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsReviveSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.reviveSystem;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsReviveSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.reviveSystem;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1181,7 +1151,7 @@ $C.@PageOverlay {
               Label #TwSettingsReviveSystemEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.reviveSystemEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsReviveEnabledTooltip {
@@ -1194,9 +1164,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsReviveSystemEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1206,17 +1174,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsPopulationSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.population;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsPopulationSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.population;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1230,7 +1199,7 @@ $C.@PageOverlay {
               Label #TwSettingsPopulationDeployedLimitLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.populationDeployedLimit;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationDeployedLimitTooltip {
@@ -1245,9 +1214,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1260,7 +1228,7 @@ $C.@PageOverlay {
               Label #TwSettingsPopulationLimitLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.populationLimit;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationLimitTooltip {
@@ -1275,9 +1243,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1290,7 +1257,7 @@ $C.@PageOverlay {
               Label #TwSettingsPopulationScopeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.populationScope;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationScopeTooltip {
@@ -1313,17 +1280,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsSimpleClaimsSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.simpleClaims;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsSimpleClaimsSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.simpleClaims;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1337,7 +1305,7 @@ $C.@PageOverlay {
               Label #TwSettingsSimpleClaimsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.simpleClaimsEnabled;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsEnabledTooltip {
@@ -1350,9 +1318,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsSimpleClaimsEnabledCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1364,7 +1330,7 @@ $C.@PageOverlay {
               Label #TwSettingsClaimLimitChunkLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.claimLimitChunk;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitChunkTooltip {
@@ -1379,9 +1345,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1394,7 +1359,7 @@ $C.@PageOverlay {
               Label #TwSettingsClaimLimitTotalLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.claimLimitTotal;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitTotalTooltip {
@@ -1409,9 +1374,8 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: $A.@PanelInputFieldStyle;
                 PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                Background: #252c27;
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1424,7 +1388,7 @@ $C.@PageOverlay {
               Label #TwSettingsBreedingRequiresClaimLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.breedingRequiresClaim;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresClaimTooltip {
@@ -1437,9 +1401,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsBreedingRequiresClaimCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1451,7 +1413,7 @@ $C.@PageOverlay {
               Label #TwSettingsSimpleClaimsProtectLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.simpleClaimsProtect;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsProtectTooltip {
@@ -1464,9 +1426,7 @@ $C.@PageOverlay {
 
               CheckBox #TwSettingsSimpleClaimsProtectCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
-                Background: (Color: #252c27);
-                OutlineColor: #4a5a50;
-                OutlineSize: 1;
+                Background: $A.@SlateQuiet;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1476,17 +1436,18 @@ $C.@PageOverlay {
 
             Group {
               Anchor: (Height: 34);
-              Background: #252c27;
-              Padding: (Left: 8, Right: 8);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #5fe0c0; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
               Label #TwSettingsTelemetrySectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.telemetrySection;
-                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: @SettingsSectionLabel;
               }
 
               TextButton #TwSettingsCrashTelemetrySectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 28);
+                Anchor: (Left: 0, Right: 12, Height: 34);
                 Text: "";
                 TooltipText: %server.tamework.ui.settings.tooltip.telemetrySection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1500,7 +1461,7 @@ $C.@PageOverlay {
               Label #TwSettingsTelemetryConsentInstructionLabel {
                 Anchor: (Left: 0, Right: 16, Height: 42);
                 Text: %server.tamework.ui.settings.note.telemetryConsentCommand;
-                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+                Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
             }
           }

@@ -1,29 +1,61 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
+// Row buttons are smaller than the shared panel buttons, and Delete keeps red text on a quiet plate.
+@RowLabel = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #c2ccd6, Alignment: Center);
+@RowLabelLit = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, Alignment: Center);
+@RowLabelDone = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eafff8, Alignment: Center);
+@RowLabelDelete = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f3aa9d, Alignment: Center);
+@RowEdit = TextButtonStyle(
+  Default: (Background: $A.@SlateQuiet, LabelStyle: @RowLabel),
+  Hovered: (Background: $A.@SlateQuietHover, LabelStyle: @RowLabelLit),
+  Pressed: (Background: $A.@SlatePressed, LabelStyle: @RowLabelLit),
+  Sounds: $C.@ButtonSounds
+);
+@RowDone = TextButtonStyle(
+  Default: (Background: $A.@SlatePrimary, LabelStyle: @RowLabelDone),
+  Hovered: (Background: $A.@SlatePrimaryHover, LabelStyle: @RowLabelDone),
+  Pressed: (Background: $A.@SlatePrimary, LabelStyle: @RowLabelDone),
+  Sounds: $C.@ButtonSounds
+);
+@RowDelete = TextButtonStyle(
+  Default: (Background: $A.@SlateQuiet, LabelStyle: @RowLabelDelete),
+  Hovered: (Background: $A.@SlateDanger, LabelStyle: @RowLabelLit),
+  Pressed: (Background: $A.@SlateDanger, LabelStyle: @RowLabelLit),
+  Sounds: $C.@ButtonSounds
+);
+
 Group {
-  Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
-  Background: #252b27;
-  Padding: (Left: 6, Right: 6, Top: 4, Bottom: 4);
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 36);
+
+  Group { Anchor: (Top: 0, Left: 0, Right: 0, Height: 32); Background: $A.@SlateQuiet; }
+
+  // Shown by Java while this row is being edited: a brighter plate and a frame for the colour picker.
+  Group #GroupEditPlate {
+    Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
+    Background: $A.@SlateNormal;
+    Visible: false;
+    Group { Anchor: (Top: 5, Left: 5, Width: 22, Height: 22); Background: $A.@SlateQuiet; }
+  }
 
   Group #GroupColorSwatch {
-    Anchor: (Top: 2, Left: 0, Width: 18, Height: 18);
+    Anchor: (Top: 10, Left: 10, Width: 12, Height: 12);
     Background: #4b657f;
   }
 
   ColorPickerDropdownBox #GroupColorPicker {
     Style: $A.@PanelColorPicker;
-    Anchor: (Top: 2, Left: 0, Width: 18, Height: 18);
+    Anchor: (Top: 8, Left: 8, Width: 16, Height: 16);
     Visible: false;
   }
 
   Label #GroupName {
-    Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
+    Anchor: (Top: 0, Left: 32, Right: 134, Height: 32);
     Text: %server.tamework.ui.shared.label.group;
     Style: (
-      FontSize: 14,
+      FontSize: 13,
       RenderBold: true,
-      TextColor: #f0eee7,
+      TextColor: #eef2f6,
       HorizontalAlignment: Start,
       VerticalAlignment: Center
     );
@@ -32,8 +64,8 @@ Group {
   TextField #GroupNameInput {
     Style: $A.@PanelInputFieldStyle;
     PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-    Background: #181e1a;
-    Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
+    Background: $A.@SlateQuietFocus;
+    Anchor: (Top: 4, Left: 32, Right: 134, Height: 24);
     Padding: (Horizontal: 6);
     PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
     MaxLength: 24;
@@ -41,22 +73,21 @@ Group {
   }
 
   TextButton #EditButton {
-    Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
+    Anchor: (Top: 4, Right: 72, Width: 54, Height: 24);
     Text: %server.tamework.ui.shared.button.edit;
-    Style: $A.@PanelButton;
+    Style: @RowEdit;
   }
 
   TextButton #CompleteButton {
-    Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
+    Anchor: (Top: 4, Right: 72, Width: 54, Height: 24);
     Text: %server.tamework.ui.shared.button.done;
-    Style: $A.@PanelButton;
+    Style: @RowDone;
     Visible: false;
   }
 
   TextButton #DeleteButton {
-    Anchor: (Top: 1, Right: 0, Width: 58, Height: 24);
+    Anchor: (Top: 4, Right: 6, Width: 62, Height: 24);
     Text: %server.tamework.ui.shared.button.delete;
-    Style: $A.@PanelButton;
+    Style: @RowDelete;
   }
 }
-

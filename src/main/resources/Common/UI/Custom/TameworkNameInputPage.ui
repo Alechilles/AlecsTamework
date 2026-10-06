@@ -1,4 +1,4 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
@@ -6,14 +6,14 @@ $C.@PageOverlay {
 
   Group #TameworkNameInputRoot {
     Anchor: (Width: 500, Height: 240);
-    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+
+    AssetImage { Anchor: (Full: 0); AssetPath: "Tamework/UI/Slate/page_name.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
 
     Group #Title {
-      Anchor: (Top: 3, Left: 3, Right: 3, Height: 44);
-      Background: #252b27;
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 44);
       Label #TameworkNameInputTitle {
-        Anchor: (Left: 14, Right: 14, Height: 44);
-        Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+        Anchor: (Left: 22, Right: 22, Height: 44);
+        Style: $A.@SlateTitle;
         Text: %server.tamework.ui.nameInput.title.default;
       }
     }
@@ -26,8 +26,8 @@ $C.@PageOverlay {
         Anchor: (Height: 26, Bottom: 16);
         Text: %server.tamework.ui.nameInput.subtitle;
         Style: (
-          FontSize: 16,
-          TextColor: #afb6b0,
+          FontSize: 14,
+          TextColor: #8794a4,
           HorizontalAlignment: Center,
           VerticalAlignment: Center
         );
@@ -36,9 +36,11 @@ $C.@PageOverlay {
       TextField #TameworkNameInputField {
         Style: $A.@PanelInputFieldStyle;
         PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-        Background: #252c27;
-        OutlineColor: #4a5a50;
-        OutlineSize: 1;
+        Background: $A.@SlateQuiet;
+        Decoration: (
+          Default: (Background: $A.@SlateQuiet),
+          Focused: (Background: $A.@SlateQuietFocus)
+        );
         Anchor: (Height: 44, Bottom: 20);
         Padding: (Horizontal: 10);
         PlaceholderText: %server.tamework.ui.nameInput.placeholder;
@@ -49,7 +51,7 @@ $C.@PageOverlay {
         LayoutMode: Right;
 
         TextButton #TameworkNameCancelButton {
-          Style: $A.@PanelButton;
+          Style: $A.@PanelButtonQuiet;
           Text: %server.tamework.ui.shared.button.cancel;
           Anchor: (Width: 128, Height: 30);
         }
@@ -71,7 +73,7 @@ $C.@PageOverlay {
         }
 
         TextButton #TameworkNameApplyButton {
-          Style: $A.@PanelButton;
+          Style: $A.@PanelButtonPrimary;
           Text: %server.tamework.ui.shared.button.apply;
           Anchor: (Width: 140, Height: 30);
         }
@@ -79,4 +81,3 @@ $C.@PageOverlay {
     }
   }
 }
-

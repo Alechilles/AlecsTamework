@@ -1,4 +1,4 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
@@ -6,41 +6,41 @@ $C.@PageOverlay {
 
   Group #TwSettingsAnnouncementRoot {
     Anchor: (Width: 620, Height: 440);
-    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+
+    AssetImage { Anchor: (Full: 0); AssetPath: "Tamework/UI/Slate/page_announcement.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
 
     Group #Title {
-      Anchor: (Top: 3, Left: 3, Right: 3, Height: 44);
-      Background: #252b27;
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 44);
       Label #TwSettingsAnnouncementTitle {
-        Anchor: (Left: 14, Right: 14, Height: 44);
-        Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+        Anchor: (Left: 22, Right: 22, Height: 44);
+        Style: $A.@SlateTitle;
         Text: %server.tamework.ui.settingsAnnouncement.title;
       }
     }
 
     Group #Content {
-      Anchor: (Top: 54, Left: 14, Right: 14, Bottom: 14);
+      Anchor: (Top: 50, Left: 14, Right: 14, Bottom: 14);
       LayoutMode: Top;
-      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Label #TwSettingsAnnouncementSubtitle {
-        Anchor: (Height: 44);
+        Anchor: (Left: 4, Right: 4, Height: 44);
         Text: %server.tamework.ui.settingsAnnouncement.subtitle;
-        Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Style: (FontSize: 12, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       }
 
+      // The body scrolls inside an inset well.
       Group {
         Anchor: (Top: 6);
         FlexWeight: 1;
-        Background: #181c1a;
-        Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
+        Background: $A.@SlateTray;
+        Padding: (Left: 12, Right: 6, Top: 10, Bottom: 10);
 
         Group #TwSettingsAnnouncementViewport {
           Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
           LayoutMode: TopScrolling;
           KeepScrollPosition: true;
           ScrollbarStyle: $C.@DefaultScrollbarStyle;
-          Padding: (Left: 4, Right: 0, Top: 2, Bottom: 2);
+          Padding: (Left: 2, Right: 6, Top: 2, Bottom: 2);
 
           Group #TwSettingsAnnouncementRows {
             LayoutMode: Top;
@@ -49,20 +49,18 @@ $C.@PageOverlay {
             Label #TwSettingsAnnouncementBody {
               Anchor: (Height: 720);
               Text: "";
-              Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 13, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
           }
         }
       }
 
       Group {
-        Anchor: (Height: 30);
+        Anchor: (Top: 6, Height: 30);
 
         CheckBox #TwSettingsAnnouncementOptOutCheck {
           Anchor: (Top: 4, Left: 0, Width: 22, Height: 22);
-          Background: (Color: #252c27);
-          OutlineColor: #4a5a50;
-          OutlineSize: 1;
+          Background: $A.@SlateQuiet;
           Padding: (Full: 4);
           Style: $C.@DefaultCheckBoxStyle;
         }
@@ -70,15 +68,16 @@ $C.@PageOverlay {
         Label #TwSettingsAnnouncementOptOutLabel {
           Anchor: (Left: 30, Right: 0, Height: 30);
           Text: %server.tamework.ui.settingsAnnouncement.optOut;
-          Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+          Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
         }
       }
 
       Group {
+        Anchor: (Top: 6);
         LayoutMode: Right;
 
         TextButton #TwSettingsAnnouncementLaterButton {
-          Style: $A.@PanelButton;
+          Style: $A.@PanelButtonQuiet;
           Text: %server.tamework.ui.settingsAnnouncement.button.later;
           Anchor: (Width: 128, Height: 30);
         }
@@ -88,7 +87,7 @@ $C.@PageOverlay {
         }
 
         TextButton #TwSettingsAnnouncementReviewButton {
-          Style: $A.@PanelButton;
+          Style: $A.@PanelButtonPrimary;
           Text: %server.tamework.ui.settingsAnnouncement.button.review;
           Anchor: (Width: 170, Height: 30);
         }
