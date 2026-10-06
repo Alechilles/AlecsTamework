@@ -73,5 +73,10 @@
         "Y": 0.15
       }
     }
-  ]
+  ],
+  "IconProperties": {
+    "Scale": 0.75,
+    "Translation": [ 1, -4 ],
+    "Rotation": [ 31, 48, -40 ]
+  }
 }
