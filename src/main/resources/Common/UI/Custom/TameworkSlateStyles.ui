@@ -151,7 +151,7 @@ $C = "Common.ui";
 
 // ---- Pieces for pages and HUDs outside the companions window.
 // Stretchable plates for windows and HUDs whose size Java changes; fixed-size pages use an off-atlas
-// AssetImage instead ("Tamework/UI/Slate/page_<name>.png", header band baked in).
+// AssetImage instead (Tamework/UI/Slate/page_NAME.png, header band baked in).
 @SlateWindow = PatchStyle(TexturePath: "Tamework/Slate/Window.png", Border: 28);
 @SlateHud = PatchStyle(TexturePath: "Tamework/Slate/Hud.png", Border: 18);
 @SlateAvailable = PatchStyle(TexturePath: "Tamework/Slate/Button_Available.png", Border: 8);
