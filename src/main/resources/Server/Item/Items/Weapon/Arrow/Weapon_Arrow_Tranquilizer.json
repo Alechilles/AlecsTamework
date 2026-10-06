@@ -11,8 +11,12 @@
     "KnowledgeRequired": false,
     "Input": [
       {
-        "ItemId": "Weapon_Arrow_Crude",
-        "Quantity": 6
+        "ItemId": "Ingredient_Bar_Iron",
+        "Quantity": 1
+      },
+      {
+        "ItemId": "Ingredient_Feathers_Light",
+        "Quantity": 3
       },
       {
         "ItemId": "Potion_Tranquilizer",

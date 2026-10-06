@@ -9,6 +9,10 @@
   rifle update as each one goes in.
 - The rifle's shading is cleaner: softer iron shadows, and corrected
   undersides, rivets and trigger guard.
+- The rifle and darts have their own recipes. The rifle takes wood trunks,
+  iron bars, cobalt bars, heavy leather, Shadoweave scraps and Tranquilizer
+  Potions, with no Cobalt Shortbow. Six darts take an iron bar, light
+  feathers, fibre and a Tranquilizer Potion, with no Crude Arrows.
 
 ### Fixed
 

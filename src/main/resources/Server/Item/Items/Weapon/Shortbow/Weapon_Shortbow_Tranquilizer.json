@@ -28,8 +28,12 @@
     "KnowledgeRequired": false,
     "Input": [
       {
-        "ItemId": "Weapon_Shortbow_Cobalt",
-        "Quantity": 1
+        "ResourceTypeId": "Wood_Trunk",
+        "Quantity": 6
+      },
+      {
+        "ItemId": "Ingredient_Bar_Iron",
+        "Quantity": 4
       },
       {
         "ItemId": "Ingredient_Bar_Cobalt",
