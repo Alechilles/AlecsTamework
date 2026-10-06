@@ -1912,3 +1912,6 @@ tamework.companions.persistence.failed = Tamework n'a pas pu lire ses fichiers d
 tamework.companions.escrow.returned.one = Tamework vous a rendu {0} objet d'une réanimation de compagnon inachevée. S'il ne tenait pas dans votre inventaire, il a été déposé à vos pieds.
 tamework.companions.escrow.returned.many = Tamework vous a rendu {0} objets d'une réanimation de compagnon inachevée. Ce qui ne tenait pas dans votre inventaire a été déposé à vos pieds.
 tamework.companions.legacy.duplicateRemoved = L’animal que vous venez de revendiquer était une copie résiduelle d’un compagnon qui existe toujours ; il a donc été supprimé. Votre vrai compagnon est en sécurité : retrouvez-le dans votre liste de compagnons.
+tamework.ui.commandHotswapHud.group.all=Tous les compagnons
+tamework.ui.commandHotswapHud.group.none=Aucun compagnon actif
+tamework.ui.commandHotswapHud.group.custom=Sélection personnalisée

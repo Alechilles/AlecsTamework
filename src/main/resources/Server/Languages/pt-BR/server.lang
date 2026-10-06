@@ -1912,3 +1912,6 @@ tamework.companions.persistence.failed = O Tamework não conseguiu ler seus arqu
 tamework.companions.escrow.returned.one = O Tamework devolveu a você {0} item de uma reanimação de companheiro não concluída. Se ele não coube no seu inventário, foi largado aos seus pés.
 tamework.companions.escrow.returned.many = O Tamework devolveu a você {0} itens de uma reanimação de companheiro não concluída. O que não coube no seu inventário foi largado aos seus pés.
 tamework.companions.legacy.duplicateRemoved = O animal que você acabou de reivindicar era uma cópia que sobrou de um companheiro que ainda existe, por isso foi removido. Seu companheiro verdadeiro está seguro; procure-o na sua lista de companheiros.
+tamework.ui.commandHotswapHud.group.all=Todos os companheiros
+tamework.ui.commandHotswapHud.group.none=Nenhum companheiro ativo
+tamework.ui.commandHotswapHud.group.custom=Seleção personalizada

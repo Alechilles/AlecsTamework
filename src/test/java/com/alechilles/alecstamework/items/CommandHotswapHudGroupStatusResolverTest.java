@@ -20,7 +20,7 @@ class CommandHotswapHudGroupStatusResolverTest {
 
     @Test
     void namedGroupUsesItsNameAndConfiguredColor() {
-        var status = resolver.resolve(entries(true, false, false), GROUPS);
+        var status = resolver.resolve(entries(true, false, false), GROUPS, "en-US");
 
         assertEquals("Blue Squad", status.label());
         assertEquals("#112233", status.colorHex());
@@ -28,8 +28,8 @@ class CommandHotswapHudGroupStatusResolverTest {
 
     @Test
     void customAndNoActiveUseDedicatedLabelsAndColors() {
-        var custom = resolver.resolve(entries(true, true, false), GROUPS);
-        var none = resolver.resolve(entries(false, false, false), GROUPS);
+        var custom = resolver.resolve(entries(true, true, false), GROUPS, "en-US");
+        var none = resolver.resolve(entries(false, false, false), GROUPS, "en-US");
 
         assertEquals("Custom Selection", custom.label());
         assertEquals("#c9a653", custom.colorHex());
@@ -38,8 +38,15 @@ class CommandHotswapHudGroupStatusResolverTest {
     }
 
     @Test
+    void builtInLabelsFollowTheViewersLanguageButGroupNamesDoNot() {
+        assertEquals("Selección personalizada",
+                resolver.resolve(entries(true, true, false), GROUPS, "es-ES").label());
+        assertEquals("Blue Squad", resolver.resolve(entries(true, false, false), GROUPS, "es-ES").label());
+    }
+
+    @Test
     void partialMultiMemberGroupRemainsCustom() {
-        var status = resolver.resolve(List.of(entry("blue", true), entry("blue", false)), GROUPS);
+        var status = resolver.resolve(List.of(entry("blue", true), entry("blue", false)), GROUPS, "en-US");
         assertEquals("Custom Selection", status.label());
     }
 
@@ -49,7 +56,8 @@ class CommandHotswapHudGroupStatusResolverTest {
                 Set.of("pblue-1", "pblue-2"),
                 GROUPS,
                 groupId -> "blue".equals(groupId)
-                        ? Set.of("pblue-1", "pblue-2") : Set.of());
+                        ? Set.of("pblue-1", "pblue-2") : Set.of(),
+                "en-US");
 
         assertEquals("Blue Squad", status.label());
         assertEquals("#112233", status.colorHex());

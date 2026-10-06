@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.HashSet;
@@ -8,21 +9,23 @@ import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
-/** Converts the active generic command roster selection into a compact HUD status. */
+/**
+ * Converts the active generic command roster selection into a compact HUD status.
+ * Built-in labels are resolved for the viewing player's language; group names are player-authored
+ * and shown as written.
+ */
 final class CommandHotswapHudGroupStatusResolver {
     private static final String ALL_COLOR = "#c8d1db";
     private static final String CUSTOM_COLOR = "#c9a653";
     private static final String NONE_COLOR = "#6e7c8b";
-    private static final CommandHotswapHudViewModel.GroupStatus ALL_STATUS =
-            new CommandHotswapHudViewModel.GroupStatus(true, "All Companions", ALL_COLOR);
-    private static final CommandHotswapHudViewModel.GroupStatus NONE_STATUS =
-            new CommandHotswapHudViewModel.GroupStatus(true, "No Active Companions", NONE_COLOR);
-    private static final CommandHotswapHudViewModel.GroupStatus CUSTOM_STATUS =
-            new CommandHotswapHudViewModel.GroupStatus(true, "Custom Selection", CUSTOM_COLOR);
+    private static final String ALL_KEY = "tamework.ui.commandHotswapHud.group.all";
+    private static final String NONE_KEY = "tamework.ui.commandHotswapHud.group.none";
+    private static final String CUSTOM_KEY = "tamework.ui.commandHotswapHud.group.custom";
 
     CommandHotswapHudViewModel.GroupStatus resolve(@Nullable List<LinkedNpcEntry> entries,
-                                                   @Nullable List<CommandGroupService.GroupRecord> groups) {
-        return resolveSelection(resolveSelectionValue(entries, groups), groups);
+                                                   @Nullable List<CommandGroupService.GroupRecord> groups,
+                                                   @Nullable String language) {
+        return resolveSelection(resolveSelectionValue(entries, groups), groups, language);
     }
 
     /**
@@ -32,50 +35,59 @@ final class CommandHotswapHudGroupStatusResolver {
     CommandHotswapHudViewModel.GroupStatus resolveSelectedKeys(
             @Nullable Set<String> selectedKeys,
             @Nullable List<CommandGroupService.GroupRecord> groups,
-            @Nullable Function<String, Set<String>> membersForGroup) {
+            @Nullable Function<String, Set<String>> membersForGroup,
+            @Nullable String language) {
         if (selectedKeys == null || selectedKeys.isEmpty()) {
-            return NONE_STATUS;
+            return builtIn(language, NONE_KEY, NONE_COLOR);
         }
         if (groups != null && membersForGroup != null) {
             for (CommandGroupService.GroupRecord group : groups) {
                 if (group == null || group.groupId == null || group.groupId.isBlank()) continue;
                 Set<String> members = membersForGroup.apply(group.groupId);
                 if (members != null && !members.isEmpty() && selectedKeys.equals(members)) {
-                    return resolveSelection(group.groupId, groups);
+                    return resolveSelection(group.groupId, groups, language);
                 }
             }
         }
-        return CUSTOM_STATUS;
+        return customStatus(language);
     }
 
-    CommandHotswapHudViewModel.GroupStatus customStatus() {
-        return CUSTOM_STATUS;
+    CommandHotswapHudViewModel.GroupStatus customStatus(@Nullable String language) {
+        return builtIn(language, CUSTOM_KEY, CUSTOM_COLOR);
+    }
+
+    private static CommandHotswapHudViewModel.GroupStatus builtIn(@Nullable String language,
+                                                                  String key,
+                                                                  String colorHex) {
+        return new CommandHotswapHudViewModel.GroupStatus(true, LocalizedText.resolve(language, key), colorHex);
     }
 
     /** Retains legacy per-item group status for owner-family command items. */
-    CommandHotswapHudViewModel.GroupStatus resolveLegacy(@Nullable ItemStack stack) {
+    CommandHotswapHudViewModel.GroupStatus resolveLegacy(@Nullable ItemStack stack, @Nullable String language) {
         CommandLinkedNpcRecordStore records = new CommandLinkedNpcRecordStore();
         CommandGroupService groups = new CommandGroupService();
         CommandGroupActivationService activation = new CommandGroupActivationService(records, groups);
         List<CommandGroupService.GroupRecord> definitions = groups.readGroups(stack);
-        return resolveSelection(activation.resolveSelectionValue(records.read(stack), definitions), definitions);
+        return resolveSelection(
+                activation.resolveSelectionValue(records.read(stack), definitions), definitions, language);
     }
 
     private CommandHotswapHudViewModel.GroupStatus resolveSelection(
             String selection,
-            @Nullable List<CommandGroupService.GroupRecord> groups) {
+            @Nullable List<CommandGroupService.GroupRecord> groups,
+            @Nullable String language) {
         if (CommandGroupActivationService.ALL_VALUE.equals(selection)) {
-            return ALL_STATUS;
+            return builtIn(language, ALL_KEY, ALL_COLOR);
         }
         if (CommandGroupActivationService.NONE_VALUE.equals(selection)) {
-            return NONE_STATUS;
+            return builtIn(language, NONE_KEY, NONE_COLOR);
         }
         if (CommandGroupActivationService.CUSTOM_VALUE.equals(selection)) {
-            return CUSTOM_STATUS;
+            return customStatus(language);
         }
         CommandGroupService.GroupRecord group = findGroup(groups, selection);
         if (group == null) {
-            return CUSTOM_STATUS;
+            return customStatus(language);
         }
         String label = group.name == null || group.name.isBlank() ? group.groupId : group.name.trim();
         return new CommandHotswapHudViewModel.GroupStatus(true, label, safeColor(group.colorHex));

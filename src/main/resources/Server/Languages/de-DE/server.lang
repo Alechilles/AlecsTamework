@@ -1912,3 +1912,6 @@ tamework.companions.persistence.failed = Tamework konnte seine Begleiter-Speiche
 tamework.companions.escrow.returned.one = Tamework hat dir {0} Gegenstand aus einer nicht abgeschlossenen Begleiter-Wiederbelebung zurückgegeben. Falls er nicht in dein Inventar passte, wurde er zu deinen Füßen fallen gelassen.
 tamework.companions.escrow.returned.many = Tamework hat dir {0} Gegenstände aus einer nicht abgeschlossenen Begleiter-Wiederbelebung zurückgegeben. Was nicht in dein Inventar passte, wurde zu deinen Füßen fallen gelassen.
 tamework.companions.legacy.duplicateRemoved = Das Tier, das du gerade beansprucht hast, war eine übrig gebliebene Kopie eines Begleiters, den es noch gibt, und wurde deshalb entfernt. Dein echter Begleiter ist sicher; du findest ihn in deiner Begleiterliste.
+tamework.ui.commandHotswapHud.group.all=Alle Gefährten
+tamework.ui.commandHotswapHud.group.none=Keine aktiven Gefährten
+tamework.ui.commandHotswapHud.group.custom=Eigene Auswahl

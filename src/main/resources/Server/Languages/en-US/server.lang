@@ -1924,3 +1924,6 @@ tamework.companions.persistence.failed = Tamework could not read its companion s
 tamework.companions.escrow.returned.one = Tamework returned {0} item from an unfinished companion revive to you. If it did not fit in your inventory, it was dropped at your feet.
 tamework.companions.escrow.returned.many = Tamework returned {0} items from an unfinished companion revive to you. Anything that did not fit in your inventory was dropped at your feet.
 tamework.companions.legacy.duplicateRemoved = The animal you just claimed was a leftover copy of a companion that still exists, so it was removed. Your real companion is safe; look for it in your companion list.
+tamework.ui.commandHotswapHud.group.all=All Companions
+tamework.ui.commandHotswapHud.group.none=No Active Companions
+tamework.ui.commandHotswapHud.group.custom=Custom Selection

@@ -503,31 +503,34 @@ public final class CommandItemFeatureHandler {
         }
         String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
         if (toolId == null || toolId.isBlank()) return CommandHotswapHudViewModel.GroupStatus.hidden();
+        // The pill's built-in labels are shown only to this player, so they use this player's language.
+        String language = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         List<LinkedNpcRecord> records = linkedNpcRecordStore.read(itemStack);
         if (records.stream().noneMatch(record -> record != null && record.active)) {
-            return groupStatusResolver.resolveSelectedKeys(Set.of(), List.of(), null);
+            return groupStatusResolver.resolveSelectedKeys(Set.of(), List.of(), null, language);
         }
         // This tick path reads only the selected records. It never builds a panel projection,
         // scans world NPCs, imports legacy groups, or writes a player component.
         if (persistenceView == null) {
-            return groupStatusResolver.customStatus();
+            return groupStatusResolver.customStatus(language);
         }
         UUID ownerUuid = player.getUuid();
-        if (ownerUuid == null) return groupStatusResolver.customStatus();
+        if (ownerUuid == null) return groupStatusResolver.customStatus(language);
         Set<String> selectedKeys = new java.util.HashSet<>();
         for (LinkedNpcRecord record : records) {
             if (record == null || !record.active) continue;
             CommandPersistenceView.ProfileSnapshot profile = persistenceView.find(record).orElse(null);
             if (profile == null || !ownerUuid.equals(profile.ownerUuid())
                     || !linkPolicyService.isRoleAllowed(profile.roleId(), config, true)) {
-                return groupStatusResolver.customStatus();
+                return groupStatusResolver.customStatus(language);
             }
             selectedKeys.add(CommandCompanionGroups.profileKey(profile.profileId().toString()));
         }
         return groupStatusResolver.resolveSelectedKeys(
                 selectedKeys,
                 groupService.readGroups(player, itemStack),
-                groupId -> CommandCompanionGroups.members(player, groupId));
+                groupId -> CommandCompanionGroups.members(player, groupId),
+                language);
     }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
