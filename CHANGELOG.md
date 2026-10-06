@@ -7,12 +7,15 @@
 - The Tranquilizer Dart Rifle shows a reload as it happens: the bolt stays
   open between darts, and the chambered dart and the loaded darts on the
   rifle update as each one goes in.
-- The iron shadows on the rifle are softer.
+- The rifle's shading is cleaner: softer iron shadows, and corrected
+  undersides, rivets and trigger guard.
 
 ### Fixed
 
 - Faces that were missing from the rifle, including the rear of the barrel
   base, are back.
+- The rifle's wrist meets the stock without a gap, and the grip wrap's straps
+  line up all the way round.
 - A dart's trail starts at the muzzle instead of partway along the dart.
 
 ## 5.1.0 - Tranquilizer Dart Rifle - 2026-10-06
