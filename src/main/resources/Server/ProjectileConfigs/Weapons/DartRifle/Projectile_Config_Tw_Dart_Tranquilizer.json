@@ -1,5 +1,10 @@
 {
   "Parent": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4",
   "LaunchLocalSoundEventId": "SFX_Tw_Dart_Rifle_Fire",
-  "LaunchWorldSoundEventId": "SFX_Tw_Dart_Rifle_Fire"
+  "LaunchWorldSoundEventId": "SFX_Tw_Dart_Rifle_Fire",
+  "SpawnOffset": {
+    "X": 0.0,
+    "Y": -0.25,
+    "Z": 0
+  }
 }
