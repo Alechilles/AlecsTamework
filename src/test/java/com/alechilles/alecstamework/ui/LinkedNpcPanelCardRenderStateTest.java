@@ -130,7 +130,7 @@ class LinkedNpcPanelCardRenderStateTest {
             org.junit.jupiter.api.Assertions.assertTrue(card.getNumber("Height").intValue()
                     > meter.getNumber("Top").intValue() + meter.getNumber("Height").intValue());
             assertEquals(176, card.getNumber("Height").intValue());
-            assertEquals(111, meter.getNumber("Top").intValue());
+            assertEquals(109, meter.getNumber("Top").intValue());
         }
     }
 

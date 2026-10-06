@@ -248,7 +248,7 @@ Group {
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
     }
-    Group #CooldownRow { Anchor: (Top: 108, Left: 432, Width: 414, Height: 46); LayoutMode: Left; Background: $A.@SlateTray; Padding: (Top: 6, Left: 10);
+    Group #CooldownRow { Anchor: (Top: 109, Left: 432, Width: 414, Height: 37); LayoutMode: Left; Background: $A.@SlateTray; Padding: (Top: 2, Left: 10);
         Group #LifecycleProgress { Anchor: (Width: 134, Height: 34); Visible: false;
             Label #CooldownText { Anchor: (Top: 22, Left: 24, Width: 106, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #8794a4); }
             Group { Anchor: (Top: 14, Left: 24, Width: 106, Height: 6); Background: #0a0e13; }

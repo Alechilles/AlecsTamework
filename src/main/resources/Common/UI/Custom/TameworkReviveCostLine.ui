@@ -4,9 +4,7 @@ $C = "Common.ui";
 
 Group {
     Anchor: (Height: 44, Left: 0, Right: 0);
-    Background: #252c27;
-    OutlineColor: #465149;
-    OutlineSize: 1;
+    Background: #000000(0.3);
 
     ItemGrid #CostItem {
         Anchor: (Top: 6, Left: 7, Width: 32, Height: 32);
@@ -19,20 +17,20 @@ Group {
     Label #CostName {
         Anchor: (Top: 0, Left: 47, Width: 178, Height: 44);
         Text: "";
-        Style: (FontSize: 12, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+        Style: (FontSize: 12, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #CostSatisfied {
         Anchor: (Top: 0, Right: 9, Width: 82, Height: 44);
         Text: "0 / 0";
-        Style: (FontSize: 12, RenderBold: true, TextColor: #85b99a, HorizontalAlignment: End, VerticalAlignment: Center);
+        Style: (FontSize: 12, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
     }
 
     Label #CostInsufficient {
         Anchor: (Top: 0, Right: 9, Width: 82, Height: 44);
         Text: "0 / 0";
-        Style: (FontSize: 12, RenderBold: true, TextColor: #df8177, HorizontalAlignment: End, VerticalAlignment: Center);
+        Style: (FontSize: 12, RenderBold: true, TextColor: #e5786d, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
     }
 

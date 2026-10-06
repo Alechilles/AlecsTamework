@@ -17,8 +17,8 @@ final class LinkedNpcPanelCardBinder {
     /** Width of the right section, and of the inline status text when action buttons sit beside it. */
     private static final int ACTION_SECTION_WIDTH = 414;
     private static final int INLINE_LOCATION_WIDTH_BESIDE_ACTIONS = 296;
-    /** The cooldown meters sit in an inset tray, so the row is taller than its 34 px of content. */
-    private static final int COOLDOWN_ROW_HEIGHT = 46;
+    /** The cooldown meters sit in an inset tray: 34 px of content plus its top inset. A pushed-down row must still end inside the card. */
+    private static final int COOLDOWN_ROW_HEIGHT = 37;
     /** Left edge that centers a 48 px action button in the column the roster Summon/Dismiss button uses. */
     private static final int ROSTER_ACTION_LEFT = 767;
 
@@ -680,7 +680,7 @@ final class LinkedNpcPanelCardBinder {
                 && (entry.dead() || entry.lost());
         Anchor cardAnchor = buildCardAnchor(compact);
         commands.setObject(card + ".Anchor", cardAnchor);
-        Anchor cooldownAnchor = fixedAnchor(108, 432, 414, COOLDOWN_ROW_HEIGHT);
+        Anchor cooldownAnchor = fixedAnchor(109, 432, 414, COOLDOWN_ROW_HEIGHT);
         commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
         bindPortrait(commands, card, entry, compact);
         boolean showDetails = !compact && entry.hasKnownCardDetails();
