@@ -1,23 +1,24 @@
 $C = "Common.ui";
 
+// TameworkCompanionTalentsPage recolours the three bars: teal for an open path, this dim slate otherwise.
 Group {
   Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
 
   Group #TalentConnectorStart {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #829d89(0.72);
+    Background: #3d4856;
     Visible: false;
   }
 
   Group #TalentConnectorMiddle {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #829d89(0.72);
+    Background: #3d4856;
     Visible: false;
   }
 
   Group #TalentConnectorEnd {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #829d89(0.72);
+    Background: #3d4856;
     Visible: false;
   }
 }

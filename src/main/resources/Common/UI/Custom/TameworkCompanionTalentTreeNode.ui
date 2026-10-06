@@ -1,3 +1,4 @@
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 @TalentNodeButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
@@ -9,58 +10,72 @@ $C = "Common.ui";
   Sounds: $C.@ButtonSounds
 );
 
+// TameworkCompanionTalentsPage picks these by the node's state.
+@TalentNodeName = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+@TalentNodeNamePurchased = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eafff8, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+@TalentNodeNameLocked = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #56606c, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+@TalentNodeCost = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Start, VerticalAlignment: Center);
+@TalentNodeCostLocked = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #56606c, HorizontalAlignment: Start, VerticalAlignment: Center);
+@TalentNodeStateAvailable = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: End, VerticalAlignment: Center);
+@TalentNodeStatePurchased = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: End, VerticalAlignment: Center);
+@TalentNodeStateUnaffordable = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: End, VerticalAlignment: Center);
+@TalentNodeStateLocked = LabelStyle(FontSize: 10, TextColor: #56606c, HorizontalAlignment: End, VerticalAlignment: Center);
+
 Group {
   Anchor: (Width: 117, Height: 66);
-  Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
+  // One plate per state; Java shows exactly one.
   Group #TalentNodeLockedBackground {
-    Anchor: (Top: 3, Left: 3, Right: 3, Bottom: 3);
-    Background: #202723;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: $A.@SlateDisabled;
     Visible: true;
   }
 
   Group #TalentNodeUnaffordableBackground {
-    Anchor: (Top: 3, Left: 3, Right: 3, Bottom: 3);
-    Background: #3a332e;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: $A.@SlateAmber;
     Visible: false;
   }
 
   Group #TalentNodeAvailableBackground {
-    Anchor: (Top: 3, Left: 3, Right: 3, Bottom: 3);
-    Background: #314b3c;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: $A.@SlateAvailable;
     Visible: false;
   }
 
   Group #TalentNodePurchasedBackground {
-    Anchor: (Top: 3, Left: 3, Right: 3, Bottom: 3);
-    Background: #28523a;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: $A.@SlatePrimary;
     Visible: false;
   }
 
+  // The selection ring is an off-atlas picture drawn at 2x for exactly this 117x66 node.
   Group #TalentNodeSelected {
-    Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1);
-    Background: #c4dbc9(0.18);
-    OutlineColor: #c4dbc9;
-    OutlineSize: 1;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    HitTestVisible: false;
     Visible: false;
+
+    AssetImage #TalentNodeSelectedRing { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); AssetPath: "Tamework/UI/Slate/talent_selected.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
   }
 
   Label #TalentNodeName {
-    Anchor: (Top: 6, Left: 6, Right: 6, Height: 34);
+    Anchor: (Top: 6, Left: 6, Right: 6, Height: 32);
     Text: "";
-    Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+    Style: @TalentNodeNameLocked;
   }
 
+  Group { Anchor: (Top: 40, Left: 10, Right: 10, Height: 1); Background: #ffffff(0.07); }
+
   Label #TalentNodeCost {
-    Anchor: (Bottom: 6, Left: 6, Width: 34, Height: 16);
+    Anchor: (Bottom: 6, Left: 9, Width: 34, Height: 16);
     Text: "";
-    Style: (FontSize: 10, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Style: @TalentNodeCostLocked;
   }
 
   Label #TalentNodeState {
-    Anchor: (Bottom: 6, Right: 6, Width: 62, Height: 16);
+    Anchor: (Bottom: 6, Right: 9, Width: 62, Height: 16);
     Text: %server.tamework.ui.talents.state.Locked;
-    Style: (FontSize: 10, TextColor: #afb6b0, HorizontalAlignment: End, VerticalAlignment: Center);
+    Style: @TalentNodeStateLocked;
   }
 
   TextButton #TalentNodeButton {

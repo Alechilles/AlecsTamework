@@ -12,6 +12,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -50,6 +51,9 @@ public final class TameworkCompanionTalentsPage
     public static final String STATE_LOCKED = "Locked";
     public static final String STATE_UNAFFORDABLE = "Unaffordable";
     public static final String STATE_AVAILABLE = "Available";
+    /** A connector on an open path (its parent talent is unlocked and the child is not locked). */
+    private static final String CONNECTOR_COLOR_OPEN = "#5fe0c0";
+    private static final String CONNECTOR_COLOR_CLOSED = "#3d4856";
 
     private final Supplier<PageData> dataSupplier;
     private final Function<String, String> purchaseCallback;
@@ -338,6 +342,15 @@ public final class TameworkCompanionTalentsPage
                     LocalizedText.format(resolveLanguage(), "tamework.ui.talents.node.cost", entry.pointCost())
             );
             commandBuilder.set(selector + " #TalentNodeState.Text", resolveStateLabel(entry.state()));
+            String stateStyle = resolveStateStyleSuffix(entry.state());
+            boolean locked = STATE_LOCKED.equals(stateStyle);
+            commandBuilder.set(selector + " #TalentNodeName.Style", Value.ref(NODE_SLOT_UI_PATH,
+                    locked ? "TalentNodeNameLocked"
+                            : STATE_PURCHASED.equals(stateStyle) ? "TalentNodeNamePurchased" : "TalentNodeName"));
+            commandBuilder.set(selector + " #TalentNodeCost.Style",
+                    Value.ref(NODE_SLOT_UI_PATH, locked ? "TalentNodeCostLocked" : "TalentNodeCost"));
+            commandBuilder.set(selector + " #TalentNodeState.Style",
+                    Value.ref(NODE_SLOT_UI_PATH, "TalentNodeState" + stateStyle));
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     selector + " #TalentNodeButton",
@@ -352,17 +365,21 @@ public final class TameworkCompanionTalentsPage
         for (TalentTreeViewModel.ConnectorSlot connector : connectorSlots) {
             commandBuilder.append("#TalentConnectorLayer", CONNECTOR_SLOT_UI_PATH);
             String selector = "#TalentConnectorLayer[" + connector.slotIndex() + "]";
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorStart", connector.startAnchor(), connector.startVisible());
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorMiddle", connector.middleAnchor(), connector.middleVisible());
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorEnd", connector.endAnchor(), connector.endVisible());
+            String color = STATE_LOCKED.equals(connector.state()) ? CONNECTOR_COLOR_CLOSED : CONNECTOR_COLOR_OPEN;
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorStart", connector.startAnchor(), connector.startVisible(), color);
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorMiddle", connector.middleAnchor(), connector.middleVisible(), color);
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorEnd", connector.endAnchor(), connector.endVisible(), color);
         }
     }
 
     private void bindConnectorSegment(@Nonnull UICommandBuilder commandBuilder,
                                       @Nonnull String selector,
                                       @Nonnull Anchor anchor,
-                                      boolean visible) {
+                                      boolean visible,
+                                      @Nonnull String color) {
         commandBuilder.set(selector + ".Visible", visible);
+        // Opaque #rrggbb only: a runtime colour string with alpha is read as a texture path.
+        commandBuilder.set(selector + ".Background", color);
         commandBuilder.setObject(selector + ".Anchor", anchor);
     }
 
@@ -388,6 +405,8 @@ public final class TameworkCompanionTalentsPage
         );
         commandBuilder.set("#TalentDetailDescription.Text", selectedEntry.description());
         commandBuilder.set("#TalentDetailStatus.Text", selectedEntry.status());
+        commandBuilder.set("#TalentDetailStatus.Style",
+                Value.ref(UI_PATH, "TalentDetailStatus" + resolveStateStyleSuffix(selectedEntry.state())));
         commandBuilder.set("#TalentDetailRequirements.Text", resolveRequirementText(selectedEntry));
         commandBuilder.set("#TalentDetailEffects.Text", selectedEntry.effectSummary());
         boolean hasEffects = !selectedEntry.effectSummary().isBlank();
@@ -425,6 +444,15 @@ public final class TameworkCompanionTalentsPage
     @Nonnull
     private String resolveStateLabel(@Nonnull String state) {
         return LocalizedText.resolveConfigValue(resolveLanguage(), "tamework.ui.talents.state." + state, state);
+    }
+
+    /** Maps a node state onto the suffix of the label styles in the page and node markup. */
+    @Nonnull
+    private static String resolveStateStyleSuffix(@Nullable String state) {
+        if (STATE_PURCHASED.equals(state) || STATE_AVAILABLE.equals(state) || STATE_UNAFFORDABLE.equals(state)) {
+            return state;
+        }
+        return STATE_LOCKED;
     }
 
     @Nullable
