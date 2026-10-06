@@ -3,7 +3,7 @@
   "LaunchLocalSoundEventId": "SFX_Tw_Dart_Rifle_Fire",
   "LaunchWorldSoundEventId": "SFX_Tw_Dart_Rifle_Fire",
   "SpawnOffset": {
-    "X": -0.3,
+    "X": 0.3,
     "Y": -0.4,
     "Z": 0.5
   }
