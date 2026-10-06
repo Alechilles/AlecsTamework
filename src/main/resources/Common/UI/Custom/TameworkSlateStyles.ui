@@ -148,3 +148,23 @@ $C = "Common.ui";
  SelectedEntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #5fe0c0),
  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #5fe0c0, RenderBold: true, RenderUppercase: false)
 );
+
+// ---- Pieces for pages and HUDs outside the companions window.
+// Stretchable plates for windows and HUDs whose size Java changes; fixed-size pages use an off-atlas
+// AssetImage instead ("Tamework/UI/Slate/page_<name>.png", header band baked in).
+@SlateWindow = PatchStyle(TexturePath: "Tamework/Slate/Window.png", Border: 28);
+@SlateHud = PatchStyle(TexturePath: "Tamework/Slate/Hud.png", Border: 18);
+@SlateAvailable = PatchStyle(TexturePath: "Tamework/Slate/Button_Available.png", Border: 8);
+@SlateAmber = PatchStyle(TexturePath: "Tamework/Slate/Button_Amber.png", Border: 8);
+// A header band and its teal rule, for windows drawn with @SlateWindow.
+@SlateHeaderBand = #000000(0.32);
+@SlateRule = #ffffff(0.08);
+@SlateTrackColor = #0a0e13;
+@SlateGold = #f2c66d;
+@SlateRed = #e5786d;
+@SlateAmberColor = #f0b45a;
+@SlateBlue = #7fa8ee;
+
+@SlateTitle = LabelStyle(FontSize: 17, FontName: "Secondary", LetterSpacing: 1, TextColor: @SlateText, VerticalAlignment: Center);
+@SlateSectionLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: @SlateDim, VerticalAlignment: Center);
+@SlateBody = LabelStyle(FontSize: 12, TextColor: @SlateSoft, VerticalAlignment: Center);
