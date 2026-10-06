@@ -1,0 +1,12 @@
+{
+  "Type": "Simple",
+  "RunTime": 0.5,
+  "HorizontalSpeedMultiplier": 0.75,
+  "Effects": {
+    "ItemAnimationId": "ReloadClose3",
+    "ClearAnimationOnFinish": true,
+    "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Close",
+    "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Close"
+  },
+  "Next": "Tw_Dart_Rifle_Sync_Display"
+}
