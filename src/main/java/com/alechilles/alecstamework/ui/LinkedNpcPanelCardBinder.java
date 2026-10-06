@@ -17,6 +17,8 @@ final class LinkedNpcPanelCardBinder {
     /** Width of the right section, and of the inline status text when action buttons sit beside it. */
     private static final int ACTION_SECTION_WIDTH = 414;
     private static final int INLINE_LOCATION_WIDTH_BESIDE_ACTIONS = 296;
+    /** The cooldown meters sit in an inset tray, so the row is taller than its 34 px of content. */
+    private static final int COOLDOWN_ROW_HEIGHT = 46;
     /** Left edge that centers a 48 px action button in the column the roster Summon/Dismiss button uses. */
     private static final int ROSTER_ACTION_LEFT = 767;
 
@@ -160,7 +162,9 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
-        commandBuilder.set(entrySelector + " #SlatePlate.AssetPath", slatePlatePath(entry));
+        String slateState = slateState(entry);
+        commandBuilder.set(entrySelector + " #SlatePlate.AssetPath", "Tamework/UI/Slate/card_" + slateState + ".png");
+        commandBuilder.set(entrySelector + " #PortraitFrame.AssetPath", "Tamework/UI/Slate/portrait_" + slateState + ".png");
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
@@ -283,6 +287,8 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkSelector, showUnlink);
         LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkDisabledSelector, showUnlinkDisabled);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
+        commandBuilder.set(entrySelector + " #SlateSelected.Visible", showActiveToggleActive);
+        bindStatePill(commandBuilder, entrySelector, entry, slateState, language);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         if (entry.ownedActions()) {
             commandBuilder.set(activeToggleInactiveSelector + ".Disabled", !entry.selectionSupported());
@@ -475,7 +481,7 @@ final class LinkedNpcPanelCardBinder {
             if (inlineHeight > 74) {
                 // A two-line status above world, coordinates and distance pushes the meters down.
                 commandBuilder.setObject(entrySelector + " #CooldownRow.Anchor",
-                        fixedAnchor(32 + inlineHeight + 3, 432, ACTION_SECTION_WIDTH, 34));
+                        fixedAnchor(32 + inlineHeight + 3, 432, ACTION_SECTION_WIDTH, COOLDOWN_ROW_HEIGHT));
             }
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(88, 730, 116, 20));
@@ -674,7 +680,7 @@ final class LinkedNpcPanelCardBinder {
                 && (entry.dead() || entry.lost());
         Anchor cardAnchor = buildCardAnchor(compact);
         commands.setObject(card + ".Anchor", cardAnchor);
-        Anchor cooldownAnchor = fixedAnchor(111, 432, 414, 34);
+        Anchor cooldownAnchor = fixedAnchor(108, 432, 414, COOLDOWN_ROW_HEIGHT);
         commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
         bindPortrait(commands, card, entry, compact);
         boolean showDetails = !compact && entry.hasKnownCardDetails();
@@ -684,30 +690,29 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
-        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 120, 0, 144, 26));
-        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 120, 26, 96, 26));
-        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 87 : 127, 7, 12, 12));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 135, 2, 142, 24));
+        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 135, 28, 94, 24));
+        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 86 : 141, 10, 12, 12));
+        commands.set(card + " #PortraitFrame.Visible", !compact);
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(68, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
-        commands.set(card + " #HealthFrame.Background",
-                entry.dead() ? "#151916"
-                        : compact ? "#202423" : "#151916");
+        commands.set(card + " #HealthFrame.Background", "#0a0e13");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(38, 358, 48, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(38, 304, 34, 24));
-        int activeTop = compact ? 56 : 96;
-        commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
-        commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
+        // The level sits on the portrait's lower-left corner; talent points keep the stats row's right end.
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(LinkedNpcPanelProgressionBinder.LEVEL_TOP,
+                LinkedNpcPanelProgressionBinder.LEVEL_LEFT, 48, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(38, 372, 34, 24));
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
         nameAnchor.setWidth(null);
-        nameAnchor.setRight(Value.of(36));
+        // Leaves room for the role subtitle, the state pill, the select switch and the removal button.
+        nameAnchor.setRight(Value.of(366));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
     }
 
@@ -770,15 +775,43 @@ final class LinkedNpcPanelCardBinder {
                 "tamework.commandmenu.lifecycle.stage." + nextStage);
     }
 
-    /** Off-atlas card background for the entry's state; paths are relative to the pack's Common folder. */
-    private static String slatePlatePath(LinkedNpcEntry entry) {
+    /**
+     * Names the card's state for its off-atlas pictures: {@code Common/Tamework/UI/Slate/card_<state>.png}
+     * and {@code portrait_<state>.png}, generated by the TameworkUiKit repo.
+     */
+    static String slateState(LinkedNpcEntry entry) {
         if (entry.dead()) {
-            return "Tamework/UI/Slate/card_dead.png";
+            return "dead";
         }
-        if (entry.lost()) {
-            return "Tamework/UI/Slate/card_lost.png";
+        if (entry.lost() && !entry.inCoop()) {
+            return "lost";
         }
-        return entry.captured() ? "Tamework/UI/Slate/card_stored.png" : "Tamework/UI/Slate/card_world.png";
+        if (entry.captured() || entry.inCoop()) {
+            return "stored";
+        }
+        return entry.loaded() ? "world" : "rest";
+    }
+
+    /** The pill beside the name says the state in words and takes that state's colour. */
+    private static void bindStatePill(UICommandBuilder commands, String card, LinkedNpcEntry entry,
+                                      String slateState, String language) {
+        // A recovery hold explains itself in the status area with a sentence that does not fit a pill.
+        commands.set(card + " #StatePill.Visible", !entry.recoveryHeld());
+        if (entry.recoveryHeld()) {
+            return;
+        }
+        String color = switch (slateState) {
+            case "dead" -> "#e5786d";
+            case "lost" -> "#f0b45a";
+            case "stored" -> "#7fa8ee";
+            case "rest" -> "#8fa2b8";
+            default -> "#5fe0c0";
+        };
+        commands.setObject(card + " #StatePill.Background",
+                new PatchStyle(Value.of("Tamework/Slate/Pill.png"), Value.of(7)).setColor(Value.of(color)));
+        commands.set(card + " #StatePillText.Text", "world".equals(slateState)
+                ? LocalizedText.resolve(language, "tamework.ui.companions.inWorld")
+                : LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
     }
 
     private static void bindLifecycleProgress(UICommandBuilder commands, String card,
@@ -786,7 +819,7 @@ final class LinkedNpcPanelCardBinder {
                                               LifecycleDisplay display, String language, boolean muted) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
-        String color = muted ? "#727772" : lifecycleColor(lifecycle);
+        String color = muted ? "#6b7480" : lifecycleColor(lifecycle);
         commands.setObject(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle).setColor(Value.of(color)));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
@@ -805,8 +838,8 @@ final class LinkedNpcPanelCardBinder {
     }
 
     static String lifecycleColor(LinkedNpcEntry.AnimalLifecycle lifecycle) {
-        return lifecycle.prime() ? "#d9c878"
-                : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#d9a86f" : "#78bfc1";
+        return lifecycle.prime() ? "#f2c66d"
+                : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#f0b45a" : "#78bfc1";
     }
 
     static PatchStyle lifecycleIcon(LinkedNpcEntry.AnimalLifecycle lifecycle) {
@@ -829,8 +862,7 @@ final class LinkedNpcPanelCardBinder {
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {
         LinkedNpcPanelPortraitBinder.bind(commands, card, entry);
         commands.set(card + " #Portrait.Style", Value.ref("TameworkLinkedNpcPanelCard.ui", compact ? "PortraitCompactStyle" : "PortraitStyle"));
-        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 28, compact ? 96 : 28, compact ? 48 : 92, compact ? 48 : 92));
-        commands.setObject(card + " #RoleSubtitle.Anchor", fixedAnchor(37, 0, compact && !entry.portraitIcon().isBlank() ? 92 : 148, 18));
+        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 34, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92));
         int activeTop = compact ? 56 : 96;
         boolean portrait = !entry.portraitIcon().isBlank();
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(

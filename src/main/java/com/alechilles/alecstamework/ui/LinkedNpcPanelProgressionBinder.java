@@ -68,14 +68,15 @@ final class LinkedNpcPanelProgressionBinder {
                                               String ringSelector,
                                               String levelText) {
         int width = resolveLevelControlWidth(levelText);
-        int left = 406 - width;
-        String cardSelector = ringSelector.substring(0, ringSelector.length() - " #XpProgressRing".length());
-        commandBuilder.setObject(cardSelector + " #TalentPointAction.Anchor", fixedAnchor(38, left - 38, 34, 24));
-        commandBuilder.setObject(ringSelector + ".Anchor", fixedAnchor(38, left, width, 24));
+        commandBuilder.setObject(ringSelector + ".Anchor", fixedAnchor(LEVEL_TOP, LEVEL_LEFT, width, 24));
         commandBuilder.setObject(ringSelector + " #XpTooltip.Anchor", fixedAnchor(0, 0, width, 24));
         commandBuilder.setObject(ringSelector + " #XpLevelText.Anchor",
                 fixedAnchor(2, 30, Math.max(14, width - 34), 20));
     }
+
+    /** The level button overlaps the portrait frame's lower-left corner. */
+    static final int LEVEL_TOP = 104;
+    static final int LEVEL_LEFT = 6;
 
     private static int resolveLevelControlWidth(String levelText) {
         int digits = levelText == null || levelText.isBlank() ? 1 : levelText.length();

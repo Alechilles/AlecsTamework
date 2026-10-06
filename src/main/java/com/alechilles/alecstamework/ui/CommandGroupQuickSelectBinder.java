@@ -56,7 +56,7 @@ final class CommandGroupQuickSelectBinder {
                 commands.append(LIST, "TameworkCommandGroupQuickSelectRow.ui");
                 commands.setObject(button + ".Text", entry.label());
                 commands.setObject(button + ".TooltipText", entry.label());
-                commands.set(button + ".Style", Value.ref("TameworkPanelActionStyles.ui", style));
+                commands.set(button + ".Style", Value.ref("TameworkSlateStyles.ui", style));
                 commands.setObject(swatch + ".Background", LinkedNpcPanelGroupTabBinder.markerStyle(color, !groupColors.containsKey(normalize(entry.value()))));
                 commands.set(swatch + ".Visible", !"__all__".equalsIgnoreCase(entry.value()));
                 values.remember(button + ".Style", style);
@@ -97,11 +97,11 @@ final class CommandGroupQuickSelectBinder {
     }
 
     private static String colorFor(DropdownEntryInfo entry, Map<String, String> groupColors) {
-        if (entry == null || entry.value() == null) return "#55635a";
+        if (entry == null || entry.value() == null) return "#516177";
         String color = groupColors.get(normalize(entry.value()));
         if (color != null) return color;
         // All and No Group stay neutral; selection is communicated by the button style.
-        return "#55635a";
+        return "#516177";
     }
 
     private static String normalize(String value) {

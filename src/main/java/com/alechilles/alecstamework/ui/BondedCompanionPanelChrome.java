@@ -69,7 +69,7 @@ final class BondedCompanionPanelChrome {
         for (String filter : FILTERS) {
             String selector = "#BondedRoster" + filter;
             String style = filter.equals(page.rosterStateFilter) ? "PanelButtonSelected" : "PanelButton";
-            if (values == null) commands.set(selector + ".Style", Value.ref("TameworkPanelActionStyles.ui", style));
+            if (values == null) commands.set(selector + ".Style", Value.ref("TameworkSlateStyles.ui", style));
             else values.setStyle(commands, selector + ".Style", style);
             if (values == null) events.addEventBinding(CustomUIEventBindingType.Activating, selector,
                     EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,

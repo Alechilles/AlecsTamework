@@ -60,7 +60,7 @@ final class LinkedNpcPanelPresentationSupport {
         for (String tab : List.of("Linked", "Nearby", "Owned")) {
             String style = modeTabStyle(tab, selected);
             String selector = "#TameworkMode" + tab + ".Style";
-            if (values == null) commands.set(selector, Value.ref("TameworkPanelActionStyles.ui", style));
+            if (values == null) commands.set(selector, Value.ref("TameworkSlateStyles.ui", style));
             else values.setStyle(commands, selector, style);
         }
     }

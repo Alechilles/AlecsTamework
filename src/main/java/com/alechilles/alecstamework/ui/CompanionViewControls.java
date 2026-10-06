@@ -50,7 +50,7 @@ final class CompanionViewControls {
         set(c, values, "#CompanionViewPicker.Entries", entries);
         set(c, values, "#CompanionViewPicker.Value", customDraft ? "__custom__" : id);
         set(c, values, "#CompanionViewSaveNew.TooltipText", text(unsaved ? "modifiedHint" : "saveButton"));
-        set(c, values, "#CompanionViewSaveNew.OutlineColor", unsaved ? "#f1c66a" : "#4a5a50");
+        set(c, values, "#CompanionViewSaveNew.OutlineColor", unsaved ? "#f2c66d" : "#333e4c");
         set(c, values, "#CompanionViewSaveNew.OutlineSize", 1);
         set(c, values, "#CompanionViewSaveGlyph.Visible", !unsaved);
         set(c, values, "#CompanionViewSaveGlyphUnsaved.Visible", unsaved);

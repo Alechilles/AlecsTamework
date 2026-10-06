@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  */
 final class LinkedNpcPanelVitalsBinder {
     private static final int CARD_HEALTH_FILL_MAX_WIDTH = 232;
-    private static final String MUTED_FILL_COLOR = "#727772";
+    private static final String MUTED_FILL_COLOR = "#6b7480";
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
@@ -113,7 +113,7 @@ final class LinkedNpcPanelVitalsBinder {
                         muted ? "HealthTextShadowMuted" : "HealthTextShadowNormal"));
             }
             commandBuilder.set(healthFillSelector + ".Visible", true);
-            commandBuilder.set(healthFillSelector + ".Background", muted ? MUTED_FILL_COLOR : "#6fc576");
+            commandBuilder.set(healthFillSelector + ".Background", muted ? MUTED_FILL_COLOR : "#57c87a");
             // A dead companion keeps its saved maximum health, but its tooltip still shows the revive countdown.
             String tooltip = entry.dead()
                     ? LinkedNpcPanelStatusTextService.resolveDeadHealthTooltip(entry, language) : healthText;
@@ -413,7 +413,7 @@ final class LinkedNpcPanelVitalsBinder {
                 muted ? "CooldownTextMuted" : "CooldownTextNormal"));
         commands.set(slot + " #CooldownLabel.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
                 muted ? "CooldownTextMuted" : "CooldownLabelNormal"));
-        commands.set(slot + " #MeterFill.Background", muted ? "#727772" : fillColor);
+        commands.set(slot + " #MeterFill.Background", muted ? MUTED_FILL_COLOR : fillColor);
         commands.setObject(slot + " #MeterFill.Anchor",
                 LinkedNpcPanelStatusMeter.buildFillAnchor(
                         remainingMs < 0L ? 0.0 : active ? ratio : 1.0));

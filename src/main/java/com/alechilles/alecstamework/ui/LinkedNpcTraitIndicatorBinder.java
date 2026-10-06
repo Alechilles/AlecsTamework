@@ -11,8 +11,8 @@ import com.hypixel.hytale.server.core.ui.Value;
 final class LinkedNpcTraitIndicatorBinder {
     static final int MAX_VISIBLE_TRAIT_INDICATORS = 4;
 
-    private static final String POSITIVE_FILL_COLOR = "#6fc576";
-    private static final String NEGATIVE_FILL_COLOR = "#d45f5f";
+    private static final String POSITIVE_FILL_COLOR = "#5fe0c0";
+    private static final String NEGATIVE_FILL_COLOR = "#e5786d";
 
     private LinkedNpcTraitIndicatorBinder() {
     }
@@ -40,7 +40,7 @@ final class LinkedNpcTraitIndicatorBinder {
         if (indicator.hasIconTexturePath()) {
             commandBuilder.set(slotSelector + " #TraitIcon.Visible", false);
             commandBuilder.set(slotSelector + " #TraitIconImage.Visible", true);
-            commandBuilder.setObject(slotSelector + " #TraitIconImage.Anchor", iconAnchor(indicator.iconTexturePath(), 6, 5, 22));
+            commandBuilder.setObject(slotSelector + " #TraitIconImage.Anchor", iconAnchor(indicator.iconTexturePath(), 6, 3, 20));
             commandBuilder.setObject(
                     slotSelector + " #TraitIconImage.Background",
                     UiIconStyle.forTexture(indicator.iconTexturePath())
@@ -55,8 +55,8 @@ final class LinkedNpcTraitIndicatorBinder {
         commandBuilder.set(slotSelector + " #RingFillBar1.Background", fillColor);
         Anchor fill = new Anchor();
         fill.setLeft(Value.of(6));
-        fill.setTop(Value.of(1));
-        fill.setWidth(Value.of((int) Math.round(indicator.fillRatio() * 22)));
+        fill.setTop(Value.of(24));
+        fill.setWidth(Value.of((int) Math.round(indicator.fillRatio() * 20)));
         fill.setHeight(Value.of(3));
         commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", fill);
     }

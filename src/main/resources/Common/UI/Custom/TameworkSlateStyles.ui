@@ -1,0 +1,150 @@
+$C = "Common.ui";
+
+// Slate: the companions window's own look. Screens that have not been restyled yet keep
+// TameworkPanelActionStyles.ui, so the style names here mirror that file one for one.
+// The 9-patches are drawn at 1x by the TameworkUiKit repo's build_assets.py; buttons use Border 8.
+
+@SlateText = #eef2f6;
+@SlateSoft = #c2ccd6;
+@SlateDim = #8794a4;
+@SlateTeal = #5fe0c0;
+
+@SlateNormal = PatchStyle(TexturePath: "Tamework/Slate/Button_Normal.png", Border: 8);
+@SlateHover = PatchStyle(TexturePath: "Tamework/Slate/Button_Hover.png", Border: 8);
+@SlatePressed = PatchStyle(TexturePath: "Tamework/Slate/Button_Pressed.png", Border: 8);
+@SlatePrimary = PatchStyle(TexturePath: "Tamework/Slate/Button_Primary.png", Border: 8);
+@SlatePrimaryHover = PatchStyle(TexturePath: "Tamework/Slate/Button_PrimaryHover.png", Border: 8);
+@SlateDanger = PatchStyle(TexturePath: "Tamework/Slate/Button_Danger.png", Border: 8);
+@SlateQuiet = PatchStyle(TexturePath: "Tamework/Slate/Button_Quiet.png", Border: 8);
+@SlateQuietHover = PatchStyle(TexturePath: "Tamework/Slate/Button_QuietHover.png", Border: 8);
+@SlateQuietFocus = PatchStyle(TexturePath: "Tamework/Slate/Button_QuietFocus.png", Border: 8);
+@SlateDisabled = PatchStyle(TexturePath: "Tamework/Slate/Button_Disabled.png", Border: 8);
+@SlateModal = PatchStyle(TexturePath: "Tamework/Slate/Modal.png", Border: 18);
+@SlateTray = PatchStyle(TexturePath: "Tamework/Slate/Tray.png", Border: 10);
+@SlateTrack = PatchStyle(TexturePath: "Tamework/Slate/Track.png", Border: 3);
+
+// Icon buttons: the glyph is a separate element drawn over the button.
+@IconLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@Action = TextButtonStyle(Default: (Background: @SlateNormal, LabelStyle: @IconLabel), Hovered: (Background: @SlateHover, LabelStyle: @IconLabel), Pressed: (Background: @SlatePressed, LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@ActionDisabled = TextButtonStyle(Default: (Background: @SlateDisabled, LabelStyle: @IconLabel));
+// A toggle that is switched on, or the one action a card is asking for.
+@ActionOn = TextButtonStyle(Default: (Background: @SlatePrimary, LabelStyle: @IconLabel), Hovered: (Background: @SlatePrimaryHover, LabelStyle: @IconLabel), Pressed: (Background: @SlatePrimary, LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@ActionDanger = TextButtonStyle(Default: (Background: @SlateNormal, LabelStyle: @IconLabel), Hovered: (Background: @SlateDanger, LabelStyle: @IconLabel), Pressed: (Background: @SlateDanger, LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@ActionQuiet = TextButtonStyle(Default: (Background: @SlateQuiet, LabelStyle: @IconLabel), Hovered: (Background: @SlateQuietHover, LabelStyle: @IconLabel), Pressed: (Background: @SlatePressed, LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@Release = @ActionDanger;
+@ReleaseDisabled = @ActionDisabled;
+@Unlink = @Action;
+@UnlinkDisabled = @ActionDisabled;
+@Cull = @ActionDanger;
+@CullDisabled = @ActionDisabled;
+@Remove = TextButtonStyle(Default: (Background: @SlateQuiet, LabelStyle: @IconLabel), Hovered: (Background: @SlateDanger, LabelStyle: @IconLabel), Pressed: (Background: @SlateDanger, LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@RemoveDisabled = @ActionDisabled;
+@Back = @ActionQuiet;
+@FlightAirborne = @ActionOn;
+@FlightAirborneDisabled = @ActionDisabled;
+@FlightGrounded = @Action;
+@FlightGroundedDisabled = @ActionDisabled;
+@ShoulderOn = @ActionOn;
+@ShoulderOnDisabled = @ActionDisabled;
+@ShoulderOff = @Action;
+@ShoulderOffDisabled = @ActionDisabled;
+@ReturnHome = @Action;
+@ReturnHomeDisabled = @ActionDisabled;
+@SetHome = @Action;
+@SetHomeDisabled = @ActionDisabled;
+@Recall = @Action;
+@RecallDisabled = @ActionDisabled;
+@Locate = @Action;
+@LocateDisabled = @ActionDisabled;
+@BreedingOn = @ActionOn;
+@BreedingOnDisabled = @ActionDisabled;
+@BreedingOff = @Action;
+@BreedingOffDisabled = @ActionDisabled;
+@Revive = @ActionOn;
+@ReviveDisabled = @ActionDisabled;
+@Recover = @ActionOn;
+@RecoverDisabled = @ActionDisabled;
+
+// The card's select switch: fixed-size pictures, so they ship at 2x and are not 9-sliced.
+@SwitchOn = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/Slate/Switch_On_Default.png"), LabelStyle: @IconLabel), Hovered: (Background: (TexturePath: "Tamework/Slate/Switch_On_Hover.png"), LabelStyle: @IconLabel), Pressed: (Background: (TexturePath: "Tamework/Slate/Switch_On_Hover.png"), LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@SwitchOff = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/Slate/Switch_Off_Default.png"), LabelStyle: @IconLabel), Hovered: (Background: (TexturePath: "Tamework/Slate/Switch_Off_Hover.png"), LabelStyle: @IconLabel), Pressed: (Background: (TexturePath: "Tamework/Slate/Switch_Off_Hover.png"), LabelStyle: @IconLabel), Disabled: (Background: (TexturePath: "Tamework/Slate/Switch_Off_Default.png", Color: #ffffff(0.4)), LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+
+@PanelDropdown = DropdownBoxStyle(
+ ...$C.@DefaultDropdownBoxStyle,
+ DefaultBackground: @SlateQuiet,
+ HoveredBackground: @SlateQuietHover,
+ PressedBackground: @SlateQuietHover,
+ PanelBackground: @SlateModal,
+ LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: @SlateSoft),
+ EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: @SlateSoft),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: @SlateTeal),
+ HoveredEntryBackground: (Color: #2d3744),
+ PressedEntryBackground: (Color: #1d252f),
+ ArrowWidth: 10, ArrowHeight: 14
+);
+
+@PanelButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: @SlateText, Alignment: Center);
+@PanelButtonDisabledLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #56606c, Alignment: Center);
+@PanelButton = TextButtonStyle(
+ Default: (Background: @SlateNormal, LabelStyle: @PanelButtonLabel),
+ Hovered: (Background: @SlateHover, LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: @SlatePressed, LabelStyle: @PanelButtonLabel),
+ Disabled: (Background: @SlateDisabled, LabelStyle: @PanelButtonDisabledLabel),
+ Sounds: $C.@ButtonSounds
+);
+@PanelButtonQuietLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: @SlateSoft, Alignment: Center);
+@PanelButtonQuiet = TextButtonStyle(
+ Default: (Background: @SlateQuiet, LabelStyle: @PanelButtonQuietLabel),
+ Hovered: (Background: @SlateQuietHover, LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: @SlatePressed, LabelStyle: @PanelButtonLabel),
+ Disabled: (Background: @SlateDisabled, LabelStyle: @PanelButtonDisabledLabel),
+ Sounds: $C.@ButtonSounds
+);
+@PanelButtonPrimary = TextButtonStyle(
+ Default: (Background: @SlatePrimary, LabelStyle: (...@PanelButtonLabel, TextColor: #eafff8)),
+ Hovered: (Background: @SlatePrimaryHover, LabelStyle: (...@PanelButtonLabel, TextColor: #ffffff)),
+ Pressed: (Background: @SlatePrimary, LabelStyle: (...@PanelButtonLabel, TextColor: #eafff8)),
+ Disabled: (Background: @SlateDisabled, LabelStyle: @PanelButtonDisabledLabel),
+ Sounds: $C.@ButtonSounds
+);
+@PanelButtonSelected = @PanelButtonPrimary;
+
+// Status tabs are plain words; the selected one carries a teal underline.
+@CompanionTabLabel = LabelStyle(FontSize: 12, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: @SlateDim, Alignment: Center);
+@CompanionTabButton = TextButtonStyle(
+ Default: (Background: (Color: #000000(0.0)), LabelStyle: @CompanionTabLabel),
+ Hovered: (Background: (Color: #ffffff(0.05)), LabelStyle: (...@CompanionTabLabel, TextColor: @SlateSoft)),
+ Pressed: (Background: (Color: #000000(0.2)), LabelStyle: (...@CompanionTabLabel, TextColor: @SlateSoft)),
+ Sounds: $C.@ButtonSounds
+);
+@CompanionTabButtonSelected = TextButtonStyle(
+ Default: (Background: (TexturePath: "Tamework/Slate/Tab_Selected.png", Border: 4), LabelStyle: (...@CompanionTabLabel, TextColor: @SlateText)),
+ Hovered: (Background: (TexturePath: "Tamework/Slate/Tab_Selected.png", Border: 4), LabelStyle: (...@CompanionTabLabel, TextColor: #ffffff)),
+ Pressed: (Background: (TexturePath: "Tamework/Slate/Tab_Selected.png", Border: 4), LabelStyle: (...@CompanionTabLabel, TextColor: @SlateText)),
+ Sounds: $C.@ButtonSounds
+);
+
+@PanelInputFieldStyle = InputFieldStyle(...$C.@DefaultInputFieldStyle, TextColor: @SlateText);
+@PanelInputFieldPlaceholderStyle = InputFieldStyle(...$C.@DefaultInputFieldPlaceholderStyle, TextColor: #5d6876);
+
+@PanelColorPicker = (...$C.@DefaultColorPickerDropdownBoxStyle, PanelBackground: @SlateModal);
+
+// Group rows stay quiet and reserve colour for the small marker; a fully selected group lights up.
+@GroupRowLabel = LabelStyle(FontSize: 12, TextColor: @SlateSoft, HorizontalAlignment: Start, VerticalAlignment: Center);
+@GroupRow = TextButtonStyle(Default: (Background: @SlateQuiet, LabelStyle: @GroupRowLabel), Hovered: (Background: @SlateQuietHover, LabelStyle: (...@GroupRowLabel, TextColor: @SlateText)), Pressed: (Background: @SlatePressed, LabelStyle: @GroupRowLabel), Sounds: $C.@ButtonSounds);
+@GroupRowSelected = TextButtonStyle(Default: (Background: @SlatePrimary, LabelStyle: (...@GroupRowLabel, TextColor: #eafff8, RenderBold: true)), Hovered: (Background: @SlatePrimaryHover, LabelStyle: (...@GroupRowLabel, TextColor: #ffffff, RenderBold: true)), Sounds: $C.@ButtonSounds);
+@GroupDropdown = DropdownBoxStyle(...@PanelDropdown,
+ HorizontalPadding: 6,
+ LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, FontSize: 12, TextColor: @SlateSoft, RenderUppercase: false),
+ EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: @SlateSoft, RenderUppercase: false),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: @SlateText, RenderUppercase: false),
+ DefaultArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", HoveredArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", PressedArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", ArrowWidth: 10, ArrowHeight: 6
+);
+
+// Multi-group membership needs a persistent selected marker, not only a subtle text tint.
+@CompanionGroupDropdown = DropdownBoxStyle(...@GroupDropdown,
+ EntryIconWidth: 12, EntryIconHeight: 12,
+ EntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamondOutline.png", Color: #8794a4),
+ SelectedEntryIconBackground: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #5fe0c0),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #5fe0c0, RenderBold: true, RenderUppercase: false)
+);
