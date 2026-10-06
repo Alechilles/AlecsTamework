@@ -1842,8 +1842,7 @@ public class Tamework extends JavaPlugin {
                 () -> new com.alechilles.alecstamework.companion.coop.CoopBreakSystem(coopResidents,
                         com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.getComponentType()));
         companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
-                TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
-                ownerComponentType, tamedComponentType,
+                TameworkCompanionComponent.getComponentType(), ownerComponentType, tamedComponentType,
                 lifecycle.hasLegacyBodies() ? projectionIdentityComponentType : null);
         // Retired 3.x/4.x components (plan 7 R15, R16). Declared after the companion index systems:
         // the strip system depends on CompanionOwnershipSystems.OnAdd. The projection identity
