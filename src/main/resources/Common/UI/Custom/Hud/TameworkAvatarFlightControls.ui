@@ -1,21 +1,26 @@
 @FlightControlSlotSize = 58;
 @FlightControlSlotHeight = 74;
+// Slate pieces, matching Hud/TameworkCommandHotswapControls.ui. Texture paths climb out of Hud/.
+@FlightControlSlot = PatchStyle(TexturePath: "../Tamework/Slate/Button_Normal.png", Border: 8);
 @FlightControlBindingStyle = (
+    FontSize: 9,
+    RenderBold: true,
+    LetterSpacing: 1,
+    TextColor: #eef2f6,
+    Alignment: Center
+);
+@FlightControlGlyphTextStyle = (
     FontName: "Secondary",
     FontSize: 10,
     RenderBold: true,
-    TextColor: #e8e4da,
+    TextColor: #f3ead6,
     Alignment: Center
-);
-@FlightControlBindingBackground = PatchStyle(
-    TexturePath: "../Tamework/PanelActions/Base_Default.png",
-    Border: 3
 );
 @FlightControlCooldownStyle = (
     FontName: "Secondary",
     FontSize: 20,
     RenderBold: true,
-    TextColor: #f0eee7,
+    TextColor: #eef2f6,
     Alignment: Center
 );
 
@@ -32,7 +37,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #Ability2Frame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #Ability2Glyph {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -43,28 +48,29 @@ Group #TameworkAvatarFlightControls {
             Label #Ability2GlyphText {
                 Anchor: (Top: 17, Left: 3, Width: 52, Height: 22);
                 Text: "";
-                Style: @FlightControlBindingStyle;
+                Style: @FlightControlGlyphTextStyle;
                 Visible: false;
             }
         }
 
-        Label #Ability2Binding {
-            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "";
-            Style: @FlightControlBindingStyle;
-        }
-
+        // The shade covers the slot only, so the key stays readable while the ability cools down.
         Group #Ability2CooldownShade {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: 69);
-            Background: #0a0e14(0.72);
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Background: #06080b(0.74);
             Visible: false;
 
             Label #Ability2CooldownLabel {
-                Anchor: (Top: 17, Left: 0, Width: @FlightControlSlotSize, Height: 28);
+                Anchor: (Top: 15, Left: 0, Width: @FlightControlSlotSize, Height: 28);
                 Text: "";
                 Style: @FlightControlCooldownStyle;
             }
+        }
+
+        Label #Ability2Binding {
+            Anchor: (Top: 50, Left: 17, Width: 24, Height: 18);
+            Background: @FlightControlSlot;
+            Text: "";
+            Style: @FlightControlBindingStyle;
         }
     }
 
@@ -74,7 +80,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #Ability3Frame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #Ability3Glyph {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -85,28 +91,29 @@ Group #TameworkAvatarFlightControls {
             Label #Ability3GlyphText {
                 Anchor: (Top: 17, Left: 3, Width: 52, Height: 22);
                 Text: "";
-                Style: @FlightControlBindingStyle;
+                Style: @FlightControlGlyphTextStyle;
                 Visible: false;
             }
         }
 
-        Label #Ability3Binding {
-            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "";
-            Style: @FlightControlBindingStyle;
-        }
-
+        // The shade covers the slot only, so the key stays readable while the ability cools down.
         Group #Ability3CooldownShade {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: 69);
-            Background: #0a0e14(0.72);
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Background: #06080b(0.74);
             Visible: false;
 
             Label #Ability3CooldownLabel {
-                Anchor: (Top: 17, Left: 0, Width: @FlightControlSlotSize, Height: 28);
+                Anchor: (Top: 15, Left: 0, Width: @FlightControlSlotSize, Height: 28);
                 Text: "";
                 Style: @FlightControlCooldownStyle;
             }
+        }
+
+        Label #Ability3Binding {
+            Anchor: (Top: 50, Left: 17, Width: 24, Height: 18);
+            Background: @FlightControlSlot;
+            Text: "";
+            Style: @FlightControlBindingStyle;
         }
     }
 
@@ -115,7 +122,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #LaunchFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #LaunchIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -124,8 +131,8 @@ Group #TameworkAvatarFlightControls {
         }
 
         Label #LaunchBinding {
-            Anchor: (Top: 50, Left: 3, Width: 52, Height: 19);
-            Background: @FlightControlBindingBackground;
+            Anchor: (Top: 50, Left: 1, Width: 56, Height: 18);
+            Background: @FlightControlSlot;
             Text: %server.tamework.ui.flight.crouch;
             Style: @FlightControlBindingStyle;
         }
@@ -136,7 +143,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #ForwardBoostFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #ForwardBoostIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -145,8 +152,8 @@ Group #TameworkAvatarFlightControls {
         }
 
         Label #ForwardBoostBinding {
-            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
-            Background: @FlightControlBindingBackground;
+            Anchor: (Top: 50, Left: 17, Width: 24, Height: 18);
+            Background: @FlightControlSlot;
             Text: "Q";
             Style: @FlightControlBindingStyle;
         }
@@ -157,7 +164,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #UpwardFlapFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #UpwardFlapIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -166,8 +173,8 @@ Group #TameworkAvatarFlightControls {
         }
 
         Label #UpwardFlapBinding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @FlightControlBindingBackground;
+            Anchor: (Top: 50, Left: 12, Width: 34, Height: 18);
+            Background: @FlightControlSlot;
             Text: "LMB";
             Style: @FlightControlBindingStyle;
         }
@@ -178,7 +185,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #AirbrakeFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
+            Background: @FlightControlSlot;
 
             Group #AirbrakeIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -187,8 +194,8 @@ Group #TameworkAvatarFlightControls {
         }
 
         Label #AirbrakeBinding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @FlightControlBindingBackground;
+            Anchor: (Top: 50, Left: 12, Width: 34, Height: 18);
+            Background: @FlightControlSlot;
             Text: "RMB";
             Style: @FlightControlBindingStyle;
         }

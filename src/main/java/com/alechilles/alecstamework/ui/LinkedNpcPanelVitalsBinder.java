@@ -22,6 +22,11 @@ final class LinkedNpcPanelVitalsBinder {
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
+    private static final String[] HUD_NEED_FILL_COLORS = {"#f2c97c", "#d9a066", "#84dbff"};
+    private static final String HUD_BREEDING_FILL_COLOR = "#e59ab0";
+    private static final String HUD_HARVEST_FILL_COLOR = "#f2c66d";
+    private static final String HUD_ICON_COLOR = "#f3ead6";
+    private static final int HUD_NEED_FILL_TOP = 22;
     private static final Color TOOLTIP_WHITE = new Color(0xff, 0xff, 0xff);
     private static final Color TOOLTIP_GREEN = new Color(0x6f, 0xc5, 0x76);
     private static final Color TOOLTIP_RED = new Color(0xd4, 0x5f, 0x5f);
@@ -40,19 +45,20 @@ final class LinkedNpcPanelVitalsBinder {
         for (int i = 0; i < needs.length; i++) {
             commands.setObject(needs[i] + " #MeterFill.Anchor", hudFill(ratios[i], 100));
             commands.set(needs[i] + " #NeedValueText.Style", Value.ref("TameworkCommandTargetHud.ui", "MeterValue"));
+            // The shared need binder writes the companion card's colours; the HUD keeps its own palette.
+            commands.set(needs[i] + " #MeterFill.Background", entry.loaded() ? HUD_NEED_FILL_COLORS[i] : MUTED_FILL_COLOR);
         }
         commands.setObject("#NeedHappiness #BreedingThresholdMarker.Anchor",
-                LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 0, 18, 100));
+                LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(
+                        entry.breedingHappinessRatio(), 0, HUD_NEED_FILL_TOP - 6, 100));
         Anchor target = hudFill(0, 2);
         target.setLeft(Value.of((int) Math.round(clamp(entry.targetHappinessPercent() / 100.0) * 98)));
-        target.setTop(Value.of(24));
+        target.setTop(Value.of(HUD_NEED_FILL_TOP - 2));
         target.setWidth(Value.of(2));
         target.setHeight(Value.of(10));
         commands.setObject("#NeedHappiness #HappinessTargetMarker.Anchor", target);
-        commands.setObject("#BreedingCooldown #MeterFill.Anchor", hudFill(
-                entry.breedingCooldownRemainingMs() < 0 ? 0 : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1, 156));
-        commands.setObject("#HarvestCooldown #MeterFill.Anchor", hudFill(
-                entry.harvestCooldownRemainingMs() < 0 ? 0 : entry.harvestCooldownActive() ? entry.harvestCooldownRatio() : 1, 156));
+        // CommandTargetHudBinder positions the cooldown fills; only their HUD colours are set here.
+        boolean harvestMuted = entry.captured() || entry.dead();
         boolean breedingMuted = entry.captured() || entry.dead() || !entry.breedingEnabled()
                 || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
         commands.set("#BreedingCooldown #CooldownText.Style", Value.ref("TameworkCommandTargetHud.ui",
@@ -61,12 +67,20 @@ final class LinkedNpcPanelVitalsBinder {
                 entry.loaded() ? "CooldownValue" : "CooldownMuted"));
         commands.set("#BreedingCooldown #CooldownLabel.Style", Value.ref("TameworkCommandTargetHud.ui", "CooldownLabel"));
         commands.set("#HarvestCooldown #CooldownLabel.Style", Value.ref("TameworkCommandTargetHud.ui", "CooldownLabel"));
+        commands.set("#BreedingCooldown #MeterFill.Background", breedingMuted ? MUTED_FILL_COLOR : HUD_BREEDING_FILL_COLOR);
+        commands.set("#HarvestCooldown #MeterFill.Background", harvestMuted ? MUTED_FILL_COLOR : HUD_HARVEST_FILL_COLOR);
+        commands.setObject("#BreedingCooldown #BreedingCooldownIconImage.Background",
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Breeding_Cooldown.png"))
+                        .setColor(Value.of(HUD_ICON_COLOR)));
+        commands.setObject("#HarvestCooldown #HarvestCooldownIconImage.Background",
+                new PatchStyle(Value.of("Tamework/LinkedPanelIcons/Harvest_Cooldown.png"))
+                        .setColor(Value.of(harvestMuted ? MUTED_FILL_COLOR : HUD_ICON_COLOR)));
     }
 
     private static Anchor hudFill(double ratio, int width) {
         Anchor anchor = new Anchor();
         anchor.setLeft(Value.of(0));
-        anchor.setTop(Value.of(26));
+        anchor.setTop(Value.of(HUD_NEED_FILL_TOP));
         anchor.setWidth(Value.of((int) Math.round(clamp(ratio) * width)));
         anchor.setHeight(Value.of(6));
         return anchor;

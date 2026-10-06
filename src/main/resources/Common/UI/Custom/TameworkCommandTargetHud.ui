@@ -1,178 +1,228 @@
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
+// The command-target HUD in the Slate look. Java sets the root height and stacks the rows
+// (CommandTargetHudBinder), so the plate is a stretchable 9-patch, not an off-atlas picture.
 @HudTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @HudTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Sounds: $C.@ButtonSounds);
 @HudTooltipStyle = $C.@DefaultTextTooltipStyle;
 @FoodItemGridStyle = ItemGridStyle(SlotSize: 28, SlotSpacing: 0, SlotIconSize: 28);
 @CompatibleFoodItemGridStyle = ItemGridStyle(SlotSize: 28, SlotSpacing: 0, SlotIconSize: 28);
 
-@MeterValue = LabelStyle(FontSize: 14, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: End, VerticalAlignment: Center);
-@CooldownValue = LabelStyle(FontSize: 11, TextColor: #f7ecd0);
-@CooldownMuted = LabelStyle(FontSize: 11, TextColor: #818880);
-@CooldownLabel = LabelStyle(FontSize: 10, TextColor: #b9beb8);
+// Java swaps these four by name (LinkedNpcPanelVitalsBinder.bindHud).
+@MeterValue = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: End, VerticalAlignment: Center);
+@CooldownValue = LabelStyle(FontSize: 10, TextColor: #c2ccd6, VerticalAlignment: Center);
+@CooldownMuted = LabelStyle(FontSize: 10, TextColor: #6b7480, VerticalAlignment: Center);
+@CooldownLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, VerticalAlignment: Center);
+
+@Caption = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, VerticalAlignment: Center);
+// Food value badges: the white pill outline is tinted per sign.
+@FoodChipTextPositive = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #7fe08f, Alignment: Center);
+@FoodChipTextNegative = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #e5786d, Alignment: Center);
+@FoodChipTextNeutral = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #c2ccd6, Alignment: Center);
+@FoodChipPositive = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #7fe08f);
+@FoodChipNegative = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #e5786d);
+@FoodChipNeutral = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #8794a4);
+
 Group #Root {
  Anchor: (Top: 218, Right: 26, Width: 344, Height: 300);
  Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
- Background: #202722;
+ Background: $A.@SlateHud;
  Visible: false;
- Group { Anchor: (Top: -10, Left: -10, Right: -10, Height: 1); Background: #596453; }
- Group { Anchor: (Bottom: -10, Left: -10, Right: -10, Height: 1); Background: #596453; }
- Group { Anchor: (Top: -10, Bottom: -10, Left: -10, Width: 1); Background: #596453; }
- Group { Anchor: (Top: -10, Bottom: -10, Right: -10, Width: 1); Background: #596453; }
  Group #HeaderRow {
   Anchor: (Top: 0, Left: 0, Right: 0, Height: 26);
-  Group #GenderMaleIcon { Anchor: (Top: 4, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #50c8ef); Visible: false; }
-  Group #GenderFemaleIcon { Anchor: (Top: 4, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #fc7cb4); Visible: false; }
-  Label #Name { Anchor: (Top: 0, Left: 24, Right: 126, Height: 26); Text: ""; Style: (FontSize: 17, RenderBold: true, TextColor: #f7ecd0, VerticalAlignment: Center); }
+  Group #GenderMaleIcon { Anchor: (Top: 4, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #58c9f0); Visible: false; }
+  Group #GenderFemaleIcon { Anchor: (Top: 4, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #ff86bb); Visible: false; }
+  Label #Name { Anchor: (Top: 0, Left: 24, Right: 126, Height: 26); Text: ""; Style: (FontSize: 16, FontName: "Secondary", TextColor: #eef2f6, VerticalAlignment: Center); }
   Group #TraitRingRow { Anchor: (Top: 0, Right: 0, Width: 120, Height: 26); LayoutMode: Left; Visible: false;
    Group #TraitSlot0 { Anchor: (Width: 30, Height: 26); Visible: false;
-    Group #TraitTick { Anchor: (Top: 0, Left: 2, Width: 20, Height: 3); Background: #6fc576; }
-    Group #TraitIconImage { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Visible: false; }
-    Label #TraitIcon { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
+    Group { Anchor: (Top: 0, Left: 0, Width: 26, Height: 24); Background: $A.@SlateQuiet; }
+    Group { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #0a0e13; }
+    Group #TraitTick { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #5fe0c0; }
+    Group #TraitIconImage { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Visible: false; }
+    Label #TraitIcon { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Text: ""; Style: (FontSize: 13, TextColor: #f3ead6, Alignment: Center); }
     TextButton #TraitTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
    }
    Group #TraitSlot1 { Anchor: (Width: 30, Height: 26); Visible: false;
-    Group #TraitTick { Anchor: (Top: 0, Left: 2, Width: 20, Height: 3); Background: #6fc576; }
-    Group #TraitIconImage { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Visible: false; }
-    Label #TraitIcon { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
+    Group { Anchor: (Top: 0, Left: 0, Width: 26, Height: 24); Background: $A.@SlateQuiet; }
+    Group { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #0a0e13; }
+    Group #TraitTick { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #5fe0c0; }
+    Group #TraitIconImage { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Visible: false; }
+    Label #TraitIcon { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Text: ""; Style: (FontSize: 13, TextColor: #f3ead6, Alignment: Center); }
     TextButton #TraitTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
    }
    Group #TraitSlot2 { Anchor: (Width: 30, Height: 26); Visible: false;
-    Group #TraitTick { Anchor: (Top: 0, Left: 2, Width: 20, Height: 3); Background: #6fc576; }
-    Group #TraitIconImage { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Visible: false; }
-    Label #TraitIcon { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
+    Group { Anchor: (Top: 0, Left: 0, Width: 26, Height: 24); Background: $A.@SlateQuiet; }
+    Group { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #0a0e13; }
+    Group #TraitTick { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #5fe0c0; }
+    Group #TraitIconImage { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Visible: false; }
+    Label #TraitIcon { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Text: ""; Style: (FontSize: 13, TextColor: #f3ead6, Alignment: Center); }
     TextButton #TraitTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
    }
    Group #TraitSlot3 { Anchor: (Width: 30, Height: 26); Visible: false;
-    Group #TraitTick { Anchor: (Top: 0, Left: 2, Width: 20, Height: 3); Background: #6fc576; }
-    Group #TraitIconImage { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Visible: false; }
-    Label #TraitIcon { Anchor: (Top: 5, Left: 2, Width: 20, Height: 20); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
+    Group { Anchor: (Top: 0, Left: 0, Width: 26, Height: 24); Background: $A.@SlateQuiet; }
+    Group { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #0a0e13; }
+    Group #TraitTick { Anchor: (Top: 20, Left: 4, Width: 18, Height: 3); Background: #5fe0c0; }
+    Group #TraitIconImage { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Visible: false; }
+    Label #TraitIcon { Anchor: (Top: 1, Left: 4, Width: 18, Height: 18); Text: ""; Style: (FontSize: 13, TextColor: #f3ead6, Alignment: Center); }
     TextButton #TraitTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
    }
   }
  }
- Label #RoleSubtitle { Anchor: (Top: 26, Left: 24, Right: 126, Height: 16); Text: ""; Visible: false; Style: (FontSize: 11, TextColor: #b9beb8, VerticalAlignment: Center); }
+ Label #RoleSubtitle { Anchor: (Top: 26, Left: 24, Right: 126, Height: 16); Text: ""; Visible: false; Style: (FontSize: 11, TextColor: #8794a4, VerticalAlignment: Center); }
+ // Talent points sit on a teal chip, the level on a quiet one in gold. Java sets both widths.
  Group #ProgressionRow { Anchor: (Top: 26, Right: 0, Width: 110, Height: 18); Visible: false;
-  Group #TalentPointAction { Anchor: (Top: 0, Left: 0, Width: 36, Height: 18); Visible: false;
-   Group #TalentPointIcon { Anchor: (Top: 2, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png", Color: #f5e8c9); }
-   Label #TalentPointCountShadow { Anchor: (Left: 17, Width: 18, Height: 18); Text: ""; Visible: false; }
-   Label #TalentPointCount { Anchor: (Left: 17, Width: 18, Height: 18); Text: ""; Style: (FontSize: 12, TextColor: #f7ecd0, VerticalAlignment: Center); }
+  Group #TalentPointAction { Anchor: (Top: 0, Left: 0, Width: 36, Height: 18); Background: $A.@SlatePrimary; Visible: false;
+   Group #TalentPointIcon { Anchor: (Top: 3, Left: 5, Width: 12, Height: 12); Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png", Color: #eafff8); }
+   Label #TalentPointCountShadow { Anchor: (Left: 18, Width: 16, Height: 18); Text: ""; Visible: false; }
+   Label #TalentPointCount { Anchor: (Left: 18, Width: 16, Height: 18); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #eafff8, VerticalAlignment: Center); }
   }
-  Group #XpProgressRing { Anchor: (Right: 0, Width: 70, Height: 18); Visible: false;
-   Label #XpLevelText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 13, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: End, VerticalAlignment: Center); }
+  Group #XpProgressRing { Anchor: (Right: 0, Width: 70, Height: 18); Background: $A.@SlateQuiet; Visible: false;
+   Label #XpLevelText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #f2c66d, Alignment: Center); }
    TextButton #XpTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
  }
  Group #HealthRow { Anchor: (Top: 46, Left: 0, Right: 0, Height: 28);
-  Group #HealthBar { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Background: #3a443d;
-   Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 20); Background: #6fc576; }
-   Label #HealthTextShadow { Anchor: (Top: 1, Left: 1, Right: -1, Height: 22); Text: ""; Style: (FontSize: 14, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center); }
-   Label #HealthText { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Text: ""; Style: (FontSize: 14, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
+  Group #HealthBar { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Background: $A.@SlateTrack;
+   Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 20); Background: #57c87a; }
+   Label #HealthTextShadow { Anchor: (Top: 1, Left: 1, Right: -1, Height: 22); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #08100a, HorizontalAlignment: Center, VerticalAlignment: Center); }
+   Label #HealthText { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
    TextButton #HealthTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
  }
- Group #StatusRingRow { Anchor: (Top: 80, Left: 0, Width: 324, Height: 48); LayoutMode: Left;
-  Group #NeedHappiness { Anchor: (Width: 112, Height: 48);
+ Group #StatusRingRow { Anchor: (Top: 80, Left: 0, Width: 324, Height: 42); LayoutMode: Left;
+  Group #NeedHappiness { Anchor: (Width: 112, Height: 42);
    Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Visible: false; }
-   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
-   Label #NeedValueText { Anchor: (Top: 0, Left: 26, Width: 74, Height: 16); Text: ""; Style: @MeterValue; }
-   Group { Anchor: (Top: 26, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #MeterFill { Anchor: (Top: 26, Left: 0, Width: 0, Height: 6); Background: #d7ba77; }
-   Label { Anchor: (Top: 34, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: (FontSize: 10, TextColor: #b9beb8); }
-   Group #HappinessTargetMarker { Anchor: (Top: 24, Left: 0, Width: 2, Height: 10); Background: #e1be73; Visible: false; HitTestVisible: false; }
-            Group #BreedingThresholdMarker { Anchor: (Top: 15, Left: -7, Width: 14, Height: 12); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Threshold.png", Color: #ed8eae); Visible: false; HitTestVisible: false; }
-            TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Text: ""; Style: (FontSize: 12, TextColor: #f3ead6); }
+   Label #NeedValueText { Anchor: (Top: 0, Left: 20, Width: 80, Height: 16); Text: ""; Style: @MeterValue; }
+   Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+   Group #MeterFill { Anchor: (Top: 22, Left: 0, Width: 0, Height: 6); Background: #f2c97c; }
+   Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: @Caption; }
+   Group #HappinessTargetMarker { Anchor: (Top: 20, Left: 0, Width: 2, Height: 10); Background: #f2c66d; Visible: false; HitTestVisible: false; }
+   Group #BreedingThresholdMarker { Anchor: (Top: 13, Left: -7, Width: 14, Height: 12); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Threshold.png", Color: #ff86bb); Visible: false; HitTestVisible: false; }
+   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 42); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
-  Group #NeedHunger { Anchor: (Width: 112, Height: 48);
-   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Visible: false; }
-   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
-   Label #NeedValueText { Anchor: (Top: 0, Left: 26, Width: 74, Height: 22); Text: ""; Style: @MeterValue; }
-   Group { Anchor: (Top: 26, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #MeterFill { Anchor: (Top: 26, Left: 0, Width: 0, Height: 6); Background: #ba9b79; }
-   Label { Anchor: (Top: 34, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.hunger; Style: (FontSize: 10, TextColor: #b9beb8); }
-   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+  Group #NeedHunger { Anchor: (Width: 112, Height: 42);
+   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Visible: false; }
+   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Text: ""; Style: (FontSize: 12, TextColor: #f3ead6); }
+   Label #NeedValueText { Anchor: (Top: 0, Left: 20, Width: 80, Height: 16); Text: ""; Style: @MeterValue; }
+   Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+   Group #MeterFill { Anchor: (Top: 22, Left: 0, Width: 0, Height: 6); Background: #d9a066; }
+   Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.hunger; Style: @Caption; }
+   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 42); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
-  Group #NeedThirst { Anchor: (Width: 100, Height: 48);
-   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Visible: false; }
-   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
-   Label #NeedValueText { Anchor: (Top: 0, Left: 26, Width: 74, Height: 22); Text: ""; Style: @MeterValue; }
-   Group { Anchor: (Top: 26, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #MeterFill { Anchor: (Top: 26, Left: 0, Width: 0, Height: 6); Background: #7eb6b0; }
-   Label { Anchor: (Top: 34, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.thirst; Style: (FontSize: 10, TextColor: #b9beb8); }
-   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
-  }
- }
- Group #CooldownRow { Anchor: (Top: 134, Left: 0, Right: 0, Height: 40); LayoutMode: Left;
-  Group #AgeProgress { Anchor: (Width: 112, Height: 40); Visible: false;
-   Group #AgeIcon { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/LifeStage_Adult.png", Color: #ffffff); }
-   Label #AgeStage { Anchor: (Top: 0, Left: 18, Width: 82, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #f7ecd0, VerticalAlignment: Center); }
-   Group { Anchor: (Top: 16, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #AgeMeterFill { Anchor: (Top: 16, Left: 0, Width: 0, Height: 6); Background: #85b5cf; }
-   Label #AgeCountdown { Anchor: (Top: 24, Left: 0, Width: 100, Height: 14); Text: ""; Style: (FontSize: 10, TextColor: #b9beb8, VerticalAlignment: Center); }
-   TextButton #AgeTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 40); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
-  }
-  Group #BreedingCooldown { Anchor: (Width: 112, Height: 40); Visible: false;
-   Group #BreedingCooldownIconImage { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #ffffff); Visible: false; }
-   Group #BreedingCooldownIconMuted { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #747b73); Visible: false; }
-   Label #CooldownLabel { Anchor: (Top: 0, Left: 18, Width: 82, Height: 14); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: @CooldownLabel; }
-   Group { Anchor: (Top: 16, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #MeterFill { Anchor: (Top: 16, Left: 0, Width: 0, Height: 6); Background: #bb959e; }
-   Label #CooldownText { Anchor: (Top: 24, Left: 0, Width: 100, Height: 14); Text: ""; Style: @CooldownValue; }
-   TextButton #BreedingCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 40); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
-  }
-  Group #HarvestCooldown { Anchor: (Width: 100, Height: 40); Visible: false;
-   Group #HarvestCooldownIconImage { Anchor: (Top: 0, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png", Color: #ffffff); Visible: false; }
-   Label #CooldownLabel { Anchor: (Top: 0, Left: 18, Width: 82, Height: 14); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: @CooldownLabel; }
-   Group { Anchor: (Top: 16, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
-   Group #MeterFill { Anchor: (Top: 16, Left: 0, Width: 0, Height: 6); Background: #cbbb88; }
-   Label #CooldownText { Anchor: (Top: 24, Left: 0, Width: 100, Height: 14); Text: ""; Style: @CooldownValue; }
-   TextButton #HarvestCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 40); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+  Group #NeedThirst { Anchor: (Width: 100, Height: 42);
+   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Visible: false; }
+   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Text: ""; Style: (FontSize: 12, TextColor: #f3ead6); }
+   Label #NeedValueText { Anchor: (Top: 0, Left: 20, Width: 80, Height: 16); Text: ""; Style: @MeterValue; }
+   Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+   Group #MeterFill { Anchor: (Top: 22, Left: 0, Width: 0, Height: 6); Background: #84dbff; }
+   Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.thirst; Style: @Caption; }
+   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 42); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
  }
- Group #AppearanceDivider { Anchor: (Top: 184, Left: 0, Right: 0, Height: 1); Background: #414c42; Visible: false; }
-    Group #FoodTameRow {
-        Anchor: (Top: 96, Left: 0, Right: 0, Height: 60);
-        Visible: false;
-        Group { Anchor: (Top: -3, Left: 0, Right: 0, Height: 1); Background: #414c42; }
+ // Age, breeding and harvest share one inset tray. Java sets each cell's size and fill.
+ Group #CooldownRow { Anchor: (Top: 128, Left: 0, Right: 0, Height: 46); Padding: (Left: 8, Right: 8, Top: 5, Bottom: 5); Background: $A.@SlateTray; LayoutMode: Left;
+  Group #AgeProgress { Anchor: (Width: 104, Height: 36); Visible: false;
+   Group #AgeIcon { Anchor: (Top: 8, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/LifeStage_Adult.png", Color: #78bfc1); }
+   Label #AgeStage { Anchor: (Top: 0, Left: 22, Width: 80, Height: 12); Text: ""; Style: (FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #78bfc1, VerticalAlignment: Center); }
+   Group { Anchor: (Top: 15, Left: 22, Width: 78, Height: 6); Background: $A.@SlateTrack; }
+   Group #AgeMeterFill { Anchor: (Top: 15, Left: 22, Width: 0, Height: 6); Background: #78bfc1; }
+   Label #AgeCountdown { Anchor: (Top: 22, Left: 22, Width: 80, Height: 14); Text: ""; Style: @CooldownValue; }
+   TextButton #AgeTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 36); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+  }
+  Group #BreedingCooldown { Anchor: (Width: 104, Height: 36); Visible: false;
+   Group #BreedingCooldownIconImage { Anchor: (Top: 8, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #f3ead6); Visible: false; }
+   Group #BreedingCooldownIconMuted { Anchor: (Top: 8, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Breeding_Cooldown.png", Color: #6b7480); Visible: false; }
+   Label #CooldownLabel { Anchor: (Top: 0, Left: 22, Width: 80, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: @CooldownLabel; }
+   Group { Anchor: (Top: 15, Left: 22, Width: 78, Height: 6); Background: $A.@SlateTrack; }
+   Group #MeterFill { Anchor: (Top: 15, Left: 22, Width: 0, Height: 6); Background: #e59ab0; }
+   Label #CooldownText { Anchor: (Top: 22, Left: 22, Width: 80, Height: 14); Text: ""; Style: @CooldownValue; }
+   TextButton #BreedingCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 36); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+  }
+  Group #HarvestCooldown { Anchor: (Width: 100, Height: 36); Visible: false;
+   Group #HarvestCooldownIconImage { Anchor: (Top: 8, Left: 0, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png", Color: #f3ead6); Visible: false; }
+   Label #CooldownLabel { Anchor: (Top: 0, Left: 22, Width: 78, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: @CooldownLabel; }
+   Group { Anchor: (Top: 15, Left: 22, Width: 78, Height: 6); Background: $A.@SlateTrack; }
+   Group #MeterFill { Anchor: (Top: 15, Left: 22, Width: 0, Height: 6); Background: #f2c66d; }
+   Label #CooldownText { Anchor: (Top: 22, Left: 22, Width: 78, Height: 14); Text: ""; Style: @CooldownValue; }
+   TextButton #HarvestCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 36); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+  }
+ }
+ Group #AppearanceDivider { Anchor: (Top: 184, Left: 0, Right: 0, Height: 1); Background: #ffffff(0.08); Visible: false; }
+ Group #FoodTameRow {
+  Anchor: (Top: 96, Left: 0, Right: 0, Height: 60);
+  Visible: false;
+  Group { Anchor: (Top: -3, Left: 0, Right: 0, Height: 1); Background: #ffffff(0.08); }
 
-        Group #FoodRow {
-            Anchor: (Top: 0, Left: 0, Width: 112, Height: 58);
-            Visible: false;
+  Group #FoodRow {
+   Anchor: (Top: 0, Left: 0, Width: 112, Height: 58);
+   Visible: false;
 
-            Label #FoodHeading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8); }
-            Group #FavoriteFoodBlock {
-                Anchor: (Top: 0, Left: 0, Width: 112, Height: 36);
-                Visible: false;
-                ItemGrid #FoodItemGrid { Anchor: (Top: 6, Left: 0, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
-                Label #FoodLabel { Anchor: (Top: 2, Left: 34, Width: 78, Height: 14); Text: ""; Style: (FontSize: 10, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); }
-                Label #FoodName { Anchor: (Top: 16, Left: 34, Width: 78, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #f7ecd0, HorizontalAlignment: Start, VerticalAlignment: Center); }
-            }
+   Label #FoodHeading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @Caption; }
+   Group #FavoriteFoodBlock {
+    Anchor: (Top: 0, Left: 0, Width: 112, Height: 36);
+    Visible: false;
+    Group { Anchor: (Top: 1, Left: 0, Width: 34, Height: 34); Background: $A.@SlateQuiet; }
+    ItemGrid #FoodItemGrid { Anchor: (Top: 4, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
+    Label #FoodLabel { Anchor: (Top: 3, Left: 40, Width: 72, Height: 14); Text: ""; Style: (FontSize: 10, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #FoodName { Anchor: (Top: 16, Left: 40, Width: 72, Height: 18); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+   }
 
-            Group #FoodStripBlock {
-                Anchor: (Top: 0, Left: 0, Width: 168, Height: 46);
-                Visible: false;
-                Group #FoodSlot0 { Anchor: (Top: 0, Left: 0, Width: 34, Height: 46); Visible: false; Label #FoodValuePositive { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #84c67d, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNegative { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #de8d83, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNeutral { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: Center, VerticalAlignment: Center); } ItemGrid #FoodGrid { Anchor: (Top: 14, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; } TextButton #FoodTooltip { Anchor: (Top: 13, Left: 2, Width: 30, Height: 30); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-                Group #FoodSlot1 { Anchor: (Top: 0, Left: 38, Width: 34, Height: 46); Visible: false; Label #FoodValuePositive { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #84c67d, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNegative { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #de8d83, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNeutral { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: Center, VerticalAlignment: Center); } ItemGrid #FoodGrid { Anchor: (Top: 14, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; } TextButton #FoodTooltip { Anchor: (Top: 13, Left: 2, Width: 30, Height: 30); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-                Group #FoodSlot2 { Anchor: (Top: 0, Left: 76, Width: 34, Height: 46); Visible: false; Label #FoodValuePositive { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #84c67d, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNegative { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #de8d83, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNeutral { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: Center, VerticalAlignment: Center); } ItemGrid #FoodGrid { Anchor: (Top: 14, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; } TextButton #FoodTooltip { Anchor: (Top: 13, Left: 2, Width: 30, Height: 30); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-                Group #FoodSlot3 { Anchor: (Top: 0, Left: 114, Width: 34, Height: 46); Visible: false; Label #FoodValuePositive { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #84c67d, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNegative { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #de8d83, HorizontalAlignment: Center, VerticalAlignment: Center); } Label #FoodValueNeutral { Anchor: (Top: 2, Left: 0, Width: 34, Height: 12); Text: ""; Visible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: Center, VerticalAlignment: Center); } ItemGrid #FoodGrid { Anchor: (Top: 14, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; } TextButton #FoodTooltip { Anchor: (Top: 13, Left: 2, Width: 30, Height: 30); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-                Label #FoodMore { Anchor: (Top: 14, Left: 144, Width: 24, Height: 18); Text: ""; Visible: false; Style: (FontSize: 10, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: Center, VerticalAlignment: Center); }
-            }
-        }
-
-        Group #TameRequirementRow {
-            Anchor: (Top: 0, Right: 0, Width: 116, Height: 52);
-            Visible: false;
-            Label #TameRequirementLabel { Anchor: (Top: 2, Left: 0, Width: 116, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #ffc4c4, HorizontalAlignment: Start, VerticalAlignment: Center); }
-            Label #TameRequirementValue { Anchor: (Top: 16, Left: 0, Width: 116, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
-            Label #TameRequirementCurrent { Anchor: (Top: 32, Left: 0, Width: 116, Height: 16); Text: ""; Visible: false; Style: (FontSize: 10, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
-        }
+   // Each slot is a quiet plate with the happiness change as a small badge on its top-right corner.
+   Group #FoodStripBlock {
+    Anchor: (Top: 0, Left: 0, Width: 168, Height: 46);
+    Visible: false;
+    Group #FoodSlot0 { Anchor: (Top: 0, Left: 0, Width: 34, Height: 46); Visible: false;
+     Group { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Background: $A.@SlateQuiet; }
+     ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
+     Label #FoodValuePositive { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; }
+     Label #FoodValueNegative { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; }
+     Label #FoodValueNeutral { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; }
+     TextButton #FoodTooltip { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Text: ""; TooltipText: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
     }
+    Group #FoodSlot1 { Anchor: (Top: 0, Left: 38, Width: 34, Height: 46); Visible: false;
+     Group { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Background: $A.@SlateQuiet; }
+     ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
+     Label #FoodValuePositive { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; }
+     Label #FoodValueNegative { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; }
+     Label #FoodValueNeutral { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; }
+     TextButton #FoodTooltip { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Text: ""; TooltipText: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+    }
+    Group #FoodSlot2 { Anchor: (Top: 0, Left: 76, Width: 34, Height: 46); Visible: false;
+     Group { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Background: $A.@SlateQuiet; }
+     ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
+     Label #FoodValuePositive { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; }
+     Label #FoodValueNegative { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; }
+     Label #FoodValueNeutral { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; }
+     TextButton #FoodTooltip { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Text: ""; TooltipText: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+    }
+    Group #FoodSlot3 { Anchor: (Top: 0, Left: 114, Width: 34, Height: 46); Visible: false;
+     Group { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Background: $A.@SlateQuiet; }
+     ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 3, Width: 28, Height: 28); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: @FoodItemGridStyle; Visible: false; }
+     Label #FoodValuePositive { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; }
+     Label #FoodValueNegative { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; }
+     Label #FoodValueNeutral { Anchor: (Top: 3, Left: 10, Width: 24, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; }
+     TextButton #FoodTooltip { Anchor: (Top: 10, Left: 0, Width: 34, Height: 34); Text: ""; TooltipText: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+    }
+    Label #FoodMore { Anchor: (Top: 18, Left: 144, Width: 24, Height: 18); Text: ""; Visible: false; Style: (FontSize: 10, RenderBold: true, TextColor: #8794a4, HorizontalAlignment: Center, VerticalAlignment: Center); }
+   }
+  }
 
-    Group #AttachmentRow0 { Anchor: (Top: 164, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #AttachmentRow1 { Anchor: (Top: 182, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #AttachmentRow2 { Anchor: (Top: 200, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #AttachmentRow3 { Anchor: (Top: 218, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #AttachmentRow4 { Anchor: (Top: 236, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #AttachmentRow5 { Anchor: (Top: 254, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center); } }
-    Group #OwnerRow { Anchor: (Top: 274, Right: 0, Width: 180, Height: 18); Visible: false; Label #OwnerText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8, HorizontalAlignment: End, VerticalAlignment: Center); } }
+  Group #TameRequirementRow {
+   Anchor: (Top: 0, Right: 0, Width: 116, Height: 52);
+   Visible: false;
+   Label #TameRequirementLabel { Anchor: (Top: 2, Left: 0, Width: 116, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #f3aa9d, HorizontalAlignment: Start, VerticalAlignment: Center); }
+   Label #TameRequirementValue { Anchor: (Top: 16, Left: 0, Width: 116, Height: 16); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+   Label #TameRequirementCurrent { Anchor: (Top: 32, Left: 0, Width: 116, Height: 16); Text: ""; Visible: false; Style: (FontSize: 10, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+  }
+ }
+
+ Group #AttachmentRow0 { Anchor: (Top: 164, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #AttachmentRow1 { Anchor: (Top: 182, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #AttachmentRow2 { Anchor: (Top: 200, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #AttachmentRow3 { Anchor: (Top: 218, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #AttachmentRow4 { Anchor: (Top: 236, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #AttachmentRow5 { Anchor: (Top: 254, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+ Group #OwnerRow { Anchor: (Top: 274, Right: 0, Width: 180, Height: 18); Visible: false; Label #OwnerText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: End, VerticalAlignment: Center); } }
 }

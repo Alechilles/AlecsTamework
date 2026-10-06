@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.items.CommandHotswapHudViewModel;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import javax.annotation.Nonnull;
 
@@ -36,7 +38,12 @@ final class CommandHotswapHudBinder {
                                         @Nonnull CommandHotswapHudViewModel.GroupStatus status) {
         commandBuilder.set("#CommandHotswapGroupStatus.Visible", status.visible());
         commandBuilder.set("#CommandHotswapGroupStatus #Label.Text", status.label());
-        commandBuilder.set("#CommandHotswapGroupStatus #Dot.Background", status.colorHex());
-        commandBuilder.set("#CommandHotswapGroupStatus #Accent.Background", status.colorHex());
+        // The pill outline and the diamond are white textures tinted with the group's colour.
+        commandBuilder.setObject("#CommandHotswapGroupStatus #Dot.Background",
+                new PatchStyle(Value.of("Tamework/PanelControls/GroupDiamond.png"))
+                        .setColor(Value.of(status.colorHex())));
+        commandBuilder.setObject("#CommandHotswapGroupStatus #Accent.Background",
+                new PatchStyle(Value.of("Tamework/Slate/PillDark.png"), Value.of(7))
+                        .setColor(Value.of(status.colorHex())));
     }
 }

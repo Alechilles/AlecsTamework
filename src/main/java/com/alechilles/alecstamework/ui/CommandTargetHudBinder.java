@@ -30,10 +30,19 @@ final class CommandTargetHudBinder {
     private static final int SECTION_GAP = 6;
     private static final int FOOD_ATTACHMENT_GAP = 8;
     private static final int STATUS_ROW_WIDTH = 324;
-    private static final int STATUS_ROW_HEIGHT = 48;
-    private static final int COOLDOWN_ROW_HEIGHT = 40;
-    private static final int COMPACT_METER_WIDTH = 112;
-    private static final int COMPACT_METER_FILL_WIDTH = 100;
+    private static final int STATUS_ROW_HEIGHT = 42;
+    // The cooldown cells sit in a tray with 8px side and 5px top and bottom padding.
+    private static final int COOLDOWN_ROW_HEIGHT = 46;
+    private static final int COOLDOWN_CELL_HEIGHT = 36;
+    private static final int COMPACT_METER_WIDTH = 104;
+    private static final int LAST_COMPACT_METER_WIDTH = 100;
+    private static final int COMPACT_METER_FILL_LEFT = 22;
+    private static final int COMPACT_METER_FILL_TOP = 15;
+    private static final int COMPACT_METER_FILL_WIDTH = 78;
+    private static final int TRAIT_TICK_WIDTH = 18;
+    private static final int LEVEL_CHIP_PADDING = 12;
+    private static final String TRAIT_ABOVE_COLOR = "#5fe0c0";
+    private static final String TRAIT_BELOW_COLOR = "#e5786d";
     private static final int FOOD_HEADING_HEIGHT = 18;
     private static final int FAVORITE_FOOD_HEIGHT = 36;
     private static final int FOOD_STRIP_HEIGHT = 46;
@@ -213,7 +222,7 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#AgeProgress.Visible", display.visible());
         commandBuilder.setObject("#BreedingCooldown.Anchor", compactMeterAnchor());
         Anchor harvestAnchor = compactMeterAnchor();
-        harvestAnchor.setWidth(Value.of(COMPACT_METER_FILL_WIDTH));
+        harvestAnchor.setWidth(Value.of(LAST_COMPACT_METER_WIDTH));
         commandBuilder.setObject("#HarvestCooldown.Anchor", harvestAnchor);
         commandBuilder.set("#HarvestCooldown #HarvestCooldownIconImage.Visible", status.harvestCooldownKnown());
         commandBuilder.setObject("#BreedingCooldown #MeterFill.Anchor", compactMeterFill(
@@ -251,7 +260,7 @@ final class CommandTargetHudBinder {
         String level = status.futureStatA() != null
                 ? LinkedNpcPanelProgressionBinder.resolveLevelText(status.futureStatA().label()) : "";
         String levelLabel = LocalizedText.format(language, "tamework.ui.linkedPanel.bonded.talents.level", level);
-        int levelWidth = status.futureStatA() != null ? levelLabel.length() * 8 : 0;
+        int levelWidth = status.futureStatA() != null ? levelLabel.length() * 7 + LEVEL_CHIP_PADDING : 0;
         commandBuilder.setObject("#ProgressionRow.Anchor",
                 rightAnchor(26, levelWidth + (hasTalentPoints ? 44 : 0), 18));
         commandBuilder.setObject("#XpProgressRing.Anchor", rightAnchor(0, Math.max(1, levelWidth), 18));
@@ -284,15 +293,15 @@ final class CommandTargetHudBinder {
             commandBuilder.set(slot + " #TraitIcon.Visible", !trait.hasIconTexturePath());
             if (trait.hasIconTexturePath()) {
                 commandBuilder.setObject(slot + " #TraitIconImage.Background", UiIconStyle.forTexture(trait.iconTexturePath()));
-                commandBuilder.setObject(slot + " #TraitIconImage.Anchor", LinkedNpcTraitIndicatorBinder.iconAnchor(trait.iconTexturePath(), 2, 5, 20));
+                commandBuilder.setObject(slot + " #TraitIconImage.Anchor", LinkedNpcTraitIndicatorBinder.iconAnchor(trait.iconTexturePath(), 4, 1, 18));
             } else {
                 commandBuilder.set(slot + " #TraitIcon.Text", trait.iconText());
             }
             commandBuilder.set(slot + " #TraitTooltip.TooltipText", trait.tooltipText());
             commandBuilder.set(slot + " #TraitTooltip.TooltipTextSpans", LinkedNpcTraitIndicatorBinder.tooltipSpans(trait.tooltipText()));
-            commandBuilder.set(slot + " #TraitTick.Background", trait.belowDefault() ? "#d45f5f" : "#6fc576");
-            Anchor tick = leftAnchor(0, Math.max(2, (int) Math.round(trait.fillRatio() * 20)), 3);
-            tick.setLeft(Value.of(2));
+            commandBuilder.set(slot + " #TraitTick.Background", trait.belowDefault() ? TRAIT_BELOW_COLOR : TRAIT_ABOVE_COLOR);
+            Anchor tick = leftAnchor(20, Math.max(2, (int) Math.round(trait.fillRatio() * TRAIT_TICK_WIDTH)), 3);
+            tick.setLeft(Value.of(4));
             commandBuilder.setObject(slot + " #TraitTick.Anchor", tick);
         }
     }
@@ -546,15 +555,15 @@ final class CommandTargetHudBinder {
     private static Anchor compactMeterAnchor() {
         Anchor anchor = new Anchor();
         anchor.setWidth(Value.of(COMPACT_METER_WIDTH));
-        anchor.setHeight(Value.of(COOLDOWN_ROW_HEIGHT));
+        anchor.setHeight(Value.of(COOLDOWN_CELL_HEIGHT));
         return anchor;
     }
 
     @Nonnull
     private static Anchor compactMeterFill(double ratio) {
         Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(16));
-        anchor.setLeft(Value.of(0));
+        anchor.setTop(Value.of(COMPACT_METER_FILL_TOP));
+        anchor.setLeft(Value.of(COMPACT_METER_FILL_LEFT));
         anchor.setWidth(Value.of((int) Math.round(clampRatio(ratio) * COMPACT_METER_FILL_WIDTH)));
         anchor.setHeight(Value.of(6));
         return anchor;
