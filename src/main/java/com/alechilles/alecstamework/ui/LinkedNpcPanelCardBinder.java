@@ -160,6 +160,7 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
+        commandBuilder.set(entrySelector + " #SlatePlate.AssetPath", slatePlatePath(entry));
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
@@ -767,6 +768,17 @@ final class LinkedNpcPanelCardBinder {
         };
         return nextStage.isEmpty() ? "" : LocalizedText.resolve(language,
                 "tamework.commandmenu.lifecycle.stage." + nextStage);
+    }
+
+    /** Off-atlas card background for the entry's state; paths are relative to the pack's Common folder. */
+    private static String slatePlatePath(LinkedNpcEntry entry) {
+        if (entry.dead()) {
+            return "Tamework/UI/Slate/card_dead.png";
+        }
+        if (entry.lost()) {
+            return "Tamework/UI/Slate/card_lost.png";
+        }
+        return entry.captured() ? "Tamework/UI/Slate/card_stored.png" : "Tamework/UI/Slate/card_world.png";
     }
 
     private static void bindLifecycleProgress(UICommandBuilder commands, String card,

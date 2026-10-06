@@ -44,6 +44,11 @@ Group {
     OutlineSize: 1;
     Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
+    // In-game AssetImage test: off-atlas pictures under Common/Tamework/UI/Slate (not Common/UI, so they stay out of the shared UI atlas).
+    // #SlatePlate covers the padded card and gets its AssetPath from LinkedNpcPanelCardBinder; #SlateStaticProbe sets AssetPath in markup only.
+    AssetImage #SlatePlate { Anchor: (Top: -8, Left: -10, Right: -10, Bottom: -8); FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+    AssetImage #SlateStaticProbe { Anchor: (Top: 2, Right: 40, Width: 20, Height: 20); AssetPath: "Tamework/UI/Slate/probe_paw.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+
     TextField #CardTarget { Visible: false; MaxLength: 36; }
 
     Group { Anchor: (Top: 36, Left: 156, Bottom: 0, Width: 1); Background: #414845; }
