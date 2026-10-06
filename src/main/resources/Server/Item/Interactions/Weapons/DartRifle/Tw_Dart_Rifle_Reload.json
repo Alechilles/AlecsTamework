@@ -1,43 +1,138 @@
 {
-  "$Comment": "Opens the bolt, loads one dart per loop until the rifle is full, the darts run out or the player fires, then closes the bolt.",
+  "$Comment": "Opens the bolt, loads up to 3 darts one at a time while there is room and darts remain, then closes the bolt. The steps are one chain on purpose. A Repeat runs each round in a forked chain, and when a fork ended the bolt dropped back to its closed bind pose for a few frames before the next fork opened it again.",
   "Type": "Simple",
   "RunTime": 0.5,
   "HorizontalSpeedMultiplier": 0.75,
+  "Rules": {
+    "InterruptedBy": [
+      "Primary",
+      "Secondary"
+    ]
+  },
   "Effects": {
     "ItemAnimationId": "ReloadOpen",
     "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Open",
     "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Open"
   },
   "Next": {
-    "Type": "Repeat",
-    "Repeat": -1,
-    "Rules": {
-      "InterruptedBy": [
-        "Primary",
-        "Secondary"
-      ]
+    "Type": "StatsCondition",
+    "LessThan": true,
+    "Costs": {
+      "Ammo": 100
     },
-    "ForkInteractions": {
-      "Interactions": [
-        {
-          "Type": "StatsCondition",
-          "LessThan": true,
-          "Costs": {
-            "Ammo": 100
+    "ValueType": "Percent",
+    "Failed": "Tw_Dart_Rifle_Reload_Close",
+    "Next": {
+      "Type": "ModifyInventory",
+      "RequiredGameMode": "Adventure",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Failed": "Tw_Dart_Rifle_Reload_Close",
+      "Next": {
+        "Type": "Simple",
+        "RunTime": 0.75,
+        "HorizontalSpeedMultiplier": 0.75,
+        "Rules": {
+          "InterruptedBy": [
+            "Primary",
+            "Secondary"
+          ]
+        },
+        "Effects": {
+          "ItemAnimationId": "ReloadLoad",
+          "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Load",
+          "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Load"
+        },
+        "Next": {
+          "Type": "ChangeStat",
+          "StatModifiers": {
+            "Ammo": 1
           },
-          "ValueType": "Percent",
           "Next": {
-            "Type": "ModifyInventory",
-            "RequiredGameMode": "Adventure",
-            "ItemToRemove": {
-              "Id": "Weapon_Arrow_Tranquilizer",
-              "Quantity": 1
+            "Type": "StatsCondition",
+            "LessThan": true,
+            "Costs": {
+              "Ammo": 100
             },
-            "Next": "Tw_Dart_Rifle_Reload_Load"
+            "ValueType": "Percent",
+            "Failed": "Tw_Dart_Rifle_Reload_Close",
+            "Next": {
+              "Type": "ModifyInventory",
+              "RequiredGameMode": "Adventure",
+              "ItemToRemove": {
+                "Id": "Weapon_Arrow_Tranquilizer",
+                "Quantity": 1
+              },
+              "Failed": "Tw_Dart_Rifle_Reload_Close",
+              "Next": {
+                "Type": "Simple",
+                "RunTime": 0.75,
+                "HorizontalSpeedMultiplier": 0.75,
+                "Rules": {
+                  "InterruptedBy": [
+                    "Primary",
+                    "Secondary"
+                  ]
+                },
+                "Effects": {
+                  "ItemAnimationId": "ReloadLoad",
+                  "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Load",
+                  "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Load"
+                },
+                "Next": {
+                  "Type": "ChangeStat",
+                  "StatModifiers": {
+                    "Ammo": 1
+                  },
+                  "Next": {
+                    "Type": "StatsCondition",
+                    "LessThan": true,
+                    "Costs": {
+                      "Ammo": 100
+                    },
+                    "ValueType": "Percent",
+                    "Failed": "Tw_Dart_Rifle_Reload_Close",
+                    "Next": {
+                      "Type": "ModifyInventory",
+                      "RequiredGameMode": "Adventure",
+                      "ItemToRemove": {
+                        "Id": "Weapon_Arrow_Tranquilizer",
+                        "Quantity": 1
+                      },
+                      "Failed": "Tw_Dart_Rifle_Reload_Close",
+                      "Next": {
+                        "Type": "Simple",
+                        "RunTime": 0.75,
+                        "HorizontalSpeedMultiplier": 0.75,
+                        "Rules": {
+                          "InterruptedBy": [
+                            "Primary",
+                            "Secondary"
+                          ]
+                        },
+                        "Effects": {
+                          "ItemAnimationId": "ReloadLoad",
+                          "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Load",
+                          "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Load"
+                        },
+                        "Next": {
+                          "Type": "ChangeStat",
+                          "StatModifiers": {
+                            "Ammo": 1
+                          },
+                          "Next": "Tw_Dart_Rifle_Reload_Close"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-      ]
-    },
-    "Failed": "Tw_Dart_Rifle_Reload_Close"
+      }
+    }
   }
 }
