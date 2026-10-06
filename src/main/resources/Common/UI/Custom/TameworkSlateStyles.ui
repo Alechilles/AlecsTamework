@@ -168,3 +168,6 @@ $C = "Common.ui";
 @SlateTitle = LabelStyle(FontSize: 17, FontName: "Secondary", LetterSpacing: 1, TextColor: @SlateText, VerticalAlignment: Center);
 @SlateSectionLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: @SlateDim, VerticalAlignment: Center);
 @SlateBody = LabelStyle(FontSize: 12, TextColor: @SlateSoft, VerticalAlignment: Center);
+// @SlateWindow with a 48 or 54 px header band and its teal rule baked in, so the band follows the cut corner.
+@SlateWindowHeader48 = PatchStyle(TexturePath: "Tamework/Slate/Window_Header48.png", HorizontalBorder: 28, VerticalBorder: 52);
+@SlateWindowHeader54 = PatchStyle(TexturePath: "Tamework/Slate/Window_Header54.png", HorizontalBorder: 28, VerticalBorder: 58);
