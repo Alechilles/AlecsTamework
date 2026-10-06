@@ -721,7 +721,6 @@ $C.@PageOverlay {
               CheckBox #TwSettingsAnimalOldAgeDeathCheck {
                 Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
                 Background: $A.@SlateQuiet;
-                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }

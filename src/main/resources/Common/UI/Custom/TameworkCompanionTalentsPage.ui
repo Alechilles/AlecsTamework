@@ -160,7 +160,7 @@ $C.@PageOverlay {
               Style: @TalentDetailStatusLocked;
             }
 
-            Group { Anchor: (Top: 116, Left: 0, Right: 0, Height: 1); Background: $A.@SlateRule; }
+            Group { Anchor: (Top: 116, Left: 0, Right: 0, Height: 1); Background: #ffffff(0.08); }
 
             Label #TalentDetailDescription {
               Anchor: (Top: 126, Left: 0, Right: 0, Height: 96);
