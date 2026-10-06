@@ -1,6 +1,13 @@
 # Changelog
 
-## 5.1.0 - Tranquilizer Dart Rifle - Unreleased
+## 5.1.0 - Tranquilizer Dart Rifle - 2026-10-06
+
+### Added
+
+- `TameworkFlyingOrbit` accepts an optional `AirborneTargetAltitudeRange`, a
+  separate vertical offset used while the target is flying, so two flyers can
+  settle at a similar height. Without it, `DesiredAltitudeRange` always
+  applies. `Kettle` mode ignores it.
 
 ### Changed
 
@@ -16,6 +23,13 @@
 ### Removed
 
 - The shortbow's charged shot, guard and volley are gone with the bow.
+
+### Fixed
+
+- The flight and shoulder buttons on bonded companion cards no longer ignore
+  clicks while the roster refreshes in the background.
+- Commands with `ShowInRadial: false` can now be assigned through the LMB
+  selector, as they can through Q, E, and R.
 
 ## 5.0.0 - Companion Store Rework - 2026-10-04
 
