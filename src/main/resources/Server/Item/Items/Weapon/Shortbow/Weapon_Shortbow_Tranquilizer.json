@@ -89,7 +89,8 @@
   },
   "Weapon": {
     "EntityStatsToClear": [
-      "Ammo"
+      "Ammo",
+      "Tw_Dart_Rifle_Loaded"
     ],
     "StatModifiers": {
       "Ammo": [
@@ -108,7 +109,7 @@
   "DurabilityLossOnHit": 0.35,
   "ItemSoundSetId": "ISS_Weapons_Wood",
   "ItemAppearanceConditions": {
-    "Ammo": [
+    "Tw_Dart_Rifle_Loaded": [
       {
         "Condition": [
           1,

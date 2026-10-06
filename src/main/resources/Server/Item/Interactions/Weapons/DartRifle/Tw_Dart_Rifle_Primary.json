@@ -1,5 +1,5 @@
 {
-  "$Comment": "Fire when a dart is loaded, otherwise start loading.",
+  "$Comment": "Fire when a dart is loaded, otherwise start loading. Between spending the dart and the shot, the stat the rifle's look follows is set to the new count.",
   "Type": "StatsCondition",
   "Costs": {
     "Ammo": 1
@@ -10,6 +10,44 @@
     "StatModifiers": {
       "Ammo": -1
     },
-    "Next": "Tw_Dart_Rifle_Shoot"
+    "Next": {
+      "Type": "StatsCondition",
+      "Costs": {
+        "Ammo": 2
+      },
+      "Next": {
+        "Type": "ChangeStat",
+        "Behaviour": "Set",
+        "ValueType": "Absolute",
+        "StatModifiers": {
+          "Tw_Dart_Rifle_Loaded": 2
+        },
+        "Next": "Tw_Dart_Rifle_Shoot"
+      },
+      "Failed": {
+        "Type": "StatsCondition",
+        "Costs": {
+          "Ammo": 1
+        },
+        "Next": {
+          "Type": "ChangeStat",
+          "Behaviour": "Set",
+          "ValueType": "Absolute",
+          "StatModifiers": {
+            "Tw_Dart_Rifle_Loaded": 1
+          },
+          "Next": "Tw_Dart_Rifle_Shoot"
+        },
+        "Failed": {
+          "Type": "ChangeStat",
+          "Behaviour": "Set",
+          "ValueType": "Absolute",
+          "StatModifiers": {
+            "Tw_Dart_Rifle_Loaded": 0
+          },
+          "Next": "Tw_Dart_Rifle_Shoot"
+        }
+      }
+    }
   }
 }

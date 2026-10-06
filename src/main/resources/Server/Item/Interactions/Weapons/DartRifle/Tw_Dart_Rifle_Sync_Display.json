@@ -1,0 +1,51 @@
+{
+  "$Comment": "Copies the loaded count (Ammo) to the stat the rifle's look follows. Changing the look rebuilds the held item, which drops whatever clip is playing, so this only runs when no reload clip is: before a shot and after the bolt closes.",
+  "Type": "StatsCondition",
+  "Costs": {
+    "Ammo": 3
+  },
+  "Next": {
+    "Type": "ChangeStat",
+    "Behaviour": "Set",
+    "ValueType": "Absolute",
+    "StatModifiers": {
+      "Tw_Dart_Rifle_Loaded": 3
+    }
+  },
+  "Failed": {
+    "Type": "StatsCondition",
+    "Costs": {
+      "Ammo": 2
+    },
+    "Next": {
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "ValueType": "Absolute",
+      "StatModifiers": {
+        "Tw_Dart_Rifle_Loaded": 2
+      }
+    },
+    "Failed": {
+      "Type": "StatsCondition",
+      "Costs": {
+        "Ammo": 1
+      },
+      "Next": {
+        "Type": "ChangeStat",
+        "Behaviour": "Set",
+        "ValueType": "Absolute",
+        "StatModifiers": {
+          "Tw_Dart_Rifle_Loaded": 1
+        }
+      },
+      "Failed": {
+        "Type": "ChangeStat",
+        "Behaviour": "Set",
+        "ValueType": "Absolute",
+        "StatModifiers": {
+          "Tw_Dart_Rifle_Loaded": 0
+        }
+      }
+    }
+  }
+}
