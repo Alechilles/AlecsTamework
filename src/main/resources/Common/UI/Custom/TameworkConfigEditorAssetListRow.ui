@@ -1,16 +1,18 @@
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 Group {
-  Anchor: (Top: 0, Left: 0, Right: 0, Height: 28);
+  Anchor: (Top: 0, Left: 0, Right: 4, Height: 28);
 
+  // The list sits on a quiet plate, so an unselected row draws nothing of its own.
   Group #AssetRowBackground {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-    Background: #202723;
   }
 
+  // The selected row: a primary plate under the whole row, shown by TameworkConfigEditorPage.java.
   Group #AssetRowSelectedBar {
-    Anchor: (Top: 0, Left: 0, Width: 3, Bottom: 0);
-    Background: #8bbd9a;
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: $A.@SlatePrimary;
     Visible: false;
   }
 
@@ -18,8 +20,8 @@ Group {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #35423a)),
-      Pressed: (Background: (Color: #2d3831))
+      Hovered: (Background: (Color: #ffffff(0.06))),
+      Pressed: (Background: (Color: #000000(0.2)))
     );
 
     Label #AssetRowLabel {
@@ -27,7 +29,7 @@ Group {
       Text: "";
       Style: (
         FontSize: 12,
-        TextColor: #e8e4da,
+        TextColor: #eef2f6,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         Wrap: false

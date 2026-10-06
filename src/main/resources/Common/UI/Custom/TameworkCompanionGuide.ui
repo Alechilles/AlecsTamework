@@ -1,63 +1,77 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
+// Topic rows are the shared group rows with wrapping labels, because translated topic names can run to two lines.
+// TameworkCompanionGuide.java swaps a button between these two styles by name.
+@GuideTopicLabel = LabelStyle(FontSize: 11, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
 @GuideTopicStyle = TextButtonStyle(
- Default: (Background: (Color: #202923), LabelStyle: (FontSize: 11, TextColor: #d6d9d0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true)),
- Hovered: (Background: (Color: #2d3831), LabelStyle: (FontSize: 11, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true)),
- Pressed: (Background: (Color: #354339), LabelStyle: (FontSize: 11, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true)),
+ Default: (Background: $A.@SlateQuiet, LabelStyle: @GuideTopicLabel),
+ Hovered: (Background: $A.@SlateQuietHover, LabelStyle: (...@GuideTopicLabel, TextColor: #eef2f6)),
+ Pressed: (Background: $A.@SlatePressed, LabelStyle: @GuideTopicLabel),
+ Sounds: $C.@ButtonSounds
+);
+@GuideTopicStyleSelected = TextButtonStyle(
+ Default: (Background: $A.@SlatePrimary, LabelStyle: (...@GuideTopicLabel, TextColor: #eafff8, RenderBold: true)),
+ Hovered: (Background: $A.@SlatePrimaryHover, LabelStyle: (...@GuideTopicLabel, TextColor: #ffffff, RenderBold: true)),
+ Pressed: (Background: $A.@SlatePrimary, LabelStyle: (...@GuideTopicLabel, TextColor: #eafff8, RenderBold: true)),
  Sounds: $C.@ButtonSounds
 );
 
 Group #TameworkCompanionGuideRoot {
  Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
  Visible: false;
- Background: #101311(0.94);
+ // Clear, so the plate's cut corners show the world and not a square; it still covers the command window's controls.
+ Background: #000000(0.0);
  Group #TameworkCompanionGuideFrame {
-  Anchor: (Top: 10, Left: 10, Right: 10, Bottom: 10);
-  Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
-  Group #TameworkCompanionGuideHeader { Anchor: (Top: 3, Left: 3, Right: 3, Height: 52); Background: #252b27;
-   Group { Anchor: (Top: 10, Left: 14, Width: 28, Height: 28); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; HitTestVisible: false; }
-   Label #TameworkCompanionGuideTitle { Anchor: (Top: 5, Left: 54, Right: 100, Height: 26); Text: ""; Style: (FontSize: 22, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
-   Label #TameworkCompanionGuideSubtitle { Anchor: (Top: 29, Left: 55, Right: 100, Height: 16); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); }
-   TextButton #TameworkCompanionGuideCloseButton { Anchor: (Top: 12, Right: 14, Width: 28, Height: 28); Text: ""; TooltipText: ""; Style: $A.@Remove; }
-   Group { Anchor: (Top: 14, Right: 16, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f67661); HitTestVisible: false; }
+  Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+  // Off-atlas page plate, 1120x860 with the 52-high header band baked in (TameworkUiKit).
+  AssetImage #TameworkCompanionGuidePlate { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); AssetPath: "Tamework/UI/Slate/page_guide.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+  Group #TameworkCompanionGuideHeader { Anchor: (Top: 0, Left: 0, Right: 0, Height: 52);
+   Group { Anchor: (Top: 9, Left: 20, Width: 34, Height: 34); Background: "Tamework/Slate/Badge.png"; HitTestVisible: false; }
+   Label #TameworkCompanionGuideTitle { Anchor: (Top: 6, Left: 66, Right: 100, Height: 24); Text: ""; Style: $A.@SlateTitle; }
+   Label #TameworkCompanionGuideSubtitle { Anchor: (Top: 29, Left: 67, Right: 100, Height: 16); Text: ""; Style: (FontSize: 11, TextColor: #8794a4, VerticalAlignment: Center); }
+   TextButton #TameworkCompanionGuideCloseButton { Anchor: (Top: 12, Right: 16, Width: 28, Height: 28); Text: ""; TooltipText: ""; Style: $A.@ActionQuiet; }
+   Group { Anchor: (Top: 14, Right: 18, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #c2ccd6); HitTestVisible: false; }
   }
-  Group #TameworkCompanionGuideTopics { Anchor: (Top: 64, Left: 12, Width: 128, Bottom: 12); Background: #171d19; OutlineColor: #414845; OutlineSize: 1;
-   Label #TameworkCompanionGuideTopicsLabel { Anchor: (Top: 8, Left: 10, Right: 10, Height: 22); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #c4dbc9, VerticalAlignment: Center); }
-   Group { Anchor: (Top: 36, Left: 6, Right: 6, Bottom: 6); LayoutMode: TopScrolling; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 4);
+  Group #TameworkCompanionGuideTopics { Anchor: (Top: 64, Left: 12, Width: 160, Bottom: 14); Background: #000000(0.28); OutlineColor: #000000(0.6); OutlineSize: 1;
+   Label #TameworkCompanionGuideTopicsLabel { Anchor: (Top: 8, Left: 12, Right: 10, Height: 22); Text: ""; Style: (...$A.@SlateSectionLabel, TextColor: #c2ccd6); }
+   Group { Anchor: (Top: 36, Left: 8, Right: 4, Bottom: 8); LayoutMode: TopScrolling; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 4);
     Group { Anchor: (Left: 0, Right: 0); LayoutMode: Top;
-     TextButton #TameworkCompanionGuideTopic0 { Anchor: (Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #d5b15c; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic1 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic2 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic3 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic4 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic5 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic6 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic7 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic8 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic9 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
-     TextButton #TameworkCompanionGuideTopic10 { Anchor: (Top: 3, Height: 42); Text: ""; Style: @GuideTopicStyle; OutlineColor: #414845; OutlineSize: 1; Padding: (Left: 8, Right: 4); }
+     TextButton #TameworkCompanionGuideTopic0 { Anchor: (Height: 38); Text: ""; Style: @GuideTopicStyleSelected; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic1 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic2 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic3 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic4 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic5 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic6 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic7 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic8 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic9 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
+     TextButton #TameworkCompanionGuideTopic10 { Anchor: (Top: 3, Height: 38); Text: ""; Style: @GuideTopicStyle; Padding: (Left: 10, Right: 6); }
     }
    }
   }
-  Group #TameworkCompanionGuideContent { Anchor: (Top: 64, Left: 152, Right: 12, Bottom: 12); Background: #181c1a; OutlineColor: #414845; OutlineSize: 1;
-   Label #TameworkCompanionGuideContentTitle { Anchor: (Top: 18, Left: 20, Right: 20, Height: 30); Text: ""; Style: (FontSize: 22, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
-   Group { Anchor: (Top: 56, Left: 20, Right: 20, Height: 1); Background: #414845; }
+  // 924 wide: the example well is inset 14 and the 880-wide companion card a further 8.
+  Group #TameworkCompanionGuideContent { Anchor: (Top: 64, Left: 184, Right: 12, Bottom: 14);
+   Label #TameworkCompanionGuideContentTitle { Anchor: (Top: 14, Left: 20, Right: 110, Height: 34); Text: ""; Style: (...$A.@SlateTitle, FontSize: 20); }
+   Group { Anchor: (Top: 22, Right: 20, Width: 70, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #8794a4); HitTestVisible: false;
+    Label #TameworkCompanionGuidePage { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); Text: ""; Style: (FontSize: 9, RenderBold: true, LetterSpacing: 1, TextColor: #8794a4, HorizontalAlignment: Center, VerticalAlignment: Center); }
+   }
+   Group { Anchor: (Top: 56, Left: 20, Right: 20, Height: 1); Background: #ffffff(0.1); }
    Group #TameworkCompanionGuideBodyViewport { Anchor: (Top: 70, Left: 20, Right: 20, Height: 210); }
-   Group #TameworkCompanionGuideExample { Anchor: (Top: 294, Left: 14, Right: 14, Bottom: 60); Background: #202423; OutlineColor: #4a5a50; OutlineSize: 1;
-    Label #TameworkCompanionGuideExampleTitle { Anchor: (Top: 12, Left: 14, Right: 14, Height: 22); Text: ""; Style: (FontSize: 15, RenderBold: true, TextColor: #d5b15c, VerticalAlignment: Center); }
+   Group #TameworkCompanionGuideExample { Anchor: (Top: 294, Left: 14, Right: 14, Bottom: 60); Background: #000000(0.28); OutlineColor: #000000(0.6); OutlineSize: 1;
+    Label #TameworkCompanionGuideExampleTitle { Anchor: (Top: 8, Left: 14, Right: 14, Height: 22); Text: ""; Style: (FontSize: 13, RenderBold: true, TextColor: #eef2f6, VerticalAlignment: Center); }
     TextButton #TameworkCompanionGuideExamplePreviousButton { Anchor: (Top: 34, Left: 14, Width: 76, Height: 24); Text: ""; Style: $A.@PanelButton; Visible: false; }
-    Label #TameworkCompanionGuideScenarioTitle { Anchor: (Top: 34, Left: 98, Right: 98, Height: 24); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center); }
+    Label #TameworkCompanionGuideScenarioTitle { Anchor: (Top: 34, Left: 98, Right: 98, Height: 24); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Center, VerticalAlignment: Center); }
     TextButton #TameworkCompanionGuideExampleNextButton { Anchor: (Top: 34, Right: 14, Width: 76, Height: 24); Text: ""; Style: $A.@PanelButton; }
     // The production card document is appended here at runtime, with detached guide data.
-    Group #TameworkCompanionGuideExampleCard { Anchor: (Top: 62, Left: 14, Right: 14, Height: 176); }
-    Label #TameworkCompanionGuideExampleNote { Anchor: (Top: 250, Left: 14, Right: 14, Bottom: 48); Text: ""; Style: (FontSize: 12, TextColor: #c8ccc5, Wrap: true, VerticalAlignment: Center); }
-    Label #TameworkCompanionGuideExampleLabel { Anchor: (Bottom: 8, Left: 14, Right: 14, Height: 32); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, Wrap: true, VerticalAlignment: Center); }
+    Group #TameworkCompanionGuideExampleCard { Anchor: (Top: 62, Left: 8, Right: 8, Height: 182); }
+    Label #TameworkCompanionGuideExampleNote { Anchor: (Top: 250, Left: 16, Right: 16, Bottom: 48); Text: ""; Style: (FontSize: 13, TextColor: #c2ccd6, Wrap: true, VerticalAlignment: Center); }
+    Label #TameworkCompanionGuideExampleLabel { Anchor: (Bottom: 8, Left: 16, Right: 16, Height: 32); Text: ""; Style: (FontSize: 11, TextColor: #8794a4, Wrap: true, VerticalAlignment: Center); }
    }
-   TextButton #TameworkCompanionGuideBackButton { Anchor: (Bottom: 16, Left: 20, Width: 140, Height: 28); Text: ""; Style: $A.@PanelButton; }
-   TextButton #TameworkCompanionGuidePreviousButton { Anchor: (Bottom: 16, Left: 168, Width: 92, Height: 28); Text: ""; Style: $A.@PanelButton; Visible: false; }
-   Label #TameworkCompanionGuidePage { Anchor: (Bottom: 16, Left: 268, Width: 80, Height: 28); Text: ""; Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center); }
-   TextButton #TameworkCompanionGuideNextButton { Anchor: (Bottom: 16, Right: 20, Width: 92, Height: 28); Text: ""; Style: $A.@PanelButton; }
+   TextButton #TameworkCompanionGuideBackButton { Anchor: (Bottom: 16, Left: 20, Width: 150, Height: 28); Text: ""; Style: $A.@PanelButtonQuiet; }
+   TextButton #TameworkCompanionGuidePreviousButton { Anchor: (Bottom: 16, Left: 180, Width: 92, Height: 28); Text: ""; Style: $A.@PanelButton; Visible: false; }
+   TextButton #TameworkCompanionGuideNextButton { Anchor: (Bottom: 16, Right: 20, Width: 92, Height: 28); Text: ""; Style: $A.@PanelButtonPrimary; }
   }
  }
 }

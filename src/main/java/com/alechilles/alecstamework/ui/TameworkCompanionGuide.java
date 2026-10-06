@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -172,8 +173,8 @@ final class TameworkCompanionGuide {
             TameworkCompanionGuideContent.Topic listed = TameworkCompanionGuideContent.TOPICS[index];
             commands.set("#TameworkCompanionGuideTopic" + index + ".Text",
                     text(language, "topic." + listed.key() + ".title"));
-            commands.set("#TameworkCompanionGuideTopic" + index + ".OutlineColor",
-                    index == topicIndex ? "#d5b15c" : "#414845");
+            commands.set("#TameworkCompanionGuideTopic" + index + ".Style", Value.ref("TameworkCompanionGuide.ui",
+                    index == topicIndex ? "GuideTopicStyleSelected" : "GuideTopicStyle"));
         }
     }
 

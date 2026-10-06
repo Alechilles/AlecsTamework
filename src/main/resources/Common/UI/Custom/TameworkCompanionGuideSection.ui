@@ -1,16 +1,16 @@
 Group {
  Anchor: (Left: 0, Right: 0);
  LayoutMode: Top;
- Padding: (Bottom: 18);
+ Padding: (Bottom: 14);
  Label #Heading {
   Anchor: (Left: 0, Right: 0);
-  Padding: (Bottom: 6);
+  Padding: (Bottom: 4);
   Text: "";
-  Style: (FontSize: 17, RenderBold: true, TextColor: #d5b15c, Wrap: true, VerticalAlignment: Start);
+  Style: (FontSize: 14, RenderBold: true, TextColor: #f2c66d, Wrap: true, VerticalAlignment: Start);
  }
  Label #Body {
   Anchor: (Left: 0, Right: 0);
   Text: "";
-  Style: (FontSize: 14, TextColor: #d6d9d0, Wrap: true, VerticalAlignment: Start);
+  Style: (FontSize: 13, TextColor: #c2ccd6, Wrap: true, VerticalAlignment: Start);
  }
 }

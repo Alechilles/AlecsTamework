@@ -1,32 +1,36 @@
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 Group {
   Anchor: (Top: 0, Left: 0, Right: 0, Height: 28);
 
   Group #SectionRowBackground {
-    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-    Background: #252b27;
+    // TameworkConfigEditorPage.java sets an opaque Slate tone by depth.
+    Anchor: (Top: 1, Left: 0, Right: 4, Bottom: 1);
+    Background: #2d3744;
+    OutlineColor: #06080b;
+    OutlineSize: 1;
   }
 
   Group #SectionGuideDepth1 {
     Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
-    Background: #526a57;
+    Background: #5fe0c0(0.35);
     Visible: false;
   }
 
   Group #SectionGuideDepth2 {
     Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
-    Background: #526a57;
+    Background: #5fe0c0(0.35);
     Visible: false;
   }
 
   Button #SectionToggleTopButton {
-    Anchor: (Top: 2, Left: 4, Right: 0, Height: 24);
+    Anchor: (Top: 2, Left: 4, Right: 8, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #35423a)),
-      Pressed: (Background: (Color: #2d3831))
+      Hovered: (Background: (Color: #ffffff(0.06))),
+      Pressed: (Background: (Color: #000000(0.2)))
     );
 
     Group #SectionToggleTopIconContainer {
@@ -35,13 +39,13 @@ Group {
 
       Group #SectionToggleTopExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
         Visible: true;
       }
 
       Group #SectionToggleTopCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
         Visible: false;
       }
     }
@@ -51,9 +55,9 @@ Group {
       FlexWeight: 1;
       Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
-        FontSize: 13,
+        FontSize: 11,
         RenderBold: true,
-        TextColor: #c4dbc9,
+        TextColor: #eef2f6,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -104,7 +108,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #afb6b0,
+          TextColor: #8794a4,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -136,12 +140,12 @@ Group {
   }
 
   Button #SectionToggleNestedButton {
-    Anchor: (Top: 2, Left: 26, Right: 0, Height: 24);
+    Anchor: (Top: 2, Left: 26, Right: 8, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #35423a)),
-      Pressed: (Background: (Color: #2d3831))
+      Hovered: (Background: (Color: #ffffff(0.06))),
+      Pressed: (Background: (Color: #000000(0.2)))
     );
     Visible: false;
 
@@ -151,13 +155,13 @@ Group {
 
       Group #SectionToggleNestedExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
         Visible: true;
       }
 
       Group #SectionToggleNestedCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
         Visible: false;
       }
     }
@@ -167,9 +171,9 @@ Group {
       FlexWeight: 1;
       Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
-        FontSize: 13,
+        FontSize: 11,
         RenderBold: true,
-        TextColor: #c4dbc9,
+        TextColor: #eef2f6,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -220,7 +224,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #afb6b0,
+          TextColor: #8794a4,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -252,12 +256,12 @@ Group {
   }
 
   Button #SectionToggleDeepButton {
-    Anchor: (Top: 2, Left: 48, Right: 0, Height: 24);
+    Anchor: (Top: 2, Left: 48, Right: 8, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #35423a)),
-      Pressed: (Background: (Color: #2d3831))
+      Hovered: (Background: (Color: #ffffff(0.06))),
+      Pressed: (Background: (Color: #000000(0.2)))
     );
     Visible: false;
 
@@ -267,13 +271,13 @@ Group {
 
       Group #SectionToggleDeepExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
         Visible: true;
       }
 
       Group #SectionToggleDeepCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #b4bfcc);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
         Visible: false;
       }
     }
@@ -283,9 +287,9 @@ Group {
       FlexWeight: 1;
       Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
-        FontSize: 13,
+        FontSize: 11,
         RenderBold: true,
-        TextColor: #c4dbc9,
+        TextColor: #eef2f6,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -336,7 +340,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #afb6b0,
+          TextColor: #8794a4,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
