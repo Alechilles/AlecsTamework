@@ -81,9 +81,6 @@ public final class ActionTameworkDenyCaptureUntamed extends TameworkActionBase {
                 if (i18n != null) {
                     display = i18n.getMessage(language, key);
                 }
-                if (display == null || display.isBlank()) {
-                    display = key;
-                }
             }
             if (display == null || display.isBlank()) {
                 if (registry != null) {

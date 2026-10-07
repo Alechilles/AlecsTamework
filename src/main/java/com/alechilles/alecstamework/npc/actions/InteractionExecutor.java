@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -685,7 +686,7 @@ final class InteractionExecutor {
             ui.showSuccessKey(
                     player,
                     "tamework.ui.notifications.tame.autoLink.linked",
-                    safeCompanion(result.animalDisplayName()),
+                    safeCompanion(player, result.animalDisplayName()),
                     safeCommandItem(result.commandItemDisplayName())
             );
             return;
@@ -694,15 +695,17 @@ final class InteractionExecutor {
             ui.showWarningKey(
                     player,
                     "tamework.ui.notifications.tame.autoLink.noTool",
-                    safeCompanion(result.animalDisplayName()),
+                    safeCompanion(player, result.animalDisplayName()),
                     safeCommandItem(result.commandItemDisplayName()),
                     safeCraftingStation(result.craftingStationDisplayName())
             );
         }
     }
 
-    private String safeCompanion(String value) {
-        return value == null || value.isBlank() ? "Companion" : value;
+    private String safeCompanion(Player player, String value) {
+        return value == null || value.isBlank()
+                ? LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName")
+                : value;
     }
 
     private String safeCommandItem(String value) {
