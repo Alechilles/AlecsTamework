@@ -1,5 +1,7 @@
 $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
+@ReviveSummaryReady = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #7fe08f, HorizontalAlignment: Start, VerticalAlignment: Center);
+@ReviveSummaryBlocked = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Center);
 Group #TameworkLinkedPanelRoot {
   Anchor: (Top: 54, Left: 176, Width: 928, Height: 790);
  Visible: false;
@@ -341,53 +343,73 @@ Group #TameworkLinkedPanelPagination {
             Background: #05080b(0.82);
             Visible: false;
 
+            // Sized and placed by LinkedNpcPanelReviveOverlayState: it grows with the number of cost lines.
             Group #TameworkLinkedPanelReviveModal {
-                Anchor: (Top: 230, Left: 273, Width: 382, Height: 180);
-                Background: $A.@SlateModal;
+                Anchor: (Top: 200, Left: 254, Width: 420, Height: 276);
+                Background: $A.@SlateWindowHeader48;
 
                 Label #TameworkLinkedPanelReviveTitle {
-                    Anchor: (Top: 10, Left: 14, Width: 354, Height: 24);
+                    Anchor: (Top: 0, Left: 22, Width: 376, Height: 48);
                     Text: %server.tamework.ui.linkedPanel.revive.title;
-                    Style: (FontSize: 18, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: $A.@SlateTitle;
+                }
+
+                Label #TameworkLinkedPanelReviveSubtitle {
+                    Anchor: (Top: 58, Left: 16, Width: 388, Height: 18);
+                    Text: "";
+                    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Label {
+                    Anchor: (Top: 80, Left: 16, Width: 388, Height: 16);
+                    Text: %server.tamework.ui.linkedPanel.revive.costHeader;
+                    Style: $A.@SlateSectionLabel;
                 }
 
                 Group #TameworkLinkedPanelReviveCostViewport {
-                    Anchor: (Top: 44, Left: 14, Width: 354, Height: 88);
+                    Anchor: (Top: 100, Left: 16, Width: 388, Height: 96);
                     KeepScrollPosition: true;
                     ScrollbarStyle: $C.@DefaultScrollbarStyle;
                     LayoutMode: TopScrolling;
 
                     Group #TameworkLinkedPanelReviveCostList {
                         LayoutMode: Top;
-                        Anchor: (Bottom: 4);
                     }
                 }
 
+                Label #TameworkLinkedPanelReviveSummary {
+                    Anchor: (Top: 202, Left: 16, Width: 388, Height: 18);
+                    Text: "";
+                    Style: @ReviveSummaryBlocked;
+                }
+
                 Group #TameworkLinkedPanelReviveActions {
-                    Anchor: (Top: 146, Left: 14, Width: 354, Height: 24);
+                    Anchor: (Top: 232, Left: 16, Width: 388, Height: 30);
                     LayoutMode: Left;
 
                     Group { Anchor: (Width: 158); }
 
                     TextButton #TameworkLinkedPanelReviveCancelButton {
-                        Style: $A.@PanelButton;
-                        Anchor: (Width: 88, Height: 24);
+                        Style: $A.@PanelButtonQuiet;
+                        Anchor: (Width: 100, Height: 30);
                         Text: %server.tamework.ui.shared.button.cancel;
                     }
 
-                    Group { Anchor: (Width: 8); }
+                    Group { Anchor: (Width: 10); }
 
                     TextButton #TameworkLinkedPanelReviveConfirmButton {
                         Style: $A.@PanelButtonPrimary;
-                        Anchor: (Width: 100, Height: 24);
+                        Anchor: (Width: 120, Height: 30);
                         Text: %server.tamework.ui.linkedPanel.revive.confirm;
                         Visible: false;
                     }
 
+                    // Shown in place of the confirm button while the cost cannot be paid: the same button, greyed out.
                     Label #TameworkLinkedPanelReviveBlockedButton {
-                        Anchor: (Width: 100, Height: 24);
+                        Anchor: (Width: 120, Height: 30);
                         Text: %server.tamework.ui.linkedPanel.revive.confirm;
-                        Style: (FontSize: 13, RenderBold: true, TextColor: #445974, HorizontalAlignment: Center, VerticalAlignment: Center);
+                        Background: $A.@SlateDisabled;
+                        Style: (FontSize: 12, RenderBold: true, TextColor: #445974, HorizontalAlignment: Center, VerticalAlignment: Center);
                         Visible: false;
                     }
                 }

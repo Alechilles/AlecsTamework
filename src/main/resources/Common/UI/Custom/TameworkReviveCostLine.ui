@@ -1,13 +1,22 @@
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
-@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 32, SlotSpacing: 0, SlotIconSize: 32);
+@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 30, SlotSpacing: 0, SlotIconSize: 30);
+@ReviveCostCount = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #7fe08f, HorizontalAlignment: End, VerticalAlignment: Center);
+@ReviveCostCountShort = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #e5786d, HorizontalAlignment: End, VerticalAlignment: Center);
 
+// One required item: a 44 px plate and a 4 px gap. LinkedNpcPanelReviveOverlayState shows the green or the red
+// set (edge, count, and a check or a "Missing N" pill) by whether the line is satisfied.
 Group {
-    Anchor: (Height: 44, Left: 0, Right: 0);
-    Background: #000000(0.3);
+    Anchor: (Height: 48, Left: 0, Right: 0);
 
+    Group { Anchor: (Top: 0, Left: 0, Right: 0, Height: 44); Background: $A.@SlateQuiet; }
+    Group #CostEdgeSatisfied { Anchor: (Top: 1, Left: 1, Width: 3, Height: 42); Background: #7fe08f; Visible: false; }
+    Group #CostEdgeInsufficient { Anchor: (Top: 1, Left: 1, Width: 3, Height: 42); Background: #e5786d; Visible: false; }
+
+    Group { Anchor: (Top: 5, Left: 12, Width: 34, Height: 34); Background: $A.@SlateNormal; }
     ItemGrid #CostItem {
-        Anchor: (Top: 6, Left: 7, Width: 32, Height: 32);
+        Anchor: (Top: 7, Left: 14, Width: 30, Height: 30);
         SlotsPerRow: 1;
         RenderItemQualityBackground: false;
         InfoDisplay: None;
@@ -15,22 +24,27 @@ Group {
     }
 
     Label #CostName {
-        Anchor: (Top: 0, Left: 47, Width: 178, Height: 44);
+        Anchor: (Top: 0, Left: 56, Width: 150, Height: 44);
         Text: "";
-        Style: (FontSize: 12, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+        Style: (FontSize: 13, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Group #CostCheck { Anchor: (Top: 13, Right: 76, Width: 18, Height: 18); Background: (TexturePath: "TwConfigCheck.png", Color: #7fe08f); Visible: false; }
+    Group #CostShortage { Anchor: (Top: 13, Right: 76, Width: 96, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #e5786d); Visible: false;
+        Label #CostShortageText { Anchor: (Top: 0, Left: 4, Right: 4, Height: 18); Text: ""; Style: (FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #f3aa9d, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
 
     Label #CostSatisfied {
-        Anchor: (Top: 0, Right: 9, Width: 82, Height: 44);
+        Anchor: (Top: 0, Right: 12, Width: 60, Height: 44);
         Text: "0 / 0";
-        Style: (FontSize: 12, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: End, VerticalAlignment: Center);
+        Style: @ReviveCostCount;
         Visible: false;
     }
 
     Label #CostInsufficient {
-        Anchor: (Top: 0, Right: 9, Width: 82, Height: 44);
+        Anchor: (Top: 0, Right: 12, Width: 60, Height: 44);
         Text: "0 / 0";
-        Style: (FontSize: 12, RenderBold: true, TextColor: #e5786d, HorizontalAlignment: End, VerticalAlignment: Center);
+        Style: @ReviveCostCountShort;
         Visible: false;
     }
 

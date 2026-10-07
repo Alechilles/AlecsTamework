@@ -169,7 +169,7 @@ final class LinkedNpcPanelFeatureBinder {
         return "";
     }
 
-    private static String revivalStatus(
+    static String revivalStatus(
             CommandReviveCostPresentation revival,
             String language
     ) {
