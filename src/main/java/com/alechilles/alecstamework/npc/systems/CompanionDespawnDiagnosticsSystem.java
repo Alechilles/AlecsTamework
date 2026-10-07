@@ -17,9 +17,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,7 +34,8 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
     private final ComponentType<EntityStore, SpawnMarkerReference> spawnMarkerReferenceType;
     private final ComponentType<EntityStore, SpawnBeaconReference> spawnBeaconReferenceType;
     private final ComponentType<EntityStore, UUIDComponent> uuidType;
-    private final Map<String, TrackedNpcSnapshot> trackedByReference = new HashMap<>();
+    // One system instance serves every world thread.
+    private final Map<String, TrackedNpcSnapshot> trackedByReference = new ConcurrentHashMap<>();
 
     public CompanionDespawnDiagnosticsSystem(ComponentType<EntityStore, NPCEntity> npcType,
                                              ComponentType<EntityStore, TameworkTamedComponent> tamedType,
@@ -55,12 +56,15 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        String refKey = key(reference);
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || !plugin.isDebugDespawnEnabled()) {
-            trackedByReference.remove(refKey);
+            // Runs for every entity add; skip building the key unless a debug session left entries.
+            if (!trackedByReference.isEmpty()) {
+                trackedByReference.remove(key(reference));
+            }
             return;
         }
+        String refKey = key(reference);
         if (npcType == null) {
             return;
         }
@@ -124,12 +128,15 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                                @Nonnull RemoveReason reason,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        String refKey = key(reference);
-        TrackedNpcSnapshot tracked = trackedByReference.remove(refKey);
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || !plugin.isDebugDespawnEnabled()) {
+            if (!trackedByReference.isEmpty()) {
+                trackedByReference.remove(key(reference));
+            }
             return;
         }
+        String refKey = key(reference);
+        TrackedNpcSnapshot tracked = trackedByReference.remove(refKey);
         NPCEntity npc = npcType == null ? null : store.getComponent(reference, npcType);
         String roleName = resolveRoleName(npc, tracked);
         TameworkTamedComponent tamed = tamedType == null ? null : store.getComponent(reference, tamedType);

@@ -49,7 +49,11 @@ public final class AvatarFlightPacketInputCapture {
         if (world == null) {
             return;
         }
-        world.execute(() -> captureOnWorld(packet, playerUuid, ref, store));
+        try {
+            world.execute(() -> captureOnWorld(packet, playerUuid, ref, store));
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; this input sample is dropped.
+        }
     }
 
     public static void clear(@Nonnull UUID playerUuid) {
