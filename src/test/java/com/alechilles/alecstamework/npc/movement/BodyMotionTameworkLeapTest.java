@@ -31,6 +31,21 @@ class BodyMotionTameworkLeapTest {
     }
 
     @Test
+    void stopDistanceLandsShortOfTheTargetAndNeverBehindTakeoff() {
+        var arc = new BodyMotionTameworkLeap.Arc(1, 1, 1.5);
+        arc.start(new Vector3d(0, 0, 0), new Vector3d(3, 2, 4));
+        Vector3d position = arc.advance(1, new Vector3d());
+        assertEquals(2.1, position.x, 1e-9);
+        assertEquals(2, position.y, 1e-9);
+        assertEquals(2.8, position.z, 1e-9);
+
+        arc.start(new Vector3d(5, 0, 5), new Vector3d(5.6, 0, 5.8));
+        arc.advance(1, position);
+        assertEquals(5, position.x, 1e-9);
+        assertEquals(5, position.z, 1e-9);
+    }
+
+    @Test
     void interruptedLeapCanStartAgainWithoutOldTargetOrElapsedTime() {
         var arc = new BodyMotionTameworkLeap.Arc(1.2, 4);
         arc.start(new Vector3d(), new Vector3d(12, 0, 0));

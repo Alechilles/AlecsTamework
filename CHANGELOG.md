@@ -32,6 +32,8 @@
   NPC holds its settle posture and restarts its cycle when another instruction
   sets `Tamework_Wander_Reset`, so outside behaviors can stand a resting NPC up
   before moving it.
+- Modders: `TameworkLeap` takes a `StopDistance` to land that many blocks short
+  of its target, so an NPC can pounce to just in front of a player.
 
 ### Fixed
 
