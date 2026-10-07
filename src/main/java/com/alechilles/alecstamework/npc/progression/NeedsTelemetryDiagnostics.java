@@ -42,7 +42,7 @@ public final class NeedsTelemetryDiagnostics {
             Set.of("NO_ALLOWED_FOOD_IN_RANGE", "NO_CONTAINER_IN_RANGE", "NO_ITEMS_CONSUMED");
     private static final Set<String> EXPECTED_CONSUME_REASONS = Set.of(
             "not_near_water", "food_refill_disabled", "water_refill_disabled",
-            "no_refill_applied", "needs_update_no_change");
+            "no_refill_applied");
 
     public static void recordSeekFailure(@Nullable String roleId,
                                          @Nonnull String resourceType,

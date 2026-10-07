@@ -1281,7 +1281,7 @@ tamework.commands.api.description=Comandos de ferramentas da API do Tamework.
 tamework.commands.apiSelfTestCommandSupport.api.self.test.fixtures.are.not.available=Os itens de teste automático da API não estão disponíveis.
 tamework.commands.apiSelfTestCommandSupport.api.self.test.runner.is.not.available=O executor do teste automático da API não está disponível.
 tamework.commands.apiSelfTestCommandSupport.no.api.self.test.fixture.set.found=Nenhum conjunto de itens de teste automático da API foi encontrado neste mundo.
-tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role=- {0}: npcUuid={1}, dono={2}, função={3}
+tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role= - {0}: npcUuid={1}, owner={2}, role={3}
 tamework.commands.apiSelfTestCommandSupport.tamework.api.is.not.available=Tamework API não está disponível.
 tamework.commands.apiSelfTestCommandSupport.tamework.plugin.not.available=O plugin Tamework não está disponível.
 tamework.commands.apiSelfTestCommandSupport.you.do.not.have.permission.to.use=Você não tem permissão para usar /tw api test.
@@ -1294,7 +1294,7 @@ tamework.commands.apiTestReset.unable.to.resolve.the.player.for.fixture=Não foi
 tamework.commands.apiTestRun.description=Executar as suítes de teste automático da API do Tamework em tempo real.
 tamework.commands.apiTestRun.that.suite.requires.prepared.in.world.fixtures=Essa suíte exige itens de teste preparados no mundo. No console, use core, command-hud, diagnostics, hydragon-integrations ou all para o agregado somente leitura.
 tamework.commands.apiTestRun.usage.tw.api.test.run.core.profile=Uso: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|command-ui|command-hud|diagnostics|hydragon-integrations|all] [verbose]
-tamework.commands.apiTestStatus.api.self.test.status.runner.fixtures.player=Estado do teste automático da API: executor={0}, itens de teste=por jogador, preparar/redefinir=por jogador. Use /tw api test run all para o agregado seguro para o console.
+tamework.commands.apiTestStatus.api.self.test.status.runner.fixtures.player=Estado do teste automático da API: runner={0}, fixtures=player-scoped, prepare/reset=player-scoped. Use /tw api test run all para o agregado seguro para o console.
 tamework.commands.apiTestStatus.description=Mostrar o estado atual dos itens de teste automático da API.
 tamework.commands.commandRoot.description=Comandos do Tamework.
 tamework.commands.config.description=Abrir o editor de configuração do Tamework.
@@ -1576,7 +1576,7 @@ tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.no.longer=Rast
 tamework.commands.showHitboxes.no.npc.found.in.view=Nenhum NPC encontrado à vista.
 tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across=Renderizada 1 hitbox principal e {0} caixas de detalhe em {1} grupos de detalhe.
 tamework.commands.showHitboxes.target.npc.is.missing.required.components=O NPC alvo não tem os componentes necessários.
-tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Rastreando a depuração de hitbox do NPC {0} (função={1}) com atualizações por tick (visível somente para você). Execute /tw debug view hitboxes novamente para desativar.
+tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Rastreando a depuração de hitbox do NPC {0} (role={1}) com atualizações por tick (visível somente para você). Execute /tw debug view hitboxes novamente para desativar.
 tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid=Não foi possível determinar o UUID do seu jogador.
 tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s=...e mais {0} beacon(s) carregado(s).
 tamework.commands.showSpawnBeacons.at=  {0} em {1}

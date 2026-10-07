@@ -1303,7 +1303,7 @@ tamework.commands.api.description=Tamework-API-Werkzeugbefehle.
 tamework.commands.apiSelfTestCommandSupport.api.self.test.fixtures.are.not.available=Die API-Selbsttest-Fixtures sind nicht verfügbar.
 tamework.commands.apiSelfTestCommandSupport.api.self.test.runner.is.not.available=Der API-Selbsttest-Runner ist nicht verfügbar.
 tamework.commands.apiSelfTestCommandSupport.no.api.self.test.fixture.set.found=In dieser Welt wurde kein API-Selbsttest-Fixture-Set gefunden.
-tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role= - {0}: npcUuid={1}, Besitzer={2}, Rolle={3}
+tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role= - {0}: npcUuid={1}, owner={2}, role={3}
 tamework.commands.apiSelfTestCommandSupport.tamework.api.is.not.available=Die Tamework-API ist nicht verfügbar.
 tamework.commands.apiSelfTestCommandSupport.tamework.plugin.not.available=Das Tamework-Plugin ist nicht verfügbar.
 tamework.commands.apiSelfTestCommandSupport.you.do.not.have.permission.to.use=Du hast keine Berechtigung für /tw api test.
@@ -1598,7 +1598,7 @@ tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.no.longer=Hitb
 tamework.commands.showHitboxes.no.npc.found.in.view=Kein NPC im Blickfeld gefunden.
 tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across=1 Haupt-Hitbox und {0} Detailboxen in {1} Detailgruppen dargestellt.
 tamework.commands.showHitboxes.target.npc.is.missing.required.components=Dem Ziel-NPC fehlen erforderliche Komponenten.
-tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Hitbox-Debug für NPC {0} (Rolle={1}) wird mit Updates pro Tick verfolgt (nur für dich sichtbar). Führe /tw debug view hitboxes erneut aus, um es zu deaktivieren.
+tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Hitbox-Debug für NPC {0} (role={1}) wird mit Updates pro Tick verfolgt (nur für dich sichtbar). Führe /tw debug view hitboxes erneut aus, um es zu deaktivieren.
 tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid=Deine Spieler-UUID konnte nicht ermittelt werden.
 tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s=  ...und {0} weitere geladene Beacon(s).
 tamework.commands.showSpawnBeacons.at=  {0} bei {1}

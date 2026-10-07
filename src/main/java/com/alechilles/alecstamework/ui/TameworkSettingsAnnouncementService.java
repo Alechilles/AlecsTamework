@@ -160,13 +160,14 @@ public final class TameworkSettingsAnnouncementService {
         openAnnouncement(playerUuid, event.getPlayerRef(), store, player, true, false);
     }
 
+    /** Opens the announcement for a command; returns null on success, else the translation key of the reason. */
     @Nullable
     public String openAnnouncementNow(@Nonnull Ref<EntityStore> playerRef,
                                       @Nonnull Store<EntityStore> store,
                                       @Nonnull Player player) {
         UUID playerUuid = player.getUuid();
         if (playerUuid == null) {
-            return LocalizedText.resolve(player, "tamework.ui.settingsAnnouncement.openUnavailable");
+            return "tamework.ui.settingsAnnouncement.openUnavailable";
         }
         return openAnnouncement(playerUuid, playerRef, store, player, false, true);
     }
@@ -179,10 +180,10 @@ public final class TameworkSettingsAnnouncementService {
                                     boolean respectEnabled,
                                     boolean ignoreOptOutState) {
         if (!playerRef.isValid()) {
-            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
         if (player.getPageManager() == null) {
-            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
 
         ResolvedAnnouncement announcement = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
@@ -227,10 +228,10 @@ public final class TameworkSettingsAnnouncementService {
 
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
         if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, uiPlayerRef)) {
-            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.you.do.not.have.permission.to.use");
+            return respectEnabled ? null : "tamework.commands.news.you.do.not.have.permission.to.use";
         }
 
         ResolvedAnnouncement selectedAnnouncement = announcement;
@@ -268,7 +269,7 @@ public final class TameworkSettingsAnnouncementService {
                             "Failed to open Tamework settings announcement."
                     ).build()
             );
-            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
     }
 

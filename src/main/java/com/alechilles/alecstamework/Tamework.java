@@ -3270,15 +3270,20 @@ public class Tamework extends JavaPlugin {
         if (tranquilizerRecipeVisibilityService == null) {
             return;
         }
-        try {
-            tranquilizerRecipeVisibilityService.reconcile();
-        } catch (RuntimeException exception) {
-            // The recipe map is not thread safe, and another plugin can load recipes while this
-            // pass iterates it. Recipe visibility is optional and the next recipe or item asset
-            // event runs the pass again, so a failed pass must not fail plugin start.
-            getLogger().at(Level.WARNING).withCause(exception).log(
-                    "Skipped a gated recipe visibility pass; it runs again on the next recipe asset change.");
+        // The recipe map is not thread safe, and another plugin can load recipes while this pass
+        // iterates it. The window is a few milliseconds, so try again at once. Recipe visibility is
+        // optional: if every attempt fails, log it and carry on instead of failing plugin start.
+        RuntimeException failure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                tranquilizerRecipeVisibilityService.reconcile();
+                return;
+            } catch (RuntimeException exception) {
+                failure = exception;
+            }
         }
+        getLogger().at(Level.WARNING).withCause(failure).log(
+                "Gated recipe visibility pass failed; disabled recipes may stay visible until the next recipe asset change.");
     }
 
     private void reconcileFeedTroughWaterChargeDroplistCompat() {

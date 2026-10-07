@@ -20,8 +20,9 @@ import javax.annotation.Nullable;
  * Action that performs explicit needs resource consumption driven by template flow.
  */
 public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase {
-    // Matches the default of TameworkNeedsResourceRejectTarget and outlasts the shared search snapshot.
-    private static final double FAILED_CONSUME_SUPPRESS_SECONDS = 30.0;
+    // Just longer than the 10 s shared search snapshot, so a stale entry cannot hand the source
+    // back, and short enough that a refilled trough is used again quickly.
+    private static final double FAILED_CONSUME_SUPPRESS_SECONDS = 12.0;
 
     @Nullable
     private final String resourceType;
