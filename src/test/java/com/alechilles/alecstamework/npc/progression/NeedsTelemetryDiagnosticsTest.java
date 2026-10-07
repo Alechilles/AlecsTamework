@@ -67,6 +67,20 @@ class NeedsTelemetryDiagnosticsTest {
     }
 
     @Test
+    void reportsOnlyActionableConsumeFailureReasons() {
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("not_near_water"));
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=NO_ALLOWED_FOOD_IN_RANGE,containers=1,attempts=0),not_near_water"));
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("food_refill_disabled,not_near_water"));
+
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=REMOVE_TRANSACTION_FAILED,containers=1,attempts=1)"));
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=NO_ITEMS_CONSUMED,containers=1),needs_component_type_missing"));
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("config_missing_or_disabled"));
+    }
+
+    @Test
     void reportsOnlyActionableSeekFailureReasons() {
         assertFalse(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("food_target_not_found"));
         assertFalse(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("water_target_not_found"));

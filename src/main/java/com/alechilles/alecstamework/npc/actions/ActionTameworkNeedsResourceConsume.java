@@ -20,6 +20,9 @@ import javax.annotation.Nullable;
  * Action that performs explicit needs resource consumption driven by template flow.
  */
 public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase {
+    // Matches the default of TameworkNeedsResourceRejectTarget and outlasts the shared search snapshot.
+    private static final double FAILED_CONSUME_SUPPRESS_SECONDS = 30.0;
+
     @Nullable
     private final String resourceType;
     @Nullable
@@ -68,7 +71,14 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
                 foodItemIds,
                 consumeOrigin
         );
-        NeedsResourceConsumeAttemptTracker.record(resolveNpcUuid(npcRef, store), resourceType, consumed, System.currentTimeMillis());
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        NeedsResourceConsumeAttemptTracker.record(npcUuid, resourceType, consumed, System.currentTimeMillis());
+        if (!consumed && consumeOrigin != null) {
+            // The source ran dry or changed after the search saw it. Without a rejection the cached
+            // search result and the recent water target hand this NPC the same empty source again.
+            SensorTameworkNeedsResourceTarget.rejectTarget(
+                    npcUuid, resourceType, consumeOrigin, FAILED_CONSUME_SUPPRESS_SECONDS);
+        }
         if (releaseTarget) {
             SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, consumeOrigin);
         }
