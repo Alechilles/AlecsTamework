@@ -271,6 +271,9 @@ never set; the component's `Set: false` gate then remains open.
   effects then run only from the admitted owner-mutation continuation; do not add eager sibling
   inventory/tame success actions to the same list.
 - `TameworkSetTamed`: Sets/clears tamed state.
+- `TameworkProgressionReward`: Grants the NPC an immediate `Happiness` change and companion `Xp` from a role
+  instruction, for example after play. Each part is skipped when its amount is zero or the role has no enabled
+  happiness or leveling config. Gate repeats with a timer or alarm in the role.
 - `TameworkNeedsResourceConsume`: Consumes configured needs resource targets (food/water seek flows).
 - `TameworkNeedsResourceRejectTarget`: Temporarily suppresses a failed needs seek target so later scans can choose another reachable source.
 - `TameworkNeedsResourceReleaseTarget`: Releases a successful needs seek target reservation without marking it as failed.
