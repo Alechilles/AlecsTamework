@@ -38,12 +38,14 @@ public final class CompanionStartupAdmission {
     private final CompanionBodyLifecycle lifecycle;
     private final LoadedBodies<Ref<EntityStore>> loaded;
     private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
-    private final Query<EntityStore> unstamped;
+    private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
+    private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
+    @Nullable
+    private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType;
 
     public CompanionStartupAdmission(@Nonnull CompanionBodySystem bodies, @Nonnull CompanionBodyLifecycle lifecycle,
                                      @Nonnull LoadedBodies<Ref<EntityStore>> loaded,
                                      @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
-                                     @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
                                      @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
                                      @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamedType,
                                      @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent>
@@ -52,8 +54,9 @@ public final class CompanionStartupAdmission {
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.loaded = Objects.requireNonNull(loaded, "loaded");
         this.stampType = Objects.requireNonNull(stampType, "stampType");
-        this.unstamped = CompanionOwnershipSystems.unstamped(npcType, ownerType, tamedType, stampType,
-                projectionType);
+        this.ownerType = Objects.requireNonNull(ownerType, "ownerType");
+        this.tamedType = Objects.requireNonNull(tamedType, "tamedType");
+        this.projectionType = projectionType;
     }
 
     /** Queues one pass on each world's thread; returns at once. */
@@ -78,6 +81,10 @@ public final class CompanionStartupAdmission {
             if (store == null) {
                 return;
             }
+            // NPCEntity's type is unavailable during plugin startup on some server load orders.
+            Query<EntityStore> unstamped = CompanionOwnershipSystems.unstamped(
+                    Objects.requireNonNull(NPCEntity.getComponentType(), "NPCEntity component type"),
+                    ownerType, tamedType, stampType, projectionType);
             int[] counts = new int[3]; // admitted, fenced, tamed
             store.forEachChunk(stampType, (chunk, buffer) -> {
                 for (int i = 0; i < chunk.size(); i++) {
