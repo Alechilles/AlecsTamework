@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -97,7 +98,7 @@ public class TameworkClearFeedTroughWaterInteraction extends SimpleInteraction {
             fail(context, time, type, cooldownHandler);
             return;
         }
-        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetBlock.x, targetBlock.z));
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(targetBlock.x, targetBlock.z));
         if (chunk == null) {
             fail(context, time, type, cooldownHandler);
             return;

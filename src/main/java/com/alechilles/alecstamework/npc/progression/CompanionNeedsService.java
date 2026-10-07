@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.damage.TameworkEnvironmentSource;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
@@ -1176,7 +1177,7 @@ public final class CompanionNeedsService {
                     return;
                 }
                 Damage deferredDamage = new Damage(
-                        new Damage.EnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
+                        new TameworkEnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
                         cause,
                         appliedDamage
                 );
@@ -1191,7 +1192,7 @@ public final class CompanionNeedsService {
             );
         }
         Damage damage = new Damage(
-                new Damage.EnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
+                new TameworkEnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
                 cause,
                 appliedDamage
         );

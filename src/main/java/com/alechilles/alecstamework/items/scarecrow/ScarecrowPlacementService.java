@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.scarecrow;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -53,7 +54,7 @@ public final class ScarecrowPlacementService {
             return new Preparation(Status.INVALID_ASSET, null);
         }
         WorldChunk chunk = world != null
-                ? world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(blockX, blockZ))
+                ? HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(blockX, blockZ))
                 : null;
         if (chunk == null) {
             return new Preparation(Status.UNAVAILABLE, null);

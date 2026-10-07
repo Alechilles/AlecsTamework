@@ -401,7 +401,7 @@ public final class HytaleCoopIntake implements CoopIntakeFlow.Coop<Ref<EntitySto
         if (store == null) {
             return null;
         }
-        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(x, z));
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(x, z));
         if (chunk == null || !HytaleChunkAccess.isOwnedBy(chunk, world)) {
             return null;
         }

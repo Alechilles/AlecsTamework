@@ -136,7 +136,7 @@ public final class TameworkLingeringHazardSystem extends TickingSystem<EntitySto
             } catch (IllegalArgumentException ignored) {
             }
         }
-        return new Damage.EnvironmentSource(hazard.getSourceTypeId());
+        return new TameworkEnvironmentSource(hazard.getSourceTypeId());
     }
 
     @Nonnull
