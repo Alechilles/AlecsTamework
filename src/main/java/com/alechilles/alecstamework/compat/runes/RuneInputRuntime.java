@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.compat.runes;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -161,10 +162,13 @@ public final class RuneInputRuntime {
         ItemStack selected = hotbar.getActiveItem();
         if (ItemStack.isEmpty(selected)) return Demand.NONE;
         Item item = selected.getItem();
-        if (item == null || item.getWeapon() == null || item.getData() == null
-                || item.getData().getExpandedTagIndexes() == null
-                || !item.getData().getExpandedTagIndexes().contains(
-                        AssetRegistry.getOrCreateTagIndex("Family=TameworkInput"))) return Demand.NONE;
+        if (item == null) return Demand.NONE;
+        boolean tagged = item.getWeapon() != null && item.getData() != null
+                && item.getData().getExpandedTagIndexes() != null
+                && item.getData().getExpandedTagIndexes().contains(
+                        AssetRegistry.getOrCreateTagIndex("Family=TameworkInput"));
+        // Entity input needs no rune, so a configured command item qualifies without the weapon patch.
+        if (!tagged && !(ENTITY_INPUT && isCommandItem(selected.getItemId()))) return Demand.NONE;
         if (TALISMAN_ID.equals(selected.getItemId())) {
             ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
             if (flightType == null || accessor.getComponent(ref, flightType) == null) return Demand.NONE;
@@ -173,6 +177,18 @@ public final class RuneInputRuntime {
         if (interactions == null) return Demand.NONE;
         return new Demand(root(interactions.get(InteractionType.Ability2)),
                 root(interactions.get(InteractionType.Ability3)));
+    }
+
+    private static boolean isCommandItem(@Nullable String itemId) {
+        var configs = TwCommandItemConfig.getAssetMap();
+        if (itemId == null || configs == null) return false;
+        for (TwCommandItemConfig config : configs.getAssetMap().values()) {
+            if (config == null) continue;
+            for (String configured : config.getItemIds()) {
+                if (itemId.equalsIgnoreCase(configured)) return true;
+            }
+        }
+        return false;
     }
 
     private static boolean root(@Nullable String value) {
