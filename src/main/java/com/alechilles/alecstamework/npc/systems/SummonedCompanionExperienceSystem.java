@@ -29,29 +29,24 @@ import javax.annotation.Nullable;
  * lookup that runs every tick).
  */
 public final class SummonedCompanionExperienceSystem extends EntityTickingSystem<EntityStore> {
-    private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
     private final Predicate<UUID> bonded;
     private final ComponentType<EntityStore, TameworkLevelingComponent> levelingType;
     private final ComponentType<EntityStore, DeathComponent> deathType;
-    private final Query<EntityStore> query;
     private final SummonedCompanionExperienceService experienceService = new SummonedCompanionExperienceService();
     private final ProjectionSettingsResolver settingsResolver;
     private final CompanionXpAwarder xpAwarder;
     private final LongSupplier clock;
 
     public SummonedCompanionExperienceSystem(
-            @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
             @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
             @Nonnull Predicate<UUID> bonded,
             @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> levelingType,
             @Nonnull ComponentType<EntityStore, DeathComponent> deathType) {
-        this.npcType = npcType;
         this.stampType = stampType;
         this.bonded = bonded;
         this.levelingType = levelingType;
         this.deathType = deathType;
-        this.query = Query.and(npcType, stampType);
         this.settingsResolver = (reference, store) -> {
             String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
             TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
@@ -64,7 +59,6 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
     }
 
     SummonedCompanionExperienceSystem(
-            @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
             @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType,
             @Nonnull Predicate<UUID> bonded,
             @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> levelingType,
@@ -72,12 +66,10 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
             @Nonnull ProjectionSettingsResolver settingsResolver,
             @Nonnull CompanionXpAwarder xpAwarder,
             @Nonnull LongSupplier clock) {
-        this.npcType = npcType;
         this.stampType = stampType;
         this.bonded = bonded;
         this.levelingType = levelingType;
         this.deathType = deathType;
-        this.query = Query.and(npcType, stampType);
         this.settingsResolver = settingsResolver;
         this.xpAwarder = xpAwarder;
         this.clock = clock;
@@ -85,7 +77,8 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
 
     @Override
     public Query<EntityStore> getQuery() {
-        return query;
+        // NPCEntity's type can be unavailable while runtime participants are preflighted.
+        return Query.and(NPCEntity.getComponentType(), stampType);
     }
 
     @Override
