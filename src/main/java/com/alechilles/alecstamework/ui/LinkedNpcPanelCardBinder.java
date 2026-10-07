@@ -693,9 +693,9 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
-        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 135, 2, 142, 24));
-        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 135, 28, 94, 24));
-        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 86 : 141, 10, 12, 12));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 136, 2, 142, 24));
+        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 136, 28, 94, 24));
+        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 86 : 142, 10, 12, 12));
         commands.set(card + " #PortraitFrame.Visible", !compact);
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(68, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
@@ -866,7 +866,7 @@ final class LinkedNpcPanelCardBinder {
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {
         LinkedNpcPanelPortraitBinder.bind(commands, card, entry);
         commands.set(card + " #Portrait.Style", Value.ref("TameworkLinkedNpcPanelCard.ui", compact ? "PortraitCompactStyle" : "PortraitStyle"));
-        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 34, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92));
+        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 38, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92));
         int activeTop = compact ? 56 : 96;
         boolean portrait = !entry.portraitIcon().isBlank();
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(

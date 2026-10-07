@@ -75,7 +75,7 @@ final class LinkedNpcPanelProgressionBinder {
     }
 
     /** The level button overlaps the portrait frame's lower-left corner. */
-    static final int LEVEL_TOP = 104;
+    static final int LEVEL_TOP = 108;
     static final int LEVEL_LEFT = 6;
 
     private static int resolveLevelControlWidth(String levelText) {
