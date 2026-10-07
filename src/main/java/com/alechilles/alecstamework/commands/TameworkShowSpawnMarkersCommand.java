@@ -95,7 +95,7 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         ACTIVE_TRACKING.put(playerUuid, new TrackingSession(sessionId, world, parse.radius()));
         scheduleTrackingTick(world, playerRef, playerUuid, sessionId);
 
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks").param("0", String.valueOf(formatNumber(parse.radius()))).param("1", String.valueOf(markers.size())).param("2", String.valueOf((markers.size() == 1 ? "" : "s"))));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks").param("0", String.valueOf(formatNumber(parse.radius()))).param("1", String.valueOf(markers.size())));
         sendMarkerSummary(commandContext, markers);
     }
 

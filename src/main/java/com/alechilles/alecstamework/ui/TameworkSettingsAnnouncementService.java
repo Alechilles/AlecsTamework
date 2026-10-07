@@ -179,10 +179,10 @@ public final class TameworkSettingsAnnouncementService {
                                     boolean respectEnabled,
                                     boolean ignoreOptOutState) {
         if (!playerRef.isValid()) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
         }
         if (player.getPageManager() == null) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
         }
 
         ResolvedAnnouncement announcement = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
@@ -227,10 +227,10 @@ public final class TameworkSettingsAnnouncementService {
 
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
         }
         if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, uiPlayerRef)) {
-            return respectEnabled ? null : "You do not have permission to use /tw news.";
+            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.you.do.not.have.permission.to.use");
         }
 
         ResolvedAnnouncement selectedAnnouncement = announcement;
@@ -268,7 +268,7 @@ public final class TameworkSettingsAnnouncementService {
                             "Failed to open Tamework settings announcement."
                     ).build()
             );
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : LocalizedText.resolve(player, "tamework.commands.news.unable.to.open.tamework.news.right.now");
         }
     }
 

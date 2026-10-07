@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
@@ -29,18 +30,35 @@ public final class OwnerMessageUtil {
             return;
         }
 
-        // Resolve a human-friendly NPC/owner label for messaging.
-        String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
         String resolvedOwner = ownerName != null && !ownerName.isBlank()
                 ? ownerName
-                : (ownerUuid != null ? ownerUuid.toString() : "someone");
-        String resolvedVerb = verb != null && !verb.isBlank() ? verb : "interact with";
+                : (ownerUuid != null ? ownerUuid.toString()
+                        : LocalizedText.resolve(player, "tamework.ui.ownership.unknownOwner"));
+        send(player, Message.raw(LocalizedText.format(
+                player, deniedKey(verb), resolveNpcLabel(player, npcName), resolvedOwner)));
+    }
 
-        send(player, Message.raw(
-                "That " + resolvedNpc + " belongs to " + resolvedOwner
-                        + ". You cannot " + resolvedVerb
-                        + " a pet that does not belong to you."
-        ));
+    /**
+     * The whole-sentence key for a refused action. {@code verb} is the English action word the
+     * callers pass ("capture", "link", "name", "interact with"); anything else uses the
+     * interaction wording.
+     */
+    static String deniedKey(String verb) {
+        if (verb == null) {
+            return "tamework.ui.ownership.denied.interact";
+        }
+        return switch (verb) {
+            case "capture" -> "tamework.ui.ownership.denied.capture";
+            case "link" -> "tamework.ui.ownership.denied.link";
+            case "name" -> "tamework.ui.ownership.denied.name";
+            default -> "tamework.ui.ownership.denied.interact";
+        };
+    }
+
+    private static String resolveNpcLabel(Player player, String npcName) {
+        return npcName != null && !npcName.isBlank()
+                ? npcName
+                : LocalizedText.resolve(player, "tamework.ui.ownership.unnamedNpc");
     }
 
     public static void sendUntamed(Player player, String npcName) {
@@ -52,12 +70,10 @@ public final class OwnerMessageUtil {
             return;
         }
 
-        // Keep the base message short; optionally append allowed foods.
-        String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
-        String message = "You must tame that " + resolvedNpc + " before capturing it.";
-        if (foodList != null && !foodList.isBlank()) {
-            message += " Try feeding: " + foodList + ".";
-        }
+        String npcLabel = resolveNpcLabel(player, npcName);
+        String message = foodList != null && !foodList.isBlank()
+                ? LocalizedText.format(player, "tamework.ui.ownership.mustTameWithFoods", npcLabel, foodList)
+                : LocalizedText.format(player, "tamework.ui.ownership.mustTame", npcLabel);
         send(player, Message.raw(message));
     }
 
