@@ -19,7 +19,7 @@ This interaction supports direct shots, high-angle lob shots, source-centered ra
 1. Add a `Custom` interaction entry with `Type: "TameworkLaunchProjectile"`.
 2. Set `ProjectileId` to your projectile asset.
 3. Pick targeting strategy (`Target`, `TargetSlot`, or random-around-source radii).
-4. Set `TrajectoryMode` (`HIGH_ANGLE` or `DIRECT`).
+4. Set `TrajectoryMode` (`HighAngle` or `Direct`).
 5. Add optional spread (`YawSpreadDegrees`, `PitchSpreadDegrees`).
 6. Add optional `ImpactEffect` and/or `LingeringHazard` blocks.
 7. Gate execution through `Requires` (owner/tame/state/context) and add feedback in `Effects` as needed.
@@ -38,8 +38,8 @@ This interaction supports direct shots, high-angle lob shots, source-centered ra
 When random-around-source radii are configured, they override entity-target resolution.
 
 ## Trajectory Modes
-- `HIGH_ANGLE`: solves a ballistic arc using projectile velocity and gravity.
-- `DIRECT`: points directly at the solved target instead of high-lob arc behavior.
+- `HighAngle`: solves a ballistic arc using projectile velocity and gravity.
+- `Direct`: points directly at the solved target instead of high-lob arc behavior.
 
 Use `FailIfNoSolution: true` for strict behavior. Use `false` when you prefer graceful fallback rather than hard interaction failure.
 
@@ -59,7 +59,7 @@ For example, with your own projectile, marker particle system, and NPC role asse
   "Type": "TameworkLaunchProjectile",
   "ProjectileId": "Example_Egg",
   "TargetSlot": "CAETargetSlot",
-  "TrajectoryMode": "HIGH_ANGLE",
+  "TrajectoryMode": "HighAngle",
   "TargetGroundOffset": 0.05,
   "LandingMarkerParticleSystemId": "Example_Egg_Marker",
   "ImpactSpawnNpcRole": "Example_Egg_Minion"

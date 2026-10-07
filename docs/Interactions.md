@@ -369,7 +369,7 @@ Fields:
 - `YawSpreadDegrees` optional symmetric yaw spread applied after the arc is solved.
 - `PitchSpreadDegrees` optional symmetric pitch spread applied after the arc is solved.
 - `FailIfNoSolution` optional bool. Defaults to `true`.
-- `TrajectoryMode` optional enum: `HIGH_ANGLE` or `DIRECT`. Defaults to `HIGH_ANGLE`.
+- `TrajectoryMode` optional enum: `HighAngle` or `Direct`. Defaults to `HighAngle`.
 - `RandomAroundSourceMinRadius` optional inner radius for a random landing point centered on the source entity.
 - `RandomAroundSourceMaxRadius` optional outer radius for a random landing point centered on the source entity. When greater than `0`, this mode overrides entity-target resolution.
 - `RandomAroundSourceVerticalOffset` optional Y offset applied to the random landing point.
@@ -391,8 +391,8 @@ Fields:
 - `EffectId` optional entity effect asset id to reapply on each hazard pulse.
 
 Behavior:
-- Uses the projectile's `MuzzleVelocity` and `Gravity` to solve the high-angle lob when `TrajectoryMode` is `HIGH_ANGLE`.
-- Uses a direct point-at-target pitch when `TrajectoryMode` is `DIRECT`.
+- Uses the projectile's `MuzzleVelocity` and `Gravity` to solve the high-angle lob when `TrajectoryMode` is `HighAngle`.
+- Uses a direct point-at-target pitch when `TrajectoryMode` is `Direct`.
 - Uses the normal projectile spawn path after solving, so projectile asset offsets such as `VerticalCenterShot`, `HorizontalCenterShot`, `DepthShot`, and `PitchAdjustShot` still apply.
 - If no valid arc exists and `FailIfNoSolution` is `true`, the interaction fails cleanly.
 - Random-around-source targeting samples a uniform point in the authored radius band, which is useful for source-centered area denial barrages.
@@ -406,7 +406,7 @@ Example:
   "Type": "TameworkLaunchProjectile",
   "ProjectileId": "Hydra_Rain_Ice_Ball",
   "TargetSlot": "CAETargetSlot",
-  "TrajectoryMode": "DIRECT",
+  "TrajectoryMode": "Direct",
   "YawSpreadDegrees": 4.0,
   "PitchSpreadDegrees": 2.0
 }
