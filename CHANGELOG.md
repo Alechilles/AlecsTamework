@@ -28,6 +28,10 @@
 - Modders: the `TameworkProgressionReward` NPC action grants a companion an
   immediate happiness change and companion XP from a role instruction, for
   example after play.
+- Modders: the wander component sets the `Tamework_Wander_Settled` flag while an
+  NPC holds its settle posture and restarts its cycle when another instruction
+  sets `Tamework_Wander_Reset`, so outside behaviors can stand a resting NPC up
+  before moving it.
 
 ### Fixed
 

@@ -282,6 +282,16 @@ never set; the component's `Set: false` gate then remains open.
 - `TameworkHarvestDrop`: Drops harvest outputs with trait-aware bonus support.
 - `TameworkDebugMessage`: Emits debug text from instruction flows.
 
+## Wander settle flags
+
+`Component_Tamework_Instruction_Wander` keeps its move and settle cycle in component-local states, which other
+instructions cannot read. Two role flags expose what an outside instruction needs:
+
+- `Tamework_Wander_Settled` is set while the NPC holds its settle posture (`BasePostureAnimation`). Check it
+  before moving the NPC from another instruction, and play the exit animation first when it is set.
+- Set `Tamework_Wander_Reset` after taking the NPC out of a settle. The wander component then clears both
+  flags and restarts from its default state the next time it runs, so it does not resume the old settle.
+
 ## NPC Sensor Builder IDs
 - `TameworkIsOwner`
 - `TameworkHasOwner`
