@@ -64,19 +64,26 @@ public final class CompanionOwnershipSystems {
      */
     public static final class OnAdd extends RefSystem<EntityStore> {
         private final CompanionBodyLifecycle lifecycle;
-        private final Query<EntityStore> query;
+        private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
+        private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
+        private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
+        @Nullable
+        private final ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType;
         // The body's NPC UUID is its identity for the legacy alias lookup.
         private final Set<Dependency<EntityStore>> dependencies =
                 Set.of(new SystemDependency<>(Order.AFTER, EntityStore.UUIDSystem.class));
 
         /** {@code projection} is non-null only on an imported world (see {@link #unstamped}). */
-        public OnAdd(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+        public OnAdd(@Nonnull CompanionBodyLifecycle lifecycle,
                      @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> owner,
                      @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamed,
                      @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp,
                      @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent> projection) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
-            this.query = unstamped(npc, owner, tamed, stamp, projection);
+            this.ownerType = Objects.requireNonNull(owner, "owner");
+            this.tamedType = Objects.requireNonNull(tamed, "tamed");
+            this.stampType = Objects.requireNonNull(stamp, "stamp");
+            this.projectionType = projection;
         }
 
         @Override
@@ -111,7 +118,8 @@ public final class CompanionOwnershipSystems {
         @Override
         @Nonnull
         public Query<EntityStore> getQuery() {
-            return query;
+            // NPCEntity's type can be unavailable while runtime participants are preflighted.
+            return unstamped(NPCEntity.getComponentType(), ownerType, tamedType, stampType, projectionType);
         }
 
         @Override
