@@ -194,13 +194,21 @@ public final class NamingFeatureHandler {
         if (world == null) {
             return;
         }
-        world.execute(() -> {
-            Player player = store.getComponent(playerRef, Player.getComponentType());
-            if (player == null) {
-                return;
-            }
-            applyNameFromInput(player, request, content);
-        });
+        try {
+            world.execute(() -> {
+                // The player may have left or changed world since the chat event.
+                if (!playerRef.isValid() || playerRef.getStore() != store) {
+                    return;
+                }
+                Player player = store.getComponent(playerRef, Player.getComponentType());
+                if (player == null) {
+                    return;
+                }
+                applyNameFromInput(player, request, content);
+            });
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; the pending name is dropped.
+        }
     }
 
     public void onPlayerDisconnect(PlayerDisconnectEvent event) {
