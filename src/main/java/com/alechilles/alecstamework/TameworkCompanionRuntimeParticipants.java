@@ -80,8 +80,8 @@ public final class TameworkCompanionRuntimeParticipants {
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionbodysystem",
                 () -> bodySystem);
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownershiponaddsystem",
-                () -> new CompanionOwnershipSystems.OnAdd(lifecycle, NPCEntity.getComponentType(),
-                        plugin.getOwnerComponentType(), plugin.getTamedComponentType(),
+                () -> new CompanionOwnershipSystems.OnAdd(lifecycle, plugin.getOwnerComponentType(),
+                        plugin.getTamedComponentType(),
                         TameworkCompanionComponent.getComponentType(),
                         // Only an imported world has old bodies to match (plan 7 R14).
                         lifecycle.hasLegacyBodies() ? plugin.getProjectionIdentityComponentType() : null));
