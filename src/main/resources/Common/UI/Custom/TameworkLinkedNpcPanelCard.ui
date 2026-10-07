@@ -42,11 +42,13 @@ Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 176);
     Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
-    // Off-atlas pictures (Common/Tamework/UI/Slate, drawn at 2x by the TameworkUiKit repo). The plate and the portrait
-    // frame take their AssetPath from LinkedNpcPanelCardBinder by state; negative anchors make the plate cover the padding.
-    AssetImage #SlatePlate { Anchor: (Top: -8, Left: -10, Right: -10, Bottom: -8); AssetPath: "Tamework/UI/Slate/card_world.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
-    AssetImage #SlateSelected { Anchor: (Top: -8, Left: -10, Right: -10, Bottom: -8); AssetPath: "Tamework/UI/Slate/card_selected.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; Visible: false; }
-    AssetImage #PortraitFrame { Anchor: (Top: 28, Left: 2, Width: 142, Height: 104); AssetPath: "Tamework/UI/Slate/portrait_world.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+    // Card art is in the atlas on purpose: a list shows dozens of cards and rebinds them often, and a large
+    // off-atlas AssetImage per card made the client stutter. LinkedNpcPanelCardBinder swaps the plate and the
+    // portrait frame by state; negative anchors make the plate cover the padding.
+    Group #SlatePlate { Anchor: (Top: -8, Left: -10, Right: -10, Bottom: -8); Background: (TexturePath: "Tamework/Slate/Card_World.png", HorizontalBorder: 20, VerticalBorder: 38); HitTestVisible: false; }
+    Group #SlateSelected { Anchor: (Top: -8, Left: -10, Right: -10, Bottom: -8); Background: (TexturePath: "Tamework/Slate/Card_Selected.png", Border: 20); HitTestVisible: false; Visible: false; }
+    Group { Anchor: (Top: 36, Left: 156, Bottom: 4, Width: 1); Background: #000000(0.45); HitTestVisible: false; }
+    Group #PortraitFrame { Anchor: (Top: 28, Left: 2, Width: 142, Height: 104); Background: "Tamework/Slate/Portrait_World.png"; HitTestVisible: false; }
 
     TextField #CardTarget { Visible: false; MaxLength: 36; }
 
