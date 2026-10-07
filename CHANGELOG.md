@@ -1,15 +1,20 @@
 # Changelog
 
-## 5.2.0 - Slate UI - 2026-10-06
+## 5.2.0 - Slate UI - 2026-10-07
 
 ### Changed
 
 - Every Tamework screen has a new look, called Slate: navy panels with gold
   trim, closer to the base game. This covers the companions window and its
-  cards, saved views, pop-ups, the talents page, the companion guide,
+  cards, the bonded companion roster, saved views, pop-ups, the talents
+  page, the companion guide,
   settings, the group manager, the name and location pages, the config
   editor, and the command target, command hotswap and avatar flight HUDs.
 - Companion cards have a framed portrait, a state pill and a select switch.
+- The bonded companion roster shows each companion's level and how far it is
+  to the next one, and its tabs show how many companions they hold.
+- The paid-revive dialog shows whether you have each required item, with a
+  summary line underneath.
 - Window headers show the Tamework logo.
 - On the talents page, the paths between talents you have unlocked are
   coloured, and a talent you cannot afford yet reads "Too costly".
@@ -28,6 +33,20 @@
 
 - The group labels on the command hotswap HUD ("All Companions", "No Active
   Companions", "Custom Selection") are translated in all six languages.
+- Ownership, news and debug command messages that were in English or built
+  from English fragments are translated. Half-English and corrupted German
+  and Brazilian Portuguese strings are retranslated, and stale claim-limit
+  labels, missing trough hints and altered command syntax are corrected in
+  Spanish, French, Canadian French and German.
+- A food with no translation shows a readable name instead of a raw
+  translation key, and the default companion name is translated.
+- A companion no longer keeps returning to a food or water source it just
+  failed to use, and an empty water source is no longer reported as an error.
+- Fixed several crashes that could stop Tamework from starting while worlds
+  were loading.
+- Fixed errors that could occur when a chat message or packet arrived for a
+  world that was shutting down.
+- The example asset pack includes its missing Spanish translation.
 
 ## 5.1.1 - Dart Rifle Polish - 2026-10-06
 
