@@ -1927,3 +1927,4 @@ tamework.companions.legacy.duplicateRemoved = The animal you just claimed was a 
 tamework.ui.commandHotswapHud.group.all=All Companions
 tamework.ui.commandHotswapHud.group.none=No Active Companions
 tamework.ui.commandHotswapHud.group.custom=Custom Selection
+tamework.ui.roster.progression.toNext={0}% to level {1}

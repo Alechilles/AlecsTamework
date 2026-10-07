@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.companion.bonded.BondedRecords;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Arrays;
@@ -23,6 +24,17 @@ import javax.annotation.Nullable;
 final class BondedCompanionPanelChrome {
     static final String FILTER_COMMAND_PREFIX = "__bonded_roster_filter__";
     static final List<String> FILTERS = List.of("All", "Active", "Stored", "Dead");
+    /**
+     * The filter tabs render in capitals with letter spacing and carry a count, so they are wider
+     * than the markup's buttons: left and width of each, in {@link #FILTERS} order, 4 px apart.
+     */
+    private static final int[][] TAB_BOUNDS = {{0, 84}, {88, 108}, {200, 126}, {330, 96}};
+    private static final int TABS_WIDTH = 426;
+    /** Sort and search sit between the tabs and the capacity text inside the 908 px toolbar. */
+    private static final int CONTROLS_LEFT = TABS_WIDTH + 6;
+    private static final int SEARCH_WIDTH = 130;
+    private static final int CONTROLS_WIDTH = 134 + SEARCH_WIDTH;
+    private static final int CAPACITY_WIDTH = 908 - CONTROLS_LEFT - CONTROLS_WIDTH - 4;
 
     private BondedCompanionPanelChrome() {
     }
@@ -51,11 +63,24 @@ final class BondedCompanionPanelChrome {
             bind(commands, true);
             commands.set("#TameworkGroupQuickSelect.Visible", false);
             commands.set("#BondedRosterModeTabs.Visible", true);
-            commands.setObject("#TameworkLinkedPanelControlsSecondary.Anchor", anchor(300, 0, 408, 28));
+            commands.setObject("#BondedRosterModeTabs.Anchor", anchor(0, 0, TABS_WIDTH, 30));
+            for (int index = 0; index < TAB_BOUNDS.length; index++) {
+                commands.setObject("#BondedRoster" + FILTERS.get(index) + ".Anchor",
+                        anchor(TAB_BOUNDS[index][0], 0, TAB_BOUNDS[index][1], 30));
+            }
+            commands.setObject("#TameworkLinkedPanelControlsSecondary.Anchor",
+                    anchor(CONTROLS_LEFT, 0, CONTROLS_WIDTH, 28));
             commands.set("#TameworkLinkedPanelFilterLabel.Visible", false);
             commands.set("#TameworkLinkedPanelFilterDropdown.Visible", false);
-            commands.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor", anchor(0, 0, 224, 28));
-            commands.setObject("#TameworkLinkedPanelFilterInput.Anchor", anchor(0, 0, 224, 28));
+            commands.setObject("#TameworkLinkedPanelInlineFilterTextControls.Anchor",
+                    anchor(0, 0, SEARCH_WIDTH, 28));
+            commands.setObject("#TameworkLinkedPanelFilterInput.Anchor", anchor(0, 0, SEARCH_WIDTH, 28));
+            Anchor capacityAnchor = new Anchor();
+            capacityAnchor.setTop(Value.of(0));
+            capacityAnchor.setRight(Value.of(0));
+            capacityAnchor.setWidth(Value.of(CAPACITY_WIDTH));
+            capacityAnchor.setHeight(Value.of(28));
+            commands.setObject("#BondedRosterCapacity.Anchor", capacityAnchor);
             commands.set("#TameworkLinkedPanelFilterInput.PlaceholderText",
                     LocalizedText.resolve(language, "tamework.ui.roster.search"));
             commands.set("#TameworkLinkedPanelFilterInput.MaxLength", 120);
@@ -66,16 +91,23 @@ final class BondedCompanionPanelChrome {
                 "tamework.ui.roster.title", page.baseLinkedNpcEntries.length));
         set(commands, values, "#TameworkLinkedPanelSortDropdown.Entries",
                 CommandSelectionPanelOptions.resolveSortDropdownEntries(language).subList(0, 3));
+        Map<UUID, CommandPanelFeaturePresentation> features = page.featureController.presentations();
         for (String filter : FILTERS) {
             String selector = "#BondedRoster" + filter;
-            String style = filter.equals(page.rosterStateFilter) ? "PanelButtonSelected" : "PanelButton";
+            String style = filter.equals(page.rosterStateFilter)
+                    ? "CompanionTabButtonSelected" : "CompanionTabButton";
+            // Each tab counts the whole roster in its state, whatever the search box holds.
+            set(commands, values, selector + ".Text", LocalizedText.format(language,
+                    "tamework.ui.companions.tabCount",
+                    LocalizedText.resolve(language, "tamework.ui.roster.filter."
+                            + filter.toLowerCase(Locale.ROOT)),
+                    filter(page.baseLinkedNpcEntries, features, filter).length));
             if (values == null) commands.set(selector + ".Style", Value.ref("TameworkSlateStyles.ui", style));
             else values.setStyle(commands, selector + ".Style", style);
             if (values == null) events.addEventBinding(CustomUIEventBindingType.Activating, selector,
                     EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
                             FILTER_COMMAND_PREFIX + filter), false);
         }
-        Map<UUID, CommandPanelFeaturePresentation> features = page.featureController.presentations();
         String capacity = capacityHeader(features, language);
         set(commands, values, "#BondedRosterCapacity.Visible", !capacity.isBlank());
         set(commands, values, "#BondedRosterCapacity.Text", capacity);

@@ -1915,3 +1915,4 @@ tamework.companions.legacy.duplicateRemoved = O animal que você acabou de reivi
 tamework.ui.commandHotswapHud.group.all=Todos os companheiros
 tamework.ui.commandHotswapHud.group.none=Nenhum companheiro ativo
 tamework.ui.commandHotswapHud.group.custom=Seleção personalizada
+tamework.ui.roster.progression.toNext={0}% para o nível {1}

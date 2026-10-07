@@ -40,7 +40,7 @@ class BondedCompanionCardPresenterTest {
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "sessionEndsIn", "0:40"), false);
         card.assertCommand("#BondedTimerFrame.Visible", "true");
         card.assertCommand("#BondedTimerFillSession.Visible", "true");
-        card.assertCommand("#BondedTimerFillSession.Anchor", "135");
+        card.assertCommand("#BondedTimerFillSession.Anchor", "134");
         card.assertCommand("#BondedTimerFillCooldown.Visible", "false");
         card.assertCommand("#BondedHealthText.Text", "320 / 400");
         card.assertPrimaryAction("dismiss:");
@@ -56,16 +56,16 @@ class BondedCompanionCardPresenterTest {
         card.assertPrimaryAction("dismiss:");
     }
 
-    /** Dismiss is absent when it is not possible, and the status line says why. */
+    /** Dismiss is greyed out when it is not possible, and the status line says why. */
     @Test
-    void activeCompanionInAnotherWorldHasNoDismissAndSaysWhy() {
+    void activeCompanionInAnotherWorldCannotBeDismissedAndSaysWhy() {
         Bound card = bind(presentation(new BondedCompanionStatusPresentation(
                 BondedCompanionStateView.ACTIVE, BondedCompanionStatusPresentation.Action.DISMISS,
                 false, BondedCompanionActionBlockReason.WORLD_UNAVAILABLE, null, 0L), Map.of(), null));
 
         card.assertStatus(BondedCompanionActionFeedbackMapper.resolve(LANGUAGE,
                 BondedCompanionActionBlockReason.WORLD_UNAVAILABLE), true);
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -80,7 +80,7 @@ class BondedCompanionCardPresenterTest {
         card.assertPrimaryAction("summon:");
     }
 
-    /** Summon is hidden, not shown disabled, until a summon is possible. */
+    /** Summon stays in place, greyed out, until a summon is possible. */
     @Test
     void storedCooldownShowsTheWaitAsAWarningWithAnAmberBarAndNoSummon() {
         Bound card = bind(presentation(new BondedCompanionStatusPresentation(
@@ -91,9 +91,9 @@ class BondedCompanionCardPresenterTest {
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "summonIn", "0:40"), true);
         card.assertCommand("#BondedTimerFrame.Visible", "true");
         card.assertCommand("#BondedTimerFillCooldown.Visible", "true");
-        card.assertCommand("#BondedTimerFillCooldown.Anchor", "135");
+        card.assertCommand("#BondedTimerFillCooldown.Anchor", "134");
         card.assertCommand("#BondedTimerFillSession.Visible", "false");
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -105,7 +105,7 @@ class BondedCompanionCardPresenterTest {
                 false, BondedCompanionActionBlockReason.CAPACITY_REACHED, null, 0L), attributes, null));
 
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "dismissFirst", "Ember", 1, 1), true);
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -115,7 +115,7 @@ class BondedCompanionCardPresenterTest {
                 false, BondedCompanionActionBlockReason.CAPACITY_REACHED, null, 0L), FULL_FAMILY, null));
 
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "familyFull", 1, 1), true);
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -126,7 +126,7 @@ class BondedCompanionCardPresenterTest {
 
         card.assertStatus(BondedCompanionActionFeedbackMapper.resolve(LANGUAGE,
                 BondedCompanionActionBlockReason.PLACEMENT_UNAVAILABLE), true);
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -171,8 +171,8 @@ class BondedCompanionCardPresenterTest {
 
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "reviveIn", "4:32"), false);
         card.assertCommand("#BondedTimerFillCooldown.Visible", "true");
-        card.assertCommand("#BondedTimerFillCooldown.Anchor", "135");
-        card.assertNoPrimaryAction();
+        card.assertCommand("#BondedTimerFillCooldown.Anchor", "134");
+        card.assertPrimaryActionDisabled();
     }
 
     /** A full family blocks a revive too; the cost page could not explain that. */
@@ -184,7 +184,7 @@ class BondedCompanionCardPresenterTest {
                 quote(0L, new BondedCompanionReviveQuote.CostLine("Ingredient_Life_Essence", 2, 1))));
 
         card.assertStatus(LocalizedText.format(LANGUAGE, STATUS + "familyFull", 1, 1), true);
-        card.assertNoPrimaryAction();
+        card.assertPrimaryActionDisabled();
     }
 
     @Test
@@ -224,7 +224,7 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void aNamedCompanionShowsItsRoleAndLevelUnderTheNameAndItsGenderAsAnIcon() {
+    void aNamedCompanionShowsItsRoleUnderTheNameItsLevelOnThePortraitAndItsGenderAsAnIcon() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons", "NordicDrake", 4L,
                 "Wyatt", "Nordic Drake", "Female", null,
@@ -239,8 +239,8 @@ class BondedCompanionCardPresenterTest {
 
         card.assertCommand("#BondedName.Text", "Wyatt");
         card.assertCommand("#BondedSubtitle.Text", "Nordic Drake");
-        card.assertCommand("#BondedSubtitle.Text",
-                LocalizedText.format(LANGUAGE, "tamework.ui.linkedPanel.bonded.talents.level", 3));
+        card.assertCommand("#BondedLevelChip.Visible", "true");
+        card.assertCommand("#BondedLevelText.Text", "3");
         card.assertCommand("#BondedGenderFemaleIcon.Visible", "true");
         card.assertCommand("#BondedGenderMaleIcon.Visible", "false");
     }
@@ -352,6 +352,7 @@ class BondedCompanionCardPresenterTest {
 
         assertCommand(commands, "#Card #BondedUnlinkButton.Visible", "false");
         assertCommand(commands, "#Card #BondedUnlinkConfirmButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedUnlinkConfirmText.Visible", "true");
         assertCommand(commands, "#Card #BondedUnlinkCancelButton.Visible", "true");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
@@ -478,7 +479,7 @@ class BondedCompanionCardPresenterTest {
     }
 
     private static Bound bind(BondedCompanionPanelPresentation row) {
-        Bound bound = new Bound(row.status().state());
+        Bound bound = new Bound();
         BondedCompanionCardPresenter.bind(bound.commands, bound.events, "#Card", bound.uuid,
                 row, false, bindingConfig(), LANGUAGE);
         return bound;
@@ -500,17 +501,12 @@ class BondedCompanionCardPresenterTest {
         private final UICommandBuilder commands = new UICommandBuilder();
         private final UIEventBuilder events = new UIEventBuilder();
         private final UUID uuid = UUID.randomUUID();
-        private final BondedCompanionStateView state;
-
-        private Bound(BondedCompanionStateView state) {
-            this.state = state;
-        }
 
         void assertCommand(String selector, String expected) {
             BondedCompanionCardPresenterTest.assertCommand(commands, "#Card " + selector, expected);
         }
 
-        /** Exactly the tone (accent stripe and chip) of the given state is visible. */
+        /** Exactly the tone (row plate, portrait frame and pill) of the given state is visible. */
         void assertTone(BondedCompanionStateView expected) {
             for (BondedCompanionStateView candidate : BondedCompanionStateView.values()) {
                 assertCommand(BondedCompanionCardPresenter.toneSelector(candidate) + ".Visible",
@@ -528,16 +524,17 @@ class BondedCompanionCardPresenterTest {
 
         void assertPrimaryAction(String commandPrefix) {
             assertCommand("#BondedPrimaryAction.Visible", "true");
-            assertCommand(BondedCompanionCardPresenter.toneSelector(state) + " #ActionRing.Visible", "true");
+            assertCommand("#BondedPrimaryAction.Disabled", "false");
             assertEvent("#BondedPrimaryAction", commandPrefix + uuid);
         }
 
-        void assertNoPrimaryAction() {
-            assertCommand("#BondedPrimaryAction.Visible", "false");
-            assertCommand(BondedCompanionCardPresenter.toneSelector(state) + " #ActionRing.Visible", "false");
+        /** The button stays in place, greyed out and unbound, when its action is not possible. */
+        void assertPrimaryActionDisabled() {
+            assertCommand("#BondedPrimaryAction.Visible", "true");
+            assertCommand("#BondedPrimaryAction.Disabled", "true");
             assertFalse(Arrays.stream(events.getEvents())
                             .anyMatch(event -> event.selector.endsWith("#BondedPrimaryAction")),
-                    "An absent action must not be bound.");
+                    "An action that is not possible must not be bound.");
         }
 
         void assertEvent(String selector, String data) {

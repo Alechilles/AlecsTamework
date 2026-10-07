@@ -1,94 +1,102 @@
 $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
-@BondedCardButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Center, VerticalAlignment: Center);
-@BondedCardDangerButtonStyle = TextButtonStyle(Default: (Background: (Color: #b9645c), LabelStyle: @BondedCardButtonLabel), Hovered: (Background: (Color: #e5786d), LabelStyle: @BondedCardButtonLabel), Pressed: (Background: (Color: #934943), LabelStyle: @BondedCardButtonLabel), Disabled: (Background: (Color: #b9645c), LabelStyle: @BondedCardButtonLabel), Sounds: $C.@ButtonSounds);
+@BondedCardDangerLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #ffe3de, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedCardDangerHoverLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+// The atlas has one danger plate, so hover brightens the label and press darkens the plate.
+@BondedCardDangerButtonStyle = TextButtonStyle(Default: (Background: $A.@SlateDanger, LabelStyle: @BondedCardDangerLabel), Hovered: (Background: $A.@SlateDanger, LabelStyle: @BondedCardDangerHoverLabel), Pressed: (Background: (TexturePath: "Tamework/Slate/Button_Danger.png", Border: 8, Color: #c8c8c8), LabelStyle: @BondedCardDangerLabel), Disabled: (Background: $A.@SlateDisabled, LabelStyle: $A.@PanelButtonDisabledLabel), Sounds: $C.@ButtonSounds);
 @BondedCardTextTooltipStyle = $C.@DefaultTextTooltipStyle;
 @BondedTransparentButtonLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @BondedTransparentButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Hovered: (Background: (Color: #ffffff(0.06)), LabelStyle: @BondedTransparentButtonLabel), Pressed: (Background: (Color: #ffffff(0.12)), LabelStyle: @BondedTransparentButtonLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Sounds: $C.@ButtonSounds);
-@BondedPortraitStyle = ItemGridStyle(SlotSize: 72, SlotSpacing: 0, SlotIconSize: 72);
-@BondedChipLabelActive = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8aa35, HorizontalAlignment: Center, VerticalAlignment: Center);
-@BondedChipLabelStored = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #78bfc1, HorizontalAlignment: Center, VerticalAlignment: Center);
-@BondedChipLabelDead = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e5786d, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedPortraitStyle = ItemGridStyle(SlotSize: 68, SlotSpacing: 0, SlotIconSize: 68);
+@BondedChipLabelActive = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #e8aa35, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedChipLabelStored = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #7fa8ee, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedChipLabelDead = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #e5786d, HorizontalAlignment: Center, VerticalAlignment: Center);
 
-// One row, five columns: state accent (0-4), portrait (16-88), identity and vitals (100-380),
-// status (400-670), actions (690-850). The card has no padding; every anchor is card-relative.
+// One row, four columns: portrait (12-88), identity and vitals (100-380), status (400-670),
+// actions (690-850). The card has no padding; every anchor is card-relative.
+// Row art comes from the atlas: a list shows many rows and rebinds them often, so no AssetImage here.
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
-    Background: #162232;
-    OutlineColor: #05080b;
-    OutlineSize: 1;
 
-    // State tone: the accent stripe, the state chip and the ring around the primary button.
-    // Exactly one tone group is visible. Drawn first so the controls sit on top.
+    // State tone: the row plate, the portrait frame and the state pill. Exactly one tone group is
+    // visible. Drawn first so the portrait and the controls sit on top.
     Group #BondedToneActive { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); HitTestVisible: false; Visible: false;
-        Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #e8aa35; }
-        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #1d2f45; OutlineColor: #e8aa35; OutlineSize: 1;
-            Label #ChipLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @BondedChipLabelActive; }
+        Group { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); Background: (TexturePath: "Tamework/Slate/Row_Active.png", Border: 20); }
+        Group { Anchor: (Top: 8, Left: 12, Width: 76, Height: 76); Background: "Tamework/Slate/RowPortrait_Active.png"; }
+        Group { Anchor: (Top: 10, Left: 400, Width: 88, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #e8aa35);
+            Label #ChipLabel { Anchor: (Top: 0, Left: 4, Right: 4, Height: 18); Text: ""; Style: @BondedChipLabelActive; }
         }
-        Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #e8aa35; OutlineSize: 1; Visible: false; }
     }
     Group #BondedToneStored { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); HitTestVisible: false; Visible: false;
-        Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #78bfc1; }
-        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #182537; OutlineColor: #78bfc1; OutlineSize: 1;
-            Label #ChipLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @BondedChipLabelStored; }
+        Group { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); Background: (TexturePath: "Tamework/Slate/Row_Stored.png", Border: 20); }
+        Group { Anchor: (Top: 8, Left: 12, Width: 76, Height: 76); Background: "Tamework/Slate/RowPortrait_Stored.png"; }
+        Group { Anchor: (Top: 10, Left: 400, Width: 88, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #7fa8ee);
+            Label #ChipLabel { Anchor: (Top: 0, Left: 4, Right: 4, Height: 18); Text: ""; Style: @BondedChipLabelStored; }
         }
-        Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #78bfc1; OutlineSize: 1; Visible: false; }
     }
     Group #BondedToneDead { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); HitTestVisible: false; Visible: false;
-        Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #e5786d; }
-        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #2a1f22; OutlineColor: #e5786d; OutlineSize: 1;
-            Label #ChipLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @BondedChipLabelDead; }
+        Group { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); Background: (TexturePath: "Tamework/Slate/Row_Dead.png", Border: 20); }
+        Group { Anchor: (Top: 8, Left: 12, Width: 76, Height: 76); Background: "Tamework/Slate/RowPortrait_Dead.png"; }
+        Group { Anchor: (Top: 10, Left: 400, Width: 88, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #e5786d);
+            Label #ChipLabel { Anchor: (Top: 0, Left: 4, Right: 4, Height: 18); Text: ""; Style: @BondedChipLabelDead; }
         }
-        Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #e5786d; OutlineSize: 1; Visible: false; }
     }
 
-    // Portrait.
-    Group { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #090e14; OutlineColor: #000000(0.45); OutlineSize: 1; HitTestVisible: false; }
-    ItemGrid #BondedPortrait { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
-    Group #BondedPortraitDim { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #090e14(0.6); HitTestVisible: false; Visible: false; }
+    // Portrait, with the level on its lower-left corner. The chip is hidden without progression.
+    ItemGrid #BondedPortrait { Anchor: (Top: 12, Left: 16, Width: 68, Height: 68); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
+    Group #BondedPortraitDim { Anchor: (Top: 12, Left: 16, Width: 68, Height: 68); Background: #090e14(0.6); HitTestVisible: false; Visible: false; }
+    Group #BondedLevelChip { Anchor: (Top: 70, Left: 8, Width: 46, Height: 18); Background: $A.@SlateQuiet; HitTestVisible: false; Visible: false;
+        Label { Anchor: (Top: 0, Left: 5, Width: 20, Height: 18); Text: %server.tamework.ui.shared.levelAbbreviation; Style: (FontSize: 8, RenderBold: true, RenderUppercase: true, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #BondedLevelText { Anchor: (Top: 0, Left: 24, Width: 19, Height: 18); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Center, VerticalAlignment: Center); }
+    }
 
     // Identity and vitals. A known gender shows its icon before the name, and the presenter then
-    // moves the name right of it.
-    Group #BondedGenderMaleIcon { Anchor: (Top: 9, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #50c8ef); HitTestVisible: false; Visible: false; }
-    Group #BondedGenderFemaleIcon { Anchor: (Top: 9, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #fc7cb4); HitTestVisible: false; Visible: false; }
-    Label #BondedName { Anchor: (Top: 8, Left: 100, Width: 280, Height: 22); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 16, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    Label #BondedSubtitle { Anchor: (Top: 30, Left: 100, Width: 280, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    Group #BondedHealthFrame { Anchor: (Top: 50, Left: 100, Width: 280, Height: 20); Background: #090e14;
-        Group #BondedHealthFill { Anchor: (Top: 1, Left: 1, Width: 278, Height: 18); Background: #e8aa35; }
-        Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 12, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center); }
+    // moves the name right of it. The species sits under the name: the server cannot measure the
+    // name, so it cannot place text beside it.
+    Group #BondedGenderMaleIcon { Anchor: (Top: 5, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #58c9f0); HitTestVisible: false; Visible: false; }
+    Group #BondedGenderFemaleIcon { Anchor: (Top: 5, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #ff86bb); HitTestVisible: false; Visible: false; }
+    Label #BondedName { Anchor: (Top: 4, Left: 100, Width: 280, Height: 22); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 16, FontName: "Secondary", TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #BondedSubtitle { Anchor: (Top: 25, Left: 100, Width: 280, Height: 14); Text: ""; Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Group #BondedHealthFrame { Anchor: (Top: 42, Left: 100, Width: 280, Height: 20); Background: $A.@SlateTrack;
+        Group #BondedHealthFill { Anchor: (Top: 1, Left: 1, Width: 278, Height: 18); Background: #57c87a; }
+        Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 12, RenderBold: true, TextColor: #05080b, HorizontalAlignment: Center, VerticalAlignment: Center); }
         Label #BondedHealthText { Anchor: (Top: 0, Left: 0, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 12, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
-    Group #BondedXpFrame { Anchor: (Top: 73, Left: 100, Width: 280, Height: 4); Background: #090e14; Visible: false;
-        Group #BondedXpFill { Anchor: (Top: 0, Left: 0, Width: 280, Height: 4); Background: #f2c66d; }
+    Group #BondedXpFrame { Anchor: (Top: 66, Left: 100, Width: 280, Height: 6); Background: $A.@SlateTrack; Visible: false;
+        Group #BondedXpFill { Anchor: (Top: 1, Left: 1, Width: 278, Height: 4); Background: #f2c66d; }
     }
+    Label #BondedXpCaption { Anchor: (Top: 73, Left: 100, Width: 280, Height: 13); Text: ""; Style: (FontSize: 9, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center); HitTestVisible: false; Visible: false; }
     // Taller than the bar so the progression tooltip is easy to reach.
-    TextButton #BondedXpButton { Anchor: (Top: 70, Left: 100, Width: 280, Height: 10); Style: @BondedTransparentButton; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
+    TextButton #BondedXpButton { Anchor: (Top: 63, Left: 100, Width: 280, Height: 12); Style: @BondedTransparentButton; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
 
-    Group { Anchor: (Top: 10, Left: 390, Width: 1, Bottom: 10); Background: #000000(0.45); HitTestVisible: false; }
+    Group { Anchor: (Top: 12, Left: 390, Width: 1, Bottom: 12); Background: #000000(0.45); HitTestVisible: false; }
 
-    // Status: one sentence (two lines at most), then either a second warning line or a timer bar.
-    Label #BondedStatusText { Anchor: (Top: 30, Left: 400, Width: 270, Height: 30); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
-    Label #BondedStatusWarning { Anchor: (Top: 30, Left: 400, Width: 270, Height: 30); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
-    Label #BondedStatusSecondary { Anchor: (Top: 62, Left: 400, Width: 270, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
-    Group #BondedTimerFrame { Anchor: (Top: 66, Left: 400, Width: 270, Height: 4); Background: #090e14; Visible: false;
-        Group #BondedTimerFillSession { Anchor: (Top: 0, Left: 0, Width: 270, Height: 4); Background: #e8aa35; Visible: false; }
-        Group #BondedTimerFillCooldown { Anchor: (Top: 0, Left: 0, Width: 270, Height: 4); Background: #f0b45a; Visible: false; }
+    // Status: the state pill (in the tone group), one sentence (two lines at most), then a second
+    // warning line or a timer bar. The last line asks for confirmation while a delete is pending.
+    Label #BondedStatusText { Anchor: (Top: 31, Left: 400, Width: 270, Height: 28); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
+    Label #BondedStatusWarning { Anchor: (Top: 31, Left: 400, Width: 270, Height: 28); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
+    Label #BondedStatusSecondary { Anchor: (Top: 60, Left: 400, Width: 270, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
+    Group #BondedTimerFrame { Anchor: (Top: 66, Left: 400, Width: 270, Height: 6); Background: $A.@SlateTrack; Visible: false;
+        Group #BondedTimerFillSession { Anchor: (Top: 1, Left: 1, Width: 268, Height: 4); Background: #e8aa35; Visible: false; }
+        Group #BondedTimerFillCooldown { Anchor: (Top: 1, Left: 1, Width: 268, Height: 4); Background: #f0b45a; Visible: false; }
     }
+    Label #BondedUnlinkConfirmText { Anchor: (Top: 74, Left: 400, Width: 270, Height: 14); Text: %server.tamework.ui.linkedPanel.bonded.detail.unlinkConfirm; Style: (FontSize: 9, RenderBold: true, TextColor: #f3aa9d, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
 
-    Group { Anchor: (Top: 10, Left: 680, Width: 1, Bottom: 10); Background: #000000(0.45); HitTestVisible: false; }
+    Group { Anchor: (Top: 12, Left: 680, Width: 1, Bottom: 12); Background: #000000(0.45); HitTestVisible: false; }
 
-    // Actions: the primary button (absent when the action is not possible), then the icon row.
+    // Actions: the primary button (greyed out when the action is not possible), then the icon row.
+    // The presenter picks the primary or the plain look by action.
     TextButton #BondedPrimaryAction { Anchor: (Top: 10, Left: 690, Width: 160, Height: 30); Style: $A.@PanelButton; Text: ""; Visible: false; }
     TextButton #BondedUnlinkConfirmButton { Anchor: (Top: 10, Left: 690, Width: 160, Height: 30); Style: @BondedCardDangerButtonStyle; Text: %server.tamework.ui.linkedPanel.bonded.unlink.confirm; TooltipText: %server.tamework.ui.linkedPanel.bonded.detail.unlinkConfirm; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
-    TextButton #BondedUnlinkCancelButton { Anchor: (Top: 46, Left: 690, Width: 160, Height: 28); Style: $A.@PanelButton; Text: %server.tamework.ui.shared.button.cancel; Visible: false; }
+    TextButton #BondedUnlinkCancelButton { Anchor: (Top: 46, Left: 690, Width: 160, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.shared.button.cancel; Visible: false; }
 
     // The icon row is right aligned; the presenter places the visible buttons so no gap is left.
     Group #BondedTalentPointAction { Anchor: (Top: 46, Left: 726, Width: 28, Height: 28);
-        TextButton #BondedTalentPointButton { Anchor: (Top: 0, Left: 0, Width: 28, Height: 28); Style: $A.@PanelButton; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; }
-        Group { Anchor: (Top: 4, Left: 4, Width: 20, Height: 20); Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png", Color: #f5e8c9); HitTestVisible: false; }
-        Group #BondedTalentPointBadge { Anchor: (Top: 0, Left: 14, Width: 14, Height: 12); Background: #f0b45a; HitTestVisible: false; Visible: false;
-            Label #BondedTalentPointCount { Anchor: (Top: 0, Left: 0, Right: 0, Height: 12); Text: ""; Style: (FontSize: 9, RenderBold: true, TextColor: #202423, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        TextButton #BondedTalentPointButton { Anchor: (Top: 0, Left: 0, Width: 28, Height: 28); Style: $A.@Action; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; }
+        Group { Anchor: (Top: 5, Left: 5, Width: 18, Height: 18); Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png", Color: #f5e8c9); HitTestVisible: false; }
+        Group #BondedTalentPointBadge { Anchor: (Top: 0, Left: 14, Width: 14, Height: 12); Background: #f2c66d; HitTestVisible: false; Visible: false;
+            Label #BondedTalentPointCount { Anchor: (Top: 0, Left: 0, Right: 0, Height: 12); Text: ""; Style: (FontSize: 9, RenderBold: true, TextColor: #1c1a19, HorizontalAlignment: Center, VerticalAlignment: Center); }
         }
     }
     TextButton #BondedFlightToggleButton { Anchor: (Top: 46, Left: 758, Width: 28, Height: 28); Style: $A.@FlightGrounded; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
