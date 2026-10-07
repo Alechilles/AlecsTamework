@@ -13,6 +13,7 @@ public final class BuilderBodyMotionTameworkLeap extends BuilderBodyMotionBase {
     public static final String BUILDER_ID = "TameworkLeap";
     private final DoubleHolder duration = new DoubleHolder();
     private final DoubleHolder height = new DoubleHolder();
+    private final DoubleHolder stopDistance = new DoubleHolder();
 
     @Override
     public BuilderBodyMotionTameworkLeap readConfig(@Nonnull JsonElement data) {
@@ -21,13 +22,16 @@ public final class BuilderBodyMotionTameworkLeap extends BuilderBodyMotionBase {
                 BuilderDescriptorState.Stable, "Flight time in seconds, independent of target distance.", null);
         getDouble(data, "Height", height, 4.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.Stable, "Arc height above the line joining takeoff and landing.", null);
+        getDouble(data, "StopDistance", stopDistance, 0.0, DoubleSingleValidator.greaterEqual0(),
+                BuilderDescriptorState.Stable,
+                "Horizontal distance short of the target to land at, along the line from takeoff.", null);
         return this;
     }
 
     @Override
     public BodyMotionTameworkLeap build(@Nonnull BuilderSupport support) {
         return new BodyMotionTameworkLeap(this, duration.get(support.getExecutionContext()),
-                height.get(support.getExecutionContext()));
+                height.get(support.getExecutionContext()), stopDistance.get(support.getExecutionContext()));
     }
 
     @Override

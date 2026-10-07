@@ -9,6 +9,11 @@ starts and follows a parabolic arc to that exact point. `Duration` defaults to
 1.2 seconds and `Height` to 4 blocks above the line between the endpoints. Both
 must be positive. It requires a Walk controller and Hytale 0.6.7 or later.
 
+`StopDistance` (default 0) lands that many blocks short of the target, measured
+horizontally along the line from takeoff, so a pet can pounce to just in front
+of a player instead of onto them. An NPC already inside that distance hops in
+place.
+
 Keep the motion selected for the flight duration. Use a stored position sensor
 when target movement or target loss must not change the selected instruction.
 After the flight duration, wait for `OnGround` before triggering landing effects.

@@ -25,9 +25,10 @@ public final class BodyMotionTameworkLeap extends TameworkBodyMotionBase {
     private final RailStepResult collisionResult = new RailStepResult();
     private boolean started;
 
-    BodyMotionTameworkLeap(BuilderBodyMotionTameworkLeap builder, double duration, double height) {
+    BodyMotionTameworkLeap(BuilderBodyMotionTameworkLeap builder, double duration, double height,
+                           double stopDistance) {
         super(builder);
-        arc = new Arc(duration, height);
+        arc = new Arc(duration, height, stopDistance);
     }
 
     @Override
@@ -89,13 +90,19 @@ public final class BodyMotionTameworkLeap extends TameworkBodyMotionBase {
     static final class Arc {
         private final double duration;
         private final double height;
+        private final double stopDistance;
         private final Vector3d start = new Vector3d();
         private final Vector3d end = new Vector3d();
         private double elapsed;
 
         Arc(double duration, double height) {
+            this(duration, height, 0);
+        }
+
+        Arc(double duration, double height, double stopDistance) {
             this.duration = duration;
             this.height = height;
+            this.stopDistance = stopDistance;
         }
 
         boolean start(Vector3dc from, Vector3dc to) {
@@ -104,6 +111,16 @@ public final class BodyMotionTameworkLeap extends TameworkBodyMotionBase {
             }
             start.set(from);
             end.set(to);
+            if (stopDistance > 0) {
+                // Land short of the target along the approach line, never behind takeoff.
+                double dx = to.x() - from.x();
+                double dz = to.z() - from.z();
+                double horizontal = Math.sqrt(dx * dx + dz * dz);
+                double travel = Math.max(0, horizontal - stopDistance);
+                double scale = horizontal > 0 ? travel / horizontal : 0;
+                end.x = from.x() + dx * scale;
+                end.z = from.z() + dz * scale;
+            }
             elapsed = 0;
             return true;
         }
