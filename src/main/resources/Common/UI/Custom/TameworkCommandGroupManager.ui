@@ -14,7 +14,7 @@ $C.@PageOverlay {
       Group {
         Anchor: (Top: 8, Right: 14, Width: 28, Height: 28);
         TextButton #TameworkGroupCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@ActionQuiet; }
-        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #c2ccd6); }
+        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #bfcdd5); }
       }
       Label #TameworkGroupManagerTitle {
         Anchor: (Left: 22, Right: 52, Height: 44);
@@ -32,7 +32,7 @@ $C.@PageOverlay {
         Text: %server.tamework.ui.groupManager.subtitle.default;
         Style: (
           FontSize: 12,
-          TextColor: #8794a4,
+          TextColor: #96a9be,
           HorizontalAlignment: Start,
           VerticalAlignment: Center
         );
@@ -103,7 +103,7 @@ $C.@PageOverlay {
           Text: %server.tamework.ui.groupManager.emptyState;
           Style: (
             FontSize: 12,
-            TextColor: #8794a4,
+            TextColor: #96a9be,
             HorizontalAlignment: Start,
             VerticalAlignment: Center
           );

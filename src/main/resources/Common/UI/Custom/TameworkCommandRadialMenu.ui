@@ -18,13 +18,13 @@ $C.@PageOverlay {
     Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
     Group #TameworkCommandMenuLogo { Anchor: (Top: 4, Left: 20, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
     Label #TameworkCommandMenuTitle { Anchor: (Left: 66, Right: 478, Height: 42); Text: ""; Style: (FontSize: 18, FontName: "Secondary", LetterSpacing: 1, TextColor: #eef2f6, VerticalAlignment: Center); }
-    Label #TameworkContributorCapacity { Anchor: (Top: 8, Right: 286, Width: 180, Height: 26); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Label #TameworkContributorCapacity { Anchor: (Top: 8, Right: 286, Width: 180, Height: 26); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
     TextButton #CommandMenuHelpButton {
       Anchor: (Top: 8, Right: 186, Width: 88, Height: 26);
       Text: %server.tamework.ui.guide.help;
       Style: $A.@PanelButtonQuiet;
     }
-    Label #TameworkCommandMenuSubtitle { Anchor: (Left: 330, Width: 500, Height: 42); Text: ""; Visible: false; Style: (FontSize: 12, TextColor: #8794a4); }
+    Label #TameworkCommandMenuSubtitle { Anchor: (Left: 330, Width: 500, Height: 42); Text: ""; Visible: false; Style: (FontSize: 12, TextColor: #96a9be); }
     TextButton #CommandMenuFeedbackButton {
       Anchor: (Top: 8, Right: 86, Width: 92, Height: 26);
       Text: %server.tamework.ui.commandMenu.feedback;
@@ -35,12 +35,12 @@ $C.@PageOverlay {
      Anchor: (Top: 8, Right: 50, Width: 28, Height: 26);
      Visible: false;
      TextButton #CommandMenuSettingsButton { Anchor: (Full: 0); Text: ""; Style: $A.@ActionQuiet; TooltipText: %server.tamework.ui.settings.title; }
-     Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Settings_Glyph_Default.png", Color: #c2ccd6); }
+     Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Settings_Glyph_Default.png", Color: #bfcdd5); }
     }
     Group #CommandMenuClose {
      Anchor: (Top: 7, Right: 14, Width: 28, Height: 28);
      TextButton #CommandMenuCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@ActionQuiet; }
-     Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #c2ccd6); }
+     Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #bfcdd5); }
     }
    }
    Group #TameworkCommandAssignments {
@@ -73,10 +73,10 @@ $C.@PageOverlay {
     Group #TameworkGroupQuickSelect {
      Anchor: (Top: 328, Left: 8, Right: 8, Bottom: 8);
      Group { Anchor: (Top: -6, Left: 0, Right: 0, Height: 1); Background: #ffffff(0.08); }
-     Label { Anchor: (Top: 6, Left: 8, Right: 38, Height: 24); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+     Label { Anchor: (Top: 6, Left: 8, Right: 38, Height: 24); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center); }
      Group { Anchor: (Top: 5, Right: 5, Width: 26, Height: 26);
       TextButton #TameworkLinkedPanelManageGroupsButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.edit; Style: $A.@ActionQuiet; }
-      Group { Anchor: (Top: 5, Left: 5, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/GroupEdit.png", Color: #c2ccd6); HitTestVisible: false; }
+      Group { Anchor: (Top: 5, Left: 5, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/GroupEdit.png", Color: #bfcdd5); HitTestVisible: false; }
      }
      Group { Anchor: (Top: 36, Left: 4, Right: 4, Bottom: 72); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Top: 2, Bottom: 4);
       Group #TameworkGroupQuickSelectList { Anchor: (Left: 0, Right: 0); LayoutMode: Top; }

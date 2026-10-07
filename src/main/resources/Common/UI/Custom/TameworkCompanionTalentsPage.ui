@@ -1,13 +1,13 @@
 $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
-@TalentSmallCaps = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center);
+@TalentSmallCaps = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
 @TalentPointsPillLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #f2c66d, HorizontalAlignment: Center, VerticalAlignment: Center);
 // The detail status line takes one of these from TameworkCompanionTalentsPage by the selected talent's state.
 @TalentDetailStatusAvailable = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
-@TalentDetailStatusPurchased = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+@TalentDetailStatusPurchased = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #e8aa35, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
 @TalentDetailStatusUnaffordable = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
-@TalentDetailStatusLocked = LabelStyle(FontSize: 12, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+@TalentDetailStatusLocked = LabelStyle(FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
 
 $C.@PageOverlay {
   LayoutMode: Middle;
@@ -77,7 +77,7 @@ $C.@PageOverlay {
         Label #TameworkCompanionTalentsStatus {
           Anchor: (Top: 48, Left: 0, Width: 480, Height: 20);
           Text: "";
-          Style: (FontSize: 12, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Group #TalentTreePanControls {
@@ -135,7 +135,7 @@ $C.@PageOverlay {
           Label #TalentDetailEmpty {
             Anchor: (Top: 18, Left: 12, Right: 12, Height: 64);
             Text: %server.tamework.ui.talents.detail.empty;
-            Style: (FontSize: 13, TextColor: #8794a4, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+            Style: (FontSize: 13, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
           }
 
           Group #TalentDetailContent {
@@ -151,7 +151,7 @@ $C.@PageOverlay {
             Label #TalentDetailBranch {
               Anchor: (Top: 52, Left: 0, Right: 0, Height: 18);
               Text: "";
-              Style: (...@TalentSmallCaps, TextColor: #5fe0c0);
+              Style: (...@TalentSmallCaps, TextColor: #e8aa35);
             }
 
             Label #TalentDetailStatus {
@@ -165,7 +165,7 @@ $C.@PageOverlay {
             Label #TalentDetailDescription {
               Anchor: (Top: 126, Left: 0, Right: 0, Height: 96);
               Text: "";
-              Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailRequirementsLabel {
@@ -189,7 +189,7 @@ $C.@PageOverlay {
             Label #TalentDetailEffects {
               Anchor: (Top: 340, Left: 0, Right: 0, Height: 116);
               Text: %server.tamework.ui.talents.effects.none;
-              Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             TextButton #TalentDetailUnlockButton {

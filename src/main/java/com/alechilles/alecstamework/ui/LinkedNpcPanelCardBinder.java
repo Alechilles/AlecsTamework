@@ -696,7 +696,7 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #PortraitFrame.Visible", !compact);
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(68, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
-        commands.set(card + " #HealthFrame.Background", "#0a0e13");
+        commands.set(card + " #HealthFrame.Background", "#090e14");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
@@ -805,7 +805,7 @@ final class LinkedNpcPanelCardBinder {
             case "lost" -> "#f0b45a";
             case "stored" -> "#7fa8ee";
             case "rest" -> "#8fa2b8";
-            default -> "#5fe0c0";
+            default -> "#7a9cc6";
         };
         commands.setObject(card + " #StatePill.Background",
                 new PatchStyle(Value.of("Tamework/Slate/Pill.png"), Value.of(7)).setColor(Value.of(color)));
@@ -819,7 +819,7 @@ final class LinkedNpcPanelCardBinder {
                                               LifecycleDisplay display, String language, boolean muted) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
-        String color = muted ? "#6b7480" : lifecycleColor(lifecycle);
+        String color = muted ? "#586d8a" : lifecycleColor(lifecycle);
         commands.setObject(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle).setColor(Value.of(color)));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())

@@ -17,7 +17,7 @@ import javax.annotation.Nullable;
 final class CommandHotswapHudGroupStatusResolver {
     private static final String ALL_COLOR = "#c8d1db";
     private static final String CUSTOM_COLOR = "#c9a653";
-    private static final String NONE_COLOR = "#6e7c8b";
+    private static final String NONE_COLOR = "#567296";
     private static final String ALL_KEY = "tamework.ui.commandHotswapHud.group.all";
     private static final String NONE_KEY = "tamework.ui.commandHotswapHud.group.none";
     private static final String CUSTOM_KEY = "tamework.ui.commandHotswapHud.group.custom";

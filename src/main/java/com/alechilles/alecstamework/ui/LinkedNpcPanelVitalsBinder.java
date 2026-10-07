@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  */
 final class LinkedNpcPanelVitalsBinder {
     private static final int CARD_HEALTH_FILL_MAX_WIDTH = 232;
-    private static final String MUTED_FILL_COLOR = "#6b7480";
+    private static final String MUTED_FILL_COLOR = "#586d8a";
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";

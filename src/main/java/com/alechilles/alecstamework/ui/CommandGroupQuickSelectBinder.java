@@ -97,11 +97,11 @@ final class CommandGroupQuickSelectBinder {
     }
 
     private static String colorFor(DropdownEntryInfo entry, Map<String, String> groupColors) {
-        if (entry == null || entry.value() == null) return "#516177";
+        if (entry == null || entry.value() == null) return "#395880";
         String color = groupColors.get(normalize(entry.value()));
         if (color != null) return color;
         // All and No Group stay neutral; selection is communicated by the button style.
-        return "#516177";
+        return "#395880";
     }
 
     private static String normalize(String value) {

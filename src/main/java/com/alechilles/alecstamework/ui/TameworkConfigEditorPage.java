@@ -2158,18 +2158,18 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private static String sectionBackgroundColor(int depth) {
         return switch (depthBucket(depth)) {
-            case 0 -> "#2d3744";
-            case 1 -> "#262f3a";
-            default -> "#1f2731";
+            case 0 -> "#213249";
+            case 1 -> "#1c2b3e";
+            default -> "#172434";
         };
     }
 
     @Nonnull
     private static String fieldBackgroundColor(int depth) {
         return switch (depthBucket(depth)) {
-            case 0 -> "#141920";
-            case 1 -> "#1a2029";
-            default -> "#1f2731";
+            case 0 -> "#0f1722";
+            case 1 -> "#131e2c";
+            default -> "#172434";
         };
     }
 

@@ -34,7 +34,7 @@ class CommandHotswapHudGroupStatusResolverTest {
         assertEquals("Custom Selection", custom.label());
         assertEquals("#c9a653", custom.colorHex());
         assertEquals("No Active Companions", none.label());
-        assertEquals("#6e7c8b", none.colorHex());
+        assertEquals("#567296", none.colorHex());
     }
 
     @Test

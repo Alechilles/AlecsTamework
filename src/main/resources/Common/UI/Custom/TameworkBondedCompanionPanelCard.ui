@@ -7,7 +7,7 @@ $C = "Common.ui";
 @BondedTransparentButtonLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @BondedTransparentButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Hovered: (Background: (Color: #ffffff(0.06)), LabelStyle: @BondedTransparentButtonLabel), Pressed: (Background: (Color: #ffffff(0.12)), LabelStyle: @BondedTransparentButtonLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Sounds: $C.@ButtonSounds);
 @BondedPortraitStyle = ItemGridStyle(SlotSize: 72, SlotSpacing: 0, SlotIconSize: 72);
-@BondedChipLabelActive = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedChipLabelActive = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8aa35, HorizontalAlignment: Center, VerticalAlignment: Center);
 @BondedChipLabelStored = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #78bfc1, HorizontalAlignment: Center, VerticalAlignment: Center);
 @BondedChipLabelDead = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e5786d, HorizontalAlignment: Center, VerticalAlignment: Center);
 
@@ -15,22 +15,22 @@ $C = "Common.ui";
 // status (400-670), actions (690-850). The card has no padding; every anchor is card-relative.
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
-    Background: #1d252f;
-    OutlineColor: #06080b;
+    Background: #162232;
+    OutlineColor: #05080b;
     OutlineSize: 1;
 
     // State tone: the accent stripe, the state chip and the ring around the primary button.
     // Exactly one tone group is visible. Drawn first so the controls sit on top.
     Group #BondedToneActive { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); HitTestVisible: false; Visible: false;
-        Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #5fe0c0; }
-        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #16302d; OutlineColor: #5fe0c0; OutlineSize: 1;
+        Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #e8aa35; }
+        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #1d2f45; OutlineColor: #e8aa35; OutlineSize: 1;
             Label #ChipLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @BondedChipLabelActive; }
         }
-        Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #5fe0c0; OutlineSize: 1; Visible: false; }
+        Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #e8aa35; OutlineSize: 1; Visible: false; }
     }
     Group #BondedToneStored { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); HitTestVisible: false; Visible: false;
         Group { Anchor: (Top: 0, Left: 0, Width: 4, Bottom: 0); Background: #78bfc1; }
-        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #1a2c33; OutlineColor: #78bfc1; OutlineSize: 1;
+        Group { Anchor: (Top: 10, Left: 400, Width: 84, Height: 16); Background: #182537; OutlineColor: #78bfc1; OutlineSize: 1;
             Label #ChipLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: @BondedChipLabelStored; }
         }
         Group #ActionRing { Anchor: (Top: 9, Left: 689, Width: 162, Height: 32); Background: #000000(0.0); OutlineColor: #78bfc1; OutlineSize: 1; Visible: false; }
@@ -44,22 +44,22 @@ Group {
     }
 
     // Portrait.
-    Group { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #0a0e13; OutlineColor: #000000(0.45); OutlineSize: 1; HitTestVisible: false; }
+    Group { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #090e14; OutlineColor: #000000(0.45); OutlineSize: 1; HitTestVisible: false; }
     ItemGrid #BondedPortrait { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
-    Group #BondedPortraitDim { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #0a0e13(0.6); HitTestVisible: false; Visible: false; }
+    Group #BondedPortraitDim { Anchor: (Top: 10, Left: 16, Width: 72, Height: 72); Background: #090e14(0.6); HitTestVisible: false; Visible: false; }
 
     // Identity and vitals. A known gender shows its icon before the name, and the presenter then
     // moves the name right of it.
     Group #BondedGenderMaleIcon { Anchor: (Top: 9, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #50c8ef); HitTestVisible: false; Visible: false; }
     Group #BondedGenderFemaleIcon { Anchor: (Top: 9, Left: 100, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #fc7cb4); HitTestVisible: false; Visible: false; }
     Label #BondedName { Anchor: (Top: 8, Left: 100, Width: 280, Height: 22); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 16, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    Label #BondedSubtitle { Anchor: (Top: 30, Left: 100, Width: 280, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    Group #BondedHealthFrame { Anchor: (Top: 50, Left: 100, Width: 280, Height: 20); Background: #0a0e13;
-        Group #BondedHealthFill { Anchor: (Top: 1, Left: 1, Width: 278, Height: 18); Background: #5fe0c0; }
+    Label #BondedSubtitle { Anchor: (Top: 30, Left: 100, Width: 280, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Group #BondedHealthFrame { Anchor: (Top: 50, Left: 100, Width: 280, Height: 20); Background: #090e14;
+        Group #BondedHealthFill { Anchor: (Top: 1, Left: 1, Width: 278, Height: 18); Background: #e8aa35; }
         Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 12, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center); }
         Label #BondedHealthText { Anchor: (Top: 0, Left: 0, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 12, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
-    Group #BondedXpFrame { Anchor: (Top: 73, Left: 100, Width: 280, Height: 4); Background: #0a0e13; Visible: false;
+    Group #BondedXpFrame { Anchor: (Top: 73, Left: 100, Width: 280, Height: 4); Background: #090e14; Visible: false;
         Group #BondedXpFill { Anchor: (Top: 0, Left: 0, Width: 280, Height: 4); Background: #f2c66d; }
     }
     // Taller than the bar so the progression tooltip is easy to reach.
@@ -71,8 +71,8 @@ Group {
     Label #BondedStatusText { Anchor: (Top: 30, Left: 400, Width: 270, Height: 30); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
     Label #BondedStatusWarning { Anchor: (Top: 30, Left: 400, Width: 270, Height: 30); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); Visible: false; }
     Label #BondedStatusSecondary { Anchor: (Top: 62, Left: 400, Width: 270, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
-    Group #BondedTimerFrame { Anchor: (Top: 66, Left: 400, Width: 270, Height: 4); Background: #0a0e13; Visible: false;
-        Group #BondedTimerFillSession { Anchor: (Top: 0, Left: 0, Width: 270, Height: 4); Background: #5fe0c0; Visible: false; }
+    Group #BondedTimerFrame { Anchor: (Top: 66, Left: 400, Width: 270, Height: 4); Background: #090e14; Visible: false;
+        Group #BondedTimerFillSession { Anchor: (Top: 0, Left: 0, Width: 270, Height: 4); Background: #e8aa35; Visible: false; }
         Group #BondedTimerFillCooldown { Anchor: (Top: 0, Left: 0, Width: 270, Height: 4); Background: #f0b45a; Visible: false; }
     }
 

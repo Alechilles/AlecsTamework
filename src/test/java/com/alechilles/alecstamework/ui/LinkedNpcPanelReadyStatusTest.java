@@ -22,7 +22,7 @@ class LinkedNpcPanelReadyStatusTest {
         assertEquals(24, harvestFill.getNumber("Left").intValue());
         assertEquals(106, harvestFill.getNumber("Width").intValue());
         assertTrue(value(commands, "#Card #BreedingCooldown #BreedingCooldownTooltip.TooltipText").contains("Too unhappy"));
-        assertTrue(value(commands, "#Card #BreedingCooldown #MeterFill.Background").contains("#6b7480"));
+        assertTrue(value(commands, "#Card #BreedingCooldown #MeterFill.Background").contains("#586d8a"));
 
         commands = new UICommandBuilder();
         LinkedNpcPanelVitalsBinder.bind(commands, "#Card", entry(80, false, true), "en-US");
@@ -53,7 +53,7 @@ class LinkedNpcPanelReadyStatusTest {
         LinkedNpcPanelVitalsBinder.bind(commands, "#Card", entry(10, false, true, false), "en-US");
         assertTrue(value(commands, "#Card #BreedingCooldown #CooldownText.Text").contains("Breeding Off"));
         assertTrue(value(commands, "#Card #BreedingCooldown #BreedingCooldownTooltip.TooltipText").contains("Breeding is off"));
-        assertTrue(value(commands, "#Card #BreedingCooldown #MeterFill.Background").contains("#6b7480"));
+        assertTrue(value(commands, "#Card #BreedingCooldown #MeterFill.Background").contains("#586d8a"));
     }
 
     private static LinkedNpcEntry entry(int happiness, boolean cooldown, boolean known) {

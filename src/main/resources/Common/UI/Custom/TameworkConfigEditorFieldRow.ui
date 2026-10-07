@@ -2,11 +2,11 @@ $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 // The source chip is a button only for its tooltip, so it is drawn as a pill and not as a plate.
-@SourceChipLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, HorizontalAlignment: Center, VerticalAlignment: Center);
+@SourceChipLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center);
 @SourceChip = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #8794a4), LabelStyle: @SourceChipLabel),
-  Hovered: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #c2ccd6), LabelStyle: (...@SourceChipLabel, TextColor: #c2ccd6)),
-  Pressed: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #c2ccd6), LabelStyle: (...@SourceChipLabel, TextColor: #c2ccd6))
+  Default: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #96a9be), LabelStyle: @SourceChipLabel),
+  Hovered: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #bfcdd5), LabelStyle: (...@SourceChipLabel, TextColor: #bfcdd5)),
+  Pressed: (Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #bfcdd5), LabelStyle: (...@SourceChipLabel, TextColor: #bfcdd5))
 );
 
 Group {
@@ -15,38 +15,38 @@ Group {
   Group #FieldRowBackground {
     // TameworkConfigEditorPage.java sets an opaque Slate tone by depth.
     Anchor: (Top: 0, Left: 0, Right: 4, Bottom: 0);
-    Background: #141920;
+    Background: #0f1722;
   }
 
   Group #FieldGuideDepth1 {
     Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
-    Background: #5fe0c0(0.35);
+    Background: #e8aa35(0.35);
     Visible: false;
   }
 
   Group #FieldGuideDepth2 {
     Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
-    Background: #5fe0c0(0.35);
+    Background: #e8aa35(0.35);
     Visible: false;
   }
 
   Label #FieldNameTop {
     Anchor: (Top: 3, Left: 8, Width: 304, Height: 24);
     Text: %server.tamework.ui.configEditor.field.nameDefault;
-    Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
   }
 
   Label #FieldNameNested {
     Anchor: (Top: 3, Left: 30, Width: 282, Height: 24);
     Text: %server.tamework.ui.configEditor.field.nameDefault;
-    Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
   Label #FieldNameDeep {
     Anchor: (Top: 3, Left: 52, Width: 260, Height: 24);
     Text: %server.tamework.ui.configEditor.field.nameDefault;
-    Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
@@ -66,7 +66,7 @@ Group {
   Label #FieldModeChip {
     Anchor: (Top: 3, Left: 374, Width: 74, Height: 24);
     Text: %server.tamework.ui.configEditor.field.mode.noLocal;
-    Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: Center, VerticalAlignment: Center);
+    Style: (FontSize: 11, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center);
     Visible: false;
   }
 
@@ -137,7 +137,7 @@ Group {
     Label #FieldHandoff {
       Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
       Text: "";
-      Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+      Style: (FontSize: 11, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       Visible: false;
     }
   }

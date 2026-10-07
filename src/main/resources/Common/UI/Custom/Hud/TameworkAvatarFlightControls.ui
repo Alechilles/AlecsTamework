@@ -56,7 +56,7 @@ Group #TameworkAvatarFlightControls {
         // The shade covers the slot only, so the key stays readable while the ability cools down.
         Group #Ability2CooldownShade {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: #06080b(0.74);
+            Background: #05080b(0.74);
             Visible: false;
 
             Label #Ability2CooldownLabel {
@@ -99,7 +99,7 @@ Group #TameworkAvatarFlightControls {
         // The shade covers the slot only, so the key stays readable while the ability cools down.
         Group #Ability3CooldownShade {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: #06080b(0.74);
+            Background: #05080b(0.74);
             Visible: false;
 
             Label #Ability3CooldownLabel {

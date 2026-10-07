@@ -47,7 +47,7 @@ class LinkedNpcTraitIndicatorBinderTest {
         anchor.setHeight(Value.of(3));
         UICommandBuilder expected = new UICommandBuilder();
         expected.setObject("#Card #TraitSlot0 #RingFillBar1.Anchor", anchor);
-        expected.set("#Card #TraitSlot0 #RingFillBar1.Background", negative ? "#e5786d" : "#5fe0c0");
+        expected.set("#Card #TraitSlot0 #RingFillBar1.Background", negative ? "#e5786d" : "#e8aa35");
         for (var command : expected.getCommands()) {
             String emitted = null;
             for (var candidate : actual.getCommands()) {

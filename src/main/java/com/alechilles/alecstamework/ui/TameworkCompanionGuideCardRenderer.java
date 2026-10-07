@@ -113,7 +113,7 @@ final class TameworkCompanionGuideCardRenderer {
                 78, 100, happiness, 100, happiness, "", hunger, 100, thirst, 100,
                 !unloaded, topicIndex == 9, dead, captured, false, false, 0L, null,
                 level, points, traits, false, false, topicIndex == 5, topicIndex == 5,
-                !captured, active, null, null, groupId, groupName, exampleIndex == 2 ? "#f2c66d" : "#5fe0c0",
+                !captured, active, null, null, groupId, groupName, exampleIndex == 2 ? "#f2c66d" : "#e8aa35",
                 topicIndex == 4 || topicIndex == 3, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, false, false, 0L

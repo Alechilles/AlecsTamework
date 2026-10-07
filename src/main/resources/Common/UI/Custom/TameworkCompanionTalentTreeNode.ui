@@ -12,14 +12,14 @@ $C = "Common.ui";
 
 // TameworkCompanionTalentsPage picks these by the node's state.
 @TalentNodeName = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
-@TalentNodeNamePurchased = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eafff8, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
-@TalentNodeNameLocked = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #56606c, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+@TalentNodeNamePurchased = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #f2f6fc, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+@TalentNodeNameLocked = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #445974, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
 @TalentNodeCost = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Start, VerticalAlignment: Center);
-@TalentNodeCostLocked = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #56606c, HorizontalAlignment: Start, VerticalAlignment: Center);
+@TalentNodeCostLocked = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #445974, HorizontalAlignment: Start, VerticalAlignment: Center);
 @TalentNodeStateAvailable = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: End, VerticalAlignment: Center);
-@TalentNodeStatePurchased = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #5fe0c0, HorizontalAlignment: End, VerticalAlignment: Center);
+@TalentNodeStatePurchased = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8aa35, HorizontalAlignment: End, VerticalAlignment: Center);
 @TalentNodeStateUnaffordable = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: End, VerticalAlignment: Center);
-@TalentNodeStateLocked = LabelStyle(FontSize: 10, TextColor: #56606c, HorizontalAlignment: End, VerticalAlignment: Center);
+@TalentNodeStateLocked = LabelStyle(FontSize: 10, TextColor: #445974, HorizontalAlignment: End, VerticalAlignment: Center);
 
 Group {
   Anchor: (Width: 117, Height: 66);

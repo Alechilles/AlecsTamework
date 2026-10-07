@@ -41,7 +41,7 @@ final class CommandTargetHudBinder {
     private static final int COMPACT_METER_FILL_WIDTH = 78;
     private static final int TRAIT_TICK_WIDTH = 18;
     private static final int LEVEL_CHIP_PADDING = 12;
-    private static final String TRAIT_ABOVE_COLOR = "#5fe0c0";
+    private static final String TRAIT_ABOVE_COLOR = "#e8aa35";
     private static final String TRAIT_BELOW_COLOR = "#e5786d";
     private static final int FOOD_HEADING_HEIGHT = 18;
     private static final int FAVORITE_FOOD_HEIGHT = 36;

@@ -3,7 +3,7 @@ $C = "Common.ui";
 
 Group #TameworkLinkedPanelRemovalConfirmOverlay {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-    Background: #06080b(0.82);
+    Background: #05080b(0.82);
     Visible: false;
 
     Group #TameworkLinkedPanelRemovalConfirmModal {
@@ -20,7 +20,7 @@ Group #TameworkLinkedPanelRemovalConfirmOverlay {
         Label #TameworkLinkedPanelRemovalConfirmMessage {
             Anchor: (Top: 66, Left: 14, Width: 432, Height: 54);
             Text: "";
-            Style: (FontSize: 12, TextColor: #c2ccd6, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+            Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
         }
 
         Group #TameworkLinkedPanelRemovalConfirmActions {

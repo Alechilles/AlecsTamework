@@ -2,9 +2,9 @@ $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 
 // Row buttons are smaller than the shared panel buttons, and Delete keeps red text on a quiet plate.
-@RowLabel = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #c2ccd6, Alignment: Center);
+@RowLabel = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #bfcdd5, Alignment: Center);
 @RowLabelLit = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, Alignment: Center);
-@RowLabelDone = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eafff8, Alignment: Center);
+@RowLabelDone = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f2f6fc, Alignment: Center);
 @RowLabelDelete = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f3aa9d, Alignment: Center);
 @RowEdit = TextButtonStyle(
   Default: (Background: $A.@SlateQuiet, LabelStyle: @RowLabel),

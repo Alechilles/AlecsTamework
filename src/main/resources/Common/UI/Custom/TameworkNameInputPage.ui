@@ -27,7 +27,7 @@ $C.@PageOverlay {
         Text: %server.tamework.ui.nameInput.subtitle;
         Style: (
           FontSize: 14,
-          TextColor: #8794a4,
+          TextColor: #96a9be,
           HorizontalAlignment: Center,
           VerticalAlignment: Center
         );

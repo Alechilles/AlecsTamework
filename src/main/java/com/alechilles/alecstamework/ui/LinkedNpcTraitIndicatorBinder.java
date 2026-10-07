@@ -11,7 +11,7 @@ import com.hypixel.hytale.server.core.ui.Value;
 final class LinkedNpcTraitIndicatorBinder {
     static final int MAX_VISIBLE_TRAIT_INDICATORS = 4;
 
-    private static final String POSITIVE_FILL_COLOR = "#5fe0c0";
+    private static final String POSITIVE_FILL_COLOR = "#e8aa35";
     private static final String NEGATIVE_FILL_COLOR = "#e5786d";
 
     private LinkedNpcTraitIndicatorBinder() {

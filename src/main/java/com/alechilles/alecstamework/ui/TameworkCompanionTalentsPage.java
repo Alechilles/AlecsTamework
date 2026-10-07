@@ -52,8 +52,8 @@ public final class TameworkCompanionTalentsPage
     public static final String STATE_UNAFFORDABLE = "Unaffordable";
     public static final String STATE_AVAILABLE = "Available";
     /** A connector on an open path (its parent talent is unlocked and the child is not locked). */
-    private static final String CONNECTOR_COLOR_OPEN = "#5fe0c0";
-    private static final String CONNECTOR_COLOR_CLOSED = "#3d4856";
+    private static final String CONNECTOR_COLOR_OPEN = "#e8aa35";
+    private static final String CONNECTOR_COLOR_CLOSED = "#2b405c";
 
     private final Supplier<PageData> dataSupplier;
     private final Function<String, String> purchaseCallback;

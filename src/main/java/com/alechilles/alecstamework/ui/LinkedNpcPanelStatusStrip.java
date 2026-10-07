@@ -115,8 +115,8 @@ final class LinkedNpcPanelStatusStrip {
         static Palette of(State state) {
             return switch (state) {
                 case COUNTDOWN -> new Palette("#7a4a48", "#2a1f22", "#e5786d", "StatusStripLabelDead");
-                case READY -> new Palette("#3f9e8a", "#16302d", "#5fe0c0", "StatusStripLabelReady");
-                case DISABLED -> new Palette("#3d4856", "#1b2028", "#6b7480", "StatusStripLabelMuted");
+                case READY -> new Palette("#a47620", "#1d2f45", "#e8aa35", "StatusStripLabelReady");
+                case DISABLED -> new Palette("#2b405c", "#131d2b", "#586d8a", "StatusStripLabelMuted");
                 case MISSING -> new Palette("#8a6a3a", "#2a251d", "#f0b45a", "StatusStripLabelLost");
             };
         }

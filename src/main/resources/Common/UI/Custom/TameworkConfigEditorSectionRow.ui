@@ -7,20 +7,20 @@ Group {
   Group #SectionRowBackground {
     // TameworkConfigEditorPage.java sets an opaque Slate tone by depth.
     Anchor: (Top: 1, Left: 0, Right: 4, Bottom: 1);
-    Background: #2d3744;
-    OutlineColor: #06080b;
+    Background: #213249;
+    OutlineColor: #05080b;
     OutlineSize: 1;
   }
 
   Group #SectionGuideDepth1 {
     Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
-    Background: #5fe0c0(0.35);
+    Background: #e8aa35(0.35);
     Visible: false;
   }
 
   Group #SectionGuideDepth2 {
     Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
-    Background: #5fe0c0(0.35);
+    Background: #e8aa35(0.35);
     Visible: false;
   }
 
@@ -39,13 +39,13 @@ Group {
 
       Group #SectionToggleTopExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #bfcdd5);
         Visible: true;
       }
 
       Group #SectionToggleTopCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #bfcdd5);
         Visible: false;
       }
     }
@@ -108,7 +108,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #8794a4,
+          TextColor: #96a9be,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -155,13 +155,13 @@ Group {
 
       Group #SectionToggleNestedExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #bfcdd5);
         Visible: true;
       }
 
       Group #SectionToggleNestedCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #bfcdd5);
         Visible: false;
       }
     }
@@ -224,7 +224,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #8794a4,
+          TextColor: #96a9be,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -271,13 +271,13 @@ Group {
 
       Group #SectionToggleDeepExpandedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretUp.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretUp.png", Color: #bfcdd5);
         Visible: true;
       }
 
       Group #SectionToggleDeepCollapsedIcon {
         Anchor: (Width: 12, Height: 7);
-        Background: (TexturePath: "TwConfigCaretDown.png", Color: #c2ccd6);
+        Background: (TexturePath: "TwConfigCaretDown.png", Color: #bfcdd5);
         Visible: false;
       }
     }
@@ -340,7 +340,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #8794a4,
+          TextColor: #96a9be,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
