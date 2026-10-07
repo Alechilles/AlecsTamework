@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.compat.HytaleBossBarAccess;
 import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
 import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
 import com.hypixel.hytale.component.AddReason;
@@ -50,7 +51,7 @@ public final class NpcBossBarCleanupSystem extends RefSystem<EntityStore> {
         }
         for (Ref<EntityStore> member : members.getMemberTtl().keySet()) {
             if (member.isValid()) {
-                bar.revertPlayer(commandBuffer, member);
+                HytaleBossBarAccess.revertPlayer(bar, commandBuffer, reference, member);
             } else {
                 bar.forgetPlayer(member);
             }

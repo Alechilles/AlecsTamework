@@ -83,12 +83,8 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
         if (damage == null) {
             return false;
         }
-        Damage.Source source = damage.getSource();
-        if (!(source instanceof Damage.EnvironmentSource environmentSource)) {
-            return false;
-        }
-        String type = environmentSource.getType();
-        return type != null && type.equalsIgnoreCase(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE);
+        return CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE.equalsIgnoreCase(
+                TameworkEnvironmentSource.typeOf(damage.getSource()));
     }
 
     private double resolveSourceDamageMultiplier(Damage damage, Store<EntityStore> store) {

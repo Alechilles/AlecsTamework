@@ -161,7 +161,7 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     }
 
     private static boolean chunkLoaded(World world, CoopImportedResidents.Site site) {
-        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(site.x(), site.z()));
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(site.x(), site.z()));
         return chunk != null && HytaleChunkAccess.isOwnedBy(chunk, world);
     }
 

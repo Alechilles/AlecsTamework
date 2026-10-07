@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
@@ -38,7 +39,7 @@ public final class HytaleManagedCoopItemTargetResolver {
                 || world.getChunkStore() == null) {
             return null;
         }
-        WorldChunk chunk = world.getChunkIfInMemory(
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, 
                 ChunkUtil.indexChunkFromBlock(
                         targetBlock.x, targetBlock.z
                 )

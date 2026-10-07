@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -166,7 +167,7 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
                 worldName, chunkX, chunkZ, now, CHUNK_REQUEST_COOLDOWN_MS)) {
             return;
         }
-        chunkWorld.getChunkAsync(ChunkUtil.indexChunk(chunkX, chunkZ)).whenComplete((chunk, failure) -> {
+        HytaleChunkAccess.chunkAsync(chunkWorld, ChunkUtil.indexChunk(chunkX, chunkZ)).whenComplete((chunk, failure) -> {
             if (pendingByNpc.get(pending.npcUuid) != pending) {
                 return;
             }

@@ -14,7 +14,7 @@ class CompanionRevivePolicyTest {
             private final com.hypixel.hytale.server.core.modules.entity.damage.Damage damage;
             FatalEvent(String source) {
                 damage = new com.hypixel.hytale.server.core.modules.entity.damage.Damage(
-                        new com.hypixel.hytale.server.core.modules.entity.damage.Damage.EnvironmentSource(source),
+                        new com.alechilles.alecstamework.damage.TameworkEnvironmentSource(source),
                         0, 1f);
             }
             @Override public com.hypixel.hytale.server.core.modules.entity.damage.Damage getDeathInfo() {

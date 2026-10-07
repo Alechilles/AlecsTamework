@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
@@ -118,7 +119,7 @@ public final class HytaleDirectLiveCoopScanner {
      */
     public boolean coopBlockOfAnyKindAt(@Nonnull World world, @Nonnull Store<ChunkStore> chunkStore,
                                         int x, int y, int z) {
-        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(x, z));
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(x, z));
         if (chunk == null) {
             return false;
         }
@@ -138,7 +139,7 @@ public final class HytaleDirectLiveCoopScanner {
             @Nonnull Store<ChunkStore> chunkStore,
             @Nonnull CoopSlotKey slot
     ) {
-        WorldChunk chunk = world.getChunkIfInMemory(
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, 
                 ChunkUtil.indexChunkFromBlock(slot.x(), slot.z())
         );
         if (chunk == null) {

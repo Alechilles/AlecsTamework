@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.*;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.Holder;
@@ -136,7 +137,7 @@ public final class CapturedItemTracker implements AutoCloseable {
     /** World thread. Returns false when the holder is not in memory. */
     private static boolean editLoaded(World world, Holder holder, UnaryOperator<ItemStack> edit) {
         if (holder.kind() == Kind.CONTAINER) {
-            var chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
+            var chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
             var ref = chunk == null ? null : HytaleBlockStateAccess.blockEntityRefAt(chunk, (int) holder.x(), (int) holder.y(), (int) holder.z());
             var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
                     .getComponent(ref, ItemContainerBlock.getComponentType());
@@ -162,7 +163,7 @@ public final class CapturedItemTracker implements AutoCloseable {
 
     private void refresh(World world, Holder holder) {
         if (holder.kind() == Kind.CONTAINER) {
-            var chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
+            var chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock((int) holder.x(), (int) holder.z()));
             if (chunk == null) { index.unload(holder); return; }
             var ref = HytaleBlockStateAccess.blockEntityRefAt(chunk, (int) holder.x(), (int) holder.y(), (int) holder.z());
             var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
