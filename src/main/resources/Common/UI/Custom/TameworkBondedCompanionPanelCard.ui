@@ -45,12 +45,8 @@ Group {
 
     // Portrait, with the level on its lower-left corner. The chip is hidden without progression.
     ItemGrid #BondedPortrait { Anchor: (Top: 12, Left: 16, Width: 68, Height: 68); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
-    // Dims a dead or absent companion. Three strips, not one square, so the dim stays inside the frame's two cut corners.
-    Group #BondedPortraitDim { Anchor: (Top: 12, Left: 16, Width: 68, Height: 68); HitTestVisible: false; Visible: false;
-        Group { Anchor: (Top: 0, Left: 6, Width: 62, Height: 6); Background: #090e14(0.6); }
-        Group { Anchor: (Top: 6, Left: 0, Width: 68, Height: 56); Background: #090e14(0.6); }
-        Group { Anchor: (Top: 62, Left: 0, Width: 62, Height: 6); Background: #090e14(0.6); }
-    }
+    // Dims a dead or absent companion. A shaped picture, so the dim follows the frame's two cut corners.
+    Group #BondedPortraitDim { Anchor: (Top: 8, Left: 12, Width: 76, Height: 76); Background: "Tamework/Slate/RowPortrait_Dim.png"; HitTestVisible: false; Visible: false; }
     Group #BondedLevelChip { Anchor: (Top: 70, Left: 8, Width: 46, Height: 18); Background: $A.@SlateQuiet; HitTestVisible: false; Visible: false;
         Label { Anchor: (Top: 0, Left: 5, Width: 20, Height: 18); Text: %server.tamework.ui.shared.levelAbbreviation; Style: (FontSize: 8, RenderBold: true, RenderUppercase: true, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center); }
         Label #BondedLevelText { Anchor: (Top: 0, Left: 24, Width: 19, Height: 18); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Center, VerticalAlignment: Center); }
