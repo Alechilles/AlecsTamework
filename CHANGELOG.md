@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.2.0 - Slate UI - 2026-10-06
+
+### Changed
+
+- Every Tamework screen has a new look, called Slate: navy panels with gold
+  trim, closer to the base game. This covers the companions window and its
+  cards, saved views, pop-ups, the talents page, the companion guide,
+  settings, the group manager, the name and location pages, the config
+  editor, and the command target, command hotswap and avatar flight HUDs.
+- Companion cards have a framed portrait, a state pill and a select switch.
+- Window headers show the Tamework logo.
+- On the talents page, the paths between talents you have unlocked are
+  coloured, and a talent you cannot afford yet reads "Too costly".
+- The Tranquilizer Dart Rifle and darts have their own recipes. The rifle
+  takes wood trunks, iron bars, cobalt bars, heavy leather, Shadoweave scraps
+  and Tranquilizer Potions, with no Cobalt Shortbow. Six darts take an iron
+  bar, light feathers, fibre and a Tranquilizer Potion, with no Crude Arrows.
+
+### Fixed
+
+- The group labels on the command hotswap HUD ("All Companions", "No Active
+  Companions", "Custom Selection") are translated in all six languages.
+
 ## 5.1.1 - Dart Rifle Polish - 2026-10-06
 
 ### Changed
@@ -9,10 +32,6 @@
   rifle update as each one goes in.
 - The rifle's shading is cleaner: softer iron shadows, and corrected
   undersides, rivets and trigger guard.
-- The rifle and darts have their own recipes. The rifle takes wood trunks,
-  iron bars, cobalt bars, heavy leather, Shadoweave scraps and Tranquilizer
-  Potions, with no Cobalt Shortbow. Six darts take an iron bar, light
-  feathers, fibre and a Tranquilizer Potion, with no Crude Arrows.
 
 ### Fixed
 
