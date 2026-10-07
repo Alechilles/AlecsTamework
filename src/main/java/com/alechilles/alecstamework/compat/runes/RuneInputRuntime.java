@@ -93,6 +93,12 @@ public final class RuneInputRuntime {
         if (!isSupported()) return;
         Demand wanted = demand(accessor, ref);
         Interactions current = accessor.getComponent(ref, Interactions.getComponentType());
+        InventoryComponent.Hotbar spikeHotbar = accessor.getComponent(ref, InventoryComponent.Hotbar.getComponentType());
+        ItemStack spikeHeld = spikeHotbar == null ? null : spikeHotbar.getActiveItem();
+        LOGGER.at(java.util.logging.Level.INFO).log("[RuneInputSpike] check held=%s weapon=%s wantedE=%s wantedR=%s",
+                ItemStack.isEmpty(spikeHeld) ? "none" : spikeHeld.getItemId(),
+                !ItemStack.isEmpty(spikeHeld) && spikeHeld.getItem() != null && spikeHeld.getItem().getWeapon() != null,
+                wanted.ability2, wanted.ability3);
         Interactions updated = null;
         for (int line = 0; line < TYPES.length; line++) {
             String bound = current == null ? null : current.getInteractionId(TYPES[line]);

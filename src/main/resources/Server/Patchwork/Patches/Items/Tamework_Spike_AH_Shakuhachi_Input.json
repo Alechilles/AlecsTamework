@@ -1,0 +1,23 @@
+{
+  "$Comment": "SPIKE ONLY. Marks the Animal Husbandry command item as a weapon to test Update 7 E/R input. Animal Husbandry must ship this itself.",
+  "Id": "Tamework_Spike_AH_Shakuhachi_Input",
+  "Target": "Server/Item/Items/Commands/AnimalHusbandry_Command_Item_Shakuhachi.json",
+  "When": {
+    "AssetExists": "Server/Item/Items/Rune/Ability/Rune_Enrage.json"
+  },
+  "Operations": [
+    {
+      "Id": "enable-rune-input",
+      "Op": "Merge",
+      "Path": "",
+      "Value": {
+        "Weapon": {},
+        "Tags": {
+          "Family": [
+            "TameworkInput"
+          ]
+        }
+      }
+    }
+  ]
+}
