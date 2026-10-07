@@ -10,7 +10,7 @@
   "Icon": "Icons/ItemsGenerated/Tamework_Flightmasters_Talisman.png",
   "MaxStack": 1,
   "Ability": {
-    "Slot": "Primary",
+    "Slot": "Core",
     "Weapons": [
       "TameworkInput"
     ],

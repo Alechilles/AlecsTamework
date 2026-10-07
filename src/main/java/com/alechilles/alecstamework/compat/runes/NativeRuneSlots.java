@@ -27,7 +27,8 @@ final class NativeRuneSlots {
             Method getType = ABILITY_CLASS.getMethod("getComponentType");
             ComponentType<EntityStore, ?> type = (ComponentType<EntityStore, ?>) getType.invoke(null);
             Class<?> slotClass = Class.forName("com.hypixel.hytale.protocol.AbilitySlot");
-            Object primary = Enum.valueOf((Class) slotClass, "Primary");
+            // 0.7.0-pre.5 renamed the castable slot from Primary to Core.
+            Object primary = Enum.valueOf((Class) slotClass, "Core");
             Class<?> filterClass = Class.forName(
                     "com.hypixel.hytale.server.core.inventory.container.filter.AbilitySlotAddFilter");
             Constructor<?> constructor = filterClass.getConstructor(slotClass);
@@ -36,7 +37,8 @@ final class NativeRuneSlots {
                 abilityType = type;
                 primaryAddFilter = filter;
             }
-        } catch (ReflectiveOperationException | LinkageError | ClassCastException ignored) {
+        } catch (ReflectiveOperationException | LinkageError | ClassCastException
+                | IllegalArgumentException ignored) {
             // Update 6 has no ability inventory. A later setup pass may initialize Update 7.
         }
     }
