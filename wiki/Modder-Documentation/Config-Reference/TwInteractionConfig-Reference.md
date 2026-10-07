@@ -156,7 +156,7 @@ Fields:
 - `YawSpreadDegrees` (optional)
 - `PitchSpreadDegrees` (optional)
 - `FailIfNoSolution` (optional; default `true`)
-- `TrajectoryMode` (optional: `HIGH_ANGLE`, `DIRECT`; default `HIGH_ANGLE`)
+- `TrajectoryMode` (optional: `HighAngle`, `Direct`; default `HighAngle`)
 - `RandomAroundSourceMinRadius` (optional)
 - `RandomAroundSourceMaxRadius` (optional)
 - `RandomAroundSourceVerticalOffset` (optional)
