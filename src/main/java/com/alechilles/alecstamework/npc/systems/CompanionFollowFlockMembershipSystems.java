@@ -38,10 +38,11 @@ public final class CompanionFollowFlockMembershipSystems {
     }
 
     public static final class EntityRef extends RefSystem<EntityStore> {
-        private final Query<EntityStore> query = Query.and(NPCEntity.getComponentType(),
-                UUIDComponent.getComponentType(), FlockMembership.getComponentType(),
-                TameworkTamedComponent.getComponentType(), TameworkOwnerComponent.getComponentType());
-        @Override public Query<EntityStore> getQuery() { return query; }
+        @Override public Query<EntityStore> getQuery() {
+            return Query.and(NPCEntity.getComponentType(), UUIDComponent.getComponentType(),
+                    FlockMembership.getComponentType(), TameworkTamedComponent.getComponentType(),
+                    TameworkOwnerComponent.getComponentType());
+        }
         @Override public void onEntityAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AddReason reason,
                 @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> buffer) {
             observe(ref, store);
