@@ -200,6 +200,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSy
 import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -1964,10 +1965,10 @@ public class Tamework extends JavaPlugin {
         }
         TameworkRuntimeRegistrationContext.RegistrationTarget target =
                 new TameworkRuntimeRegistrationTarget(
-                        system -> getEntityStoreRegistry().registerSystem(
-                                (ISystem<EntityStore>) system),
-                        system -> getChunkStoreRegistry().registerSystem(
-                                (ISystem<ChunkStore>) system)
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getEntityStoreRegistry().registerSystem((ISystem<EntityStore>) system)),
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getChunkStoreRegistry().registerSystem((ISystem<ChunkStore>) system))
                 );
         runtimeHandle = runtimeParticipants.register(
                 runtimeStartupPlan,
@@ -1989,6 +1990,31 @@ public class Tamework extends JavaPlugin {
         );
     }
     /** Probes durable state and builds the private startup candidate. */
+    /**
+     * Registers one system while no world thread can touch its stores.
+     *
+     * <p>Worlds load on their own threads while plugins start, and the engine's
+     * {@code Store.findOrCreateArchetypeChunk} raises the archetype count before it grows the
+     * chunk array. A registration that reads the store between those two steps throws
+     * {@code ArrayIndexOutOfBoundsException} and leaves the registry half updated. A world thread
+     * holds the asset read lock for every tick and every queued task, and all store writes happen
+     * on that thread, so holding the write lock here keeps it out for the length of one
+     * registration. The lock is taken per system so worlds stall for one registration at a time.
+     * Lock order matches the engine: asset lock first, then the registry's locks.</p>
+     *
+     * <p>Not covered: entities a {@code StartWorldEvent} listener adds before a world's first
+     * tick, which run outside the asset lock.</p>
+     */
+    private static void registerSystemWhileWorldsAreParked(Runnable registration) {
+        java.util.concurrent.locks.Lock assetWriteLock = AssetRegistry.ASSET_LOCK.writeLock();
+        assetWriteLock.lock();
+        try {
+            registration.run();
+        } finally {
+            assetWriteLock.unlock();
+        }
+    }
+
     private void prepareRuntimeActivation() {
         TameworkRuntimeActivationCoordinator.Preparation preparation =
                 runtimeActivationCoordinator.prepare(getDataDirectory(), getLogger(), runtimeCapabilityRequests);
