@@ -1,0 +1,17 @@
+npcRoles.Mob_Tamework_Example.name=Ejemplo de Tamework
+npcRoles.Mob_Tamework_Example_Simple.name=Ejemplo de Tamework (simple)
+npcRoles.Mob_Tamework_Example_Patch.name=Ejemplo de Tamework (parche)
+items.Spawner_Tamework_Example.name=Generador de ejemplo de Tamework
+items.Spawner_Tamework_Example.description=Genera el NPC de ejemplo de Tamework.
+items.Tamework_Nametag_Example.name=Etiqueta de nombre de ejemplo de Tamework
+items.Tamework_Nametag_Example.description=Pone nombre a un NPC domado que te pertenece.
+items.Tamework_Command_Whistle_Example.name=Silbato de mando de ejemplo de Tamework
+items.Tamework_Command_Whistle_Example.description=Vincula mascotas y da órdenes de objeto de comando.
+npcRoles.Tamework_Example.name=Ejemplo de Tamework
+npcRoles.Tamework_Example_Simple.name=Ejemplo de Tamework (simple)
+npcRoles.Tamework_Example_Vanilla.name=Ejemplo de Tamework (vanilla)
+npcRoles.Tamework_Example_Simple_Vanilla.name=Ejemplo de Tamework (simple, vanilla)
+items.Spawner_Tamework_Roster_Example.name=Farol del grupo (ejemplo)
+items.Spawner_Tamework_Roster_Example.description=Doma una oveja salvaje y la añade al grupo de ejemplo. Lleva el Silbato del grupo en tu inventario.
+items.Tamework_Command_Roster_Example.name=Silbato del grupo (ejemplo)
+items.Tamework_Command_Roster_Example.description=Abre el grupo de ejemplo. Invoca, retira y revive a sus miembros.
