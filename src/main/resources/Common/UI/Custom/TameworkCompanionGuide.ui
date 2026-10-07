@@ -25,7 +25,8 @@ Group #TameworkCompanionGuideRoot {
  Group #TameworkCompanionGuideFrame {
   Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
   // Off-atlas page plate, 1120x860 with the 52-high header band baked in (TameworkUiKit).
-  AssetImage #TameworkCompanionGuidePlate { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); AssetPath: "Tamework/UI/Slate/page_guide.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+  // An atlas plate, not an off-atlas picture: this document is mounted (hidden) whenever the command window is open.
+  Group #TameworkCompanionGuidePlate { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); Background: $A.@SlateWindowHeader54; HitTestVisible: false; }
   Group #TameworkCompanionGuideHeader { Anchor: (Top: 0, Left: 0, Right: 0, Height: 52);
    Group { Anchor: (Top: 9, Left: 20, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; HitTestVisible: false; }
    Label #TameworkCompanionGuideTitle { Anchor: (Top: 6, Left: 66, Right: 100, Height: 24); Text: ""; Style: $A.@SlateTitle; }

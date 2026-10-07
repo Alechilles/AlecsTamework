@@ -9,8 +9,9 @@ $C.@PageOverlay {
   Visible: false;
   Group #TameworkCommandMenuSurface {
    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-   // The whole window is one off-atlas picture: frame, header band and the sidebar's inset well (TameworkUiKit, window_plate).
-   AssetImage #TameworkCommandMenuPlate { Anchor: (Full: 0); AssetPath: "Tamework/UI/Slate/window.png"; FallbackTexturePath: "UI/Custom/Tamework/Slate/Clear.png"; HitTestVisible: false; }
+   // A stretchable atlas plate with the header band baked in. This window is open for long stretches and updates
+   // often, so it uses no off-atlas picture: a full-window AssetImage here made the client hitch.
+   Background: $A.@SlateWindowHeader48;
   }
   Group #TameworkCommandMenuContent {
    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
@@ -45,6 +46,7 @@ $C.@PageOverlay {
    }
    Group #TameworkCommandAssignments {
      Anchor: (Top: 54, Left: 12, Width: 160, Bottom: 16);
+    Background: $A.@SlateTray;
     Group #TameworkCommandPrimaryAssignment {
      Anchor: (Top: 8, Left: 8, Right: 8, Height: 70);
      Label { Anchor: (Top: 5, Left: 8, Width: 40, Height: 20); Text: "LMB"; Style: @CommandAssignmentKeyStyle; Background: $A.@SlateNormal; }
