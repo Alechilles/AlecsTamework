@@ -1,7 +1,7 @@
 $A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
 @CommandAssignmentKeyStyle = LabelStyle(FontSize: 10, RenderBold: true, LetterSpacing: 1, TextColor: #eef2f6, Alignment: Center);
-@CommandAssignmentDropdownStyle = (...$A.@PanelDropdown, HorizontalPadding: 4, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11));
+@CommandAssignmentDropdownStyle = (...$A.@PanelDropdown, HorizontalPadding: 10, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #eef2f6, RenderUppercase: false, FontSize: 11));
 $C.@PageOverlay {
  LayoutMode: Middle;
  Group #TameworkCommandMenuWheel {
