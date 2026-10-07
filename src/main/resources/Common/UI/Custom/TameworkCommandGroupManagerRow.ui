@@ -30,12 +30,11 @@ Group {
 
   Group { Anchor: (Top: 0, Left: 0, Right: 0, Height: 32); Background: $A.@SlateQuiet; }
 
-  // Shown by Java while this row is being edited: a brighter plate and a frame for the colour picker.
+  // Shown by Java while this row is being edited: a brighter plate.
   Group #GroupEditPlate {
     Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
     Background: $A.@SlateNormal;
     Visible: false;
-    Group { Anchor: (Top: 5, Left: 5, Width: 22, Height: 22); Background: $A.@SlateQuiet; }
   }
 
   Group #GroupColorSwatch {
@@ -45,7 +44,7 @@ Group {
 
   ColorPickerDropdownBox #GroupColorPicker {
     Style: $A.@PanelColorPicker;
-    Anchor: (Top: 8, Left: 8, Width: 16, Height: 16);
+    Anchor: (Top: 7, Left: 7, Width: 18, Height: 18);
     Visible: false;
   }
 

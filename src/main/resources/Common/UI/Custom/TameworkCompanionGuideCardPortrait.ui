@@ -1,8 +1,8 @@
 // Stock portraits drawn over the example card, which has no live animal to render.
 // Anchors are relative to the example viewport: the card root sits at Top 3, and the generic card's
-// 10/8 padding offsets its 92x92 portrait slot (content Top 38, Left 27). The bonded card has no padding.
+// 10/8 padding offsets its 92x92 portrait slot (content Top 39, Left 27). The bonded card has no padding.
 Group #TameworkCompanionGuideGenericPortrait {
- Anchor: (Top: 49, Left: 37, Width: 92, Height: 92);
+ Anchor: (Top: 50, Left: 37, Width: 92, Height: 92);
  Background: "Tamework/Guide/CompanionGuidePortrait.png";
  HitTestVisible: false;
  Visible: false;

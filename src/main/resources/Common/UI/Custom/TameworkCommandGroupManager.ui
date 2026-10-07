@@ -58,15 +58,9 @@ $C.@PageOverlay {
 
         Group { Anchor: (Width: 6); }
 
-        // The colour picker sits in a small plate so the swatch reads as a button.
-        Group {
-          Anchor: (Width: 26, Height: 26);
-          Background: $A.@SlateNormal;
-
-          ColorPickerDropdownBox #TameworkGroupColorInput {
-            Style: $A.@PanelColorPicker;
-            Anchor: (Top: 5, Left: 5, Width: 16, Height: 16);
-          }
+        ColorPickerDropdownBox #TameworkGroupColorInput {
+          Style: $A.@PanelColorPicker;
+          Anchor: (Width: 24, Height: 24);
         }
 
         Group { Anchor: (Width: 6); }
