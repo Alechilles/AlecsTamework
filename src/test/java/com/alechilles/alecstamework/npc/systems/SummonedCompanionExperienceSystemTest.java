@@ -76,7 +76,7 @@ class SummonedCompanionExperienceSystemTest {
                 store.put(reference, deathType, allocate(DeathComponent.class));
             }
             SummonedCompanionExperienceSystem system = new SummonedCompanionExperienceSystem(
-                    npcType, stampType, bondedProfileId::equals, levelingType, deathType,
+                    stampType, bondedProfileId::equals, levelingType, deathType,
                     (ref, ignoredStore) -> new SummonedCompanionExperienceSystem.ResolvedSettings("role", settings),
                     (ref, ignoredStore, commandBuffer, roleId, awardSource, awardAmount) -> {
                         source.set(awardSource);

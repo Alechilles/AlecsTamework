@@ -282,8 +282,7 @@ public final class TameworkCompanionRuntimeParticipants {
                 () -> new CompanionSpawnAuthorityCleanupSystems.Npc(NPCEntity.getComponentType(),
                         plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.LEVELING, "summonedcompanionexperiencesystem",
-                () -> new SummonedCompanionExperienceSystem(NPCEntity.getComponentType(),
-                        TameworkCompanionComponent.getComponentType(), profileId -> {
+                () -> new SummonedCompanionExperienceSystem(TameworkCompanionComponent.getComponentType(), profileId -> {
                             // Read per call: the index is absent while companion saving is paused.
                             CompanionQueries companions = plugin.getCompanionQueries();
                             CompanionRecord record = companions == null ? null : companions.get(profileId);
