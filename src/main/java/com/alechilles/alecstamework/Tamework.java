@@ -1412,6 +1412,12 @@ public class Tamework extends JavaPlugin {
     }
 
     private void startInternal() {
+        if (NPCEntity.getComponentType() == null) {
+            // Every companion system queries this type; without it they fail later with an
+            // unexplained null query.
+            throw new IllegalStateException("The Hytale NPC plugin has not registered its NPC component type,"
+                    + " so Alec's Tamework! cannot start. Check the server log for an earlier Hytale:NPC failure.");
+        }
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
@@ -3264,7 +3270,15 @@ public class Tamework extends JavaPlugin {
         if (tranquilizerRecipeVisibilityService == null) {
             return;
         }
-        tranquilizerRecipeVisibilityService.reconcile();
+        try {
+            tranquilizerRecipeVisibilityService.reconcile();
+        } catch (RuntimeException exception) {
+            // The recipe map is not thread safe, and another plugin can load recipes while this
+            // pass iterates it. Recipe visibility is optional and the next recipe or item asset
+            // event runs the pass again, so a failed pass must not fail plugin start.
+            getLogger().at(Level.WARNING).withCause(exception).log(
+                    "Skipped a gated recipe visibility pass; it runs again on the next recipe asset change.");
+        }
     }
 
     private void reconcileFeedTroughWaterChargeDroplistCompat() {
