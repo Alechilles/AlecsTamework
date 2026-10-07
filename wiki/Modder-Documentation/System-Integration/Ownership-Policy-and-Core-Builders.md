@@ -20,6 +20,7 @@ Use this page when you need the shared building blocks rather than one specific 
 - `TameworkDenyInteract`
 - `TameworkSetOwner`
 - `TameworkSetTamed`
+- `TameworkProgressionReward`
 - `TameworkNeedsResourceConsume`
 - `TameworkHarvestDrop`
 - `TameworkHarvestAlarm`

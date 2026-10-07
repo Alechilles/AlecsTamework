@@ -18,6 +18,12 @@
   and Tranquilizer Potions, with no Cobalt Shortbow. Six darts take an iron
   bar, light feathers, fibre and a Tranquilizer Potion, with no Crude Arrows.
 
+### Added
+
+- Modders: the `TameworkProgressionReward` NPC action grants a companion an
+  immediate happiness change and companion XP from a role instruction, for
+  example after play.
+
 ### Fixed
 
 - The group labels on the command hotswap HUD ("All Companions", "No Active
