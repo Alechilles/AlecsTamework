@@ -50,8 +50,10 @@ public final class TameworkRuneInputInteraction extends SimpleInteraction {
         var rune = context.getHeldItem();
         String expectedRune = slot == InteractionType.Ability2
                 ? "Tamework_Input_Rune_E" : "Tamework_Input_Rune_R";
-        if (buffer == null || playerRef == null
-                || rune == null || !expectedRune.equals(rune.getItemId())
+        // With entity input the cast context holds the player's own rune, or nothing.
+        boolean runeMatches = RuneInputRuntime.usesEntityInput()
+                || (rune != null && expectedRune.equals(rune.getItemId()));
+        if (buffer == null || playerRef == null || !runeMatches
                 || !RuneInputRuntime.isActiveLease(buffer, playerRef, slot)) {
             return false;
         }

@@ -26,14 +26,23 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
+import com.hypixel.hytale.server.core.modules.interaction.Interactions;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Installs temporary native runes only while a selected Tamework item needs E/R. */
+/** Claims Update 7 E/R only while a selected Tamework item needs them. */
 public final class RuneInputRuntime {
+    /**
+     * Spike: bind E/R on the player's {@link Interactions} component, which the engine resolves
+     * before the rune slots, so the player's runes are never moved. {@code false} restores the
+     * temporary rune lease.
+     */
+    private static final boolean ENTITY_INPUT = true;
+    private static final InteractionType[] TYPES = {InteractionType.Ability2, InteractionType.Ability3};
+    private static final String[] ROOTS = {"Root_Tamework_Input_Rune_E", "Root_Tamework_Input_Rune_R"};
     private static final String TALISMAN_ID = "Tamework_Flightmasters_Talisman";
     private static final RuneInputLeaseService LEASES = new RuneInputLeaseService();
 
@@ -43,11 +52,22 @@ public final class RuneInputRuntime {
         return NativeRuneSlots.isSupported();
     }
 
+    /** True when E/R reach Tamework through the player's entity interactions, not a slotted rune. */
+    public static boolean usesEntityInput() {
+        return ENTITY_INPUT;
+    }
+
     /** The server-side rune interaction checks this again at cast time. */
     public static boolean isActiveLease(@Nonnull ComponentAccessor<EntityStore> accessor,
                                         @Nonnull Ref<EntityStore> ref,
                                         @Nonnull InteractionType type) {
         int line = line(type);
+        if (ENTITY_INPUT) {
+            if (line < 0 || !isSupported()) return false;
+            Interactions bound = accessor.getComponent(ref, Interactions.getComponentType());
+            return bound != null && ROOTS[line].equals(bound.getInteractionId(type))
+                    && demand(accessor, ref).forLine(line);
+        }
         ComponentType<EntityStore, RuneInputLeaseComponent> leaseType = RuneInputLeaseComponent.getComponentType();
         if (line < 0 || leaseType == null || !isSupported()) return false;
         RuneInputLeaseComponent lease = accessor.getComponent(ref, leaseType);
@@ -61,9 +81,38 @@ public final class RuneInputRuntime {
         return type == InteractionType.Ability2 ? 0 : type == InteractionType.Ability3 ? 1 : -1;
     }
 
+    /**
+     * Adds or removes only Tamework's own E/R entries. An entry another owner already holds is
+     * left alone, so that owner keeps the input.
+     */
+    private static void bindEntityInput(@Nonnull ComponentAccessor<EntityStore> accessor,
+                                        @Nonnull Ref<EntityStore> ref) {
+        if (!isSupported()) return;
+        Demand wanted = demand(accessor, ref);
+        Interactions current = accessor.getComponent(ref, Interactions.getComponentType());
+        Interactions updated = null;
+        for (int line = 0; line < TYPES.length; line++) {
+            String bound = current == null ? null : current.getInteractionId(TYPES[line]);
+            boolean add = wanted.forLine(line) && bound == null;
+            boolean remove = !wanted.forLine(line) && ROOTS[line].equals(bound);
+            if (!add && !remove) continue;
+            if (updated == null) updated = current == null ? new Interactions() : (Interactions) current.clone();
+            if (add) updated.setInteractionId(TYPES[line], ROOTS[line]);
+            else updated.removeInteractionId(TYPES[line]);
+        }
+        if (updated != null) accessor.putComponent(ref, Interactions.getComponentType(), updated);
+    }
+
     private static void seed(@Nonnull Store<EntityStore> store,
                              @Nonnull Ref<EntityStore> ref,
                              @Nonnull CommandBuffer<EntityStore> buffer) {
+        if (ENTITY_INPUT) {
+            // Deferred so the read sees every earlier write from this tick.
+            buffer.run(current -> {
+                if (ref.isValid()) bindEntityInput(current, ref);
+            });
+            return;
+        }
         ComponentType<EntityStore, RuneInputLeaseComponent> leaseType = RuneInputLeaseComponent.getComponentType();
         if (leaseType == null || !isSupported() || store.getComponent(ref, leaseType) != null) return;
         ItemContainer slots = NativeRuneSlots.container(store, ref);
@@ -87,7 +136,8 @@ public final class RuneInputRuntime {
         }
         ItemContainer slots = NativeRuneSlots.container(store, ref);
         if (slots == null) return;
-        Demand wanted = demand(store, ref);
+        // With entity input, a lease saved by an older build only hands its runes back.
+        Demand wanted = ENTITY_INPUT ? Demand.NONE : demand(store, ref);
         LEASES.reconcile(slots, lease, wanted.ability2, wanted.ability3);
         if (lease.empty()) buffer.removeComponent(ref, leaseType);
     }
@@ -219,6 +269,8 @@ public final class RuneInputRuntime {
                                    @Nonnull Store<EntityStore> store,
                                    @Nonnull CommandBuffer<EntityStore> buffer) {
             restore(store, ref);
+            // Runs after the flight component is gone, so a held talisman stops claiming E/R.
+            if (ENTITY_INPUT) seed(store, ref, buffer);
         }
 
         @Override public Query<EntityStore> getQuery() {
