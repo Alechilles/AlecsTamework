@@ -24,7 +24,7 @@ $C.@PageOverlay {
 
     Group #Title {
       Anchor: (Top: 0, Left: 0, Right: 0, Height: 48);
-      Group { Anchor: (Top: 7, Left: 18, Width: 34, Height: 34); Background: "Tamework/Slate/Badge.png"; HitTestVisible: false; }
+      Group { Anchor: (Top: 7, Left: 18, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; HitTestVisible: false; }
       Label #TwSettingsTitle {
         Anchor: (Left: 64, Right: 280, Height: 48);
         Text: %server.tamework.ui.settings.title;
