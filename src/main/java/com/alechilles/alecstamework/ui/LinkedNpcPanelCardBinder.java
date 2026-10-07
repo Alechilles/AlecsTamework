@@ -165,10 +165,9 @@ final class LinkedNpcPanelCardBinder {
         String slateState = slateState(entry);
         String slateArt = Character.toUpperCase(slateState.charAt(0)) + slateState.substring(1);
         commandBuilder.setObject(entrySelector + " #SlatePlate.Background",
-                new PatchStyle(Value.of("Tamework/Slate/Card_" + slateArt + ".png"))
-                        .setHorizontalBorder(Value.of(20)).setVerticalBorder(Value.of(38)));
+                new PatchStyle(Value.of("Tamework/Slate/Card_" + slateArt + ".png"), Value.of(38)));
         commandBuilder.setObject(entrySelector + " #PortraitFrame.Background",
-                new PatchStyle(Value.of("Tamework/Slate/Portrait_" + slateArt + ".png")));
+                UiIconStyle.forTexture("Tamework/Slate/Portrait_" + slateArt + ".png"));
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
