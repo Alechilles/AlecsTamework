@@ -58,14 +58,14 @@ Group {
       Group #ContributorStar4 { Anchor: (Top: 0, Right: 48, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #f2c66d); HitTestVisible: false; Visible: false; }
       Group #ContributorStar5 { Anchor: (Top: 0, Right: 64, Width: 16, Height: 16); Background: (TexturePath: "Tamework/PanelControls/Quality_Star.png", Color: #f2c66d); HitTestVisible: false; Visible: false; }
     }
-    TextButton #ActiveToggleActiveButton { Anchor: (Top: 2, Right: 36, Width: 42, Height: 22); Style: @LinkedActiveStateOnButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
-    TextButton #ActiveToggleInactiveButton { Anchor: (Top: 2, Right: 36, Width: 42, Height: 22); Style: @LinkedActiveStateOffButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
+    TextButton #ActiveToggleActiveButton { Anchor: (Top: 2, Right: 44, Width: 42, Height: 22); Style: @LinkedActiveStateOnButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
+    TextButton #ActiveToggleInactiveButton { Anchor: (Top: 2, Right: 44, Width: 42, Height: 22); Style: @LinkedActiveStateOffButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
     Group #GenderMaleIcon { Anchor: (Top: 1, Left: 0, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png", Color: #58c9f0); Visible: false; }
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 0, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png", Color: #ff86bb); Visible: false; }
-    Label #Name { Anchor: (Top: 0, Left: 28, Right: 366, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 17, FontName: "Secondary", TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    Label #RoleSubtitle { Anchor: (Top: 3, Right: 180, Width: 180, Height: 20); Text: ""; Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: End, VerticalAlignment: Center); Visible: false; }
+    Label #Name { Anchor: (Top: 0, Left: 28, Right: 374, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 17, FontName: "Secondary", TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #RoleSubtitle { Anchor: (Top: 3, Right: 188, Width: 180, Height: 20); Text: ""; Style: (FontSize: 11, TextColor: #8794a4, HorizontalAlignment: End, VerticalAlignment: Center); Visible: false; }
     // The state pill: LinkedNpcPanelCardBinder tints the outline and sets the word.
-    Group #StatePill { Anchor: (Top: 4, Right: 86, Width: 88, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #8fa2b8); HitTestVisible: false; Visible: false;
+    Group #StatePill { Anchor: (Top: 4, Right: 94, Width: 88, Height: 18); Background: (TexturePath: "Tamework/Slate/Pill.png", Border: 7, Color: #8fa2b8); HitTestVisible: false; Visible: false;
       Label #StatePillText { Anchor: (Top: 0, Left: 4, Right: 4, Height: 18); Text: ""; Style: @StatePillLabel; }
     }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
@@ -82,8 +82,8 @@ Group {
             Group #BarFill { Anchor: (Top: 0, Left: 0, Width: 0, Height: 4); Background: #c97a6e; }
         }
     }
-    TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 26); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
-    Group #RemoveButtonGlyph { Anchor: (Top: 1, Right: 2, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f2877b); Visible: true; HitTestVisible: false; }
+    TextButton #RemoveButton { Anchor: (Top: 2, Right: 8, Width: 26, Height: 22); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
+    Group #RemoveButtonGlyph { Anchor: (Top: 2, Right: 10, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f2877b); Visible: true; HitTestVisible: false; }
 
     DropdownBox #GroupSelector { Anchor: (Top: 135, Left: 2, Width: 142, Height: 24); Style: $A.@CompanionGroupDropdown; ShowLabel: false; MaxSelection: 0; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
     Label #GroupSelectorLabel { Anchor: (Top: 135, Left: 28, Width: 94, Height: 24); Text: ""; Style: (FontSize: 12, TextColor: #c2ccd6, VerticalAlignment: Center); HitTestVisible: false; Visible: false; }

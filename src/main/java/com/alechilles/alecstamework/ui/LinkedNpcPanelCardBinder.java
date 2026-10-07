@@ -712,7 +712,7 @@ final class LinkedNpcPanelCardBinder {
         Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
         nameAnchor.setWidth(null);
         // Leaves room for the role subtitle, the state pill, the select switch and the removal button.
-        nameAnchor.setRight(Value.of(366));
+        nameAnchor.setRight(Value.of(374));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
     }
 

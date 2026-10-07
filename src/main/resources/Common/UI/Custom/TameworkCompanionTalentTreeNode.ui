@@ -73,7 +73,7 @@ Group {
   }
 
   Label #TalentNodeState {
-    Anchor: (Bottom: 6, Right: 9, Width: 62, Height: 16);
+    Anchor: (Bottom: 6, Right: 9, Width: 66, Height: 16);
     Text: %server.tamework.ui.talents.state.Locked;
     Style: @TalentNodeStateLocked;
   }
