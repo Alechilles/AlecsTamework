@@ -74,7 +74,9 @@ $C = "Common.ui";
  DefaultBackground: @SlateQuiet,
  HoveredBackground: @SlateQuietHover,
  PressedBackground: @SlateQuietHover,
- PanelBackground: @SlateModal,
+ // The list uses the small-cut plate and its own padding: with the modal plate's larger cut corner the first entry poked out of it.
+ PanelBackground: @SlateQuiet,
+ PanelPadding: 8,
  LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: @SlateSoft),
  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: @SlateSoft),
  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: @SlateTeal),
