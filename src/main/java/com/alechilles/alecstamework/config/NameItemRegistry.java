@@ -5,12 +5,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registry for naming item configs keyed by item id.
  */
 public final class NameItemRegistry {
-    private final Map<String, TwNameItemConfig> configsByItemId = new HashMap<>();
+    // A config reload clears and refills this on another thread while world threads read it.
+    private final Map<String, TwNameItemConfig> configsByItemId = new ConcurrentHashMap<>();
 
     public void register(String itemId, TwNameItemConfig config) {
         Objects.requireNonNull(itemId, "itemId");

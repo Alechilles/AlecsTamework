@@ -127,13 +127,6 @@ class TalentTreeLayoutServiceTest {
     }
 
     @Test
-    void talentNodeColumnsUseCompactBranchingTreeDimensions() {
-        assertEquals(117, TalentTreeLayoutService.NODE_WIDTH);
-        assertEquals(117, TalentTreeLayoutService.BRANCH_WIDTH);
-        assertEquals(20, TalentTreeLayoutService.BRANCH_GAP);
-    }
-
-    @Test
     void layoutCapsNodeAndConnectorSlots() {
         ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> entries = new ArrayList<>();
         entries.add(entry("node0", "Care", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()));

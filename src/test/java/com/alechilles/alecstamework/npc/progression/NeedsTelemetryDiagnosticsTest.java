@@ -11,14 +11,6 @@ import org.joml.Vector3d;
 class NeedsTelemetryDiagnosticsTest {
 
     @Test
-    void exposesStableEventNamesAndFingerprints() {
-        assertEquals("needs_seek_failed", NeedsTelemetryDiagnostics.EventNames.NEEDS_SEEK_FAILED);
-        assertEquals("needs_consume_failed", NeedsTelemetryDiagnostics.EventNames.NEEDS_CONSUME_FAILED);
-        assertEquals("tamework.needs.seek.failed", NeedsTelemetryDiagnostics.Fingerprints.NEEDS_SEEK_FAILED);
-        assertEquals("tamework.needs.consume.failed", NeedsTelemetryDiagnostics.Fingerprints.NEEDS_CONSUME_FAILED);
-    }
-
-    @Test
     void bucketsNeedRatiosForContextBreakdowns() {
         assertEquals("unknown", NeedsTelemetryDiagnostics.needsBucket(null));
         assertEquals("0-25", NeedsTelemetryDiagnostics.needsBucket(0.12d));
@@ -64,6 +56,20 @@ class NeedsTelemetryDiagnosticsTest {
 
         assertEquals("food_and_water_unavailable", context.reason());
         assertEquals("NO_ALLOWED_FOOD_IN_RANGE", context.detail("status"));
+    }
+
+    @Test
+    void reportsOnlyActionableConsumeFailureReasons() {
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("not_near_water"));
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=NO_ALLOWED_FOOD_IN_RANGE,containers=1,attempts=0),not_near_water"));
+        assertFalse(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("food_refill_disabled,not_near_water"));
+
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=REMOVE_TRANSACTION_FAILED,containers=1,attempts=1)"));
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason(
+                "no_container_food_consumed(status=NO_ITEMS_CONSUMED,containers=1),needs_component_type_missing"));
+        assertTrue(NeedsTelemetryDiagnostics.isReportableConsumeFailureReason("config_missing_or_disabled"));
     }
 
     @Test

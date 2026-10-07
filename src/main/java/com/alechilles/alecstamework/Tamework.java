@@ -200,6 +200,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSy
 import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -1412,6 +1413,12 @@ public class Tamework extends JavaPlugin {
     }
 
     private void startInternal() {
+        if (NPCEntity.getComponentType() == null) {
+            // Every companion system queries this type; without it they fail later with an
+            // unexplained null query.
+            throw new IllegalStateException("The Hytale NPC plugin has not registered its NPC component type,"
+                    + " so Alec's Tamework! cannot start. Check the server log for an earlier Hytale:NPC failure.");
+        }
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
@@ -1842,8 +1849,7 @@ public class Tamework extends JavaPlugin {
                 () -> new com.alechilles.alecstamework.companion.coop.CoopBreakSystem(coopResidents,
                         com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.getComponentType()));
         companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
-                TameworkCompanionComponent.getComponentType(), NPCEntity.getComponentType(),
-                ownerComponentType, tamedComponentType,
+                TameworkCompanionComponent.getComponentType(), ownerComponentType, tamedComponentType,
                 lifecycle.hasLegacyBodies() ? projectionIdentityComponentType : null);
         // Retired 3.x/4.x components (plan 7 R15, R16). Declared after the companion index systems:
         // the strip system depends on CompanionOwnershipSystems.OnAdd. The projection identity
@@ -1959,10 +1965,10 @@ public class Tamework extends JavaPlugin {
         }
         TameworkRuntimeRegistrationContext.RegistrationTarget target =
                 new TameworkRuntimeRegistrationTarget(
-                        system -> getEntityStoreRegistry().registerSystem(
-                                (ISystem<EntityStore>) system),
-                        system -> getChunkStoreRegistry().registerSystem(
-                                (ISystem<ChunkStore>) system)
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getEntityStoreRegistry().registerSystem((ISystem<EntityStore>) system)),
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getChunkStoreRegistry().registerSystem((ISystem<ChunkStore>) system))
                 );
         runtimeHandle = runtimeParticipants.register(
                 runtimeStartupPlan,
@@ -1984,6 +1990,31 @@ public class Tamework extends JavaPlugin {
         );
     }
     /** Probes durable state and builds the private startup candidate. */
+    /**
+     * Registers one system while no world thread can touch its stores.
+     *
+     * <p>Worlds load on their own threads while plugins start, and the engine's
+     * {@code Store.findOrCreateArchetypeChunk} raises the archetype count before it grows the
+     * chunk array. A registration that reads the store between those two steps throws
+     * {@code ArrayIndexOutOfBoundsException} and leaves the registry half updated. A world thread
+     * holds the asset read lock for every tick and every queued task, and all store writes happen
+     * on that thread, so holding the write lock here keeps it out for the length of one
+     * registration. The lock is taken per system so worlds stall for one registration at a time.
+     * Lock order matches the engine: asset lock first, then the registry's locks.</p>
+     *
+     * <p>Not covered: entities a {@code StartWorldEvent} listener adds before a world's first
+     * tick, which run outside the asset lock.</p>
+     */
+    private static void registerSystemWhileWorldsAreParked(Runnable registration) {
+        java.util.concurrent.locks.Lock assetWriteLock = AssetRegistry.ASSET_LOCK.writeLock();
+        assetWriteLock.lock();
+        try {
+            registration.run();
+        } finally {
+            assetWriteLock.unlock();
+        }
+    }
+
     private void prepareRuntimeActivation() {
         TameworkRuntimeActivationCoordinator.Preparation preparation =
                 runtimeActivationCoordinator.prepare(getDataDirectory(), getLogger(), runtimeCapabilityRequests);
@@ -3265,7 +3296,20 @@ public class Tamework extends JavaPlugin {
         if (tranquilizerRecipeVisibilityService == null) {
             return;
         }
-        tranquilizerRecipeVisibilityService.reconcile();
+        // The recipe map is not thread safe, and another plugin can load recipes while this pass
+        // iterates it. The window is a few milliseconds, so try again at once. Recipe visibility is
+        // optional: if every attempt fails, log it and carry on instead of failing plugin start.
+        RuntimeException failure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                tranquilizerRecipeVisibilityService.reconcile();
+                return;
+            } catch (RuntimeException exception) {
+                failure = exception;
+            }
+        }
+        getLogger().at(Level.WARNING).withCause(failure).log(
+                "Gated recipe visibility pass failed; disabled recipes may stay visible until the next recipe asset change.");
     }
 
     private void reconcileFeedTroughWaterChargeDroplistCompat() {

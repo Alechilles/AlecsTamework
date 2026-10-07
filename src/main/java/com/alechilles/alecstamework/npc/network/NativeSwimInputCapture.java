@@ -20,15 +20,19 @@ final class NativeSwimInputCapture {
         Boolean jumping = states == null ? null : states.jumping || states.swimJumping;
         long receivedAt = System.currentTimeMillis();
         // Only stable identity and primitive input cross the packet/world boundary.
-        world.execute(() -> {
-            var ref = world.getEntityRef(playerId);
-            var type = NativeSwimRiderComponent.getComponentType();
-            if (ref == null || !ref.isValid() || type == null) return;
-            var store = world.getEntityStore().getStore();
-            var rider = store.getComponent(ref, type);
-            if (rider == null || rider.settings == null) return;
-            rider.captureInput(forward, vertical, crouching, jumping, receivedAt);
-            store.putComponent(ref, type, rider);
-        });
+        try {
+            world.execute(() -> {
+                var ref = world.getEntityRef(playerId);
+                var type = NativeSwimRiderComponent.getComponentType();
+                if (ref == null || !ref.isValid() || type == null) return;
+                var store = world.getEntityStore().getStore();
+                var rider = store.getComponent(ref, type);
+                if (rider == null || rider.settings == null) return;
+                rider.captureInput(forward, vertical, crouching, jumping, receivedAt);
+                store.putComponent(ref, type, rider);
+            });
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; this input sample is dropped.
+        }
     }
 }
