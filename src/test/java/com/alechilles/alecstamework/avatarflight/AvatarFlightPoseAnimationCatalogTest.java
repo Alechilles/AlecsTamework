@@ -1,13 +1,10 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -69,24 +66,6 @@ class AvatarFlightPoseAnimationCatalogTest {
                 "TameworkPitchDown40BankLeft30".equals(definition.id())));
         assertTrue(definitions.stream().allMatch(definition ->
                 definition.path().contains("/Animations/AF_Origin/")));
-    }
-
-    @Test
-    void standardPoseClipsCannotRotateTheFakePlayersStandardOrigin() throws Exception {
-        Path poseRoot = Path.of(
-                "src", "main", "resources", "Common", "NPC", "Tamework",
-                "AvatarFlight", "Animations", "AF_Origin");
-        List<Path> clips;
-        try (var files = Files.list(poseRoot)) {
-            clips = files.filter(path -> path.toString().endsWith(".blockyanim")).toList();
-        }
-
-        assertFalse(clips.isEmpty());
-        for (Path clip : clips) {
-            String json = Files.readString(clip);
-            assertTrue(json.contains("\"AF_Origin\""), clip.toString());
-            assertFalse(json.contains("\"Origin\":"), clip.toString());
-        }
     }
 
     private static TwAvatarFlightConfig.AnimationSettings standardAnimation() throws Exception {

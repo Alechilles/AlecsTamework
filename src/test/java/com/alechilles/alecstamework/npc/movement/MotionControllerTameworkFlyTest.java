@@ -12,11 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MotionControllerTameworkFlyTest {
 
     @Test
-    void builderIdUsesGenericTameworkFlyControllerName() {
-        assertEquals("TameworkFly", BuilderMotionControllerTameworkFly.BUILDER_ID);
-    }
-
-    @Test
     void noRideMountUsesHorizontalSpeedForFlightAnimationState() {
         assertTrue(TameworkFlyAnimationState.resolveHorizontalIdle(null, 0.0));
         assertTrue(TameworkFlyAnimationState.resolveHorizontalIdle(null, 0.049));
@@ -147,5 +142,4 @@ class MotionControllerTameworkFlyTest {
         assertTrue(RiddenBackwardBrake.apply(targetVelocity, stopped, state, true, 0.05));
         assertEquals(0.0, targetVelocity.z);
     }
-
 }

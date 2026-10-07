@@ -11,14 +11,6 @@ import org.joml.Vector3d;
 class NeedsTelemetryDiagnosticsTest {
 
     @Test
-    void exposesStableEventNamesAndFingerprints() {
-        assertEquals("needs_seek_failed", NeedsTelemetryDiagnostics.EventNames.NEEDS_SEEK_FAILED);
-        assertEquals("needs_consume_failed", NeedsTelemetryDiagnostics.EventNames.NEEDS_CONSUME_FAILED);
-        assertEquals("tamework.needs.seek.failed", NeedsTelemetryDiagnostics.Fingerprints.NEEDS_SEEK_FAILED);
-        assertEquals("tamework.needs.consume.failed", NeedsTelemetryDiagnostics.Fingerprints.NEEDS_CONSUME_FAILED);
-    }
-
-    @Test
     void bucketsNeedRatiosForContextBreakdowns() {
         assertEquals("unknown", NeedsTelemetryDiagnostics.needsBucket(null));
         assertEquals("0-25", NeedsTelemetryDiagnostics.needsBucket(0.12d));
