@@ -15,6 +15,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.EntityEventSystem;
+import com.hypixel.hytale.component.system.RefChangeSystem;
 import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.protocol.InteractionType;
@@ -285,26 +286,42 @@ public final class RuneInputRuntime {
         }
     }
 
-    /** A talisman becomes eligible after flight starts and loses eligibility on exit. */
-    public static final class FlightChange extends RefSystem<EntityStore> {
+    /**
+     * A talisman becomes eligible after flight starts and loses eligibility on exit. Adding a
+     * component to a live entity fires only {@link RefChangeSystem} callbacks.
+     */
+    public static final class FlightChange extends RefChangeSystem<EntityStore, AvatarFlightComponent> {
         @Override
-        public void onEntityAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AddReason reason,
-                                  @Nonnull Store<EntityStore> store,
-                                  @Nonnull CommandBuffer<EntityStore> buffer) {
+        public ComponentType<EntityStore, AvatarFlightComponent> componentType() {
+            return AvatarFlightComponent.getComponentType();
+        }
+
+        @Override
+        public void onComponentAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AvatarFlightComponent component,
+                                     @Nonnull Store<EntityStore> store,
+                                     @Nonnull CommandBuffer<EntityStore> buffer) {
             seed(store, ref, buffer);
         }
 
         @Override
-        public void onEntityRemove(@Nonnull Ref<EntityStore> ref, @Nonnull RemoveReason reason,
+        public void onComponentSet(@Nonnull Ref<EntityStore> ref, @Nullable AvatarFlightComponent oldComponent,
+                                   @Nonnull AvatarFlightComponent newComponent,
                                    @Nonnull Store<EntityStore> store,
                                    @Nonnull CommandBuffer<EntityStore> buffer) {
+            // Flight state updates do not change which inputs the talisman needs.
+        }
+
+        @Override
+        public void onComponentRemoved(@Nonnull Ref<EntityStore> ref, @Nonnull AvatarFlightComponent component,
+                                       @Nonnull Store<EntityStore> store,
+                                       @Nonnull CommandBuffer<EntityStore> buffer) {
             restore(store, ref);
             // Runs after the flight component is gone, so a held talisman stops claiming E/R.
             if (ENTITY_INPUT) seed(store, ref, buffer);
         }
 
         @Override public Query<EntityStore> getQuery() {
-            return Query.and(Player.getComponentType(), AvatarFlightComponent.getComponentType());
+            return Query.and(Player.getComponentType());
         }
     }
 
