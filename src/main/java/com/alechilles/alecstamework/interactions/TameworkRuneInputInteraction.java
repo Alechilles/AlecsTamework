@@ -67,7 +67,12 @@ public final class TameworkRuneInputInteraction extends SimpleInteraction {
         // context keeps command-item metadata writes out of the temporary rune slot.
         var heldContext = InteractionContext.forInteraction(context.getInteractionManager(),
                 playerRef, InteractionType.Ability1, buffer);
-        String rootId = heldContext.getRootInteractionId(slot);
+        // Entity input binds this same root on the player, so the context lookup would resolve
+        // back to it and fork forever. Read the selected item's own root instead.
+        var selected = heldContext.getHeldItem();
+        String rootId = !RuneInputRuntime.usesEntityInput() ? heldContext.getRootInteractionId(slot)
+                : selected == null || selected.getItem() == null ? null
+                : selected.getItem().getInteractions().get(slot);
         if (rootId == null || rootId.isBlank()) {
             return false;
         }
