@@ -399,6 +399,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
         TameworkSettingsValues requested = parseResult.values();
         NameFilterSettings requestedNameFilter = nameFilterFrom(payload);
+        NameFilterSettings previousNameFilter = savedNameFilter;
         currentValues = requested;
         currentNameFilter = requestedNameFilter;
         applyInProgress = true;
@@ -407,7 +408,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         refreshFeedback();
 
         CompletableFuture
-                .supplyAsync(() -> applySettings(requested, requestedNameFilter))
+                .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter))
                 .whenComplete((outcome, throwable) -> world.execute(() -> {
                     applyInProgress = false;
                     if (throwable != null) {
@@ -468,23 +469,28 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Nonnull
     private ApplyOutcome applySettings(@Nonnull TameworkSettingsValues values,
-                                       @Nonnull NameFilterSettings nameFilter) {
+                                       @Nonnull NameFilterSettings nameFilter,
+                                       @Nonnull NameFilterSettings savedFilter) {
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
         plugin.onRuntimeSettingsChanged();
-        if (!NameFilterSettingsStore.save(
+        List<String> warnings = new ArrayList<>();
+        // An unchanged filter is not rewritten, so a hand edit to its file survives other applies.
+        if (!nameFilter.equals(savedFilter) && !NameFilterSettingsStore.save(
                 NameFilterSettingsStore.resolveFile(plugin), nameFilter, plugin.getLogger())) {
-            return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.applied"),
-                    resolveText("tamework.ui.settings.warning.nameFilterSaveFailed"));
+            warnings.add(resolveText("tamework.ui.settings.warning.nameFilterSaveFailed"));
         }
         if (!TameworkSettingsAnnouncementStore.saveEnabled(
                 TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin),
                 values.announcementsEnabled(), plugin.getLogger())) {
+            warnings.add(resolveText("tamework.ui.settings.warning.announcementSaveFailed"));
+        }
+        if (!warnings.isEmpty()) {
             return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.applied"),
-                    resolveText("tamework.ui.settings.warning.announcementSaveFailed"));
+                    String.join(" ", warnings));
         }
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));

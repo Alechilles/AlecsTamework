@@ -100,7 +100,8 @@ public final class NameFilterSettingsStore {
         }
     }
 
-    public static boolean save(@Nonnull Path file, @Nonnull NameFilterSettings settings, @Nullable HytaleLogger logger) {
+    public static synchronized boolean save(@Nonnull Path file, @Nonnull NameFilterSettings settings,
+                                            @Nullable HytaleLogger logger) {
         if (!write(file, settings, logger)) {
             return false;
         }

@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -31,6 +32,7 @@ import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -48,11 +50,21 @@ public final class NamingFeatureHandler {
     private final NamingEffectService effectService;
     private final NamingNpcInfoService npcInfoService;
     private final ConcurrentHashMap<UUID, PendingNameRequest> pendingByPlayer = new ConcurrentHashMap<>();
+    @Nullable
+    private volatile BiConsumer<Ref<EntityStore>, Store<EntityStore>> nameClearedListener;
 
     public NamingFeatureHandler(NameItemRegistry registry, TranslationRegistry translationRegistry) {
         this.registry = registry;
         this.effectService = new NamingEffectService();
         this.npcInfoService = new NamingNpcInfoService(translationRegistry);
+    }
+
+    /**
+     * Sets the hook told when a player clears a name, so the companion record drops it too.
+     * Removing the name component alone does not: a body can lose it without being renamed.
+     */
+    public void setNameClearedListener(@Nullable BiConsumer<Ref<EntityStore>, Store<EntityStore>> listener) {
+        this.nameClearedListener = listener;
     }
 
     // Begins a naming request for the player. Runs on the store thread.
@@ -444,6 +456,19 @@ public final class NamingFeatureHandler {
         ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
         if (type != null) {
             store.tryRemoveComponent(request.npcRef, type);
+        }
+        // A ridden companion restores its hidden name on dismount; forget the cleared one.
+        ComponentType<EntityStore, TameworkMountedNameplateComponent> mountedType =
+                TameworkMountedNameplateComponent.getComponentType();
+        TameworkMountedNameplateComponent mounted = mountedType != null
+                ? store.getComponent(request.npcRef, mountedType)
+                : null;
+        if (mounted != null) {
+            mounted.setCachedDisplayName(null);
+        }
+        BiConsumer<Ref<EntityStore>, Store<EntityStore>> listener = nameClearedListener;
+        if (listener != null) {
+            listener.accept(request.npcRef, store);
         }
         applyItemChanges(player, target.rules(), false);
         sendMessageKey(player, "tamework.ui.notifications.name.cleared");
