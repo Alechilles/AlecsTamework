@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.2.1 - Update 7 Pre-release 5 - 2026-10-09
+
+### Changed
+
+- On Hytale Update 7 pre-release, E and R on command items and the
+  Flightmaster's Talisman no longer swap out your runes. Your runes stay in
+  their slots, and Tamework takes the two keys only while the item is held.
+  Runes that an older build had set aside are handed back.
+- The supported Update 7 pre-release is now 0.7.0-pre.5 or newer. Update 6
+  support is unchanged.
+- Modders: an item listed in a command item config claims E and R on Update 7
+  without the `TameworkInput` family tag. It must still be a weapon, because
+  the Update 7 client only sends E and R with a weapon in hand.
+
+### Fixed
+
+- Fixed crashes on Hytale 0.7.0-pre.5.1 from engine calls that no longer
+  exist, including one where a coop could take the world down.
+- E and R on command items work again on 0.7.0-pre.5.
+- On Update 7, the Flightmaster's Talisman claims E and R as soon as flight
+  begins and releases them when it ends.
+- Modders: schema generation no longer fails on the `TameworkFlyingOrbit`
+  body motion.
+
 ## 5.2.0 - Slate UI - 2026-10-07
 
 ### Changed
