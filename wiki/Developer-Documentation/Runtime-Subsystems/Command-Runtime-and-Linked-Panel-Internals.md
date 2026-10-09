@@ -13,23 +13,26 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 
 ## Update 7 rune inputs
 
-Update 7 reserves `Ability2` and `Ability3` for rune casts. The example command
-whistle and HyDragon's Dragon Horn temporarily use Tamework control runes while
-selected, preserving their E/R assignments. The two original primary runes are
-saved with the player, restored when the item is switched, and recovered on
-reconnect. Support rune slots are left in place. Players cannot move or drop the
-temporary primary runes.
+Update 7 reserves `Ability2` and `Ability3` for rune casts. While a Tamework
+input item is selected, `RuneInputRuntime` binds those two slots on the player's
+`Interactions` component, which the engine resolves before the rune slots. The
+player's runes are never moved. The bindings are removed when the item is
+switched, and an entry another owner already holds is left alone. A rune lease
+saved by a build before 5.2.1 only hands its runes back.
 
-The rune bridge forks the held item's existing interaction root with a hotbar
-context, so command metadata and assignments still belong to the physical tool.
-It checks the active lease and selected item again before dispatch. A late cast
-after a switch cannot invoke the old tool's action.
+The bound root forks the held item's own `Ability2` or `Ability3` root with a
+hotbar context, so command metadata and assignments still belong to the
+physical tool. It checks the binding and selected item again before dispatch. A
+late cast after a switch cannot invoke the old tool's action.
 
-Items opt into this route with `Tags.Family: ["TameworkInput"]`, a `Weapon`
-definition, and existing `Ability2` or `Ability3` roots. The supplied Patchwork
-patches add the tag and weapon definition only when the native Update 7 rune
-assets exist, preserving the items' tool classification on older servers. Keep
-the existing E/R roots for Update 6.
+An item qualifies when it has `Ability2` or `Ability3` roots and is either
+listed in a `TwCommandItemConfig` or carries `Tags.Family: ["TameworkInput"]`.
+It also needs a `Weapon` definition, because the Update 7 client only sends E
+and R with a weapon in hand. The example whistle and HyDragon's Dragon Horn add
+the tag and weapon definition through Patchwork patches that apply only when
+the native Update 7 rune assets exist, preserving the items' tool
+classification on older servers. The Flightmaster's Talisman declares both in
+its base item. Keep the existing E/R roots for Update 6.
 
 ## Major service clusters
 - Resolution and recipient selection: `CommandResolutionService`, `CommandRecipientService`

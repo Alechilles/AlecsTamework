@@ -38,7 +38,7 @@ import javax.annotation.Nullable;
 /** Claims Update 7 E/R only while a selected Tamework item needs them. */
 public final class RuneInputRuntime {
     /**
-     * Spike: bind E/R on the player's {@link Interactions} component, which the engine resolves
+     * Binds E/R on the player's {@link Interactions} component, which the engine resolves
      * before the rune slots, so the player's runes are never moved. {@code false} restores the
      * temporary rune lease.
      */
@@ -47,8 +47,6 @@ public final class RuneInputRuntime {
     private static final String[] ROOTS = {"Root_Tamework_Input_Rune_E", "Root_Tamework_Input_Rune_R"};
     private static final String TALISMAN_ID = "Tamework_Flightmasters_Talisman";
     private static final RuneInputLeaseService LEASES = new RuneInputLeaseService();
-    private static final com.hypixel.hytale.logger.HytaleLogger LOGGER =
-            com.hypixel.hytale.logger.HytaleLogger.forEnclosingClass();
 
     private RuneInputRuntime() { }
 
@@ -94,12 +92,6 @@ public final class RuneInputRuntime {
         if (!isSupported()) return;
         Demand wanted = demand(accessor, ref);
         Interactions current = accessor.getComponent(ref, Interactions.getComponentType());
-        InventoryComponent.Hotbar spikeHotbar = accessor.getComponent(ref, InventoryComponent.Hotbar.getComponentType());
-        ItemStack spikeHeld = spikeHotbar == null ? null : spikeHotbar.getActiveItem();
-        LOGGER.at(java.util.logging.Level.INFO).log("[RuneInputSpike] check held=%s weapon=%s wantedE=%s wantedR=%s",
-                ItemStack.isEmpty(spikeHeld) ? "none" : spikeHeld.getItemId(),
-                !ItemStack.isEmpty(spikeHeld) && spikeHeld.getItem() != null && spikeHeld.getItem().getWeapon() != null,
-                wanted.ability2, wanted.ability3);
         Interactions updated = null;
         for (int line = 0; line < TYPES.length; line++) {
             String bound = current == null ? null : current.getInteractionId(TYPES[line]);
@@ -110,13 +102,7 @@ public final class RuneInputRuntime {
             if (add) updated.setInteractionId(TYPES[line], ROOTS[line]);
             else updated.removeInteractionId(TYPES[line]);
         }
-        if (updated != null) {
-            accessor.putComponent(ref, Interactions.getComponentType(), updated);
-            // Spike diagnostic: shows whether the binding was applied before a key press.
-            LOGGER.at(java.util.logging.Level.INFO).log("[RuneInputSpike] bound E=%s R=%s wantedE=%s wantedR=%s",
-                    updated.getInteractionId(TYPES[0]), updated.getInteractionId(TYPES[1]),
-                    wanted.ability2, wanted.ability3);
-        }
+        if (updated != null) accessor.putComponent(ref, Interactions.getComponentType(), updated);
     }
 
     private static void seed(@Nonnull Store<EntityStore> store,

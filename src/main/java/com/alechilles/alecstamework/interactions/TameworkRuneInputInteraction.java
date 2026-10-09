@@ -38,14 +38,8 @@ public final class TameworkRuneInputInteraction extends SimpleInteraction {
     @Override
     protected void tick0(boolean firstRun, float time, @Nonnull InteractionType type,
                          @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
-        if (firstRun) {
-            boolean routed = route(context);
-            if (RuneInputRuntime.usesEntityInput()) {
-                // Spike diagnostic: proves the client sent this key to the server.
-                com.hypixel.hytale.logger.HytaleLogger.forEnclosingClass().at(java.util.logging.Level.INFO)
-                        .log("[RuneInputSpike] server received %s routed=%s", slot, routed);
-            }
-            if (!routed) context.getState().state = InteractionState.Failed;
+        if (firstRun && !route(context)) {
+            context.getState().state = InteractionState.Failed;
         }
         super.tick0(firstRun, time, type, context, cooldownHandler);
     }
