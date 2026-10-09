@@ -6,9 +6,10 @@
 
 - The naming window has a Clear Name button that removes a companion's name.
   It does not use up the naming item.
-- Offensive companion names are now blocked by default. Server owners can turn
-  the filter or its built-in word list off, and add their own blocked and
-  allowed words, in `/tw settings` under Naming.
+- Offensive companion names are now blocked by default, including common
+  disguises like swapped-in numbers, spaced-out letters, and stretched
+  letters. Server owners can turn the filter or its built-in word list off,
+  and add their own blocked and allowed words, in `/tw settings` under Naming.
 - Modders: the `LettersNumbersSpacesPunctuation` preset for `AllowedChars`
   also allows the apostrophe, hyphen, and period, for names like
   `Mr. O'Malley`.

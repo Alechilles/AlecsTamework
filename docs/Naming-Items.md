@@ -100,15 +100,23 @@ Server owners control the filter in `/tw settings` under **Naming**, or in
 
 - `enabled` (default true). Turns the whole filter on or off.
 - `useStockList` (default true). Applies the built-in English, German, Spanish, French, and Portuguese lists.
-- `blockedWords`. Extra words or phrases to block.
+- `blockedWords`. Extra words or phrases to block. Write an entry as `*word*` to block it anywhere inside a name.
 - `allowedWords`. Words or phrases to allow even when a list blocks them.
 
-Matching ignores case, accents, and punctuation, and only whole words count: a name is blocked when one of
-its words, a run of its words, or the whole name with separators removed equals a blocked entry. A blocked
-word inside a longer word does not match. The `Random` button never suggests a blocked name.
+Matching ignores case, accents, and punctuation. It also reads lookalike characters as letters (`sh1t`,
+`a55`), joins letters spelled out one at a time (`b a d`), and matches stretched letters (`baaad`).
 
-The built-in lists come from the List of Dirty, Naughty, Obscene, and Otherwise Bad Words (CC BY 4.0); see
-`META-INF/NOTICE/LDNOOBW.txt` in the jar. Naming item configs cannot bypass the filter.
+- Most entries are whole-word entries: a name is blocked when one of its words, a run of its words, or the
+  whole name with separators removed equals the entry. The entry inside a longer word does not match, so
+  `Cassie`, `Peacock`, and `Raccoon` pass.
+- A short list of severe entries (slurs and the strongest profanity) is blocked anywhere inside a word.
+- An `allowedWords` entry rescues that exact word, for example `Scunthorpe`.
+
+The `Random` button never suggests a blocked name. Naming item configs cannot bypass the filter.
+
+The whole-word lists `en.txt`, `de.txt`, `es.txt`, `fr.txt`, and `pt.txt` come from the List of Dirty,
+Naughty, Obscene, and Otherwise Bad Words (CC BY 4.0); see `META-INF/NOTICE/LDNOOBW.txt` in the jar.
+`extra.txt` (more whole-word entries) and `severe.txt` are Tamework's own.
 
 ## Persistence
 Names are stored in `TameworkNpcNameComponent` and re‑applied when the NPC is loaded.
