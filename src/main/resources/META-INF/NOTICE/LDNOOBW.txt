@@ -1,0 +1,7 @@
+List of Dirty, Naughty, Obscene, and Otherwise Bad Words (LDNOOBW)
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+Source: https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
+Source commit: 5faf2ba42d7b1c0977169ec3611df25a3c08eb13
+Files: META-INF/tamework/name-filter/en.txt, de.txt, es.txt, fr.txt, pt.txt (unmodified copies)
+Changes: Tamework does not block the entries listed in META-INF/tamework/name-filter/exceptions.txt,
+which are everyday words and animal names that players use as companion names.

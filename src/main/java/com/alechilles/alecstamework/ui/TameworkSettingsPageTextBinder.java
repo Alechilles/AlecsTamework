@@ -17,6 +17,11 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsLoadPresetLabel", "tamework.ui.settings.label.loadPreset"},
             {"#TwSettingsPresetNoteLabel", "tamework.ui.settings.note.presetScope"},
             {"#TwSettingsRecallSectionLabel", "tamework.ui.settings.label.recallSection"},
+            {"#TwSettingsNamingSectionLabel", "tamework.ui.settings.label.namingSection"},
+            {"#TwSettingsNameFilterEnabledLabel", "tamework.ui.settings.label.nameFilterEnabled"},
+            {"#TwSettingsNameFilterUseStockListLabel", "tamework.ui.settings.label.nameFilterUseStockList"},
+            {"#TwSettingsNameFilterBlockedWordsLabel", "tamework.ui.settings.label.nameFilterBlockedWords"},
+            {"#TwSettingsNameFilterAllowedWordsLabel", "tamework.ui.settings.label.nameFilterAllowedWords"},
             {"#TwSettingsRecallTeleportingLabel", "tamework.ui.settings.label.recallTeleporting"},
             {"#TwSettingsAnnouncementsLabel", "tamework.ui.settings.label.announcements"},
             {"#TwSettingsCompanionSystemsLabel", "tamework.ui.settings.label.companionSystems"},
@@ -120,6 +125,11 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsClaimLimitTotalTooltip", "tamework.ui.settings.tooltip.claimLimitTotal"},
             {"#TwSettingsBreedingRequiresClaimTooltip", "tamework.ui.settings.tooltip.breedingRequiresClaim"},
             {"#TwSettingsSimpleClaimsProtectTooltip", "tamework.ui.settings.tooltip.simpleClaimsProtect"},
+            {"#TwSettingsNamingSectionTooltip", "tamework.ui.settings.tooltip.namingSection"},
+            {"#TwSettingsNameFilterEnabledTooltip", "tamework.ui.settings.tooltip.nameFilterEnabled"},
+            {"#TwSettingsNameFilterUseStockListTooltip", "tamework.ui.settings.tooltip.nameFilterUseStockList"},
+            {"#TwSettingsNameFilterBlockedWordsTooltip", "tamework.ui.settings.tooltip.nameFilterBlockedWords"},
+            {"#TwSettingsNameFilterAllowedWordsTooltip", "tamework.ui.settings.tooltip.nameFilterAllowedWords"},
             {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"}
     };
 

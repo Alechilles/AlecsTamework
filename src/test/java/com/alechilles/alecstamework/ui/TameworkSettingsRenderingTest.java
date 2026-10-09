@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.settings.NameFilterSettings;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,9 @@ class TameworkSettingsRenderingTest {
         Field values = TameworkSettingsPage.class.getDeclaredField("currentValues");
         values.setAccessible(true);
         values.set(page, TameworkSettingsValues.fromRuntime());
+        Field nameFilter = TameworkSettingsPage.class.getDeclaredField("currentNameFilter");
+        nameFilter.setAccessible(true);
+        nameFilter.set(page, NameFilterSettings.DEFAULT);
         UICommandBuilder commands = new UICommandBuilder();
         var events = new com.hypixel.hytale.server.core.ui.builder.UIEventBuilder();
         page.build(null, commands, events, null);

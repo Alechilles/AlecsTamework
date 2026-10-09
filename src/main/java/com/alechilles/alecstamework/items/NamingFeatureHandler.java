@@ -41,6 +41,7 @@ public final class NamingFeatureHandler {
     private static final long REQUEST_TIMEOUT_MS = 300000L;
     private static final String CANCEL_TOKEN = "cancel";
     private static final int DEFAULT_UI_NAME_MAX_LENGTH = 32;
+    private static final int RANDOM_NAME_ATTEMPTS = 8;
     private static final String[] EMPTY_RANDOM_NAME_POOL = new String[0];
 
     private final NameItemRegistry registry;
@@ -349,8 +350,16 @@ public final class NamingFeatureHandler {
         if (request.randomNamePool == null || request.randomNamePool.length == 0) {
             return null;
         }
-        int index = ThreadLocalRandom.current().nextInt(request.randomNamePool.length);
-        return request.randomNamePool[index];
+        // The random button must not suggest a name the server's filter would then reject.
+        NameFilter filter = NameFilter.current();
+        for (int attempt = 0; attempt < RANDOM_NAME_ATTEMPTS; attempt++) {
+            int index = ThreadLocalRandom.current().nextInt(request.randomNamePool.length);
+            String candidate = request.randomNamePool[index];
+            if (!filter.isBlocked(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void applyNameFromInput(Player player,
@@ -386,6 +395,11 @@ public final class NamingFeatureHandler {
 
         String finalName = validation.getNormalizedName();
         if (finalName == null || finalName.isBlank()) {
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.notAllowed");
+            return;
+        }
+
+        if (NameFilter.current().isBlocked(finalName)) {
             sendMessageKey(player, "tamework.ui.notifications.name.validation.notAllowed");
             return;
         }

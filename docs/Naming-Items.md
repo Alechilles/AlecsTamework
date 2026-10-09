@@ -82,6 +82,34 @@ When the interaction succeeds, the player gets a naming UI with a text field and
 
 The server re‑validates ownership/tamed state on submission.
 
+## Name filter
+Player-entered names are checked against a server-wide blocked-word filter after the item's own rules pass.
+A blocked name is rejected with the "That name is not allowed." message. Existing names are not changed.
+
+Server owners control the filter in `/tw settings` under **Naming**, or in
+`<Tamework data>/Settings/tamework-name-filter.json` (run `/tw config reload` after a hand edit):
+
+```json
+{
+  "enabled": true,
+  "useStockList": true,
+  "blockedWords": [],
+  "allowedWords": []
+}
+```
+
+- `enabled` (default true). Turns the whole filter on or off.
+- `useStockList` (default true). Applies the built-in English, German, Spanish, French, and Portuguese lists.
+- `blockedWords`. Extra words or phrases to block.
+- `allowedWords`. Words or phrases to allow even when a list blocks them.
+
+Matching ignores case, accents, and punctuation, and only whole words count: a name is blocked when one of
+its words, a run of its words, or the whole name with separators removed equals a blocked entry. A blocked
+word inside a longer word does not match. The `Random` button never suggests a blocked name.
+
+The built-in lists come from the List of Dirty, Naughty, Obscene, and Otherwise Bad Words (CC BY 4.0); see
+`META-INF/NOTICE/LDNOOBW.txt` in the jar. Naming item configs cannot bypass the filter.
+
 ## Persistence
 Names are stored in `TameworkNpcNameComponent` and re‑applied when the NPC is loaded.
 Spawner capture preserves the Tamework name and restores it on spawn.
