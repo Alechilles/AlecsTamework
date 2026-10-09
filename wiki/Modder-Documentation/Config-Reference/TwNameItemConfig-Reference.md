@@ -70,6 +70,7 @@ Fields:
 Accepted `AllowedChars` presets:
 - `Any`
 - `LettersNumbersSpaces`
+- `LettersNumbersSpacesPunctuation`: also allows the apostrophe, hyphen, and period, for names like `Mr. O'Malley`.
 - `LettersNumbers`
 - `LettersSpaces`
 - `Letters`

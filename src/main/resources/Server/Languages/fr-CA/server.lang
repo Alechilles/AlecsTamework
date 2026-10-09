@@ -591,6 +591,8 @@ tamework.ui.nameInput.subtitle=Entrez un nom puis cliquez sur Appliquer.
 tamework.ui.nameInput.title=Nommer le compagnon
 tamework.ui.nameInput.title.default=Nommer le compagnon
 tamework.ui.nameInput.titleForNpc=Nommer {0}
+tamework.ui.nameInput.button.clear=Effacer le nom
+tamework.ui.nameInput.tooltip.clear=Retire le nom de ce compagnon.
 
 # ===== Tamework UI: Linked Location =====
 tamework.ui.linkedLocation.coordinatesLabel=Coordonnées :
@@ -706,6 +708,7 @@ tamework.ui.notifications.tame.autoLink.noTool={0} apprivoisé - Aucun {1} trouv
 tamework.ui.notifications.tame.commandItem.default=objet de commande
 tamework.ui.notifications.tame.commandItem.craftingStation.default=établi
 tamework.ui.notifications.name.cancelled=Nommage annulé.
+tamework.ui.notifications.name.cleared=Nom effacé.
 tamework.ui.notifications.name.holdItemToFinish=Gardez l'objet de nommage en main pour terminer.
 tamework.ui.notifications.name.itemCooldown=Cet objet de nommage est en temps de recharge.
 tamework.ui.notifications.name.noOwner=Ce PNJ n'a pas de propriétaire.

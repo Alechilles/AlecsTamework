@@ -591,6 +591,8 @@ tamework.ui.nameInput.subtitle=Gib einen Namen ein und klicke auf Anwenden.
 tamework.ui.nameInput.title=Begleiter benennen
 tamework.ui.nameInput.title.default=Begleiter benennen
 tamework.ui.nameInput.titleForNpc={0} benennen
+tamework.ui.nameInput.button.clear=Name löschen
+tamework.ui.nameInput.tooltip.clear=Entfernt den Namen dieses Begleiters.
 
 # ===== Tamework UI: Verknüpfter Standort =====
 tamework.ui.linkedLocation.coordinatesLabel=Koordinaten:
@@ -706,6 +708,7 @@ tamework.ui.notifications.tame.autoLink.noTool={0} gezähmt - Kein {1} zum Verkn
 tamework.ui.notifications.tame.commandItem.default=Befehlsgegenstand
 tamework.ui.notifications.tame.commandItem.craftingStation.default=Werkbank
 tamework.ui.notifications.name.cancelled=Benennung abgebrochen.
+tamework.ui.notifications.name.cleared=Name entfernt.
 tamework.ui.notifications.name.holdItemToFinish=Halte den Benennungsgegenstand, um die Benennung abzuschließen.
 tamework.ui.notifications.name.itemCooldown=Dieser Benennungsgegenstand hat noch Abklingzeit.
 tamework.ui.notifications.name.noOwner=Dieser NPC hat keinen Besitzer.

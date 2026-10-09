@@ -53,7 +53,20 @@ $C.@PageOverlay {
         TextButton #TameworkNameCancelButton {
           Style: $A.@PanelButtonQuiet;
           Text: %server.tamework.ui.shared.button.cancel;
-          Anchor: (Width: 128, Height: 30);
+          Anchor: (Width: 100, Height: 30);
+        }
+
+        Group #TameworkNameButtonSpacerBeforeClear {
+          Anchor: (Width: 12);
+          Visible: false;
+        }
+
+        TextButton #TameworkNameClearButton {
+          Style: $A.@PanelButtonQuiet;
+          Text: %server.tamework.ui.nameInput.button.clear;
+          TooltipText: %server.tamework.ui.nameInput.tooltip.clear;
+          Anchor: (Width: 100, Height: 30);
+          Visible: false;
         }
 
         Group #TameworkNameButtonSpacerBeforeRandom {
@@ -63,7 +76,7 @@ $C.@PageOverlay {
         TextButton #TameworkNameRandomButton {
           Style: $A.@PanelButton;
           Text: %server.tamework.ui.shared.button.random;
-          Anchor: (Width: 128, Height: 30);
+          Anchor: (Width: 100, Height: 30);
           Visible: false;
         }
 
@@ -75,7 +88,7 @@ $C.@PageOverlay {
         TextButton #TameworkNameApplyButton {
           Style: $A.@PanelButtonPrimary;
           Text: %server.tamework.ui.shared.button.apply;
-          Anchor: (Width: 140, Height: 30);
+          Anchor: (Width: 124, Height: 30);
         }
       }
     }

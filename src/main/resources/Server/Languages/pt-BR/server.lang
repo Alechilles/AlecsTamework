@@ -591,6 +591,8 @@ tamework.ui.nameInput.subtitle=Insira um nome e clique em Aplicar.
 tamework.ui.nameInput.title=Nomear Companheiro
 tamework.ui.nameInput.title.default=Nomear Companheiro
 tamework.ui.nameInput.titleForNpc=Nomear {0}
+tamework.ui.nameInput.button.clear=Limpar nome
+tamework.ui.nameInput.tooltip.clear=Remove o nome deste companheiro.
 
 # ===== Tamework UI: Linked Location =====
 tamework.ui.linkedLocation.coordinatesLabel=Coordenadas:
@@ -706,6 +708,7 @@ tamework.ui.notifications.tame.autoLink.noTool={0} domado - Nenhum {1} encontrad
 tamework.ui.notifications.tame.commandItem.default=item de comando
 tamework.ui.notifications.tame.commandItem.craftingStation.default=bancada de criação
 tamework.ui.notifications.name.cancelled=Nomeação cancelada.
+tamework.ui.notifications.name.cleared=Nome removido.
 tamework.ui.notifications.name.holdItemToFinish=Segure o item de nomeação para terminar.
 tamework.ui.notifications.name.itemCooldown=Esse item de nomeação está em recarga.
 tamework.ui.notifications.name.noOwner=Esse NPC não tem dono.

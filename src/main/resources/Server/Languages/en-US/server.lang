@@ -612,6 +612,8 @@ tamework.ui.nameInput.subtitle=Enter a name and click Apply.
 tamework.ui.nameInput.title=Name Companion
 tamework.ui.nameInput.title.default=Name Companion
 tamework.ui.nameInput.titleForNpc=Name {0}
+tamework.ui.nameInput.button.clear=Clear Name
+tamework.ui.nameInput.tooltip.clear=Remove this companion's name.
 
 # ===== Tamework UI: Linked Location =====
 tamework.ui.linkedLocation.coordinatesLabel=Coordinates:
@@ -734,6 +736,7 @@ tamework.ui.notifications.tame.autoLink.noTool={0} Tamed - No {1} found to link.
 tamework.ui.notifications.tame.commandItem.default=command item
 tamework.ui.notifications.tame.commandItem.craftingStation.default=crafting bench
 tamework.ui.notifications.name.cancelled=Naming cancelled.
+tamework.ui.notifications.name.cleared=Name cleared.
 tamework.ui.notifications.name.holdItemToFinish=Hold the naming item to finish naming.
 tamework.ui.notifications.name.itemCooldown=That naming item is on cooldown.
 tamework.ui.notifications.name.noOwner=That NPC does not have an owner.

@@ -6,6 +6,8 @@ package com.alechilles.alecstamework.items;
 final class NamingRules {
     static final String ALLOWED_CHARS_ANY = "Any";
     static final String ALLOWED_CHARS_LETTERS_NUMBERS_SPACES = "LettersNumbersSpaces";
+    /** Letters, numbers and spaces plus the apostrophe, hyphen and period used in names like "Mr. O'Malley-Whiskers". */
+    static final String ALLOWED_CHARS_LETTERS_NUMBERS_SPACES_PUNCTUATION = "LettersNumbersSpacesPunctuation";
     static final String ALLOWED_CHARS_LETTERS_NUMBERS = "LettersNumbers";
     static final String ALLOWED_CHARS_LETTERS_SPACES = "LettersSpaces";
     static final String ALLOWED_CHARS_LETTERS = "Letters";

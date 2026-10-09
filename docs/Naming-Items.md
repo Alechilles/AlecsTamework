@@ -62,6 +62,7 @@ Fields:
 Allowed character presets:
 - `Any`
 - `LettersNumbersSpaces`
+- `LettersNumbersSpacesPunctuation` (adds the apostrophe, hyphen, and period, for names like `Mr. O'Malley`)
 - `LettersNumbers`
 - `LettersSpaces`
 - `Letters`
@@ -76,6 +77,7 @@ When the interaction succeeds, the player gets a naming UI with a text field and
 - Clicking `Random` replaces the text in the input field only (it does not apply the name).
 - Enter the desired name and click `Apply` to submit.
 - Click `Cancel` to cancel the request.
+- If the NPC already has a name and the rules allow both `AllowRename` and `ReplaceExisting`, a `Clear Name` button removes the name. Clearing does not consume the item; `CooldownMs` still applies.
 - If the page cannot be opened, naming automatically falls back to chat input (`cancel` still cancels).
 
 The server re‑validates ownership/tamed state on submission.

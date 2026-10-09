@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Minimal naming page with a text field and Apply/Cancel actions.
+ * Minimal naming page with a text field and Apply/Cancel actions, plus optional Random and Clear actions.
  */
 public final class TameworkNameInputPage extends InteractiveCustomUIPage<TameworkNameInputPage.NameInputEventData> {
     public static final String UI_PATH = "TameworkNameInputPage.ui";
@@ -30,6 +30,7 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
     private static final String KEY_NAME_INPUT = "@NpcNameInput";
     private static final String ACTION_CANCEL = "Cancel";
     private static final String ACTION_RANDOM = "Random";
+    private static final String ACTION_CLEAR = "Clear";
     private static final String DEFAULT_TITLE_KEY = "tamework.ui.nameInput.title";
     private static final String DEFAULT_SUBTITLE_KEY = "tamework.ui.nameInput.subtitle";
     private static final String DEFAULT_PLACEHOLDER_KEY = "tamework.ui.nameInput.placeholder";
@@ -43,6 +44,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
     private final Consumer<String> submitCallback;
     private final Supplier<String> randomNameSupplier;
     private final boolean randomEnabled;
+    @Nullable
+    private final Runnable clearCallback;
     private boolean handled;
 
     public TameworkNameInputPage(@Nonnull PlayerRef playerRef,
@@ -53,7 +56,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
                                  int maxLength,
                                  @Nonnull Runnable cancelCallback,
                                  @Nonnull Consumer<String> submitCallback,
-                                 @Nullable Supplier<String> randomNameSupplier) {
+                                 @Nullable Supplier<String> randomNameSupplier,
+                                 @Nullable Runnable clearCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, NameInputEventData.CODEC);
         this.title = normalizeText(title, LocalizedText.resolve(playerRef, DEFAULT_TITLE_KEY));
         this.subtitle = normalizeText(subtitle, LocalizedText.resolve(playerRef, DEFAULT_SUBTITLE_KEY));
@@ -64,6 +68,7 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
         this.submitCallback = submitCallback;
         this.randomNameSupplier = randomNameSupplier;
         this.randomEnabled = randomNameSupplier != null;
+        this.clearCallback = clearCallback;
         this.handled = false;
     }
 
@@ -81,6 +86,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
             commandBuilder.set("#TameworkNameInputField.MaxLength", maxLength);
             commandBuilder.set("#TameworkNameRandomButton.Visible", randomEnabled);
             commandBuilder.set("#TameworkNameButtonSpacerBeforeApply.Visible", randomEnabled);
+            commandBuilder.set("#TameworkNameClearButton.Visible", clearCallback != null);
+            commandBuilder.set("#TameworkNameButtonSpacerBeforeClear.Visible", clearCallback != null);
 
             bindEvents(eventBuilder);
         } catch (Throwable throwable) {
@@ -113,6 +120,15 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
             if (cancelCallback != null) {
                 cancelCallback.run();
             }
+            return;
+        }
+        if (ACTION_CLEAR.equalsIgnoreCase(data.action)) {
+            if (clearCallback == null) {
+                return;
+            }
+            handled = true;
+            close();
+            clearCallback.run();
             return;
         }
         if (ACTION_RANDOM.equalsIgnoreCase(data.action)) {
@@ -172,6 +188,14 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
                 EventData.of(KEY_ACTION, ACTION_CANCEL),
                 false
         );
+        if (clearCallback != null) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TameworkNameClearButton",
+                    EventData.of(KEY_ACTION, ACTION_CLEAR),
+                    false
+            );
+        }
         if (randomEnabled) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
