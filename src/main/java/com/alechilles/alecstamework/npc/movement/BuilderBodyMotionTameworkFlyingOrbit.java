@@ -91,7 +91,8 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
                 DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
                 BuilderDescriptorState.WorkInProgress,
                 "Vertical offset range maintained relative to the target while steering.", null);
-        hasAirborneTargetAltitudeRange = data.isJsonObject()
+        // The engine passes null data when it reads descriptors for schema generation.
+        hasAirborneTargetAltitudeRange = data != null && data.isJsonObject()
                 && data.getAsJsonObject().has("AirborneTargetAltitudeRange");
         getDoubleRange(data, "AirborneTargetAltitudeRange", airborneTargetAltitudeRange,
                 new double[] { 0.0, Double.MAX_VALUE },
