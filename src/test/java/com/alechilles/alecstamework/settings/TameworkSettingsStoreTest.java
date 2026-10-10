@@ -64,7 +64,9 @@ class TameworkSettingsStoreTest {
                 false,
                 "FULL",
                 true,
-                73
+                73,
+                0,
+                true
         );
 
         assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, snapshot, null));
@@ -113,6 +115,8 @@ class TameworkSettingsStoreTest {
         assertEquals("FULL", overrides.animalAgingMode());
         assertEquals(true, overrides.animalOldAgeDeathEnabled());
         assertEquals(73, overrides.commandPanelCardsPerPage());
+        assertEquals(true, overrides.avatarFlightUnlimitedVigour());
+        assertTrue(TameworkSettingsStore.loadGlobalSettings(settingsFile, null).avatarFlightUnlimitedVigour());
 
         String raw = Files.readString(settingsFile);
         assertTrue(raw.contains("\"population\""));

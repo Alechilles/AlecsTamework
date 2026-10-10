@@ -75,7 +75,9 @@ public final class TameworkSettingsResolver {
                 ),
                 resolveNonNegativeInt(values.populationLimitPerPlayerDeployedTotal(),
                         defaults.populationLimitPerPlayerDeployedTotal() != null
-                                ? defaults.populationLimitPerPlayerDeployedTotal() : 0)
+                                ? defaults.populationLimitPerPlayerDeployedTotal() : 0),
+                resolveBoolean(values.avatarFlightUnlimitedVigour(),
+                        Boolean.TRUE.equals(defaults.avatarFlightUnlimitedVigour()))
         );
     }
 

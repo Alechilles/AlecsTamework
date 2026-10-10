@@ -282,6 +282,54 @@ $C.@PageOverlay {
               Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #e8aa35; }
               Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
+              Label #TwSettingsFlightSectionLabel {
+                Anchor: (Left: 14, Right: 12, Height: 34);
+                Text: %server.tamework.ui.settings.label.flightSection;
+                Style: @SettingsSectionLabel;
+              }
+
+              TextButton #TwSettingsFlightSectionTooltip {
+                Anchor: (Left: 0, Right: 12, Height: 34);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.flightSection;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsFlightUnlimitedVigourLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.flightUnlimitedVigour;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsFlightUnlimitedVigourTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.flightUnlimitedVigour;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsFlightUnlimitedVigourCheck {
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: $A.@SlateQuiet;
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #e8aa35; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
+
               Label #TwSettingsCompanionSystemsLabel {
                 Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.companionSystems;

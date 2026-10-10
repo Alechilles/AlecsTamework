@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -144,8 +145,16 @@ public final class AvatarFlightVigourService {
                 : new RechargeCadence(RechargeMode.NONE, 0.0);
     }
 
-    private static boolean isEnabled(@Nullable TwAvatarFlightConfig config) {
-        return config != null && config.getVigour().isEnabled();
+    /**
+     * True when Vigour limits this flight: the config enables it and the server has not turned on
+     * unlimited flight Vigour in `/tw settings`.
+     */
+    public static boolean isEnabled(@Nullable TwAvatarFlightConfig config) {
+        if (config == null || !config.getVigour().isEnabled()) {
+            return false;
+        }
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return settings == null || !settings.avatarFlightUnlimitedVigour();
     }
 
     private static double maxCharges(@Nullable TwAvatarFlightConfig config,

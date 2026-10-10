@@ -425,7 +425,7 @@ public final class AvatarFlightMovementSystem
                                                                @Nonnull TwAvatarFlightConfig config,
                                                                @Nonnull AvatarFlightProgressionTuning tuning,
                                                                long now) {
-        if (!config.getVigour().isEnabled()) {
+        if (!AvatarFlightVigourService.isEnabled(config)) {
             return withVigourAuthorization(input, true, true, true);
         }
         double flapCost = config.getVigour().getUpwardFlapCost();
@@ -475,7 +475,7 @@ public final class AvatarFlightMovementSystem
                                            @Nonnull AvatarFlightProgressionTuning tuning,
                                            @Nonnull AvatarFlightController.Output output,
                                            long now) {
-        if (!config.getVigour().isEnabled()) {
+        if (!AvatarFlightVigourService.isEnabled(config)) {
             return;
         }
         AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
@@ -628,7 +628,7 @@ public final class AvatarFlightMovementSystem
                                                @Nonnull TwAvatarFlightConfig config,
                                                @Nonnull AvatarFlightProgressionTuning tuning) {
         double maxCharges = maxVigourCharges(config, tuning);
-        if (!config.getVigour().isEnabled()) {
+        if (!AvatarFlightVigourService.isEnabled(config)) {
             return maxCharges;
         }
         double charges = flight.getVigourCharges();
