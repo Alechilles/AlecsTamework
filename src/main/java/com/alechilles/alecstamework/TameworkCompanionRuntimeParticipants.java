@@ -86,20 +86,19 @@ public final class TameworkCompanionRuntimeParticipants {
                         // Only an imported world has old bodies to match (plan 7 R14).
                         lifecycle.hasLegacyBodies() ? plugin.getProjectionIdentityComponentType() : null));
         participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownerchangedsystem",
-                () -> new CompanionOwnershipSystems.OwnerChanged(lifecycle, NPCEntity.getComponentType(),
-                        plugin.getOwnerComponentType(), TameworkCompanionComponent.getComponentType()));
-        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionlinkschangedsystem",
-                () -> new CompanionOwnershipSystems.LinksChanged(lifecycle, NPCEntity.getComponentType(),
-                        plugin.getCommandLinksComponentType(), TameworkCompanionComponent.getComponentType()));
-        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionnamechangedsystem",
-                () -> new CompanionOwnershipSystems.NameChanged(lifecycle, NPCEntity.getComponentType(),
-                        plugin.getNpcNameComponentType(), TameworkCompanionComponent.getComponentType()));
-        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiontamedchangedsystem",
-                () -> new CompanionOwnershipSystems.TamedChanged(lifecycle, NPCEntity.getComponentType(),
-                        plugin.getOwnerComponentType(), plugin.getTamedComponentType()));
-        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiondeathsystem",
-                () -> new CompanionDeathSystem(lifecycle, NPCEntity.getComponentType(),
+                () -> new CompanionOwnershipSystems.OwnerChanged(lifecycle, plugin.getOwnerComponentType(),
                         TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionlinkschangedsystem",
+                () -> new CompanionOwnershipSystems.LinksChanged(lifecycle, plugin.getCommandLinksComponentType(),
+                        TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionnamechangedsystem",
+                () -> new CompanionOwnershipSystems.NameChanged(lifecycle, plugin.getNpcNameComponentType(),
+                        TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiontamedchangedsystem",
+                () -> new CompanionOwnershipSystems.TamedChanged(lifecycle, plugin.getOwnerComponentType(),
+                        plugin.getTamedComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiondeathsystem",
+                () -> new CompanionDeathSystem(lifecycle, TameworkCompanionComponent.getComponentType()));
     }
 
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
