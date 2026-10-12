@@ -19,14 +19,12 @@ import javax.annotation.Nonnull;
  */
 public final class CompanionDeathSystem extends DeathSystems.OnDeathSystem {
     private final CompanionBodyLifecycle lifecycle;
-    private final Query<EntityStore> query;
+    private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
 
     public CompanionDeathSystem(@Nonnull CompanionBodyLifecycle lifecycle,
-                                @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
                                 @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stampType) {
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
-        this.query = Query.and(Objects.requireNonNull(npcType, "npcType"),
-                Objects.requireNonNull(stampType, "stampType"));
+        this.stampType = Objects.requireNonNull(stampType, "stampType");
     }
 
     @Override
@@ -38,6 +36,7 @@ public final class CompanionDeathSystem extends DeathSystems.OnDeathSystem {
     @Override
     @Nonnull
     public Query<EntityStore> getQuery() {
-        return query;
+        // NPCEntity's type can be unavailable while runtime participants are preflighted.
+        return Query.and(NPCEntity.getComponentType(), stampType);
     }
 }

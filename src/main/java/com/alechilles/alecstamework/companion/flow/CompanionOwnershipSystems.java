@@ -134,15 +134,13 @@ public final class CompanionOwnershipSystems {
         private final CompanionBodyLifecycle lifecycle;
         private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
         private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
-        private final Query<EntityStore> query;
 
-        public OwnerChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+        public OwnerChanged(@Nonnull CompanionBodyLifecycle lifecycle,
                             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> owner,
                             @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
             this.ownerType = Objects.requireNonNull(owner, "owner");
             this.stampType = Objects.requireNonNull(stamp, "stamp");
-            this.query = Query.and(npc, owner);
         }
 
         @Override
@@ -173,7 +171,8 @@ public final class CompanionOwnershipSystems {
         @Override
         @Nonnull
         public Query<EntityStore> getQuery() {
-            return query;
+            // NPCEntity's type can be unavailable while runtime participants are preflighted.
+            return Query.and(NPCEntity.getComponentType(), ownerType);
         }
 
         private void changed(Ref<EntityStore> ref, TameworkOwnerComponent owner, Store<EntityStore> store,
@@ -190,14 +189,14 @@ public final class CompanionOwnershipSystems {
     public static final class LinksChanged extends RefChangeSystem<EntityStore, TameworkCommandLinksComponent> {
         private final CompanionBodyLifecycle lifecycle;
         private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType;
-        private final Query<EntityStore> query;
+        private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
 
-        public LinksChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+        public LinksChanged(@Nonnull CompanionBodyLifecycle lifecycle,
                             @Nonnull ComponentType<EntityStore, TameworkCommandLinksComponent> links,
                             @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
             this.linksType = Objects.requireNonNull(links, "links");
-            this.query = Query.and(npc, links, stamp);
+            this.stampType = Objects.requireNonNull(stamp, "stamp");
         }
 
         @Override
@@ -228,7 +227,8 @@ public final class CompanionOwnershipSystems {
         @Override
         @Nonnull
         public Query<EntityStore> getQuery() {
-            return query;
+            // NPCEntity's type can be unavailable while runtime participants are preflighted.
+            return Query.and(NPCEntity.getComponentType(), linksType, stampType);
         }
     }
 
@@ -236,14 +236,14 @@ public final class CompanionOwnershipSystems {
     public static final class NameChanged extends RefChangeSystem<EntityStore, TameworkNpcNameComponent> {
         private final CompanionBodyLifecycle lifecycle;
         private final ComponentType<EntityStore, TameworkNpcNameComponent> nameType;
-        private final Query<EntityStore> query;
+        private final ComponentType<EntityStore, TameworkCompanionComponent> stampType;
 
-        public NameChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+        public NameChanged(@Nonnull CompanionBodyLifecycle lifecycle,
                            @Nonnull ComponentType<EntityStore, TameworkNpcNameComponent> name,
                            @Nonnull ComponentType<EntityStore, TameworkCompanionComponent> stamp) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
             this.nameType = Objects.requireNonNull(name, "name");
-            this.query = Query.and(npc, name, stamp);
+            this.stampType = Objects.requireNonNull(stamp, "stamp");
         }
 
         @Override
@@ -274,7 +274,8 @@ public final class CompanionOwnershipSystems {
         @Override
         @Nonnull
         public Query<EntityStore> getQuery() {
-            return query;
+            // NPCEntity's type can be unavailable while runtime participants are preflighted.
+            return Query.and(NPCEntity.getComponentType(), nameType, stampType);
         }
     }
 
@@ -282,14 +283,14 @@ public final class CompanionOwnershipSystems {
     public static final class TamedChanged extends RefChangeSystem<EntityStore, TameworkTamedComponent> {
         private final CompanionBodyLifecycle lifecycle;
         private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
-        private final Query<EntityStore> query;
+        private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
 
-        public TamedChanged(@Nonnull CompanionBodyLifecycle lifecycle, @Nonnull ComponentType<EntityStore, NPCEntity> npc,
+        public TamedChanged(@Nonnull CompanionBodyLifecycle lifecycle,
                             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> owner,
                             @Nonnull ComponentType<EntityStore, TameworkTamedComponent> tamed) {
             this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
             this.tamedType = Objects.requireNonNull(tamed, "tamed");
-            this.query = Query.and(npc, owner, tamed);
+            this.ownerType = Objects.requireNonNull(owner, "owner");
         }
 
         @Override
@@ -323,7 +324,8 @@ public final class CompanionOwnershipSystems {
         @Override
         @Nonnull
         public Query<EntityStore> getQuery() {
-            return query;
+            // NPCEntity's type can be unavailable while runtime participants are preflighted.
+            return Query.and(NPCEntity.getComponentType(), ownerType, tamedType);
         }
     }
 
