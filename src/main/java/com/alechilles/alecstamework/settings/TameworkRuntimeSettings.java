@@ -313,6 +313,11 @@ public final class TameworkRuntimeSettings {
         return values.commandPanelCardsPerPage();
     }
 
+    /** True when avatar-flight launches, flaps and boosts cost no Vigour on this server. */
+    public boolean avatarFlightUnlimitedVigour() {
+        return values.avatarFlightUnlimitedVigour();
+    }
+
     public boolean telemetryEnabled() {
         return values.telemetryEnabled();
     }

@@ -58,6 +58,8 @@ While transformed but not actively using Tamework's custom flight velocity, grou
 
 Vigour is a charge resource for avatar-flight movement abilities. Successful charged launches, upward flaps, and forward boosts spend charges. When Vigour reaches zero, those movement abilities stop applying until charges recover.
 
+Server owners can turn Vigour off for every flight with **Unlimited Flight Vigour** in `/tw settings` (`avatarFlight.unlimitedVigour` in `tamework-settings.json`, default `false`). While it is on, launches, flaps, and boosts are never refused or charged, the HUD hides the Vigour pips, and cooldowns still apply. It has the same effect as `Vigour.Enabled: false` on every flight config, and the change applies to flights already in progress.
+
 Default balance:
 
 - `MaxCharges`: 6.

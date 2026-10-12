@@ -188,7 +188,8 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled()),
                 boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled()),
                 numbers.commandPanelCardsPerPage(),
-                numbers.deployedLimit()
+                numbers.deployedLimit(),
+                boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour())
         );
     }
 

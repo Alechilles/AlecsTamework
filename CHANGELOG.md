@@ -13,6 +13,9 @@
 - Modders: the `LettersNumbersSpacesPunctuation` preset for `AllowedChars`
   also allows the apostrophe, hyphen, and period, for names like
   `Mr. O'Malley`.
+- `/tw settings` has a new **Unlimited Flight Vigour** option under Avatar
+  Flight. When it is on, charged launches, upward flaps and forward boosts cost
+  no Vigour and the Vigour pips are hidden. It is off by default.
 
 ## 5.2.1 - Update 7 Pre-release 5 - 2026-10-09
 

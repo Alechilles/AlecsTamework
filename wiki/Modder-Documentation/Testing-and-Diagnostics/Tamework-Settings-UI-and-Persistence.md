@@ -109,6 +109,14 @@ who may release a captured companion (`OWNER_ONLY` is the restriction). A saved
 `ownership.capture.spawnRequiresOwner` value still loads without error and is
 ignored for release.
 
+## Avatar flight
+
+**Unlimited Flight Vigour** is saved as `avatarFlight.unlimitedVigour` and is
+off by default. When it is on, charged launches, upward flaps and forward boosts
+cost no Vigour for any player, and the flight HUD hides the Vigour pips. Boost,
+flap and combat ability cooldowns still apply. Experience presets leave it
+unchanged.
+
 ## Welcome and announcements
 
 In `/tw settings`, turn off **Welcome and announcements** and click **Apply**

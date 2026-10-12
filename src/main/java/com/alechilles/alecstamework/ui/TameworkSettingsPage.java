@@ -97,6 +97,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_TALENTS_ENABLED = "@TalentsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
+    private static final String KEY_FLIGHT_UNLIMITED_VIGOUR = "@AvatarFlightUnlimitedVigour";
 
     private final Tamework plugin;
     private final World world;
@@ -253,6 +254,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_TALENTS_ENABLED, "#TwSettingsTalentsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
                 .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
+                .append(KEY_FLIGHT_UNLIMITED_VIGOUR, "#TwSettingsFlightUnlimitedVigourCheck.Value")
                 .append(KEY_ANNOUNCEMENTS_ENABLED, "#TwSettingsAnnouncementsEnabledCheck.Value")
                 .append(KEY_NAME_FILTER_ENABLED, "#TwSettingsNameFilterEnabledCheck.Value")
                 .append(KEY_NAME_FILTER_USE_STOCK_LIST, "#TwSettingsNameFilterUseStockListCheck.Value")
@@ -313,6 +315,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsTalentsEnabledCheck.Value", currentValues.talentsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
+        commandBuilder.set("#TwSettingsFlightUnlimitedVigourCheck.Value", currentValues.avatarFlightUnlimitedVigour());
         commandBuilder.set("#TwSettingsAnnouncementsEnabledCheck.Value", currentValues.announcementsEnabled());
         commandBuilder.set("#TwSettingsNameFilterEnabledCheck.Value", currentNameFilter.enabled());
         commandBuilder.set("#TwSettingsNameFilterUseStockListCheck.Value", currentNameFilter.useStockList());
@@ -720,6 +723,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_TALENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.talentsEnabled = v, x -> x.talentsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_FLIGHT_UNLIMITED_VIGOUR, Codec.BOOLEAN), (x, v) -> x.avatarFlightUnlimitedVigour = v, x -> x.avatarFlightUnlimitedVigour).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_ANNOUNCEMENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.announcementsEnabled = v, x -> x.announcementsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NAME_FILTER_ENABLED, Codec.BOOLEAN), (x, v) -> x.nameFilterEnabled = v, x -> x.nameFilterEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NAME_FILTER_USE_STOCK_LIST, Codec.BOOLEAN), (x, v) -> x.nameFilterUseStockList = v, x -> x.nameFilterUseStockList).add()
@@ -767,6 +771,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean talentsEnabled;
         Boolean reviveSystemEnabled;
         Boolean recallTeleportingEnabled;
+        Boolean avatarFlightUnlimitedVigour;
         Boolean announcementsEnabled;
         Boolean nameFilterEnabled;
         Boolean nameFilterUseStockList;

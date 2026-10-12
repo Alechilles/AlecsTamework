@@ -98,9 +98,13 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 flight.getVelocityZ(), config
         );
         double speedRatio = AvatarFlightSpeedMetrics.speedRatio(horizontalSpeed, config);
-        double maxCharges = config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier();
+        // No pips while Vigour does not limit the flight.
+        boolean vigourEnabled = AvatarFlightVigourService.isEnabled(config);
+        double maxCharges = vigourEnabled
+                ? config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier()
+                : 0.0;
         boolean groundedAtFull = flight.getMode() == AvatarFlightMode.GROUNDED
-                && fullVigour(flight.getVigourCharges(), maxCharges);
+                && (!vigourEnabled || fullVigour(flight.getVigourCharges(), maxCharges));
         long maxChargeMs = config.getLaunch().getMaxChargeMs();
         boolean launchChargeVisible = !config.isUnderwater() && config.getLaunch().isEnabled()
                 && maxChargeMs > 0L
