@@ -299,6 +299,12 @@ public final class CompanionTransitions {
         return b -> b.displayName(displayName);
     }
 
+    /** A player removed the name of a live body. */
+    @Nonnull
+    public static UnaryOperator<CompanionRecord.Builder> nameCleared() {
+        return b -> b.displayName(null);
+    }
+
     /** Tool links compare as sets: their order carries no meaning. */
     public static boolean sameTools(@Nonnull List<String> a, @Nonnull List<String> b) {
         return new HashSet<>(a).equals(new HashSet<>(b));

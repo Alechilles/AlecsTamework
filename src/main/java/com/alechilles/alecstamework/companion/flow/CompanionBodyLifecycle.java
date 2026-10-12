@@ -413,6 +413,20 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                 r -> CompanionTransitions.nameChanged(displayName));
     }
 
+    /**
+     * A player cleared the name of a stamped body. A body that merely lost its name component
+     * keeps the record's name, so an intended clear is reported here and the LIVE record drops
+     * its name; every later transition then keeps the companion unnamed.
+     */
+    public void nameCleared(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        TameworkCompanionComponent stamp = store.getComponent(ref, stampType);
+        if (stamp == null || stamp.getProfileId() == null || !ref.equals(loaded.get(stamp.getProfileId()))) {
+            return;
+        }
+        update(stamp.getProfileId(), r -> r.location().kind() == LocationKind.LIVE && r.displayName() != null,
+                r -> CompanionTransitions.nameCleared());
+    }
+
     /** Spec 8.6: record the death when DeathComponent is added, and drop the body from the loaded map. */
     public void died(@Nonnull Ref<EntityStore> ref, @Nonnull DeathComponent death, @Nonnull Store<EntityStore> store) {
         TameworkCompanionComponent stamp = store.getComponent(ref, stampType);

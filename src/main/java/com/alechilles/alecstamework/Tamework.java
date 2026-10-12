@@ -315,6 +315,9 @@ public class Tamework extends JavaPlugin {
     private CompanionPersistenceModule companionModule;
     /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
     private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
+    /** Drops a cleared name from the companion record; a no-op until the companion index is registered. */
+    private java.util.function.BiConsumer<Ref<EntityStore>, com.hypixel.hytale.component.Store<EntityStore>> companionNameCleared =
+            (ref, store) -> { };
     /** Backs {@code /tw persistence start-fresh}; null unless old saves block this world. */
     @Nullable
     private Supplier<CompanionPersistenceModule.FreshStart> companionStartFresh;
@@ -869,6 +872,7 @@ public class Tamework extends JavaPlugin {
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
+        namingFeatureHandler.setNameClearedListener((ref, store) -> companionNameCleared.accept(ref, store));
         // Core handler for command-item linking and dispatch.
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
@@ -1825,6 +1829,7 @@ public class Tamework extends JavaPlugin {
                 module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies,
                 module.legacyAliases(), module.unreadable());
         companionLegacyBody = lifecycle::isLegacyBody;
+        companionNameCleared = lifecycle::nameCleared;
         CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
                 ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
                 lifecycle);

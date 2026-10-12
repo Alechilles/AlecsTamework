@@ -62,6 +62,7 @@ Fields:
 Allowed character presets:
 - `Any`
 - `LettersNumbersSpaces`
+- `LettersNumbersSpacesPunctuation` (adds the apostrophe, hyphen, and period, for names like `Mr. O'Malley`)
 - `LettersNumbers`
 - `LettersSpaces`
 - `Letters`
@@ -76,9 +77,46 @@ When the interaction succeeds, the player gets a naming UI with a text field and
 - Clicking `Random` replaces the text in the input field only (it does not apply the name).
 - Enter the desired name and click `Apply` to submit.
 - Click `Cancel` to cancel the request.
+- If the NPC already has a name and the rules allow both `AllowRename` and `ReplaceExisting`, a `Clear Name` button removes the name. Clearing does not consume the item; `CooldownMs` still applies.
 - If the page cannot be opened, naming automatically falls back to chat input (`cancel` still cancels).
 
 The server re‑validates ownership/tamed state on submission.
+
+## Name filter
+Player-entered names are checked against a server-wide blocked-word filter after the item's own rules pass.
+A blocked name is rejected with the "That name is not allowed." message. Existing names are not changed.
+
+Server owners control the filter in `/tw settings` under **Naming**, or in
+`<Tamework data>/Settings/tamework-name-filter.json` (run `/tw config reload` after a hand edit):
+
+```json
+{
+  "enabled": true,
+  "useStockList": true,
+  "blockedWords": [],
+  "allowedWords": []
+}
+```
+
+- `enabled` (default true). Turns the whole filter on or off.
+- `useStockList` (default true). Applies the built-in English, German, Spanish, French, and Portuguese lists.
+- `blockedWords`. Extra words or phrases to block. Write an entry as `*word*` to block it anywhere inside a name.
+- `allowedWords`. Words or phrases to allow even when a list blocks them.
+
+Matching ignores case, accents, and punctuation. It also reads lookalike characters as letters (`sh1t`,
+`a55`), joins letters spelled out one at a time (`b a d`), and matches stretched letters (`baaad`).
+
+- Most entries are whole-word entries: a name is blocked when one of its words, a run of its words, or the
+  whole name with separators removed equals the entry. The entry inside a longer word does not match, so
+  `Cassie`, `Peacock`, and `Raccoon` pass.
+- A short list of severe entries (slurs and the strongest profanity) is blocked anywhere inside a word.
+- An `allowedWords` entry rescues that exact word, for example `Scunthorpe`.
+
+The `Random` button never suggests a blocked name. Naming item configs cannot bypass the filter.
+
+The whole-word lists `en.txt`, `de.txt`, `es.txt`, `fr.txt`, and `pt.txt` come from the List of Dirty,
+Naughty, Obscene, and Otherwise Bad Words (CC BY 4.0); see `META-INF/NOTICE/LDNOOBW.txt` in the jar.
+`extra.txt` (more whole-word entries) and `severe.txt` are Tamework's own.
 
 ## Persistence
 Names are stored in `TameworkNpcNameComponent` and re‑applied when the NPC is loaded.
