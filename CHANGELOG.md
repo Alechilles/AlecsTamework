@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.3.0 - Naming Updates - Unreleased
+## 5.3.0 - Naming Updates - 2026-10-13
 
 ### Added
 
@@ -16,6 +16,11 @@
 - `/tw settings` has a new **Unlimited Flight Vigour** option under Avatar
   Flight. When it is on, charged launches, upward flaps and forward boosts cost
   no Vigour and the Vigour pips are hidden. It is off by default.
+
+### Fixed
+
+- Fixed a server startup crash that could happen when Tamework set up its
+  companion systems before the game's NPC systems were ready.
 
 ## 5.2.1 - Update 7 Pre-release 5 - 2026-10-09
 
