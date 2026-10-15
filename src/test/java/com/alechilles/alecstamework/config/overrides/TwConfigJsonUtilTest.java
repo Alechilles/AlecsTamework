@@ -2,15 +2,39 @@ package com.alechilles.alecstamework.config.overrides;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies merge/path utility behavior for local override editing. */
 class TwConfigJsonUtilTest {
+
+    @Test
+    void readObjectReturnsNullWhenZipFileSystemIsClosed(@TempDir Path tempDir) throws IOException {
+        Path archive = tempDir.resolve("config-assets.zip");
+        Path jsonPath;
+        try (FileSystem zipFileSystem = FileSystems.newFileSystem(
+                URI.create("jar:" + archive.toUri()),
+                Map.of("create", "true")
+        )) {
+            jsonPath = zipFileSystem.getPath("/TwGlobalConfig.json");
+            Files.writeString(jsonPath, "{}");
+        }
+
+        assertNull(TwConfigJsonUtil.readObject(jsonPath));
+    }
 
     @Test
     void mergeUsesNestedObjectFallbackAndArrayReplacement() {
