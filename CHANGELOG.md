@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.3.1 - Config Crash Fix - 2026-10-15
+
+### Fixed
+
+- Fixed a crash that could happen when Tamework read a config from an asset
+  pack that had just been unloaded or reloaded.
+
 ## 5.3.0 - Naming Updates - 2026-10-13
 
 ### Added
