@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.3.2 - Unreleased
+## 5.3.2 - Coop Capture Item Fix - 2026-10-16
 
 ### Fixed
 
