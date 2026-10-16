@@ -142,7 +142,8 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
         Result coopResult = coopIntake.attempt(
                 commandBuffer.getExternalData().getWorld(),
                 commandBuffer,
-                context
+                context,
+                emptyItemId
         );
         if (coopResult != Result.NOT_MANAGED) {
             context.getState().state = coopResult

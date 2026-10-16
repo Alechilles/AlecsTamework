@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.3.2 - Unreleased
+
+### Fixed
+
+- Putting a captured animal into a coop from a reusable capture item, like a
+  Soul Lantern, no longer uses up the item. It turns back into its empty form,
+  ready to capture again.
+
 ## 5.3.1 - Config Crash Fix - 2026-10-15
 
 ### Fixed

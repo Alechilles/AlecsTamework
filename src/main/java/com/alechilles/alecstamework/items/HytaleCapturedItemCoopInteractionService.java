@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.coop.CoopCapturedItemInventoryPosition;
 import com.alechilles.alecstamework.companion.coop.CoopIntakeFlow;
@@ -64,12 +65,15 @@ public final class HytaleCapturedItemCoopInteractionService {
 
     /**
      * Attempts managed-coop intake using the exact block and inventory coordinate in the context.
+     * Once taken in, the source item turns into its empty form; {@code emptyItemIdOverride} is the
+     * interaction's {@code EmptyItemId}, or null for the configured one.
      */
     @Nonnull
     public Result attempt(
             @Nonnull World world,
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
-            @Nonnull InteractionContext context
+            @Nonnull InteractionContext context,
+            @Nullable String emptyItemIdOverride
     ) {
         ItemStack held = context.getHeldItem();
         if (receiptMarked(held)) {
@@ -107,7 +111,7 @@ public final class HytaleCapturedItemCoopInteractionService {
         if (source == null) {
             return Result.FAILED_CLOSED;
         }
-        return submit(world, source, target, item);
+        return submit(world, source, target, item, emptyItemIdOverride);
     }
 
     /** Capture metadata that is no index item: a 2.x alias-only item, or a snapshot id with no profile id. */
@@ -147,7 +151,8 @@ public final class HytaleCapturedItemCoopInteractionService {
             World world,
             CapturedItemCoopAuthor.Source source,
             CapturedItemCoopTarget target,
-            CaptureItemKeys.Ref item
+            CaptureItemKeys.Ref item,
+            @Nullable String emptyItemIdOverride
     ) {
         HytaleCoopIntake intake = HytaleCoopIntake.current();
         if (intake == null) {
@@ -167,7 +172,8 @@ public final class HytaleCapturedItemCoopInteractionService {
             }
             CompletableFuture<CoopIntakeFlow.Result> started = intake.offerItem(world, target.coopId(),
                     target.x(), target.y(), target.z(), target.maxResidents(), item,
-                    () -> consumeLater(actor, source.inventoryPosition(), source.sourceArtifact()));
+                    () -> consumeLater(actor, source.inventoryPosition(), source.sourceArtifact(),
+                            emptyItemIdOverride));
             if (started == null) {
                 warnLater(actor, "coopRejected");
                 return Result.FAILED_CLOSED;
@@ -203,8 +209,12 @@ public final class HytaleCapturedItemCoopInteractionService {
         return !target.ownerRestricted() || actor.equals(owner);
     }
 
-    /** Empties the exact source slot on the player's world, only if it still holds the source stack. */
-    private void consumeLater(UUID actor, CoopCapturedItemInventoryPosition position, CapturedArtifact source) {
+    /**
+     * Turns the exact source slot into its empty capture item on the player's world, only if it
+     * still holds the source stack. An item with no empty form is used up.
+     */
+    private void consumeLater(UUID actor, CoopCapturedItemInventoryPosition position, CapturedArtifact source,
+                              @Nullable String emptyItemIdOverride) {
         HytaleCaptureDelivery.onPlayerWorld(actor, (world, store, ref, player) -> {
             ItemContainer container = container(store, ref, position.section());
             if (container == null || position.slot() >= container.getCapacity()) {
@@ -213,9 +223,16 @@ public final class HytaleCapturedItemCoopInteractionService {
             short slot = (short) position.slot();
             ItemStack current = container.getItemStack(slot);
             if (artifacts.matches(current, source)) {
-                container.replaceItemStackInSlot(slot, current, ItemStack.EMPTY);
+                container.replaceItemStackInSlot(slot, current, emptied(current, emptyItemIdOverride));
             }
         }, null);
+    }
+
+    private static ItemStack emptied(ItemStack filled, @Nullable String emptyItemIdOverride) {
+        Tamework plugin = Tamework.getInstance();
+        SpawnerFeatureHandler handler = plugin == null ? null : plugin.getSpawnerFeatureHandler();
+        ItemStack emptied = handler == null ? null : handler.emptiedCaptureItem(filled, emptyItemIdOverride);
+        return emptied == null ? ItemStack.EMPTY : emptied;
     }
 
     @Nullable

@@ -1344,6 +1344,23 @@ public final class SpawnerFeatureHandler {
     }
 
     /**
+     * The empty capture item a filled one turns into once its companion has left it, or null when
+     * it has no empty form. {@code emptyItemIdOverride} is the interaction's {@code EmptyItemId},
+     * used before the configured one.
+     */
+    @Nullable
+    public ItemStack emptiedCaptureItem(@Nonnull ItemStack filled, @Nullable String emptyItemIdOverride) {
+        String emptyItemId = emptyItemIdOverride == null || emptyItemIdOverride.isBlank()
+                ? itemMetadata.resolveEmptyItemId(filled.getItemId())
+                : emptyItemIdOverride;
+        if (emptyItemId == null || emptyItemId.isBlank()) {
+            return null;
+        }
+        ItemStack emptied = itemMetadata.clearCapturedMetadata(itemMetadata.swapItemId(filled, emptyItemId));
+        return emptied == null || emptied.isEmpty() ? null : emptied;
+    }
+
+    /**
      * After a Recall or Forget (spec 8.14): empties the copies of the companion's capture item
      * that {@code playerUuid} holds, so they do not keep their filled look until used. Safe from
      * any thread; the player is resolved on their current world thread and an offline player is
