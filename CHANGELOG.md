@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- NPCs can now play a turning animation when they turn on the spot. If a
+  model has `TurnLeft` and `TurnRight` animation sets, Tamework plays them
+  while the NPC stands still and its body turns. Models without those sets
+  are unaffected.
+
 ## 5.3.2 - Coop Capture Item Fix - 2026-10-16
 
 ### Fixed

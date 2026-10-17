@@ -1219,6 +1219,9 @@ public class Tamework extends JavaPlugin {
                 ));
         deferChunkSystem(TameworkRuntimeModule.FOOD,
                 "feed-trough-food-state-sync", FeedTroughFoodStateSyncSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                "turn-in-place-animation", () -> new com.alechilles.alecstamework.npc.turning.TurnInPlaceAnimationSystem(
+                        com.alechilles.alecstamework.npc.turning.TurnInPlaceState.getComponentType()));
         deferDamageRuntimeParticipants();
     }
 
