@@ -45,14 +45,20 @@ public final class TurnInPlaceAnimationSystem extends EntityTickingSystem<Entity
     static final String TURN_RIGHT = "TurnRight";
     private static final AnimationSlot SLOT = AnimationSlot.ServerAction;
 
-    /** Yaw rate that starts a turn clip, in radians per second (about 25 degrees). */
-    static final float START_RATE = (float) Math.toRadians(25.0);
-    /** Yaw rate below which a playing turn clip counts as slowing down (about 10 degrees). */
-    static final float STOP_RATE = (float) Math.toRadians(10.0);
-    /** Seconds the turn must stay slow before the clip stops, so pauses in a turn do not flicker. */
-    static final float STOP_DELAY_SECONDS = 0.2f;
-    /** Shortest time a clip plays once started, so a brief correction still shows a step. */
-    static final float MIN_PLAY_SECONDS = 0.3f;
+    /**
+     * Seconds over which the measured yaw rate is smoothed. A standing NPC that turns to watch something
+     * moves its body in short bursts as its head reaches the end of its range; smoothing makes those
+     * bursts read as one turn instead of restarting the clip each time.
+     */
+    static final float RATE_SMOOTHING_SECONDS = 0.2f;
+    /** Smoothed yaw rate that starts a turn clip, in radians per second (about 15 degrees). */
+    static final float START_RATE = (float) Math.toRadians(15.0);
+    /** Smoothed yaw rate below which a playing turn clip counts as slowing down (about 6 degrees). */
+    static final float STOP_RATE = (float) Math.toRadians(6.0);
+    /** Seconds the turn must stay slow before the clip stops, so gaps between bursts keep it playing. */
+    static final float STOP_DELAY_SECONDS = 0.4f;
+    /** Shortest time a clip plays once started, about one step cycle, before it may stop or flip. */
+    static final float MIN_PLAY_SECONDS = 0.6f;
     /** A single-tick yaw jump larger than this is a teleport or spawn, not a turn. */
     static final float TELEPORT_ANGLE = (float) Math.toRadians(90.0);
 
@@ -127,7 +133,12 @@ public final class TurnInPlaceAnimationSystem extends EntityTickingSystem<Entity
         if (Math.abs(delta) > TELEPORT_ANGLE) {
             delta = 0f;
         }
-        int wanted = standing && dt > 0f ? nextDirection(state, delta / dt, dt) : 0;
+        if (standing && dt > 0f) {
+            state.smoothedRate += (delta / dt - state.smoothedRate) * Math.min(1f, dt / RATE_SMOOTHING_SECONDS);
+        } else {
+            state.smoothedRate = 0f;
+        }
+        int wanted = standing && dt > 0f ? nextDirection(state, state.smoothedRate, dt) : 0;
         if (wanted == state.direction) {
             return;
         }
@@ -158,7 +169,7 @@ public final class TurnInPlaceAnimationSystem extends EntityTickingSystem<Entity
             return speed >= START_RATE ? rateDirection : 0;
         }
         state.playedSeconds += dt;
-        if (speed >= START_RATE && rateDirection != state.direction) {
+        if (speed >= START_RATE && rateDirection != state.direction && state.playedSeconds >= MIN_PLAY_SECONDS) {
             return rateDirection;
         }
         state.slowSeconds = speed < STOP_RATE ? state.slowSeconds + dt : 0f;

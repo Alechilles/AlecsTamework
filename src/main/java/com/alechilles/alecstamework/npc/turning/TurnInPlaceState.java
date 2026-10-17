@@ -17,7 +17,9 @@ public final class TurnInPlaceState implements Component<EntityStore> {
     private static ComponentType<EntityStore, TurnInPlaceState> type;
 
     float lastYaw = Float.NaN;
-    /** -1 turning left, 1 turning right, 0 not playing a turn clip. */
+    /** Yaw rate in radians per second, smoothed over a few ticks. */
+    float smoothedRate;
+    /** 1 turning left (yaw rising), -1 turning right, 0 not playing a turn clip. */
     int direction;
     /** Seconds the current turn clip has played. */
     float playedSeconds;
@@ -37,6 +39,7 @@ public final class TurnInPlaceState implements Component<EntityStore> {
     public TurnInPlaceState clone() {
         TurnInPlaceState copy = new TurnInPlaceState();
         copy.lastYaw = lastYaw;
+        copy.smoothedRate = smoothedRate;
         copy.direction = direction;
         copy.playedSeconds = playedSeconds;
         copy.slowSeconds = slowSeconds;
