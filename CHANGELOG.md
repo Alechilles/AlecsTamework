@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.4.0 - Turning Animations - 2026-10-17
 
 ### Added
 
