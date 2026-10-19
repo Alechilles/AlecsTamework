@@ -1945,3 +1945,27 @@ tamework.ui.commandHotswapHud.group.all=Alle Gefährten
 tamework.ui.commandHotswapHud.group.none=Keine aktiven Gefährten
 tamework.ui.commandHotswapHud.group.custom=Eigene Auswahl
 tamework.ui.roster.progression.toNext={0} % bis Stufe {1}
+
+# ===== Tamework UI: Companion HUD placement =====
+tamework.ui.hudPlacement.button=Gefährten-HUD verschieben
+tamework.ui.hudPlacement.title=Position des Gefährten-HUD
+tamework.ui.hudPlacement.hint=Wähle einen Ankerpunkt und verschiebe das HUD dann schrittweise. Nur dein Bildschirm ändert sich.
+tamework.ui.hudPlacement.snap=Ausrichten an
+tamework.ui.hudPlacement.nudge=Verschieben
+tamework.ui.hudPlacement.step=Schritt
+tamework.ui.hudPlacement.offset=X {0} · Y {1}
+tamework.ui.hudPlacement.save=Speichern
+tamework.ui.hudPlacement.sampleName=Gefährte
+tamework.ui.hudPlacement.moveUp=Nach oben
+tamework.ui.hudPlacement.moveDown=Nach unten
+tamework.ui.hudPlacement.moveLeft=Nach links
+tamework.ui.hudPlacement.moveRight=Nach rechts
+tamework.ui.hudPlacement.point.topLeft=Oben links
+tamework.ui.hudPlacement.point.top=Oben
+tamework.ui.hudPlacement.point.topRight=Oben rechts
+tamework.ui.hudPlacement.point.left=Links
+tamework.ui.hudPlacement.point.center=Mitte
+tamework.ui.hudPlacement.point.right=Rechts
+tamework.ui.hudPlacement.point.bottomLeft=Unten links
+tamework.ui.hudPlacement.point.bottom=Unten
+tamework.ui.hudPlacement.point.bottomRight=Unten rechts

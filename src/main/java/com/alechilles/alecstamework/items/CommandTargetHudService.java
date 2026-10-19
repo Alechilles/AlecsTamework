@@ -14,6 +14,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
+import com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent;
+import com.alechilles.alecstamework.ui.TameworkHudPlacementPage;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -177,6 +179,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
 
+        if (player != null && player.getPageManager() != null
+                && player.getPageManager().getCustomPage() instanceof TameworkHudPlacementPage) {
+            // The placement editor shows its own sample; the HUD comes back with the saved position when it closes.
+            hideHud(store, playerUuid, player);
+            return;
+        }
         ActiveCommandItem activeCommand = resolveActiveCommandItem(player);
         if (activeCommand == null) {
             activationTracker.recordResolvedHand(store, playerUuid, null, false, nowMs);
@@ -208,7 +216,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             hideHudAndRememberNoTarget(store, playerUuid, player, activeCommand.itemId(), nowMs);
             return;
         }
-        CommandTargetHudViewModel model = buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs);
+        CommandTargetHudViewModel model = buildModel(player, playerRef, candidate.npcRef(), candidate.npc(), store, nowMs);
         if (model == null) {
             debug(playerUuid, nowMs, "model-null:" + targetKey,
                     "model build returned null; target=" + targetKey + ", item=" + activeCommand.itemId());
@@ -289,6 +297,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
 
     @Nullable
     private CommandTargetHudViewModel buildModel(@Nonnull Player player,
+                                                 @Nullable Ref<EntityStore> playerRef,
                                                  @Nonnull Ref<EntityStore> npcRef,
                                                  @Nonnull NPCEntity npc,
                                                  @Nonnull Store<EntityStore> store,
@@ -324,7 +333,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 tamed ? staticDisplay.foodRows() : List.of(),
                 staticDisplay.attachmentRows(),
                 resolveTameRequirement(npcRef, staticDisplay.tameRequirement(), store),
-                staticDisplay.ownerDisplayName()
+                staticDisplay.ownerDisplayName(),
+                TameworkHudPlacementComponent.read(playerRef, store)
         );
     }
 

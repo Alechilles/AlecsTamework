@@ -59,6 +59,7 @@ final class TameworkComponentRegistrar {
         com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionGroupsComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionViewsComponent.register(plugin);
+        com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent.register(plugin);
         ComponentType<EntityStore, TameworkOwnerComponent> owner = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkOwnerComponent.class, "TameworkOwner", TameworkOwnerComponent.CODEC);
         ComponentType<EntityStore, TameworkTamedComponent> tamed = plugin.getEntityStoreRegistry()

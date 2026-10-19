@@ -1370,6 +1370,7 @@ final class CommandSelectionPageService {
                 context.refreshSignals()
         );
         page.configurePagination(context.pagination());
+        page.configureReopen(context.actions().reopenMenu());
         if (context.genericRosterActions()) {
             page.configureGroupColors(() -> groupAssignPageService.resolveGroupColors(
                     resolveCurrentPlayer(context.ownerUuid()), context.toolId()));

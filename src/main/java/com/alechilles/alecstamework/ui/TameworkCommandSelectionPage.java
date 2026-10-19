@@ -13,6 +13,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -156,6 +157,8 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
     volatile boolean dismissed;
     private volatile boolean navigationPending;
+    @Nullable
+    private volatile Runnable reopenPanel;
     volatile long pendingFilterTextApplyVersion;
     String pendingFilterTextInput;
     LinkedNpcPanelPageState pagination;
@@ -444,6 +447,11 @@ public final class TameworkCommandSelectionPage
         return defaultDecorations;
     }
 
+    /** Sets how sub-pages opened from this panel, such as the HUD placement editor, return to it. */
+    public void configureReopen(@Nullable Runnable reopenPanel) {
+        this.reopenPanel = reopenPanel;
+    }
+
     /** Shares the source's world-thread-owned page window with its navigation controls. */
     public void configurePagination(@Nonnull LinkedNpcPanelPageState pagination) {
         this.pagination = java.util.Objects.requireNonNull(pagination);
@@ -628,6 +636,23 @@ public final class TameworkCommandSelectionPage
                                 LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.feedbackUnavailable")));
                         close();
                     }
+                } finally {
+                    navigationPending = false;
+                }
+            });
+            return;
+        }
+        if (CommandSelectionPageEventBinder.HUD_PLACEMENT_COMMAND_ID.equals(commandId)) {
+            if (!beginPageNavigation()) return;
+            navigateAfterUiDrain(() -> {
+                try {
+                    Ref<EntityStore> currentRef = playerRef.getReference();
+                    if (currentRef == null || !currentRef.isValid()) return;
+                    Store<EntityStore> currentStore = currentRef.getStore();
+                    Player currentPlayer = currentStore.getComponent(currentRef, Player.getComponentType());
+                    if (currentPlayer == null) return;
+                    currentPlayer.getPageManager().openCustomPage(currentRef, currentStore,
+                            new TameworkHudPlacementPage(playerRef, reopenPanel));
                 } finally {
                     navigationPending = false;
                 }

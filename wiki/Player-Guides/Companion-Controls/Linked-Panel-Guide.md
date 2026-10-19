@@ -280,6 +280,21 @@ released.
   groups does not change group memberships.
 - Groups organize the command UI. They do not change companion storage or owner limits.
 
+## Moving the companion HUD
+The companion HUD is the card that appears when you hold your command item and
+look at a companion. To move it, click the arrows button at the top of the
+panel, next to Help.
+
+- Pick one of the nine snap points to send the HUD to a corner, an edge or the
+  middle of the screen.
+- Use the arrows to nudge it. Choose a step of 1, 10 or 50 for fine or large
+  moves.
+- Click Save to keep the new spot, or Cancel to keep the old one. Reset puts
+  the HUD back in its default place at the top right.
+
+The position is saved to your character, so it only changes your screen. On a
+narrower screen the HUD stops at the edge instead of going off screen.
+
 ## Practical tips
 - If a companion is dead, use `Revive` when it becomes available. Review the
   exact cost confirmation when one is configured. If it is `LOST`, use

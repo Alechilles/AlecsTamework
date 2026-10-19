@@ -1,0 +1,126 @@
+$A = "TameworkSlateStyles.ui";
+$C = "Common.ui";
+
+// The companion HUD placement editor: a see-through page over the world with a sample of the companion HUD and a
+// control card. Hytale UI reports no mouse position, so the HUD moves by snap points and step arrows, not by drag.
+// TameworkHudPlacementPage sets the sample's lane and plate anchors (CompanionHudPlacement) and the card's side.
+@Caps = LabelStyle(FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, VerticalAlignment: Center);
+@MeterCaption = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, VerticalAlignment: Center);
+@MeterValue = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: End, VerticalAlignment: Center);
+@TrayValue = LabelStyle(FontSize: 10, TextColor: #bfcdd5, VerticalAlignment: Center);
+
+Group #TameworkHudPlacementDim { Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0); Background: (Color: #05070c(0.32)); }
+Group { Anchor: (Width: 1, Top: 0, Bottom: 0); Background: (Color: #ffffff(0.14)); HitTestVisible: false; }
+Group { Anchor: (Left: 0, Right: 0, Top: 540, Height: 1); Background: (Color: #ffffff(0.14)); HitTestVisible: false; }
+
+Group #TameworkHudPlacementLane {
+ Anchor: (Top: 0, Bottom: 0, Right: 0, MaxWidth: 370);
+ // The gold frame is the sample's own background; the plate sits 3 px inside it.
+ Group #TameworkHudPlacementSample {
+  Anchor: (Top: 218, Left: 0, MaxWidth: 344, Height: 184);
+  Background: (Color: #f2c66d);
+  Group {
+   Anchor: (Full: 3);
+   Background: $A.@SlateHud;
+   Padding: (Left: 8, Right: 8, Top: 7, Bottom: 7);
+   Label #TameworkHudPlacementSampleName { Anchor: (Top: 0, Left: 0, Right: 80, Height: 26); Text: %server.tamework.ui.hudPlacement.sampleName; Style: (FontSize: 16, FontName: "Secondary", TextColor: #eef2f6, VerticalAlignment: Center); }
+   Label { Anchor: (Top: 4, Right: 0, Width: 60, Height: 18); Text: "7"; Background: $A.@SlateQuiet; Style: (FontSize: 11, RenderBold: true, TextColor: #f2c66d, Alignment: Center); }
+   Group { Anchor: (Top: 32, Left: 0, Right: 0, Height: 22); Background: $A.@SlateTrack;
+    Group { Anchor: (Top: 1, Left: 1, Width: 250, Height: 20); Background: #57c87a; }
+    Label { Anchor: (Top: 0, Left: 0, Right: 0, Height: 22); Text: "39 / 50"; Style: (FontSize: 12, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
+   }
+   Group { Anchor: (Top: 62, Left: 0, Right: 0, Height: 42); LayoutMode: Left;
+    Group { Anchor: (Width: 112, Height: 42);
+     Label { Anchor: (Top: 0, Left: 0, Width: 100, Height: 16); Text: "82%"; Style: @MeterValue; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 82, Height: 6); Background: #f2c97c; }
+     Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: @MeterCaption; }
+    }
+    Group { Anchor: (Width: 112, Height: 42);
+     Label { Anchor: (Top: 0, Left: 0, Width: 100, Height: 16); Text: "64%"; Style: @MeterValue; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 64, Height: 6); Background: #d9a066; }
+     Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.hunger; Style: @MeterCaption; }
+    }
+    Group { Anchor: (Width: 100, Height: 42);
+     Label { Anchor: (Top: 0, Left: 0, Width: 100, Height: 16); Text: "90%"; Style: @MeterValue; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 100, Height: 6); Background: $A.@SlateTrack; }
+     Group { Anchor: (Top: 22, Left: 0, Width: 90, Height: 6); Background: #84dbff; }
+     Label { Anchor: (Top: 30, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.thirst; Style: @MeterCaption; }
+    }
+   }
+   Group { Anchor: (Top: 112, Left: 0, Right: 0, Height: 46); Padding: (Left: 8, Right: 8, Top: 5, Bottom: 5); Background: $A.@SlateTray; LayoutMode: Left;
+    Group { Anchor: (Width: 150, Height: 36);
+     Label { Anchor: (Top: 0, Left: 0, Width: 140, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: @MeterCaption; }
+     Group { Anchor: (Top: 15, Left: 0, Width: 120, Height: 6); Background: $A.@SlateTrack; }
+     Group { Anchor: (Top: 15, Left: 0, Width: 70, Height: 6); Background: #e59ab0; }
+     Label #TameworkHudPlacementSampleBreeding { Anchor: (Top: 22, Left: 0, Width: 140, Height: 14); Text: ""; Style: @TrayValue; }
+    }
+    Group { Anchor: (Width: 150, Height: 36);
+     Label { Anchor: (Top: 0, Left: 0, Width: 140, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: @MeterCaption; }
+     Group { Anchor: (Top: 15, Left: 0, Width: 120, Height: 6); Background: $A.@SlateTrack; }
+     Group { Anchor: (Top: 15, Left: 0, Width: 120, Height: 6); Background: #f2c66d; }
+     Label #TameworkHudPlacementSampleHarvest { Anchor: (Top: 22, Left: 0, Width: 140, Height: 14); Text: ""; Style: @TrayValue; }
+    }
+   }
+  }
+ }
+}
+
+// Declared last so it is on top for clicks. Java sets its side (Left or Right) so it never covers the sample.
+Group #TameworkHudPlacementCard {
+ Anchor: (Top: 160, Left: 60, Width: 400, Height: 452);
+ Background: $A.@SlateModal;
+ Label { Anchor: (Top: 16, Left: 22, Right: 22, Height: 28); Text: %server.tamework.ui.hudPlacement.title; Style: $A.@SlateTitle; }
+ Label { Anchor: (Top: 46, Left: 22, Right: 22, Height: 34); Text: %server.tamework.ui.hudPlacement.hint; Style: (FontSize: 12, TextColor: #96a9be, Wrap: true); }
+
+ Label { Anchor: (Top: 92, Left: 22, Width: 160, Height: 18); Text: %server.tamework.ui.hudPlacement.snap; Style: @Caps; }
+ Group { Anchor: (Top: 116, Left: 22, Width: 144, Height: 144);
+  TextButton #TameworkHudPlacementPoint0 { Anchor: (Top: 0, Left: 0, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.topLeft; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint1 { Anchor: (Top: 0, Left: 50, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.top; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint2 { Anchor: (Top: 0, Left: 100, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.topRight; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint3 { Anchor: (Top: 50, Left: 0, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.left; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint4 { Anchor: (Top: 50, Left: 50, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.center; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint5 { Anchor: (Top: 50, Left: 100, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.right; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint6 { Anchor: (Top: 100, Left: 0, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.bottomLeft; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint7 { Anchor: (Top: 100, Left: 50, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.bottom; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementPoint8 { Anchor: (Top: 100, Left: 100, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.point.bottomRight; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  // The dots sit on top of the buttons and let clicks through.
+  Group { Anchor: (Top: 17, Left: 17, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 17, Left: 67, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 17, Left: 117, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 67, Left: 17, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 67, Left: 67, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 67, Left: 117, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 117, Left: 17, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 117, Left: 67, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+  Group { Anchor: (Top: 117, Left: 117, Width: 10, Height: 10); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #bfcdd5); HitTestVisible: false; }
+ }
+
+ Label { Anchor: (Top: 92, Left: 204, Width: 160, Height: 18); Text: %server.tamework.ui.hudPlacement.nudge; Style: @Caps; }
+ Group { Anchor: (Top: 116, Left: 204, Width: 144, Height: 144);
+  TextButton #TameworkHudPlacementUp { Anchor: (Top: 0, Left: 50, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.moveUp; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementLeft { Anchor: (Top: 50, Left: 0, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.moveLeft; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  Label #TameworkHudPlacementStepValue { Anchor: (Top: 50, Left: 50, Width: 44, Height: 44); Text: "10"; Style: (FontSize: 11, RenderBold: true, TextColor: #96a9be, Alignment: Center); }
+  TextButton #TameworkHudPlacementRight { Anchor: (Top: 50, Left: 100, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.moveRight; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  TextButton #TameworkHudPlacementDown { Anchor: (Top: 100, Left: 50, Width: 44, Height: 44); Text: ""; TooltipText: %server.tamework.ui.hudPlacement.moveDown; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+  Group { Anchor: (Top: 12, Left: 62, Width: 20, Height: 20); Background: (TexturePath: "Tamework/PanelControls/Nudge_Up.png", Color: #eef2f6); HitTestVisible: false; }
+  Group { Anchor: (Top: 62, Left: 12, Width: 20, Height: 20); Background: (TexturePath: "Tamework/PanelControls/Nudge_Left.png", Color: #eef2f6); HitTestVisible: false; }
+  Group { Anchor: (Top: 62, Left: 112, Width: 20, Height: 20); Background: (TexturePath: "Tamework/PanelControls/Nudge_Right.png", Color: #eef2f6); HitTestVisible: false; }
+  Group { Anchor: (Top: 112, Left: 62, Width: 20, Height: 20); Background: (TexturePath: "Tamework/PanelControls/Nudge_Down.png", Color: #eef2f6); HitTestVisible: false; }
+ }
+
+ Label { Anchor: (Top: 276, Left: 22, Width: 160, Height: 18); Text: %server.tamework.ui.hudPlacement.step; Style: @Caps; }
+ TextButton #TameworkHudPlacementStep1 { Anchor: (Top: 298, Left: 22, Width: 64, Height: 30); Text: "1"; Style: $A.@PanelButton; }
+ TextButton #TameworkHudPlacementStep10 { Anchor: (Top: 298, Left: 92, Width: 64, Height: 30); Text: "10"; Style: $A.@PanelButtonPrimary; }
+ TextButton #TameworkHudPlacementStep50 { Anchor: (Top: 298, Left: 162, Width: 64, Height: 30); Text: "50"; Style: $A.@PanelButton; }
+
+ Group { Anchor: (Top: 342, Left: 22, Right: 22, Height: 32); Background: $A.@SlateTray; Padding: (Left: 12, Right: 12);
+  Label #TameworkHudPlacementPointName { Anchor: (Left: 0, Width: 170, Height: 32); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #bfcdd5, VerticalAlignment: Center); }
+  Label #TameworkHudPlacementOffset { Anchor: (Right: 0, Width: 160, Height: 32); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: End, VerticalAlignment: Center); }
+ }
+
+ TextButton #TameworkHudPlacementReset { Anchor: (Top: 394, Left: 22, Width: 100, Height: 34); Text: %server.tamework.ui.shared.button.reset; Style: $A.@PanelButtonQuiet; }
+ TextButton #TameworkHudPlacementCancel { Anchor: (Top: 394, Right: 140, Width: 100, Height: 34); Text: %server.tamework.ui.shared.button.cancel; Style: $A.@PanelButton; }
+ TextButton #TameworkHudPlacementSave { Anchor: (Top: 394, Right: 22, Width: 110, Height: 34); Text: %server.tamework.ui.hudPlacement.save; Style: $A.@PanelButtonPrimary; }
+}

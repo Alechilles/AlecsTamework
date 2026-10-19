@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- You can now move the companion HUD (the card that shows the companion you
+  are looking at). Click the arrows button at the top of the companion panel,
+  pick a snap point, and nudge it into place. The position is saved for you
+  only, so other players keep their own layout.
+
 ## 5.4.0 - Turning Animations - 2026-10-17
 
 ### Added

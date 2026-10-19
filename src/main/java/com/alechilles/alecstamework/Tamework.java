@@ -291,6 +291,7 @@ public class Tamework extends JavaPlugin {
     private final CommandNpcPortraitAssets commandNpcPortraitAssets = new CommandNpcPortraitAssets();
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
+    private CommandHudDirtySink commandHudDirtySink;
     private TameworkAssetEditorPackService assetEditorPackService;
     private TameworkPatchworkRuntime patchworkRuntime;
     private TwConfigOverrideManager configOverrideManager;
@@ -939,7 +940,7 @@ public class Tamework extends JavaPlugin {
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         CommandTargetHudActivationTracker commandHotswapHudActivationTracker = new CommandTargetHudActivationTracker();
         CommandTargetHudActivationTracker commandHighlightActivationTracker = new CommandTargetHudActivationTracker();
-        CommandHudDirtySink commandHudDirtySink = CommandHudDirtySink.fanOut(
+        CommandHudDirtySink commandHudDirtySink = this.commandHudDirtySink = CommandHudDirtySink.fanOut(
                 commandTargetHudActivationTracker,
                 commandHotswapHudActivationTracker,
                 commandHighlightActivationTracker
@@ -2254,6 +2255,12 @@ public class Tamework extends JavaPlugin {
 
     public NameItemRegistry getNameItemRegistry() {
         return nameItemRegistry;
+    }
+
+    /** Wakes the command HUDs for a player; null before command items are set up. */
+    @javax.annotation.Nullable
+    public CommandHudDirtySink getCommandHudDirtySink() {
+        return commandHudDirtySink;
     }
 
     public CommandItemRegistry getCommandItemRegistry() {

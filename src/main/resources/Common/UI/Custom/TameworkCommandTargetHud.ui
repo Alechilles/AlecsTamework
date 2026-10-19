@@ -24,8 +24,12 @@ $C = "Common.ui";
 @FoodChipNegative = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #e5786d);
 @FoodChipNeutral = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #96a9be);
 
+// The full-height lane keeps the plate on screen at any width; Java sets both anchors from the player's saved
+// position (CompanionHudPlacement).
+Group #Lane {
+Anchor: (Top: 0, Bottom: 0, Right: 0, MaxWidth: 370);
 Group #Root {
- Anchor: (Top: 218, Right: 26, Width: 344, Height: 300);
+ Anchor: (Top: 218, Right: 0, MaxWidth: 344, Height: 300);
  Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
  Background: $A.@SlateHud;
  Visible: false;
@@ -225,4 +229,5 @@ Group #Root {
  Group #AttachmentRow4 { Anchor: (Top: 236, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center); } }
  Group #AttachmentRow5 { Anchor: (Top: 254, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center); } }
  Group #OwnerRow { Anchor: (Top: 274, Right: 0, Width: 180, Height: 18); Visible: false; Label #OwnerText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center); } }
+}
 }

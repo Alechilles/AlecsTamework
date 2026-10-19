@@ -17,9 +17,6 @@ import javax.annotation.Nullable;
 final class CommandTargetHudBinder {
     private static final int MAX_ATTACHMENT_ROWS = 6;
     private static final int MAX_FOOD_STRIP_ITEMS = 4;
-    private static final int ROOT_TOP = 218;
-    private static final int ROOT_RIGHT = 26;
-    private static final int ROOT_WIDTH = 344;
     private static final int HEALTH_FILL_MAX_WIDTH = 322;
     private static final int ROOT_VERTICAL_CHROME = 22;
     private static final int HEADER_TOP = 0;
@@ -83,7 +80,9 @@ final class CommandTargetHudBinder {
     private static void bindLayout(@Nonnull UICommandBuilder commandBuilder,
                                    @Nonnull CommandTargetHudViewModel model) {
         Layout layout = resolveLayout(model);
-        commandBuilder.setObject("#Root.Anchor", rootAnchor(layout.rootHeight()));
+        CompanionHudPlacement placement = model.placement();
+        commandBuilder.setObject("#Lane.Anchor", placement.laneAnchor());
+        commandBuilder.setObject("#Root.Anchor", placement.plateAnchor(layout.rootHeight()));
         commandBuilder.setObject("#HeaderRow.Anchor", fullWidthAnchor(HEADER_TOP, HEADER_HEIGHT));
         commandBuilder.setObject("#HealthRow.Anchor", fullWidthAnchor(HEALTH_TOP, HEALTH_HEIGHT));
         commandBuilder.setObject("#StatusRingRow.Anchor", leftAnchor(layout.statusTop(), STATUS_ROW_WIDTH, STATUS_ROW_HEIGHT));
@@ -509,16 +508,6 @@ final class CommandTargetHudBinder {
 
     private static String safe(@Nullable String value, @Nullable String fallback) {
         return value == null || value.isBlank() ? fallback : value;
-    }
-
-    @Nonnull
-    private static Anchor rootAnchor(int height) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(ROOT_TOP));
-        anchor.setRight(Value.of(ROOT_RIGHT));
-        anchor.setWidth(Value.of(ROOT_WIDTH));
-        anchor.setHeight(Value.of(Math.max(1, height)));
-        return anchor;
     }
 
     @Nonnull

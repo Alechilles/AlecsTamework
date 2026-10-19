@@ -530,6 +530,7 @@ Command target HUD:
 - Uses the same loaded-NPC status snapshot as the linked panel for display name, health, happiness, hunger, thirst, level, traits, harvest cooldown, and breeding cooldown.
 - Adds compact target-only rows for favorite food, other compatible foods on tamed NPCs, attachment selections, and required tranquilizer stacks for tame interactions that require tranquilizer setup.
 - Clears automatically when the player looks away, switches away from command items, or targets an unsupported NPC.
+- Each player can move it. The arrows button in the command menu header opens `TameworkHudPlacementPage`, which offers nine snap points plus 1, 10 or 50 unit nudges. Save stores the position in the player's `TameworkHudPlacement` component and Cancel keeps the saved one; both return to the panel. Esc also keeps the saved one and just closes, because `onDismiss` runs inside the page manager's teardown and must not open a page. The real HUD is hidden while the editor is the player's open page. `CompanionHudPlacement` turns the position into a full-height lane and plate anchor, so the HUD stops at the screen edge on any aspect ratio. Custom HUD controllers are not moved.
 
 ## Move/home/recall and off-screen relocation
 Loaded flow:

@@ -1957,3 +1957,27 @@ tamework.ui.commandHotswapHud.group.all=All Companions
 tamework.ui.commandHotswapHud.group.none=No Active Companions
 tamework.ui.commandHotswapHud.group.custom=Custom Selection
 tamework.ui.roster.progression.toNext={0}% to level {1}
+
+# ===== Tamework UI: Companion HUD placement =====
+tamework.ui.hudPlacement.button=Move companion HUD
+tamework.ui.hudPlacement.title=Companion HUD position
+tamework.ui.hudPlacement.hint=Pick a snap point, then nudge the HUD into place. Only your screen changes.
+tamework.ui.hudPlacement.snap=Snap to
+tamework.ui.hudPlacement.nudge=Nudge
+tamework.ui.hudPlacement.step=Step
+tamework.ui.hudPlacement.offset=X {0} · Y {1}
+tamework.ui.hudPlacement.save=Save
+tamework.ui.hudPlacement.sampleName=Companion
+tamework.ui.hudPlacement.moveUp=Move up
+tamework.ui.hudPlacement.moveDown=Move down
+tamework.ui.hudPlacement.moveLeft=Move left
+tamework.ui.hudPlacement.moveRight=Move right
+tamework.ui.hudPlacement.point.topLeft=Top left
+tamework.ui.hudPlacement.point.top=Top
+tamework.ui.hudPlacement.point.topRight=Top right
+tamework.ui.hudPlacement.point.left=Left
+tamework.ui.hudPlacement.point.center=Center
+tamework.ui.hudPlacement.point.right=Right
+tamework.ui.hudPlacement.point.bottomLeft=Bottom left
+tamework.ui.hudPlacement.point.bottom=Bottom
+tamework.ui.hudPlacement.point.bottomRight=Bottom right

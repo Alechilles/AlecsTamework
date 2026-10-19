@@ -18,8 +18,14 @@ $C.@PageOverlay {
    Group #TameworkCommandMenuHeader {
     Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
     Group #TameworkCommandMenuLogo { Anchor: (Top: 4, Left: 20, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
-    Label #TameworkCommandMenuTitle { Anchor: (Left: 66, Right: 478, Height: 42); Text: ""; Style: (FontSize: 18, FontName: "Secondary", LetterSpacing: 1, TextColor: #eef2f6, VerticalAlignment: Center); }
-    Label #TameworkContributorCapacity { Anchor: (Top: 8, Right: 286, Width: 180, Height: 26); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Label #TameworkCommandMenuTitle { Anchor: (Left: 66, Right: 510, Height: 42); Text: ""; Style: (FontSize: 18, FontName: "Secondary", LetterSpacing: 1, TextColor: #eef2f6, VerticalAlignment: Center); }
+    Label #TameworkContributorCapacity { Anchor: (Top: 8, Right: 318, Width: 180, Height: 26); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    // Opens the per-player companion HUD placement editor.
+    Group #CommandMenuHudPlacement {
+     Anchor: (Top: 8, Right: 282, Width: 28, Height: 26);
+     TextButton #CommandMenuHudPlacementButton { Anchor: (Full: 0); Text: ""; Style: $A.@ActionQuiet; TooltipText: %server.tamework.ui.hudPlacement.button; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+     Group { Anchor: (Top: 3, Left: 4, Width: 20, Height: 20); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/HudMove_Glyph_Default.png", Color: #bfcdd5); }
+    }
     TextButton #CommandMenuHelpButton {
       Anchor: (Top: 8, Right: 186, Width: 88, Height: 26);
       Text: %server.tamework.ui.guide.help;

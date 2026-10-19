@@ -1945,3 +1945,27 @@ tamework.ui.commandHotswapHud.group.all=Tous les compagnons
 tamework.ui.commandHotswapHud.group.none=Aucun compagnon actif
 tamework.ui.commandHotswapHud.group.custom=Sélection personnalisée
 tamework.ui.roster.progression.toNext={0} % avant le niveau {1}
+
+# ===== Tamework UI: Companion HUD placement =====
+tamework.ui.hudPlacement.button=Déplacer le HUD du compagnon
+tamework.ui.hudPlacement.title=Position du HUD du compagnon
+tamework.ui.hudPlacement.hint=Choisissez un point d'ancrage, puis ajustez le HUD pas à pas. Seul votre écran change.
+tamework.ui.hudPlacement.snap=Ancrer à
+tamework.ui.hudPlacement.nudge=Ajuster
+tamework.ui.hudPlacement.step=Pas
+tamework.ui.hudPlacement.offset=X {0} · Y {1}
+tamework.ui.hudPlacement.save=Enregistrer
+tamework.ui.hudPlacement.sampleName=Compagnon
+tamework.ui.hudPlacement.moveUp=Monter
+tamework.ui.hudPlacement.moveDown=Descendre
+tamework.ui.hudPlacement.moveLeft=Vers la gauche
+tamework.ui.hudPlacement.moveRight=Vers la droite
+tamework.ui.hudPlacement.point.topLeft=En haut à gauche
+tamework.ui.hudPlacement.point.top=En haut
+tamework.ui.hudPlacement.point.topRight=En haut à droite
+tamework.ui.hudPlacement.point.left=À gauche
+tamework.ui.hudPlacement.point.center=Au centre
+tamework.ui.hudPlacement.point.right=À droite
+tamework.ui.hudPlacement.point.bottomLeft=En bas à gauche
+tamework.ui.hudPlacement.point.bottom=En bas
+tamework.ui.hudPlacement.point.bottomRight=En bas à droite
