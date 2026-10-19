@@ -63,7 +63,8 @@ class NpcBossBarCleanupSystemTest {
         private final List<Ref<EntityStore>> forgotten = new ArrayList<>();
 
         @Override
-        public void revertPlayer(ComponentAccessor<EntityStore> accessor, Ref<EntityStore> playerRef) {
+        public void revertPlayer(ComponentAccessor<EntityStore> accessor, Ref<EntityStore> encounterRef,
+                                 Ref<EntityStore> playerRef) {
             reverted.add(playerRef);
         }
 
