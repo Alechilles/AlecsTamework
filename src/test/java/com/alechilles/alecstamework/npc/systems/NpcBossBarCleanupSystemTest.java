@@ -62,7 +62,12 @@ class NpcBossBarCleanupSystemTest {
         private final List<Ref<EntityStore>> reverted = new ArrayList<>();
         private final List<Ref<EntityStore>> forgotten = new ArrayList<>();
 
-        @Override
+        // No @Override on either: the standalone release build compiles against Update 6 (two arguments) and the
+        // shared workspace against Update 7 (encounter ref added). HytaleBossBarAccess calls whichever exists.
+        public void revertPlayer(ComponentAccessor<EntityStore> accessor, Ref<EntityStore> playerRef) {
+            reverted.add(playerRef);
+        }
+
         public void revertPlayer(ComponentAccessor<EntityStore> accessor, Ref<EntityStore> encounterRef,
                                  Ref<EntityStore> playerRef) {
             reverted.add(playerRef);
