@@ -8,6 +8,10 @@
   are looking at). Click the arrows button at the top of the companion panel,
   pick a snap point, and nudge it into place. The position is saved for you
   only, so other players keep their own layout.
+- Server owners can set where the companion HUD appears by default, so it fits
+  around their other HUDs. Open `/tw settings` and use Edit under Companion
+  HUD. Players who never moved their HUD follow the default; players who did
+  keep their own spot.
 
 ## 5.4.0 - Turning Animations - 2026-10-17
 

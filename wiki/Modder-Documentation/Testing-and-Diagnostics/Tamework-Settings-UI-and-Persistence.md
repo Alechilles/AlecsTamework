@@ -117,6 +117,33 @@ cost no Vigour for any player, and the flight HUD hides the Vigour pips. Boost,
 flap and combat ability cooldowns still apply. Experience presets leave it
 unchanged.
 
+## Companion HUD
+
+**Default HUD Position** sets where the companion HUD appears for players who
+have not moved it themselves. Click Edit to open the placement editor: pick a
+snap point, nudge the sample into place and click Save. Reset in this editor
+returns to the built-in position (top right). Apply or refresh any other
+settings changes first, because the settings page closes while the editor is
+open.
+
+The default is saved to `tamework-companion-hud.json` next to the settings
+file, as a snap point name and an offset:
+
+```json
+{
+  "point": "TOP_RIGHT",
+  "x": -26,
+  "y": 218
+}
+```
+
+Points are `TOP_LEFT`, `TOP`, `TOP_RIGHT`, `LEFT`, `CENTER`, `RIGHT`,
+`BOTTOM_LEFT`, `BOTTOM` and `BOTTOM_RIGHT`. Offsets are HUD canvas units
+measured from that point (+x right, +y down); the screen is 1080 units tall.
+After editing the file by hand, run `/tw reload`. Players who moved their
+own HUD keep their spot; everyone else sees the new default within a few
+seconds.
+
 ## Welcome and announcements
 
 In `/tw settings`, turn off **Welcome and announcements** and click **Apply**

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items.components;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.ui.CompanionHudPlacement;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -14,8 +15,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Player-saved position of the companion target HUD. It changes only that player's screen. Read and write it on the
- * player's world thread; engine player saving owns durability.
+ * Player-saved position of the companion target HUD. It changes only that player's screen; a player without one
+ * follows the server default. Read and write it on the player's world thread; engine player saving owns durability.
  */
 public final class TameworkHudPlacementComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkHudPlacementComponent> CODEC = BuilderCodec
@@ -39,14 +40,29 @@ public final class TameworkHudPlacementComponent implements Component<EntityStor
         return type;
     }
 
-    /** The player's saved placement, or the default when none is saved or the component is not registered. */
+    /** The player's saved placement, or the server default when none is saved or the component is not registered. */
     @Nonnull
     public static CompanionHudPlacement read(@Nullable Ref<EntityStore> playerRef, @Nullable Store<EntityStore> store) {
+        CompanionHudPlacement saved = readSaved(playerRef, store);
+        return saved == null ? CompanionHudDefaultsStore.current() : saved;
+    }
+
+    /** The player's own saved placement, or {@code null} when they follow the server default. */
+    @Nullable
+    public static CompanionHudPlacement readSaved(@Nullable Ref<EntityStore> playerRef,
+                                                  @Nullable Store<EntityStore> store) {
         if (type == null || playerRef == null || !playerRef.isValid() || store == null) {
-            return CompanionHudPlacement.DEFAULT;
+            return null;
         }
         TameworkHudPlacementComponent saved = store.getComponent(playerRef, type);
-        return saved == null ? CompanionHudPlacement.DEFAULT : saved.placement();
+        return saved == null ? null : saved.placement();
+    }
+
+    /** Drops the player's own placement so they follow the server default again. Same calling rules as write. */
+    public static void clear(@Nullable Ref<EntityStore> playerRef, @Nullable Store<EntityStore> store) {
+        if (type != null && playerRef != null && playerRef.isValid() && store != null) {
+            store.tryRemoveComponent(playerRef, type);
+        }
     }
 
     /** Saves a placement on the player. Call from a page or interaction callback, never an ECS system iteration. */
@@ -64,10 +80,11 @@ public final class TameworkHudPlacementComponent implements Component<EntityStor
         return true;
     }
 
-    @Nonnull
+    /** The saved placement, or {@code null} when the saved point name is not a known snap point. */
+    @Nullable
     public CompanionHudPlacement placement() {
         CompanionHudPlacement.Point parsed = CompanionHudPlacement.Point.parse(point);
-        return parsed == null ? CompanionHudPlacement.DEFAULT : new CompanionHudPlacement(parsed, x, y);
+        return parsed == null ? null : new CompanionHudPlacement(parsed, x, y);
     }
 
     @Override

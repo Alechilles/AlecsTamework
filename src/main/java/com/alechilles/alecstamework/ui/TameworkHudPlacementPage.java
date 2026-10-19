@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.CommandHudDirtySink;
 import com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -25,9 +27,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Lets one player move the companion target HUD on their own screen. The page shows a sample plate where the HUD
- * will sit; Save writes the position to the player, Cancel and Esc leave the saved one. Save and Cancel return to
- * the companion panel it was opened from; Esc just closes. The real HUD stays hidden while this is the open page.
+ * Moves the companion target HUD. In {@link Mode#PLAYER} it changes one player's own screen; in
+ * {@link Mode#SERVER_DEFAULT} an admin sets the position used by every player who has not moved theirs. The page
+ * shows a sample plate where the HUD will sit. Save stores the position, Cancel and Esc keep the old one. Save and
+ * Cancel return to the page it was opened from; Esc just closes. The real HUD stays hidden while this is the open
+ * page.
  */
 public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<TameworkHudPlacementPage.EventPayload> {
     public static final String UI_PATH = "TameworkHudPlacementPage.ui";
@@ -52,6 +56,8 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
     private static final String ACTION_CANCEL = "cancel";
     private static final String ACTION_SAVE = "save";
 
+    @Nonnull
+    private final Mode mode;
     @Nullable
     private final Runnable returnToPanel;
     private CompanionHudPlacement draft;
@@ -59,8 +65,13 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
     private boolean finished;
 
     public TameworkHudPlacementPage(@Nonnull PlayerRef playerRef, @Nullable Runnable returnToPanel) {
+        this(playerRef, Mode.PLAYER, returnToPanel);
+    }
+
+    public TameworkHudPlacementPage(@Nonnull PlayerRef playerRef, @Nonnull Mode mode, @Nullable Runnable returnTo) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
-        this.returnToPanel = returnToPanel;
+        this.mode = mode;
+        this.returnToPanel = returnTo;
     }
 
     @Override
@@ -69,10 +80,18 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
         if (draft == null) {
-            draft = TameworkHudPlacementComponent.read(ref, store);
+            draft = mode == Mode.SERVER_DEFAULT
+                    ? CompanionHudDefaultsStore.current()
+                    : TameworkHudPlacementComponent.read(ref, store);
             wakeTargetHud(store);
         }
         commandBuilder.append(UI_PATH);
+        if (mode == Mode.SERVER_DEFAULT) {
+            commandBuilder.set("#TameworkHudPlacementTitle.Text",
+                    LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.defaultTitle"));
+            commandBuilder.set("#TameworkHudPlacementHint.Text",
+                    LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.defaultHint"));
+        }
         bindState(commandBuilder);
         bindEvents(eventBuilder);
     }
@@ -87,15 +106,18 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
         }
         switch (action) {
             case ACTION_SAVE -> {
-                TameworkHudPlacementComponent.write(ref, store, draft);
-                finish(ref, store);
+                // A refused or failed save has already told the player why; going back would only repeat it.
+                finish(ref, store, save(ref, store));
                 return;
             }
             case ACTION_CANCEL -> {
-                finish(ref, store);
+                finish(ref, store, true);
                 return;
             }
-            case ACTION_RESET -> draft = CompanionHudPlacement.DEFAULT;
+            // A player resets to the server default; an admin resets the server default to the built-in one.
+            case ACTION_RESET -> draft = mode == Mode.SERVER_DEFAULT
+                    ? CompanionHudPlacement.DEFAULT
+                    : CompanionHudDefaultsStore.current();
             case ACTION_UP -> draft = draft.moved(0, -step).fitted(SAMPLE_HEIGHT);
             case ACTION_DOWN -> draft = draft.moved(0, step).fitted(SAMPLE_HEIGHT);
             case ACTION_LEFT -> draft = draft.moved(-step, 0);
@@ -124,11 +146,35 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
         wakeTargetHud(store);
     }
 
-    /** Leaves through Save or Cancel: reopening the panel replaces this page; if it cannot, the page closes. */
-    private void finish(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+    /** Saves the draft; returns false when the save was refused or failed and the player was told why. */
+    private boolean save(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        if (mode == Mode.PLAYER) {
+            // A player at the server default keeps following it, including later changes to it.
+            if (draft.equals(CompanionHudDefaultsStore.current())) {
+                TameworkHudPlacementComponent.clear(ref, store);
+            } else {
+                TameworkHudPlacementComponent.write(ref, store, draft);
+            }
+            return true;
+        }
+        if (!TameworkSettingsPageService.hasAccess(playerRef, playerRef)) {
+            playerRef.sendMessage(Message.raw(LocalizedText.resolve(playerRef, "tamework.ui.settings.permissionDenied")));
+            return false;
+        }
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null
+                || !CompanionHudDefaultsStore.save(CompanionHudDefaultsStore.resolveFile(plugin), draft, plugin.getLogger())) {
+            playerRef.sendMessage(Message.raw(LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.defaultSaveFailed")));
+            return false;
+        }
+        return true;
+    }
+
+    /** Leaves through Save or Cancel: reopening the caller replaces this page; otherwise the page closes. */
+    private void finish(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, boolean goBack) {
         finished = true;
         wakeTargetHud(store);
-        if (returnToPanel != null) {
+        if (goBack && returnToPanel != null) {
             returnToPanel.run();
         }
         Player player = store.getComponent(ref, Player.getComponentType());
@@ -229,6 +275,14 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
         if (sink != null && playerUuid != null) {
             sink.markDirty(store, playerUuid);
         }
+    }
+
+    /** Whose position the page edits. */
+    public enum Mode {
+        /** The viewing player's own position. */
+        PLAYER,
+        /** The server default for players who have not moved theirs; requires settings access to save. */
+        SERVER_DEFAULT
     }
 
     /** Event payload for placement editor buttons. */

@@ -71,8 +71,8 @@ Group #TameworkHudPlacementLane {
 Group #TameworkHudPlacementCard {
  Anchor: (Top: 160, Left: 60, Width: 400, Height: 452);
  Background: $A.@SlateModal;
- Label { Anchor: (Top: 16, Left: 22, Right: 22, Height: 28); Text: %server.tamework.ui.hudPlacement.title; Style: $A.@SlateTitle; }
- Label { Anchor: (Top: 46, Left: 22, Right: 22, Height: 34); Text: %server.tamework.ui.hudPlacement.hint; Style: (FontSize: 12, TextColor: #96a9be, Wrap: true); }
+ Label #TameworkHudPlacementTitle { Anchor: (Top: 16, Left: 22, Right: 22, Height: 28); Text: %server.tamework.ui.hudPlacement.title; Style: $A.@SlateTitle; }
+ Label #TameworkHudPlacementHint { Anchor: (Top: 46, Left: 22, Right: 22, Height: 34); Text: %server.tamework.ui.hudPlacement.hint; Style: (FontSize: 12, TextColor: #96a9be, Wrap: true); }
 
  Label { Anchor: (Top: 92, Left: 22, Width: 160, Height: 18); Text: %server.tamework.ui.hudPlacement.snap; Style: @Caps; }
  Group { Anchor: (Top: 116, Left: 22, Width: 144, Height: 144);

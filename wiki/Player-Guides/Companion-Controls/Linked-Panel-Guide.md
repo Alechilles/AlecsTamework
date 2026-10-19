@@ -290,7 +290,8 @@ panel, next to Help.
 - Use the arrows to nudge it. Choose a step of 1, 10 or 50 for fine or large
   moves.
 - Click Save to keep the new spot, or Cancel to keep the old one. Reset puts
-  the HUD back in its default place at the top right.
+  the HUD back in the server's default place (top right unless the server
+  owner changed it).
 
 The position is saved to your character, so it only changes your screen. On a
 narrower screen the HUD stops at the edge instead of going off screen.

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
+import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.alechilles.beacon.api.TelemetryEventContext;
@@ -66,6 +67,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
             if (!topologyReport.restartRequired()) {
                 TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
                 NameFilterSettingsStore.invalidateCache();
+                CompanionHudDefaultsStore.invalidateCache();
                 loaded = plugin.reloadItemFeatureConfigs();
             }
             int totalSpawners = plugin.getItemFeatureRegistry() != null

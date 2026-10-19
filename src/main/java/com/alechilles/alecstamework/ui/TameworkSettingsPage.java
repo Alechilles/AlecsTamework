@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.settings.NameFilterSettings;
+import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore;
@@ -22,6 +23,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
@@ -52,6 +54,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_LOAD_PRESET = "LoadPreset";
     private static final String ACTION_CLOSE = "Close";
     private static final String ACTION_EDIT = "Edit";
+    private static final String ACTION_EDIT_HUD_DEFAULT = "EditHudDefault";
 
     private static final String KEY_ANNOUNCEMENTS_ENABLED = "@AnnouncementsEnabled";
     private static final String KEY_NAME_FILTER_ENABLED = "@NameFilterEnabled";
@@ -113,6 +116,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
+    /** Set when this page hands over to the HUD default editor, which returns here; skips the leaving reminder. */
+    private boolean openingHudDefaultEditor;
 
     public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
                                 @Nonnull Tamework plugin,
@@ -168,6 +173,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data, store);
+            case ACTION_EDIT_HUD_DEFAULT -> onEditHudDefault(data, ref, store);
             default -> {
             }
         }
@@ -175,6 +181,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        if (openingHudDefaultEditor) {
+            return;
+        }
         playerRef.sendMessage(Message.raw(resolveText("tamework.ui.settings.dismissReminder")));
     }
 
@@ -202,6 +211,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 CustomUIEventBindingType.ValueChanged,
                 "#TwSettingsPresetDropdown",
                 appendFormEventData(EventData.of(ACTION, ACTION_LOAD_PRESET)),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TwSettingsHudDefaultEditButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_EDIT_HUD_DEFAULT)),
                 false
         );
         eventBuilder.addEventBinding(
@@ -264,6 +279,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
+        CompanionHudPlacement hudDefault = CompanionHudDefaultsStore.current();
+        commandBuilder.set("#TwSettingsHudDefaultValue.Text", LocalizedText.format(playerRef,
+                "tamework.ui.hudPlacement.summary",
+                LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.point." + hudDefault.point().key()),
+                hudDefault.x(), hudDefault.y()));
         renderFeedback(commandBuilder);
         commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries(resolveLanguage()));
         commandBuilder.set("#TwSettingsPresetDropdown.Value", TameworkSettingsPreset.match(currentValues).value());
@@ -380,6 +400,48 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                             : draftPayload.captureItemOwnership));
         }
         sendUpdate(commandBuilder, null, false);
+    }
+
+    /**
+     * Opens the HUD placement editor for the server default. Unapplied form edits would be lost when this page
+     * closes, so the editor only opens once they are applied or refreshed away.
+     */
+    private void onEditHudDefault(@Nonnull EventPayload payload,
+                                  @Nonnull Ref<EntityStore> ref,
+                                  @Nonnull Store<EntityStore> store) {
+        draftPayload = payload;
+        updateUnsavedChanges();
+        if (unsavedChanges || applyInProgress) {
+            warningLine = resolveText("tamework.ui.settings.warning.applyBeforeHudDefault");
+            statusLine = "";
+            refreshFeedback();
+            return;
+        }
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null) {
+            return;
+        }
+        openingHudDefaultEditor = true;
+        try {
+            player.getPageManager().openCustomPage(ref, store, new TameworkHudPlacementPage(
+                    playerRef, TameworkHudPlacementPage.Mode.SERVER_DEFAULT, this::reopenSettings));
+        } catch (RuntimeException failure) {
+            // The settings page stays open, so it should still remind the player when it does close.
+            openingHudDefaultEditor = false;
+            throw failure;
+        }
+    }
+
+    private void reopenSettings() {
+        Ref<EntityStore> currentRef = playerRef.getReference();
+        if (currentRef == null || !currentRef.isValid()) {
+            return;
+        }
+        String error = TameworkSettingsPageService.openSettingsPage(
+                currentRef, currentRef.getStore(), "hud_placement", "settings_hud_default");
+        if (error != null) {
+            playerRef.sendMessage(Message.raw(error));
+        }
     }
 
     private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
