@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.5.0 - Movable Companion HUD - 2026-10-19
 
 ### Added
 
