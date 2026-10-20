@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.5.1 - Startup Crash Fix - 2026-10-20
+
+### Fixed
+
+- Fixed a crash that could stop Tamework from starting when it set up
+  companion flock following before the game's NPC systems were ready.
+
 ## 5.5.0 - Movable Companion HUD - 2026-10-19
 
 ### Added
