@@ -15,7 +15,6 @@ import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.flock.FlockMembership;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -39,8 +38,9 @@ public final class CompanionFollowFlockMembershipSystems {
 
     public static final class EntityRef extends RefSystem<EntityStore> {
         @Override public Query<EntityStore> getQuery() {
-            return Query.and(NPCEntity.getComponentType(), UUIDComponent.getComponentType(),
-                    FlockMembership.getComponentType(), TameworkTamedComponent.getComponentType(),
+            // FlockMembership only occurs on NPCs, while NPCEntity's type can still be unavailable here at startup.
+            return Query.and(UUIDComponent.getComponentType(), FlockMembership.getComponentType(),
+                    TameworkTamedComponent.getComponentType(),
                     TameworkOwnerComponent.getComponentType());
         }
         @Override public void onEntityAdded(@Nonnull Ref<EntityStore> ref, @Nonnull AddReason reason,
@@ -54,7 +54,8 @@ public final class CompanionFollowFlockMembershipSystems {
     }
 
     public static final class MembershipChange extends RefChangeSystem<EntityStore, FlockMembership> {
-        private final Query<EntityStore> query = Query.and(NPCEntity.getComponentType(), UUIDComponent.getComponentType());
+        private final Query<EntityStore> query = Query.and(UUIDComponent.getComponentType(),
+                FlockMembership.getComponentType());
         @Override public Query<EntityStore> getQuery() { return query; }
         @Override public ComponentType<EntityStore, FlockMembership> componentType() {
             return FlockMembership.getComponentType();
