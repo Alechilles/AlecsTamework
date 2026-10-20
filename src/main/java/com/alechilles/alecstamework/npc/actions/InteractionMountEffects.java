@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
 import com.alechilles.alecstamework.items.CommandActiveNpcHighlightMountCleanupService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
@@ -9,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
@@ -725,7 +725,7 @@ final class InteractionMountEffects {
         if (movementManager == null) {
             return false;
         }
-        if (!HytaleMovementSettingsAccess.setDefaultProfile(
+        if (!NativeMountMovementSettingsService.setDefaultProfile(
                 movementManager, movementConfig, playerPhysicsValues, playerComponent.getGameMode())) {
             return false;
         }

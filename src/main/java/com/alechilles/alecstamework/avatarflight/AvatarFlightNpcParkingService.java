@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.avatarflight;
 
-import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -22,6 +21,7 @@ import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3f;
 
 /** Captures, parks, and restores the same source NPC entity used by avatar flight. */
 public final class AvatarFlightNpcParkingService {
@@ -80,8 +80,7 @@ public final class AvatarFlightNpcParkingService {
         removeIfPresent(store, npcRef, Interactable.getComponentType());
         removeIfPresent(store, npcRef, EntityTrackerSystems.Visible.getComponentType());
         store.putComponent(npcRef, MountedComponent.getComponentType(),
-                HytaleMountedComponentAccess.createEntityMount(
-                        riderRef, 0.0F, 0.0F, 0.0F, MountController.Minecart));
+                new MountedComponent(riderRef, new Vector3f(), MountController.Minecart));
         source.setPhase(AvatarFlightMountPhase.ACTIVE);
         return true;
     }

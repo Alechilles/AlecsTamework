@@ -11,3 +11,7 @@ npcRoles.Tamework_Example.name=Exemplo do Tamework
 npcRoles.Tamework_Example_Simple.name=Exemplo do Tamework (Simples)
 npcRoles.Tamework_Example_Vanilla.name=Exemplo do Tamework (Vanilla)
 npcRoles.Tamework_Example_Simple_Vanilla.name=Exemplo do Tamework (Simples, Vanilla)
+items.Spawner_Tamework_Roster_Example.name=Lanterna do Grupo (Exemplo)
+items.Spawner_Tamework_Roster_Example.description=Doma uma ovelha selvagem e a adiciona ao grupo de exemplo. Mantenha o Apito do Grupo no seu inventário.
+items.Tamework_Command_Roster_Example.name=Apito do Grupo (Exemplo)
+items.Tamework_Command_Roster_Example.description=Abre o grupo de exemplo. Invoque, dispense e reviva seus membros.

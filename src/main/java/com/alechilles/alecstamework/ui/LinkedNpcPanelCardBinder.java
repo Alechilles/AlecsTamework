@@ -14,7 +14,13 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int NORMAL_CARD_HEIGHT = 176;
-    private static final int ROSTER_CARD_HEIGHT = 212;
+    /** Width of the right section, and of the inline status text when action buttons sit beside it. */
+    private static final int ACTION_SECTION_WIDTH = 414;
+    private static final int INLINE_LOCATION_WIDTH_BESIDE_ACTIONS = 296;
+    /** The cooldown meters sit in an inset tray: 34 px of content plus its top inset. A pushed-down row must still end inside the card. */
+    private static final int COOLDOWN_ROW_HEIGHT = 37;
+    /** Left edge that centers a 48 px action button in the column the roster Summon/Dismiss button uses. */
+    private static final int ROSTER_ACTION_LEFT = 767;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
                                      LinkedNpcEntry entry, String language) {
@@ -156,6 +162,12 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
+        String slateState = slateState(entry);
+        String slateArt = Character.toUpperCase(slateState.charAt(0)) + slateState.substring(1);
+        commandBuilder.setObject(entrySelector + " #SlatePlate.Background",
+                new PatchStyle(Value.of("Tamework/Slate/Card_" + slateArt + ".png"), Value.of(38)));
+        commandBuilder.setObject(entrySelector + " #PortraitFrame.Background",
+                UiIconStyle.forTexture("Tamework/Slate/Portrait_" + slateArt + ".png"));
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
@@ -169,6 +181,9 @@ final class LinkedNpcPanelCardBinder {
         // Read-only ordinary companions keep the normal card and location layout.
         boolean rosterLayout = config.ownerCommandFamilyRoster()
                 || feature != null && (feature.roster() != null || feature.bonded() != null);
+        // Roster lines take the status area at the top of the action section, as inline location
+        // text does on generic cards, so the emblem and its label are not drawn under them.
+        boolean rosterLines = feature != null && feature.roster() != null;
         boolean legacyLinked = isLinked && !managedRoster;
         boolean genericLinkedOrOwned = !managedRoster
                 && (legacyLinked || entry.ownedActions());
@@ -189,13 +204,14 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         boolean showLocate = !showInlineLocation && genericLinkedOrOwned
                 && !entry.dead() && !entry.lost() && !pendingUnlink;
+        // A captured companion's Recall restores it from its snapshot (spec 8.14), so it does not
+        // depend on the recall-teleport setting.
         boolean showRecall = genericLinkedOrOwned
-                && config.recallActionEnabled()
-                && !entry.dead()
-                && !entry.captured()
-                && !entry.inCoop()
-                && !entry.lost()
-                && !pendingUnlink;
+                && !pendingUnlink
+                && (entry.captured() || config.recallActionEnabled()
+                        && !entry.dead()
+                        && !entry.inCoop()
+                        && !entry.lost());
         boolean showSetHome = genericLinkedOrOwned
                 && entry.loaded()
                 && !entry.dead()
@@ -214,13 +230,15 @@ final class LinkedNpcPanelCardBinder {
         boolean removalMenuAvailable = !managedRoster;
         boolean canRelease = removalMenuAvailable && !entry.captured() && !entry.inCoop();
         boolean canCull = canRelease && entry.loaded() && !entry.dead() && !entry.lost();
+        // The release slot becomes Forget for a companion in a capture item; the page picks the action.
+        boolean canForget = removalMenuAvailable && genericLinkedOrOwned && entry.captured();
         boolean showLink = !entry.ownedActions() && !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
         boolean showRemovalMenu = removalMenuAvailable && pendingUnlink;
         boolean showUnlink = showRemovalMenu && legacyLinked && !entry.ownedActions();
         boolean showUnlinkDisabled = showRemovalMenu && !legacyLinked && !entry.ownedActions();
-        boolean showRelease = showRemovalMenu && canRelease;
-        boolean showReleaseDisabled = showRemovalMenu && !canRelease;
+        boolean showRelease = showRemovalMenu && (canRelease || canForget);
+        boolean showReleaseDisabled = showRemovalMenu && !canRelease && !canForget;
         boolean showCull = showRemovalMenu && canCull;
         boolean showActiveToggleActive = genericLinkedOrOwned && entry.active();
         boolean showActiveToggleInactive = genericLinkedOrOwned && !entry.active();
@@ -247,7 +265,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !showInlineLocation
+                !showInlineLocation && !rosterLines
                         && (!entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop())
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
@@ -272,6 +290,8 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkSelector, showUnlink);
         LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkDisabledSelector, showUnlinkDisabled);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
+        commandBuilder.set(entrySelector + " #SlateSelected.Visible", showActiveToggleActive);
+        bindStatePill(commandBuilder, entrySelector, entry, slateState, language);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         if (entry.ownedActions()) {
             commandBuilder.set(activeToggleInactiveSelector + ".Disabled", !entry.selectionSupported());
@@ -346,7 +366,13 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
-        int actionLeft = showInlineLocation ? 736 : 432;
+        String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
+        // Roster rows report state and revival in their roster lines; the removal menu keeps the
+        // emblem because its buttons occupy the strip's area.
+        boolean showStatusStrip = emblem != null && !showInlineLocation && !rosterLayout
+                && !pendingUnlink && LinkedNpcPanelStatusStrip.applies(entry);
+        // A roster row's only icon action is Revive/Recover, shown when Summon and Dismiss are not.
+        int actionLeft = rosterLines ? ROSTER_ACTION_LEFT : showInlineLocation ? 736 : 432;
         String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
                 showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
                 respawnSelector, locateSelector, recallSelector, setHomeSelector,
@@ -354,7 +380,8 @@ final class LinkedNpcPanelCardBinder {
                 unlinkSelector, unlinkDisabledSelector, cullSelector};
         boolean[] actionVisible = {showShoulderRide, showFlightToggle,
                 showBreedingToggleEnabled || showBreedingToggleDisabled,
-                showRespawn, showLocate, showRecall, showSetHome, showReturnHome,
+                // The strip places its own Revive/Recover button.
+                showRespawn && !showStatusStrip, showLocate, showRecall, showSetHome, showReturnHome,
                 showRelease, showReleaseDisabled, showUnlink, showUnlinkDisabled, showCull};
         for (int actionIndex = 0; actionIndex < actionSelectors.length; actionIndex++) {
             if (actionVisible[actionIndex]) {
@@ -368,9 +395,14 @@ final class LinkedNpcPanelCardBinder {
                 actionLeft += 60;
             }
         }
-        String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
-        if (emblem != null && !showInlineLocation) {
+        commandBuilder.set(entrySelector + " #StatusStrip.Visible", false);
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible",
+                emblem != null && !showInlineLocation && !showStatusStrip && !rosterLines);
+        if (showStatusStrip) {
+            commandBuilder.set(statusUnloadedSelector + ".Visible", false);
+            LinkedNpcPanelStatusStrip.bind(commandBuilder, entrySelector, entry, emblem,
+                    respawnSelector, showRespawn, language);
+        } else if (emblem != null && !showInlineLocation && !rosterLines) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
@@ -417,10 +449,13 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.set(inlineLocationCoordinatesSelector + ".Value", location.coordinates());
             commandBuilder.set(inlineLocationCoordinatesSelector + ".MaxLength",
                     Math.max(64, location.coordinates().length() + 16));
-            int locationRow = showInlineStatus ? 28 : 14;
-            int inlineLocationWidth = showRecall || showReturnHome || showSetHome ? 296 : 414;
+            int inlineLocationWidth = showRecall || showReturnHome || showSetHome
+                    ? INLINE_LOCATION_WIDTH_BESIDE_ACTIONS : ACTION_SECTION_WIDTH;
+            int statusLines = inlineStatusLines(location.status(), inlineLocationWidth);
+            int locationRow = showInlineStatus ? 14 + statusLines * 14 : 14;
+            // The label is always two lines tall, so a status that wraps unexpectedly is not clipped.
             commandBuilder.setObject(inlineLocationStatusSelector + ".Anchor",
-                    fixedAnchor(14, 0, inlineLocationWidth, 14));
+                    fixedAnchor(14, 0, inlineLocationWidth, 28));
             commandBuilder.setObject(inlineLocationWorldSelector + ".Anchor",
                     fixedAnchor(locationRow, 0, inlineLocationWidth, 14));
             locationRow += showInlineWorld ? 14 : 0;
@@ -441,8 +476,16 @@ final class LinkedNpcPanelCardBinder {
                         inlineLocationSelector + " #CopyButton",
                         EventData.of(config.eventCommandId(), LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid()), false);
             }
-            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 74);
+            int inlineBottom = !showInlineCoordinates ? locationRow
+                    : locationRow + (location.relativeDistance().isBlank() ? 18 : 32);
+            int inlineHeight = Math.max(74, inlineBottom);
+            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, inlineHeight);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
+            if (inlineHeight > 74) {
+                // A two-line status above world, coordinates and distance pushes the meters down.
+                commandBuilder.setObject(entrySelector + " #CooldownRow.Anchor",
+                        fixedAnchor(32 + inlineHeight + 3, 432, ACTION_SECTION_WIDTH, COOLDOWN_ROW_HEIGHT));
+            }
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(88, 730, 116, 20));
             commandBuilder.set(recallCountdownSelector + ".Style",
@@ -466,8 +509,10 @@ final class LinkedNpcPanelCardBinder {
         }
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseSelector, showRelease);
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseDisabledSelector, showReleaseDisabled);
-        commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.card.button.release"));
+        commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language, canForget
+                ? "tamework.ui.linkedPanel.card.button.forget" : "tamework.ui.linkedPanel.card.button.release"));
+        commandBuilder.set(releaseSelector + ".TooltipText", LocalizedText.resolve(language, canForget
+                ? "tamework.ui.linkedPanel.card.tooltip.forget" : "tamework.ui.linkedPanel.card.tooltip.release"));
         LinkedNpcPanelIconStyles.visible(commandBuilder, cullSelector, showCull);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
 
@@ -636,9 +681,9 @@ final class LinkedNpcPanelCardBinder {
                                boolean showInlineLocation) {
         boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation
                 && (entry.dead() || entry.lost());
-        Anchor cardAnchor = buildCardAnchor(managedRoster, compact);
+        Anchor cardAnchor = buildCardAnchor(compact);
         commands.setObject(card + ".Anchor", cardAnchor);
-        Anchor cooldownAnchor = fixedAnchor(111, 432, 414, 34);
+        Anchor cooldownAnchor = fixedAnchor(109, 432, 414, COOLDOWN_ROW_HEIGHT);
         commands.setObject(card + " #CooldownRow.Anchor", cooldownAnchor);
         bindPortrait(commands, card, entry, compact);
         boolean showDetails = !compact && entry.hasKnownCardDetails();
@@ -648,31 +693,38 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
-        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 120, 0, 144, 26));
-        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 120, 26, 96, 26));
-        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 87 : 127, 7, 12, 12));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 137, 2, 142, 24));
+        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 137, 28, 94, 24));
+        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 86 : 143, 10, 12, 12));
+        commands.set(card + " #PortraitFrame.Visible", !compact);
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(68, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
-        commands.set(card + " #HealthFrame.Background",
-                entry.dead() ? "#151916"
-                        : compact ? "#202423" : "#151916");
+        commands.set(card + " #HealthFrame.Background", "#090e14");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(38, 358, 48, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(38, 304, 34, 24));
-        int activeTop = compact ? 56 : 96;
-        commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
-        commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
+        // The level sits on the portrait's lower-left corner; talent points keep the stats row's right end.
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(LinkedNpcPanelProgressionBinder.LEVEL_TOP,
+                LinkedNpcPanelProgressionBinder.LEVEL_LEFT, 48, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(38, 372, 34, 24));
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
         nameAnchor.setWidth(null);
-        nameAnchor.setRight(Value.of(36));
+        // Leaves room for the role subtitle, the state pill, the select switch and the removal button.
+        nameAnchor.setRight(Value.of(374));
         commands.setObject(card + " #Name.Anchor", nameAnchor);
+    }
+
+    /**
+     * Lines to reserve for the inline status text. The server has no font metrics, so this assumes
+     * about 6 px per character of the bold 11 px status font, which errs toward reserving two lines.
+     */
+    static int inlineStatusLines(String status, int width) {
+        return status != null && status.length() * 6 > width ? 2 : 1;
     }
 
     static LifecycleDisplay resolveLifecycleDisplay(LinkedNpcEntry entry, String language) {
@@ -726,12 +778,52 @@ final class LinkedNpcPanelCardBinder {
                 "tamework.commandmenu.lifecycle.stage." + nextStage);
     }
 
+    /**
+     * Names the card's state for its atlas art: {@code Tamework/Slate/Card_<State>.png} (a 9-patch) and
+     * {@code Portrait_<State>.png}, generated by the TameworkUiKit repo. These stay in the atlas because a
+     * list rebinds dozens of cards at once; a large off-atlas picture per card made the client stutter.
+     */
+    static String slateState(LinkedNpcEntry entry) {
+        if (entry.dead()) {
+            return "dead";
+        }
+        if (entry.lost() && !entry.inCoop()) {
+            return "lost";
+        }
+        if (entry.captured() || entry.inCoop()) {
+            return "stored";
+        }
+        return entry.loaded() ? "world" : "rest";
+    }
+
+    /** The pill beside the name says the state in words and takes that state's colour. */
+    private static void bindStatePill(UICommandBuilder commands, String card, LinkedNpcEntry entry,
+                                      String slateState, String language) {
+        // A recovery hold explains itself in the status area with a sentence that does not fit a pill.
+        commands.set(card + " #StatePill.Visible", !entry.recoveryHeld());
+        if (entry.recoveryHeld()) {
+            return;
+        }
+        String color = switch (slateState) {
+            case "dead" -> "#e5786d";
+            case "lost" -> "#f0b45a";
+            case "stored" -> "#7fa8ee";
+            case "rest" -> "#8fa2b8";
+            default -> "#7a9cc6";
+        };
+        commands.setObject(card + " #StatePill.Background",
+                new PatchStyle(Value.of("Tamework/Slate/Pill.png"), Value.of(7)).setColor(Value.of(color)));
+        commands.set(card + " #StatePillText.Text", "world".equals(slateState)
+                ? LocalizedText.resolve(language, "tamework.ui.companions.inWorld")
+                : LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
+    }
+
     private static void bindLifecycleProgress(UICommandBuilder commands, String card,
                                               LinkedNpcEntry.AnimalLifecycle lifecycle,
                                               LifecycleDisplay display, String language, boolean muted) {
         String selector = card + " #LifecycleProgress";
         commands.set(selector + ".Visible", display.visible());
-        String color = muted ? "#727772" : lifecycleColor(lifecycle);
+        String color = muted ? "#586d8a" : lifecycleColor(lifecycle);
         commands.setObject(selector + " #AgeIcon.Background", lifecycleIcon(lifecycle).setColor(Value.of(color)));
         commands.set(selector + " #CooldownLabel.Text", display.visible()
                 ? LocalizedText.format(language, "tamework.commandmenu.lifecycle.ageStage", display.stageText())
@@ -750,8 +842,8 @@ final class LinkedNpcPanelCardBinder {
     }
 
     static String lifecycleColor(LinkedNpcEntry.AnimalLifecycle lifecycle) {
-        return lifecycle.prime() ? "#d9c878"
-                : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#d9a86f" : "#78bfc1";
+        return lifecycle.prime() ? "#f2c66d"
+                : "Senior".equalsIgnoreCase(lifecycle.stage()) ? "#f0b45a" : "#78bfc1";
     }
 
     static PatchStyle lifecycleIcon(LinkedNpcEntry.AnimalLifecycle lifecycle) {
@@ -774,15 +866,14 @@ final class LinkedNpcPanelCardBinder {
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {
         LinkedNpcPanelPortraitBinder.bind(commands, card, entry);
         commands.set(card + " #Portrait.Style", Value.ref("TameworkLinkedNpcPanelCard.ui", compact ? "PortraitCompactStyle" : "PortraitStyle"));
-        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 28, compact ? 96 : 28, compact ? 48 : 92, compact ? 48 : 92));
-        commands.setObject(card + " #RoleSubtitle.Anchor", fixedAnchor(37, 0, compact && !entry.portraitIcon().isBlank() ? 92 : 148, 18));
+        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 39, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92));
         int activeTop = compact ? 56 : 96;
         boolean portrait = !entry.portraitIcon().isBlank();
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(
                 activeTop, 48, portrait && compact ? 56 : 96, 20));
     }
 
-    private static Anchor fixedAnchor(int top, int left, int width, int height) {
+    static Anchor fixedAnchor(int top, int left, int width, int height) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(top));
         anchor.setLeft(Value.of(left));
@@ -791,13 +882,12 @@ final class LinkedNpcPanelCardBinder {
         return anchor;
     }
 
-    private static Anchor buildCardAnchor(boolean managedRoster, boolean compact) {
+    private static Anchor buildCardAnchor(boolean compact) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(managedRoster
-                ? ROSTER_CARD_HEIGHT : compact ? 124 : NORMAL_CARD_HEIGHT));
+        anchor.setHeight(Value.of(compact ? 124 : NORMAL_CARD_HEIGHT));
         return anchor;
     }
 

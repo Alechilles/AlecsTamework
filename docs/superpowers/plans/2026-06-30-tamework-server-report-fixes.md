@@ -1,5 +1,7 @@
 # Tamework Server Report Fixes Implementation Plan
 
+> Historical: this plan names classes from the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the confirmed server-report issues around multi-world ECS singleton state, blocking HStats network calls, profile-state data loss, spawner duplication ordering, and interaction inventory economy semantics.

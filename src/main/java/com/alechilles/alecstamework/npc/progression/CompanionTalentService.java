@@ -242,10 +242,37 @@ public final class CompanionTalentService {
         }
         TameworkTalentsComponent existing = reconcileTalentsComponent(npcRef, store, roleId);
         TwTalentConfig config = resolveConfig(existing, roleId);
+        CompanionLevelingService.LevelingSnapshot leveling = CompanionLevelingService.resolveSnapshot(npcRef, store, roleId);
+        if (config != null && config.isEnabled() && leveling == null) {
+            return PurchaseResult.invalid("Level data is unavailable for this companion.");
+        }
+        PurchaseResult purchase = purchase(existing, config, leveling == null ? 0 : leveling.level(),
+                leveling == null ? null : leveling.configId(), talentId);
+        if (!purchase.applied() || purchase.component() == null) {
+            return purchase;
+        }
+        store.putComponent(npcRef, type, purchase.component());
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
+        return PurchaseResult.applied(purchase.component(), resolveAvailablePoints(npcRef, store));
+    }
+
+    /**
+     * The rules of one talent purchase, with no entity access: the tree must be enabled and hold
+     * the talent, the talent must not be bought yet, the level and the prerequisites must be met
+     * and the points earned at {@code level} must cover the cost. {@code existing} is the
+     * allocation already reconciled with {@code config} ({@link #reconcileAllocation}) and is not
+     * changed; an applied result carries a new component and the points left after the purchase.
+     */
+    @Nonnull
+    public static PurchaseResult purchase(@Nullable TameworkTalentsComponent existing,
+                                          @Nullable TwTalentConfig config,
+                                          int level,
+                                          @Nullable String levelingConfigId,
+                                          @Nullable String talentId) {
         if (config == null || !config.isEnabled()) {
             return PurchaseResult.invalid("No talent tree is configured for this companion.");
         }
-        TwTalentConfig.TalentDefinition talent = config.findTalent(talentId);
+        TwTalentConfig.TalentDefinition talent = talentId == null || talentId.isBlank() ? null : config.findTalent(talentId);
         if (talent == null) {
             return PurchaseResult.invalid("That talent could not be found.");
         }
@@ -257,17 +284,14 @@ public final class CompanionTalentService {
         if (component.hasPurchasedTalent(talent.getId())) {
             return PurchaseResult.invalid("That talent is already unlocked.");
         }
-        CompanionLevelingService.LevelingSnapshot leveling = CompanionLevelingService.resolveSnapshot(npcRef, store, roleId);
-        if (leveling == null) {
-            return PurchaseResult.invalid("Level data is unavailable for this companion.");
-        }
-        if (leveling.level() < talent.getMinLevel()) {
+        if (level < talent.getMinLevel()) {
             return PurchaseResult.invalid("This talent requires a higher level.");
         }
         if (!hasPrerequisites(component, talent)) {
             return PurchaseResult.invalid("This talent requires another talent first.");
         }
-        int availablePoints = resolveAvailablePoints(npcRef, store);
+        int availablePoints = Math.max(0, CompanionLevelingService.resolveEarnedTalentPoints(level, levelingConfigId)
+                - component.getSpentPoints());
         if (availablePoints < talent.getPointCost()) {
             return PurchaseResult.invalid("Not enough talent points are available.");
         }
@@ -278,9 +302,7 @@ public final class CompanionTalentService {
         updatedTalents.add(talent.getId());
         component.setPurchasedTalentIds(updatedTalents.toArray(new String[0]));
         component.setSpentPoints(component.getSpentPoints() + talent.getPointCost());
-        store.putComponent(npcRef, type, component);
-        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
-        return PurchaseResult.applied(component, resolveAvailablePoints(npcRef, store));
+        return PurchaseResult.applied(component, availablePoints - talent.getPointCost());
     }
 
     @Nonnull

@@ -1,4 +1,3 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 scripts/tools/link-codex-skills.sh text eol=lf
-src/main/resources/persistence/schema/*.sql text eol=lf

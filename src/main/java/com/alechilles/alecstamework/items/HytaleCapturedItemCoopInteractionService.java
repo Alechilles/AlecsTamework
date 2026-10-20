@@ -1,14 +1,23 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.coop.CoopCapturedItemInventoryPosition;
-import com.alechilles.alecstamework.companion.coop.CoopCapturedItemSourceEvidence;
-import com.alechilles.alecstamework.items.coop.CapturedItemCoopArtifactClaim;
+import com.alechilles.alecstamework.companion.coop.CoopIntakeFlow;
+import com.alechilles.alecstamework.companion.coop.HytaleCoopIntake;
+import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopAuthor;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
-import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
@@ -18,22 +27,26 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.util.Inter
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
-import java.util.concurrent.CompletionStage;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3i;
 
 /**
- * Shared Hytale boundary for placing canonical captured items into managed coops.
+ * Shared Hytale boundary for placing capture items into managed coops.
  *
  * <p>The boundary returns {@link Result#NOT_MANAGED} whenever the caller must preserve its
- * ordinary item behavior. Once a canonical artifact targets a managed coop, missing exact
- * inventory evidence or runtime composition fails closed so no competing spawn or vanilla coop
- * mutation can consume the same source item.</p>
+ * ordinary item behavior. Once a 5.0 capture item (profile id and generation) targets a managed
+ * coop, missing exact inventory evidence or runtime composition fails closed so no competing
+ * spawn or vanilla coop mutation can use the same source item. The intake itself is the
+ * commit-first {@link CoopIntakeFlow}: the exact source slot is emptied only after the coop slot
+ * is written.</p>
  */
 public final class HytaleCapturedItemCoopInteractionService {
     private final HytaleManagedCoopItemTargetResolver targets;
     private final HytaleCapturedArtifactAdapter artifacts;
+    private final TameworkUiMessageService messages = new TameworkUiMessageService();
 
     public HytaleCapturedItemCoopInteractionService() {
         this(
@@ -52,12 +65,15 @@ public final class HytaleCapturedItemCoopInteractionService {
 
     /**
      * Attempts managed-coop intake using the exact block and inventory coordinate in the context.
+     * Once taken in, the source item turns into its empty form; {@code emptyItemIdOverride} is the
+     * interaction's {@code EmptyItemId}, or null for the configured one.
      */
     @Nonnull
     public Result attempt(
             @Nonnull World world,
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
-            @Nonnull InteractionContext context
+            @Nonnull InteractionContext context,
+            @Nullable String emptyItemIdOverride
     ) {
         ItemStack held = context.getHeldItem();
         if (receiptMarked(held)) {
@@ -72,9 +88,14 @@ public final class HytaleCapturedItemCoopInteractionService {
         if (target == null) {
             return Result.NOT_MANAGED;
         }
+        CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(held);
+        if (item == null) {
+            // An older capture item must not fall through to vanilla crate handling.
+            return olderCaptureItem(held) ? Result.FAILED_CLOSED : Result.NOT_MANAGED;
+        }
         CapturedArtifact artifact = artifact(held);
-        if (CapturedItemCoopArtifactClaim.parse(artifact) == null) {
-            return Result.NOT_MANAGED;
+        if (artifact == null) {
+            return Result.FAILED_CLOSED;
         }
         if (!InteractionValidation.canPlayerInteractWithBlock(
                 context.getEntity(),
@@ -90,7 +111,20 @@ public final class HytaleCapturedItemCoopInteractionService {
         if (source == null) {
             return Result.FAILED_CLOSED;
         }
-        return submit(source, target);
+        return submit(world, source, target, item, emptyItemIdOverride);
+    }
+
+    /** Capture metadata that is no index item: a 2.x alias-only item, or a snapshot id with no profile id. */
+    private static boolean olderCaptureItem(@Nullable ItemStack held) {
+        if (held == null || held.isEmpty()) {
+            return false;
+        }
+        try {
+            return held.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) != null
+                    || held.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.STRING) != null;
+        } catch (RuntimeException | LinkageError unreadable) {
+            return true;
+        }
     }
 
     /** Returns whether an item is carrying an in-flight durable retirement receipt. */
@@ -100,7 +134,7 @@ public final class HytaleCapturedItemCoopInteractionService {
         }
         try {
             return item.getFromMetadataOrNull(
-                    CoopCapturedItemSourceEvidence.RECEIPT_METADATA_KEY,
+                    TameworkMetadataKeys.COOP_CAPTURE_RECEIPT,
                     Codec.STRING
             ) != null;
         } catch (RuntimeException | LinkageError invalidReceipt) {
@@ -108,25 +142,113 @@ public final class HytaleCapturedItemCoopInteractionService {
         }
     }
 
+    /**
+     * Starts the commit-first intake on the interaction's world thread. Refusals known now fail
+     * closed with a message; later failures are reported to the player when the intake ends.
+     */
     @Nonnull
     private Result submit(
+            World world,
             CapturedItemCoopAuthor.Source source,
-            CapturedItemCoopTarget target
+            CapturedItemCoopTarget target,
+            CaptureItemKeys.Ref item,
+            @Nullable String emptyItemIdOverride
     ) {
-        CapturedItemCoopRuntime.Submission submission =
-                CapturedItemCoopRuntime.current();
-        if (submission == null) {
+        HytaleCoopIntake intake = HytaleCoopIntake.current();
+        if (intake == null) {
             return Result.FAILED_CLOSED;
         }
+        UUID actor = source.actorUuid();
         try {
-            CompletionStage<CapturedItemCoopAuthor.Outcome> started =
-                    submission.submit(source, target);
-            return started == null
-                    ? Result.FAILED_CLOSED
-                    : Result.STARTED;
+            CompanionRecord record = intake.record(item.profileId());
+            if (record == null || record.location().kind() != LocationKind.ITEM
+                    || record.generation() != item.generation()) {
+                warnLater(actor, "releaseProfileConflict");
+                return Result.FAILED_CLOSED;
+            }
+            if (source.sourceArtifact().quantity() != 1 || !policyAllows(target, record, actor)) {
+                warnLater(actor, "coopRejected");
+                return Result.FAILED_CLOSED;
+            }
+            CompletableFuture<CoopIntakeFlow.Result> started = intake.offerItem(world, target.coopId(),
+                    target.x(), target.y(), target.z(), target.maxResidents(), item,
+                    () -> consumeLater(actor, source.inventoryPosition(), source.sourceArtifact(),
+                            emptyItemIdOverride));
+            if (started == null) {
+                warnLater(actor, "coopRejected");
+                return Result.FAILED_CLOSED;
+            }
+            started.thenAccept(result -> {
+                String key = switch (result) {
+                    case TAKEN_IN -> null;
+                    case NOT_ELIGIBLE, CONFLICT -> "releaseProfileConflict";
+                    case BUSY -> "coopRejected";
+                    case COMMIT_FAILED, SLOT_FAILED -> "compensated";
+                };
+                if (key != null) {
+                    warnLater(actor, key);
+                }
+            });
+            return Result.STARTED;
         } catch (RuntimeException | LinkageError failure) {
             return Result.FAILED_CLOSED;
         }
+    }
+
+    /**
+     * The coop's capture policy against the companion's record. A record without an owner counts
+     * as untamed for {@code RequireTamed}: the tamed state lives in the stored snapshot, which is
+     * not read here.
+     */
+    private static boolean policyAllows(CapturedItemCoopTarget target, CompanionRecord record, UUID actor) {
+        UUID owner = record.ownerUuid();
+        if (!target.acceptsRole(record.roleId())
+                || (target.requireTamed() || target.requireOwner()) && owner == null) {
+            return false;
+        }
+        return !target.ownerRestricted() || actor.equals(owner);
+    }
+
+    /**
+     * Turns the exact source slot into its empty capture item on the player's world, only if it
+     * still holds the source stack. An item with no empty form is used up.
+     */
+    private void consumeLater(UUID actor, CoopCapturedItemInventoryPosition position, CapturedArtifact source,
+                              @Nullable String emptyItemIdOverride) {
+        HytaleCaptureDelivery.onPlayerWorld(actor, (world, store, ref, player) -> {
+            ItemContainer container = container(store, ref, position.section());
+            if (container == null || position.slot() >= container.getCapacity()) {
+                return;
+            }
+            short slot = (short) position.slot();
+            ItemStack current = container.getItemStack(slot);
+            if (artifacts.matches(current, source)) {
+                container.replaceItemStackInSlot(slot, current, emptied(current, emptyItemIdOverride));
+            }
+        }, null);
+    }
+
+    private static ItemStack emptied(ItemStack filled, @Nullable String emptyItemIdOverride) {
+        Tamework plugin = Tamework.getInstance();
+        SpawnerFeatureHandler handler = plugin == null ? null : plugin.getSpawnerFeatureHandler();
+        ItemStack emptied = handler == null ? null : handler.emptiedCaptureItem(filled, emptyItemIdOverride);
+        return emptied == null ? ItemStack.EMPTY : emptied;
+    }
+
+    @Nullable
+    private static ItemContainer container(Store<EntityStore> store, Ref<EntityStore> ref,
+                                           CoopCapturedItemInventoryPosition.Section section) {
+        InventoryComponent inventory = switch (section) {
+            case HOTBAR -> store.getComponent(ref, InventoryComponent.Hotbar.getComponentType());
+            case STORAGE -> store.getComponent(ref, InventoryComponent.Storage.getComponentType());
+            case BACKPACK -> store.getComponent(ref, InventoryComponent.Backpack.getComponentType());
+        };
+        return inventory == null ? null : inventory.getInventory();
+    }
+
+    private void warnLater(UUID actor, String key) {
+        HytaleCaptureDelivery.onPlayerWorld(actor, (world, store, ref, player) -> messages.showKey(player,
+                NotificationStyle.Warning, "tamework.ui.notifications.spawner." + key), null);
     }
 
     @Nullable

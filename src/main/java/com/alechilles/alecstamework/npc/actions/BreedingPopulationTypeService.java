@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -57,8 +56,7 @@ final class BreedingPopulationTypeService {
         }
         final double radiusSq = Math.max(0.0, radius) * Math.max(0.0, radius);
         List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
-        HytaleSpatialAccess.collect(
-                entitySpatialResource.getSpatialStructure(), center, Math.max(0.0, radius), nearby);
+        entitySpatialResource.getSpatialStructure().collect(center, Math.max(0.0, radius), nearby);
         int count = 0;
         for (Ref<EntityStore> ref : nearby) {
             if (ref == null || !ref.isValid()) {

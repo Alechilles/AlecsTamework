@@ -1,21 +1,33 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -25,10 +37,21 @@ import org.joml.Vector3d;
  * Resolves and spawns a litter from current world state after the pairing animation.
  *
  * <p>Capacity is checked against the released SimpleClaims scan and the current
- * nearby same-type population immediately before the litter is spawned.
+ * nearby same-type population immediately before the litter is spawned. The litter is then
+ * admitted as a whole against the owner and population-group caps.
+ *
+ * <p>A litter of a role managed by an admission provider needs the provider's cached decision.
+ * While that decision is still being fetched the birth is not refused: it is run again on the
+ * world thread after {@link #ADMISSION_RETRY_MS}, up to {@link #ADMISSION_RETRIES} times. The
+ * retry carries only the world, the pair context (parent UUIDs) and the litter plan; parents,
+ * owners and every limit are resolved again when it runs. It is a one-shot delayed task per
+ * birth, so there is nothing to cancel on shutdown: a stopped world refuses the task.</p>
  */
 final class BreedingOffspringBirthService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
+    /** The provider answers within its 2 s timeout, so three retries a second apart cover it. */
+    static final long ADMISSION_RETRY_MS = 1_000L;
+    static final int ADMISSION_RETRIES = 3;
 
     private final BreedingOffspringSpawnService spawnService =
             new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
@@ -58,6 +81,11 @@ final class BreedingOffspringBirthService {
 
     void spawn(@Nonnull World world, @Nonnull BreedingPairContext context,
                @Nonnull BreedingLitterPlanner.Plan plan) {
+        spawn(world, context, plan, ADMISSION_RETRIES);
+    }
+
+    private void spawn(@Nonnull World world, @Nonnull BreedingPairContext context,
+                       @Nonnull BreedingLitterPlanner.Plan plan, int admissionRetries) {
         Store<EntityStore> store = resolveStore(world);
         ParentRefs parents = resolveParents(world, store, context);
         if (store == null || parents == null) {
@@ -83,6 +111,21 @@ final class BreedingOffspringBirthService {
                 store, liveContext, setup, plan.resolvedRoles().size(),
                 plan.resolvedRoles().getFirst()
         );
+        allowance = admitLitter(
+                world, store, liveContext, setup, allowance, plan.resolvedRoles(), admissionRetries > 0
+        );
+        if (allowance == null) {
+            // Nothing was spawned or told to the owner; the same birth is decided again shortly.
+            try {
+                CompletableFuture.runAsync(
+                        () -> world.execute(() -> spawn(world, context, plan, admissionRetries - 1)),
+                        CompletableFuture.delayedExecutor(ADMISSION_RETRY_MS, TimeUnit.MILLISECONDS)
+                );
+            } catch (RuntimeException notQueued) {
+                logBlocked(liveContext, "owner-provider-retry-not-queued");
+            }
+            return;
+        }
         int spawnedCount = spawnChildren(
                 store, parents, liveContext, setup, allowance, plan.resolvedRoles()
         );
@@ -186,6 +229,103 @@ final class BreedingOffspringBirthService {
                 : requested;
         count = limitByNearbyPopulation(store, setup, firstRole, count);
         return new BirthAllowance(Math.max(0, count), firstRole);
+    }
+
+    /**
+     * Admits the litter against the owner and population-group caps as a whole before any child
+     * spawns (spec 8.11). A refused litter is not born and the owner is told why. Only children
+     * that will be tamed with an owner count, as only they get a companion record. Each child's
+     * tame stamping still re-checks under the index lock.
+     *
+     * <p>Returns null, with no message, when the only obstacle is an admission provider decision
+     * that is still being fetched and {@code mayRetry} is set; the caller runs the birth again.
+     * Without {@code mayRetry} that litter is refused with the provider-unavailable message.</p>
+     */
+    @Nullable
+    private BirthAllowance admitLitter(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull BreedingPairContext context,
+            @Nonnull SpawnSetup setup,
+            @Nonnull BirthAllowance allowance,
+            @Nonnull List<BreedingResolvedSpawnRole> roles,
+            boolean mayRetry
+    ) {
+        String worldName = world.getName();
+        if (allowance.count() <= 0 || worldName == null || worldName.isBlank()) {
+            return allowance;
+        }
+        Map<UUID, List<CompanionRecord>> candidatesByOwner = new LinkedHashMap<>();
+        for (int index = 0; index < allowance.count(); index++) {
+            BreedingResolvedSpawnRole role = roles.get(index);
+            UUID owner = role == null ? null : litterOwner(setup.config(), role, context);
+            if (owner == null) {
+                continue;
+            }
+            Vector3d at = setup.position();
+            candidatesByOwner.computeIfAbsent(owner, ignored -> new ArrayList<>()).add(
+                    CompanionRecord.builder(
+                                    UUID.randomUUID(), role.roleId(),
+                                    CompanionLocation.live(worldName, at.x, at.y, at.z))
+                            .ownerUuid(owner).homeWorld(worldName).build()
+            );
+        }
+        for (Map.Entry<UUID, List<CompanionRecord>> entry : candidatesByOwner.entrySet()) {
+            OwnerPopulationCapService.Decision decision =
+                    OwnerPopulationCapService.evaluateBatch(entry.getKey(), entry.getValue());
+            if (!decision.allowed()) {
+                if (ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(decision.messageKey())) {
+                    if (mayRetry) {
+                        return null;
+                    }
+                    // Still no decision after the retries: the reason's own message is "unavailable".
+                    decision = new OwnerPopulationCapService.Decision(false, decision.capEnabled(),
+                            decision.limit(), decision.currentCount(), 0, decision.scope(), decision.reason());
+                }
+                logBlocked(context, decision.reason());
+                Player owner = resolveOnlinePlayer(world, store, entry.getKey());
+                if (owner != null) {
+                    OwnerMessageUtil.sendAcquisitionDenied(owner, decision);
+                }
+                return BirthAllowance.none();
+            }
+        }
+        return allowance;
+    }
+
+    /** The owner a child of {@code role} will be tamed for, or null when it will get no companion record. */
+    @Nullable
+    private static UUID litterOwner(
+            @Nullable TwBreedingConfig config,
+            @Nonnull BreedingResolvedSpawnRole role,
+            @Nonnull BreedingPairContext context
+    ) {
+        TwBreedingConfig.InheritanceSettings inheritance = config == null
+                ? null
+                : config.resolveInheritance(role.roleId());
+        boolean tamed = (inheritance == null || inheritance.isInheritTamed())
+                && (context.parentATamed() || context.parentBTamed());
+        return tamed
+                ? BreedingInheritedOwnerResolver.resolve(
+                        config, role.roleId(), context.parentAOwner(), context.parentBOwner()).ownerId()
+                : null;
+    }
+
+    @Nullable
+    private static Player resolveOnlinePlayer(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull UUID playerId
+    ) {
+        Ref<EntityStore> ref = world.getEntityRef(playerId);
+        if (ref == null || !ref.isValid()) {
+            return null;
+        }
+        try {
+            return store.getComponent(ref, Player.getComponentType());
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
     }
 
     private int limitByNearbyPopulation(

@@ -1,7 +1,9 @@
 # ADR 0009: Managed Activities, Capacity, and Durable Output
 
-- Status: Accepted
+- Status: Accepted; storage part superseded by ADR 0011 (Tamework 5.0.0)
 - Date: 2026-08-20
+
+> Historical storage: the SQLite tables, reservations, output claims and schema upgrade below were removed in 5.0.0. Admission provider claims are now stored on the companion record and counted per owner; see [ADR 0011](0011-companion-index-persistence.md).
 
 ## Context
 

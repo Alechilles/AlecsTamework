@@ -29,7 +29,7 @@ final class LinkedNpcPanelRefreshValues {
 
     void setStyle(UICommandBuilder commands, String selector, String style) {
         if (!changed(selector, style)) return;
-        commands.set(selector, Value.ref("TameworkPanelActionStyles.ui", style));
+        commands.set(selector, Value.ref("TameworkSlateStyles.ui", style));
     }
 
     void set(@Nonnull UICommandBuilder commands, @Nonnull String selector,

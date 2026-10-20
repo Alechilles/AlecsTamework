@@ -82,7 +82,7 @@ class CommandUnlinkedOwnedSnapshotTest {
     }
 
     @Test
-    void doesNotAdoptDisposableBondedProjectionAsGenericCompanion() throws Exception {
+    void retiredProjectionMarkerDoesNotHideAnOwnedTame() throws Exception {
         try (SnapshotScope scope = SnapshotScope.install()) {
             Ref<EntityStore> reference = scope.store.createReference();
             NPCEntity npc = npc(OWNED_NPC, "Tamed_Pig");
@@ -96,9 +96,13 @@ class CommandUnlinkedOwnedSnapshotTest {
                             TameworkProjectionIdentityComponent.KIND_BONDED_COMPANION,
                             null, OWNED_NPC, 1L));
 
-            assertNull(new CommandLiveNpcSnapshotFactory().capture(
-                    reference, scope.store, npc, null),
-                    "A bonded lease owns this projection; it must not create a generic profile.");
+            // A body saved by 4.x that still carries the retired marker is observed like a
+            // body spawned by this version, which never has one.
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot =
+                    new CommandLiveNpcSnapshotFactory().capture(reference, scope.store, npc, null);
+            assertNotNull(snapshot, "The retired projection marker must not change the observation.");
+            assertEquals(OWNED_NPC, snapshot.npcUuid());
+            assertEquals(OWNER, snapshot.ownerId());
         }
     }
 

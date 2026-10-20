@@ -48,7 +48,6 @@ final class CommandRelocationTerminalService {
         }
         PendingRelocation pending = pendingByNpc.get(npcUuid);
         if (pending != null && remover.test(npcUuid, pending)) {
-            pending.markCrossWorldTransferFinished();
             diagnostics.accept(
                     Level.INFO,
                     "Cancelled pending relocation for npc=" + npcUuid

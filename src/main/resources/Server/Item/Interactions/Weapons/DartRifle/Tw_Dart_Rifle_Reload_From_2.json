@@ -1,0 +1,33 @@
+{
+  "$Comment": "Reload with 2 dart(s) already in the rifle: take one from the inventory, play the load clip for this count, count it, go on.",
+  "Type": "ModifyInventory",
+  "RequiredGameMode": "Adventure",
+  "ItemToRemove": {
+    "Id": "Weapon_Arrow_Tranquilizer",
+    "Quantity": 1
+  },
+  "Failed": "Tw_Dart_Rifle_Reload_Close_2",
+  "Next": {
+    "Type": "Simple",
+    "RunTime": 0.75,
+    "HorizontalSpeedMultiplier": 0.75,
+    "Rules": {
+      "InterruptedBy": [
+        "Primary",
+        "Secondary"
+      ]
+    },
+    "Effects": {
+      "ItemAnimationId": "ReloadLoad2",
+      "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Load",
+      "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Load"
+    },
+    "Next": {
+      "Type": "ChangeStat",
+      "StatModifiers": {
+        "Ammo": 1
+      },
+      "Next": "Tw_Dart_Rifle_Reload_Close_3"
+    }
+  }
+}

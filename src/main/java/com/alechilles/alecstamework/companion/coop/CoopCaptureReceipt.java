@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.companion.coop;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.companion.migrate.retired.OperationId;
 import javax.annotation.Nonnull;
 
 /**
@@ -27,25 +27,5 @@ public record CoopCaptureReceipt(
             );
         }
         receiptKey = receiptKey.trim();
-    }
-
-    /** Builds the only receipt accepted for the supplied prepared operation. */
-    @Nonnull
-    public static CoopCaptureReceipt exact(
-            @Nonnull CompanionCoopCaptureRequest request,
-            @Nonnull OperationId operationId
-    ) {
-        if (request == null || operationId == null) {
-            throw new IllegalArgumentException(
-                    "Coop capture request and operation are required"
-            );
-        }
-        return new CoopCaptureReceipt(
-                operationId,
-                request.profileId(),
-                request.source().sourceAlias(),
-                request.targetSlot(),
-                request.source().retirementReceiptKey()
-        );
     }
 }

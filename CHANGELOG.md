@@ -1,5 +1,426 @@
 # Changelog
 
+## 5.5.0 - Movable Companion HUD - 2026-10-19
+
+### Added
+
+- You can now move the companion HUD (the card that shows the companion you
+  are looking at). Click the arrows button at the top of the companion panel,
+  pick a snap point, and nudge it into place. The position is saved for you
+  only, so other players keep their own layout.
+- Server owners can set where the companion HUD appears by default, so it fits
+  around their other HUDs. Open `/tw settings` and use Edit under Companion
+  HUD. Players who never moved their HUD follow the default; players who did
+  keep their own spot.
+
+## 5.4.0 - Turning Animations - 2026-10-17
+
+### Added
+
+- NPCs can now play a turning animation when they turn on the spot. If a
+  model has `TurnLeft` and `TurnRight` animation sets, Tamework plays them
+  while the NPC stands still and its body turns. Models without those sets
+  are unaffected.
+
+## 5.3.2 - Coop Capture Item Fix - 2026-10-16
+
+### Fixed
+
+- Putting a captured animal into a coop from a reusable capture item, like a
+  Soul Lantern, no longer uses up the item. It turns back into its empty form,
+  ready to capture again.
+
+## 5.3.1 - Config Crash Fix - 2026-10-15
+
+### Fixed
+
+- Fixed a crash that could happen when Tamework read a config from an asset
+  pack that had just been unloaded or reloaded.
+
+## 5.3.0 - Naming Updates - 2026-10-13
+
+### Added
+
+- The naming window has a Clear Name button that removes a companion's name.
+  It does not use up the naming item.
+- Offensive companion names are now blocked by default, including common
+  disguises like swapped-in numbers, spaced-out letters, and stretched
+  letters. Server owners can turn the filter or its built-in word list off,
+  and add their own blocked and allowed words, in `/tw settings` under Naming.
+- Modders: the `LettersNumbersSpacesPunctuation` preset for `AllowedChars`
+  also allows the apostrophe, hyphen, and period, for names like
+  `Mr. O'Malley`.
+- `/tw settings` has a new **Unlimited Flight Vigour** option under Avatar
+  Flight. When it is on, charged launches, upward flaps and forward boosts cost
+  no Vigour and the Vigour pips are hidden. It is off by default.
+
+### Fixed
+
+- Fixed a server startup crash that could happen when Tamework set up its
+  companion systems before the game's NPC systems were ready.
+
+## 5.2.1 - Update 7 Pre-release 5 - 2026-10-09
+
+### Changed
+
+- On Hytale Update 7 pre-release, E and R on command items and the
+  Flightmaster's Talisman no longer swap out your runes. Your runes stay in
+  their slots, and Tamework takes the two keys only while the item is held.
+  Runes that an older build had set aside are handed back.
+- The supported Update 7 pre-release is now 0.7.0-pre.5 or newer. Update 6
+  support is unchanged.
+- Modders: an item listed in a command item config claims E and R on Update 7
+  without the `TameworkInput` family tag. It must still be a weapon, because
+  the Update 7 client only sends E and R with a weapon in hand.
+
+### Fixed
+
+- Fixed crashes on Hytale 0.7.0-pre.5.1 from engine calls that no longer
+  exist, including one where a coop could take the world down.
+- E and R on command items work again on 0.7.0-pre.5.
+- On Update 7, the Flightmaster's Talisman claims E and R as soon as flight
+  begins and releases them when it ends.
+- Modders: schema generation no longer fails on the `TameworkFlyingOrbit`
+  body motion.
+
+## 5.2.0 - Slate UI - 2026-10-07
+
+### Changed
+
+- Every Tamework screen has a new look, called Slate: navy panels with gold
+  trim, closer to the base game. This covers the companions window and its
+  cards, the bonded companion roster, saved views, pop-ups, the talents
+  page, the companion guide,
+  settings, the group manager, the name and location pages, the config
+  editor, and the command target, command hotswap and avatar flight HUDs.
+- Companion cards have a framed portrait, a state pill and a select switch.
+- The bonded companion roster shows each companion's level and how far it is
+  to the next one, and its tabs show how many companions they hold.
+- The paid-revive dialog shows whether you have each required item, with a
+  summary line underneath.
+- Window headers show the Tamework logo.
+- On the talents page, the paths between talents you have unlocked are
+  coloured, and a talent you cannot afford yet reads "Too costly".
+- The Tranquilizer Dart Rifle and darts have their own recipes. The rifle
+  takes wood trunks, iron bars, cobalt bars, heavy leather, Shadoweave scraps
+  and Tranquilizer Potions, with no Cobalt Shortbow. Six darts take an iron
+  bar, light feathers, fibre and a Tranquilizer Potion, with no Crude Arrows.
+
+### Added
+
+- Modders: the `TameworkProgressionReward` NPC action grants a companion an
+  immediate happiness change and companion XP from a role instruction, for
+  example after play.
+- Modders: the wander component sets the `Tamework_Wander_Settled` flag while an
+  NPC holds its settle posture and restarts its cycle when another instruction
+  sets `Tamework_Wander_Reset`, so outside behaviors can stand a resting NPC up
+  before moving it.
+- Modders: `TameworkLeap` takes a `StopDistance` to land that many blocks short
+  of its target, so an NPC can pounce to just in front of a player.
+
+### Fixed
+
+- The group labels on the command hotswap HUD ("All Companions", "No Active
+  Companions", "Custom Selection") are translated in all six languages.
+- Ownership, news and debug command messages that were in English or built
+  from English fragments are translated. Half-English and corrupted German
+  and Brazilian Portuguese strings are retranslated, and stale claim-limit
+  labels, missing trough hints and altered command syntax are corrected in
+  Spanish, French, Canadian French and German.
+- A food with no translation shows a readable name instead of a raw
+  translation key, and the default companion name is translated.
+- A companion no longer keeps returning to a food or water source it just
+  failed to use, and an empty water source is no longer reported as an error.
+- Fixed several crashes that could stop Tamework from starting while worlds
+  were loading.
+- Fixed errors that could occur when a chat message or packet arrived for a
+  world that was shutting down.
+- The example asset pack includes its missing Spanish translation.
+
+## 5.1.1 - Dart Rifle Polish - 2026-10-06
+
+### Changed
+
+- The Tranquilizer Dart Rifle shows a reload as it happens: the bolt stays
+  open between darts, and the chambered dart and the loaded darts on the
+  rifle update as each one goes in.
+- The rifle's shading is cleaner: softer iron shadows, and corrected
+  undersides, rivets and trigger guard.
+
+### Fixed
+
+- Faces that were missing from the rifle, including the rear of the barrel
+  base, are back.
+- The rifle's wrist meets the stock without a gap, and the grip wrap's straps
+  line up all the way round.
+- A dart's trail starts at the muzzle instead of partway along the dart.
+
+## 5.1.0 - Tranquilizer Dart Rifle - 2026-10-06
+
+### Added
+
+- `TameworkFlyingOrbit` accepts an optional `AirborneTargetAltitudeRange`, a
+  separate vertical offset used while the target is flying, so two flyers can
+  settle at a similar height. Without it, `DesiredAltitudeRange` always
+  applies. `Kettle` mode ignores it.
+
+### Changed
+
+- The Tranquilizer Shortbow is now the Tranquilizer Dart Rifle and Tranquilizer
+  Arrows are now Tranquilizer Darts. Both keep their item IDs, so bows and
+  arrows already in a world become the rifle and darts, and recipes are
+  unchanged.
+- The rifle is bolt-action and holds 3 darts. The primary action fires and
+  works the bolt, and starts a reload when the rifle is empty. The reload key
+  loads one dart at a time and firing interrupts it. Loaded darts return to the
+  inventory when the rifle is put away, and the loaded count shows on the HUD.
+
+### Removed
+
+- The shortbow's charged shot, guard and volley are gone with the bow.
+
+### Fixed
+
+- The flight and shoulder buttons on bonded companion cards no longer ignore
+  clicks while the roster refreshes in the background.
+- Commands with `ShowInRadial: false` can now be assigned through the LMB
+  selector, as they can through Q, E, and R.
+
+## 5.0.0 - Companion Store Rework - 2026-10-04
+
+**Upgrade compatibility:** Back up the world's `universe` folder before
+updating. This release requires Hytale server 0.6.0 or later; 0.5.x is no
+longer supported. The first start on a 3.x or 4.x world imports all companion
+data automatically, before worlds load. The old database files are only read
+and stay unchanged, so rolling back to 4.3.x uses them as they were before the
+update. 2.x worlds are not imported: run Tamework 4.3.x once first, or start
+fresh. A later release will remove the importer, so 3.x and 4.x worlds must run
+a 5.0.x version once before moving past it. The public Java API is now 3.0.0
+and is not compatible with 2.x, so mods that call it, such as HyDragon and
+Alec's NPC Debug Inspector, need versions built for Tamework 5.0. See
+[World Migration for Server Admins](wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md).
+
+### Migration
+
+- Each import writes `import-report-<UTC time>.txt` to the `Tamework/Data`
+  folder, prints a one-line summary to the console and records a receipt in
+  the new store's `meta.json`. The report lists the sources, counts, skipped
+  entries with reasons, and companions that need attention.
+- A failed import writes `import-report-failed.txt`, shows operators a notice,
+  changes nothing, keeps companion features off and tries again at every start.
+  A `Companions` folder that is a link or junction, or that holds files but no
+  `meta.json`, is refused with instructions.
+- 2.x worlds show operators a chat notice and a popup that name the version to
+  run first. While old data blocks the world, operators can run
+  `/tw persistence start-fresh [confirm]` instead, also from the console. It
+  creates an empty companion store, leaves the old files alone and takes effect
+  after a restart.
+- After the import, companions that 4.x left in unloaded chunks are located in
+  the background, one chunk at a time on a low-priority thread that slows down
+  under server load and resumes after a restart. Until it finishes, their cards
+  show "Being located after the update" and Recall, Recover and Locate are
+  refused. A companion found in no saved chunk is listed as lost and can be
+  recovered; if its animal loads later, it rejoins.
+- As chunks load, each old animal is matched to its imported companion.
+  Leftover stale copies are removed without a death or drops, and animals that
+  cannot be proved stale are left alone. A player who claimed a removed copy
+  gets a message. Leftover copies cannot be captured or put in a coop.
+- Companions imported as lost because the old data was unclear rejoin when
+  their animal loads. Animals that 4.x had released can be tamed again.
+- Imported dead, lost, stored and bonded companions can be revived, recovered
+  and summoned from their saved state. A companion that starved revives with
+  default needs.
+- 4.x capture items release their companion once; copies are refused. 2.x
+  capture items that were never rewritten restore the animal from their own
+  data on first use; copies are refused. A tamed companion with no owner in an
+  imported item becomes the releaser's, within their limits.
+- Command items keep their links, including links to an old animal. Imported
+  coop residents rejoin their coop when it loads. They wait while a coop block
+  stands without a usable config, and are released beside the block, or listed
+  as lost and recoverable, if the coop is gone or full.
+- Items held by an unfinished 4.x bonded revive payment are returned when the
+  player enters a world. Items that do not fit drop at the player's feet, with
+  a message. Paid or refunded payments are discarded.
+- Retired 4.x data is removed from animals and players as they load.
+- Timed summons that were active at import restart their remaining time from
+  the import.
+- Limits that another mod enforces through Tamework do not count imported
+  companions until their next change.
+- A 4.x settings file's `limitPerPlayerOwnedTotal` value moves to the new
+  `limitPerPlayerDeployedTotal`, and the owned limit becomes unlimited, because
+  4.x counted only loaded companions. Imported companions not seen since the
+  import do not count as deployed. Review both limits in `/tw settings`.
+- A world that needs migration logs a warning at startup instead of a severe
+  error.
+
+### Added
+
+- Separate per-player limits in `/tw settings`. "Max companions out in the
+  world" (`limitPerPlayerDeployedTotal`) counts every summoned companion,
+  loaded or not. "Max companions owned" (`limitPerPlayerOwnedTotal`) counts
+  everything a player owns, including companions in items, rosters and coops,
+  dead and lost. Each limit has its own refusal message.
+- A "Captured companion ownership" setting with three modes: Follows the item
+  (default; whoever takes the filled item into their inventory becomes the
+  owner, within their limits), Owner only, and Changes on release (the releaser
+  becomes the owner). A companion in a capture item always keeps an owner.
+- Filled capture items show an "Owner:" line that updates when the item changes
+  hands.
+- In Follows the item mode, a player at their limit cannot pick up another
+  player's filled capture item. Item configs can turn this off with
+  `BlockIneligibleHolders: false`.
+- Recall and Forget for captured companions in the companion panel. Recall
+  brings the companion out of its item; Forget releases it permanently and
+  frees its slot. Either way, surviving copies of the item become empty.
+- `/tw companions forget <self|player|UUID> <companion> [confirm]` and
+  `/tw companions restore <self|player|UUID> <companion> [confirm]` let admins
+  forget a captured companion or restore one from an item, a coop or lost.
+- `/tw bonded grant <self|player|UUID> <rosterId> <roleId> [name]` gives an
+  online player a stored bonded companion.
+- Admins see a one-time in-game notice about the 5.0 changes, with a reminder
+  to back up and a pointer to the migration guide.
+- Bonded roster configs accept `NameKey` for a translated family name.
+- The optional example pack includes a roster capture item, command item and
+  companion config for testing rosters, timed summons and paid revives.
+
+### Changed
+
+- Companion data is stored as files in `universe/Tamework/Companions`: one file
+  per owner, plus one saved state for each companion that is not in a world.
+  Hytale world backups include it. Tamework no longer uses a database.
+- Each companion and capture item carries a generation. An outdated copy, such
+  as a duplicated capture item or an animal left behind in an unloaded chunk,
+  is refused or removed when it is next seen.
+- Recall and follow across worlds respawn the companion from its saved state,
+  leaving no copy behind.
+- A capture item that despawns or is destroyed leaves its companion lost and
+  recoverable.
+- Breaking a coop releases its residents beside the block.
+- Coop production follows vanilla coop timing: it runs on the world's game
+  clock, produces at the morning roam and catches up missed days.
+- A tamed animal with no owner is claimed only when a player interacts with it,
+  within that player's limits.
+- Owned and group limits count every owned companion, including those in items,
+  rosters, coops, dead and lost. Admin tamed spawns of managed roles count
+  toward limits like any other new companion.
+- Dead and lost companion cards show a status strip. Dead cards show the revive
+  countdown, or that the companion is ready to revive; lost cards show that the
+  companion is missing and ready to recover.
+- Bonded companions are stored with all other companions. A revive brings the
+  companion back active at the chosen place and needs a free active slot; the
+  cost is charged first and refunded if the revive fails. Bonded companions are
+  stored when their session expires or the owner logs out or changes world, not
+  when the owner dies. A lost bonded companion is listed as stored and can be
+  summoned again. Provisioned bonded companions count toward the owner's owned
+  and group limits.
+- Redesigned bonded roster cards with a named family header, counts and a full
+  bar, a gender icon, and a family-full line that names the active companion.
+  Bonded names read as given name, translated role, then species.
+- Ordinary command items no longer control bonded companions, and owned-pet
+  transformation refuses roster companions.
+- When a mod limits taming through Tamework, the action is refused if that
+  mod's check is missing, slow or failing, and a limit of 0 allows none. A
+  first attempt may answer "checking requirements, try again". These messages
+  no longer mention Husbandry.
+- The mod jar is about half the size (30 MB down to 16 MB). The bundled SQLite driver is used only by
+  the importer and keeps native files for Windows x64, Linux x64 and ARM64
+  (including Alpine), and macOS x64 and ARM64. On other platforms the import
+  fails without changing anything.
+- Public Java API 3.0.0 changes events, diagnostics, profile data, population
+  counts and bonded companions, and the API is available only while the
+  companion store is ready. See
+  [Changes from 2.x](wiki/Modder-Documentation/Public-API/API-Reference/Public-API-Overview.md#changes-from-2x).
+
+### Removed
+
+- `/tw debug persistence` and all its subcommands: `status`, `health`,
+  `detail`, `export`, `reviveready`, `compact` and `simulateerror`. For
+  support, send the server log and, after an import, the import report.
+- Automatic startup database compaction from 4.3.2, along with the database.
+- The "Spawn requires owner" setting. The capture item fields
+  `Spawn.OwnerRestricted`, `Spawn.RequireOwner` and `Capture.ClearsOwner` still
+  load but are ignored; the captured companion ownership mode decides. Existing
+  capture-clears-owner and spawn-sets-owner settings map to the nearest mode. A
+  capture with `TamesTarget` always tames.
+- The companion config field `Travel.OnTransferFailure` still loads but is
+  ignored. Recall across worlds respawns the companion from its saved state, so
+  there is no transfer to fail.
+- Public API entry points `commandFamilyRosters()`, `commandTimedSummoning()`,
+  `companionProvisioning()`, `paidCommandRevival()`,
+  `policies().populationAdmissions()` with its reservation tokens,
+  `populationGroups().getReconciliationStatus()`,
+  `profileData().findOperation(...)` and the persistence resilience
+  diagnostics, with their capabilities. Rosters, timed summons and paid revives
+  stay available through roster and companion configs, and bonded companions
+  through `bondedCompanions()`; add limit checks with
+  `policies().admissionProviders()`.
+- Events no longer published: population group membership and limit changes,
+  timed summoning, provisioning, provisioned death and revive, paid revive, and
+  command roster membership.
+- Direct import of 2.x saves.
+- Support for Hytale server 0.5.x.
+- The optional NameplateBuilder integration: the pet-name override for the
+  `entity-name` segment and the Happiness, Hunger, Thirst, Tranquilizer and
+  Traits segments. Tamework pet naming is unchanged.
+
+### Fixed
+
+- Updated embedded Beacon to 2.0.3 to remove mod archive scans during player
+  joins and world transfers, and reduce repeated consent-file reads.
+- Changes to idle companions, such as renames, stats and progression, now
+  always reach the world save. Before, Hytale saved them only when something
+  else also changed the animal.
+- `/tw api test run` and `/tw api test status` no longer fail with "Assert not
+  in thread".
+- German, French, Canadian French and Brazilian Portuguese no longer show
+  leftover English placeholder text, and Spanish uses "Niv." for level.
+
+## 4.3.2 - Startup Database Compaction Hotfix - 2026-10-01
+
+- Older databases now compact automatically during startup, before normal saves,
+  to reclaim disk space from accumulated checkpoint history.
+- Fresh databases and databases already compacted skip the pass. Failed attempts
+  are logged and retried on a later startup while conversion is still needed.
+- The manual `/tw debug persistence compact` command remains available.
+
+## 4.3.1 - Newly Tamed Companion Talents - 2026-09-29
+
+- Fixed blank talent pages for newly tamed companions. Owned, loaded companions
+  can open their talents without being selected on a command flute.
+- Older databases now compact automatically during startup. Fresh databases and
+  databases already compacted skip the pass; unsuccessful attempts are logged
+  and retried on a later startup.
+
+## 4.3.0 - Boss Tools and Update 7 Compatibility - 2026-09-28
+
+- Added `TameworkBeam`, a terrain-blocked NPC beam that follows the NPC's look
+  direction. Roles control its duration and turning speed to create dodgeable
+  sweeping attacks.
+- Added `TameworkBossBar` for native boss health bars with nearby-player
+  visibility and cleanup when combat ends, the boss dies, or it unloads.
+- Added `TameworkLeap` for a timed arc to a captured target position, with block
+  collision checks. This movement requires Hytale 0.6.7 or later.
+- Added optional landing markers, feet targeting, and NPC hatching to arc
+  projectiles. Projectile effects now activate when a projectile interaction is
+  loaded, including servers with capture and tranquilizers disabled.
+- Added an owned-NPC transformation effect that creates the replacement before
+  safely releasing the original companion. Fixed translation keys appearing
+  instead of configured interaction notifications.
+- Added Hytale Update 7 compatibility, including `0.7.0-pre.4`, while retaining
+  Update 5 and Update 6 support. E/R flight combat and command-item shortcuts
+  preserve and restore equipped runes when their temporary control runes are
+  released.
+- Added opt-in underwater avatar mounting with acceleration, a cruising speed
+  limit, forward boosts, braking, and rise/descend controls. It uses AvatarFlight's
+  rider and recovery lifecycle without altitude-based speed changes.
+- Added an experimental native hammerhead swimming mount to the optional example
+  pack, preserving the mount's breathing rules without a talisman or rider
+  transformation. In Hytale 0.6.8 live testing, crouch and Q input did not reach
+  the mounted handlers, W acceleration remained unverified, and passive sinking
+  remained. This example's custom controls still need further testing.
+- Simplified companion stat and timer tooltips by removing explanations of saved
+  data and loading.
+
 ## 4.2.0 - Companion Views and Stability - 2026-09-23
 
 - Fixed Revive and Recover on ordinary companion cards when a linked animal's old NPC ID was retired after death or loss.

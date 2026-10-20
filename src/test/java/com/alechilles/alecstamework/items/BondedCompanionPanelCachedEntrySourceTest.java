@@ -126,6 +126,32 @@ class BondedCompanionPanelCachedEntrySourceTest {
         assertNull(card.status().blockReason());
     }
 
+    /** Flight and shoulder buttons revalidate through this lookup on every click. */
+    @Test
+    void passiveRefreshKeepsTheProfileTrustedForAuxiliaryActions() {
+        QueueExecutor worker = new QueueExecutor();
+        AtomicLong now = new AtomicLong();
+        MutableApi api = new MutableApi(profile(
+                4L, BondedCompanionStateView.ACTIVE));
+        BondedCompanionPanelEntrySourceService source = source(api, worker,
+                now::get, 1L);
+        source.buildSnapshot(OWNER, ROSTER, "world-a");
+        worker.runNext();
+
+        now.set(2L);
+        var trusted = source.currentTrustedProfile(OWNER, ROSTER, "profile-cache");
+
+        assertEquals(4L, trusted == null ? -1L : trusted.revision(),
+                "a scheduled cache refresh must not reject the click");
+
+        api.fire(new BondedCompanionChangedEvent(
+                "profile-cache", OWNER, ROSTER,
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStateView.STORED, 5L, "stored"));
+        assertNull(source.currentTrustedProfile(OWNER, ROSTER, "profile-cache"),
+                "a real profile change still revokes the action");
+    }
+
     private BondedCompanionPanelEntrySourceService source(
             MutableApi api, QueueExecutor worker) {
         return source(api, worker, System::nanoTime, Long.MAX_VALUE);

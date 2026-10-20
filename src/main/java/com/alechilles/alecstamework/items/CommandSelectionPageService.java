@@ -16,7 +16,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -1283,12 +1282,7 @@ final class CommandSelectionPageService {
                 CommandTravelSettings.isRecallTeleportingEnabled());
     }
 
-    private java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> savedPanelSignals =
-            ignored -> LinkedPanelRefreshSignalSource.none();
-
-    void configureSavedPanelSignals(java.util.function.Function<UUID, LinkedPanelRefreshSignalSource> signals) {
-        savedPanelSignals = signals;
-    }
+    private final CommandPanelOwnerSignals ownerSignals = new CommandPanelOwnerSignals();
 
     LinkedPanelRefreshSignalSource pageSignals(Player player,
                                                 TwCommandItemConfig config) {
@@ -1300,7 +1294,15 @@ final class CommandSelectionPageService {
         return ownerUuid != null && config != null && config.usesBondedCompanionRoster()
                 && bondedRefreshSignals != null
                 ? bondedRefreshSignals.forRoster(ownerUuid, config.getBondedRosterId())
-                : savedPanelSignals == null ? LinkedPanelRefreshSignalSource.none() : savedPanelSignals.apply(ownerUuid);
+                : ownerSignals.forOwner(ownerUuid);
+    }
+
+    /**
+     * Refreshes the open generic and command-family panels of {@code ownerUuid} after a change that
+     * finished outside a panel click, such as a completed restore. Safe from any thread.
+     */
+    void signalOwnerPanels(UUID ownerUuid) {
+        ownerSignals.changed(ownerUuid);
     }
 
     private TameworkCommandSelectionPage createSelectionPage(
@@ -1368,12 +1370,13 @@ final class CommandSelectionPageService {
                 context.refreshSignals()
         );
         page.configurePagination(context.pagination());
+        page.configureReopen(context.actions().reopenMenu());
         if (context.genericRosterActions()) {
             page.configureGroupColors(() -> groupAssignPageService.resolveGroupColors(
                     resolveCurrentPlayer(context.ownerUuid()), context.toolId()));
         }
         page.configureActiveHighlight(new CommandActiveHighlightBinding(
-                context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
+                context.genericRosterActions(),
                 context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
                                 resolveCurrentPlayer(context.ownerUuid()),
@@ -1397,6 +1400,9 @@ final class CommandSelectionPageService {
                     context.toolId(), context.config()));
         }
         page.configureShoulderRideCallback(shoulderRideCallback(context));
+        if (context.genericRosterActions()) {
+            page.configureForgetCallback(guardedUuid(context.genericAuthority(), context.actions().forget()));
+        }
         page.configureHotswapAssignments(
                 () -> toolInventoryService.findActiveToolStack(
                         resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
@@ -1826,7 +1832,15 @@ final class CommandSelectionPageService {
                    Consumer<UUID> returnHome,
                    Runnable manageGroups,
                    Runnable reopenMenu,
-                   Consumer<String> selectCommand) {
+                   Consumer<String> selectCommand,
+                   Consumer<UUID> forget) {
+        /** Without the panel's Forget (spec 8.14). */
+        Actions(Consumer<UUID> unlink, Consumer<UUID> release, Consumer<UUID> cull, Consumer<UUID> respawn,
+                Consumer<UUID> locate, Consumer<UUID> recall, Consumer<UUID> setHome, Consumer<UUID> returnHome,
+                Runnable manageGroups, Runnable reopenMenu, Consumer<String> selectCommand) {
+            this(unlink, release, cull, respawn, locate, recall, setHome, returnHome, manageGroups, reopenMenu,
+                    selectCommand, ignored -> { });
+        }
     }
 
     private record PageContext(

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.spatial.SpatialResource;
@@ -60,7 +59,7 @@ public final class AvatarFlightParticleEmitter {
                     maxDurationSeconds
             );
             return true;
-        } catch (RuntimeException error) {
+        } catch (RuntimeException | LinkageError error) {
             warnOnce(systemId, "AvatarFlight particle emission failed for " + systemId
                     + ": " + error.getMessage());
             return false;
@@ -76,8 +75,7 @@ public final class AvatarFlightParticleEmitter {
         SpatialResource<Ref<EntityStore>, EntityStore> playerSpatialResource =
                 componentAccessor.getResource(EntityModule.get().getPlayerSpatialResourceType());
         if (playerSpatialResource != null) {
-            HytaleSpatialAccess.collect(
-                    playerSpatialResource.getSpatialStructure(),
+            playerSpatialResource.getSpatialStructure().collect(
                     position,
                     ParticleUtil.DEFAULT_PARTICLE_DISTANCE,
                     recipients

@@ -13,8 +13,9 @@ offline time, restoration, and presentation.
 1. Read `references/progression-lifecycle.md`.
 2. Identify the component that owns the value and the `Tw*Config` family that
    defines its policy.
-3. Trace initialization, runtime mutation, checkpoint or snapshot capture,
-   restore, load bootstrap, and UI/API presentation.
+3. Trace initialization, runtime mutation, how the change reaches disk (the
+   change detector or a dirty mark), snapshot capture, restore, load
+   bootstrap, and UI/API presentation.
 4. Find coupled systems. Needs can affect happiness and damage; life stage can
    affect roles and attachments; traits and talents can affect stats and time
    scales.
@@ -25,8 +26,8 @@ offline time, restoration, and presentation.
 
 - World-time epoch milliseconds can be negative. Zero is the explicit unset
   sentinel; sign is not validity.
-- Preserve signed timestamps through codecs, snapshots, databases, arithmetic,
-  logs, and UI.
+- Preserve signed timestamps through codecs, snapshots, the record summary,
+  arithmetic, logs, and UI.
 - Compare by ordering. Do not gate valid timers with `> 0` or clamp them to
   positive values.
 - Distinguish real time from scaled world time before computing offline elapsed
@@ -48,8 +49,8 @@ offline time, restoration, and presentation.
 
 - Use `$tamework-config-authoring` for `Tw*Config` schema, inheritance,
   override, editor, or reload changes.
-- Use `$tamework-persistence` for durable state, snapshots, checkpoints,
-  database rows, recovery, or migration.
+- Use `$tamework-persistence` for saved companion state, snapshots, the
+  change detector, restore flows, or 3.x/4.x import.
 - Use `$tamework-runtime-safety` for ECS writes, world-thread access, async
   work, and sweep performance.
 - Use `$tamework-api-evolution` when public progression views or mutations

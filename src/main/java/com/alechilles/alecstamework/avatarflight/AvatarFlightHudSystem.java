@@ -17,10 +17,10 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -35,8 +35,9 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
     private final ComponentType<EntityStore, UUIDComponent> uuidType;
     private final ComponentType<EntityStore, Player> playerType;
     private final Query<EntityStore> query;
-    // Command and mount activators are not owned by this system, so the main-thread connection cache is shared.
-    private static final Map<UUID, HudState> STATE_BY_PLAYER = new HashMap<>();
+    // Shared with the command and mount activators, and touched by every world thread that ticks
+    // this system plus the disconnect event thread, so it must be a concurrent map.
+    private static final Map<UUID, HudState> STATE_BY_PLAYER = new ConcurrentHashMap<>();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, AvatarFlightMovementSystem.class)
     );
@@ -91,17 +92,21 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                                                @Nonnull TwAvatarFlightConfig config,
                                                @Nonnull AvatarFlightProgressionTuning tuning,
                                                long nowMs) {
-        double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
+        double horizontalSpeed = AvatarFlightSpeedMetrics.movementSpeed(
                 flight.getVelocityX(),
                 flight.getVelocityY(),
-                flight.getVelocityZ()
+                flight.getVelocityZ(), config
         );
         double speedRatio = AvatarFlightSpeedMetrics.speedRatio(horizontalSpeed, config);
-        double maxCharges = config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier();
+        // No pips while Vigour does not limit the flight.
+        boolean vigourEnabled = AvatarFlightVigourService.isEnabled(config);
+        double maxCharges = vigourEnabled
+                ? config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier()
+                : 0.0;
         boolean groundedAtFull = flight.getMode() == AvatarFlightMode.GROUNDED
-                && fullVigour(flight.getVigourCharges(), maxCharges);
+                && (!vigourEnabled || fullVigour(flight.getVigourCharges(), maxCharges));
         long maxChargeMs = config.getLaunch().getMaxChargeMs();
-        boolean launchChargeVisible = config.getLaunch().isEnabled()
+        boolean launchChargeVisible = !config.isUnderwater() && config.getLaunch().isEnabled()
                 && maxChargeMs > 0L
                 && input.isLaunchCharging()
                 && input.isOnGround();
@@ -132,7 +137,7 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                         AvatarFlightCombatAbilitySlot.ABILITY_3,
                         nowMs,
                         flight.getNextAbility3CombatAtMs())
-        );
+        ).withUnderwater(config.isUnderwater());
     }
 
     @Nonnull

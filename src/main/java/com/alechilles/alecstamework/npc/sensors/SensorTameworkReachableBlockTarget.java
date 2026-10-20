@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
@@ -496,13 +497,15 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                           @Nonnull Set<String> blockTypes,
                                           @Nullable BlockSetMembership blockSetMembership) {
         if (!blockTypes.isEmpty()
-                && matchesExactBlockType(worldChunk.getBlockType(x, y, z), blockTypes)) {
+                && matchesExactBlockType(
+                        HytaleBlockStateAccess.blockTypeAt(worldChunk, x, y, z), blockTypes)) {
             return true;
         }
         if (blockSetIndex == Integer.MIN_VALUE || blockSetMembership == null) {
             return false;
         }
-        return blockSetMembership.blockInSet(blockSetIndex, worldChunk.getBlock(x, y, z));
+        return blockSetMembership.blockInSet(blockSetIndex,
+                HytaleBlockStateAccess.blockIdAt(worldChunk, x, y, z));
     }
 
     static boolean matchesConfiguredBlock(@Nullable BlockType blockType,

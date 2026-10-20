@@ -1,0 +1,108 @@
+package com.alechilles.alecstamework.companion.coop;
+
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.RestoreRules;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import org.bson.BsonDocument;
+import org.bson.BsonString;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class CoopReleaseTest {
+    private static final CoopRelease.At AT = new CoopRelease.At("default", 4, 64, 9);
+    private static final RestoreFlow.Destination DEST = new RestoreFlow.Destination("default", 5.5, 64, 10.5, 0f, 0f);
+
+    private final List<String> events = new ArrayList<>();
+    private final List<RestoreFlow.Request> requests = new ArrayList<>();
+    private CompletableFuture<Boolean> spawn = new CompletableFuture<>();
+    private CompletableFuture<Void> clear = CompletableFuture.completedFuture(null);
+    private RestoreFlow.Result restoreResult = RestoreFlow.Result.RESTORED;
+
+    private final CoopRelease release = new CoopRelease(id -> null, new CoopRelease.Port() {
+        @Override
+        public CompletableFuture<RestoreFlow.Result> restore(RestoreFlow.Request request) {
+            events.add("restore");
+            requests.add(request);
+            return CompletableFuture.completedFuture(restoreResult);
+        }
+
+        @Override
+        public CompletableFuture<Boolean> spawnUnowned(CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry,
+                                                       RestoreFlow.Destination destination) {
+            events.add("spawn");
+            return spawn;
+        }
+
+        @Override
+        public CompletableFuture<Void> clearSlot(CoopRelease.At at, TameworkCoopSlotsComponent.Slot entry) {
+            events.add("clear " + entry.slot());
+            return clear;
+        }
+    }, System::currentTimeMillis);
+
+    @Test
+    void unownedResidentIsSpawnedOnceWhileItsSpawnRuns() {
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(2,
+                new BsonDocument("Components", new BsonString("chicken")));
+
+        CompletableFuture<CoopRelease.Outcome> first = release.release(AT, entry, DEST);
+        // A second sweep while the spawn is pending must not spawn the resident again.
+        assertEquals("BUSY", release.release(AT, entry, DEST).join().cause());
+        assertEquals(List.of("spawn"), events);
+
+        spawn.complete(true);
+        assertTrue(first.join().released());
+    }
+
+    @Test
+    void aBreakQueuedBetweenTheSpawnAndTheSlotClearDoesNotSpawnTheResidentAgain() {
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(3,
+                new BsonDocument("Components", new BsonString("chicken")));
+        clear = new CompletableFuture<>();
+        spawn.complete(true);
+
+        CompletableFuture<CoopRelease.Outcome> morning = release.release(AT, entry, DEST);
+        // The spawn task ran; the queued clear has not. A break release queued before it runs now.
+        assertFalse(release.resident(AT, entry));
+        assertEquals("BUSY", release.release(AT, entry, DEST).join().cause());
+        assertEquals(List.of("spawn", "clear 3"), events);
+
+        clear.complete(null);
+        assertTrue(morning.join().released());
+    }
+
+    @Test
+    void failedUnownedSpawnIsReportedAndRetriedOnlyAfterTheDelay() {
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.unowned(0,
+                new BsonDocument("Components", new BsonString("chicken")));
+        spawn.complete(false);
+
+        assertEquals(new CoopRelease.Outcome(false, "SPAWN_FAILED"), release.release(AT, entry, DEST).join());
+        assertFalse(release.releasableNow(AT, entry));
+    }
+
+    @Test
+    void companionIsRestoredAtItsGenerationAndItsSlotClearedOnlyWhenRestored() {
+        UUID profileId = UUID.randomUUID();
+        TameworkCoopSlotsComponent.Slot entry = TameworkCoopSlotsComponent.Slot.companion(1, profileId, 7L);
+
+        restoreResult = RestoreFlow.Result.STALE;
+        assertEquals("STALE", release.release(AT, entry, DEST).join().cause());
+        assertEquals(List.of("restore"), events);
+
+        restoreResult = RestoreFlow.Result.RESTORED;
+        assertTrue(release.release(AT, entry, DEST).join().released());
+        assertEquals(List.of("restore", "restore", "clear 1"), events);
+        RestoreFlow.Request request = requests.get(1);
+        assertEquals(profileId, request.profileId());
+        assertEquals(RestoreRules.Reason.COOP_RELEASE, request.reason());
+        assertEquals(7L, request.expectedGeneration());
+        assertEquals(DEST, request.destination());
+    }
+}

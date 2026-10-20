@@ -63,8 +63,8 @@ Fields:
 - `Denylist`
 
 ### `Capture`
-- `ClearsOwner`: legacy/configurable owner-clear behavior; server runtime
-  policy may own the effective value.
+- `ClearsOwner`: retired. It still loads and is ignored: a capture never
+  clears the owner.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
 - `TamesTarget`: allows an eligible wild, unowned target to become the actor's
   owned tamed companion on successful capture.
@@ -77,6 +77,10 @@ Fields:
 - `TamedRoleOverrides`: source-role to stored/tamed-role map used with
   `TamesTarget`.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
+- `BlockIneligibleHolders` (default `true`): while the server's captured
+  companion ownership mode is `FOLLOWS_ITEM`, a player at their companion limit
+  cannot pick up or take the filled item. Uses inventory slot filters; set it to
+  `false` on every item config if another mod filters player inventory slots.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
@@ -95,10 +99,11 @@ Fields:
   `ResolvedAttempt` spends one exact source item after either terminal success
   or terminal failure.
 - `SuccessDisposition`: `CapturedItem` creates the configured filled item;
-  `TameAndCommandLink` keeps the target live and atomically establishes its
-  canonical tame/owner/role/profile, population groups, roster membership, and
-  first timed lease; `StoreBondedCompanion` creates a durable `STORED` profile
-  in the separate bonded authority before retiring the source NPC.
+  `TameAndCommandLink` keeps the target in the world, tames it for the
+  capturing player, links it to the item's command family and registers it as a
+  member of that family's roster, after the population limits pass;
+  `StoreBondedCompanion` saves the target as a `STORED` bonded companion in the
+  capturing player's bonded roster, then removes the source NPC.
 - `BondedRosterId`: required only for `StoreBondedCompanion`; names the
   receiving bonded roster.
 - `CommandFamilyId`: required stable owner-scoped family for
@@ -113,28 +118,57 @@ Fields:
 requires the `CAPTURE_POLICY` capability before an integration treats the flow
 as available. `ResolvedAttempt` additionally requires
 `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, and `TameAndCommandLink` requires
-`CAPTURE_TAME_AND_LINK` plus its population/roster/timed dependencies.
+`CAPTURE_TAME_AND_LINK`.
 
 `StoreBondedCompanion` instead requires `BONDED_COMPANIONS`. The selected
 target role must resolve to exactly one enabled family inside
-`BondedRosterId`. A successful operation stores the full snapshot and exact
-capture evidence before source cleanup, creates no filled item, and does not
-touch the generic command-family, population, timed-summon, generic profile,
-or outbox authorities. Missing or ambiguous bonded policy fails closed before
-the roll or source spend.
+`BondedRosterId`. A successful capture saves the full snapshot and the capture
+evidence on the companion's record before it removes the source NPC, and gives
+no filled item. The capturing player always owns the result. One source item is
+spent before the save and given back when the save does not go through. The
+family's `MaximumOwned` and the ordinary owner and population-group limits
+apply, and the stored companion starts with the family's summon cooldown.
+Missing or ambiguous bonded policy fails closed before the roll or source
+spend.
 
 For a channeled bonded-capture item, use `ChannelAuraEffectId` and
 `ChannelSoundEvent` for Begin-phase feedback and author one completion effect.
-Completion feedback is dispatched only after the durable result publishes;
+Completion feedback is dispatched only after the capture is saved;
 do not author the same completion particle/sound in two paths.
 
 ### `Spawn`
-- `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
-- `RequireOwner`: explicit owner-presence requirement for this item flow.
+- `AssignsOwner`: retired. It still loads and is ignored; the server's captured
+  companion ownership mode decides who owns a released companion.
+- `OwnerRestricted`, `RequireOwner`: retired. They still load and are ignored;
+  the server's captured companion ownership mode decides who may release
+  (`OWNER_ONLY` is the restriction).
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
 - `MaxDistance`
+
+### Captured companion ownership (server setting)
+
+A capture never clears the owner; only a wild animal caught by an item that
+does not tame it is an unowned capture. The
+server setting **Captured companion ownership** in `/tw settings`
+(`ownership.capture.captureItemOwnership`) decides how that owner changes, for
+every capture item:
+
+- `FOLLOWS_ITEM` (default): the owner becomes whoever gets the filled item into
+  their inventory, if their limits allow it. `BlockIneligibleHolders` applies
+  in this mode. A holder who is not the owner becomes the owner on release, if
+  their limits allow.
+- `OWNER_ONLY`: other players cannot pick up, take or release the item.
+- `CHANGES_ON_RELEASE`: the 4.x rule. The owner stays the same while the
+  companion is in the item; whoever releases it becomes the owner.
+
+The mode alone decides who may release a captured companion. The former
+`Spawn` owner checks and the "Spawn requires owner" server setting are retired
+and ignored for release. A filled item that no longer matches its companion
+turns into an empty item when anyone uses it. `Capture.OwnershipFollowsHolder` was
+replaced by this setting before release. A filled item shows its owner on the
+last tooltip line.
 
 ### Companion appearance icons
 
@@ -169,8 +203,8 @@ Appearance header.
   Install and explicitly enable `Alec's Tamework! Examples` before using it;
   the main Tamework jar does not ship enabled sample assets.
 - Captured Tamework names and progression metadata are preserved on the item and restored on spawn.
-- Capture owner clearing and spawn owner assignment are settings-owned runtime policy.
-- Spawner capture and release preserve canonical profile identity and tool-link
+- Who owns a captured companion is decided by the server's captured companion ownership mode, not by this config.
+- Spawner capture and release preserve the companion's profile identity and tool-link
   state through the replacement full-state snapshot. This config only defines
   the author-facing item policy.
 
@@ -186,9 +220,6 @@ Appearance header.
   },
   "Capture": {
     "RequireTamed": true
-  },
-  "Spawn": {
-    "OwnerRestricted": true
   }
 }
 ```
@@ -215,7 +246,6 @@ Appearance header.
     "MaxDistance": 5
   },
   "Spawn": {
-    "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
     "CooldownMs": 500,
@@ -227,9 +257,10 @@ Appearance header.
 
 ## Gotchas
 - `EmptyItemId` is the resolution key. If two active configs target the same item, selection becomes a config-resolution problem instead of an item-authoring problem.
-- `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
-- Use `/tw settings` for the global capture/spawn owner-transfer defaults.
-- Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
+- `Capture.RequireOwner` is an explicit override, not the same thing as `Capture.OwnerRestricted`.
+- Use `/tw settings` for the global capture owner requirement and the captured companion ownership mode.
+- An unset `Capture.RequireOwner` is not equivalent to `false`; it defers to the global capture owner requirement.
+- `Spawn.OwnerRestricted` and `Spawn.RequireOwner` no longer restrict release; use the `OWNER_ONLY` ownership mode.
 - Companion icon rules belong to `TwDynamicIconConfig`; update dependent packs together when migrating the removed inline icon maps.
 - `/tw config reload` is required after editing spawner configs during development.
 - Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied

@@ -1,9 +1,15 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.RestoreRules;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -14,18 +20,30 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Resolves and queues generic linked-record companion travel after a player
- * enters a destination world.
+ * Brings following linked-record companions to a player who entered a destination world.
+ *
+ * <p>A companion whose body is loaded in another world is restored at the player through
+ * {@link RestoreFlow} (reason RECALL) once its live state passes the follow state filter on its
+ * own world thread. A companion whose body is already loaded in the destination world is moved by
+ * the in-world relocation. A companion with no loaded body is skipped: it was not near its owner,
+ * so it was not following. Without the flow and the index queries, nothing travels.</p>
  */
 final class CommandWorldChangeTravelCoordinator {
+    private static final Logger LOGGER =
+            Logger.getLogger(CommandWorldChangeTravelCoordinator.class.getName());
+
     private final CommandNpcRelocationService relocationService;
     private final CommandResolutionService resolutionService;
     private final CommandLinkMutationService linkMutationService;
@@ -34,6 +52,10 @@ final class CommandWorldChangeTravelCoordinator {
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final double defaultSafeSpawnDistance;
+    @Nullable
+    private final RestoreFlow<Ref<EntityStore>> restoreFlow;
+    @Nullable
+    private final CompanionQueries companions;
 
     CommandWorldChangeTravelCoordinator(
             CommandNpcRelocationService relocationService,
@@ -42,7 +64,9 @@ final class CommandWorldChangeTravelCoordinator {
             CommandCanonicalRecordCommitGate canonicalRecordCommitGate,
             CommandCompanionPlacementService placementService,
             @Nullable CommandNpcProfileActionResolver profileActionResolver,
-            double defaultSafeSpawnDistance
+            double defaultSafeSpawnDistance,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
+            @Nullable CompanionQueries companions
     ) {
         this.relocationService = relocationService;
         this.resolutionService = resolutionService;
@@ -51,6 +75,8 @@ final class CommandWorldChangeTravelCoordinator {
         this.placementService = placementService;
         this.profileActionResolver = profileActionResolver;
         this.defaultSafeSpawnDistance = defaultSafeSpawnDistance;
+        this.restoreFlow = restoreFlow;
+        this.companions = companions;
     }
 
     void queueForPlayerUuid(@Nullable World destinationWorld,
@@ -90,9 +116,13 @@ final class CommandWorldChangeTravelCoordinator {
         Ref<EntityStore> playerRef = player.getReference();
         if (destinationStore == null || playerRef == null
                 || !playerRef.isValid()) return;
+        if (restoreFlow == null || companions == null) return;
+        if (CompanionDestinationAdmissionPolicy.assess(destinationWorld)
+                != CompanionDestinationAdmissionPolicy.Decision.ALLOWED) return;
 
         ItemContainer hotbar = inventory.getHotbar();
         Set<UUID> queuedNpcUuids = new HashSet<>();
+        Set<UUID> queuedProfileIds = new HashSet<>();
         for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
             ItemStack stack = hotbar.getItemStack(slot);
             if (stack == null || stack.isEmpty()) continue;
@@ -111,7 +141,7 @@ final class CommandWorldChangeTravelCoordinator {
                     hotbar, slot, stack, linkedRecords);
             if (linkedRecords == null) continue;
             queueRecords(player, playerRef, destinationWorld,
-                    destinationStore, linkedRecords, queuedNpcUuids);
+                    destinationStore, linkedRecords, queuedNpcUuids, queuedProfileIds);
         }
     }
 
@@ -145,7 +175,8 @@ final class CommandWorldChangeTravelCoordinator {
             World destinationWorld,
             Store<EntityStore> destinationStore,
             List<LinkedNpcRecord> linkedRecords,
-            Set<UUID> queuedNpcUuids
+            Set<UUID> queuedNpcUuids,
+            Set<UUID> queuedProfileIds
     ) {
         for (LinkedNpcRecord cachedRecord : linkedRecords) {
             LinkedNpcRecord record = resolveRelocationRecord(cachedRecord);
@@ -159,12 +190,13 @@ final class CommandWorldChangeTravelCoordinator {
                 continue;
             }
             if (queueRecord(player, playerRef, destinationWorld,
-                    destinationStore, record, roleId, settings)) {
+                    destinationStore, record, roleId, settings, queuedProfileIds)) {
                 queuedNpcUuids.add(record.npcUuid);
             }
         }
     }
 
+    /** Runs on the destination world thread. Returns true once the companion was handed off. */
     private boolean queueRecord(
             Player player,
             Ref<EntityStore> playerRef,
@@ -172,23 +204,100 @@ final class CommandWorldChangeTravelCoordinator {
             Store<EntityStore> destinationStore,
             LinkedNpcRecord record,
             @Nullable String roleId,
-            TwCompanionConfig.EffectiveSettings settings
+            TwCompanionConfig.EffectiveSettings settings,
+            Set<UUID> queuedProfileIds
     ) {
-        RelocationState state = resolveTravelRelocationState(record);
+        RestoreFlow<Ref<EntityStore>> flow = restoreFlow;
+        CompanionQueries queries = companions;
+        if (flow == null || queries == null) return false;
+        CompanionRecord companion = resolveCompanion(queries, record);
+        // A bonded companion never follows: the same event stores it (RosterSummons.storeBondedOutside,
+        // plan 6 R18), and a follow would race that store.
+        if (companion == null || companion.bonded()
+                || !player.getUuid().equals(companion.ownerUuid())
+                || queuedProfileIds.contains(companion.profileId())) return false;
+        UUID profileId = companion.profileId();
+        Ref<EntityStore> body = queries.loadedBody(profileId);
+        Store<EntityStore> sourceStore = body != null ? body.getStore() : null;
+        World sourceWorld = sourceStore != null ? sourceStore.getExternalData().getWorld() : null;
+        if (sourceWorld == null) return false;
         Vector3d sourceHint = record.lastKnownPosition != null
                 ? record.lastKnownPosition : record.homePosition;
         double safeSpawnDistance = settings.getRecallSafeSpawnDistance() > 0.0
                 ? settings.getRecallSafeSpawnDistance()
                 : defaultSafeSpawnDistance;
-        Vector3d destination = placementService.computeSafeRecallPosition(
+        if (sourceWorld == destinationWorld) {
+            Vector3d destination = placementService.computeSafeRecallPosition(
+                    playerRef, destinationStore, safeSpawnDistance, roleId, sourceHint);
+            if (destination == null) return false;
+            RelocationState state = resolveTravelRelocationState(record);
+            relocationService.queueRelocation(
+                    destinationWorld, record.npcUuid, destination, player.getUuid(),
+                    true, true, state.state, state.subState, 0L, sourceHint,
+                    record.homePosition, settings.getFollowMasterOnWorldChangeStateFilter());
+            queuedProfileIds.add(profileId);
+            return true;
+        }
+        CompanionSpawnPlacement placement = placementService.computeRestorationPlacement(
                 playerRef, destinationStore, safeSpawnDistance, roleId, sourceHint);
-        if (destination == null) return false;
-        relocationService.queueRelocation(
-                destinationWorld, record.npcUuid, destination, player.getUuid(),
-                true, true, state.state, state.subState, 0L, sourceHint,
-                record.homePosition, true, settings.getOnTransferFailure(),
-                settings.getFollowMasterOnWorldChangeStateFilter());
+        if (placement == null) return false;
+        RestoreFlow.Destination destination = RestoreFlow.Destination.of(placement);
+        // The follow state lives on the body, so it is read on the body's own world thread. Only
+        // the profile id and the store identity cross threads; the ref is resolved again there.
+        try {
+            sourceWorld.execute(() -> {
+                Ref<EntityStore> live = queries.loadedBody(profileId);
+                if (live == null || live.getStore() != sourceStore) return;
+                NPCEntity npc = sourceStore.getComponent(live, NPCEntity.getComponentType());
+                if (npc == null || !settings.isWorldChangeStateAllowed(
+                        currentStateName(live, npc, sourceStore))) return;
+                flow.restore(profileId, RestoreRules.Reason.RECALL, destination)
+                        .whenComplete((result, error) -> logRestoreOutcome(
+                                profileId, destination, result, error));
+            });
+        } catch (RuntimeException e) {
+            // A closing world refuses new tasks; skip this companion and keep going.
+            LOGGER.log(Level.INFO, "World-change follow skipped for profile " + profileId
+                    + ": source world " + sourceWorld.getName() + " refused the task", e);
+            return false;
+        }
+        queuedProfileIds.add(profileId);
         return true;
+    }
+
+    private static void logRestoreOutcome(UUID profileId, RestoreFlow.Destination destination,
+                                          @Nullable RestoreFlow.Result result,
+                                          @Nullable Throwable error) {
+        if (error != null) {
+            LOGGER.log(Level.INFO, "World-change follow restore for profile " + profileId
+                    + " to " + destination.world() + " failed", error);
+        } else if (result != RestoreFlow.Result.RESTORED) {
+            LOGGER.log(Level.INFO, "World-change follow restore for profile " + profileId
+                    + " to " + destination.world() + " ended with " + result);
+        }
+    }
+
+    @Nullable
+    private static CompanionRecord resolveCompanion(CompanionQueries queries,
+                                                    LinkedNpcRecord record) {
+        if (record.profileId != null && !record.profileId.isBlank()) {
+            try {
+                CompanionRecord byProfile = queries.get(UUID.fromString(record.profileId.trim()));
+                if (byProfile != null) return byProfile;
+            } catch (IllegalArgumentException ignored) {
+                // Not a UUID; fall back to the linked NPC UUID.
+            }
+        }
+        return queries.byNpcUuid(record.npcUuid);
+    }
+
+    @Nullable
+    private static String currentStateName(Ref<EntityStore> ref, NPCEntity npc,
+                                           Store<EntityStore> store) {
+        if (npc.getRole() == null) return null;
+        StateSupport stateSupport = NpcSupportAccess.state(npc.getRole(), ref, store);
+        String state = stateSupport != null ? stateSupport.getStateName() : null;
+        return state != null && !state.isBlank() ? state : null;
     }
 
     @Nullable

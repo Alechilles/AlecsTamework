@@ -1,44 +1,41 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
-import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseIntent;
-import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
-import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.ownership.OwnerNameUtil;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
-import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.UUID;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Freezes one filled-spawner source, empty receipt, and exact release placement. */
+/**
+ * Prepares one release from a filled capture item: the exact hotbar slot, the empty item that
+ * replaces it, the placement and the spawn effect. Who may release is the caller's decision
+ * (the capture item ownership mode); population caps are the restore's job.
+ */
 final class SpawnerReleaseIntentFactory {
     private final SpawnerSpawnPositionService positions;
     private final SpawnerPlayerInventoryService inventory;
     private final SpawnerItemStackMetadataService itemMetadata;
-    private final SpawnerOwnershipPolicyService ownership;
 
     SpawnerReleaseIntentFactory(
             SpawnerSpawnPositionService positions,
             SpawnerPlayerInventoryService inventory,
-            SpawnerItemStackMetadataService itemMetadata,
-            SpawnerOwnershipPolicyService ownership
+            SpawnerItemStackMetadataService itemMetadata
     ) {
         this.positions = positions;
         this.inventory = inventory;
         this.itemMetadata = itemMetadata;
-        this.ownership = ownership;
     }
 
+    /**
+     * Returns null when the release cannot start here: no exact slot, no position in range or no
+     * empty item id.
+     */
     @Nullable
     PreparedRelease prepare(
             @Nullable Player player,
@@ -66,9 +63,6 @@ final class SpawnerReleaseIntentFactory {
                 )) {
             return null;
         }
-        Rotation3f rotation = positions.resolveSpawnRotation(
-                store, player.getReference(), position
-        );
         String emptyItemId = emptyItemIdOverride;
         if (emptyItemId == null || emptyItemId.isBlank()) {
             emptyItemId = itemMetadata.resolveEmptyItemId(
@@ -84,59 +78,9 @@ final class SpawnerReleaseIntentFactory {
         if (receipt == null || receipt.isEmpty()) {
             return null;
         }
-        UUID capturedOwner = source.getFromMetadataOrNull(
-                TameworkMetadataKeys.OWNER_UUID,
-                Codec.UUID_STRING
+        Rotation3f rotation = positions.resolveSpawnRotation(
+                store, player.getReference(), position
         );
-        UUID captureSourceOwner = source.getFromMetadataOrNull(
-                TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
-                Codec.UUID_STRING
-        );
-        UUID policyOwner = SpawnerOwnershipPolicyService
-                .resolveSpawnPolicyOwner(
-                        capturedOwner, captureSourceOwner, config
-                );
-        if (!ownership.isSpawnAllowed(
-                player.getUuid(), policyOwner, config
-        )) {
-            return null;
-        }
-        OwnerId ownerAssignment = null;
-        String ownerAssignmentName = null;
-        if (capturedOwner == null && config.isSpawnAssignsOwner()) {
-            OwnerPopulationCapService.Decision cap =
-                    OwnerPopulationCapService.evaluateAcquisition(
-                            store, player.getUuid()
-                    );
-            if (!cap.allowed()) {
-                denyOwnerAssignment(player, cap);
-                return null;
-            }
-            ownerAssignment = new OwnerId(player.getUuid());
-            ownerAssignmentName = OwnerNameUtil.resolve(player);
-        }
-        String intentKey = player.getUuid()
-                + ":" + world.getName()
-                + ":" + sourceSlot
-                + ":" + SpawnerSourceFingerprint.of(source);
-        SpawnerCapturedArtifactReleaseIntent intent =
-                new SpawnerCapturedArtifactReleaseIntent(
-                        intentKey,
-                        player.getUuid(),
-                        world.getName(),
-                        sourceSlot,
-                        source,
-                        receipt,
-                        ownerAssignment,
-                        ownerAssignmentName,
-                        new SpawnerPublishedEffect(
-                                position.x,
-                                position.y,
-                                position.z,
-                                config.getSpawnParticleSystem(),
-                                config.getSpawnSoundEvent()
-                        )
-                );
         CompanionSpawnPlacement placement = new CompanionSpawnPlacement(
                 world.getName(),
                 position.x,
@@ -146,28 +90,26 @@ final class SpawnerReleaseIntentFactory {
                 rotation.yaw(),
                 rotation.roll()
         );
-        return new PreparedRelease(intent, placement);
+        return new PreparedRelease(
+                sourceSlot,
+                receipt,
+                placement,
+                new SpawnerPublishedEffect(
+                        position.x,
+                        position.y,
+                        position.z,
+                        config.getSpawnParticleSystem(),
+                        config.getSpawnSoundEvent()
+                )
+        );
     }
 
+    /** {@code receipt} is the empty capture item the filled one turns into. */
     record PreparedRelease(
-            SpawnerCapturedArtifactReleaseIntent intent,
-            CompanionSpawnPlacement placement
+            int slot,
+            @Nonnull ItemStack receipt,
+            @Nonnull CompanionSpawnPlacement placement,
+            @Nonnull SpawnerPublishedEffect effect
     ) {
-    }
-
-    private void denyOwnerAssignment(
-            Player player,
-            OwnerPopulationCapService.Decision cap
-    ) {
-        if ("owner-cap-reached".equals(cap.reason())) {
-            OwnerMessageUtil.sendPopulationCapReached(
-                    player,
-                    cap.currentCount(),
-                    cap.limit(),
-                    cap.scope()
-            );
-            return;
-        }
-        OwnerMessageUtil.sendPopulationUnavailable(player, cap.reason());
     }
 }

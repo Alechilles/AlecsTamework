@@ -2,8 +2,8 @@
   "Parent": "Arrow_Crude",
   "DefaultAttachments": [
     {
-      "Model": "Items/Weapons/Arrow/Arrow.blockymodel",
-      "Texture": "Items/Weapons/Arrow/Tranquilizer_Texture.png"
+      "Model": "Items/Tamework/TranquilizerDart/Tranquilizer_Dart.blockymodel",
+      "Texture": "Items/Tamework/TranquilizerDart/Tranquilizer_Dart_Texture.png"
     }
   ]
 }

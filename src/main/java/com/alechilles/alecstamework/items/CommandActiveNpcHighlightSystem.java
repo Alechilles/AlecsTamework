@@ -60,16 +60,13 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
     private final CommandActiveNpcHighlightBatchService<
             CommandActiveNpcHighlightPlanService.HighlightTarget> batchService =
             new CommandActiveNpcHighlightBatchService<>(MAX_TARGETS_PER_PLAYER_SWEEP);
-    private final CommandActiveNpcHighlightTargetResolver targetResolver;
     private final Object storesLock = new Object();
     private final Map<Store<EntityStore>, Long> nextSweepByStore = new IdentityHashMap<>();
 
     public CommandActiveNpcHighlightSystem(@Nonnull CommandItemRegistry registry,
-                                           @Nonnull CommandTargetHudActivationTracker activationTracker,
-                                           @Nonnull LoadedNpcIdentityIndex loadedNpcIdentities) {
+                                           @Nonnull CommandTargetHudActivationTracker activationTracker) {
         this.registry = registry;
         this.activationTracker = activationTracker;
-        this.targetResolver = new CommandActiveNpcHighlightTargetResolver(loadedNpcIdentities);
         activationTracker.addLifecycleListener(new CommandTargetHudActivationTracker.LifecycleListener() {
             @Override
             public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
@@ -141,10 +138,6 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             return;
         }
         activationTracker.recordResolvedHand(store, playerUuid, activeTool.itemId(), true, nowMs);
-        CommandActiveNpcHighlightTargetResolver.LoadedTargetProbe loadedTargetProbe = npcUuid -> {
-            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-            return npcRef != null && npcRef.isValid();
-        };
         List<CommandActiveNpcHighlightPlanService.HighlightTarget> targets = batchService.select(
                 store,
                 playerUuid,
@@ -164,7 +157,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 new ArrayList<>(targets.size());
         for (CommandActiveNpcHighlightPlanService.HighlightTarget target : targets) {
             emitForLoadedTarget(
-                    store, world, loadedTargetProbe, playerCandidate.ref(), playerUuid,
+                    store, world, playerCandidate.ref(), playerUuid,
                     activeTool.toolId(), target, syncTargets
             );
         }
@@ -223,19 +216,14 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
     private void emitForLoadedTarget(
             @Nonnull Store<EntityStore> store,
             @Nonnull World world,
-            @Nonnull CommandActiveNpcHighlightTargetResolver.LoadedTargetProbe loadedTargetProbe,
             @Nonnull Ref<EntityStore> viewerRef,
             @Nonnull UUID playerUuid,
             @Nonnull String toolId,
             @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
             @Nonnull List<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets
     ) {
-        UUID resolvedNpcUuid = targetResolver.resolve(
-                target.npcUuid(), target.profileId(), loadedTargetProbe
-        );
-        Ref<EntityStore> npcRef = resolvedNpcUuid != null
-                ? world.getEntityRef(resolvedNpcUuid)
-                : null;
+        UUID resolvedNpcUuid = target.npcUuid();
+        Ref<EntityStore> npcRef = world.getEntityRef(resolvedNpcUuid);
         if (npcRef == null || !npcRef.isValid()
                 || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)) {
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));

@@ -69,7 +69,7 @@ public final class TameworkManagedCoopCaptureCrateInteraction
             @Nonnull CooldownHandler cooldownHandler
     ) {
         HytaleCapturedItemCoopInteractionService.Result result =
-                intake.attempt(world, commandBuffer, context);
+                intake.attempt(world, commandBuffer, context, null);
         switch (result) {
             case NOT_MANAGED -> delegate(
                     world, commandBuffer, type, context, itemInHand,

@@ -1,10 +1,10 @@
 ---
-title: "Check and Reserve Owner Population before Taming"
+title: "Check the Owner Cap before Taming"
 order: 8
 published: true
 draft: false
 ---
-# Check and Reserve Owner Population before Taming
+# Check the Owner Cap before Taming
 
 Use the version-two policy preflight for early UI feedback with explicit world
 and requested-slot context:
@@ -14,18 +14,33 @@ OwnerPopulationCapDecisionViewV2 decision =
         api.policies().evaluatePopulationCap(
                 new OwnerPopulationCapRequestV2(ownerUuid, worldName, 1)
         );
+if (!decision.allowed()) {
+    // Tell the player before they spend food or an item.
+}
 ```
 
-The result reads the durable canonical owner count, but remains informational.
-For a custom mutation, construct the complete role-aware
-`PopulationAdmissionRequestV2` and use
-`api.policies().populationAdmissions()`:
+The result counts every companion the owner has in that scope, loaded or not.
+It is informational:
 
-1. `tryAdmitV2(request)`;
-2. immediately before live mutation, `claimForApply(token)`;
-3. after successful live mutation, `commit(token)`;
-4. on any pre-commit abort, `cancel(token)`.
+- It reserves nothing. API 3.0.0 has no reservation tokens;
+  `policies().populationAdmissions()` was removed.
+- The request names no role, so population-group limits and admission
+  providers are not part of the answer.
+- Another change by the same owner can use the slot before yours does.
 
-Complete or cancel every token. Ordinary Tamework tame/spawn/capture flows
-already perform this protocol; do not wrap them in a second reservation and do
-not write persistence rows directly.
+Tamework runs the binding check itself, in the step that saves the companion,
+for every tame, spawn, capture, restore, and bonded provision. Do not wrap
+those flows in a check of your own and do not write companion files directly.
+Handle the refusal instead: the player sees Tamework's limit message and
+nothing changes.
+
+For a group limit, read
+`api.populationGroups().getCounts(ownerUuid, groupId, worldName)` and compare
+`committedOwned` with `maxOwned` (`0` means no limit).
+
+To add your own rule to the binding check, register an
+[admission provider](/mod/alecs-tamework/admission-providers-api-reference).
+
+## Related Pages
+- [Policies API Reference](/mod/alecs-tamework/policies-api-reference)
+- [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)

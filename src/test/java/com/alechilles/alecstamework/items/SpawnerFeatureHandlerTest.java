@@ -1,9 +1,13 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import java.lang.reflect.Method;
-import java.util.Map;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.flow.CaptureFlow;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.item.CaptureItemOwnership.Release;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.UUID;
+import org.bson.BsonDocument;
+import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,107 +18,60 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SpawnerFeatureHandlerTest {
 
     @Test
-    void interactionSpawnAssignsOwnerOverrideWinsOverGlobalDefault() throws Exception {
-        ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
-                .spawnerEnabled(true)
-                .spawnAssignsOwner(true)
-                .build();
+    void aReleaseAsksTheRestoreForTheOwnerItsOwnershipDecisionNames() {
+        UUID releaser = UUID.randomUUID();
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, false);
-
-        assertFalse(resolved.isSpawnAssignsOwner());
+        assertEquals(new RestoreFlow.Owner(releaser, "Releaser"),
+                SpawnerFeatureHandler.releaseOwner(Release.ASSIGN_RELEASER, releaser, "Releaser"));
+        // The owner's own release changes nothing; an unowned wild capture comes back unowned.
+        assertNull(SpawnerFeatureHandler.releaseOwner(Release.KEEP_OWNER, releaser, "Releaser"));
+        assertEquals(new RestoreFlow.Owner(null, null),
+                SpawnerFeatureHandler.releaseOwner(Release.UNOWNED, releaser, "Releaser"));
     }
 
     @Test
-    void missingInteractionSpawnAssignsOwnerOverrideUsesRuntimeDefault() throws Exception {
-        ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
-                .spawnerEnabled(true)
-                .spawnAssignsOwner(false)
-                .build();
+    void aProviderKeyWithNoTranslationIsShownAsTheBuiltInDenialNotAsTheKey() {
+        String shown = SpawnerFeatureHandler.populationText("en-US", "othermod.husbandry.denied.levelTooLow");
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
-
-        assertTrue(resolved.isSpawnAssignsOwner());
+        assertEquals(LocalizedText.resolve("en-US", CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY), shown);
+        assertFalse(shown.equals(CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY), "the fallback itself resolves");
+        // A key that resolves is shown as its own text.
+        assertEquals(LocalizedText.resolve("en-US", CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY),
+                SpawnerFeatureHandler.populationText("en-US", CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY));
+        assertFalse(SpawnerFeatureHandler.populationText("en-US", null).isBlank());
     }
 
     @Test
-    void interactionResolverPreservesWildCaptureContract() throws Exception {
-        ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
-                .spawnerEnabled(true)
-                .captureRequireTamed(false)
-                .captureTamesTarget(true)
-                .captureMaxHealthPercent(20.0d)
-                .captureRequiredEffectId("Required")
-                .captureChannelAuraEffectId("Aura")
-                .captureTamedRoleOverrides(Map.of("Wild", "Tamed"))
-                .build();
+    void aBondedCaptureStoresTheBodyTamedAndInTheRoleItsRosterFamilyAllows() {
+        BsonDocument npc = new BsonDocument("RoleName", new BsonString("NordicDrake"))
+                .append("ActiveMC", new BsonString("Fly"))
+                .append("SpawnName", new BsonString("NordicDrake"))
+                .append("Env", new BsonString("Zone3_Mountains"));
+        BsonDocument entity = new BsonDocument("Components", new BsonDocument("NPC", npc));
 
-        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
+        BsonDocument stored = SpawnerFeatureHandler.entityPatch(true, "Tamed_NordicDrake").apply(entity);
 
-        assertTrue(resolved.isCaptureTamesTarget());
-        assertEquals(20.0d, resolved.getCaptureMaxHealthPercent());
-        assertEquals("Required", resolved.getCaptureRequiredEffectId());
-        assertEquals("Aura", resolved.getCaptureChannelAuraEffectId());
-        assertEquals("Tamed", resolved.resolveCaptureTamedRole("Wild"));
+        BsonDocument components = stored.getDocument("Components");
+        assertEquals("Tamed_NordicDrake", components.getDocument("NPC").getString("RoleName").getValue());
+        // The wild role's motion controller is not carried into the tamed role.
+        assertFalse(components.getDocument("NPC").containsKey("ActiveMC"));
+        // Nor its spawn role and environment: the stored companion is detached from its spawning.
+        assertFalse(components.getDocument("NPC").containsKey("SpawnName"));
+        assertFalse(components.getDocument("NPC").containsKey("Env"));
+        assertEquals(com.alechilles.alecstamework.companion.flow.SnapshotPatch.withTamed(entity).getDocument("Components").get("TameworkTamed"),
+                components.get("TameworkTamed"));
+        // The body in the world is not changed by the capture's snapshot patch.
+        assertEquals("NordicDrake", npc.getString("RoleName").getValue());
+        assertNull(SpawnerFeatureHandler.entityPatch(false, null));
     }
 
     @Test
-    void wildCaptureDoesNotInventAnOwnerWhenPreservingOwnership() {
-        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(null, false));
-    }
-
-    @Test
-    void captureOwnerMetadataPreservesOrClearsTheExistingOwnerExactly() {
-        UUID owner = UUID.randomUUID();
-
-        assertEquals(owner, SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, false));
-        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, true));
-    }
-
-    @Test
-    void captureClearAndSpawnAssignmentMatrixProducesTheExactOwnerTransition() {
-        UUID currentOwner = UUID.randomUUID();
-        UUID spawningPlayer = UUID.randomUUID();
-
-        for (boolean captureClearsOwner : new boolean[]{false, true}) {
-            for (boolean spawnAssignsOwner : new boolean[]{false, true}) {
-                ItemFeatureConfig config = ItemFeatureConfig.builder()
-                        .spawnerEnabled(true)
-                        .captureClearsOwner(captureClearsOwner)
-                        .spawnAssignsOwner(spawnAssignsOwner)
-                        .build();
-                UUID itemOwner = SpawnerFeatureHandler.resolveCapturedOwnerMetadata(
-                        currentOwner, captureClearsOwner
-                );
-                UUID resolvedOwner = SpawnerOwnershipPolicyService.resolveSpawnOwner(
-                        itemOwner, spawningPlayer, config
-                );
-                UUID expectedOwner = captureClearsOwner
-                        ? (spawnAssignsOwner ? spawningPlayer : null)
-                        : currentOwner;
-
-                assertEquals(
-                        expectedOwner,
-                        resolvedOwner,
-                        "captureClearsOwner=" + captureClearsOwner
-                                + ", spawnAssignsOwner=" + spawnAssignsOwner
-                );
-            }
+    void aCaptureThatPaidBeforeItsCommitIsRefundedUnlessTheCompanionWasCaptured() {
+        for (CaptureFlow.Result result : CaptureFlow.Result.values()) {
+            assertEquals(result != CaptureFlow.Result.CAPTURED,
+                    SpawnerFeatureHandler.refundsSource(new CaptureFlow.Outcome(result, null)), result.name());
         }
-    }
-
-    private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
-                                                                      Boolean spawnAssignsOwnerOverride)
-            throws Exception {
-        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(
-                null, null, null
-        );
-        Method method = SpawnerFeatureHandler.class.getDeclaredMethod(
-                "buildSpawnerConfigForInteraction",
-                ItemFeatureConfig.class,
-                Boolean.class
-        );
-        method.setAccessible(true);
-        return (ItemFeatureConfig) method.invoke(handler, baseConfig, spawnAssignsOwnerOverride);
+        // A commit that failed with no outcome at all changed nothing either.
+        assertTrue(SpawnerFeatureHandler.refundsSource(null));
     }
 }

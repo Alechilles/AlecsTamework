@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.api;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
-import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
@@ -27,7 +26,6 @@ class TameworkApiV011ContractTest {
             TameworkApiCapability.ACTIVITY_FEED_V2,
             TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT,
             TameworkApiCapability.DURABLE_OUTPUT_OPERATIONS,
-            TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
             TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,
             TameworkApiCapability.REQUIRED_CONTENT_PROFILES
     );
@@ -43,19 +41,13 @@ class TameworkApiV011ContractTest {
     }
 
     @Test
-    void productionAndDegradedFacadesHoldBackNewCapabilitiesUntilReady() throws Exception {
+    void productionFacadeHoldsBackNewCapabilitiesUntilReady() throws Exception {
         try (TameworkApiImpl base = newBaseApi()) {
             assertNewCapabilitiesAbsent(base);
             assertCommandUiCapabilities(base);
             assertActivityFeedUnavailable(base);
             assertAdmissionDefaultsUnavailable(base.policies());
         }
-
-        TameworkApi degraded = new BondedOnlyTameworkApi(
-                BondedCompanionApi.unavailable());
-        assertNewCapabilitiesAbsent(degraded);
-        assertCommandUiUnavailable(degraded);
-        assertActivityFeedUnavailable(degraded);
     }
 
     @Test
@@ -163,17 +155,6 @@ class TameworkApiV011ContractTest {
                 ));
     }
 
-    @Test
-    void degradedFacadeReportsV2VersionWithoutAdvertisingTheUnavailableFeed() {
-        TameworkApi api = new BondedOnlyTameworkApi(
-                BondedCompanionApi.unavailable());
-
-        assertEquals("2.0.0", api.getApiVersion());
-        assertFalse(api.getCapabilities().contains(
-                TameworkApiCapability.ACTIVITY_FEED_V2));
-        assertFalse(api.activities().status("contract-consumer").available());
-    }
-
     private static void assertNewCapabilitiesAbsent(TameworkApi api) {
         assertTrue(api.getCapabilities().stream()
                 .noneMatch(NEW_CAPABILITIES::contains));
@@ -218,14 +199,6 @@ class TameworkApiV011ContractTest {
 
     private static void assertAdmissionDefaultsUnavailable(PolicyApi policy)
             throws Exception {
-        assertEquals(
-                PopulationAdmissionDecision.Status.UNAVAILABLE,
-                policy.populationAdmissions()
-                        .tryAdmitV3(admissionRequest())
-                        .toCompletableFuture()
-                        .join()
-                        .status()
-        );
         AutoCloseable registration = policy.admissionProviders().register(
                 "provider:test",
                 1,

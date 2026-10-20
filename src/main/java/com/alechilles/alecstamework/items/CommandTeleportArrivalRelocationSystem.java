@@ -17,7 +17,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,8 +29,6 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
     private static final long TELEPORT_ARRIVAL_DELAY_MS = 350L;
 
     private final CommandItemFeatureHandler featureHandler;
-    private final Set<UUID> queuedPlayers = ConcurrentHashMap.newKeySet();
-
     private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     public CommandTeleportArrivalRelocationSystem(CommandItemFeatureHandler featureHandler) {
@@ -70,10 +67,11 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
                                 playerType,
                                 teleportType,
                                 world,
-                                activeTeleportingPlayers
+                                activeTeleportingPlayers,
+                                tickState.queuedPlayers
                         )
         );
-        queuedPlayers.retainAll(activeTeleportingPlayers);
+        tickState.queuedPlayers.retainAll(activeTeleportingPlayers);
     }
 
     private void collectSameWorldTeleportCandidates(ArchetypeChunk<EntityStore> chunk,
@@ -81,7 +79,8 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
                                                     ComponentType<EntityStore, Player> playerType,
                                                     ComponentType<EntityStore, Teleport> teleportType,
                                                     World world,
-                                                    Set<UUID> activeTeleportingPlayers) {
+                                                    Set<UUID> activeTeleportingPlayers,
+                                                    Set<UUID> queuedPlayers) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Player player = chunk.getComponent(i, playerType);
@@ -141,5 +140,7 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
 
     private static final class TickState {
         private long nextSweepAtMs;
+        // Per store: one world's sweep must not prune players that are teleporting in another world.
+        private final Set<UUID> queuedPlayers = new HashSet<>();
     }
 }

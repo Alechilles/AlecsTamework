@@ -116,7 +116,7 @@ final class BondedCompanionPanelActionRouter {
         var context = action == BondedCompanionPanelActionService.Action.ABANDON
                 ? null : contexts.create(
                         player, eventStore, feature.bonded().roleId(),
-                        action == BondedCompanionPanelActionService.Action.SUMMON);
+                        placementRequired(action));
         var outcome = actions.performAsync(
                 action, ownerUuid, world, context, feature.bonded());
         var owningWorld = player.getWorld();
@@ -134,6 +134,13 @@ final class BondedCompanionPanelActionRouter {
                 // A changed world is already an unavailable action context.
             }
         });
+    }
+
+    /** Summon and revive both put a body in the world, so both need a placement. */
+    private static boolean placementRequired(
+            BondedCompanionPanelActionService.Action action) {
+        return action == BondedCompanionPanelActionService.Action.SUMMON
+                || action == BondedCompanionPanelActionService.Action.REVIVE;
     }
 
     /**
@@ -190,7 +197,7 @@ final class BondedCompanionPanelActionRouter {
             actionContext = action == BondedCompanionPanelActionService.Action.ABANDON
                     ? null : contexts.create(player, currentContext.store(),
                             presentation.roleId(),
-                            action == BondedCompanionPanelActionService.Action.SUMMON);
+                            placementRequired(action));
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
                     "bonded action context failed"));

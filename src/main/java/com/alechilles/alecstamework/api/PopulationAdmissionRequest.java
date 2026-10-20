@@ -49,9 +49,7 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
             throw new IllegalArgumentException("Exact requested slots must be positive.");
         }
         if (exactSlots != 1) {
-            throw new IllegalArgumentException(
-                    "A single-profile admission reserves one slot; use PopulationBatchAdmissionRequest for batches."
-            );
+            throw new IllegalArgumentException("A single-profile admission reserves one slot.");
         }
         validateForce(operation, forcePolicy);
         validateLifecycle(operation, newOwnerUuid, destination, targetLifecycle);
@@ -192,7 +190,7 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                 }
             }
             case PROVISION_DORMANT -> throw new IllegalArgumentException(
-                    "PROVISION_DORMANT is available only through CompanionProvisioningApi."
+                    "PROVISION_DORMANT is not a population admission request operation."
             );
             case ADMIN_FORCE -> requirePresent(destination, "destination", operation);
         }

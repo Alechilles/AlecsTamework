@@ -10,10 +10,10 @@ import com.hypixel.hytale.server.npc.role.Role;
 import javax.annotation.Nonnull;
 
 /**
- * Adapts Tamework entity filters to the Update 5 and Update 6 callback signatures.
+ * Adapts the engine ExecutionSupport callbacks to the Role-based methods Tamework entity filters implement.
  */
 public abstract class TameworkEntityFilterBase extends EntityFilterBase {
-    /** Update 5 callback retained for dual-version loading. */
+    /** Role-based callback that subclasses implement. */
     public abstract boolean matchesEntity(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Ref<EntityStore> targetRef,
                                           @Nonnull Role role,
@@ -32,7 +32,7 @@ public abstract class TameworkEntityFilterBase extends EntityFilterBase {
         }
     }
 
-    /** Update 5 lifecycle callback retained for dual-version loading. */
+    /** Role-based lifecycle callback that subclasses override. */
     public void registerWithSupport(@Nonnull Role role) {
     }
 

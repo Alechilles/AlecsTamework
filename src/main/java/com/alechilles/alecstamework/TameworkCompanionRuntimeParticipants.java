@@ -1,5 +1,16 @@
 package com.alechilles.alecstamework;
 
+import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.flow.CompanionDeathSystem;
+import com.alechilles.alecstamework.companion.flow.CompanionOwnershipSystems;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.hypixel.hytale.builtin.encountermanager.EncounterManagerPlugin;
+import com.hypixel.hytale.builtin.encountermanager.EncounterMembers;
+import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
+
 import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
@@ -55,7 +66,45 @@ public final class TameworkCompanionRuntimeParticipants {
         return plugin.resolveOptionalSpawnMarkerEntityComponentType();
     }
 
+    /**
+     * Declares the companion index systems (spec 8). Called from runtime service construction
+     * once the persistence module is ready; they register with the other participants.
+     */
+    static void addCompanionIndex(
+            Tamework plugin,
+            TameworkRuntimeParticipantRegistry participants,
+            CompanionBodySystem bodySystem,
+            CompanionBodyLifecycle lifecycle
+    ) {
+        // The startup pass shares this instance, so it is built by the caller.
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionbodysystem",
+                () -> bodySystem);
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownershiponaddsystem",
+                () -> new CompanionOwnershipSystems.OnAdd(lifecycle, plugin.getOwnerComponentType(),
+                        plugin.getTamedComponentType(),
+                        TameworkCompanionComponent.getComponentType(),
+                        // Only an imported world has old bodies to match (plan 7 R14).
+                        lifecycle.hasLegacyBodies() ? plugin.getProjectionIdentityComponentType() : null));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionownerchangedsystem",
+                () -> new CompanionOwnershipSystems.OwnerChanged(lifecycle, plugin.getOwnerComponentType(),
+                        TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionlinkschangedsystem",
+                () -> new CompanionOwnershipSystems.LinksChanged(lifecycle, plugin.getCommandLinksComponentType(),
+                        TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companionnamechangedsystem",
+                () -> new CompanionOwnershipSystems.NameChanged(lifecycle, plugin.getNpcNameComponentType(),
+                        TameworkCompanionComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiontamedchangedsystem",
+                () -> new CompanionOwnershipSystems.TamedChanged(lifecycle, plugin.getOwnerComponentType(),
+                        plugin.getTamedComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companiondeathsystem",
+                () -> new CompanionDeathSystem(lifecycle, TameworkCompanionComponent.getComponentType()));
+    }
+
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
+        participants.optionalEntitySystem(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "npcbossbarcleanupsystem",
+                () -> EncounterManagerPlugin.get() == null ? null : new NpcBossBarCleanupSystem(NPCEntity.getComponentType(),
+                        EncounterMembers.getComponentType(), EncounterBossBarState.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockentitysystem",
                 CompanionFollowFlockMembershipSystems.EntityRef::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockmembershipsystem",
@@ -70,6 +119,15 @@ public final class TameworkCompanionRuntimeParticipants {
                         NPCEntity.getComponentType(), plugin.getOwnerComponentType()));
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "npcnamepersistencesystem",
                 () -> new NpcNamePersistenceSystem(plugin.getNpcNameComponentType(), NPCEntity.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionchangedetectorsystem",
+                () -> new com.alechilles.alecstamework.companion.live.CompanionChangeDetectorSystem(
+                        NPCEntity.getComponentType(),
+                        com.alechilles.alecstamework.npc.components.TameworkOwnerComponent.getComponentType(),
+                        com.alechilles.alecstamework.companion.live.CompanionChangeTracker.getComponentType(),
+                        com.alechilles.alecstamework.companion.live.CompanionFingerprints.production(),
+                        () -> System.nanoTime() / 1_000_000L, // monotonic: wall-clock steps must not stall checks
+                        2_000L,
+                        60_000L));
         participants.entitySystem(TameworkRuntimeModule.DEBUG_SELF_TEST, "playerinputdebugsystem",
                 () -> new PlayerInputDebugSystem(PlayerInput.getComponentType(), UUIDComponent.getComponentType(),
                         MovementStatesComponent.getComponentType(), HeadRotation.getComponentType(),
@@ -134,6 +192,10 @@ public final class TameworkCompanionRuntimeParticipants {
             TameworkRuntimeParticipantRegistry participants,
             ComponentType<EntityStore, NPCMountComponent> npcMount
     ) {
+        participants.entitySystem(TameworkRuntimeModule.MOUNTS, "nativeswimsystem",
+                com.alechilles.alecstamework.npc.systems.NativeSwimSystem::new);
+        participants.entitySystem(TameworkRuntimeModule.MOUNTS, "nativeswimbreathingsystem",
+                com.alechilles.alecstamework.npc.systems.NativeSwimBreathingSystem::new);
         participants.entitySystem(TameworkRuntimeModule.MOUNTS, "mountedownerreferencesanitysystem",
                 () -> new MountedOwnerReferenceSanitySystem(NPCEntity.getComponentType(), npcMount,
                         Player.getComponentType(), Interactable.getComponentType()));
@@ -219,9 +281,12 @@ public final class TameworkCompanionRuntimeParticipants {
                 () -> new CompanionSpawnAuthorityCleanupSystems.Npc(NPCEntity.getComponentType(),
                         plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.LEVELING, "summonedcompanionexperiencesystem",
-                () -> new SummonedCompanionExperienceSystem(NPCEntity.getComponentType(),
-                        plugin.getProjectionIdentityComponentType(), plugin.getLevelingComponentType(),
-                        DeathComponent.getComponentType()));
+                () -> new SummonedCompanionExperienceSystem(TameworkCompanionComponent.getComponentType(), profileId -> {
+                            // Read per call: the index is absent while companion saving is paused.
+                            CompanionQueries companions = plugin.getCompanionQueries();
+                            CompanionRecord record = companions == null ? null : companions.get(profileId);
+                            return record != null && record.bonded();
+                        }, plugin.getLevelingComponentType(), DeathComponent.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionlifestageresumeonloadsystem",
                 () -> new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(),
                         plugin.getLifeStageComponentType()));

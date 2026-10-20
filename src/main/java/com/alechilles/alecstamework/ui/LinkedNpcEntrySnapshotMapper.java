@@ -98,6 +98,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     .withTraitValues(entry.traitValues())
                     .withCompanionGroups(entry.companionKey(), entry.groups(), entry.selectionSupported())
                     .withNearby(entry.nearby())
+                    .withDeadRespawnTotalMs(entry.deadRespawnTotalMs())
                     .withAnimalLifecycle(entry.animalLifecycle().active()
                             ? new com.alechilles.alecstamework.npc.progression.AnimalProgressionService.Presentation(
                                     entry.animalLifecycle().stage(), entry.animalLifecycle().prime(),

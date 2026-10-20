@@ -168,13 +168,13 @@ Behavior:
 
 ## Ownership rules
 
-`SetOwner` and Tame check durable owner-population admission when adding a
-non-null owner. The configured global/per-world cap counts canonical owned
-profiles, and positive acquisitions reserve capacity inside the same operation.
-This is independent from SimpleClaims placement and does not create a
-feature-local provisioning or population journal.
+`SetOwner` and Tame check the owner's population limits when adding a non-null
+owner. The owned limit counts every companion the player owns, the deployed
+limit counts summoned companions, and both are checked inside the companion
+index lock together with group limits and admission providers. This is
+independent from SimpleClaims placement.
 
-`TameworkOwnerComponent` is the canonical live authorization source for
+`TameworkOwnerComponent` is the live authorization source for
 ownership mutation and command access. A clear invalidates command-tool links
 and clears name ownership; a transfer invalidates the prior owner's links and
 retargets retained name metadata.
@@ -283,7 +283,7 @@ durability, animation, and optional hold confirmation.
 
 Both fields default to `true`. The interaction rejects missing or non-NPC
 targets, targets that do not meet the selected owner/tame policy, and bonded
-companion projections. It clears ordinary command links before the death path
+companions. It clears ordinary command links before the death path
 and removes the NPC from eligible generic command tools in the hotbar. After a
 successful managed cull, Activity V2 emits `tamework:cull_success` with the
 owner, companion, family, mapped activity ID, and rolled item quantities.
@@ -363,10 +363,13 @@ Fields:
 - `ProjectileId` required projectile asset id.
 - `Target` optional enum: `USER`, `OWNER`, `TARGET`. Defaults to `TARGET`.
 - `TargetSlot` optional NPC marked target slot. When present, Tamework first tries the source NPC's marked target in that slot and falls back to `Target` resolution if none is present.
+- `TargetGroundOffset` optional Y offset above the entity's feet. When omitted, entity aiming still uses eye height. This does not project airborne targets onto terrain and does not change look or random targets.
+- `LandingMarkerParticleSystemId` optional particle system emitted once at the frozen solver target after a successful launch. Its asset controls marker lifetime. Use zero spread and zero projectile shot offsets when matching the marked point matters.
+- `ImpactSpawnNpcRole` optional role ID spawned once at the projectile's final position on normal removal, including lifetime expiry. The role controls chase, lifetime, and despawn behavior. Unloading a world does not hatch projectiles.
 - `YawSpreadDegrees` optional symmetric yaw spread applied after the arc is solved.
 - `PitchSpreadDegrees` optional symmetric pitch spread applied after the arc is solved.
 - `FailIfNoSolution` optional bool. Defaults to `true`.
-- `TrajectoryMode` optional enum: `HIGH_ANGLE` or `DIRECT`. Defaults to `HIGH_ANGLE`.
+- `TrajectoryMode` optional enum: `HighAngle` or `Direct`. Defaults to `HighAngle`.
 - `RandomAroundSourceMinRadius` optional inner radius for a random landing point centered on the source entity.
 - `RandomAroundSourceMaxRadius` optional outer radius for a random landing point centered on the source entity. When greater than `0`, this mode overrides entity-target resolution.
 - `RandomAroundSourceVerticalOffset` optional Y offset applied to the random landing point.
@@ -388,8 +391,8 @@ Fields:
 - `EffectId` optional entity effect asset id to reapply on each hazard pulse.
 
 Behavior:
-- Uses the projectile's `MuzzleVelocity` and `Gravity` to solve the high-angle lob when `TrajectoryMode` is `HIGH_ANGLE`.
-- Uses a direct point-at-target pitch when `TrajectoryMode` is `DIRECT`.
+- Uses the projectile's `MuzzleVelocity` and `Gravity` to solve the high-angle lob when `TrajectoryMode` is `HighAngle`.
+- Uses a direct point-at-target pitch when `TrajectoryMode` is `Direct`.
 - Uses the normal projectile spawn path after solving, so projectile asset offsets such as `VerticalCenterShot`, `HorizontalCenterShot`, `DepthShot`, and `PitchAdjustShot` still apply.
 - If no valid arc exists and `FailIfNoSolution` is `true`, the interaction fails cleanly.
 - Random-around-source targeting samples a uniform point in the authored radius band, which is useful for source-centered area denial barrages.
@@ -403,7 +406,7 @@ Example:
   "Type": "TameworkLaunchProjectile",
   "ProjectileId": "Hydra_Rain_Ice_Ball",
   "TargetSlot": "CAETargetSlot",
-  "TrajectoryMode": "DIRECT",
+  "TrajectoryMode": "Direct",
   "YawSpreadDegrees": 4.0,
   "PitchSpreadDegrees": 2.0
 }
@@ -549,3 +552,26 @@ Optional action overrides:
 - `IsMountable`
 - `IsHarvestable`
 - `HarvestInteractionContext`
+
+## Owned NPC transformations
+
+The built-in custom effect `tamework:transform_owned_npc` replaces an owned,
+tamed NPC with a fresh NPC. It creates the replacement before releasing the
+original companion through the existing persistence authority, and removes the
+replacement if release fails. Use `Param` for the target role and `JsonPayload`
+for `Item` (one held item consumed) and `Message` (a notification translation key).
+The interacting player must own the NPC, crouch, and hold the specified item.
+This effect supports ordinary companions, not roster members.
+The new NPC starts at full health without the original companion's owner,
+command links, or progression. Other effects should not be combined with this
+asynchronous effect; it owns the item cost and success notification.
+
+```json
+{
+  "Custom": [{
+    "Id": "tamework:transform_owned_npc",
+    "Param": "My_Boss_Role",
+    "JsonPayload": "{\"Item\":\"Ingredient_Bar_Gold\",\"Message\":\"server.myMod.bossSummoned\"}"
+  }]
+}
+```

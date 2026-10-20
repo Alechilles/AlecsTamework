@@ -134,10 +134,10 @@ class CompanionHappinessTimedEffectsTest {
             write.setAccessible(true);
             ItemStack captured = (ItemStack) write.invoke(writerCtor.newInstance(),
                     new ItemStack("Test_Capture", 1), f.ref, f.store);
-            Class<?> metadataType = Class.forName("com.alechilles.alecstamework.items.persistence.LegacyCapturedArtifactMetadata");
+            Class<?> metadataType = Class.forName("com.alechilles.alecstamework.companion.migrate.legacy.LegacyCapturedArtifactMetadata");
             var metadataCtor = metadataType.getDeclaredConstructor(BsonDocument.class);
             metadataCtor.setAccessible(true);
-            Class<?> mapperType = Class.forName("com.alechilles.alecstamework.items.persistence.LegacyCapturedArtifactProgressionMapper");
+            Class<?> mapperType = Class.forName("com.alechilles.alecstamework.companion.migrate.legacy.LegacyCapturedArtifactProgressionMapper");
             var mapperCtor = mapperType.getDeclaredConstructor();
             mapperCtor.setAccessible(true);
             var read = mapperType.getDeclaredMethod("happiness", metadataType, long.class);

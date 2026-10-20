@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
@@ -59,14 +60,10 @@ public final class ActionTameworkSetOwner extends TameworkActionBase {
         UUID oldOwnerId = existingOwner == null ? null : existingOwner.getOwnerId();
         if (oldOwnerId == null) {
             OwnerPopulationCapService.Decision decision =
-                    OwnerPopulationCapService.evaluateAcquisition(store, playerId);
+                    OwnerPopulationCapService.evaluateAcquisition(store, playerId,
+                            CompanionRoleIdResolver.resolveRoleId(npcRef, store));
             if (!decision.allowed()) {
-                OwnerMessageUtil.sendPopulationCapReached(
-                        player,
-                        decision.currentCount(),
-                        decision.limit(),
-                        decision.scope()
-                );
+                OwnerMessageUtil.sendAcquisitionDenied(player, decision);
                 return false;
             }
         }

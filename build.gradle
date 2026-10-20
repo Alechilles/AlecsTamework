@@ -39,11 +39,6 @@ configurations {
         canBeResolved = true
         transitive = false
     }
-    update5ServerRuntime {
-        canBeConsumed = false
-        canBeResolved = true
-        transitive = false
-    }
 }
 
 if (rootProject.findProject(':alecstelemetry:runtime') != null) {
@@ -55,7 +50,6 @@ if (rootProject.findProject(':alecstelemetry:runtime') != null) {
 }
 
 dependencies {
-    compileOnly files(property('nameplatebuilder_jar_path'))
     implementation beaconCoordinates
     telemetryAssetPack beaconCoordinates
     implementation "com.alechilles:patchwork-runtime:${patchworkVersion}"
@@ -63,7 +57,6 @@ dependencies {
     implementation "org.xerial:sqlite-jdbc:${property('sqlite_jdbc_version')}"
     implementation "org.slf4j:slf4j-api:${property('slf4j_version')}"
     implementation "org.slf4j:slf4j-nop:${property('slf4j_version')}"
-    update5ServerRuntime 'com.hypixel.hytale:Server:0.5.7'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
@@ -86,7 +79,7 @@ hytaleTools {
     modCredits = 'Alec (Alechilles)||https://www.curseforge.com/members/alechilles/projects'
     mainClass = 'com.alechilles.alecstamework.Tamework'
     manifestDependencies = 'Hytale:NPC=*'
-    manifestOptionalDependencies = 'Frotty27:NameplateBuilder=>=4.260326.7,Buuz135:SimpleClaims=>=1.0.38 <1.1.0,net.evilcraft:QuestLinesClaims==1.3.1'
+    manifestOptionalDependencies = 'Buuz135:SimpleClaims=>=1.0.38 <1.1.0,net.evilcraft:QuestLinesClaims==1.3.1'
     curseforgeId = '1447962'
     includesPack = true
     bundleAssetEditorRuntime = false
@@ -157,6 +150,23 @@ tasks.named('shadowJar', ShadowJar) {
         skipStringConstants = true
     }
     relocate 'org.slf4j', 'com.alechilles.alecstamework.shadow.slf4j'
+    // The SQLite driver is only used by the one-time importer. Ship natives for the platforms
+    // Hytale servers run on (Windows, Linux, Mac on x86_64/aarch64, plus Alpine/musl containers)
+    // and drop the rest. Do not relocate org.sqlite: the JNI symbols in the natives are bound to
+    // that package name. Plain patterns (not a closure) so Gradle tracks them for up-to-date checks.
+    exclude 'META-INF/versions/9/org/sqlite/nativeimage/**'
+    exclude 'org/sqlite/native/FreeBSD/**'
+    exclude 'org/sqlite/native/Linux-Android/**'
+    exclude 'org/sqlite/native/Linux-Musl/x86/**'
+    exclude 'org/sqlite/native/Linux/arm/**'
+    exclude 'org/sqlite/native/Linux/armv6/**'
+    exclude 'org/sqlite/native/Linux/armv7/**'
+    exclude 'org/sqlite/native/Linux/ppc64/**'
+    exclude 'org/sqlite/native/Linux/riscv64/**'
+    exclude 'org/sqlite/native/Linux/x86/**'
+    exclude 'org/sqlite/native/Windows/aarch64/**'
+    exclude 'org/sqlite/native/Windows/armv7/**'
+    exclude 'org/sqlite/native/Windows/x86/**'
     manifest {
         attributes(
                 'Plugin-Group': project.group,
@@ -174,7 +184,6 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
     workingDir projectDir
     systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
-    systemProperty 'tamework.update5ServerJar', configurations.update5ServerRuntime.singleFile.absolutePath
 }
 
 tasks.named('test') {

@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 /**
  * Reads compact linked-panel cooldown snapshots from loaded companion state.
  */
-final class CommandLinkedPanelCooldownSnapshotService {
+public final class CommandLinkedPanelCooldownSnapshotService {
     private static final String DEFAULT_HARVEST_ALARM_NAME = "Harvest_Ready";
     private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
 
@@ -279,7 +279,7 @@ final class CommandLinkedPanelCooldownSnapshotService {
                 : 0L;
     }
 
-    static String resolveHarvestAlarmName() {
+    public static String resolveHarvestAlarmName() {
         TwGlobalConfig config = TwGlobalConfig.resolveActive();
         String configured = config != null ? config.getHarvestAlarmName() : null;
         return configured != null && !configured.isBlank() ? configured : DEFAULT_HARVEST_ALARM_NAME;

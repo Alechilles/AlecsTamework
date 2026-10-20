@@ -20,14 +20,12 @@ the server-global `debug*` logging toggles. Patchwork administration requires
 the `patchwork.admin` permission.
 `/tw debug telemetry crash` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
-`/tw debug persistence [status|health|detail|export]` is console-safe.
-Status and detail actions are read-only. `export` writes a bounded, redacted
-support ZIP without changing persistence state. Every response line is sent to
-the command caller and written to the server log. This includes the export
-bundle path.
-`/tw debug persistence simulateerror` is also console-safe. It sends one
-synthetic failure through the real automatic diagnostic path and prints a
-unique token. It does not read or change the SQLite database.
+Tamework 5.0 removed the `/tw debug persistence` command and all its
+subcommands (`status`, `health`, `detail`, `export`, `reviveready`, `compact`,
+`simulateerror`) together with the SQLite persistence they served.
+`/tw persistence start-fresh [confirm]` is console-safe. It only applies while
+old companion data blocks the world; see the wiki page "World Migration for
+Server Admins".
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw config reload`,
@@ -79,64 +77,38 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 
 - Confirm an enabled `TwCoopConfig` resolves for the exact coop under test.
 - Test live NPC intake and live resident release independently.
-- Test eligible captured-item intake independently. A successful operation
-  retires the exact item and creates one canonical coop resident; an ineligible
-  item or unavailable persistence feature remains untouched.
+- Test filled capture-item intake independently. A successful intake empties
+  that item and makes the companion a coop resident; an ineligible item, or a
+  stale copy of an item, stays untouched.
+- Breaking a coop releases its residents beside the block.
 - Filled spawner items still release through their normal interaction when the
   targeted block is not a supported managed coop intake.
 - For death or Lost recovery, verify the linked panel shows the recorded state
   and exact cooldown. Roster-backed paid revival must show every configured
   cost; legacy item-linked restoration remains free.
-- Released schema v2-v4 sources and released DAT records import into
-  `tamework-state.sqlite` without modifying the source. A v5-v9 source is a
-  deliberate refusal: restore a public backup or create a new world instead of
-  trying to repair or migrate that tester-only database.
-- A migration retest must begin without an existing replacement target. Stop
-  the server, back up the complete data directory, and restore the complete
-  pre-upgrade directory (or move `tamework-state.sqlite` with its WAL/SHM
-  sidecars, `persistence-engine.json`, and the prior import report out of the
-  active directory). Restoring only `tamework.sqlite` leaves the previous target
-  authoritative. The first clean import reports `IMPORTED_PUBLIC`; `EXISTING`
-  means no import ran during that startup.
-- After a clean import, wait for `/tw debug persistence status` to report storage mode
-  `READ_WRITE` and startup readiness `MUTATION_READY` before testing capture,
-  release, or recovery. `STARTING` with `RECONCILE_WORLD` running is a transient
-  safety gate: an attempted mutation is rejected with `world_evidence_pending`,
-  the source item remains untouched, and the player should retry after startup
-  becomes mutation-ready.
-- Use `/tw debug persistence status` for engine, target-origin, schema, startup,
-  operation, validation, and checkpoint state. `health` is an alias for the
-  same bounded summary.
-- Use `/tw debug persistence detail` for bounded feature, outbox, operation-phase,
-  incident, quarantine, and `openCircuits` counts. It does not repair or retry
-  persistence work. Circuit evidence comes from the one replacement feature
-  registry and shared `feature_circuit` table, not an old failure catalog;
-  there is no separate persistence rehearsal runtime.
-- Use `/tw debug persistence export` to create a bounded support ZIP under the universe's
-  Tamework `Data/diagnostics` directory. It contains sanitized operational
-  status, counters, and durable diagnostic summaries. It excludes the SQLite
-  database, save data, player identities, coordinates, inventory payloads,
-  secrets, and unrestricted logs.
-- When Tamework telemetry and `Diag` consent are enabled, a terminal persistence error creates the
-  automatic evidence in memory and sends it to Beacon as a diagnostic
-  bundle. The report includes a safe error classification and a ZIP of at most
-  512 KiB. It does not write a local export file. Its status data uses a strict
-  allowlist and omits the durable detail snapshot from the manual export.
-- Automatic diagnostics cover generic and bonded persistence. They run on a
-  separate bounded worker and cannot change a read, write, startup, checkpoint,
-  or shutdown result. Set `telemetry.enabled` to `false` in Tamework's global
-  settings, or disable `Diag` in `/beacon consent`, to opt out. `Diag` is
-  separate from Error consent. Existing projects that already reviewed consent
-  must select Save and Close in `/beacon consent` before Diagnostics can run.
-  A disabled or failed local submission stays eligible when the same failure
-  classification occurs again.
-- Use `/tw debug persistence simulateerror` to test this path without causing a
-  real persistence failure. The diagnostic requests an automatic upload. Run
-  `/beacon flush` if you want to force the queue, then find the printed token
-  in the diagnostic `reason` attribute in Beacon.
-- The automatic ZIP excludes the SQLite database, save data, player identity,
-  coordinates, inventory payloads, secrets, exception messages, and unrestricted
-  logs. Beacon treats the ZIP as opaque evidence.
+- Tamework 5.0 imports a 3.x or 4.x world by itself at the first start and
+  never changes the old files. A 2.x world must run Tamework 4.3.x once first.
+  The wiki page "World Migration for Server Admins"
+  (`wiki/Player-Guides/Troubleshooting-and-Glossary/World-Migration-for-Server-Admins.md`)
+  covers the console lines, the report file, a failed import and
+  `/tw persistence start-fresh`.
+- To retest an import, stop the server and delete `universe/Tamework/Companions`
+  while the old database files are still in `universe/Tamework/Data`. The next
+  start imports again. `meta.json` in the new folder holds the import receipt;
+  while it exists no import runs.
+- There is no persistence status, detail or export command in 5.0. For
+  support, collect the server log and, after an import, the
+  `import-report-*.txt` file from `universe/Tamework/Data`.
+- Companion store problems show in the server log, such as a failed write or
+  an unreadable owner file (moved aside with an `.unreadable-` suffix). A
+  failed write logs the WARN `Companion data was not written (<n> owner files
+  and <n> snapshots pending); it stays in memory and the write is retried`, at
+  most once a minute while writes keep failing. The unwritten data stays in
+  memory and the write is retried. The
+  Public API
+  diagnostics view reports record counts by location, the last flush time,
+  the last failure, and unreadable records.
+- Tamework 5.0 sends no automatic persistence diagnostic bundles.
 
 ## Needs/resource seek troubleshooting
 - Confirm seek sensor/action components are in the role/template:
@@ -162,33 +134,28 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
 - A dead-target capture denial writes the player, target, role, item, exact
   health, and death-component state to the server log.
-- `/tw debug log respawn-trace` covers normal captured-item releases, restoration,
-  and bonded roster summons. A bonded summon trace includes its planned
-  full-health snapshot, profile/lease/world identity, projection result,
-  immediate live health and death state, first damage, and probes after 250 ms
-  and 1 second. Early placement, world, thread, and exception failures are also
-  recorded. Enable it only for a short reproduction.
-- New companion projections always clear stale fall distance and velocity and
-  receive brief spawn-time fall protection. This protection does not depend on
-  `/tw debug log respawn-trace`. A cancelled invalid fall can appear under
-  `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on active trace
-  evidence.
+- `/tw debug log respawn-trace` logs `[tw-respawn-trace]` lines for every
+  companion body the restore flows spawn (recall, recover, revive, summon,
+  captured-item release, and coop release): the spawn result, probes 250 ms
+  and 1000 ms later, the first damage, and cancelled fall damage.
+- Newly bred offspring receive brief spawn-time fall protection; a cancelled
+  fall appears under `[tw-spawn-protection]`.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
 ## Population and claim troubleshooting
 
-- The owner cap counts canonical owned profiles, including unloaded, captured,
-  cooped, roster-stored, provisioned-dormant, dead, and Lost profiles in the
-  configured global/per-world scope. If the result looks wrong, inspect
-  lifecycle ownership and reconciliation readiness rather than only nearby live
-  NPCs.
+- `limitPerPlayerOwnedTotal` counts every owned companion: out in a world,
+  in capture items, rosters, and coops, dead, and lost.
+  `limitPerPlayerDeployedTotal` counts summoned companions, loaded or not.
+  Imported companions that 5.0 has not seen yet do not count as deployed. If a
+  result looks wrong, check the companion's location in the linked panel
+  rather than only nearby live NPCs.
 - SimpleClaims affects breeding only through its direct claim-required,
   per-chunk, and total-claim settings.
 - SimpleClaims damage protection uses its native tamed-NPC policy. Integration
   errors fail open rather than making companions invulnerable.
-- There is no provider selector or QuestLines bridge. Durable owner/group
-  admission and sealed reconciliation belong to replacement persistence, not
-  SimpleClaims.
+- There is no QuestLines bridge. Owner, group, and admission-provider limits
+  are checked inside the companion index, not by SimpleClaims.
 
 ## Debug toggles
 
@@ -240,11 +207,6 @@ it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore the saved player mod
 
 `/tw debug avatar input` logs movement packets, mouse packets, interaction events, and per-tick player
 input/state snapshots for the executing player. Use it only during short input experiments; it is intentionally verbose.
-
-`/tw debug log respawn-trace` logs capture-time stored health and needs, raw and
-normalized return projections, immediate live health and death state, first
-damage, and delayed 250 ms and 1 second probes for captured-item release and
-companion restoration. Enable it only for a short reproduction.
 
 `/tw debug log despawn` notes:
 - Default (no role filter) tracks all tamed companions.

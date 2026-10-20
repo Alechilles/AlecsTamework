@@ -36,9 +36,7 @@ final class CommandRelocationRetryCoordinator {
         CommandRelocationTimeoutDecision.Outcome outcome = CommandRelocationTimeoutDecision.decide(
                 exhausted(pending, now),
                 pending.physicalMutationAttempted(),
-                liveNpcObservedOutsideDestination,
-                pending.crossWorldTransferAttempted(),
-                pending.crossWorldDestinationInstalled()
+                liveNpcObservedOutsideDestination
         );
         if (finishTerminal(outcome, world, npcUuid, pending, now)) {
             return;
@@ -68,12 +66,6 @@ final class CommandRelocationRetryCoordinator {
         return switch (outcome) {
             case CANCEL_CONFIRMED_SAME_WORLD -> {
                 owner.cancelObservedSameWorldRelocation(world, npcUuid, pending);
-                yield true;
-            }
-            case DROP_UNCONFIRMED_TRANSFER -> {
-                owner.dropUnconfirmedRelocation(
-                        world, npcUuid, pending, now
-                );
                 yield true;
             }
             case COMMIT_UNCONFIRMED_AS_UNLOADED -> {

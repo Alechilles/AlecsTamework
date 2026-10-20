@@ -92,6 +92,10 @@ final class LinkedNpcPanelCountdownPresenter {
             commands.set(selector + " #HealthTooltip.TooltipText",
                     deadHealthTooltip(entry,
                             projected.deadRespawnRemainingMs(), language));
+            // The full render owns strip visibility and the Revive button, which the expiration
+            // refresh shows once the countdown reaches zero.
+            LinkedNpcPanelStatusStrip.refresh(commands, selector, projected,
+                    projected.deadRespawnRemainingMs(), false, language);
         }
         if (entry.breedingCooldownKnown() || entry.harvestCooldownKnown()) {
             LinkedNpcPanelVitalsBinder.bindCooldowns(commands, selector, projected,

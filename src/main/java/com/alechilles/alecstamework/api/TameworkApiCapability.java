@@ -21,7 +21,6 @@ public enum TameworkApiCapability {
     CAPTURE_POLICY,
     /** Durable revision-fenced profile-data mutations and restart-visible operation queries. */
     PROFILE_DATA_TRANSACTIONS,
-    PERSISTENCE_RESILIENCE,
     POPULATION_GROUPS,
     /** Process-local loaded-owner counts filtered by population groups. */
     LOADED_POPULATION_GROUP_COUNTS,
@@ -29,13 +28,6 @@ public enum TameworkApiCapability {
     DURABLE_POPULATION_GROUP_COUNTS,
     /** Durable world-animal counts, excluding capture items and stored/dead profiles. */
     DURABLE_DEPLOYABLE_POPULATION_COUNTS,
-    COMPANION_PROVISIONING,
-    /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
-    COMMAND_TIMED_SUMMONING,
-    /** Data-driven, idempotent, exact multi-item command revival. */
-    PAID_COMMAND_REVIVAL,
-    /** Durable owner/command-family/profile roster authority. */
-    COMMAND_FAMILY_ROSTERS,
     /** Exact source decrement after either terminal capture roll. */
     CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
     /** Successful capture can tame the live NPC and commit command-roster membership. */
@@ -48,8 +40,6 @@ public enum TameworkApiCapability {
     REVIVAL_ACTIVITY_CONTEXT,
     /** Durable companion output operations and pending-output claims. */
     DURABLE_OUTPUT_OPERATIONS,
-    /** Named, weighted population-capacity reservations. */
-    NAMED_CAPACITY_RESERVATIONS,
     /** External admission-policy provider registration and evaluation. */
     EXTERNAL_ADMISSION_PROVIDERS,
     /** Validated managed-content profiles and readiness state. */

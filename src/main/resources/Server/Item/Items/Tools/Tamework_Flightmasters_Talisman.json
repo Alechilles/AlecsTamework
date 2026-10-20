@@ -66,5 +66,11 @@
   "UsePlayerAnimations": false,
   "Categories": [
     "Items.Tools"
-  ]
+  ],
+  "Weapon": {},
+  "Tags": {
+    "Family": [
+      "TameworkInput"
+    ]
+  }
 }

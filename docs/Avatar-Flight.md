@@ -1,6 +1,20 @@
 # Avatar Flight
 
+Native prototype status (Hytale 0.6.8): live testing receives jump input, but crouch and Q did not reach the observed handlers while mounted. The trace also omitted forward wish input, so custom W acceleration is unverified. Native swimming still introduces passive sinking. The configured controls below describe the intended behavior, not a verified working control scheme.
+
 Avatar flight is the transformed-player flight path used by dragon-style mounts. The real player becomes the flight model, while Tamework can attach a visual rider copy for the seated player appearance.
+
+## Underwater Mounts
+
+Set `Underwater` to `true` on a `TwAvatarFlightConfig` to use swimming propulsion with the same mount session, talisman, visual rider, source NPC preservation, and dismount/recovery lifecycle. Keep `MountMode=TameworkAvatarFlight` and give the role an explicit `AvatarFlightConfig` id. Existing profiles default to `Underwater=false`. Omitted `Underwater` inherits from the parent; an explicit value overrides it. The existing avatar-flight asset loader, overrides, editor schema, and reload behavior apply.
+
+Underwater movement starts automatically while the player has native `inFluid` or `swimming` state. W accelerates along mouse look, S reverses, A/D strafe, Space rises, and crouch descends. Right-click brakes and Q boosts through Flightmaster's Talisman. F dismounts. No launch charge or upward flap is available. Pitch changes direction without giving dive speed, climb penalties, gravity sink, or stall. Launch/flap HUD controls and the pitch readout are hidden. Flight XP is not awarded for swimming.
+
+The normal cruising limit applies to total 3D speed, including combined directional inputs. `Movement.MaxForwardSpeed` sets cruise and `Movement.ForwardAcceleration` sets acceleration. `MaxBackwardSpeed` and `BackwardAcceleration` tune reverse; `DescendSpeed` also controls direct rise/descend and strafe speed, capped at cruise. `HoverHorizontalDamping` slows coasting and `AirbrakeDeceleration` controls braking. Boost uses `Boost.ForwardImpulse`, `DurationSeconds`, and `CooldownSeconds`, plus the existing Vigour cost. Its maximum speed is cruise plus the forward impulse. Above-cruise speed decays using `Curve.BoostedSpeedDecay`; use a positive value. Swimming ignores `MaxGlideSpeed` and all pitch/load/launch/flap tuning. The speed HUD, fast animation, and fast-movement Vigour recharge use total speed.
+
+Leaving liquid releases custom velocity and clears the controller's stored speed. The avatar mount session remains active, so entering liquid again resumes swimming and normal dismount still restores the same NPC. Native fluid flags are preserved rather than forcing flying mode. This follows the existing fluid-state detection, including water contact; it does not add water-type filtering or require full head submersion. Breath and environmental damage retain native behavior.
+
+The optional hammerhead shark role in `examples/asset-pack` now tests native mounting with W acceleration, coasting, S braking, a Q boost, and crouch descent without a talisman. It preserves the shark's breathing rules while mounted. Its earlier underwater avatar config remains available for comparison. See the example pack README for the role parameters. Live client checks are still required for native swim prediction, surface transitions, camera and rider placement, and underwater dismount/recovery.
 
 ## NPC Mounting
 
@@ -30,9 +44,9 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
 - Right-click with Flightmaster's Talisman applies the airbrake.
 - Q with Flightmaster's Talisman performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
-- Flightmaster's Talisman also binds its native `Ability2` and `Ability3` item slots to optional configured combat roots. In Hytale's default layout those slots are E and R, respectively. They are slot names, not literal-key listeners: players who remap either native ability binding still activate the matching configured root.
+- Flightmaster's Talisman binds `Ability2` and `Ability3` to optional configured combat roots. In Hytale's default layout those slots are E and R, respectively. They are slot names, not literal-key listeners: players who remap either native ability binding still activate the matching configured root. On Update 7, Tamework binds the two slots on the player's own interactions during avatar flight and removes the bindings on dismount or item switch. The player's runes stay in their slots. Update 6 keeps the direct item controls.
 - Flightmaster's Talisman must already be selected before mounting or enabling avatar flight. Activation fails before changing the player model when another hotbar item is held.
-- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman remains tool-only, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman so weapon controls cannot replace or overlap the flight controls. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
+- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman keeps its dedicated flight controls, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
 - Press F to immediately dismount from an NPC-backed avatar-flight session, including while airborne. An airborne normal dismount restores the companion at the current flight position. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
@@ -43,6 +57,8 @@ While transformed but not actively using Tamework's custom flight velocity, grou
 ## Vigour
 
 Vigour is a charge resource for avatar-flight movement abilities. Successful charged launches, upward flaps, and forward boosts spend charges. When Vigour reaches zero, those movement abilities stop applying until charges recover.
+
+Server owners can turn Vigour off for every flight with **Unlimited Flight Vigour** in `/tw settings` (`avatarFlight.unlimitedVigour` in `tamework-settings.json`, default `false`). While it is on, launches, flaps, and boosts are never refused or charged, the HUD hides the Vigour pips, and cooldowns still apply. It has the same effect as `Vigour.Enabled: false` on every flight config, and the change applies to flights already in progress.
 
 Default balance:
 

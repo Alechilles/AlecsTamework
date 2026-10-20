@@ -30,7 +30,7 @@ Tamework does not force one path everywhere. Use the optimized path for the comm
 Use `TameworkCullNpc` when an item should cull one NPC target without opening a
 command panel. It requires an owned and tamed target by default, clears generic
 command links, then uses normal death processing and drops. It never culls a
-bonded companion projection.
+bonded companion.
 
 ```json
 { "Type": "TameworkCullNpc" }

@@ -65,11 +65,16 @@ final class LinkedNpcPanelCardDynamicState {
             LinkedNpcEntry previous,
             LinkedNpcEntry current
     ) {
-        return respawnReady(previous) == respawnReady(current);
+        return respawnReady(previous) == respawnReady(current)
+                && respawnDisabled(previous) == respawnDisabled(current);
     }
 
     private static boolean respawnReady(LinkedNpcEntry entry) {
         return (entry.dead() || entry.lost()) && entry.deadRespawnRemainingMs() == 0L;
+    }
+
+    private static boolean respawnDisabled(LinkedNpcEntry entry) {
+        return entry.dead() && entry.deadRespawnRemainingMs() < 0L;
     }
 
     private static boolean samePresence(Object previous, Object current) {

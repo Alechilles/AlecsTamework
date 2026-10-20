@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Atomic registry for item feature configs and their compiled capture projections.
@@ -36,6 +37,26 @@ public final class ItemFeatureRegistry {
         // Preserve legacy disposable captured-item state normalization.
         String normalized = normalizeStateItemId(itemId);
         return normalized != null && !normalized.equals(itemId) ? configs.get(normalized) : null;
+    }
+
+    /**
+     * The config bound to an empty item id ({@link #get}), or else the config whose filled item id
+     * matches {@code itemId}; state suffixes are ignored on both sides. Null when neither matches.
+     */
+    @Nullable
+    public ItemFeatureConfig getForFilledOrEmpty(@Nullable String itemId) {
+        ItemFeatureConfig direct = get(itemId);
+        if (direct != null || itemId == null) {
+            return direct;
+        }
+        String normalized = normalizeStateItemId(itemId);
+        for (ItemFeatureConfig config : state.configsByItemId().values()) {
+            String filled = config == null ? null : config.getSpawnerFilledItemId();
+            if (filled != null && !filled.isBlank() && normalized.equals(normalizeStateItemId(filled))) {
+                return config;
+            }
+        }
+        return null;
     }
 
     @Nonnull

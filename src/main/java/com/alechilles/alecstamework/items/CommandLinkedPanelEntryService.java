@@ -106,18 +106,7 @@ final class CommandLinkedPanelEntryService {
     List<LinkedNpcEntry> buildEntries(Player player, Store<EntityStore> store, ItemStack stack,
                                      String toolId, List<LinkedNpcRecord> records) {
         if (player == null || store == null || stack == null || stack.isEmpty()) return List.of();
-        if (persistenceView != null) {
-            records = persistenceView.linkedRecordsForTool(records, toolId);
-        }
         return buildEntriesFromRecords(player, store, stack, toolId, records);
-    }
-
-    /** Selection membership does not require constructing live status cards a second time. */
-    java.util.Set<UUID> linkedRecordIdsForTool(List<LinkedNpcRecord> records, String toolId) {
-        var canonical = persistenceView == null ? records : persistenceView.linkedRecordsForTool(records, toolId);
-        var ids = new java.util.HashSet<UUID>();
-        for (var record : canonical) ids.add(record.npcUuid);
-        return ids;
     }
 
     /** Builds from canonical records when item metadata is merely a disposable projection. */
@@ -299,6 +288,7 @@ final class CommandLinkedPanelEntryService {
             boolean inCoop = false;
             boolean lost = false;
             long deadRespawnRemainingMs = 0L;
+            long deadRespawnTotalMs = 0L;
             String deathCauseHint = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
@@ -395,6 +385,7 @@ final class CommandLinkedPanelEntryService {
                             canonicalProfile.restorationAvailableAtMs(),
                             System.currentTimeMillis()
                     );
+                    deadRespawnTotalMs = canonicalProfile.restorationCooldownMs();
                 }
             }
             if (!dead && !captured && !inCoop && world != null) {
@@ -475,7 +466,8 @@ final class CommandLinkedPanelEntryService {
             ).withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                     customName, speciesRoleId, record.cachedNameKey))
                     .withPortraitIcon(TwDynamicIconConfig.resolveIcon(
-                            speciesRoleId, null));
+                            speciesRoleId, null))
+                    .withDeadRespawnTotalMs(deadRespawnTotalMs);
             CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null : persistenceView.savedPanel(record, player.getUuid());
             if (saved != null) {
                 // Use the current world's configured clock when this animal belongs to it.
@@ -492,6 +484,13 @@ final class CommandLinkedPanelEntryService {
             renderedIds.put(record.npcUuid, entry.npcUuid());
         }
         return new ResolvedEntries(entries, renderedIds);
+    }
+
+    /** What stands in for the location of an imported companion that has not been seen or located yet. */
+    static String unseenImportStatus(Player player, String displayName) {
+        return com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator.pending()
+                ? LocalizedText.resolve(player, "tamework.ui.linkedLocation.beingLocated")
+                : LocalizedText.format(player, "tamework.ui.notifications.command.locate.noLocation", displayName);
     }
 
     /** Uses saved evidence and observed item holders without querying live inventories. */
@@ -526,7 +525,7 @@ final class CommandLinkedPanelEntryService {
                     "tamework.ui.notifications.command.locate.coop");
             if (stored != null && stored.coop() != null) {
                 var coop = stored.coop();
-                world = coop.worldKey();
+                world = coop.world();
                 targetX = coop.x();
                 targetZ = coop.z();
                 coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
@@ -534,7 +533,17 @@ final class CommandLinkedPanelEntryService {
             }
         } else {
             status = "";
-            if (record.lastKnownPosition != null) {
+            if (persistenceView != null && persistenceView.neverSighted(record)) {
+                // An import nobody has seen yet has no real place: never show its 0, 0, 0.
+                status = unseenImportStatus(player, entry.displayName());
+            } else if (persistenceView != null && persistenceView.livePlace(record).isPresent()) {
+                // The index holds the companion's last recorded place; the item's copy can be stale.
+                var place = persistenceView.livePlace(record).get();
+                world = place.world();
+                targetX = place.x();
+                targetZ = place.z();
+                coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(place.x(), place.y(), place.z());
+            } else if (record.lastKnownPosition != null) {
                 world = record.lastKnownWorldName;
                 targetX = record.lastKnownPosition.x;
                 targetZ = record.lastKnownPosition.z;

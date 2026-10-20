@@ -55,6 +55,7 @@ import javax.annotation.Nullable;
 public final class MountedRidePacketHandler implements SubPacketHandler {
     private static final ConcurrentMap<UUID, RideSession> ACTIVE_TAMEWORK_RIDES = new ConcurrentHashMap<>();
     private final IPacketHandler packetHandler;
+    private final NativeSwimInputCapture swimInputCapture = new NativeSwimInputCapture();
     private Consumer<ToServerPacket> clientMovementDelegate;
     private Consumer<ToServerPacket> mountMovementDelegate;
     private Consumer<ToServerPacket> mouseInteractionDelegate;
@@ -177,6 +178,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
+        swimInputCapture.capture(packet, packetHandler);
         PlayerInputDebugProbe.logClientMovement(packetHandler.getPlayerRef(), packet);
         avatarFlightPacketInputCapture.capture(packet, packetHandler);
         glidePacketInputCapture.capture(packet, packetHandler);
@@ -208,7 +210,12 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
                 World world = store == null || store.getExternalData() == null
                         ? null : store.getExternalData().getWorld();
                 if (world != null) {
-                    world.execute(() -> handleAvatarFlightDismount(riderRef, store));
+                    try {
+                        world.execute(() -> handleAvatarFlightDismount(riderRef, store));
+                    } catch (RuntimeException ignored) {
+                        // The world is stopping and takes no more tasks; the packet must still
+                        // reach the vanilla handler below.
+                    }
                 }
             }
         }
@@ -318,13 +325,21 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
 
     private void handle(@Nonnull DismountNPC packet) {
         PlayerRef playerRef = packetHandler.getPlayerRef();
-        Ref<EntityStore> riderRef = playerRef.getReference();
+        Ref<EntityStore> riderRef = playerRef == null ? null : playerRef.getReference();
         if (riderRef == null || !riderRef.isValid()) {
             return;
         }
         Store<EntityStore> store = riderRef.getStore();
-        World world = store.getExternalData().getWorld();
-        world.execute(() -> handleOnWorldThread(riderRef, store));
+        World world = store == null || store.getExternalData() == null
+                ? null : store.getExternalData().getWorld();
+        if (world == null) {
+            return;
+        }
+        try {
+            world.execute(() -> handleOnWorldThread(riderRef, store));
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks.
+        }
     }
 
     private void handleOnWorldThread(@Nonnull Ref<EntityStore> riderRef, @Nonnull Store<EntityStore> store) {

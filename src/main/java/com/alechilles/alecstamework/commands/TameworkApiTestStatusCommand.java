@@ -50,12 +50,12 @@ public final class TameworkApiTestStatusCommand extends AbstractTameworkServerCo
             TameworkApiSelfTestCommandSupport.sendFixtureStatus(commandContext, null);
             return;
         }
-        Player player = store.getComponent(ref, Player.getComponentType());
-        if (player == null) {
-            TameworkApiSelfTestCommandSupport.sendFixtureStatus(commandContext, null);
-            return;
-        }
-        ApiSelfTestFixtureSet fixtureSet = manager.resolveFixtureSet(player, store, world).orElse(null);
-        TameworkApiSelfTestCommandSupport.sendFixtureStatus(commandContext, fixtureSet);
+        // The command runs off the world thread; the player and the fixtures are only readable on it.
+        world.execute(() -> {
+            Player player = ref.isValid() ? store.getComponent(ref, Player.getComponentType()) : null;
+            ApiSelfTestFixtureSet fixtureSet = player == null
+                    ? null : manager.resolveFixtureSet(player, store, world).orElse(null);
+            TameworkApiSelfTestCommandSupport.sendFixtureStatus(commandContext, fixtureSet);
+        });
     }
 }

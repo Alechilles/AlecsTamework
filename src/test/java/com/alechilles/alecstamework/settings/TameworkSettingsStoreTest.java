@@ -1,0 +1,540 @@
+package com.alechilles.alecstamework.settings;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class TameworkSettingsStoreTest {
+
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void saveAndLoadGlobalSettingsRoundTripsValues() throws Exception {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
+
+        TameworkSettingsStore.GlobalSettingsSnapshot snapshot = new TameworkSettingsStore.GlobalSettingsSnapshot(
+                17,
+                "Global",
+                true,
+                3,
+                12,
+                true,
+                true,
+                true,
+                false,
+                true,
+                "OWNER_ONLY",
+                true,
+                false,
+                false,
+                true,
+                false,
+                "AlwaysFast",
+                "OWNER_ONLINE_GRACE_THEN_DECAY",
+                48.0,
+                1.25,
+                true,
+                "MIN_ONLY_PERCENT",
+                "SUM_BOTH",
+                4.5,
+                5.5,
+                false,
+                true,
+                false,
+                false,
+                false,
+                true,
+                false,
+                true,
+                false,
+                false,
+                true,
+                false,
+                "FULL",
+                true,
+                73,
+                0,
+                true
+        );
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, snapshot, null));
+
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertNotNull(overrides);
+        assertEquals(17, overrides.populationLimitPerPlayerOwnedTotal());
+        assertEquals("Global", overrides.populationPerPlayerLimitScope());
+        assertEquals(true, overrides.simpleClaimsEnabled());
+        assertEquals(3, overrides.simpleClaimsLimitPerClaimChunk());
+        assertEquals(12, overrides.simpleClaimsLimitPerClaimTotal());
+        assertEquals(true, overrides.simpleClaimsBreedingRequiresClaim());
+        assertEquals(true, overrides.simpleClaimsProtectTamedFromNonMembers());
+        assertEquals(true, overrides.blockOwnerDamage());
+        assertEquals(false, overrides.blockAllPlayerDamageIfOwned());
+        assertEquals(true, overrides.invulnerableIfOwned());
+        assertEquals("OWNER_ONLY", overrides.captureItemOwnership());
+        assertNull(overrides.captureClearsOwner());
+        assertNull(overrides.spawnSetsOwner());
+        assertEquals(true, overrides.captureRequiresOwner());
+        assertEquals(false, overrides.spawnRequiresOwner());
+        assertEquals(false, overrides.interactionRequiresOwner());
+        assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(false, overrides.needsEnabled());
+        assertEquals("AlwaysFast", overrides.needsResourceMode());
+        assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
+        assertEquals(48.0, overrides.needsOwnerOfflineGraceHours());
+        assertEquals(1.25, overrides.needsOwnerOfflineDecayMultiplier());
+        assertEquals(true, overrides.needsDamageEnabled());
+        assertEquals("MIN_ONLY_PERCENT", overrides.needsDamageModel());
+        assertEquals("SUM_BOTH", overrides.needsDamageDualNeedRule());
+        assertEquals(4.5, overrides.needsStarvationDamagePerMinute());
+        assertEquals(5.5, overrides.needsDehydrationDamagePerMinute());
+        assertEquals(false, overrides.needsDamageLethal());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(false, overrides.passiveBreedingEnabled());
+        assertEquals(false, overrides.breedingRequiresHappiness());
+        assertEquals(false, overrides.breedingGenderEnabled());
+        assertEquals(true, overrides.traitsEnabled());
+        assertEquals(false, overrides.levelingEnabled());
+        assertEquals(true, overrides.talentsEnabled());
+        assertEquals(false, overrides.reviveSystemEnabled());
+        assertEquals(false, overrides.recallTeleportingEnabled());
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+        assertEquals("FULL", overrides.animalAgingMode());
+        assertEquals(true, overrides.animalOldAgeDeathEnabled());
+        assertEquals(73, overrides.commandPanelCardsPerPage());
+        assertEquals(true, overrides.avatarFlightUnlimitedVigour());
+        assertTrue(TameworkSettingsStore.loadGlobalSettings(settingsFile, null).avatarFlightUnlimitedVigour());
+
+        String raw = Files.readString(settingsFile);
+        assertTrue(raw.contains("\"population\""));
+        assertTrue(raw.contains("\"simpleClaims\""));
+        assertTrue(raw.contains("\"ownership\""));
+        assertTrue(raw.contains("\"damageProtection\""));
+        assertTrue(raw.contains("\"capture\""));
+        assertTrue(raw.contains("\"captureItemOwnership\""));
+        assertTrue(raw.contains("\"interactionRequiresOwner\""));
+        assertTrue(raw.contains("\"linkingRequiresOwner\""));
+        assertTrue(raw.contains("\"needs\""));
+        assertTrue(raw.contains("\"enabled\""));
+        assertTrue(raw.contains("\"resourceMode\""));
+        assertTrue(raw.contains("\"happiness\""));
+        assertTrue(raw.contains("\"breeding\""));
+        assertTrue(raw.contains("\"genderEnabled\""));
+        assertTrue(raw.contains("\"traits\""));
+        assertTrue(raw.contains("\"progression\""));
+        assertTrue(raw.contains("\"levelingEnabled\""));
+        assertTrue(raw.contains("\"talentsEnabled\""));
+        assertTrue(raw.contains("\"revive\""));
+        assertTrue(raw.contains("\"travel\""));
+        assertTrue(raw.contains("\"recallTeleportingEnabled\""));
+        assertTrue(raw.contains("\"commandPanel\""));
+        assertTrue(raw.contains("\"cardsPerPage\""));
+        assertTrue(raw.contains("\"telemetry\""));
+        assertTrue(raw.contains("\"breadcrumbsEnabled\""));
+    }
+
+    @Test
+    void aFileWithOnlyTheRetiredCaptureSettingsMapsThemToAnOwnershipMode() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        String[][] cases = {
+                {"true", "true", "FOLLOWS_ITEM"},
+                {"true", "false", "FOLLOWS_ITEM"},
+                {"false", "true", "CHANGES_ON_RELEASE"},
+                {"false", "false", "OWNER_ONLY"},
+        };
+        for (String[] legacy : cases) {
+            Files.writeString(settingsFile, "{\"version\":2,\"ownership\":{\"capture\":{\"captureClearsOwner\":"
+                    + legacy[0] + ",\"SpawnSetsOwner\":" + legacy[1] + "}}}");
+            TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+
+            ResolvedTameworkSettings settings = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+            assertEquals(legacy[2], settings.captureItemOwnership(), legacy[0] + "/" + legacy[1]);
+        }
+        // An explicit mode wins over the retired values, and saving drops them.
+        Files.writeString(settingsFile, "{\"version\":2,\"ownership\":{\"capture\":{\"captureClearsOwner\":true,"
+                + "\"SpawnSetsOwner\":true,\"captureItemOwnership\":\"OWNER_ONLY\"}}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings explicit = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals("OWNER_ONLY", explicit.captureItemOwnership());
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, explicit.toSnapshot(), null));
+        TameworkSettingsStore.GlobalOverrides saved = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals("OWNER_ONLY", saved.captureItemOwnership());
+        assertNull(saved.captureClearsOwner());
+        assertNull(saved.spawnSetsOwner());
+    }
+
+    /**
+     * Before 5.0 the owned limit counted only loaded companions out in the world. A file from then
+     * keeps its number as the deployed limit, so an upgrade does not lock players out of taming.
+     */
+    @Test
+    void aFileWithOnlyTheOwnedLimitMovesItToTheDeployedLimitOnce() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        Files.writeString(settingsFile,
+                "{\"version\":2,\"population\":{\"limitPerPlayerOwnedTotal\":3,\"perPlayerLimitScope\":\"Global\"}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+
+        ResolvedTameworkSettings upgraded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals(3, upgraded.populationLimitPerPlayerDeployedTotal());
+        assertEquals(0, upgraded.populationLimitPerPlayerOwnedTotal());
+        assertEquals("Global", upgraded.populationPerPlayerLimitScope());
+
+        // The file now has both limits, so a later load, or an owned limit set by an admin, is not moved again.
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings reloaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(3, reloaded.populationLimitPerPlayerDeployedTotal());
+        assertEquals(0, reloaded.populationLimitPerPlayerOwnedTotal());
+
+        Files.writeString(settingsFile, "{\"version\":2,\"population\":{\"limitPerPlayerOwnedTotal\":8,"
+                + "\"limitPerPlayerDeployedTotal\":2}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings both = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(8, both.populationLimitPerPlayerOwnedTotal());
+        assertEquals(2, both.populationLimitPerPlayerDeployedTotal());
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, both.toSnapshot(), null));
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        TameworkSettingsStore.GlobalOverrides saved = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals(8, saved.populationLimitPerPlayerOwnedTotal());
+        assertEquals(2, saved.populationLimitPerPlayerDeployedTotal());
+    }
+
+    @Test
+    void aFreshSettingsFileHasNoOwnedOrDeployedLimit() {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("fresh").resolve("Tamework"));
+
+        ResolvedTameworkSettings fresh = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals(0, fresh.populationLimitPerPlayerOwnedTotal());
+        assertEquals(0, fresh.populationLimitPerPlayerDeployedTotal());
+        // The template on disk has both keys, so an owned limit an admin sets later is not moved.
+        TameworkSettingsStore.GlobalOverrides template = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals(0, template.populationLimitPerPlayerOwnedTotal());
+        assertEquals(0, template.populationLimitPerPlayerDeployedTotal());
+    }
+
+    @Test
+    void loadGlobalOverridesCreatesDefaultDocumentWhenFileMissing() {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
+
+        assertFalse(Files.exists(settingsFile));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertNotNull(overrides);
+        assertTrue(Files.isRegularFile(settingsFile));
+
+        assertEquals(0, overrides.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", overrides.populationPerPlayerLimitScope());
+        assertEquals(false, overrides.simpleClaimsEnabled());
+        assertEquals(0, overrides.simpleClaimsLimitPerClaimChunk());
+        assertEquals(0, overrides.simpleClaimsLimitPerClaimTotal());
+        assertEquals(false, overrides.simpleClaimsBreedingRequiresClaim());
+        assertEquals(false, overrides.simpleClaimsProtectTamedFromNonMembers());
+        assertEquals(false, overrides.blockOwnerDamage());
+        assertEquals(false, overrides.blockAllPlayerDamageIfOwned());
+        assertEquals(false, overrides.invulnerableIfOwned());
+        assertEquals("FOLLOWS_ITEM", overrides.captureItemOwnership());
+        assertEquals(true, overrides.captureRequiresOwner());
+        assertEquals(true, overrides.spawnRequiresOwner());
+        assertEquals(true, overrides.interactionRequiresOwner());
+        assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(true, overrides.needsEnabled());
+        assertEquals("AutoFast", overrides.needsResourceMode());
+        assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
+        assertEquals(72.0, overrides.needsOwnerOfflineGraceHours());
+        assertEquals(1.0, overrides.needsOwnerOfflineDecayMultiplier());
+        assertEquals(true, overrides.needsDamageEnabled());
+        assertEquals("MIN_ONLY_PERCENT", overrides.needsDamageModel());
+        assertEquals("USE_HIGHER_ONLY", overrides.needsDamageDualNeedRule());
+        assertEquals(2.0, overrides.needsStarvationDamagePerMinute());
+        assertEquals(3.0, overrides.needsDehydrationDamagePerMinute());
+        assertEquals(true, overrides.needsDamageLethal());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(true, overrides.passiveBreedingEnabled());
+        assertEquals(true, overrides.breedingRequiresHappiness());
+        assertEquals(true, overrides.breedingGenderEnabled());
+        assertEquals(true, overrides.traitsEnabled());
+        assertEquals(true, overrides.levelingEnabled());
+        assertEquals(true, overrides.talentsEnabled());
+        assertEquals(true, overrides.reviveSystemEnabled());
+        assertEquals(true, overrides.recallTeleportingEnabled());
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(true, overrides.telemetryBreadcrumbsEnabled());
+        assertEquals(50, overrides.commandPanelCardsPerPage());
+    }
+
+    @Test
+    void loadGlobalSettingsCreatesCompleteResolvedDocumentWhenFileMissing() {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
+
+        assertFalse(Files.exists(settingsFile));
+        ResolvedTameworkSettings settings =
+                TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertTrue(Files.isRegularFile(settingsFile));
+        assertEquals(0, settings.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", settings.populationPerPlayerLimitScope());
+        assertEquals(false, settings.simpleClaimsEnabled());
+        assertEquals(CaptureItemOwnershipMode.FOLLOWS_ITEM, settings.captureItemOwnershipMode());
+        assertEquals(true, settings.captureRequiresOwner());
+        assertEquals(true, settings.spawnRequiresOwner());
+        assertEquals(true, settings.interactionRequiresOwner());
+        assertEquals(true, settings.linkingRequiresOwner());
+        assertEquals(true, settings.needsEnabled());
+        assertEquals("AutoFast", settings.needsResourceMode());
+        assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", settings.needsTickPolicyMode());
+        assertEquals(72.0, settings.needsOwnerOfflineGraceHours());
+        assertEquals(true, settings.needsDamageEnabled());
+        assertEquals("MIN_ONLY_PERCENT", settings.needsDamageModel());
+        assertEquals("USE_HIGHER_ONLY", settings.needsDamageDualNeedRule());
+        assertEquals(true, settings.happinessEnabled());
+        assertEquals(true, settings.passiveBreedingEnabled());
+        assertEquals(true, settings.breedingRequiresHappiness());
+        assertEquals(true, settings.breedingGenderEnabled());
+        assertEquals(true, settings.traitsEnabled());
+        assertEquals(true, settings.reviveSystemEnabled());
+        assertEquals(true, settings.recallTeleportingEnabled());
+        assertEquals(true, settings.telemetryEnabled());
+        assertEquals(true, settings.telemetryBreadcrumbsEnabled());
+        assertEquals(50, settings.commandPanelCardsPerPage());
+    }
+
+    @Test
+    void commandPanelCardsPerPageDefaultsAndClampsPersistedInput() throws Exception {
+        Path existingFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("existing").resolve("Tamework"));
+        Files.createDirectories(existingFile.getParent());
+        Files.writeString(existingFile, "{\"version\":2}", StandardCharsets.UTF_8);
+        assertEquals(50, TameworkSettingsStore.loadGlobalSettings(existingFile, null).commandPanelCardsPerPage());
+
+        Path zeroFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("zero").resolve("Tamework"));
+        Files.createDirectories(zeroFile.getParent());
+        Files.writeString(zeroFile, "{\"commandPanel\":{\"cardsPerPage\":0}}", StandardCharsets.UTF_8);
+        assertEquals(1, TameworkSettingsStore.loadGlobalSettings(zeroFile, null).commandPanelCardsPerPage());
+
+        Path highFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("high").resolve("Tamework"));
+        Files.createDirectories(highFile.getParent());
+        Files.writeString(highFile, "{\"commandPanel\":{\"cardsPerPage\":101}}", StandardCharsets.UTF_8);
+        assertEquals(100, TameworkSettingsStore.loadGlobalSettings(highFile, null).commandPanelCardsPerPage());
+    }
+
+    @Test
+    void importsLegacyTelemetryJsonIntoGlobalSettings() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("crash-telemetry.json");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(
+                legacy,
+                """
+                {
+                  "enabled": false,
+                  "breadcrumbsEnabled": false
+                }
+                """,
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(0, overrides.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", overrides.populationPerPlayerLimitScope());
+        assertEquals(false, overrides.simpleClaimsEnabled());
+        assertEquals(true, overrides.captureRequiresOwner());
+        assertEquals(true, overrides.spawnRequiresOwner());
+        assertEquals(true, overrides.interactionRequiresOwner());
+        assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(true, overrides.needsEnabled());
+        assertEquals("AutoFast", overrides.needsResourceMode());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(true, overrides.passiveBreedingEnabled());
+        assertEquals(true, overrides.breedingGenderEnabled());
+        assertEquals(true, overrides.traitsEnabled());
+        assertEquals(false, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+        assertTrue(Files.readString(settingsFile, StandardCharsets.UTF_8).contains("\"telemetry\""));
+    }
+
+    @Test
+    void importsLegacyTelemetryTextIntoGlobalSettings() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("tamework-crash-telemetry.txt");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "enabled=0\nbreadcrumbs_enabled=off", StandardCharsets.UTF_8);
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(false, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void migratesLegacyNeedsPolicyIntoAnimalProgressionWithoutChangingValues() throws Exception {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        Files.writeString(settingsFile, """
+                {
+                  "version": 1,
+                  "needs": {
+                    "tickPolicy": {
+                      "mode": "ANY_LOADED_PLAYER",
+                      "ownerOfflineGraceHours": 37.5,
+                      "ownerOfflineDecayMultiplier": 0.75
+                    }
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+
+        ResolvedTameworkSettings migrated = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertEquals("ANY_LOADED_PLAYER", migrated.needsTickPolicyMode());
+        assertEquals(37.5, migrated.needsOwnerOfflineGraceHours());
+        assertEquals(0.75, migrated.needsOwnerOfflineDecayMultiplier());
+        assertEquals("FREEZE_AT_PRIME", migrated.animalAgingMode());
+        assertFalse(migrated.animalOldAgeDeathEnabled());
+
+        ResolvedTameworkSettings reloaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(migrated, reloaded);
+    }
+
+    @Test
+    void saveAndLoadGlobalSettingsRoundTripsNeedsResourceModeThroughResolvedSnapshot() {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        ResolvedTameworkSettings settings = TameworkSettingsStore.defaultGlobalSettings();
+        ResolvedTameworkSettings custom = new ResolvedTameworkSettings(
+                settings.populationLimitPerPlayerOwnedTotal(),
+                settings.populationPerPlayerLimitScope(),
+                settings.simpleClaimsEnabled(),
+                settings.simpleClaimsLimitPerClaimChunk(),
+                settings.simpleClaimsLimitPerClaimTotal(),
+                settings.simpleClaimsBreedingRequiresClaim(),
+                settings.simpleClaimsProtectTamedFromNonMembers(),
+                settings.blockOwnerDamage(),
+                settings.blockAllPlayerDamageIfOwned(),
+                settings.invulnerableIfOwned(),
+                settings.captureClearsOwner(),
+                settings.spawnSetsOwner(),
+                settings.captureRequiresOwner(),
+                settings.spawnRequiresOwner(),
+                settings.interactionRequiresOwner(),
+                settings.linkingRequiresOwner(),
+                settings.needsEnabled(),
+                "AlwaysFast",
+                settings.needsTickPolicyMode(),
+                settings.needsOwnerOfflineGraceHours(),
+                settings.needsOwnerOfflineDecayMultiplier(),
+                settings.needsDamageEnabled(),
+                settings.needsDamageModel(),
+                settings.needsDamageDualNeedRule(),
+                settings.needsStarvationDamagePerMinute(),
+                settings.needsDehydrationDamagePerMinute(),
+                settings.needsDamageLethal(),
+                settings.happinessEnabled(),
+                settings.passiveBreedingEnabled(),
+                settings.breedingRequiresHappiness(),
+                settings.breedingGenderEnabled(),
+                settings.traitsEnabled(),
+                settings.levelingEnabled(),
+                settings.talentsEnabled(),
+                settings.reviveSystemEnabled(),
+                settings.recallTeleportingEnabled(),
+                settings.telemetryEnabled(),
+                settings.telemetryBreadcrumbsEnabled()
+        );
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, custom.toSnapshot(), null));
+
+        ResolvedTameworkSettings loaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals("AlwaysFast", loaded.needsResourceMode());
+    }
+
+    @Test
+    void existingGlobalTelemetrySettingsWinOverLegacyFiles() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("crash-telemetry.json");
+        Files.createDirectories(settingsFile.getParent());
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(
+                settingsFile,
+                """
+                {
+                  "version": 1,
+                  "telemetry": {
+                    "enabled": true,
+                    "breadcrumbsEnabled": false
+                  }
+                }
+                """,
+                StandardCharsets.UTF_8
+        );
+        Files.writeString(legacy, "{\"enabled\": false, \"breadcrumbsEnabled\": true}", StandardCharsets.UTF_8);
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void legacyImportReadsCurrentDocumentWhenItsTimestampIsUnchanged()
+            throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework")
+                .resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data")
+                .resolve("crash-telemetry.json");
+        Files.createDirectories(settingsFile.getParent());
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(settingsFile, "{\"version\":1}", StandardCharsets.UTF_8);
+        FileTime originalTimestamp = Files.getLastModifiedTime(settingsFile);
+        TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        Files.writeString(settingsFile, """
+                {
+                  "version": 1,
+                  "telemetry": {
+                    "enabled": true,
+                    "breadcrumbsEnabled": true
+                  }
+                }
+                """, StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(settingsFile, originalTimestamp);
+        Files.writeString(
+                legacy,
+                "{\"enabled\": false, \"breadcrumbsEnabled\": false}",
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(
+                settingsFile, List.of(legacy), null
+        ));
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+
+        TameworkSettingsStore.GlobalOverrides overrides =
+                TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(true, overrides.telemetryBreadcrumbsEnabled());
+    }
+}

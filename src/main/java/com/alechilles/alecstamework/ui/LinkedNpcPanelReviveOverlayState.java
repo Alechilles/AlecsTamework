@@ -14,20 +14,31 @@ import javax.annotation.Nullable;
 /** Holds and renders the complete server-authoritative revival quote. */
 final class LinkedNpcPanelReviveOverlayState {
     static final String COST_LINE_UI_PATH = "TameworkReviveCostLine.ui";
-    private static final int MODAL_WIDTH = 382;
+    private static final String PANEL_UI = "TameworkLinkedNpcPanel.ui";
+    private static final int MODAL_WIDTH = 420;
+    /** Centred in the 928 px companions panel. */
+    private static final int MODAL_LEFT = (928 - MODAL_WIDTH) / 2;
+    private static final int CONTENT_LEFT = 16;
+    private static final int CONTENT_WIDTH = MODAL_WIDTH - 2 * CONTENT_LEFT;
     private static final int MODAL_HEIGHT_LIMIT = 592;
     private static final int MODAL_TOP_LIMIT = 24;
     private static final int OVERLAY_HEIGHT = 640;
-    private static final int COST_ROW_HEIGHT = 44;
-    private static final int COST_VIEWPORT_TOP = 44;
-    private static final int COST_VIEWPORT_MAX_HEIGHT = 440;
-    private static final int ACTION_GAP = 14;
-    private static final int ACTION_HEIGHT = 24;
-    private static final int MODAL_BOTTOM_PADDING = 10;
+    /** A 44 px cost plate and the 4 px gap under it (TameworkReviveCostLine.ui). */
+    private static final int COST_ROW_HEIGHT = 48;
+    /** Below the 48 px header band, the subtitle and the cost heading. */
+    private static final int COST_VIEWPORT_TOP = 100;
+    /** Five lines; a longer cost scrolls. */
+    private static final int COST_VIEWPORT_MAX_HEIGHT = 5 * COST_ROW_HEIGHT;
+    private static final int SUMMARY_GAP = 6;
+    private static final int SUMMARY_HEIGHT = 18;
+    private static final int ACTION_GAP = 12;
+    private static final int ACTION_HEIGHT = 30;
+    private static final int MODAL_BOTTOM_PADDING = 14;
 
     private boolean visible;
     private UUID npcUuid;
     private CommandReviveCostPresentation presentation;
+    private String companionName = "";
     private long revision;
 
     boolean isVisible() {
@@ -46,6 +57,7 @@ final class LinkedNpcPanelReviveOverlayState {
         }
         visible = true;
         npcUuid = entry.npcUuid();
+        companionName = entry.displayName() == null ? "" : entry.displayName();
         presentation = quote;
         revision++;
     }
@@ -101,6 +113,12 @@ final class LinkedNpcPanelReviveOverlayState {
         bindLayout(commandBuilder, presentation.costs().size());
         bindCosts(commandBuilder, language);
         boolean confirmEnabled = presentation.confirmEnabled();
+        commandBuilder.set("#TameworkLinkedPanelReviveSubtitle.Text", LocalizedText.format(language,
+                "tamework.ui.linkedPanel.revive.subtitle", companionName));
+        commandBuilder.set("#TameworkLinkedPanelReviveSummary.Text",
+                LinkedNpcPanelFeatureBinder.revivalStatus(presentation, language));
+        commandBuilder.set("#TameworkLinkedPanelReviveSummary.Style", Value.ref(PANEL_UI,
+                confirmEnabled ? "ReviveSummaryReady" : "ReviveSummaryBlocked"));
         commandBuilder.set(
                 "#TameworkLinkedPanelReviveConfirmButton.Visible",
                 confirmEnabled
@@ -115,17 +133,20 @@ final class LinkedNpcPanelReviveOverlayState {
         int requestedCostHeight = Math.max(0, costCount) * COST_ROW_HEIGHT;
         int costViewportHeight = Math.min(requestedCostHeight,
                 COST_VIEWPORT_MAX_HEIGHT);
-        int actionTop = COST_VIEWPORT_TOP + costViewportHeight + ACTION_GAP;
+        int summaryTop = COST_VIEWPORT_TOP + costViewportHeight + SUMMARY_GAP;
+        int actionTop = summaryTop + SUMMARY_HEIGHT + ACTION_GAP;
         int modalHeight = Math.min(MODAL_HEIGHT_LIMIT,
                 actionTop + ACTION_HEIGHT + MODAL_BOTTOM_PADDING);
         int modalTop = Math.max(MODAL_TOP_LIMIT,
                 (OVERLAY_HEIGHT - modalHeight) / 2);
         commandBuilder.setObject("#TameworkLinkedPanelReviveModal.Anchor",
-                anchor(modalTop, 24, MODAL_WIDTH, modalHeight));
+                anchor(modalTop, MODAL_LEFT, MODAL_WIDTH, modalHeight));
         commandBuilder.setObject("#TameworkLinkedPanelReviveCostViewport.Anchor",
-                anchor(COST_VIEWPORT_TOP, 14, 354, costViewportHeight));
+                anchor(COST_VIEWPORT_TOP, CONTENT_LEFT, CONTENT_WIDTH, costViewportHeight));
+        commandBuilder.setObject("#TameworkLinkedPanelReviveSummary.Anchor",
+                anchor(summaryTop, CONTENT_LEFT, CONTENT_WIDTH, SUMMARY_HEIGHT));
         commandBuilder.setObject("#TameworkLinkedPanelReviveActions.Anchor",
-                anchor(actionTop, 14, 354, ACTION_HEIGHT));
+                anchor(actionTop, CONTENT_LEFT, CONTENT_WIDTH, ACTION_HEIGHT));
     }
 
     private void bindCosts(
@@ -167,6 +188,15 @@ final class LinkedNpcPanelReviveOverlayState {
             commandBuilder.set(
                     root + " #CostInsufficient.Visible", !line.satisfied()
             );
+            commandBuilder.set(root + " #CostEdgeSatisfied.Visible", line.satisfied());
+            commandBuilder.set(root + " #CostEdgeInsufficient.Visible", !line.satisfied());
+            commandBuilder.set(root + " #CostCheck.Visible", line.satisfied());
+            commandBuilder.set(root + " #CostShortage.Visible", !line.satisfied());
+            if (!line.satisfied()) {
+                commandBuilder.set(root + " #CostShortageText.Text", LocalizedText.format(language,
+                        "tamework.ui.linkedPanel.revive.shortage",
+                        Math.max(0, line.requiredQuantity() - line.ownedQuantity())));
+            }
         }
     }
 

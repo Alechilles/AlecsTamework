@@ -1,5 +1,7 @@
 # HyDragon Integration Specifications
 
+> Tamework 5.0.0 note: [the integration contract](integration-contract.md) describes the current Public API 3.0 boundary. The other pages here are historical designs for the 3.x and 4.x SQLite runtime; see [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 Status: bonded implementation and focused automated coverage complete; clean
 package verification and fresh-world acceptance pending
 

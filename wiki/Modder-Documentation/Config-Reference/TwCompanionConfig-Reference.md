@@ -121,7 +121,7 @@ behavior without changing its role, removes interaction, and marks it intangible
 and invulnerable. Its pose follows the player's rotation, and stale locomotion
 state is cleared so it uses its idle animation instead of continuing to run in
 place. The original physical flags are restored on dismount; because the role
-never changes, persistence always retains the canonical companion role. This
+never changes, the saved companion always keeps its real role. This
 capability is disabled by default and should only be enabled for models whose
 scale and pose suit a shoulder attachment. Tamework updates the passenger after
 player movement so its tracking pose does not lag a server tick behind the
@@ -129,19 +129,16 @@ player.
 
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
-- `OnTransferFailure`: what to do when the target transfer cannot complete.
-- `FollowMasterOnWorldChange`: automatically migrate the companion when the owner changes worlds. The shipped default is `false`; explicit cross-world Recall is unaffected.
+- `OnTransferFailure`: retired. It still loads (`QueueForRecall`, `MarkLost` or
+  `Ignore`) and is ignored.
+- `FollowMasterOnWorldChange`: automatically bring the companion along when the owner changes worlds. The shipped default is `false`; explicit cross-world Recall is unaffected.
 - `FollowMasterOnWorldChangeStateFilter`: only auto-follow across worlds when the companion is in one of these states.
 
-Accepted `OnTransferFailure` values:
-- `QueueForRecall`
-- `MarkLost`
-- `Ignore`
-
-`MarkLost` is a retained config name, not permission to author the canonical
-`LOST` lifecycle. In the replacement runtime it abandons the failed relocation
-retry and logs the drop. Only positive destructive-removal evidence can create
-`LOST`.
+Tamework 5.0 removed the cross-world entity transfer that `OnTransferFailure`
+governed. A companion that moves to another world, by Recall or by following
+its owner, is respawned there from its saved state, and the old body is
+removed. No copy is left behind, so there is no failed transfer to handle. A
+recall never makes a companion `LOST`.
 
 ## Global vs Role Boundary
 Use `TwCompanionConfig` for behavior policy:
@@ -250,8 +247,8 @@ Older packs may still contain ownership protection and revive enablement keys in
 - A global cooldown value does not override a matching role-scoped cooldown.
 - `Costs` is an AND recipe, not weighted alternatives. Duplicate item IDs,
   zero/negative quantities, and invalid warning thresholds reject the config.
-- Relocation timeout or retry exhaustion never creates canonical `LOST`
-  state, regardless of `OnTransferFailure`.
+- A relocation timeout never makes a companion `LOST`. `OnTransferFailure` is
+  ignored.
 
 ## Related Pages
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)

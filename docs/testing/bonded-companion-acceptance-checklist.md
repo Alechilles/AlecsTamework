@@ -4,12 +4,13 @@ Status: manual acceptance pending
 
 Use this checklist only after both clean builds, manifest/dependency checks,
 packaged-asset checks, local installation, and installed-jar hash verification
-pass. Test in a fresh world; migration from unreleased tester persistence is
-not part of this feature.
+pass. Test in a fresh world. Tamework 5.0 keeps bonded companions as records
+on the shared companion index (ADR 0011); a 4.x world's bonded companions are
+covered by the import, not by this checklist.
 
 Run one numbered pass at a time. The implementing agent must stop before
 waiting for the tester and state the one requested action, expected visible
-result, and failure-export command. Do not leave an implementation goal or
+result, and what to collect on failure. Do not leave an implementation goal or
 background monitor running while waiting for manual feedback.
 
 ## Preconditions
@@ -23,9 +24,9 @@ background monitor running while waiting for manual feedback.
   available for the timer pass.
 - Hytale logs remain available if a pass fails.
 
-For passes 1–9, run `/tw debug persistence export` only if the pass fails, then provide
-the reported archive path and relevant server-log excerpt. Pass 10 always runs
-all three diagnostic commands as its actual acceptance action.
+If a pass fails, keep the server log from that session and provide the relevant
+excerpt. The `/tw debug persistence export` command this checklist used before
+Tamework 5.0 is no longer registered, and no support archive is produced.
 
 ## 1. Capture a full dragon
 
@@ -42,27 +43,26 @@ Expected visible result:
 - name, species, gender, health, details, and valid action buttons are visible
   immediately without relogging.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 2. Summon from the Horn
 
 - [ ] Summon from the Horn. Verify full card details and correct buttons
-  immediately, one active projection, correct commands, and no generic
-  persistence-evidence error.
+  immediately, one live body, correct commands, and no generic error.
 
 Expected visible result:
 
 - exactly one matching dragon appears at a safe player-relative placement;
 - the card becomes `ACTIVE` and shows Dismiss plus complete details immediately;
 - Follow/Hold/other configured Horn commands affect that exact dragon; and
-- no "persistence evidence isn't ready" or "NPC is not linked" message appears.
+- no "NPC is not linked" message appears.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 3. Dismiss/store
 
 - [ ] Dismiss/store. Verify the complete snapshot persists, card becomes
-  stored, and no live projection remains.
+  stored, and no live body remains.
 
 Expected visible result:
 
@@ -72,7 +72,7 @@ Expected visible result:
   and
 - Summon reflects the configured cooldown/capacity state.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 4. Capacity and cooldown
 
@@ -84,53 +84,54 @@ Expected visible result:
 - family `MaximumActive` is enforced without consuming another family's slot;
 - the recently stored profile cannot bypass its family cooldown;
 - an eligible different profile summons only when the family has capacity; and
-- denied clicks do not create a projection, duplicate lease, or generic error.
+- denied clicks do not spawn a body, a second active copy, or a generic error.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 5. Death and paid revival
 
-- [ ] Kill an active bonded dragon. Verify `DEAD`, revive pricing, no automatic
-  summon after revive, then successful manual summon.
+- [ ] Kill an active bonded dragon. Verify `DEAD`, revive pricing, and that a
+  paid revive brings the dragon back active.
 
 Expected visible result:
 
 - confirmed death changes the same card to `DEAD`;
 - the confirmation shows every exact cost line and owned/required quantity;
 - insufficient payment charges nothing;
-- successful payment consumes the complete recipe once and changes the card to
-  `STORED`;
-- no NPC appears until Summon is clicked; and
-- manual summon creates one projection of the revived profile.
+- with the family at its active limit, revive is refused and charges nothing;
+- successful payment consumes the complete recipe once, and one body of the
+  revived dragon appears at the chosen place with the card `ACTIVE` and a new
+  session timer; and
+- a revive that fails after payment returns the payment.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 6. Finite and unlimited sessions
 
 - [ ] Test a finite-session policy and a zero-duration policy. Verify
-  expiration stores the projection and zero duration never expires.
+  expiration stores the companion and zero duration never expires.
 
 Expected visible result:
 
-- the finite lease expires once, retires its NPC, stores its complete snapshot,
-  and begins the configured cooldown;
-- the zero-duration lease remains active past the finite test window; and
+- the finite session expires once, removes its NPC, stores its complete
+  snapshot, and begins the configured cooldown;
+- the zero-duration session remains active past the finite test window; and
 - signed world-time values do not make either timer immediately invalid.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 7. Relog and world transfer
 
-- [ ] Leave/rejoin and transfer worlds with an active projection. Verify it
+- [ ] Leave/rejoin and transfer worlds with an active companion. Verify it
   becomes stored and never lost/unloaded.
 
 Expected visible result:
 
-- logout/rejoin stores the active profile and removes/cleans the projection;
+- logout/rejoin stores the active companion and removes its body;
 - leaving one world and entering another stores it instead of copying it; and
 - the Horn shows `STORED` with full details, never Lost or Unloaded.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 8. Soul-bond a Miniwyvern
 
@@ -146,9 +147,9 @@ Expected visible result:
 - its family-specific timer/cooldown/capacity and revive recipe apply;
 - archetype, attunement, ability, and progression extension fields survive
   summon, store, and relog; and
-- death produces `DEAD`, revival produces `STORED`, and summon is manual.
+- death produces `DEAD`, and a paid revive brings it back `ACTIVE`.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 9. Active full-dragon eligibility
 
@@ -158,32 +159,20 @@ Failure collection: `/tw debug persistence export`.
 
 Expected visible result:
 
-- a profile in family `hydragon:full_dragons` with state `ACTIVE` and a valid
-  lease qualifies;
+- a profile in family `hydragon:full_dragons` with state `ACTIVE` and one live
+  body qualifies;
 - stored and dead full dragons do not qualify;
 - an active Miniwyvern does not qualify; and
 - stale NPCs or old generic population evidence do not qualify.
 
-Failure collection: `/tw debug persistence export`.
+Failure collection: the server log from the session.
 
 ## 10. Diagnostics and redaction
 
-- [ ] Run `/tw debug persistence status`, `/tw debug persistence detail`, and
-  `/tw debug persistence export`. Verify aggregate bonded status and a redacted bonded
-  bundle entry.
-
-Expected visible result:
-
-- status/detail report bonded readiness and aggregate profile/lease/cleanup
-  counts without affecting generic persistence mode;
-- export completes and reports the archive path;
-- the archive contains `bonded-companions.json`; and
-- that member contains only readiness, schema version, stored/active/dead
-  counts, active lease count, pending bounded-cleanup count, and a fixed failure
-  category—not owner IDs, profile IDs, NPC UUIDs, snapshots, or extension data.
-
-If this step fails, preserve the produced archive (if any) and the relevant
-server-log excerpt.
+Retired in Tamework 5.0. This pass ran `/tw debug persistence status`, `detail`
+and `export` against the 4.x bonded SQLite store. Those subcommands are no
+longer registered and 5.0 keeps bonded companions in the shared companion
+store, so there is nothing to run here. Record the pass as not applicable.
 
 ## Completion record
 
@@ -195,7 +184,7 @@ Record the following in the implementation handoff after all ten passes:
 - fresh world name;
 - date/time and Hytale build;
 - each pass result;
-- diagnostic archive path for any failed/retried pass; and
+- server-log excerpt for any failed/retried pass; and
 - final acceptance decision.
 
 Do not begin release preparation from an incomplete or partially retried

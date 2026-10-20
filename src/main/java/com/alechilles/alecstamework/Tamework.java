@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
-import java.time.Duration;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,11 +14,17 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
+import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
+import com.alechilles.alecstamework.api.internal.CompanionEventPublisher;
+import com.alechilles.alecstamework.api.internal.IndexDiagnosticsApi;
+import com.alechilles.alecstamework.api.internal.IndexNpcProfilesApi;
+import com.alechilles.alecstamework.api.internal.IndexPopulationGroupApi;
+import com.alechilles.alecstamework.api.internal.IndexProfileDataApi;
+import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
-import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
-import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
+import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
@@ -35,6 +40,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySyste
 import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.SpawnBeaconVisualizationService;
+import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -68,14 +74,12 @@ import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.npc.actions.BreedingLitterRuntime;
 import com.alechilles.alecstamework.npc.actions.HusbandryHarvestUseContext;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
@@ -98,10 +102,10 @@ import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
+import com.alechilles.alecstamework.items.OwnedNpcTransformationInteractionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
-import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.TameworkNpcCullService;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
@@ -110,7 +114,6 @@ import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
-import com.alechilles.alecstamework.items.CommandDirectLiveCoopSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandHotswapHudService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
@@ -134,8 +137,6 @@ import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.items.scarecrow.ScarecrowBlockEventSystems;
-import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
-import com.alechilles.alecstamework.items.persistence.CompositeRecallRecoverySink;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -156,7 +157,7 @@ import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTarget;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTelemetry;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationContext;
-import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
+import com.alechilles.alecstamework.companion.migrate.retired.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -186,24 +187,7 @@ import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
-import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
-import com.alechilles.alecstamework.persistence.diagnostics
-        .PersistenceDiagnosticExporter;
-import com.alechilles.alecstamework.persistence.TameworkDataPathService;
-import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationEvidence;
-import com.alechilles.alecstamework.companion.bonded.runtime
-        .BondedCompanionExpiryWarningSystem;
-import com.alechilles.alecstamework.companion.bonded.runtime
-        .BondedCompanionMaintenanceSystem;
-import com.alechilles.alecstamework.companion.bonded.runtime
-        .BondedCompanionDeathSystem;
-import com.alechilles.alecstamework.companion.command.timed.runtime
-        .TimedSummonOwnerDeathSystem;
-import com.alechilles.alecstamework.companion.command.timed.runtime
-        .TimedSummonOwnerLifecycleService;
-import com.alechilles.alecstamework.persistence.runtime
-        .PublicPersistenceShutdownReport;
+import com.alechilles.alecstamework.settings.TameworkDataPathService;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
@@ -216,6 +200,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSy
 import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -229,7 +214,6 @@ import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -242,15 +226,55 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import java.util.function.Supplier;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
+import com.hypixel.hytale.server.core.permissions.provider.HytalePermissionsProvider;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
-import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
+import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
+import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
+import com.alechilles.alecstamework.companion.item.AdmissionCache;
+import com.alechilles.alecstamework.companion.item.CaptureItemFlows;
+import com.alechilles.alecstamework.companion.flow.CompanionBodies;
+import com.alechilles.alecstamework.companion.flow.CompanionSnapshotSource;
+import com.alechilles.alecstamework.companion.flow.HytaleCompanionSpawner;
+import com.alechilles.alecstamework.companion.flow.CaptureFlow;
+import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.CompanionOwnerDeathSystem;
+import com.alechilles.alecstamework.companion.flow.HytaleStoreCapture;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
+import com.alechilles.alecstamework.companion.flow.StoreFlow;
+import com.alechilles.alecstamework.companion.flow.SummonExpiryScheduler;
+import com.alechilles.alecstamework.items.CompanionRestoreRecallSink;
+import com.hypixel.hytale.component.Ref;
+import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
+import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
+import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
+import com.alechilles.alecstamework.settings.TameworkDataPathLayout;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.live.CompanionSummaries;
+import com.alechilles.alecstamework.companion.live.HytaleSummarySources;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionPersistenceModule;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import com.alechilles.alecstamework.companion.store.CompanionStorage;
+import com.alechilles.alecstamework.companion.store.HytaleCompanionFileIo;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.event.events.ShutdownEvent;
+import java.nio.file.Files;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
@@ -267,6 +291,7 @@ public class Tamework extends JavaPlugin {
     private final CommandNpcPortraitAssets commandNpcPortraitAssets = new CommandNpcPortraitAssets();
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
+    private CommandHudDirtySink commandHudDirtySink;
     private TameworkAssetEditorPackService assetEditorPackService;
     private TameworkPatchworkRuntime patchworkRuntime;
     private TwConfigOverrideManager configOverrideManager;
@@ -281,12 +306,44 @@ public class Tamework extends JavaPlugin {
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private Path runtimeDataDirectory;
-    private TameworkPersistenceComposition persistenceComposition;
-    private TameworkBondedCompanionComposition bondedCompanionComposition;
-    private AutoCloseable bondedDiagnosticRegistration;
-    private PersistenceBootstrap persistenceBootstrap;
-    private TameworkApi api;
-    private ReplacementTameworkApiFactory.Composition apiComposition;
+    /**
+     * The public API, built in setup once the companion module is ready. Null in
+     * migration-required mode, when the companion store failed to open, and after shutdown;
+     * {@link #getApi()} callers handle null.
+     */
+    @Nullable
+    private volatile IndexTameworkApi api;
+    private CompanionPersistenceModule companionModule;
+    /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
+    private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
+    /** Drops a cleared name from the companion record; a no-op until the companion index is registered. */
+    private java.util.function.BiConsumer<Ref<EntityStore>, com.hypixel.hytale.component.Store<EntityStore>> companionNameCleared =
+            (ref, store) -> { };
+    /** Backs {@code /tw persistence start-fresh}; null unless old saves block this world. */
+    @Nullable
+    private Supplier<CompanionPersistenceModule.FreshStart> companionStartFresh;
+    @Nullable
+    private volatile AdmissionCache captureAdmissionCache;
+    /** Cached admission provider decisions for the synchronous sites; closed in {@link #closeApiComposition}. */
+    @Nullable
+    private volatile ProviderDecisionCache providerDecisionCache;
+    private volatile CaptureItemHolderSystems.Transfers captureItemTransfers;
+    private ReleaseFlow companionReleaseFlow;
+    /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */
+    @Nullable
+    private CaptureItemFlows captureItemFlows;
+    /** Roster summon and store; null unless the companion module is ready and generic persistence is active. */
+    private RosterSummons companionRosterSummons;
+    private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bondedCompanionApi;
+    /** Summon aura, expiry warning and expiry fall protection of bonded companions; closed with the bonded API. */
+    private com.alechilles.alecstamework.companion.bonded.BondedSummonEffects bondedSummonEffects;
+    /** Stored talent changes (bonded API and saved talent pages); null unless the companion module is ready. */
+    @Nullable
+    private com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates storedTalentUpdates;
+    private CompanionStartupAdmission companionStartupAdmission;
+    /** Retired 3.x/4.x entity component types that nothing reads any more (plan 7 R15). */
+    private List<ComponentType<EntityStore, ?>> retiredEntityComponentTypes = List.of();
+    private com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup retiredComponentCleanup;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
     private AutoCloseable companionXpLegacyAdapter;
@@ -298,6 +355,8 @@ public class Tamework extends JavaPlugin {
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ManagedActivityConfigRegistry managedActivityConfigRegistry;
+    /** External admission providers; built with the public API and closed with it. */
+    private AdmissionProviderRegistry admissionProviderRegistry;
     private ManagedActivityAssetRegistrar managedActivityAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
@@ -314,8 +373,9 @@ public class Tamework extends JavaPlugin {
             new TameworkRuntimeCapabilityRequests();
     private TameworkRuntimeParticipantRegistry runtimeParticipants;
     private Runnable runtimeServiceInitializer;
-    private TameworkPersistenceActivationEvidence genericPersistenceActivationEvidence;
-    private TameworkPersistenceActivationEvidence bondedPersistenceActivationEvidence;
+    /** Whether old Tamework save files (any, and the bonded database) existed at startup. */
+    private boolean genericLegacyDataPresent;
+    private boolean bondedLegacyDataPresent;
     private TameworkDiagnosticRuntime diagnosticRuntime;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
@@ -400,6 +460,10 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
             bondedReviveEscrowComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
+    /** Retired; the coop schedule system strips it from coop blocks. */
+    private ComponentType<ChunkStore,
+            com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent>
+            coopCaptureReceiptsComponentType;
     private ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -614,6 +678,9 @@ public class Tamework extends JavaPlugin {
                 components.inventoryOperationReceipts();
         bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
+        coopCaptureReceiptsComponentType = components.coopCaptureReceipts();
+        retiredEntityComponentTypes = List.of(components.persistenceRetirement(),
+                components.captureSourceReceipts(), components.inventoryOperationReceipts());
 
         spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
         deferPersistenceIndependentRuntimeParticipants();
@@ -624,10 +691,10 @@ public class Tamework extends JavaPlugin {
         }
         boolean genericPersistenceNeeded = runtimeStartupPlan.isActive(
                 TameworkRuntimeModule.GENERIC_PERSISTENCE
-        ) || genericPersistenceActivationEvidence.hasDurableWork();
+        ) || genericLegacyDataPresent;
         boolean bondedPersistenceNeeded = runtimeStartupPlan.isActive(
                 TameworkRuntimeModule.BONDED_PERSISTENCE
-        ) || bondedPersistenceActivationEvidence.hasDurableWork();
+        ) || bondedLegacyDataPresent;
         if (!genericPersistenceNeeded && !bondedPersistenceNeeded) {
             return;
         }
@@ -638,129 +705,46 @@ public class Tamework extends JavaPlugin {
             throw new IllegalStateException(
                     "Could not install Tamework's companion XP legacy adapter.");
         }
-        runtimeDataDirectory = new TameworkDataPathService(getLogger())
-                .resolveAndInitializeDataPathLayout(getDataDirectory())
-                .targetDirectory();
+        TameworkDataPathLayout dataPaths = new TameworkDataPathService(getLogger())
+                .resolveAndInitializeDataPathLayout(getDataDirectory());
+        runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
-        if (diagnosticRuntime != null) {
-            diagnosticRuntime.preparePersistence(runtimeDataDirectory);
+        openCompanionPersistence(dataPaths.persistenceSourceDirectories());
+        ReleaseFlow releaseFlow = null;
+        CompanionQueries companionQueries = null;
+        RestoreFlow<Ref<EntityStore>> restoreFlow = null;
+        CompanionRestoreRecallSink recallRestore = null;
+        CompanionAdmissionGate admissionGate = null;
+        ProviderAdmission providerAdmission = ProviderAdmission.none();
+        // Bonded families come from the roster config on every call, so a reload applies at once.
+        com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies =
+                com.alechilles.alecstamework.companion.bonded.BondedRecords.families(bondedCompanionRosterRegistry);
+        if (companionModule != null && companionModule.ready()) {
+            releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
+                    companionModule.writer()::queueSnapshotDelete);
+            companionQueries = companionModule.queries();
+            admissionProviderRegistry = new AdmissionProviderRegistry();
+            providerAdmission = ProviderAdmission.of(managedActivityConfigRegistry, admissionProviderRegistry);
+            ProviderDecisionCache providerDecisions = startProviderDecisionCache(providerAdmission);
+            admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot,
+                    providerDecisions);
+            OwnerPopulationCapService.useAdmissionGate(admissionGate);
+            restoreFlow = createRestoreFlow(companionModule, providerAdmission, admissionGate, bondedFamilies);
+            captureItemFlows = new CaptureItemFlows(companionModule.index(),
+                    companionModule.writer()::queueSnapshotDelete, restoreFlow);
+            recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
+            registerCompanionPersistenceRuntime(admissionGate, restoreFlow, bondedFamilies);
+            // One store flow serves the bonded API, roster dismiss, summon expiry and owner logout.
+            StoreFlow<Ref<EntityStore>> storeFlow = createStoreFlow(companionModule);
+            bondedCompanionApi = createBondedCompanionApi(companionModule, restoreFlow, storeFlow, bondedFamilies);
+            // A provisioned bonded companion counts against the built-in owned caps, like a captured
+            // one. Remove this one call to count provisioned companions against family limits only.
+            bondedCompanionApi.useBuiltInCaps(admissionGate::deny);
+            companionRosterSummons = startRosterSummons(companionModule, restoreFlow, storeFlow, bondedCompanionApi);
+        } else if (companionModule != null && companionModule.legacyKind() == null) {
+            registerCompanionPersistenceFailedNotice();
         }
-        bondedCompanionComposition = TameworkBondedCompanionComposition.openIfActive(
-                runtimeDataDirectory,
-                bondedCompanionRosterRegistry,
-                getLogger(),
-                System::currentTimeMillis,
-                apiEventBus::publishPersistenceEvent,
-                diagnosticRuntime == null
-                        ? null : diagnosticRuntime::onBondedFailure,
-                runtimeStartupPlan,
-                bondedPersistenceActivationEvidence
-        );
-        if (bondedCompanionComposition != null) {
-        if (diagnosticRuntime != null) {
-            diagnosticRuntime.useBondedExporter(
-                    bondedCompanionComposition.diagnostics()
-            );
-        }
-        runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.BONDED_PERSISTENCE);
-        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-companion-maintenance",
-                () -> new BondedCompanionMaintenanceSystem(bondedCompanionComposition));
-        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-companion-expiry-warning",
-                () -> new BondedCompanionExpiryWarningSystem(bondedCompanionComposition));
-        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-companion-death",
-                () -> new BondedCompanionDeathSystem(
-                        bondedCompanionComposition,
-                        projectionIdentityComponentType,
-                        UUIDComponent.getComponentType()
-                ));
-        deferGlobalListener(
-                TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-world-load-reconciliation",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this, StartWorldEvent.class,
-                        bondedCompanionComposition::onWorldLoad,
-                        "bonded companion world-load reconciliation"
-                )
-        );
-        deferGlobalListener(
-                TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-player-added-reconciliation",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this, AddPlayerToWorldEvent.class,
-                        bondedCompanionComposition::onPlayerAdded,
-                        "bonded companion player join/transfer reconciliation"
-                )
-        );
-        deferGlobalListener(
-                TameworkRuntimeModule.BONDED_PERSISTENCE,
-                "bonded-player-disconnect-reconciliation",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this, PlayerDisconnectEvent.class,
-                        bondedCompanionComposition::onPlayerLogout,
-                        "bonded companion logout reconciliation"
-                )
-        );
-        }
-        try {
-            persistenceComposition = TameworkPersistenceComposition.createIfActive(
-                    this,
-                    components,
-                    apiEventBus,
-                    itemFeatureRegistry,
-                    commandItemRegistry,
-                    populationGroupConfigRegistry,
-                    runtimeStartupPlan,
-                    genericPersistenceActivationEvidence,
-                    runtimeParticipants,
-                    diagnosticRuntime == null
-                            ? ignored -> { } : diagnosticRuntime.failureSink(),
-                    diagnosticRuntime == null
-                            ? ignored -> { } : diagnosticRuntime::useExporter
-            );
-            if (persistenceComposition == null) {
-                if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
-                    throw new IllegalStateException(
-                            "Active generic persistence returned no runtime composition"
-                    );
-                }
-                if (bondedCompanionComposition != null) {
-                    activateBondedOnlyFallback(
-                            new IllegalStateException("Generic persistence is dormant")
-                    );
-                }
-                return;
-            }
-            runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.GENERIC_PERSISTENCE);
-        } catch (RuntimeException genericStartupFailure) {
-            if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
-                closeBondedCompanions();
-                throw new IllegalStateException(
-                        "Required generic persistence failed during startup",
-                        genericStartupFailure
-                );
-            }
-            if (spawnMarkerEntityType != null) {
-                deferEntitySystem(
-                        TameworkRuntimeModule.CORE_OWNERSHIP,
-                        "companion-spawn-authority-cleanup-marker-fallback",
-                        () -> new CompanionSpawnAuthorityCleanupSystems.Marker(
-                                spawnMarkerEntityType,
-                                tamedComponentType
-                        )
-                );
-            }
-            if (bondedCompanionComposition != null) {
-                activateBondedOnlyFallback(genericStartupFailure);
-            } else {
-                getLogger().at(Level.SEVERE).withCause(genericStartupFailure).log(
-                        "Generic persistence composition failed and no bonded authority is active."
-                );
-            }
-            return;
-        }
+        this.companionReleaseFlow = releaseFlow;
         if (spawnMarkerEntityType != null) {
             deferEntitySystem(
                     TameworkRuntimeModule.CORE_OWNERSHIP,
@@ -771,25 +755,10 @@ public class Tamework extends JavaPlugin {
                     )
             );
         }
-        commandNpcRelocationService = new CommandNpcRelocationService(
-                getLogger(),
-                new CompositeRecallRecoverySink(List.of(
-                        persistenceComposition.exactRecallRecovery(),
-                        new ImportedCompanionRecallRecovery(
-                                persistenceComposition.facades(),
-                                getLogger()
-                        )
-                ))
-        );
-        runtimeDataDirectory = persistenceComposition.dataDirectory();
-        if (bondedCompanionComposition != null) {
-            bondedDiagnosticRegistration = persistenceComposition.registerBondedDiagnostics(
-                    bondedCompanionComposition.diagnostics()
-            );
-        }
-        persistenceBootstrap = persistenceComposition.persistence();
-        commandLinkedNpcStateSnapshotService =
-                persistenceComposition.snapshots();
+        commandNpcRelocationService = recallRestore != null
+                ? new CommandNpcRelocationService(getLogger(), recallRestore)
+                : new CommandNpcRelocationService(getLogger());
+        commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService();
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
                 new HeldItemAttachmentInteractionService(getLogger());
@@ -809,63 +778,52 @@ public class Tamework extends JavaPlugin {
                 HeldItemAttachmentInteractionService.EXCHANGE_ATTACHMENT_EFFECT_ID,
                 heldItemAttachmentInteractions::exchangeAttachment
         );
-        traitEffectRegistry = new TraitEffectRegistry(
-                getLogger(),
-                new ReplacementNpcProfilesApi(
-                        persistenceComposition.facades().queries(),
-                        Duration.ofSeconds(5)
-                )
-        );
+        OwnedNpcTransformationInteractionService ownedNpcTransformations =
+                new OwnedNpcTransformationInteractionService(releaseFlow, companionQueries);
+        interactionExtensionRegistry.registerBuiltInEffect(
+                "tamework:transform_owned_npc", ownedNpcTransformations::apply);
+        // Without a ready companion index there is no profile API: trait effects see a null profile id.
+        IndexNpcProfilesApi profilesApi = companionQueries == null ? null : new IndexNpcProfilesApi(companionQueries);
+        traitEffectRegistry = new TraitEffectRegistry(getLogger(), profilesApi);
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-vfx", CaptureChannelVfxSystem::new);
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
-        SimpleClaimsTamedDamagePolicy damagePolicy =
-                new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime);
-        apiComposition = ReplacementTameworkApiFactory.compose(
-                persistenceBootstrap,
-                Duration.ofSeconds(5),
-                System::currentTimeMillis,
-                apiEventBus,
-                commandLinkedNpcStateSnapshotService,
-                interactionExtensionRegistry,
-                traitEffectRegistry,
-                damagePolicy,
-                persistenceComposition.featureApiDependencies(),
-                bondedCompanionComposition == null ? null : bondedCompanionComposition.api()
-        );
-        api = apiComposition.api();
-        apiComposition.installActivityRuntime(managedActivityConfigRegistry);
-        BreedingLitterRuntime.install(
-                this::managedBatchAdmissions,
-                litter -> persistenceComposition == null
-                        ? java.util.concurrent.CompletableFuture
-                                .completedFuture(false)
-                        : persistenceComposition.facades().operations()
-                                .prepareBreedingLitter(litter),
-                litter -> persistenceComposition == null
-                        ? null
-                        : persistenceComposition.facades().operations()
-                                .submitBreedingLitter(litter)
-        );
-        apiComposition.activateCapturePolicyRuntime(
-                itemFeatureRegistry, capturePolicyRegistry
-        );
-        TimedSummonOwnerLifecycleService timedSummonOwnerLifecycle =
-                new TimedSummonOwnerLifecycleService(
-                        () -> api.commandTimedSummoning(),
-                        () -> persistenceComposition.facades().queries()
-                                .projectedTimedSummons()
-                );
-        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
-                "timed-summon-owner-death", () -> new TimedSummonOwnerDeathSystem(
-                        timedSummonOwnerLifecycle,
-                        Player.getComponentType(),
-                        UUIDComponent.getComponentType()
-                )
-        );
+        if (profilesApi != null) {
+            CompanionPersistenceModule apiModule = companionModule;
+            IndexTameworkApi indexApi = new IndexTameworkApi(
+                    profilesApi,
+                    new IndexProfileDataApi(apiModule.index(), apiModule.writer()::flushNow),
+                    new IndexDiagnosticsApi(apiModule.index(), apiModule.writer()::status,
+                            apiModule.root().toString(), apiModule::folderBytes, apiModule::unreadableCount),
+                    new IndexPopulationGroupApi(apiModule.index(), populationGroupConfigRegistry::snapshot),
+                    apiEventBus,
+                    commandLinkedNpcStateSnapshotService,
+                    interactionExtensionRegistry,
+                    traitEffectRegistry,
+                    new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime),
+                    new CommandUiRegistry(),
+                    new CommandHudRegistry(),
+                    itemFeatureRegistry,
+                    capturePolicyRegistry,
+                    admissionProviderRegistry,
+                    managedActivityConfigRegistry);
+            ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
+            indexApi.useBondedCompanions(bondedCompanionApi);
+            api = indexApi;
+            // Companion events go out after the index lock is released, on the changing thread (spec 9).
+            apiModule.addAfterUnlockListener(new CompanionEventPublisher(
+                    apiEventBus,
+                    roleId -> populationGroupConfigRegistry.snapshot().resolvePoliciesForRole(roleId).stream()
+                            .map(policy -> policy.groupId()).toList(),
+                    System::currentTimeMillis));
+        } else {
+            // No public API without the companion index; activity producers and care credits
+            // still need their runtime.
+            ActivityRuntime.install(LiveActivityFeed.standalonePublisher(), managedActivityConfigRegistry);
+        }
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
-                () -> api,
+                () -> null,
                 message -> getLogger().at(Level.INFO).log(message),
                 companionProgressionSignalBus
         );
@@ -874,15 +832,7 @@ public class Tamework extends JavaPlugin {
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-npc-relocation-on-load", () -> new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
-                        commandLinkedNpcStateSnapshotService,
-                        new com.alechilles.alecstamework.items.ReleasedCompanionCleanup(
-                                persistenceComposition.facades().queries())
-                )
-        );
-        deferChunkSystem(TameworkRuntimeModule.COOPS,
-                "command-direct-live-coop", () -> new CommandDirectLiveCoopSystem(
-                        persistenceComposition.directLiveCoopAuthor(),
-                        persistenceComposition.directLiveCoopProjections()
+                        commandLinkedNpcStateSnapshotService
                 )
         );
         // Initial assets load before deferred subscriptions; publish portraits even without spawners.
@@ -897,53 +847,82 @@ public class Tamework extends JavaPlugin {
         translationRegistry = new TranslationRegistry();
         int langLoaded = ModLanguageDiscovery.loadAll(translationRegistry, getLogger(), getDataDirectory());
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
-        NameplateBuilderBridgeLoader.initialize(this);
 
-        // Core handler for capture/spawn flows.
-        if (bondedCompanionComposition == null) {
-            spawnerFeatureHandler = new SpawnerFeatureHandler(
-                    getLogger(), itemFeatureRegistry, translationRegistry,
-                    persistenceComposition.captureAuthor(), persistenceComposition.releaseAuthor(),
-                    capturePolicyRegistry, interactionExtensionRegistry,
-                    persistenceComposition.tameAndLinkEvidence()
-            );
-        } else {
-            spawnerFeatureHandler = new SpawnerFeatureHandler(
-                    getLogger(), itemFeatureRegistry, translationRegistry,
-                    persistenceComposition.captureAuthor(), persistenceComposition.releaseAuthor(),
-                    capturePolicyRegistry, interactionExtensionRegistry,
-                    persistenceComposition.tameAndLinkEvidence(),
-                    bondedCompanionComposition.captureAuthor(), bondedCompanionRosterRegistry,
-                    commandItemRegistry
-            );
+        // Capture into an item and release from one (spec 8.2, 8.3). Without a ready companion
+        // index it is not built, and capture and spawner interactions fail before changing anything.
+        if (restoreFlow != null) {
+            CompanionPersistenceModule module = companionModule;
+            spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, translationRegistry,
+                    capturePolicyRegistry, interactionExtensionRegistry, module.index(), module.loaded(),
+                    new CaptureFlow<>(module.index(), module.loaded(),
+                            (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
+                            module.writer()::flushNow, providerAdmission,
+                            // A capture into bonded storage re-checks the family's owned limit under the index lock.
+                            com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
+                                    admissionGate::deny, module.index()::fileRecords, bondedFamilies),
+                            // A leftover 4.x body is never captured into a second record (plan 7 R14).
+                            companionLegacyBody),
+                    restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.production(),
+                            module.writer()::queueSnapshot),
+                    CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
+                    admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, bondedFamilies,
+                    // A 2.x capture item gets its record and stored state on its first release (plan 7 R18).
+                    new com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption(module.index(),
+                            module.legacyAliases(), module.writer()::queueSnapshot,
+                            admissionGate::admit, System::currentTimeMillis));
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
+        namingFeatureHandler.setNameClearedListener((ref, store) -> companionNameCleared.accept(ref, store));
         // Core handler for command-item linking and dispatch.
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
                 commandNpcRelocationService,
                 commandLinkedNpcStateSnapshotService,
-                persistenceComposition.facades(),
-                persistenceComposition.restorationAuthor(),
-                api::commandTimedSummoning,
-                api::paidCommandRevival,
-                api::populationGroups,
-                api::bondedCompanions,
-                companionProgressionSignalBus
+                restoreFlow,
+                // The bonded panel reads the index-backed API; after shutdown it reports unavailable.
+                bondedCompanionApi == null ? null : () -> {
+                    com.alechilles.alecstamework.api.BondedCompanionApi current = bondedCompanionApi;
+                    return current != null ? current : com.alechilles.alecstamework.api.BondedCompanionApi.unavailable();
+                },
+                companionProgressionSignalBus,
+                companionQueries,
+                releaseFlow,
+                () -> companionRosterSummons,
+                admissionGate
         );
-        commandItemFeatureHandler.configureCommandUi(api.commandUi());
+        commandItemFeatureHandler.configureRecallRestore(recallRestore);
+        commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
+        commandItemFeatureHandler.configureSavedTalents(companionQueries, storedTalentUpdates);
+        if (captureItemFlows != null && spawnerFeatureHandler != null) {
+            // After a Recall or Forget the item turns empty at once in its owner's inventory and
+            // where the item locator last saw it (a container, a dropped item or another player).
+            SpawnerFeatureHandler spawner = spawnerFeatureHandler;
+            var itemTracker = commandItemFeatureHandler.capturedItemTracker();
+            captureItemFlows.useItemSweep((owner, profileId, itemGeneration) -> {
+                spawner.emptyHeldCaptureItems(owner, profileId);
+                spawner.emptyLocatedCaptureItem(itemTracker, owner, profileId, itemGeneration);
+            });
+        }
+        // The command pages use the registry the public API hands to renderers and contributors.
+        IndexTameworkApi commandUiApi = api;
+        commandItemFeatureHandler.configureCommandUi(
+                commandUiApi != null ? commandUiApi.commandUi() : new CommandUiRegistry());
+        // Capture item ownership follows the holder (spec 8.14); without a ready index only the locator runs.
+        CaptureItemHolderSystems.Transfers captureItemTransfers = admissionGate == null ? null
+                : createCaptureItemTransfers(admissionGate);
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
             var tracker = commandItemFeatureHandler.capturedItemTracker();
             tracker.start(runtimeDataDirectory.resolve("cache/captured-item-locations.json"));
-            return new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Lifecycle(tracker);
+            return new CaptureItemHolderSystems.Lifecycle(tracker, captureItemTransfers);
         });
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-inventory-locations",
-                () -> new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Changes(
-                        commandItemFeatureHandler.capturedItemTracker()));
+                () -> new CaptureItemHolderSystems.Changes(
+                        commandItemFeatureHandler.capturedItemTracker(), captureItemTransfers));
+        CaptureItemFlows destroyedCaptureItems = captureItemFlows;
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-dropped-locations",
                 () -> new com.alechilles.alecstamework.items.locate.CapturedItemDropSystem(
-                        commandItemFeatureHandler.capturedItemTracker()));
+                        commandItemFeatureHandler.capturedItemTracker(), destroyedCaptureItems));
         deferChunkSystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-container-locations",
                 () -> new com.alechilles.alecstamework.items.locate.CapturedItemContainerSystem(
                         commandItemFeatureHandler.capturedItemTracker()));
@@ -960,9 +939,8 @@ public class Tamework extends JavaPlugin {
                 () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         CommandTargetHudActivationTracker commandHotswapHudActivationTracker = new CommandTargetHudActivationTracker();
-        CommandTargetHudActivationTracker commandHighlightActivationTracker =
-                HytaleApiLevel.isUpdate6OrLater() ? new CommandTargetHudActivationTracker() : null;
-        CommandHudDirtySink commandHudDirtySink = CommandHudDirtySink.fanOut(
+        CommandTargetHudActivationTracker commandHighlightActivationTracker = new CommandTargetHudActivationTracker();
+        CommandHudDirtySink commandHudDirtySink = this.commandHudDirtySink = CommandHudDirtySink.fanOut(
                 commandTargetHudActivationTracker,
                 commandHotswapHudActivationTracker,
                 commandHighlightActivationTracker
@@ -988,15 +966,12 @@ public class Tamework extends JavaPlugin {
                         commandHotswapHudActivationTracker,
                         commandTargetInspector
                 ));
-        if (commandHighlightActivationTracker != null) {
-            deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
-                    "command-active-npc-highlight",
-                    () -> new CommandActiveNpcHighlightSystem(
-                            commandItemRegistry,
-                            commandHighlightActivationTracker,
-                            commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
-                    ));
-        }
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-active-npc-highlight",
+                () -> new CommandActiveNpcHighlightSystem(
+                        commandItemRegistry,
+                        commandHighlightActivationTracker
+                ));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hud-player-lifecycle",
                 () -> new CommandHudPlayerLifecycleSystem(commandHudDirtySink));
@@ -1006,6 +981,7 @@ public class Tamework extends JavaPlugin {
 
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
+        registerCompanionMigrationPopup(companionModule == null ? null : companionModule.legacyKind());
 
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
@@ -1049,19 +1025,6 @@ public class Tamework extends JavaPlugin {
                         PlayerDisconnectEvent.class,
                         ownerPresenceTimelineService::onPlayerDisconnect,
                         "owner presence disconnect tracking"
-                )
-        );
-        deferGlobalListener(
-                TameworkRuntimeModule.COMMAND_ITEMS,
-                "timed-summon-owner-logout",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this,
-                        PlayerDisconnectEvent.class,
-                        event -> timedSummonOwnerLifecycle.onOwnerLogout(
-                                event == null || event.getPlayerRef() == null
-                                        ? null : event.getPlayerRef().getUuid()
-                        ),
-                        "timed summon owner logout storage"
                 )
         );
         deferGlobalListener(
@@ -1171,28 +1134,6 @@ public class Tamework extends JavaPlugin {
                 )
         );
         deferGlobalListener(
-                TameworkRuntimeModule.AVATAR_FLIGHT,
-                "stale-avatar-flight-roster",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this,
-                        AddPlayerToWorldEvent.class,
-                        event -> {
-                            PlayerRef playerRef = event == null || event.getHolder() == null
-                                    ? null : event.getHolder().getComponent(
-                                    PlayerRef.getComponentType()
-                            );
-                            if (playerRef != null
-                                    && AvatarFlightStaleOwnerRecoveryRegistry.claim(
-                                    playerRef.getUuid())) {
-                                timedSummonOwnerLifecycle.onStaleAvatarFlightRecovery(
-                                        playerRef.getUuid()
-                                );
-                            }
-                        },
-                        "stale avatar flight roster storage"
-                )
-        );
-        deferGlobalListener(
                 TameworkRuntimeModule.CORE_OWNERSHIP,
                 "crash-telemetry-world-cleanup",
                 () -> TameworkEventRegistrationSupport.registerGlobal(
@@ -1249,6 +1190,18 @@ public class Tamework extends JavaPlugin {
     }
 
     private void deferPersistenceIndependentRuntimeParticipants() {
+        if (com.alechilles.alecstamework.compat.runes.RuneInputRuntime.isSupported()) {
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-load", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.Load::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-tick", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.Tick::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-active-slot", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.ActiveSlot::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-hotbar-change", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.HotbarChange::new);
+            deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "rune-input-flight-change", com.alechilles.alecstamework.compat.runes.RuneInputRuntime.FlightChange::new);
+        }
         deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
                 "scarecrow-block-placed", ScarecrowBlockEventSystems.Placed::new);
         deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
@@ -1267,6 +1220,9 @@ public class Tamework extends JavaPlugin {
                 ));
         deferChunkSystem(TameworkRuntimeModule.FOOD,
                 "feed-trough-food-state-sync", FeedTroughFoodStateSyncSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
+                "turn-in-place-animation", () -> new com.alechilles.alecstamework.npc.turning.TurnInPlaceAnimationSystem(
+                        com.alechilles.alecstamework.npc.turning.TurnInPlaceState.getComponentType()));
         deferDamageRuntimeParticipants();
     }
 
@@ -1465,6 +1421,12 @@ public class Tamework extends JavaPlugin {
     }
 
     private void startInternal() {
+        if (NPCEntity.getComponentType() == null) {
+            // Every companion system queries this type; without it they fail later with an
+            // unexplained null query.
+            throw new IllegalStateException("The Hytale NPC plugin has not registered its NPC component type,"
+                    + " so Alec's Tamework! cannot start. Check the server log for an earlier Hytale:NPC failure.");
+        }
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
@@ -1482,6 +1444,8 @@ public class Tamework extends JavaPlugin {
         preflightDeclaredRuntimeParticipants();
         initializeRuntimeServices();
         registerRuntimeParticipants();
+        admitCompanionsAlreadyLoaded();
+        startLegacyBodyLocate();
         runtimeActivationState = TameworkRuntimeActivationState.of(
                 runtimeStartupPlan, runtimeStartupDiagnostics
         );
@@ -1500,13 +1464,18 @@ public class Tamework extends JavaPlugin {
 
     private void registerCommandRoot() {
         if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(TameworkCommandRootFactory.create(
-                    persistenceComposition,
-                    bondedCompanionComposition,
+            CompanionQueries companions = companionModule != null && companionModule.ready()
+                    ? companionModule.queries() : null;
+            var root = new TameworkCommandRoot(
                     spawnBeaconVisualizationService,
-                    diagnosticRuntime == null
-                            ? null : diagnosticRuntime.failureSink()
-            ));
+                    companionReleaseFlow,
+                    companions
+            );
+            root.addCompanionCommands(captureItemFlows, companions);
+            root.addPersistenceCommands(companionStartFresh);
+            root.addBondedCommands(() -> bondedCompanionApi, () -> bondedCompanionRosterRegistry == null
+                    ? null : bondedCompanionRosterRegistry.snapshot());
+            getCommandRegistry().registerCommand(root);
         }
     }
 
@@ -1520,11 +1489,476 @@ public class Tamework extends JavaPlugin {
         initializer.run();
     }
 
+    /**
+     * Opens the companion store before the world systems register. {@code open} blocks on file
+     * I/O; this runs in plugin start, not on a world thread. The universe's StorageManager is a
+     * final field set when the core Universe plugin is constructed, so it is usable here.
+     */
+    private void openCompanionPersistence(@Nonnull List<Path> legacyDirectories) {
+        Universe universe = Universe.get();
+        if (universe == null) {
+            getLogger().at(Level.SEVERE).log(
+                    "Universe is unavailable at Tamework start; companion persistence is disabled.");
+            return;
+        }
+        Path companionRoot = CompanionStorage.root(universe.getPath());
+        HytaleCompanionFileIo companionIo = new HytaleCompanionFileIo(() -> Universe.get().getStorageManager());
+        String version = String.valueOf(getManifest().getVersion());
+        companionModule = CompanionPersistenceModule.open(
+                companionRoot,
+                legacyDirectories,
+                Files::exists,
+                companionIo,
+                System::currentTimeMillis,
+                version,
+                runtimeDataDirectory);
+        // Command items resolve links that name an old body through the import's alias file (plan 7 R19).
+        com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(companionModule.legacyAliases());
+        // Only a world blocked by old saves may start fresh (spec 12.3).
+        if (companionModule.state() == CompanionPersistenceModule.State.MIGRATION_REQUIRED) {
+            companionStartFresh = () -> CompanionPersistenceModule.startFresh(companionRoot, legacyDirectories,
+                    Files::exists, companionIo, System::currentTimeMillis, version);
+        }
+    }
+
+    /**
+     * Runs the one-shot companion startup pass after the companion systems registered. Worlds
+     * already loading when Tamework starts keep their bodies; the add systems never see those.
+     */
+    private void admitCompanionsAlreadyLoaded() {
+        CompanionStartupAdmission admission = companionStartupAdmission;
+        companionStartupAdmission = null;
+        Universe universe = Universe.get();
+        if (admission == null || universe == null
+                || !runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return;
+        }
+        admission.admitLoadedWorlds(universe.getWorlds().values());
+        // Queued after the admission pass, which reads the retired projection identity (plan 7 R15).
+        com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup cleanup = retiredComponentCleanup;
+        if (cleanup != null) {
+            cleanup.stripLoadedWorlds(universe.getWorlds().values());
+        }
+    }
+
+    /**
+     * Builds the restore used by recall, world-change follow and the panel's Recover and Revive.
+     * The snapshot is a fresh capture when the body is loaded, otherwise the stored one.
+     */
+    private static RestoreFlow<Ref<EntityStore>> createRestoreFlow(
+            CompanionPersistenceModule module, ProviderAdmission providerAdmission,
+            CompanionAdmissionGate admissionGate,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
+        CompanionSnapshotSource snapshots = new CompanionSnapshotSource(
+                module.queries()::loadedBody, module.index()::get, module.writer()::queueSnapshot,
+                module::readSnapshot, CompanionSnapshots.production());
+        HytaleCompanionSpawner spawner =
+                new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
+                        module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete);
+        // The flow unregistered the old body at commit, so its removal raises no LOST transition.
+        // A ref no longer valid means the body left its store; if its chunk loads it again, the
+        // generation fence removes it.
+        return new RestoreFlow<>(module.index(), module.loaded(), snapshots::read,
+                module.writer()::flushNow, spawner, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
+                System::currentTimeMillis, providerAdmission,
+                // A bonded family's owned and active limits join the caps under the index lock (plan 6 R15).
+                com.alechilles.alecstamework.companion.bonded.BondedAdmission.withFamilyCaps(
+                        admissionGate::deny, module.index()::fileRecords, bondedFamilies));
+    }
+
+    /**
+     * Builds the bonded companion API over the companion index (plan 6 task 9). Its change events
+     * go out after the index lock is released. {@link #closeApiComposition} closes it.
+     *
+     * <p>Also starts the summon effects (plan 6 task 11): the summon aura plays once a restore
+     * has brought the body back, and the expiry warning runs on the companion module's timer
+     * thread, which the module stops at shutdown.
+     */
+    private com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi createBondedCompanionApi(
+            CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            StoreFlow<Ref<EntityStore>> storeFlow,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
+        com.alechilles.alecstamework.companion.bonded.runtime.HytaleBondedBodies bondedBodies =
+                new com.alechilles.alecstamework.companion.bonded.runtime.HytaleBondedBodies(module.loaded()::get);
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects effects =
+                new com.alechilles.alecstamework.companion.bonded.BondedSummonEffects(
+                        module.index()::get, bondedFamilies, bondedBodies,
+                        (task, delayMs) -> {
+                            java.util.concurrent.ScheduledFuture<?> scheduled = module.timers().schedule(
+                                    task, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+                            return () -> scheduled.cancel(false);
+                        },
+                        System::currentTimeMillis);
+        bondedSummonEffects = effects;
+        module.addAfterUnlockListener(effects::onChanged);
+        effects.rebuild(module.index());
+        java.util.function.Function<RestoreFlow.Request,
+                java.util.concurrent.CompletableFuture<RestoreFlow.Result>> restore =
+                request -> restoreFlow.restore(request).whenComplete((result, failure) -> {
+                    if (result == RestoreFlow.Result.RESTORED) {
+                        effects.summoned(request.profileId());
+                    }
+                });
+        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded =
+                new com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi(
+                        module.index(), bondedFamilies, restore, storeFlow::store,
+                        module.writer()::flushNow,
+                        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi.bodies(
+                                module.loaded(), CompanionBodies::removeOnOwnWorld),
+                        module.writer()::queueSnapshotDelete,
+                        com.alechilles.alecstamework.companion.bonded.BondedTalentTimers.fromSnapshots(
+                                module::readSnapshot),
+                        System::currentTimeMillis);
+        module.addAfterUnlockListener(bonded::onChanged);
+        com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates talents =
+                new com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates(
+                        module.index(), module::readSnapshot, module.writer()::queueSnapshot, bondedBodies);
+        bonded.useTalents(talents);
+        // Its stored half also serves the talent pages of dead and lost ordinary companions.
+        storedTalentUpdates = talents;
+        return bonded;
+    }
+
+    /**
+     * Builds the store used by the panel's dismiss, summon expiry and owner logout or death. A
+     * loaded body is captured on its world thread; otherwise the stored snapshot stands.
+     */
+    private static StoreFlow<Ref<EntityStore>> createStoreFlow(CompanionPersistenceModule module) {
+        return new StoreFlow<>(module.index(), module.loaded(),
+                new HytaleStoreCapture(CompanionSnapshots.production(),
+                        new CompanionSummaries(new HytaleSummarySources())),
+                module::readSnapshot, (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
+                module.writer()::flushNow, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
+                System::currentTimeMillis);
+    }
+
+    /**
+     * The admission provider decisions the synchronous sites read (plan 6 R11). An owner's are
+     * dropped when the owner's counts change (index listener, after the lock) and on disconnect,
+     * all on config reload and on shutdown; they are warmed when a player enters a world. The
+     * listeners only pass the player id and the world name on; the provider is asked on the
+     * provider registry's threads.
+     */
+    private ProviderDecisionCache startProviderDecisionCache(ProviderAdmission providerAdmission) {
+        ProviderDecisionCache cache = new ProviderDecisionCache(providerAdmission, System::currentTimeMillis);
+        providerDecisionCache = cache;
+        companionModule.addAfterUnlockListener(cache::onRecordChanged);
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "admission-provider-decision-warm",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        event -> {
+                            if (event == null || event.getWorld() == null || event.getHolder() == null) {
+                                return;
+                            }
+                            PlayerRef player = event.getHolder().getComponent(PlayerRef.getComponentType());
+                            String world = event.getWorld().getName();
+                            if (player != null && player.getUuid() != null && world != null && !world.isBlank()) {
+                                cache.warm(player.getUuid(), world);
+                            }
+                        },
+                        "admission provider decision warm-up"
+                )
+        );
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "admission-provider-decision-disconnect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            PlayerRef player = event == null ? null : event.getPlayerRef();
+                            if (player != null && player.getUuid() != null) {
+                                cache.forgetOwner(player.getUuid());
+                            }
+                        },
+                        "admission provider decision cleanup"
+                )
+        );
+        return cache;
+    }
+
+    /**
+     * Capture item ownership follows the holder, and ineligible players cannot pick the item up
+     * (spec 8.14). The pickup filters read cached admission decisions: a player's are dropped when
+     * their counts change (index listener) and all on config reload.
+     */
+    private CaptureItemHolderSystems.Transfers createCaptureItemTransfers(CompanionAdmissionGate admissionGate) {
+        AdmissionCache admissionCache = new AdmissionCache(System::currentTimeMillis);
+        companionModule.addChangeListener(admissionCache::onRecordChanged);
+        captureAdmissionCache = admissionCache;
+        CaptureItemHolderSystems.Transfers transfers = new CaptureItemHolderSystems.Transfers(
+                companionModule.index(), companionModule.writer(), admissionGate, itemFeatureRegistry, admissionCache,
+                // The handler exists whenever the admission gate does; a failed stamp keeps the owner id.
+                (stack, owner, ownerName) -> spawnerFeatureHandler.withCaptureOwner(stack, owner, ownerName));
+        captureItemTransfers = transfers;
+        return transfers;
+    }
+
+    /**
+     * Builds roster summon and store and starts timed-summon expiry on the module's timer thread,
+     * which the module stops before its final flush. Timed summons are also stored when their
+     * owner logs out or dies (spec 8.4). The expiry listener is added and filled in one index
+     * step, so no change is missed between them. Returns null when generic persistence is not
+     * active: a timed summon would never expire, so there are no summons.
+     */
     @Nullable
-    ManagedBatchAdmissionAuthority managedBatchAdmissions() {
-        return persistenceComposition == null
-                ? null
-                : persistenceComposition.managedBatchAdmissions();
+    private RosterSummons startRosterSummons(
+            CompanionPersistenceModule module, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            StoreFlow<Ref<EntityStore>> storeFlow,
+            com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi bonded) {
+        if (!runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return null;
+        }
+        RosterSummons summons = new RosterSummons(module.index()::get, module.queries()::owned,
+                restoreFlow::restoreOutcome, storeFlow::store, module.writer()::flushNow, RosterSummons.Policy::forRole,
+                System::currentTimeMillis, bonded::storeActive);
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects summonEffects = bondedSummonEffects;
+        SummonExpiryScheduler expiry = new SummonExpiryScheduler(profileId -> {
+            // A rider's fall protection is armed while the body is still there. Its world task is
+            // queued before the store's, so it runs first on the body's world thread.
+            if (summonEffects != null) {
+                summonEffects.expiring(profileId);
+            }
+            return summons.storeExpired(profileId);
+        });
+        module.index().atomically(() -> {
+            module.addChangeListener(expiry::onChange);
+            expiry.rebuild(module.index());
+            return null;
+        });
+        expiry.start(module.timers(), System::currentTimeMillis);
+        deferGlobalListener(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "companion-timed-summon-logout",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            PlayerRef player = event == null ? null : event.getPlayerRef();
+                            if (player != null && player.getUuid() != null) {
+                                summons.storeTimedSummons(player.getUuid(), true);
+                            }
+                        },
+                        "companion timed summon logout auto-store"
+                )
+        );
+        // An active bonded companion does not follow its owner to another world (plan 6 R18). Only
+        // the owner id and the world name leave the event; the store hops to the body's world itself.
+        deferGlobalListener(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "bonded-companion-owner-world-change",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        event -> {
+                            if (event == null || event.getWorld() == null || event.getHolder() == null) {
+                                return;
+                            }
+                            PlayerRef player = event.getHolder().getComponent(PlayerRef.getComponentType());
+                            if (player != null && player.getUuid() != null) {
+                                summons.storeBondedOutside(player.getUuid(), event.getWorld().getName());
+                            }
+                        },
+                        "bonded companion owner world-change auto-store"
+                )
+        );
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "companion-timed-summon-owner-death",
+                () -> new CompanionOwnerDeathSystem(owner -> summons.storeTimedSummons(owner, false)));
+        return summons;
+    }
+
+    /**
+     * Starts the background search for imported companions in the worlds' saved chunks (plan 7
+     * task 13) when the companion module has one: only on a world imported from 3.x/4.x that still
+     * has companions nobody has seen since. It reads the worlds that are loaded once the universe
+     * is ready, and any world started while it runs. Worlds that are deleted when removed
+     * (instances) are not read. It is stopped before the worlds shut down, so no storage read of
+     * its own is running when a world's storage closes.
+     */
+    private void startLegacyBodyLocate() {
+        CompanionPersistenceModule module = companionModule;
+        Universe universe = Universe.get();
+        com.alechilles.alecstamework.companion.migrate.LegacyBodyLocator locator =
+                module == null || !module.ready() ? null : module.legacyLocator();
+        if (locator == null || universe == null
+                || !runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            return;
+        }
+        locator.begin();
+        java.util.function.Consumer<World> offer = world -> {
+            if (world != null && world.getWorldConfig() != null && !world.getWorldConfig().isDeleteOnRemove()) {
+                locator.offer(new com.alechilles.alecstamework.companion.migrate.SavedChunks(world));
+            }
+        };
+        TameworkEventRegistrationSupport.registerGlobal(this,
+                com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent.class,
+                (com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent event) ->
+                        offer.accept(event.getWorld()),
+                "companion locate world start");
+        TameworkEventRegistrationSupport.registerGlobal(this, Short.MAX_VALUE, RemoveWorldEvent.class,
+                (RemoveWorldEvent event) -> {
+                    if (event.getWorld() != null && (!event.isCancelled()
+                            || event.getRemovalReason() == RemoveWorldEvent.RemovalReason.EXCEPTIONAL)) {
+                        locator.worldRemoved(event.getWorld().getName());
+                    }
+                }, "companion locate world removal");
+        // Between UNBIND_LISTENERS (-40) and SHUTDOWN_WORLDS (-32).
+        getEventRegistry().register((short) -36, ShutdownEvent.class, event -> locator.stop());
+        java.util.concurrent.CompletableFuture<Void> ready = universe.getUniverseReady();
+        Runnable begin = () -> {
+            universe.getWorlds().values().forEach(offer);
+            locator.start();
+        };
+        if (ready == null) {
+            begin.run();
+        } else {
+            // Also after a failed world load: the worlds that did load are still read.
+            ready.whenComplete((ignored, failure) -> begin.run());
+        }
+    }
+
+    /** Registers the companion index systems, world-removal listener and final flush. */
+    private void registerCompanionPersistenceRuntime(
+            CompanionAdmissionGate admissionGate, RestoreFlow<Ref<EntityStore>> restoreFlow,
+            com.alechilles.alecstamework.companion.bonded.BondedRecords.Families bondedFamilies) {
+        CompanionPersistenceModule module = companionModule;
+        CompanionBodyLifecycle lifecycle = new CompanionBodyLifecycle(
+                module.index(), module.writer(), module.loaded(),
+                TameworkCompanionComponent.getComponentType(),
+                CompanionSnapshots.production(),
+                new CompanionSummaries(new HytaleSummarySources()),
+                module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies,
+                module.legacyAliases(), module.unreadable());
+        companionLegacyBody = lifecycle::isLegacyBody;
+        companionNameCleared = lifecycle::nameCleared;
+        CompanionBodySystem bodySystem = new CompanionBodySystem(TameworkCompanionComponent.getComponentType(),
+                ownerComponentType, tamedComponentType, module.index(), module.unreadable(), module.loaded(),
+                lifecycle);
+        TameworkCompanionRuntimeParticipants.addCompanionIndex(this, runtimeParticipants, bodySystem, lifecycle);
+        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake coopIntake =
+                new com.alechilles.alecstamework.companion.coop.HytaleCoopIntake(module.index(), module.loaded(),
+                        (profileId, snapshot) -> module.writer().queueSnapshot(snapshot), module.writer()::flushNow,
+                        CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
+                        lifecycle::isLegacyBody);
+        // Same gate as the coop systems below: without them no intake may commit coop moves.
+        if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.install(coopIntake);
+        }
+        com.alechilles.alecstamework.companion.coop.HytaleCoopResidents coopResidents =
+                new com.alechilles.alecstamework.companion.coop.HytaleCoopResidents(module.index(), restoreFlow,
+                        new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
+                                module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete));
+        deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopschedulesystem",
+                () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake, coopResidents,
+                        coopCaptureReceiptsComponentType));
+        deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopbreaksystem",
+                () -> new com.alechilles.alecstamework.companion.coop.CoopBreakSystem(coopResidents,
+                        com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.getComponentType()));
+        companionStartupAdmission = new CompanionStartupAdmission(bodySystem, lifecycle, module.loaded(),
+                TameworkCompanionComponent.getComponentType(), ownerComponentType, tamedComponentType,
+                lifecycle.hasLegacyBodies() ? projectionIdentityComponentType : null);
+        // Retired 3.x/4.x components (plan 7 R15, R16). Declared after the companion index systems:
+        // the strip system depends on CompanionOwnershipSystems.OnAdd. The projection identity
+        // goes once its body is stamped; only the old-body match above still reads it.
+        com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup retiredCleanup =
+                new com.alechilles.alecstamework.companion.migrate.RetiredComponentCleanup(
+                        retiredEntityComponentTypes, projectionIdentityComponentType,
+                        TameworkCompanionComponent.getComponentType(), lifecycle.hasLegacyBodies());
+        retiredComponentCleanup = retiredCleanup;
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-component-cleanup",
+                retiredCleanup::addSystem);
+        deferEntitySystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "retired-revive-escrow-refund",
+                () -> new com.alechilles.alecstamework.companion.migrate.EscrowRefund(
+                        bondedReviveEscrowComponentType).system());
+        CompanionWorldRemovalListener worldRemoval =
+                new CompanionWorldRemovalListener(lifecycle, module.index(), module.loaded());
+        deferGlobalListener(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "companion-world-removal",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        Short.MAX_VALUE,
+                        RemoveWorldEvent.class,
+                        worldRemoval::onRemoveWorld,
+                        "companion world removal"
+                )
+        );
+        // After worlds shut down (-32) and before universe resources flush (-24). Nothing may
+        // change the index after this flush; the writer drops later changes.
+        // Coop intake stops first so no intake commits after the flush.
+        getEventRegistry().register((short) -28, ShutdownEvent.class, event -> {
+            com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+            module.shutdown(System.currentTimeMillis() + 10_000L);
+        });
+    }
+
+    /**
+     * Tells admins on connect that companion saving is paused because the store could not be
+     * read. The module logged the cause.
+     */
+    private void registerCompanionPersistenceFailedNotice() {
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerConnectEvent.class,
+                event -> {
+                    PlayerRef player = event == null ? null : event.getPlayerRef();
+                    PermissionsModule permissions = PermissionsModule.get();
+                    if (player == null || player.getUuid() == null || permissions == null
+                            || !permissions.getGroupsForUser(player.getUuid())
+                            .contains(HytalePermissionsProvider.GROUP_ADMIN)) {
+                        return;
+                    }
+                    player.sendMessage(Message.translation("server.tamework.companions.persistence.failed"));
+                },
+                "companion persistence operator notice"
+        );
+    }
+
+    /**
+     * Tells admins, operators and the local singleplayer owner that the world needs converting,
+     * on every login while old saves block the store: a chat message on connect and a popup when
+     * the player is ready. Registered directly, not through a runtime module, so it does not
+     * depend on which Tamework features are active. The disconnect listener lets the popup
+     * return on the next login.
+     */
+    private void registerCompanionMigrationPopup(@Nullable CompanionStorage.LegacyKind legacyKind) {
+        TameworkSettingsAnnouncementService service = settingsAnnouncementService;
+        if (legacyKind == null || service == null) {
+            return;
+        }
+        // 2.x: the Tamework version that converts the data. 3.x/4.x: the report of the failed import.
+        String reportName = companionModule == null ? null : companionModule.importReportName();
+        String noticeValue = reportName != null ? reportName : legacyKind.converterVersion();
+        service.requireMigrationNotice(legacyKind, noticeValue);
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerConnectEvent.class,
+                event -> {
+                    PlayerRef player = event == null ? null : event.getPlayerRef();
+                    if (service.migrationNoticeFor(player) == null) {
+                        return;
+                    }
+                    player.sendMessage(Message.translation("server."
+                                    + TameworkSettingsAnnouncementService.migrationNoticeKey(legacyKind))
+                            .param("0", noticeValue));
+                },
+                "companion migration chat notice"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerReadyEvent.class,
+                service::onPlayerReadyMigrationNotice,
+                "companion migration popup"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerDisconnectEvent.class,
+                service::onPlayerDisconnect,
+                "companion migration popup session reset"
+        );
     }
 
     /** Validates setup-declared factories before persistence can mutate state. */
@@ -1540,10 +1974,10 @@ public class Tamework extends JavaPlugin {
         }
         TameworkRuntimeRegistrationContext.RegistrationTarget target =
                 new TameworkRuntimeRegistrationTarget(
-                        system -> getEntityStoreRegistry().registerSystem(
-                                (ISystem<EntityStore>) system),
-                        system -> getChunkStoreRegistry().registerSystem(
-                                (ISystem<ChunkStore>) system)
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getEntityStoreRegistry().registerSystem((ISystem<EntityStore>) system)),
+                        system -> registerSystemWhileWorldsAreParked(
+                                () -> getChunkStoreRegistry().registerSystem((ISystem<ChunkStore>) system))
                 );
         runtimeHandle = runtimeParticipants.register(
                 runtimeStartupPlan,
@@ -1565,13 +1999,38 @@ public class Tamework extends JavaPlugin {
         );
     }
     /** Probes durable state and builds the private startup candidate. */
+    /**
+     * Registers one system while no world thread can touch its stores.
+     *
+     * <p>Worlds load on their own threads while plugins start, and the engine's
+     * {@code Store.findOrCreateArchetypeChunk} raises the archetype count before it grows the
+     * chunk array. A registration that reads the store between those two steps throws
+     * {@code ArrayIndexOutOfBoundsException} and leaves the registry half updated. A world thread
+     * holds the asset read lock for every tick and every queued task, and all store writes happen
+     * on that thread, so holding the write lock here keeps it out for the length of one
+     * registration. The lock is taken per system so worlds stall for one registration at a time.
+     * Lock order matches the engine: asset lock first, then the registry's locks.</p>
+     *
+     * <p>Not covered: entities a {@code StartWorldEvent} listener adds before a world's first
+     * tick, which run outside the asset lock.</p>
+     */
+    private static void registerSystemWhileWorldsAreParked(Runnable registration) {
+        java.util.concurrent.locks.Lock assetWriteLock = AssetRegistry.ASSET_LOCK.writeLock();
+        assetWriteLock.lock();
+        try {
+            registration.run();
+        } finally {
+            assetWriteLock.unlock();
+        }
+    }
+
     private void prepareRuntimeActivation() {
         TameworkRuntimeActivationCoordinator.Preparation preparation =
                 runtimeActivationCoordinator.prepare(getDataDirectory(), getLogger(), runtimeCapabilityRequests);
         runtimeStartupPlan = preparation.plan();
         runtimeStartupDiagnostics = new TameworkRuntimeDiagnostics(runtimeStartupPlan);
-        genericPersistenceActivationEvidence = preparation.genericPersistence();
-        bondedPersistenceActivationEvidence = preparation.bondedPersistence();
+        genericLegacyDataPresent = preparation.genericLegacyData();
+        bondedLegacyDataPresent = preparation.bondedLegacyData();
     }
     @Override
     protected void shutdown() {
@@ -1583,13 +2042,26 @@ public class Tamework extends JavaPlugin {
                 this::closeRuntimeApiDependents,
                 this::closeApiComposition);
         simpleClaimsCapabilityRuntime.close();
-        api = null;
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
         }
-        shutdownPersistence();
-        closeBondedCompanions();
+        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+        com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(
+                com.alechilles.alecstamework.companion.migrate.LegacyAliases.EMPTY);
+        if (companionModule != null) {
+            // Returns the -28 ShutdownEvent flush result when that already ran.
+            if (!companionModule.shutdown(System.currentTimeMillis() + 2_000L)) {
+                getLogger().at(Level.SEVERE).log(
+                        "Companion saves were not fully written before shutdown.");
+            }
+            companionModule = null;
+        }
+        OwnerPopulationCapService.useAdmissionGate(null);
+        companionReleaseFlow = null;
+        captureItemFlows = null;
+        companionRosterSummons = null;
+        companionStartupAdmission = null;
         if (diagnosticRuntime != null) {
             diagnosticRuntime.close();
             diagnosticRuntime = null;
@@ -1612,6 +2084,7 @@ public class Tamework extends JavaPlugin {
         }
         ownerPopulationLiveIndex.clear();
         LinkedNpcPanelPortraitItemIndex.clear();
+        AvatarFlightStaleOwnerRecoveryRegistry.clear();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().close();
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
@@ -1663,36 +2136,32 @@ public class Tamework extends JavaPlugin {
     }
 
     private void closeApiComposition() {
-        if (apiComposition != null) {
-            ActivityRuntime.clear();
-            apiComposition.close();
-            apiComposition = null;
+        ActivityRuntime.clear();
+        IndexTameworkApi closing = api;
+        api = null;
+        if (closing != null) {
+            closing.close();
         }
-    }
-
-    private void shutdownPersistence() {
-        if (persistenceComposition == null) {
-            return;
+        com.alechilles.alecstamework.companion.bonded.IndexBondedCompanionApi closingBonded = bondedCompanionApi;
+        bondedCompanionApi = null;
+        if (closingBonded != null) {
+            closingBonded.close();
         }
-        PublicPersistenceShutdownReport report =
-                persistenceComposition.shutdown();
-        if (!report.terminal()) {
-            getLogger().at(Level.SEVERE).log(
-                    "Replacement persistence teardown is not terminal: "
-                            + report.status() + " (outstanding workflows: "
-                            + report.outstandingWorkflows() + ")."
-            );
-            return;
+        com.alechilles.alecstamework.companion.bonded.BondedSummonEffects closingEffects = bondedSummonEffects;
+        bondedSummonEffects = null;
+        if (closingEffects != null) {
+            closingEffects.close();
         }
-        if (report.status()
-                != PublicPersistenceShutdownReport.Status.COMPLETE) {
-            getLogger().at(Level.WARNING).log(
-                    "Replacement persistence teardown completed with "
-                            + report.status() + "."
-            );
+        ProviderDecisionCache closingDecisions = providerDecisionCache;
+        providerDecisionCache = null;
+        if (closingDecisions != null) {
+            closingDecisions.close();
         }
-        persistenceComposition = null;
-        persistenceBootstrap = null;
+        AdmissionProviderRegistry closingProviders = admissionProviderRegistry;
+        admissionProviderRegistry = null;
+        if (closingProviders != null) {
+            closingProviders.close();
+        }
     }
 
     private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
@@ -1788,6 +2257,12 @@ public class Tamework extends JavaPlugin {
         return nameItemRegistry;
     }
 
+    /** Wakes the command HUDs for a player; null before command items are set up. */
+    @javax.annotation.Nullable
+    public CommandHudDirtySink getCommandHudDirtySink() {
+        return commandHudDirtySink;
+    }
+
     public CommandItemRegistry getCommandItemRegistry() {
         return commandItemRegistry;
     }
@@ -1840,8 +2315,27 @@ public class Tamework extends JavaPlugin {
     /** Refreshes runtime-backed API settings without exposing its implementation. */
     public void onRuntimeSettingsChanged() {
         CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
-        if (apiComposition != null) {
-            apiComposition.onRuntimeSettingsChanged();
+        IndexTameworkApi currentApi = api;
+        if (currentApi != null) {
+            currentApi.onRuntimeSettingsChanged();
+        }
+        AdmissionCache admissionCache = captureAdmissionCache;
+        if (admissionCache != null) {
+            // Limits, limit scope and the capture item ownership mode decide the cached pickup admissions.
+            admissionCache.clear();
+        }
+        ProviderDecisionCache providerDecisions = providerDecisionCache;
+        if (providerDecisions != null) {
+            providerDecisions.clear();
+        }
+        refreshCapturePickupFilters();
+    }
+
+    /** Pickup blocking may have turned on: players already online get their filters now. */
+    private void refreshCapturePickupFilters() {
+        CaptureItemHolderSystems.Transfers transfers = captureItemTransfers;
+        if (transfers != null) {
+            transfers.refreshFilters();
         }
     }
 
@@ -1893,8 +2387,8 @@ public class Tamework extends JavaPlugin {
         return runtimeActivationCoordinator.compare(
                 runtimeActivationState.plan(),
                 runtimeCapabilityRequests.snapshot(),
-                genericPersistenceActivationEvidence,
-                bondedPersistenceActivationEvidence
+                genericLegacyDataPresent,
+                bondedLegacyDataPresent
         );
     }
 
@@ -2169,49 +2663,6 @@ public class Tamework extends JavaPlugin {
         deferAssetSubscription(TameworkRuntimeModule.COMMAND_ITEMS, "command-config-assets-removed",
                 () -> getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved));
         commandAssetsRegistered = true;
-    }
-
-    /** Keeps the isolated bonded authority reachable after generic startup aborts. */
-    private void activateBondedOnlyFallback(RuntimeException failure) {
-        api = new BondedOnlyTameworkApi(bondedCompanionComposition.api());
-        PersistenceDiagnosticExporter exporter = diagnosticRuntime == null
-                ? PersistenceDiagnosticExporter.bondedOnly(
-                        runtimeDataDirectory,
-                        bondedCompanionComposition.diagnostics()
-                )
-                : diagnosticRuntime.useBondedExporter(
-                        bondedCompanionComposition.diagnostics()
-        );
-        if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(TameworkCommandRootFactory.bondedOnly(
-                    exporter,
-                    bondedCompanionComposition,
-                    spawnBeaconVisualizationService,
-                    diagnosticRuntime == null
-                            ? null : diagnosticRuntime.failureSink()
-            ));
-        }
-        getLogger().at(Level.SEVERE).withCause(failure).log(
-                "Generic persistence composition failed; bonded companion "
-                        + "persistence remains isolated and available."
-        );
-    }
-
-    private void closeBondedCompanions() {
-        if (bondedDiagnosticRegistration != null) {
-            try {
-                bondedDiagnosticRegistration.close();
-            } catch (Exception failure) {
-                getLogger().at(Level.WARNING).withCause(failure).log(
-                        "Bonded diagnostic aggregation teardown failed."
-                );
-            }
-            bondedDiagnosticRegistration = null;
-        }
-        if (bondedCompanionComposition != null) {
-            bondedCompanionComposition.close();
-            bondedCompanionComposition = null;
-        }
     }
 
     private void registerBondedCompanionRosterAssets() {
@@ -2860,7 +3311,20 @@ public class Tamework extends JavaPlugin {
         if (tranquilizerRecipeVisibilityService == null) {
             return;
         }
-        tranquilizerRecipeVisibilityService.reconcile();
+        // The recipe map is not thread safe, and another plugin can load recipes while this pass
+        // iterates it. The window is a few milliseconds, so try again at once. Recipe visibility is
+        // optional: if every attempt fails, log it and carry on instead of failing plugin start.
+        RuntimeException failure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                tranquilizerRecipeVisibilityService.reconcile();
+                return;
+            } catch (RuntimeException exception) {
+                failure = exception;
+            }
+        }
+        getLogger().at(Level.WARNING).withCause(failure).log(
+                "Gated recipe visibility pass failed; disabled recipes may stay visible until the next recipe asset change.");
     }
 
     private void reconcileFeedTroughWaterChargeDroplistCompat() {
@@ -3026,6 +3490,17 @@ public class Tamework extends JavaPlugin {
     }
 
     private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
+        AdmissionCache admissionCache = captureAdmissionCache;
+        if (admissionCache != null) {
+            // Every config reload, so a changed limit or population group applies to pickup filters at once.
+            admissionCache.clear();
+        }
+        ProviderDecisionCache providerDecisions = providerDecisionCache;
+        if (providerDecisions != null) {
+            // A provider decided against the config that was loaded; a reload asks again.
+            providerDecisions.clear();
+        }
+        refreshCapturePickupFilters();
         if (apiEventBus == null || changedIds == null) {
             return;
         }
@@ -3367,6 +3842,19 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkCommandLinksComponent> getCommandLinksComponentType() {
         return commandLinksComponentType;
+    }
+
+    /** Companion index reads, or null while companion saving is paused (the module is not ready). */
+    @Nullable
+    public CompanionQueries getCompanionQueries() {
+        CompanionPersistenceModule module = companionModule;
+        return module != null && module.ready() ? module.queries() : null;
+    }
+
+    /** True when the companion record of {@code profileId} could not be read at startup. */
+    public boolean isCompanionRecordUnreadable(@Nonnull java.util.UUID profileId) {
+        CompanionPersistenceModule module = companionModule;
+        return module != null && module.unreadable().test(profileId);
     }
 
     public ComponentType<EntityStore, TameworkHappinessComponent> getHappinessComponentType() {

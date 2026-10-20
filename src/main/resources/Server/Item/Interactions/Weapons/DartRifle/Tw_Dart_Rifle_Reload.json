@@ -1,0 +1,39 @@
+{
+  "$Comment": "Opens the bolt, then loads darts one at a time until the rifle is full or the darts run out, then closes the bolt. It is one chain with a step per loaded count, not a Repeat: each step plays the clip that shows that count, because the rifle's look must not change while a reload clip plays (the game rebuilds the held item and drops the clip).",
+  "Type": "Simple",
+  "RunTime": 0.5,
+  "HorizontalSpeedMultiplier": 0.75,
+  "Rules": {
+    "InterruptedBy": [
+      "Primary",
+      "Secondary"
+    ]
+  },
+  "Effects": {
+    "ItemAnimationId": "ReloadOpen",
+    "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Open",
+    "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Open"
+  },
+  "Next": {
+    "Type": "StatsCondition",
+    "Costs": {
+      "Ammo": 3
+    },
+    "Next": "Tw_Dart_Rifle_Reload_Close_3",
+    "Failed": {
+      "Type": "StatsCondition",
+      "Costs": {
+        "Ammo": 2
+      },
+      "Next": "Tw_Dart_Rifle_Reload_From_2",
+      "Failed": {
+        "Type": "StatsCondition",
+        "Costs": {
+          "Ammo": 1
+        },
+        "Next": "Tw_Dart_Rifle_Reload_From_1",
+        "Failed": "Tw_Dart_Rifle_Reload_From_0"
+      }
+    }
+  }
+}

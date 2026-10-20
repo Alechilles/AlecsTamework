@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
@@ -7,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -29,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -40,7 +43,7 @@ import org.joml.Vector3i;
  * <p>The scanner discovers only loaded block entities and live NPC entities. It never infers a
  * removed coop from an unloaded chunk and never reads captured items.</p>
  */
-final class HytaleDirectLiveCoopScanner {
+public final class HytaleDirectLiveCoopScanner {
     private static final String BLOCK_MODULE_CLASS =
             "com.hypixel.hytale.server.core.modules.block.BlockModule";
     private static final String ITEM_CONTAINER_BLOCK_CLASS =
@@ -57,7 +60,14 @@ final class HytaleDirectLiveCoopScanner {
     private volatile boolean componentTypesResolved;
     /** Returns one immutable view of currently loaded coops and live NPC candidates. */
     @Nullable
-    Scan scan(@Nonnull Store<ChunkStore> chunkStore) {
+    public Scan scan(@Nonnull Store<ChunkStore> chunkStore) {
+        return scan(chunkStore, (coop, time) -> coop.acceptsCapture());
+    }
+
+    /** Like {@link #scan(Store)}, scanning live NPCs only when {@code needsNpcs} holds for a loaded coop. */
+    @Nullable
+    public Scan scan(@Nonnull Store<ChunkStore> chunkStore,
+                     @Nonnull BiPredicate<LoadedCoop, WorldTimeResource> needsNpcs) {
         World world = chunkStore.getExternalData() == null
                 ? null : chunkStore.getExternalData().getWorld();
         if (world == null || world.getEntityStore() == null) {
@@ -74,32 +84,74 @@ final class HytaleDirectLiveCoopScanner {
             return null;
         }
         List<LoadedCoop> coops = scanCoops(chunkStore, world);
-        List<LiveNpc> npcs = coops.stream().anyMatch(LoadedCoop::acceptsCapture)
+        List<LiveNpc> npcs = coops.stream().anyMatch(coop -> needsNpcs.test(coop, worldTime))
                 ? scanLiveNpcs(entityStore)
                 : List.of();
         return new Scan(world, chunkStore, entityStore, worldTime, coops, npcs);
     }
+    /**
+     * The config of a coop block entity resolved from its vanilla coop component's asset, as the
+     * sweep resolves it, for a block whose type is already gone (a break). Null when the block has
+     * no vanilla coop component (Farming not loaded, or a container-only coop) or no enabled config.
+     */
+    @Nullable
+    public TwCoopConfig configOf(@Nonnull ComponentAccessor<ChunkStore> accessor, @Nonnull Ref<ChunkStore> block) {
+        ComponentType<ChunkStore, ?> type = coopBlockComponentType();
+        if (type == null) {
+            return null;
+        }
+        Object state;
+        try {
+            state = accessor.getComponent(block, castComponentType(type));
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+        TwCoopConfig config = state == null ? null : resolveConfig(null, coopAssetId(state));
+        return config != null && config.isEnabled() ? config : null;
+    }
+
+    /**
+     * Whether the block at this position of a loaded chunk is a coop of any kind, managed or not:
+     * its block entity has the vanilla coop component, or its block type has a coop config
+     * (enabled or disabled). A block that cannot be told apart also counts: a placeholder for a
+     * block type whose content pack is not loaded, or a block section that cannot be read. False
+     * only for air or another known block. Read-only; call on the world thread.
+     */
+    public boolean coopBlockOfAnyKindAt(@Nonnull World world, @Nonnull Store<ChunkStore> chunkStore,
+                                        int x, int y, int z) {
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(x, z));
+        if (chunk == null) {
+            return false;
+        }
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
+        if (block == null || block.isUnknown() || resolveIdentifier(block.getId()) != null) {
+            return true;
+        }
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, x, y, z);
+        ComponentType<ChunkStore, ?> type = coopBlockComponentType();
+        return blockRef != null && type != null
+                && safeChunkComponent(chunkStore, blockRef, castComponentType(type)) != null;
+    }
+
     /** Confirms removal only when the exact coop chunk is loaded and no matching coop remains. */
     boolean confirmedRemoved(
             @Nonnull World world,
             @Nonnull Store<ChunkStore> chunkStore,
             @Nonnull CoopSlotKey slot
     ) {
-        WorldChunk chunk = world.getChunkIfInMemory(
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, 
                 ChunkUtil.indexChunkFromBlock(slot.x(), slot.z())
         );
         if (chunk == null) {
             return false;
         }
-        BlockType block = chunk.getBlockType(slot.x(), slot.y(), slot.z());
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, slot.x(), slot.y(), slot.z());
         TwCoopConfig config = resolveConfig(block == null ? null : block.getId(), null);
         String foundId = normalize(config == null ? null : config.getCoopId());
         if (slot.coopId().equals(foundId)) {
             return false;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(
-                slot.x(), slot.y(), slot.z()
-        );
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, slot.x(), slot.y(), slot.z());
         if (blockRef == null) {
             return true;
         }
@@ -221,11 +273,11 @@ final class HytaleDirectLiveCoopScanner {
         int x = resolved.x();
         int y = resolved.y();
         int z = resolved.z();
-        BlockType block = chunk.getBlockType(x, y, z);
+        BlockType block = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
         return new CoopLocation(
                 new Vector3i(x, y, z),
                 normalizeBlockType(block == null ? null : block.getId()),
-                chunk.getRotationIndex(x, y, z)
+                HytaleBlockStateAccess.rotationAt(chunk, x, y, z)
         );
     }
 
@@ -439,7 +491,7 @@ final class HytaleDirectLiveCoopScanner {
         return null;
     }
 
-    record Scan(@Nonnull World world,
+    public record Scan(@Nonnull World world,
                 @Nonnull Store<ChunkStore> chunkStore,
                 @Nonnull Store<EntityStore> entityStore,
                 @Nonnull WorldTimeResource worldTime,
@@ -447,7 +499,7 @@ final class HytaleDirectLiveCoopScanner {
                 @Nonnull List<LiveNpc> liveNpcs) {
     }
 
-    record LoadedCoop(@Nonnull String worldKey,
+    public record LoadedCoop(@Nonnull String worldKey,
                       @Nonnull String coopId,
                       @Nonnull Vector3i block,
                       int rotationIndex,
@@ -477,7 +529,7 @@ final class HytaleDirectLiveCoopScanner {
         }
     }
 
-    record LiveNpc(@Nonnull Ref<EntityStore> reference,
+    public record LiveNpc(@Nonnull Ref<EntityStore> reference,
                    @Nonnull UUID alias,
                    @Nonnull String roleId,
                    @Nonnull Vector3d position,

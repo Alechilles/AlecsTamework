@@ -1,0 +1,26 @@
+{
+  "EmptyItemId": "Spawner_Tamework_Roster_Example",
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [
+      "Sheep"
+    ]
+  },
+  "Capture": {
+    "RequireTamed": false,
+    "TamesTarget": true,
+    "TamedRoleOverrides": {
+      "Sheep": "Tamed_Sheep"
+    },
+    "SuccessDisposition": "TameAndCommandLink",
+    "CommandFamilyId": "example_roster",
+    "RequiredCommandConfigId": "TwCommandRosterExample",
+    "RequireCommandAccessItem": true,
+    "ChanceMode": "Guaranteed",
+    "OwnerRestricted": true,
+    "ParticleSystem": "Poof_Small",
+    "SoundEvent": "SFX_Tamework_Poof",
+    "CooldownMs": 500,
+    "MaxDistance": 5
+  }
+}

@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.npc;
 
 import java.util.logging.Level;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkLeap;
 
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkBossBar;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkBeam;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
@@ -24,6 +27,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkRejectPosit
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetFlyingCompanionMode;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetLeashToTargetHome;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkProgressionReward;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
@@ -163,7 +167,11 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderActionTameworkSetLeashToTargetHome::new
             );
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
+            actionFactory.add(BuilderActionTameworkProgressionReward.BUILDER_ID,
+                    BuilderActionTameworkProgressionReward::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
+            actionFactory.add(BuilderActionTameworkBossBar.BUILDER_ID, BuilderActionTameworkBossBar::new);
+            actionFactory.add(BuilderActionTameworkBeam.BUILDER_ID, BuilderActionTameworkBeam::new);
         }
 
         BuilderFactory<Sensor> sensorFactory = npcPlugin.getBuilderManager().getFactory(Sensor.class);
@@ -227,6 +235,8 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Body motion factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Body motion factory ready.");
+            bodyMotionFactory.add(BuilderBodyMotionTameworkLeap.BUILDER_ID,
+                    BuilderBodyMotionTameworkLeap::new);
             bodyMotionFactory.add(
                     BuilderBodyMotionTameworkFlyingOrbit.BUILDER_ID,
                     BuilderBodyMotionTameworkFlyingOrbit::new

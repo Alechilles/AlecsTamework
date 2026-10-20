@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
@@ -20,6 +21,7 @@ import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -188,6 +190,35 @@ class TwBondedCompanionRosterConfigTest {
     }
 
     @Test
+    void familyNameKeyIsOptionalReachesThePolicyAndInheritsFromAParent() throws Exception {
+        String named = """
+                {
+                  "RosterId": "hydragon:dragons",
+                  "FamilyId": "hydragon:dragon",
+                  "NameKey": " server.example.family.dragons ",
+                  "AllowedRoles": ["Tamed_Dragon_Fire"]
+                }
+                """;
+        TwBondedCompanionRosterConfig child = roster("Child", """
+                {
+                  "FamilyId": "hydragon:mini",
+                  "AllowedRoles": ["Tamed_Mini"]
+                }
+                """);
+        child.inheritMissingTopLevelFrom(roster("Parent", named), Set.of("FamilyId", "AllowedRoles"));
+        BondedCompanionRosterRegistry registry = new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(roster("Named", named), child), 1L).applied());
+        BondedCompanionPolicyResolver resolver = new BondedCompanionPolicyResolver(registry);
+
+        assertEquals("server.example.family.dragons", resolver.resolve(
+                "hydragon:dragons", "hydragon:dragon", 1L).policy().nameKey());
+        assertEquals("server.example.family.dragons", resolver.resolve(
+                "hydragon:dragons", "hydragon:mini", 1L).policy().nameKey());
+        assertNull(new BondedCompanionPolicyResolver(registryWith(roster("Plain",
+                minimalRosterJson("hydragon:dragons")))).resolve("hydragon:dragons", 1L).policy().nameKey());
+    }
+
+    @Test
     void validationRejectsNegativeValuesDuplicateIdsAndDuplicateRoles() throws Exception {
         TwBondedCompanionRosterConfig negative = roster(
                 "Negative",
@@ -313,6 +344,29 @@ class TwBondedCompanionRosterConfigTest {
                         Map.of("hydragon:horn", Map.of())
                 )
         );
+    }
+
+    @Test
+    void typedRosterAndRoleIdsResolveToTheConfiguredIdsIgnoringCase() throws Exception {
+        BondedCompanionRosterRegistry.Snapshot snapshot = registryWith(roster(
+                "Roster", minimalRosterJson("hydragon:Dragons")
+        )).snapshot();
+
+        assertEquals(Optional.of("hydragon:Dragons"), snapshot.canonicalRosterId("HYDRAGON:dragons"));
+        assertEquals(Optional.of("Tamed_Dragon_Fire"),
+                snapshot.canonicalRoleId("hydragon:Dragons", "tamed_dragon_fire"));
+        assertEquals(Optional.empty(), snapshot.canonicalRosterId("hydragon:wyverns"));
+        assertEquals(Optional.empty(), snapshot.canonicalRoleId("hydragon:Dragons", "Tamed_Dragon_Ice"));
+    }
+
+    @Test
+    void aTypedRosterIdThatTwoConfiguredIdsMatchIgnoringCaseResolvesToNeither() throws Exception {
+        BondedCompanionRosterRegistry registry = new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(
+                roster("Upper", minimalRosterJson("hydragon:Dragons")),
+                roster("Lower", minimalRosterJson("hydragon:dragons"))), 1L).applied());
+
+        assertEquals(Optional.empty(), registry.snapshot().canonicalRosterId("hydragon:dragons"));
     }
 
     @Test

@@ -23,10 +23,8 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
-import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 
 /**
  * Evaluates whether a spawner item is currently allowed to capture a target NPC.
@@ -264,124 +262,6 @@ public final class SpawnerCapturePolicyService {
                 targetRef, effectType);
         return TameworkEntityEffectService.hasActiveEffect(
                 controller, TRANQUILIZED_EFFECT_ID);
-    }
-
-    /** Reads bonded admission evidence without emitting generic-path feedback. */
-    BondedAdmissionEvidence assessBonded(
-            Player player,
-            Ref<EntityStore> targetRef,
-            ItemFeatureConfig config,
-            ItemStack itemStack,
-            List<BondedCompanionRosterRegistry.RosterDefinition> families,
-            long rosterRevision
-    ) {
-        if (rosterRevision < 0L) {
-            throw new IllegalArgumentException("negative rosterRevision");
-        }
-        if (player == null || targetRef == null || !targetRef.isValid()
-                || config == null || itemStack == null || families == null
-                || families.isEmpty()) {
-            return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
-                    rosterRevision);
-        }
-        World world = player.getWorld();
-        if (world == null || world.getEntityStore() == null) {
-            return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
-                    rosterRevision);
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        NPCEntity npc = store.getComponent(
-                targetRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
-                    rosterRevision);
-        }
-        String sourceRoleId = rolePolicyService.resolveRoleIdFromNpc(npc);
-        BondedCompanionCaptureRoleResolver.Resolution resolvedRole =
-                BondedCompanionCaptureRoleResolver.resolve(
-                        config, families, sourceRoleId);
-        boolean roleAllowed = rolePolicyService.isRoleAllowed(
-                sourceRoleId, config) && resolvedRole != null;
-        UUID owner = npcStateService.resolveOwnerFromComponent(
-                targetRef, world);
-        boolean ownerAllowed = ownershipPolicyService.isCaptureAllowed(
-                player.getUuid(), owner, config);
-        BondedCompanionCaptureAuthor.Status denial = bondedPolicyDenial(
-                player, targetRef, config, itemStack, world, store, owner);
-        return new BondedAdmissionEvidence(
-                denial, ownerAllowed, roleAllowed,
-                resolvedRole == null ? null : resolvedRole.roleId(),
-                resolvedRole == null ? null : resolvedRole.family().familyId(),
-                rosterRevision);
-    }
-
-    private BondedCompanionCaptureAuthor.Status bondedPolicyDenial(
-            Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config,
-            ItemStack itemStack, World world, Store<EntityStore> store,
-            UUID ownerUuid
-    ) {
-        if (isCooldownActive(itemStack,
-                TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
-                config.getCaptureCooldownMs())) return BondedCompanionCaptureAuthor.Status.COOLDOWN_ACTIVE;
-        if (config.isCaptureRequireTamed()
-                && !npcStateService.resolveTamedState(targetRef, world)) {
-            return BondedCompanionCaptureAuthor.Status.TARGET_NOT_TAMED;
-        }
-        if (config.isCaptureTamesTarget()
-                && (npcStateService.resolveTamedState(targetRef, world)
-                || ownerUuid != null)) {
-            return BondedCompanionCaptureAuthor.Status.TARGET_ALREADY_TAMED;
-        }
-        if (!meetsHealthRequirement(targetRef, config, store)
-                || !isWithinCaptureDistance(player, targetRef, config, store)) {
-            return !meetsHealthRequirement(targetRef, config, store)
-                    ? BondedCompanionCaptureAuthor.Status.HEALTH_TOO_HIGH
-                    : BondedCompanionCaptureAuthor.Status.OUT_OF_RANGE;
-        }
-        return null;
-    }
-
-    private BondedCompanionCaptureAuthor.Status admissionDenied() {
-        return BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED;
-    }
-
-    record BondedAdmissionEvidence(
-            BondedCompanionCaptureAuthor.Status denial,
-            boolean ownerAllowed,
-            boolean roleAllowed,
-            String roleId,
-            String familyId,
-            long rosterRevision
-    ) {
-        BondedAdmissionEvidence {
-            if (rosterRevision < 0L) {
-                throw new IllegalArgumentException("negative rosterRevision");
-            }
-            roleId = normalized(roleId);
-            familyId = normalized(familyId);
-            if (roleAllowed && (roleId == null || familyId == null)) {
-                throw new IllegalArgumentException(
-                        "allowed role requires resolved role and family");
-            }
-        }
-
-        static BondedAdmissionEvidence denied(
-                BondedCompanionCaptureAuthor.Status denial,
-                long rosterRevision
-        ) {
-            return new BondedAdmissionEvidence(
-                    denial, false, false, null, null, rosterRevision);
-        }
-
-        private static String normalized(String value) {
-            if (value == null || value.isBlank()) {
-                return null;
-            }
-            return value.trim();
-        }
     }
 
     static String missingRequiredEffectMessageKey(String requiredEffectId) {

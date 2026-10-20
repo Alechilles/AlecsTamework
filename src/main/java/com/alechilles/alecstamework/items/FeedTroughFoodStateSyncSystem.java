@@ -85,7 +85,8 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         if (location == null) {
             return;
         }
-        BlockType blockType = location.chunk.getBlockType(location.x, location.y, location.z);
+        BlockType blockType = HytaleBlockStateAccess.blockTypeAt(
+                location.chunk, location.x, location.y, location.z);
         if (!isFeedTroughFoodSyncTarget(
                 state,
                 location,
@@ -200,7 +201,7 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         int x = location.x;
         int y = location.y;
         int z = location.z;
-        BlockType currentType = chunk.getBlockType(x, y, z);
+        BlockType currentType = HytaleBlockStateAccess.blockTypeAt(chunk, x, y, z);
         if (currentType == null) {
             return;
         }
@@ -227,8 +228,9 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         if (targetIndex == Integer.MIN_VALUE) {
             return;
         }
-        int currentRotation = chunk.getRotationIndex(x, y, z);
-        chunk.setBlock(x, y, z, targetIndex, targetType, currentRotation, 0, 198);
+        int currentRotation = HytaleBlockStateAccess.rotationAt(chunk, x, y, z);
+        HytaleBlockStateAccess.setBlock(chunk, x, y, z, targetIndex, targetType,
+                currentRotation, 0, 198);
     }
 
     @Nullable

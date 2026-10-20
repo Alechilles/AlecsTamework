@@ -1,12 +1,14 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.commands.TameworkConfigPermission;
+import com.alechilles.alecstamework.companion.store.CompanionStorage;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
 import com.hypixel.hytale.common.plugin.PluginManifest;
 import com.hypixel.hytale.common.semver.Semver;
 import com.hypixel.hytale.component.Ref;
@@ -16,6 +18,9 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.modules.singleplayer.SingleplayerModule;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
+import com.hypixel.hytale.server.core.permissions.provider.HytalePermissionsProvider;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
@@ -28,10 +33,19 @@ import javax.annotation.Nullable;
 
 /**
  * Opens the Tamework settings announcement once per login session for eligible players.
+ * While the world still needs its old companion saves converted, server admins, operators and
+ * the local singleplayer owner get the conversion notice instead, on every login: it has no
+ * opt-out and no seen state.
  */
 public final class TameworkSettingsAnnouncementService {
+    private static final String MIGRATION_TITLE_KEY = "tamework.companions.persistence.migrationRequired.title";
+
     private final Tamework plugin;
     private final Set<UUID> attemptedThisSession = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> migrationNoticeShownThisSession = ConcurrentHashMap.newKeySet();
+    /** Set once during plugin setup, before any player event; null when no conversion is needed. */
+    @Nullable private volatile CompanionStorage.LegacyKind migrationNotice;
+    private volatile String migrationNoticeValue = "";
 
     public TameworkSettingsAnnouncementService(@Nonnull Tamework plugin) {
         this.plugin = plugin;
@@ -45,6 +59,87 @@ public final class TameworkSettingsAnnouncementService {
         clearSessionState(event != null && event.getPlayerRef() != null ? event.getPlayerRef().getUuid() : null);
     }
 
+    /**
+     * Makes admins, operators and the local singleplayer owner get the conversion notice for
+     * {@code kind} on every login from now on. {@code noticeValue} fills the notice's {@code {0}}:
+     * the Tamework version that converts 2.x data, or the report file of a failed 3.x/4.x import.
+     */
+    public void requireMigrationNotice(@Nonnull CompanionStorage.LegacyKind kind, @Nonnull String noticeValue) {
+        this.migrationNoticeValue = noticeValue;
+        this.migrationNotice = kind;
+    }
+
+    /**
+     * The conversion notice this player must see, or {@code null}. Only whether a conversion is
+     * pending and who the player is decide it; seen and opt-out state do not. The audience is the
+     * people who can convert the world: server admins, operators with Tamework settings access,
+     * and the local singleplayer owner. Regular players get nothing.
+     */
+    @Nullable
+    static CompanionStorage.LegacyKind migrationNoticeFor(@Nullable CompanionStorage.LegacyKind pending,
+                                                         boolean serverAdmin,
+                                                         boolean settingsAccess,
+                                                         boolean localSingleplayerOwner) {
+        return serverAdmin || settingsAccess || localSingleplayerOwner ? pending : null;
+    }
+
+    /**
+     * The conversion notice this player must see now, or {@code null}. Safe in the connect event:
+     * it needs the player's identity only, not a loaded entity.
+     */
+    @Nullable
+    public CompanionStorage.LegacyKind migrationNoticeFor(@Nullable PlayerRef playerRef) {
+        CompanionStorage.LegacyKind pending = migrationNotice;
+        if (pending == null || playerRef == null || playerRef.getUuid() == null) {
+            return null;
+        }
+        PermissionsModule permissions = PermissionsModule.get();
+        boolean serverAdmin = permissions != null && permissions.getGroupsForUser(playerRef.getUuid())
+                .contains(HytalePermissionsProvider.GROUP_ADMIN);
+        boolean localOwner = SingleplayerModule.get() != null && SingleplayerModule.isOwner(playerRef);
+        return migrationNoticeFor(pending, serverAdmin, TameworkConfigPermission.hasAccess(playerRef), localOwner);
+    }
+
+    /** The localization key, without the {@code server.} prefix, of the notice text for {@code kind}. */
+    @Nonnull
+    public static String migrationNoticeKey(@Nonnull CompanionStorage.LegacyKind kind) {
+        return "tamework.companions.persistence.migrationRequired."
+                + (kind == CompanionStorage.LegacyKind.LEGACY_2X ? "legacy2x" : "legacy3x4x");
+    }
+
+    /**
+     * Opens the conversion notice for its audience, once per login session. Runs where the
+     * announcement opens: in the PlayerReadyEvent, with the event's own player and store.
+     */
+    public void onPlayerReadyMigrationNotice(@Nullable PlayerReadyEvent event) {
+        if (event == null || event.getPlayer() == null || event.getPlayerRef() == null) {
+            return;
+        }
+        Player player = event.getPlayer();
+        UUID playerUuid = player.getUuid();
+        PlayerRef uiPlayerRef = player.getPlayerRef();
+        CompanionStorage.LegacyKind kind = migrationNoticeFor(uiPlayerRef);
+        if (kind == null || playerUuid == null || !migrationNoticeShownThisSession.add(playerUuid)) {
+            return;
+        }
+        Ref<EntityStore> playerRef = event.getPlayerRef();
+        Store<EntityStore> store = playerRef.getStore();
+        if (store == null || !playerRef.isValid() || player.getPageManager() == null
+                || uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            return;
+        }
+        TameworkSettingsAnnouncementPage page = TameworkSettingsAnnouncementPage.notice(
+                uiPlayerRef,
+                LocalizedText.resolve(uiPlayerRef, MIGRATION_TITLE_KEY),
+                LocalizedText.format(uiPlayerRef, migrationNoticeKey(kind), migrationNoticeValue));
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+        } catch (Throwable throwable) {
+            plugin.getLogger().at(Level.WARNING).withCause(throwable)
+                    .log("Failed to open the Tamework world conversion notice for player " + playerUuid + ".");
+        }
+    }
+
     public void onPlayerReady(@Nullable PlayerReadyEvent event) {
         if (event == null || event.getPlayer() == null || event.getPlayerRef() == null) {
             return;
@@ -54,6 +149,10 @@ public final class TameworkSettingsAnnouncementService {
         if (playerUuid == null || !attemptedThisSession.add(playerUuid)) {
             return;
         }
+        // The conversion notice takes this login's popup; other news waits for a later login.
+        if (migrationNoticeFor(player.getPlayerRef()) != null) {
+            return;
+        }
         Store<EntityStore> store = event.getPlayerRef().getStore();
         if (store == null) {
             return;
@@ -61,13 +160,14 @@ public final class TameworkSettingsAnnouncementService {
         openAnnouncement(playerUuid, event.getPlayerRef(), store, player, true, false);
     }
 
+    /** Opens the announcement for a command; returns null on success, else the translation key of the reason. */
     @Nullable
     public String openAnnouncementNow(@Nonnull Ref<EntityStore> playerRef,
                                       @Nonnull Store<EntityStore> store,
                                       @Nonnull Player player) {
         UUID playerUuid = player.getUuid();
         if (playerUuid == null) {
-            return LocalizedText.resolve(player, "tamework.ui.settingsAnnouncement.openUnavailable");
+            return "tamework.ui.settingsAnnouncement.openUnavailable";
         }
         return openAnnouncement(playerUuid, playerRef, store, player, false, true);
     }
@@ -80,10 +180,10 @@ public final class TameworkSettingsAnnouncementService {
                                     boolean respectEnabled,
                                     boolean ignoreOptOutState) {
         if (!playerRef.isValid()) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
         if (player.getPageManager() == null) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
 
         ResolvedAnnouncement announcement = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
@@ -128,10 +228,10 @@ public final class TameworkSettingsAnnouncementService {
 
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
         if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, uiPlayerRef)) {
-            return respectEnabled ? null : "You do not have permission to use /tw news.";
+            return respectEnabled ? null : "tamework.commands.news.you.do.not.have.permission.to.use";
         }
 
         ResolvedAnnouncement selectedAnnouncement = announcement;
@@ -169,7 +269,7 @@ public final class TameworkSettingsAnnouncementService {
                             "Failed to open Tamework settings announcement."
                     ).build()
             );
-            return respectEnabled ? null : "Unable to open Tamework news right now.";
+            return respectEnabled ? null : "tamework.commands.news.unable.to.open.tamework.news.right.now";
         }
     }
 
@@ -326,6 +426,7 @@ public final class TameworkSettingsAnnouncementService {
             return;
         }
         attemptedThisSession.remove(playerUuid);
+        migrationNoticeShownThisSession.remove(playerUuid);
     }
 
     @Nonnull

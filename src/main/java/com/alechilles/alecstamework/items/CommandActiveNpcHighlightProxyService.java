@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentType;
@@ -72,11 +71,9 @@ final class CommandActiveNpcHighlightProxyService {
         holder.ensureComponent(EntityTrackerSystems.Visible.getComponentType());
         Ref<EntityStore> proxyRef = spawnMountedProxy(
                 store, holder, MountedComponent.getComponentType(),
-                HytaleMountedComponentAccess.createEntityMount(
+                new MountedComponent(
                         parentNpcRef,
-                        attachmentOffset.x,
-                        attachmentOffset.y,
-                        attachmentOffset.z,
+                        new Vector3f(attachmentOffset),
                         MountController.Minecart
                 )
         );

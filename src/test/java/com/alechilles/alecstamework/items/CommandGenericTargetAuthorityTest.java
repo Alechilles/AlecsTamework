@@ -6,6 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.index.CompanionIndex;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.CompanionSummary;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -14,7 +24,6 @@ import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.ComponentType;
@@ -52,16 +61,17 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
-/** Behavioral contract for rejecting bonded projections at generic boundaries. */
+/**
+ * Behavioral contract for rejecting bonded companions at generic boundaries. A body is bonded when
+ * its companion stamp names a bonded index record; the retired projection marker plays no part.
+ */
 class CommandGenericTargetAuthorityTest {
     @Test
-    void adminSpawnedCompanionCanAppearAndReceiveGenericCommands() throws Exception {
+    void ordinaryStampedCompanionCanAppearAndReceiveGenericCommands() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveOrdinaryTarget(false);
-            scope.store.put(target.reference, scope.markerType,
-                    new TameworkProjectionIdentityComponent("profile", "operation",
-                            TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE,
-                            null, null, 0L));
+            scope.store.put(target.reference, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.ORDINARY_PROFILE, 0L));
 
             assertTrue(CommandGenericTargetAuthority.allowsNearbyPresentation(
                     target.reference, scope.store));
@@ -203,21 +213,17 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
-    void identifiesOnlyLiveBondedProjectionMarkers() throws Exception {
+    void onlyBodiesStampedWithABondedRecordAreRejected() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             Ref<EntityStore> bonded = scope.store.createReference();
-            Ref<EntityStore> ordinary = scope.store.createReference();
-            scope.store.put(bonded, scope.markerType,
-                    TameworkProjectionIdentityComponent.bondedCompanion(
-                            "profile", "lease"));
-            scope.store.put(ordinary, scope.markerType,
-                    new TameworkProjectionIdentityComponent(
-                            "profile", "operation",
-                            TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
-                            null, null, 0L));
+            Ref<EntityStore> rosterMember = scope.store.createReference();
+            scope.store.put(bonded, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.BONDED_PROFILE, 3L));
+            scope.store.put(rosterMember, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.ROSTER_PROFILE, 0L));
 
             assertFalse(allowsGenericTargetMutation(bonded, scope.store));
-            assertTrue(allowsGenericTargetMutation(ordinary, scope.store));
+            assertTrue(allowsGenericTargetMutation(rosterMember, scope.store));
         }
     }
 
@@ -280,7 +286,6 @@ class CommandGenericTargetAuthorityTest {
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
                             CullTerminalOwnerReleaseService.Outcome.RELEASED
                     ));
@@ -328,7 +333,7 @@ class CommandGenericTargetAuthorityTest {
             CullTerminalOwnerReleaseService.Outcome terminalOutcome) throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveOrdinaryTarget(true);
-            scope.store.removeComponent(target.reference, scope.markerType);
+            scope.store.removeComponent(target.reference, scope.stampType);
             DamageCause previousCommandCause = DamageCause.COMMAND;
             DamageCause.COMMAND = new DamageCause("test-command");
             TameworkNpcCullService service = new TameworkNpcCullService(
@@ -336,7 +341,6 @@ class CommandGenericTargetAuthorityTest {
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
                             terminalOutcome
                     ));
@@ -362,14 +366,13 @@ class CommandGenericTargetAuthorityTest {
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveOrdinaryTarget(true);
-            scope.store.removeComponent(target.reference, scope.markerType);
+            scope.store.removeComponent(target.reference, scope.stampType);
             AtomicBoolean releaseAttempted = new AtomicBoolean();
             TameworkNpcCullService service = new TameworkNpcCullService(
                     new TameworkCullEligibility(new CommandLinkPolicyService()),
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
                             new CommandLinkPolicyService(), null, null),
-                    null,
                     (ownerUuid, npcUuid) -> {
                         releaseAttempted.set(true);
                         return CompletableFuture.completedFuture(
@@ -388,38 +391,78 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
-    void releaseRemovesOwnedNpcWithoutWaitingForNpcTicks() throws Exception {
+    void panelReleaseOfADeadCompanionByItsPresentationRowReleasesIt() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
-            LiveTarget target = scope.liveOrdinaryTarget(true);
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
+            LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
+            CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0,
+                    new CompanionTransitions.BodyFacts(UUID.randomUUID(), target.owner, "Alec", "Tamed_Chicken",
+                            "Chicken", "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY));
+            index.insert(live);
+            index.update(live.profileId(), index.get(live.profileId()).revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            CompanionQueries companions = new CompanionQueries(index, loaded);
             CommandOwnerReleaseService release = new CommandOwnerReleaseService(
-                    new CommandLinkPolicyService(),
                     new CommandFeedbackService(null),
-                    new CommandNpcNameResolver());
+                    new ReleaseFlow(index, loaded, ignored -> { }),
+                    companions,
+                    new CommandPersistenceView(companions),
+                    new CommandToolInventoryService(null, null, null, null),
+                    new CommandLinkMutationService(new CommandLinkedNpcRecordStore(),
+                            new CommandLinkPolicyService(), null, null),
+                    null);
 
+            // A bodiless companion's panel row carries its derived presentation UUID.
             release.release(target.player, "generic-tool", genericConfig(),
-                    target.uuid);
+                    CommandRosterPanelRecordSource.presentationUuid(new ProfileId(live.profileId())));
 
-            // Release must remove the entity even when no NPC tick advances its timer.
-            assertEquals(List.of(target.reference), scope.removedEntities);
+            assertEquals(LocationKind.RELEASED, index.get(live.profileId()).location().kind());
         }
     }
 
+    /** Release and Forget each refuse the other's records, so a stale confirmation never does the other action. */
     @Test
-    void forgedGenericReleaseLeavesBondedTargetOwnershipUntouched()
-            throws Exception {
+    void panelReleaseAndForgetEachRefuseTheOthersRecords() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
-            LiveTarget target = scope.liveBondedTarget();
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            CompanionIndex index = new CompanionIndex(System::currentTimeMillis, (b, a) -> { });
+            LoadedBodies<Ref<EntityStore>> loaded = new LoadedBodies<>();
+            CompanionTransitions.BodyFacts body = new CompanionTransitions.BodyFacts(UUID.randomUUID(), target.owner,
+                    "Alec", "Tamed_Chicken", "Chicken", "default", 0, 0, 0, List.of(), CompanionSummary.EMPTY);
+            CompanionRecord item = CompanionTransitions.newItem(UUID.randomUUID(), body, target.owner, "Alec");
+            index.insert(item);
+            CompanionRecord live = CompanionTransitions.newLive(UUID.randomUUID(), 0, body);
+            index.insert(live);
+            index.update(live.profileId(), index.get(live.profileId()).revision(),
+                    CompanionTransitions.died(live, CompanionSummary.EMPTY, 1_000L, 61_000L, "PLAYER", null));
+            CompanionQueries companions = new CompanionQueries(index, loaded);
             CommandOwnerReleaseService release = new CommandOwnerReleaseService(
-                    new CommandLinkPolicyService(),
                     new CommandFeedbackService(null),
-                    new CommandNpcNameResolver());
+                    new ReleaseFlow(index, loaded, ignored -> { }),
+                    companions,
+                    new CommandPersistenceView(companions),
+                    new CommandToolInventoryService(null, null, null, null),
+                    new CommandLinkMutationService(new CommandLinkedNpcRecordStore(),
+                            new CommandLinkPolicyService(), null, null),
+                    null);
+            release.useCaptureItemFlows(new com.alechilles.alecstamework.companion.item.CaptureItemFlows(
+                    index, ignored -> { }, new com.alechilles.alecstamework.companion.flow.RestoreFlow<Ref<EntityStore>>(
+                    index, loaded, id -> CompletableFuture.completedFuture(null),
+                    owner -> CompletableFuture.completedFuture(null),
+                    (committed, snapshot, destination, reason) -> CompletableFuture.completedFuture(false),
+                    (id, oldBody) -> { }, System::currentTimeMillis, (before, after) -> null)));
+            UUID itemRow = CommandRosterPanelRecordSource.presentationUuid(new ProfileId(item.profileId()));
+            UUID deadRow = CommandRosterPanelRecordSource.presentationUuid(new ProfileId(live.profileId()));
 
-            release.release(target.player, "generic-tool", genericConfig(),
-                    target.uuid);
+            release.release(target.player, "generic-tool", genericConfig(), itemRow, false);
+            release.release(target.player, "generic-tool", genericConfig(), deadRow, true);
+            assertEquals(LocationKind.ITEM, index.get(item.profileId()).location().kind());
+            assertEquals(LocationKind.DEAD, index.get(live.profileId()).location().kind());
 
-            assertEquals(target.owner, scope.store.getComponent(
-                    target.reference, scope.ownerType).getOwnerId());
-            assertTrue(scope.removedEntities.isEmpty());
+            release.release(target.player, "generic-tool", genericConfig(), itemRow, true);
+            assertEquals(LocationKind.RELEASED, index.get(item.profileId()).location().kind());
+            assertEquals(CompanionTransitions.CAUSE_FORGOTTEN, index.get(item.profileId()).location().cause());
         }
     }
 
@@ -672,57 +715,86 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
-    void genericNearbyPresentationRejectsBondedLiveMarker()
+    void genericNearbyPresentationRejectsBondedBody()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             Ref<EntityStore> bonded = scope.store.createReference();
-            scope.store.put(bonded, scope.markerType,
-                    TameworkProjectionIdentityComponent.bondedCompanion(
-                            "nearby-profile", "nearby-lease"));
+            scope.store.put(bonded, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.BONDED_PROFILE, 1L));
 
             assertFalse(isAllowedInGenericNearbyMode(bonded, scope.store));
         }
     }
 
     @Test
-    void genericTargetMutationFailsClosedWhenMarkerTypeIsUnavailable()
+    void genericTargetMutationFailsClosedWhenStampTypeIsUnavailable()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             Ref<EntityStore> ordinary = scope.store.createReference();
-            Field instance = staticField(Tamework.class, "instance");
-            Object configuredTamework = instance.get(null);
+            Field type = staticField(TameworkCompanionComponent.class, "type");
+            Object installed = type.get(null);
             try {
-                instance.set(null, null);
+                type.set(null, null);
                 assertFalse(allowsGenericTargetMutation(ordinary, scope.store));
             } finally {
-                instance.set(null, configuredTamework);
+                type.set(null, installed);
             }
         }
     }
 
     @Test
-    void corruptProjectionMarkerKindsFailClosedButKnownGenericAndUnmarkedPass()
+    void unstampedAndOrdinaryBodiesPassAndAFailedIndexLookupFailsClosed()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
-            Ref<EntityStore> unmarked = scope.store.createReference();
-            Ref<EntityStore> knownGeneric = scope.store.createReference();
-            Ref<EntityStore> blankKind = scope.store.createReference();
-            Ref<EntityStore> unknownKind = scope.store.createReference();
-            scope.store.put(knownGeneric, scope.markerType,
-                    new TameworkProjectionIdentityComponent("p", "o",
-                            TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
-                            null, null, 0L));
-            scope.store.put(blankKind, scope.markerType,
-                    new TameworkProjectionIdentityComponent("p", "o", "",
-                            null, null, 0L));
-            scope.store.put(unknownKind, scope.markerType,
-                    new TameworkProjectionIdentityComponent("p", "o",
-                            "UNKNOWN_FUTURE_KIND", null, null, 0L));
+            Ref<EntityStore> unstamped = scope.store.createReference();
+            Ref<EntityStore> noRecord = scope.store.createReference();
+            Ref<EntityStore> blankStamp = scope.store.createReference();
+            Ref<EntityStore> unreadable = scope.store.createReference();
+            scope.store.put(noRecord, scope.stampType,
+                    new TameworkCompanionComponent(UUID.randomUUID(), 0L));
+            scope.store.put(blankStamp, scope.stampType,
+                    new TameworkCompanionComponent());
+            scope.store.put(unreadable, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.FAILING_PROFILE, 0L));
 
-            assertTrue(allowsGenericTargetMutation(unmarked, scope.store));
-            assertTrue(allowsGenericTargetMutation(knownGeneric, scope.store));
-            assertFalse(allowsGenericTargetMutation(blankKind, scope.store));
-            assertFalse(allowsGenericTargetMutation(unknownKind, scope.store));
+            assertTrue(allowsGenericTargetMutation(unstamped, scope.store));
+            assertTrue(allowsGenericTargetMutation(noRecord, scope.store));
+            assertTrue(allowsGenericTargetMutation(blankStamp, scope.store));
+            assertFalse(allowsGenericTargetMutation(unreadable, scope.store));
+        }
+    }
+
+    @Test
+    void bodyWhoseRecordWasUnreadableAtStartupIsRejected() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            Ref<EntityStore> body = scope.store.createReference();
+            scope.store.put(body, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.UNREADABLE_PROFILE, 0L));
+
+            // The lost record may be a bonded one, so generic items must not act on its body.
+            assertFalse(allowsGenericTargetMutation(body, scope.store));
+            assertFalse(CommandGenericTargetAuthority.isRosterMember(body, scope.store));
+        }
+    }
+
+    @Test
+    void rosterMembershipIsReadFromTheStampedRecord() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            Ref<EntityStore> rosterMember = scope.store.createReference();
+            Ref<EntityStore> bonded = scope.store.createReference();
+            Ref<EntityStore> ordinary = scope.store.createReference();
+            Ref<EntityStore> unstamped = scope.store.createReference();
+            scope.store.put(rosterMember, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.ROSTER_PROFILE, 0L));
+            scope.store.put(bonded, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.BONDED_PROFILE, 0L));
+            scope.store.put(ordinary, scope.stampType,
+                    new TameworkCompanionComponent(ProjectionScope.ORDINARY_PROFILE, 0L));
+
+            assertTrue(CommandGenericTargetAuthority.isRosterMember(rosterMember, scope.store));
+            assertFalse(CommandGenericTargetAuthority.isRosterMember(bonded, scope.store));
+            assertFalse(CommandGenericTargetAuthority.isRosterMember(ordinary, scope.store));
+            assertFalse(CommandGenericTargetAuthority.isRosterMember(unstamped, scope.store));
         }
     }
 
@@ -1028,7 +1100,7 @@ class CommandGenericTargetAuthorityTest {
                     "com.alechilles.alecstamework.items.CommandGenericTargetAuthority"
             );
         } catch (ClassNotFoundException missing) {
-            fail("Generic command boundaries need a bonded marker authority",
+            fail("Generic command boundaries need a bonded companion authority",
                     missing);
             return false;
         }
@@ -1129,9 +1201,20 @@ class CommandGenericTargetAuthorityTest {
         private final Object oldEntityModule;
         private final ComponentType<EntityStore, NPCEntity> npcType =
                 new ComponentType<>();
-        private final ComponentType<EntityStore,
-                TameworkProjectionIdentityComponent> markerType =
-                new ComponentType<>();
+        private static final UUID BONDED_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000b0");
+        private static final UUID ROSTER_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000c0");
+        private static final UUID ORDINARY_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000d0");
+        private static final UUID FAILING_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000e0");
+        private final ComponentType<EntityStore, TameworkCompanionComponent>
+                stampType = new ComponentType<>();
+        private Object oldStampType;
+        private static final UUID UNREADABLE_PROFILE =
+                UUID.fromString("73000000-0000-0000-0000-0000000000f0");
+        private CommandGenericTargetAuthority.Index oldIndex;
         private final ComponentType<EntityStore, TameworkOwnerComponent>
                 ownerType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkTamedComponent>
@@ -1181,8 +1264,6 @@ class CommandGenericTargetAuthorityTest {
             Tamework tamework = (Tamework) unsafe().allocateInstance(
                     Tamework.class);
             setField(tamework, Tamework.class,
-                    "projectionIdentityComponentType", scope.markerType);
-            setField(tamework, Tamework.class,
                     "ownerComponentType", scope.ownerType);
             setField(tamework, Tamework.class,
                     "tamedComponentType", scope.tamedType);
@@ -1191,12 +1272,33 @@ class CommandGenericTargetAuthorityTest {
             setField(tamework, Tamework.class,
                     "hookComponentType", scope.hookType);
             instance.set(null, tamework);
+            Field stampTypeField = staticField(TameworkCompanionComponent.class, "type");
+            scope.oldStampType = stampTypeField.get(null);
+            stampTypeField.set(null, scope.stampType);
+            // Stands in for the companion index with real records: a bonded one, a roster
+            // member, a plain one, and one profile whose file was unreadable at startup.
+            Map<UUID, CompanionRecord> records = new HashMap<>();
+            var live = com.alechilles.alecstamework.companion.index.CompanionLocation.live("default", 0, 0, 0);
+            records.put(BONDED_PROFILE, CompanionRecord.builder(BONDED_PROFILE, "Dragon", live)
+                    .rosterId("test:roster").rosterSlot(0).bonded(true).build());
+            records.put(ROSTER_PROFILE, CompanionRecord.builder(ROSTER_PROFILE, "Sheep", live)
+                    .rosterId("test:family").rosterSlot(0).build());
+            records.put(ORDINARY_PROFILE, CompanionRecord.builder(ORDINARY_PROFILE, "Sheep", live).build());
+            scope.oldIndex = CommandGenericTargetAuthority.indexForTest(
+                    new CommandGenericTargetAuthority.Index(profileId -> {
+                        if (FAILING_PROFILE.equals(profileId)) {
+                            throw new IllegalStateException("index unavailable");
+                        }
+                        return records.get(profileId);
+                    }, UNREADABLE_PROFILE::equals));
             return scope;
         }
 
         @Override
         public void close() throws Exception {
             store.close();
+            CommandGenericTargetAuthority.indexForTest(oldIndex);
+            staticField(TameworkCompanionComponent.class, "type").set(null, oldStampType);
             staticField(Tamework.class, "instance").set(null, oldTamework);
             staticField(EntityModule.class, "instance").set(null,
                     oldEntityModule);
@@ -1223,13 +1325,8 @@ class CommandGenericTargetAuthorityTest {
             NPCEntity npc = new NPCEntity();
             npc.setLegacyUUID(uuid);
             store.put(reference, npcType, npc);
-            store.put(reference, markerType, bonded
-                    ? TameworkProjectionIdentityComponent.bondedCompanion(
-                            "profile", "lease")
-                    : new TameworkProjectionIdentityComponent(
-                            "profile", "operation",
-                            TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
-                            null, null, 0L));
+            store.put(reference, stampType, new TameworkCompanionComponent(
+                    bonded ? BONDED_PROFILE : ROSTER_PROFILE, 0L));
             store.put(reference, transformType, new TransformComponent());
             TameworkOwnerComponent ownership = new TameworkOwnerComponent();
             ownership.setOwnerId(owner);

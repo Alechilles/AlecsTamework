@@ -1,9 +1,6 @@
 package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.beacon.api.TelemetryEventContext;
-import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
-import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
-import com.alechilles.beacon.api.TelemetryDiagnosticDisposition;
 import com.alechilles.beacon.embedded.EmbeddedTelemetryDiagnostics;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
@@ -16,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -153,29 +149,6 @@ class CrashTelemetryServiceTest {
         assertEquals("debug_lifecycle", runtime.lastLifecycleEvent);
         assertEquals(123, runtime.lastLifecycleDurationMs);
         assertTrue(runtime.lastLifecycleSuccess);
-    }
-
-    @Test
-    void diagnosticBundleUsesHostedEventSettingAndRuntime() {
-        FakeEmbeddedRuntime runtime = new FakeEmbeddedRuntime();
-        CrashTelemetryService service = createService(true, true, runtime);
-        TelemetryDiagnosticBundle bundle = new TelemetryDiagnosticBundle(
-                "diagnostic-id", "2026-08-30T12:00:00Z", "automatic",
-                "persistence_failure", "Persistence failure", "Safe summary",
-                "error", TelemetryDiagnosticDisposition.createOrJoinIssue("fingerprint"),
-                Map.of(), List.of()
-        );
-
-        TelemetryDiagnosticBundleResult result = service.submitDiagnosticBundle(bundle);
-
-        assertEquals(TelemetryDiagnosticBundleResult.Status.QUEUED, result.status());
-        assertSame(bundle, runtime.lastDiagnosticBundle);
-        service.applyEnabledSetting(false);
-        assertEquals(
-                TelemetryDiagnosticBundleResult.Status.DISABLED,
-                service.submitDiagnosticBundle(bundle).status()
-        );
-        assertSame(bundle, runtime.lastDiagnosticBundle);
     }
 
     @Test
@@ -399,7 +372,6 @@ class CrashTelemetryServiceTest {
         private boolean lastLifecycleSuccess;
         private String lastUsageEvent;
         private TelemetryEventContext lastUsageContext;
-        private TelemetryDiagnosticBundle lastDiagnosticBundle;
 
         @Override
         public boolean isEnabled() {
@@ -504,17 +476,6 @@ class CrashTelemetryServiceTest {
                                            @Nullable TelemetryEventContext context) {
             lastUsageEvent = eventName;
             lastUsageContext = context;
-        }
-
-        @Nonnull
-        @Override
-        public TelemetryDiagnosticBundleResult submitDiagnosticBundle(
-                @Nonnull TelemetryDiagnosticBundle bundle
-        ) {
-            lastDiagnosticBundle = bundle;
-            return new TelemetryDiagnosticBundleResult(
-                    TelemetryDiagnosticBundleResult.Status.QUEUED, null
-            );
         }
 
         @Override

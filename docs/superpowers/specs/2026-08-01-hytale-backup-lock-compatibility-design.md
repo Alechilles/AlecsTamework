@@ -1,5 +1,7 @@
 # Hytale Backup Lock Compatibility Design
 
+> Historical: this design names classes from the 3.x and 4.x SQLite persistence runtime, which Tamework 5.0.0 removed. See [ADR 0011](../../decisions/0011-companion-index-persistence.md).
+
 ## Problem
 
 Tamework stores its persistence engine lease inside the Hytale universe at

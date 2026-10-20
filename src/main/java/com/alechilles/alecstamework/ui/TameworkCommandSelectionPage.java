@@ -13,6 +13,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -56,6 +57,8 @@ public final class TameworkCommandSelectionPage
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandSelectionOptionSource.Option[] options;
+    /** LMB accepts every command, including hotswap-only entries hidden from the radial. */
+    private final CommandSelectionOptionSource.Option[] primaryOptions;
     final TwCommandItemConfig config;
     final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final CommandSelectionRosterEventBoundary rosterEventBoundary;
@@ -133,6 +136,8 @@ public final class TameworkCommandSelectionPage
     private final LinkedNpcPanelFeatureAction rosterAbandonCallback;
     private final LinkedNpcPanelFeatureAction flightToggleCallback;
     private LinkedNpcPanelFeatureAction shoulderRideCallback = (id, ref, store) -> { };
+    @Nullable
+    private Consumer<UUID> forgetCallback;
     private final Consumer<UUID> locateCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -152,6 +157,8 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
     volatile boolean dismissed;
     private volatile boolean navigationPending;
+    @Nullable
+    private volatile Runnable reopenPanel;
     volatile long pendingFilterTextApplyVersion;
     String pendingFilterTextInput;
     LinkedNpcPanelPageState pagination;
@@ -332,6 +339,8 @@ public final class TameworkCommandSelectionPage
                 resolveLanguage(),
                 MAX_COMMAND_BUTTONS
         );
+        this.primaryOptions = CommandSelectionOptionSource.build(
+                config, commandOptionPredicate, resolveLanguage(), Integer.MAX_VALUE);
         this.cardBindingConfig = LinkedNpcPanelCardBindingFactory.create(
                 recallActionEnabled,
                 config != null && config.usesOwnerCommandFamilyRoster()
@@ -438,6 +447,11 @@ public final class TameworkCommandSelectionPage
         return defaultDecorations;
     }
 
+    /** Sets how sub-pages opened from this panel, such as the HUD placement editor, return to it. */
+    public void configureReopen(@Nullable Runnable reopenPanel) {
+        this.reopenPanel = reopenPanel;
+    }
+
     /** Shares the source's world-thread-owned page window with its navigation controls. */
     public void configurePagination(@Nonnull LinkedNpcPanelPageState pagination) {
         this.pagination = java.util.Objects.requireNonNull(pagination);
@@ -486,10 +500,10 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(
                     "#TameworkCommandMenuCurrent.Text",
                     CommandSelectionOptionSource.currentLabel(
-                            options, selectedCommandId, resolveLanguage()
+                            primaryOptions, selectedCommandId, resolveLanguage()
                     )
             );
-            hotswapController.build(commandBuilder, options, selectedCommandId);
+            hotswapController.build(commandBuilder, primaryOptions, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.append("#TameworkLinkedPanelRoot",
                     "TameworkLinkedNpcPanelRemovalConfirm.ui");
@@ -581,7 +595,7 @@ public final class TameworkCommandSelectionPage
         }
         if (viewBinding != null && viewControls.blocksWhileEditing(data)) return;
         if (data.primaryCommandValue != null) {
-            if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(options, data.primaryCommandValue)) {
+            if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(primaryOptions, data.primaryCommandValue)) {
                 selectionCallback.accept(data.primaryCommandValue);
                 selectedCommandId = data.primaryCommandValue;
             }
@@ -622,6 +636,23 @@ public final class TameworkCommandSelectionPage
                                 LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.feedbackUnavailable")));
                         close();
                     }
+                } finally {
+                    navigationPending = false;
+                }
+            });
+            return;
+        }
+        if (CommandSelectionPageEventBinder.HUD_PLACEMENT_COMMAND_ID.equals(commandId)) {
+            if (!beginPageNavigation()) return;
+            navigateAfterUiDrain(() -> {
+                try {
+                    Ref<EntityStore> currentRef = playerRef.getReference();
+                    if (currentRef == null || !currentRef.isValid()) return;
+                    Store<EntityStore> currentStore = currentRef.getStore();
+                    Player currentPlayer = currentStore.getComponent(currentRef, Player.getComponentType());
+                    if (currentPlayer == null) return;
+                    currentPlayer.getPageManager().openCustomPage(currentRef, currentStore,
+                            new TameworkHudPlacementPage(playerRef, reopenPanel));
                 } finally {
                     navigationPending = false;
                 }
@@ -958,8 +989,10 @@ public final class TameworkCommandSelectionPage
         }
         if (commandId.startsWith(RELEASE_COMMAND_PREFIX)) {
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
-            openRemovalConfirmation(npcUuid,
-                    LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE);
+            // The release slot is Forget for a companion in a capture item (spec 8.14).
+            openRemovalConfirmation(npcUuid, genericForgetAvailable(npcUuid)
+                    ? LinkedNpcPanelRemovalConfirmOverlayState.Action.FORGET
+                    : LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE);
             return;
         }
         if (commandId.startsWith(CULL_COMMAND_PREFIX)) {
@@ -1019,12 +1052,15 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (commandId.startsWith(RECALL_COMMAND_PREFIX)) {
-            if (recallCallback == null) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RECALL_COMMAND_PREFIX);
+            // A captured companion is recalled by restoring it next to the player, the Recover path
+            // (spec 8.14); this raises its generation, so a surviving capture item turns empty.
+            Consumer<UUID> recall = capturedEntry(npcUuid) ? respawnCallback : recallCallback;
+            if (recall == null) {
                 return;
             }
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RECALL_COMMAND_PREFIX);
             if (npcUuid != null) {
-                recallCallback.accept(npcUuid);
+                recall.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -1095,6 +1131,11 @@ public final class TameworkCommandSelectionPage
     /** Installs the bonded shoulder action before the page is opened. */
     public void configureShoulderRideCallback(@Nonnull LinkedNpcPanelFeatureAction callback) {
         shoulderRideCallback = Objects.requireNonNull(callback, "callback");
+    }
+
+    /** The panel's Forget for a companion in a capture item (spec 8.14); without it Forget is not offered. */
+    public void configureForgetCallback(@Nonnull Consumer<UUID> callback) {
+        forgetCallback = Objects.requireNonNull(callback, "callback");
     }
 
     private boolean handleLinkedFlightToggle(
@@ -1199,6 +1240,12 @@ public final class TameworkCommandSelectionPage
                 && genericCullAvailable(npcUuid)) {
             cullCallback.accept(npcUuid);
             completed = true;
+        } else if (action == LinkedNpcPanelRemovalConfirmOverlayState.Action.FORGET
+                && forgetCallback != null
+                && isPendingUnlink(npcUuid)
+                && genericForgetAvailable(npcUuid)) {
+            forgetCallback.accept(npcUuid);
+            completed = true;
         }
         if (completed) {
             pendingRemovals.hide(npcUuid);
@@ -1231,9 +1278,11 @@ public final class TameworkCommandSelectionPage
         if (!isPendingUnlink(npcUuid)) {
             return;
         }
-        boolean available = action == LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE
-                ? releaseCallback != null && genericReleaseAvailable(npcUuid)
-                : cullCallback != null && genericCullAvailable(npcUuid);
+        boolean available = switch (action) {
+            case RELEASE -> releaseCallback != null && genericReleaseAvailable(npcUuid);
+            case FORGET -> forgetCallback != null && genericForgetAvailable(npcUuid);
+            case CULL -> cullCallback != null && genericCullAvailable(npcUuid);
+        };
         if (!available) {
             return;
         }
@@ -1257,6 +1306,16 @@ public final class TameworkCommandSelectionPage
     private boolean genericReleaseAvailable(@Nullable UUID npcUuid) {
         LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
         return entry != null && !entry.captured() && !entry.inCoop();
+    }
+
+    private boolean genericForgetAvailable(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && entry.captured() && (entry.linked() || entry.ownedActions());
+    }
+
+    private boolean capturedEntry(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
+        return entry != null && entry.captured();
     }
 
     private boolean genericCullAvailable(@Nullable UUID npcUuid) {

@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.items.locate;
 
+import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.transaction.*;
 import java.util.UUID;
@@ -10,28 +12,58 @@ import org.bson.BsonDocument;
 
 /** Capture identity parsing and a cheap gate before any inventory rescan. */
 public final class CapturedItemMetadata {
+    /** Prefix of the key part that stands in for a snapshot id on a 5.0 item. */
+    private static final String GENERATION_KEY_PREFIX = "generation:";
+
     private CapturedItemMetadata() { }
 
+    /**
+     * The key of a 5.0 item made for {@code profileId} at {@code generation}. A companion index
+     * record in an item looks its item up with its own profile id and generation, so both sides
+     * must build the key here.
+     */
+    public static CaptureKey indexKey(UUID profileId, long generation) {
+        return new CaptureKey(profileId.toString(), GENERATION_KEY_PREFIX + generation, profileId);
+    }
+
+    /**
+     * Reads either identity shape. An index item (5.0, or 4.x at generation 0) is keyed by its
+     * profile and generation, so a recapture of the same companion is a different key. A 2.x item
+     * carries only the captured body's NPC UUID and is keyed by that.
+     */
     @Nullable
     public static CaptureKey read(@Nullable ItemStack stack) {
-        if (!marked(stack)) return null;
+        if (stack == null || stack.isEmpty()) return null;
+        CaptureItemKeys.Ref ref = CaptureItemKeys.readIndexItem(stack);
+        if (ref != null) {
+            return indexKey(ref.profileId(), ref.generation());
+        }
+        if (!has(stack, TameworkMetadataKeys.TARGET_UUID)) return null;
         BsonDocument metadata = stack.getMetadata();
         try {
-            UUID alias = UUID.fromString(metadata.getString(TameworkMetadataKeys.TARGET_UUID).getValue());
-            boolean profile = metadata.containsKey(TameworkMetadataKeys.COMPANION_PROFILE_ID);
-            boolean snapshot = metadata.containsKey(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID);
-            if (profile != snapshot) return null;
-            return new CaptureKey(profile ? UUID.fromString(metadata.getString(
-                    TameworkMetadataKeys.COMPANION_PROFILE_ID).getValue()).toString() : null,
-                    snapshot ? metadata.getString(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID).getValue() : null, alias);
+            // A profile id that could not be read, or a snapshot id without one, is damaged.
+            if (metadata.containsKey(TameworkMetadataKeys.COMPANION_PROFILE_ID)
+                    || metadata.containsKey(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID)) return null;
+            return new CaptureKey(null, null,
+                    UUID.fromString(metadata.getString(TameworkMetadataKeys.TARGET_UUID).getValue()));
         } catch (RuntimeException invalid) {
             return null;
         }
     }
 
+    /** Cheap gate: a stack that carries either identity key. Reads two keys without copying the metadata. */
     private static boolean marked(@Nullable ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.getMetadata() != null
-                && stack.getMetadata().containsKey(TameworkMetadataKeys.TARGET_UUID);
+        return stack != null && !stack.isEmpty()
+                && (has(stack, TameworkMetadataKeys.TARGET_UUID) || has(stack, TameworkMetadataKeys.COMPANION_PROFILE_ID));
+    }
+
+    /** True when the key is present; a value of the wrong type still counts as present. */
+    private static boolean has(ItemStack stack, String key) {
+        try {
+            return stack.getFromMetadataOrNull(key, Codec.STRING) != null;
+        } catch (RuntimeException wrongType) {
+            return true;
+        }
     }
 
     /** Only affected stacks are inspected; ordinary item changes allocate nothing here. */

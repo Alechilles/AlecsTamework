@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -206,11 +205,21 @@ final class CommandPanelEntrySourceService {
                         player.getUuid(),
                         worldName,
                         config.getCommandFamilyId(),
-                        rosterSnapshot.members()
+                        rosterSnapshot.members(),
+                        heldItemCounter(player, store)
                 );
         return new CommandPanelSnapshot(
                 entries, CommandPanelFeatureRemapper.remap(features, rosterEntries)
         );
+    }
+
+    /** Counts the player's held items for the revive cost lines; read at once, on the world thread. */
+    @Nullable
+    private static java.util.function.ToIntFunction<String> heldItemCounter(
+            Player player, @Nullable Store<EntityStore> store) {
+        Ref<EntityStore> ref = player.getReference();
+        return store == null || ref == null || !ref.isValid() ? null
+                : itemId -> CommandReviveCostInventory.count(store, ref, itemId);
     }
 
     @Nullable
@@ -237,7 +246,7 @@ final class CommandPanelEntrySourceService {
         records.addAll(inputs.owned().ownedRecords());
         records.addAll(inputs.owned().capturedRecords());
         appendFreshOwnedRecords(player, store, records, inputs.linkedRecords());
-        Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+        Set<UUID> linkedIds = ownedLinkedIds(inputs);
         CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
         boolean includeCareValues = sort == CommandPanelPreferenceService.PanelSort.Happiness
                 || sort == CommandPanelPreferenceService.PanelSort.Hunger
@@ -297,6 +306,21 @@ final class CommandPanelEntrySourceService {
         }
     }
 
+    /** Item links name an NPC UUID; an owned row that moved to a new body keeps its link through the profile. */
+    private Set<UUID> ownedLinkedIds(RefreshInputs inputs) {
+        Set<UUID> ids = new HashSet<>();
+        for (LinkedNpcRecord record : inputs.linkedRecords()) ids.add(record.npcUuid);
+        if (inputs.owned() == null) return ids;
+        Set<String> linkedProfiles = new HashSet<>();
+        for (LinkedNpcRecord record : inputs.linkedRecords()) {
+            if (record.profileId != null && ids.contains(record.npcUuid)) linkedProfiles.add(record.profileId);
+        }
+        for (LinkedNpcRecord record : inputs.owned().ownedRecords()) {
+            if (record.profileId != null && linkedProfiles.contains(record.profileId)) ids.add(record.npcUuid);
+        }
+        return ids;
+    }
+
     private static Map<UUID, String> profileKeys(List<LinkedNpcRecord> records) {
         Map<UUID, String> keys = new java.util.HashMap<>();
         for (LinkedNpcRecord record : records) {
@@ -353,7 +377,7 @@ final class CommandPanelEntrySourceService {
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (ownedMode) CommandCompanionGroups.importLegacy(player, stack);
         if (ownedMode) {
-            Set<UUID> linkedIds = linkedPanelEntryService.linkedRecordIdsForTool(inputs.linkedRecords(), toolId);
+            Set<UUID> linkedIds = ownedLinkedIds(inputs);
             List<LinkedNpcRecord> ownedRecords = new ArrayList<>();
             if (inputs.owned() != null) {
                 ownedRecords.addAll(inputs.owned().ownedRecords());
@@ -493,7 +517,7 @@ final class CommandPanelEntrySourceService {
             var spatial = store.getResource(EntityModule.get().getEntitySpatialResourceType());
             if (spatial != null) {
                 // Own the list: card calculations can perform nested spatial queries on this thread.
-                HytaleSpatialAccess.collect(spatial.getSpatialStructure(), center, radius, result);
+                spatial.getSpatialStructure().collect(center, radius, result);
             }
         }
         return result;

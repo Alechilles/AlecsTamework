@@ -239,7 +239,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             return CommandHotswapHudViewModel.GroupStatus.hidden();
         }
         if (config.getRosterStorage() != TwCommandItemConfig.RosterStorage.ItemMetadata) {
-            return groupStatusResolver.resolveLegacy(stack);
+            return groupStatusResolver.resolveLegacy(
+                    stack, player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null);
         }
         Tamework plugin = Tamework.getInstance();
         CommandItemFeatureHandler handler = plugin != null

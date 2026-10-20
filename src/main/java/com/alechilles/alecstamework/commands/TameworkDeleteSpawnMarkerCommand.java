@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -177,11 +179,11 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
             return false;
         }
 
-        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(blockPosition.x, blockPosition.z));
+        WorldChunk chunk = HytaleChunkAccess.chunkIfInMemory(world, ChunkUtil.indexChunkFromBlock(blockPosition.x, blockPosition.z));
         if (chunk == null) {
             return false;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(blockPosition.x, blockPosition.y, blockPosition.z);
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, blockPosition.x, blockPosition.y, blockPosition.z);
         if (blockRef == null || !blockRef.isValid()) {
             return false;
         }

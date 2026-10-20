@@ -7,6 +7,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import javax.annotation.Nullable;
 
 public final class TameworkProjectileImpactEffectComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkProjectileImpactEffectComponent> CODEC = BuilderCodec.builder(
@@ -32,6 +33,12 @@ public final class TameworkProjectileImpactEffectComponent implements Component<
             )
             .add()
             .<String>append(
+                    new KeyedCodec<>("SpawnNpcRole", Codec.STRING),
+                    (component, value) -> component.spawnNpcRole = value,
+                    component -> component.spawnNpcRole
+            )
+            .add()
+            .<String>append(
                     new KeyedCodec<>("SourceEntityUuid", Codec.STRING),
                     (component, value) -> component.sourceEntityUuid = value,
                     component -> component.sourceEntityUuid
@@ -43,6 +50,8 @@ public final class TameworkProjectileImpactEffectComponent implements Component<
     private String effectId;
     private boolean excludeSource = true;
     private String sourceEntityUuid;
+    @Nullable
+    private String spawnNpcRole;
 
     public TameworkProjectileImpactEffectComponent() {
     }
@@ -51,10 +60,19 @@ public final class TameworkProjectileImpactEffectComponent implements Component<
                                                   String effectId,
                                                   boolean excludeSource,
                                                   String sourceEntityUuid) {
+        this(radius, effectId, excludeSource, sourceEntityUuid, null);
+    }
+
+    public TameworkProjectileImpactEffectComponent(double radius,
+                                                  String effectId,
+                                                  boolean excludeSource,
+                                                  String sourceEntityUuid,
+                                                  @Nullable String spawnNpcRole) {
         this.radius = radius;
         this.effectId = effectId;
         this.excludeSource = excludeSource;
         this.sourceEntityUuid = sourceEntityUuid;
+        this.spawnNpcRole = spawnNpcRole;
     }
 
     public static ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> getComponentType() {
@@ -79,12 +97,21 @@ public final class TameworkProjectileImpactEffectComponent implements Component<
     }
 
     public boolean isEnabled() {
+        return isEffectEnabled() || getSpawnNpcRole() != null;
+    }
+
+    boolean isEffectEnabled() {
         return getRadius() > 0.0 && effectId != null && !effectId.isBlank();
+    }
+
+    @Nullable
+    public String getSpawnNpcRole() {
+        return spawnNpcRole == null || spawnNpcRole.isBlank() ? null : spawnNpcRole;
     }
 
     @Override
     public TameworkProjectileImpactEffectComponent clone() {
-        return new TameworkProjectileImpactEffectComponent(radius, effectId, excludeSource, sourceEntityUuid);
+        return new TameworkProjectileImpactEffectComponent(radius, effectId, excludeSource, sourceEntityUuid, spawnNpcRole);
     }
 
     private static double sanitizePositive(double value, double fallback) {

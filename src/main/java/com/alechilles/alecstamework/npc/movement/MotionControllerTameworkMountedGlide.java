@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
-import com.alechilles.alecstamework.npc.compat.NpcRoleAccess;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -56,7 +55,7 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
         }
         lastCanSteer = isAlive(ref, componentAccessor)
                 && role != null
-                && NpcRoleAccess.couldBreatheCached(role, ref, componentAccessor)
+                && role.couldBreatheCached(ref, componentAccessor)
                 && !isForcePushed()
                 && effectHorizontalSpeedMultiplier != 0.0;
         lastCanSteerReason = lastCanSteer ? "" : mountedGlideCanSteerFailReason(ref, componentAccessor);
@@ -174,7 +173,7 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
         if (role == null) {
             return "NO_ROLE";
         }
-        if (!NpcRoleAccess.couldBreatheCached(role, ref, componentAccessor)) {
+        if (!role.couldBreatheCached(ref, componentAccessor)) {
             return "CANNOT_BREATHE";
         }
         if (isForcePushed()) {

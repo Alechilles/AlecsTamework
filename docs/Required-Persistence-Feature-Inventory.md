@@ -1,5 +1,7 @@
 # Required Persistence Feature Inventory
 
+> Historical: superseded by [ADR 0011](decisions/0011-companion-index-persistence.md) in Tamework 5.0.0. The replacement runtime, bonded leases, and `bonded-companions.sqlite` described here no longer exist.
+
 This document records two deliberately separate persistence boundaries:
 
 1. the generic replacement-persistence recovery completed at `f7c3f046`, with

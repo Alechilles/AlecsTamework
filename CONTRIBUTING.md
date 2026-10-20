@@ -47,10 +47,6 @@ If you’re unsure where to start, open an issue describing what you want to wor
 - Guard tests must pass for system/runtime changes:
   - `EcsWriteSafetyGuardTest`
   - `AsyncThreadSafetyGuardTest`
-  - `DamageExecutionWriteSafetyGuardTest`
-  - `StartupResilienceGuardTest`
-  - `NeedsDamageDispatchGuardTest`
-  - `SqliteStartupResilienceGuardTest`
 
 ## Compatibility goals
 - Prefer changes that don’t break existing mod integrations.

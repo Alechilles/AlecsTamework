@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -52,6 +53,11 @@ final class TameworkSettingsFormParser {
         if (!populationLimit.success()) {
             return NumericResult.failure(populationLimit.message());
         }
+        ValueResult<Integer> deployedLimit = parseNonNegativeInt(
+                payload.populationDeployedLimit, "tamework.ui.settings.field.populationDeployedLimit");
+        if (!deployedLimit.success()) {
+            return NumericResult.failure(deployedLimit.message());
+        }
         ValueResult<Integer> commandPanelCardsPerPage = parseIntInRange(
                 payload.commandPanelCardsPerPage,
                 "tamework.ui.settings.field.commandPanelCardsPerPage",
@@ -95,7 +101,7 @@ final class TameworkSettingsFormParser {
             return NumericResult.failure(dehydrationDamage.message());
         }
         return NumericResult.success(new NumericValues(
-                populationLimit.value(), commandPanelCardsPerPage.value(),
+                populationLimit.value(), deployedLimit.value(), commandPanelCardsPerPage.value(),
                 claimLimitChunk.value(), claimLimitTotal.value(),
                 offlineGraceHours.value(), offlineDecayMultiplier.value(),
                 starvationDamage.value(), dehydrationDamage.value()
@@ -128,7 +134,11 @@ final class TameworkSettingsFormParser {
                 NeedsResourceMode.fromConfigValue(resourceMode).toConfigValue(),
                 TwNeedsConfig.DamageModel.fromConfigValue(damageModel),
                 TwNeedsConfig.DualNeedRule.fromConfigValue(dualNeedRule),
-                AnimalAgingMode.fromConfigValue(agingMode)
+                AnimalAgingMode.fromConfigValue(agingMode),
+                CaptureItemOwnershipMode.fromConfigValue(fallback(
+                        payload.captureItemOwnership,
+                        currentValues.captureItemOwnership().toConfigValue()
+                ))
         ));
     }
 
@@ -148,10 +158,8 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.blockOwnerDamage, current.blockOwnerDamage()),
                 boolOrDefault(payload.blockAllDamageIfOwned, current.blockAllPlayerDamageIfOwned()),
                 boolOrDefault(payload.invulnerableIfOwned, current.invulnerableIfOwned()),
-                boolOrDefault(payload.captureClearsOwner, current.captureClearsOwner()),
-                boolOrDefault(payload.spawnSetsOwner, current.spawnSetsOwner()),
+                choices.captureItemOwnership(),
                 boolOrDefault(payload.captureRequiresOwner, current.captureRequiresOwner()),
-                boolOrDefault(payload.spawnRequiresOwner, current.spawnRequiresOwner()),
                 boolOrDefault(payload.interactionRequiresOwner, current.interactionRequiresOwner()),
                 boolOrDefault(payload.linkingRequiresOwner, current.linkingRequiresOwner()),
                 boolOrDefault(payload.needsEnabled, current.needsEnabled()),
@@ -179,7 +187,9 @@ final class TameworkSettingsFormParser {
                 choices.animalAgingMode(),
                 boolOrDefault(payload.animalOldAgeDeathEnabled, current.animalOldAgeDeathEnabled()),
                 boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled()),
-                numbers.commandPanelCardsPerPage()
+                numbers.commandPanelCardsPerPage(),
+                numbers.deployedLimit(),
+                boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour())
         );
     }
 
@@ -277,6 +287,7 @@ final class TameworkSettingsFormParser {
     }
 
     private record NumericValues(int populationLimit,
+                                 int deployedLimit,
                                  int commandPanelCardsPerPage,
                                  int claimLimitChunk,
                                  int claimLimitTotal,
@@ -301,7 +312,8 @@ final class TameworkSettingsFormParser {
                                 @Nonnull String needsResourceMode,
                                 @Nonnull TwNeedsConfig.DamageModel damageModel,
                                 @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule,
-                                @Nonnull AnimalAgingMode animalAgingMode) {
+                                @Nonnull AnimalAgingMode animalAgingMode,
+                                @Nonnull CaptureItemOwnershipMode captureItemOwnership) {
     }
 
     private record ChoiceResult(boolean success, @Nonnull String message, @Nullable ChoiceValues values) {

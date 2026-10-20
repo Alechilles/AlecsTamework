@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlayerInventoryAccessTest {
     @Test
-    void readsActiveSlotItemAndContainerFromUpdate5HotbarComponent() throws ReflectiveOperationException {
+    void readsActiveSlotItemAndContainerFromHotbarComponent() throws ReflectiveOperationException {
         SimpleItemContainer container = new SimpleItemContainer((short) 3);
         ItemStack expected = itemStack("test:item", 1);
         container.setItemStackForSlot((short) 2, expected);

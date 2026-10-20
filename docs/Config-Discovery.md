@@ -143,16 +143,18 @@ Behavior summary:
   command behavior.
 - `TwBondedCompanionRosterConfig` defines bonded roster-family limits, session
   duration, summon cooldown, revive cooldown, revive price, and action gates.
-  `ReviveCooldownSeconds: 0` disables the bonded revive cooldown.
+  `ReviveCooldownSeconds: 0` disables the bonded revive cooldown. Optional
+  `NameKey` is the translation key of the family's short display name, shown
+  with its counts in the bonded roster panel header.
 - Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config open` hide them so server owners use `/tw settings`.
 
 Persistence machinery does not have feature-specific asset families.
 Population groups are authored through `TwPopulationGroupConfig`; paid revival
 and timed summon balance are nested role policy in `TwCompanionConfig`.
-Command rosters and companion provisioning are public integration authorities,
-not asset families. The `feature_circuit` control plane is internal and
-registry-derived, not a configurable rehearsal runtime or a return to the old
-per-feature failure catalogs.
+Command rosters, timed summons, and provisioning are config-driven
+(`TwCommandItemConfig` roster storage and bonded roster configs). Public API
+3.0 removed the command-family roster, timed-summoning, companion-provisioning,
+and paid-command-revival APIs.
 
 ## Asset-set gates
 `TwGlobalConfig.AssetSets` gates optional bundled asset sets:

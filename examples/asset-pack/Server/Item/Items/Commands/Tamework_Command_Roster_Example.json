@@ -1,0 +1,66 @@
+{
+  "$Comment": "Example roster whistle. Primary dispatches the selected command; Secondary opens the roster selection menu.",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Command_Roster_Example.name",
+    "Description": "server.items.Tamework_Command_Roster_Example.description"
+  },
+  "Quality": "Tool",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommand"
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommand",
+          "CommandId": "OpenSelectionMenu"
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommandHotswap",
+          "Slot": "Q"
+        }
+      ]
+    },
+    "Ability2": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommandHotswap",
+          "Slot": "E"
+        }
+      ]
+    },
+    "Ability3": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommandHotswap",
+          "Slot": "R"
+        }
+      ]
+    }
+  },
+  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "IconProperties": {
+    "Scale": 0.76,
+    "Translation": [
+      -1,
+      5
+    ],
+    "Rotation": [
+      135,
+      135,
+      0
+    ]
+  },
+  "MaxStack": 1
+}

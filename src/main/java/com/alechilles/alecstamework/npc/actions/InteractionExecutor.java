@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -87,10 +88,16 @@ final class InteractionExecutor {
         }
         if (entry instanceof TameInteraction) {
             TameInteraction tame = (TameInteraction) entry;
+            // The role the tame leaves the NPC in: a SetRole effect applies last, else the tame role.
+            String tamedRoleId = effects.resolveSetRoleId(entry.getEffects(), role, ctx);
+            if (tamedRoleId == null) {
+                tamedRoleId = effects.resolveTameRoleId(tame, role, ctx);
+            }
             return effects.applyStartTaming(
                     npcRef,
                     store,
                     player,
+                    tamedRoleId,
                     (liveNpcRef, liveStore, livePlayer, acquired) -> {
                         Role liveRole = effects.resolveLiveRole(liveNpcRef, liveStore, role);
                         InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
@@ -679,7 +686,7 @@ final class InteractionExecutor {
             ui.showSuccessKey(
                     player,
                     "tamework.ui.notifications.tame.autoLink.linked",
-                    safeCompanion(result.animalDisplayName()),
+                    safeCompanion(player, result.animalDisplayName()),
                     safeCommandItem(result.commandItemDisplayName())
             );
             return;
@@ -688,15 +695,17 @@ final class InteractionExecutor {
             ui.showWarningKey(
                     player,
                     "tamework.ui.notifications.tame.autoLink.noTool",
-                    safeCompanion(result.animalDisplayName()),
+                    safeCompanion(player, result.animalDisplayName()),
                     safeCommandItem(result.commandItemDisplayName()),
                     safeCraftingStation(result.craftingStationDisplayName())
             );
         }
     }
 
-    private String safeCompanion(String value) {
-        return value == null || value.isBlank() ? "Companion" : value;
+    private String safeCompanion(Player player, String value) {
+        return value == null || value.isBlank()
+                ? LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName")
+                : value;
     }
 
     private String safeCommandItem(String value) {

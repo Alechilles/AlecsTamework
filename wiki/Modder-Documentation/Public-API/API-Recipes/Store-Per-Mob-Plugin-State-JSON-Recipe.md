@@ -18,14 +18,15 @@ String payload = "{\"schema\":1,\"affinity\":42,\"lastRewardAtMs\":1730500000000
 
 boolean ok = api.profileData().put(profileId, namespace, key, payload);
 if (!ok) {
-    // invalid args, reserved namespace, invalid JSON, or queue rejection
+    // invalid args, reserved namespace, invalid JSON, or no such companion
 }
 ```
 
-`put(...)` reports submission acceptance only. When this value coordinates
-item consumption, a cooldown, an entitlement, or another durable effect,
-require `PROFILE_DATA_TRANSACTIONS` and use `getVersioned(...)` plus
-`compareAndSet(...)` with one stable idempotency key.
+`put(...)` changes the value in memory and returns before the file is
+written. When this value coordinates item consumption, a cooldown, an
+entitlement, or another durable effect, require `PROFILE_DATA_TRANSACTIONS`
+and use `getVersioned(...)` plus `compareAndSet(...)`. Its stage completes
+after the file is written, possibly on a thread that is not a world thread.
 
 ## Read
 ```java
@@ -45,10 +46,10 @@ boolean deleted = api.profileData().delete(profileId, "example.plugin", "compani
 
 ## Rules
 - Use your own plugin id for `namespace`.
-- `Alechilles:Tamework` is reserved.
-- `namespace` and `key` must be nonblank.
+- `tamework` and `Alechilles:Tamework` are reserved.
+- `namespace` and `key` must be nonblank. A namespace may not contain `/`.
 - Payload must be JSON text.
-- Prefer the transactional methods whenever queue acceptance is not a strong
+- Prefer `compareAndSet(...)` whenever an in-memory change is not a strong
   enough success result.
 
 ## Related Pages

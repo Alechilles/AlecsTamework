@@ -24,9 +24,11 @@ routes interchangeable.
 ## Preserve Domain Boundaries
 
 - Generic commands act on live linked targets through generic selection and
-  operation authority.
-- Bonded panels act through durable profile, roster, revision, lease, and
-  capability gates. Never send a bonded event through a generic callback.
+  target authority (`CommandGenericTargetAuthority`), which keeps bonded
+  companions and their roster tools out of generic pages.
+- Bonded panels act through the bonded API, fenced by profile, roster, and the
+  record generation the panel rendered. Never send a bonded event through a
+  generic callback.
 - Revalidate authority at execution time. A rendered button or cached selected
   target is not authority.
 - Pass stable IDs across deferred or async boundaries, then resolve live state

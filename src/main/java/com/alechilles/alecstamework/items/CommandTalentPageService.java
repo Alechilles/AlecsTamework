@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -29,20 +28,24 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Opens and mutates the companion talents page for command-linked companions.
+ * Opens and mutates the companion talents page for owned live companions. A dead or lost
+ * companion has no body; its page is served by {@link CommandSavedTalentPageService} once one is
+ * configured ({@link #useSavedTalents}).
  */
 final class CommandTalentPageService {
-    private final CommandLinkMutationService linkMutationService;
+    private final CommandLinkPolicyService linkPolicyService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
-    private CommandSavedTalentPageService savedTalentPages;
+    /** Set once at startup when the companion index is ready; null before and without it. */
+    @Nullable
+    private volatile CommandSavedTalentPageService savedTalents;
 
-    CommandTalentPageService(@Nonnull CommandLinkMutationService linkMutationService,
+    CommandTalentPageService(@Nonnull CommandLinkPolicyService linkPolicyService,
                              @Nonnull CommandToolInventoryService toolInventoryService,
                              @Nonnull CommandFeedbackService feedbackService,
                              @Nonnull CommandNpcNameResolver npcNameResolver) {
-        this.linkMutationService = linkMutationService;
+        this.linkPolicyService = linkPolicyService;
         this.toolInventoryService = toolInventoryService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
@@ -55,28 +58,42 @@ final class CommandTalentPageService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        CommandSavedTalentPageService saved = savedTalents;
+        if (saved != null && !hasLoadedBody(player, npcUuid)) {
+            // No body to read: a dead or lost companion's talents are in its stored snapshot.
+            saved.openPage(player, toolId, npcUuid, backCallback);
+            return;
+        }
         openTalentPage(player,
                 () -> resolveLinkedCompanionTalentContext(player, toolId, npcUuid),
                 backCallback);
     }
 
-    void configureSavedTalents(com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades persistence) {
-        savedTalentPages = persistence == null ? null
-                : new CommandSavedTalentPageService(persistence, toolInventoryService, this);
+    /** Serves the saved talent pages of dead and lost companions; null turns them off. */
+    void useSavedTalents(@Nullable CommandSavedTalentPageService saved) {
+        savedTalents = saved;
     }
 
+    /** The managed command UI's talent flow for a dead or lost companion. Owner's world thread. */
     java.util.concurrent.CompletionStage<com.alechilles.alecstamework.api.commandui.CommandUiActionResult> openSavedTalents(
             CommandUiSessionImpl session, UUID rowId, Player player, String toolId, UUID npcId,
             java.util.function.BooleanSupplier authority) {
-        return savedTalentPages == null
-                ? java.util.concurrent.CompletableFuture.completedFuture(
+        CommandSavedTalentPageService saved = savedTalents;
+        return saved != null ? saved.openManaged(session, rowId, player, toolId, npcId, authority)
+                : java.util.concurrent.CompletableFuture.completedFuture(
                         com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
                                 LocalizedText.resolve(
                                         resolveLanguage(player),
                                         "tamework.ui.talents.saved.unavailable"
                                 )
-                        ))
-                : savedTalentPages.open(session, rowId, player, toolId, npcId, authority);
+                        ));
+    }
+
+    /** True when {@code npcUuid} is a loaded entity in the player's world. World thread. */
+    private static boolean hasLoadedBody(@Nonnull Player player, @Nonnull UUID npcUuid) {
+        World world = player.getWorld();
+        Ref<EntityStore> ref = world == null ? null : world.getEntityRef(npcUuid);
+        return ref != null && ref.isValid();
     }
 
     /** Opens the shared talent page for a caller-authorized live companion. */
@@ -557,23 +574,13 @@ final class CommandTalentPageService {
         if (toolStack == null || toolStack.isEmpty()) {
             return null;
         }
-        LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(
-                linkMutationService.readLinkedNpcRecords(toolStack),
-                npcUuid
-        );
-        if (record == null) {
+        // Talent access follows ownership, independently of this flute's selection.
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                || !linkPolicyService.passesOwnerAndTamed(true, true, npcRef, player.getUuid(), store)) {
             return null;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            return null;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || !links.containsToolId(toolId)) {
-            return null;
-        }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId != null && !ownerId.equals(player.getUuid())) {
             return null;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -590,8 +597,9 @@ final class CommandTalentPageService {
         return new TalentTarget(npcRef, store, displayName, roleId);
     }
 
+    /** The viewer's text for a {@link CompanionTalentService} purchase or reset message. */
     @Nonnull
-    private static String resolveMutationMessage(
+    static String resolveMutationMessage(
             @Nullable String language,
             @Nullable String message
     ) {

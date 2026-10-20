@@ -12,7 +12,7 @@ Goal: let a Java plugin replace the target HUD, the equipped command-item
 hotswap HUD, or both with a bespoke layout. Tamework continues to own the
 snapshot, lifecycle, fallback, and server state.
 
-The stable `1.0.0` HUD API is passive. It does not add custom HUD actions,
+The HUD API is passive. It does not add custom HUD actions,
 event handlers, or flows.
 
 ## 1. Check capabilities

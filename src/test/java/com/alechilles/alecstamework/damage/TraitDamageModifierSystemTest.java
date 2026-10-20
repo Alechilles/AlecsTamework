@@ -26,7 +26,7 @@ class TraitDamageModifierSystemTest {
     @Test
     void shouldBypassTraitModifiersForNeedsDamageSource() {
         Damage needsDamage = new Damage(
-                new Damage.EnvironmentSource(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE),
+                new TameworkEnvironmentSource(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE),
                 0,
                 2.0f
         );

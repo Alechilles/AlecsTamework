@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.companion.coop.runtime.CoopTransitionEffectSink;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -36,7 +36,7 @@ public final class CoopEffectService implements CoopTransitionEffectSink {
                     new Vector3d(x, y, z),
                     config.getCapturePolicy()
             );
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
             // Optional presentation must never roll back or block a committed coop transition.
         }
     }
@@ -56,7 +56,7 @@ public final class CoopEffectService implements CoopTransitionEffectSink {
         }
         String particleSystem = policy.getParticleSystem();
         if (particleSystem != null && !particleSystem.isBlank()) {
-            HytaleParticleAccess.spawn(particleSystem, position, store);
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
         }
         String soundEvent = policy.getSoundEvent();
         if (soundEvent == null || soundEvent.isBlank()) {

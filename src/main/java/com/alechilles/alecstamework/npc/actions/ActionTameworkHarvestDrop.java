@@ -180,7 +180,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                 .getStringParam(role, null, paramName);
     }
 
-    /** Bridges the Update 6 callback while retaining the Update 5 Role overload above. */
+    /** Bridges the engine callback to the Role overload above. */
     @Override
     public boolean execute(@Nonnull Ref<EntityStore> ref,
                            @Nonnull ExecutionSupport support,

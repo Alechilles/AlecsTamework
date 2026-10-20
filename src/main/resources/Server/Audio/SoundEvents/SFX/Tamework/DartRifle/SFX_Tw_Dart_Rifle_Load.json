@@ -1,0 +1,25 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_01.ogg",
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_02.ogg",
+        "Sounds/Weapons/Guns/Handgun/Handgun_Shot_Mechanism_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1.5,
+        "MaxPitch": 1.5,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": 6.0,
+      "StartDelay": 0.5
+    }
+  ],
+  "Volume": 0.0,
+  "Pitch": 3.0,
+  "PreventSoundInterruption": true,
+  "MaxInstance": 6,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Quiet"
+}

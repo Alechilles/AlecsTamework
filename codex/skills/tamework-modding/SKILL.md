@@ -41,8 +41,8 @@ that owns part of the change.
   `$tamework-runtime-safety`.
 - Avatar flight input, movement, model, rider, equipment, effects, or cleanup:
   `$tamework-avatar-flight`.
-- Saved state, SQLite, snapshots, operations, recovery, or migration:
-  `$tamework-persistence`.
+- Saved companion state, the companion index, snapshots, capture, store or
+  restore flows, or 3.x/4.x import: `$tamework-persistence`.
 
 Load more than one focused skill when a change crosses boundaries.
 

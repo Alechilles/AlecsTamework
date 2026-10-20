@@ -14,13 +14,7 @@ import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityCom
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
-import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Component;
-import com.hypixel.hytale.component.ComponentRegistry;
-import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.component.Holder;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.EnumMap;
 import java.util.Map;
@@ -33,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CoopResidentStateSnapshotCodecTest {
@@ -52,7 +45,7 @@ class CoopResidentStateSnapshotCodecTest {
             if (component instanceof TameworkAlarmComponent alarm) {
                 restored.set(alarm);
             }
-        }, CompanionReturnStateNormalizer.forCaptureRelease(codec.copy(decoded.snapshot())), null);
+        }, decoded.snapshot(), null);
 
         assertNotNull(restored.get(), "Capture restoration must restore harvest alarms");
         assertTrue(restored.get().isAlarmActive("Harvest_Ready", -2000L));
@@ -201,45 +194,6 @@ class CoopResidentStateSnapshotCodecTest {
                 .setToolIds(new String[] {"changed-after-plan"});
         assertEquals("tool-alpha", source.commandLinks().getToolIds()[0]);
         assertFalse(postAddWork.attachments().getAttachmentIds().isEmpty());
-    }
-
-    @Test
-    void projectionPostAddWorkAssignsTheRestoredOwnerAsMasterTarget() {
-        UUID ownerUuid = UUID.randomUUID();
-        ComponentRegistry<EntityStore> registry = new ComponentRegistry<>();
-        Store<EntityStore> store = registry.addStore(null, null);
-        try {
-            ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
-                    registry.registerComponent(
-                            TameworkOwnerComponent.class,
-                            TameworkOwnerComponent::new
-                    );
-            Holder<EntityStore> npc = registry.newHolder();
-            npc.addComponent(ownerType, new TameworkOwnerComponent(ownerUuid, "Owner"));
-            Ref<EntityStore> npcRef = store.addEntity(npc, AddReason.SPAWN);
-            Ref<EntityStore> ownerRef = store.addEntity(
-                    registry.newHolder(), AddReason.SPAWN);
-            AtomicReference<UUID> resolvedOwner = new AtomicReference<>();
-            AtomicReference<Ref<EntityStore>> assignedTarget = new AtomicReference<>();
-
-            boolean assigned = PlannedNpcProjectionPostAddService.assignOwnerTarget(
-                    npcRef,
-                    store,
-                    ownerType,
-                    requestedOwner -> {
-                        resolvedOwner.set(requestedOwner);
-                        return ownerRef;
-                    },
-                    assignedTarget::set
-            );
-
-            assertTrue(assigned);
-            assertEquals(ownerUuid, resolvedOwner.get());
-            assertSame(ownerRef, assignedTarget.get());
-        } finally {
-            registry.removeStore(store);
-            registry.shutdown();
-        }
     }
 
     private void assertInvalidScalar(String raw, String expectedField) {

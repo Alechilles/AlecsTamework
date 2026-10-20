@@ -51,57 +51,59 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestRun.usage.tw.api.test.run.core.profile"));
             return;
         }
-        PlayerExecution playerExecution = resolvePlayerExecution(commandContext);
-        if (playerExecution == null) {
-            ApiSelfTestRunReport report = TameworkApiSelfTestCommandSupport.runConsoleSafe(
-                    runner, plugin, api, parsed.suite());
-            if (report == null) {
-                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestRun.that.suite.requires.prepared.in.world.fixtures"));
-                return;
-            }
-            TameworkApiSelfTestCommandSupport.sendReport(
-                    commandContext, plugin, report, parsed.suite(), parsed.verbose());
+        World world = senderWorld(commandContext);
+        if (world == null) {
+            runWithoutPlayer(commandContext, plugin, runner, api, parsed);
+            return;
+        }
+        // The command runs off the world thread; the player and the fixtures are only readable on it.
+        Ref<EntityStore> ref = commandContext.senderAsPlayerRef();
+        world.execute(() -> runAsPlayer(commandContext, plugin, runner, api, parsed, world, ref));
+    }
+
+    private static void runWithoutPlayer(@Nonnull CommandContext commandContext, @Nonnull Tamework plugin,
+                                         @Nonnull ApiSelfTestRunner runner, @Nonnull TameworkApi api,
+                                         @Nonnull ParsedArgs parsed) {
+        ApiSelfTestRunReport report = TameworkApiSelfTestCommandSupport.runConsoleSafe(
+                runner, plugin, api, parsed.suite());
+        if (report == null) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestRun.that.suite.requires.prepared.in.world.fixtures"));
+            return;
+        }
+        TameworkApiSelfTestCommandSupport.sendReport(
+                commandContext, plugin, report, parsed.suite(), parsed.verbose());
+    }
+
+    private static void runAsPlayer(@Nonnull CommandContext commandContext, @Nonnull Tamework plugin,
+                                    @Nonnull ApiSelfTestRunner runner, @Nonnull TameworkApi api,
+                                    @Nonnull ParsedArgs parsed, @Nonnull World world,
+                                    @Nonnull Ref<EntityStore> ref) {
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Player player = ref.isValid() ? store.getComponent(ref, Player.getComponentType()) : null;
+        if (player == null) {
+            runWithoutPlayer(commandContext, plugin, runner, api, parsed);
             return;
         }
         ApiSelfTestFixtureManager manager = TameworkApiSelfTestCommandSupport.requireFixtureManager(
                 commandContext, plugin);
         if (manager == null) return;
-        Player player = playerExecution.player();
-        Store<EntityStore> store = playerExecution.store();
-        Ref<EntityStore> ref = playerExecution.ref();
-        World world = playerExecution.world();
         ApiSelfTestFixtureSet fixtureSet = manager.resolveFixtureSet(player, store, world).orElse(null);
         ApiSelfTestContext context = TameworkApiSelfTestCommandSupport.buildContext(
-                plugin,
-                api,
-                player,
-                store,
-                ref,
-                world,
-                fixtureSet
-        );
+                plugin, api, player, store, ref, world, fixtureSet);
         ApiSelfTestRunReport report = runner.run(context, parsed.suite());
         TameworkApiSelfTestCommandSupport.sendReport(
-                commandContext,
-                plugin,
-                report,
-                parsed.suite(),
-                parsed.verbose()
-        );
+                commandContext, plugin, report, parsed.suite(), parsed.verbose());
     }
 
+    /** The sending player's world, or null for the console or a player whose world is gone. */
     @Nullable
-    private static PlayerExecution resolvePlayerExecution(@Nonnull CommandContext context) {
+    private static World senderWorld(@Nonnull CommandContext context) {
         if (!context.isPlayer()) return null;
         PlayerRef playerRef = context.senderAs(PlayerRef.class);
         Ref<EntityStore> ref = context.senderAsPlayerRef();
-        if (playerRef == null || ref == null || !ref.isValid()) return null;
+        if (playerRef == null || ref == null) return null;
         World world = Universe.get().getWorld(playerRef.getWorldUuid());
-        if (world == null || world.getEntityStore() == null) return null;
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) return null;
-        Player player = store.getComponent(ref, Player.getComponentType());
-        return player == null ? null : new PlayerExecution(player, store, ref, world);
+        return world == null || world.getEntityStore() == null ? null : world;
     }
 
     private ParsedArgs parse(@Nonnull CommandContext commandContext) {
@@ -134,8 +136,4 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
     private record ParsedArgs(@Nonnull ApiSelfTestRunner.Suite suite, boolean verbose) {
     }
 
-    private record PlayerExecution(@Nonnull Player player,
-                                   @Nonnull Store<EntityStore> store,
-                                   @Nonnull Ref<EntityStore> ref,
-                                   @Nonnull World world) { }
 }

@@ -325,7 +325,10 @@ final class ApiMapper {
                         ),
                         TameworkRuntimeSettings.populationPerPlayerLimitScope(
                                 config.getPopulationPerPlayerLimitScope()
-                        ).configValue()
+                        ).configValue(),
+                        TameworkRuntimeSettings.populationLimitPerPlayerDeployedTotal(
+                                config.getPopulationLimitPerPlayerDeployedTotal()
+                        )
                 ),
                 new GlobalConfigView.SimpleClaimsView(
                         TameworkRuntimeSettings.simpleClaimsEnabled(config.isSimpleClaimsEnabled()),

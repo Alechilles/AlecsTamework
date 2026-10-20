@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.compat.HytaleParticleAccess;
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParticleAttachTarget;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundEffect;
@@ -177,7 +175,7 @@ final class InteractionPresentationEffects {
                             store
                     );
                 } else {
-                    HytaleParticleAccess.spawn(
+                    ParticleUtil.spawnParticleEffect(
                             particleSystem,
                             position,
                             0f,
@@ -191,7 +189,7 @@ final class InteractionPresentationEffects {
                 }
             } else {
                 if (attachToNpc) {
-                    HytaleParticleAccess.spawn(
+                    ParticleUtil.spawnParticleEffect(
                             particleSystem,
                             position,
                             npcRef,
@@ -199,7 +197,7 @@ final class InteractionPresentationEffects {
                             store
                     );
                 } else {
-                    HytaleParticleAccess.spawn(
+                    ParticleUtil.spawnParticleEffect(
                             particleSystem,
                             position,
                             Collections.singletonList(playerRef),
@@ -211,7 +209,7 @@ final class InteractionPresentationEffects {
             if (color != null) {
                 List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
                 if (viewers.isEmpty()) {
-                    HytaleParticleAccess.spawn(particleSystem, position, store);
+                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
                 } else {
                     if (attachToNpc) {
                         ParticleUtil.spawnParticleEffect(
@@ -229,7 +227,7 @@ final class InteractionPresentationEffects {
                                 store
                         );
                     } else {
-                        HytaleParticleAccess.spawn(
+                        ParticleUtil.spawnParticleEffect(
                                 particleSystem,
                                 position,
                                 0f,
@@ -246,9 +244,9 @@ final class InteractionPresentationEffects {
                 if (attachToNpc) {
                     List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
                     if (viewers.isEmpty()) {
-                        HytaleParticleAccess.spawn(particleSystem, position, store);
+                        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
                     } else {
-                        HytaleParticleAccess.spawn(
+                        ParticleUtil.spawnParticleEffect(
                                 particleSystem,
                                 position,
                                 npcRef,
@@ -257,7 +255,7 @@ final class InteractionPresentationEffects {
                         );
                     }
                 } else {
-                    HytaleParticleAccess.spawn(particleSystem, position, store);
+                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
                 }
             }
         }
@@ -428,8 +426,7 @@ final class InteractionPresentationEffects {
         }
 
         List<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
-        HytaleSpatialAccess.collect(
-                playerSpatialResource.getSpatialStructure(),
+        playerSpatialResource.getSpatialStructure().collect(
                 position,
                 ParticleUtil.DEFAULT_PARTICLE_DISTANCE,
                 results

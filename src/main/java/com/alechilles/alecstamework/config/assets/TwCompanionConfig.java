@@ -734,6 +734,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return crossWorldRecallEnabled;
         }
 
+        /** Ignored since 5.0; kept so configs that set {@code OnTransferFailure} still load. */
         @Nonnull
         public TransferFailurePolicy getOnTransferFailure() {
             return onTransferFailure;

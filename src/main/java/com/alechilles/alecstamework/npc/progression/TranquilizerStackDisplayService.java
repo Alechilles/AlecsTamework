@@ -16,12 +16,6 @@ public final class TranquilizerStackDisplayService {
         return Math.max(1, (int) Math.round(initialDurationSeconds / STACK_DURATION_SECONDS));
     }
 
-    public static double resolvePeakDuration(double trackedPeakSeconds, double currentRemainingSeconds) {
-        double tracked = sanitizePositive(trackedPeakSeconds);
-        double current = sanitizePositive(currentRemainingSeconds);
-        return Math.max(tracked, current);
-    }
-
     public static String formatRemainingDuration(double remainingSeconds) {
         long totalSeconds = Math.max(0L, (long) Math.ceil(remainingSeconds));
         long minutes = totalSeconds / 60L;
@@ -47,12 +41,5 @@ public final class TranquilizerStackDisplayService {
                 yield stacks + " (" + remainingText + ")";
             }
         };
-    }
-
-    private static double sanitizePositive(double value) {
-        if (!Double.isFinite(value) || value <= 0.0) {
-            return 0.0;
-        }
-        return value;
     }
 }

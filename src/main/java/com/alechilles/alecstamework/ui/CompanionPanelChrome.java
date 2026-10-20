@@ -11,8 +11,6 @@ import java.util.*;
 final class CompanionPanelChrome {
     static final String FILTER_PREFIX = "__companion_filter__:";
     static final List<String> FILTERS = List.of("InWorld", "Stored", "LostDead", "All");
-    private static final String TAB_DEFAULT_OUTLINE = "#4a5a50";
-    private static final String TAB_SELECTED_OUTLINE = "#7acb88";
 
     static void bind(UICommandBuilder c, UIEventBuilder e, TameworkCommandSelectionPage page,
                      LinkedNpcPanelRefreshValues values) {
@@ -71,9 +69,8 @@ final class CompanionPanelChrome {
             int tabCount = counts.forFilter(filter);
             set(c, values, selector + ".Text", LocalizedText.format(language,
                     "tamework.ui.companions.tabCount", text(language, filterKey(filter)), tabCount));
-            setTabOutline(c, values, selector, selected ? TAB_SELECTED_OUTLINE : TAB_DEFAULT_OUTLINE);
             if (values == null) {
-                c.set(selector + ".Style", Value.ref("TameworkPanelActionStyles.ui", style));
+                c.set(selector + ".Style", Value.ref("TameworkSlateStyles.ui", style));
                 e.addEventBinding(CustomUIEventBindingType.Activating, selector,
                         EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID, FILTER_PREFIX + filter), false);
             } else values.setStyle(c, selector + ".Style", style);
@@ -121,16 +118,6 @@ final class CompanionPanelChrome {
             case "LostDead" -> "lostDead";
             default -> filter.toLowerCase(Locale.ROOT);
         };
-    }
-
-    private static void setTabOutline(UICommandBuilder c, LinkedNpcPanelRefreshValues values,
-                                      String selector, String color) {
-        if (values == null || values.changed(selector + ".OutlineColor", color)) {
-            c.set(selector + ".OutlineColor", color);
-        }
-        if (values == null || values.changed(selector + ".OutlineSize", 1)) {
-            c.set(selector + ".OutlineSize", 1);
-        }
     }
 
     record TabCounts(int inWorld, int stored, int lostDead, int all) {

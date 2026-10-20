@@ -233,7 +233,8 @@ public final class BondedCompanionRosterRegistry {
                         configuredFeatures.isSummon(),
                         configuredFeatures.isDismiss(),
                         configuredFeatures.isRevive()
-                )
+                ),
+                config.getNameKey()
         );
     }
 
@@ -312,6 +313,45 @@ public final class BondedCompanionRosterRegistry {
         /** Returns every roster ID, including multi-family rosters. */
         @Nonnull public Set<String> rosterIds() {
             return familiesByRosterId.keySet();
+        }
+
+        /**
+         * The configured roster id that equals {@code typed} ignoring case, for ids an operator
+         * types. Empty when none does, or when several configured ids differ only by case.
+         */
+        @Nonnull
+        public Optional<String> canonicalRosterId(@Nullable String typed) {
+            return soleIgnoringCase(familiesByRosterId.keySet(), typed);
+        }
+
+        /**
+         * The allowed role id of {@code rosterId}'s families that equals {@code typed} ignoring
+         * case. Empty when none does, or when several allowed ids differ only by case.
+         */
+        @Nonnull
+        public Optional<String> canonicalRoleId(@Nullable String rosterId, @Nullable String typed) {
+            Set<String> roles = new java.util.HashSet<>();
+            for (RosterDefinition family : families(rosterId)) {
+                roles.addAll(family.allowedRoles());
+            }
+            return soleIgnoringCase(roles, typed);
+        }
+
+        private static Optional<String> soleIgnoringCase(Set<String> ids, @Nullable String typed) {
+            if (typed == null) {
+                return Optional.empty();
+            }
+            String match = null;
+            for (String id : ids) {
+                if (!id.equalsIgnoreCase(typed.trim())) {
+                    continue;
+                }
+                if (match != null) {
+                    return Optional.empty();
+                }
+                match = id;
+            }
+            return Optional.ofNullable(match);
         }
 
         /** Returns the number of logical rosters, not configured families. */
@@ -417,9 +457,11 @@ public final class BondedCompanionRosterRegistry {
             @Nullable String summonAuraEffectId,
             @Nullable String expiryWarningEffectId,
             @Nullable RevivePrice revivePrice,
-            @Nonnull FeatureFlags features
+            @Nonnull FeatureFlags features,
+            @Nullable String nameKey
     ) {
         public RosterDefinition {
+            nameKey = nameKey == null || nameKey.isBlank() ? null : nameKey.trim();
             configId = Objects.requireNonNull(configId, "configId");
             rosterId = Objects.requireNonNull(rosterId, "rosterId");
             familyId = Objects.requireNonNull(familyId, "familyId");
@@ -447,7 +489,7 @@ public final class BondedCompanionRosterRegistry {
         ) {
             this(configId, priority, rosterId, familyId, allowedRoles,
                     maximumOwned, maximumActive, sessionDurationSeconds,
-                    summonCooldownSeconds, 0L, null, null, revivePrice, features);
+                    summonCooldownSeconds, 0L, null, null, revivePrice, features, null);
         }
     }
 

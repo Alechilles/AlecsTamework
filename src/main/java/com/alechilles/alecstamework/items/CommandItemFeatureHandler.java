@@ -7,9 +7,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -30,8 +27,11 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHoo
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
-import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
+import com.alechilles.alecstamework.companion.flow.RestoreFlow;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
+import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Holder;
@@ -101,6 +101,8 @@ public final class CommandItemFeatureHandler {
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
+    @Nullable
+    private final CommandCompanionRestorationService restorationService;
     private final com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker =
             new com.alechilles.alecstamework.items.locate.CapturedItemTracker();
     private final CommandOwnedActionService ownedActions;
@@ -120,92 +122,32 @@ public final class CommandItemFeatureHandler {
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
-        this(registry, relocationService, stateSnapshotService, null, null);
+        this(registry, relocationService, stateSnapshotService, null, null, null, null, null, null,
+                null);
     }
 
-    public CommandItemFeatureHandler(CommandItemRegistry registry,
-                                     CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable PersistenceDomainFacades persistence,
-                                     @Nullable FreeCompanionRestorationAuthor restorationAuthor) {
-        this(
-                registry,
-                relocationService,
-                stateSnapshotService,
-                persistence,
-                restorationAuthor,
-                (CommandTimedSummoningApi) null,
-                (PaidCommandRevivalApi) null,
-                (PopulationGroupApi) null
-        );
-    }
-
+    /**
+     * Full constructor. When {@code companions} is set, the panel, owned rows, owned actions,
+     * locate, release and cull read the companion index; without it they report that tracking is
+     * unavailable. With
+     * {@code restoreFlow} and {@code companions}, the panel's Revive and Recover buttons and
+     * world-change follow restore through the flow; without them, those buttons report that
+     * tracking is unavailable and nothing follows across worlds. With {@code companions}, an
+     * owner command-family item's panel lists its roster members from the index; {@code
+     * rosterSummons} runs their Summon and Dismiss and {@code admissionGate} gives the deployed
+     * group limits shown on each row.
+     */
     public CommandItemFeatureHandler(
             CommandItemRegistry registry,
             CommandNpcRelocationService relocationService,
             CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
-            @Nullable CommandTimedSummoningApi timedSummoning,
-            @Nullable PaidCommandRevivalApi paidRevival,
-            @Nullable PopulationGroupApi populationGroups
-    ) {
-        this(
-                registry,
-                relocationService,
-                stateSnapshotService,
-                persistence,
-                restorationAuthor,
-                constant(timedSummoning),
-                constant(paidRevival),
-                constant(populationGroups)
-        );
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups
-    ) {
-        this(
-                registry, relocationService, stateSnapshotService, persistence,
-                restorationAuthor, timedSummoning, paidRevival,
-                populationGroups, null
-        );
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups,
-            @Nullable Supplier<BondedCompanionApi> bondedCompanions
-    ) {
-        this(registry, relocationService, stateSnapshotService, persistence,
-                restorationAuthor, timedSummoning, paidRevival, populationGroups,
-                bondedCompanions, null);
-    }
-
-    public CommandItemFeatureHandler(
-            CommandItemRegistry registry,
-            CommandNpcRelocationService relocationService,
-            CommandLinkedNpcStateSnapshotService stateSnapshotService,
-            @Nullable PersistenceDomainFacades persistence,
-            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
-            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nullable Supplier<PopulationGroupApi> populationGroups,
+            @Nullable RestoreFlow<Ref<EntityStore>> restoreFlow,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
-            @Nullable CompanionProgressionSignalBus progressionSignals
+            @Nullable CompanionProgressionSignalBus progressionSignals,
+            @Nullable CompanionQueries companions,
+            @Nullable ReleaseFlow releaseFlow,
+            @Nullable Supplier<RosterSummons> rosterSummons,
+            @Nullable CompanionAdmissionGate admissionGate
     ) {
         this.registry = registry;
         this.relocationService = relocationService;
@@ -218,25 +160,20 @@ public final class CommandItemFeatureHandler {
         this.npcExistenceService = stateSnapshotService != null
                 ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
                 : new CommandNpcExistenceService();
-        this.persistenceView = persistence != null
-                ? new CommandPersistenceView(persistence)
+        this.persistenceView = companions != null
+                ? new CommandPersistenceView(companions)
                 : null;
         CommandRosterPanelRecordSource rosterPanelRecordSource =
-                persistence != null
-                        ? new CommandRosterPanelRecordSource(
-                                persistence.queries()
-                        )
+                companions != null
+                        ? new CommandRosterPanelRecordSource(companions)
                         : null;
         CommandPanelFeaturePresentationSource featurePresentations =
                 rosterPanelRecordSource != null
-                        && timedSummoning != null
-                        && paidRevival != null
-                        && populationGroups != null
                         ? new CommandPanelFeaturePresentationSource(
                                 rosterPanelRecordSource,
-                                timedSummoning,
-                                paidRevival,
-                                populationGroups,
+                                CommandPanelFeaturePresentationSource.ReviveTerms::forRole,
+                                companions::owned,
+                                admissionGate != null ? admissionGate::rules : () -> null,
                                 System::currentTimeMillis
                         )
                         : null;
@@ -270,14 +207,7 @@ public final class CommandItemFeatureHandler {
                 rosterPanelRecordSource,
                 featurePresentations,
                 BondedCompanionPanelEntrySourceService.production(bondedCompanions),
-                persistence == null ? null : new CommandOwnedPanelRecordSource(
-                        persistence.queries()::projectedProfileSnapshot,
-                        () -> {
-                            var managed = new java.util.HashSet<>(
-                                    persistence.queries().projectedCommandRosterActions().keySet());
-                            managed.addAll(persistence.queries().projectedLaggingCommandRosterProfiles());
-                            return managed;
-                        })
+                companions != null ? new CommandOwnedPanelRecordSource(companions) : null
         );
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());
@@ -287,7 +217,8 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 linkPolicyService,
                 npcNameResolver,
-                stateSnapshotService
+                stateSnapshotService,
+                companions
         );
         this.toolInventoryService = new CommandToolInventoryService(
                 panelEntryService,
@@ -298,12 +229,11 @@ public final class CommandItemFeatureHandler {
         this.callbackAuthority = new CommandPanelCallbackAuthority(
                 registry, toolInventoryService);
         this.talentPageService = new CommandTalentPageService(
-                linkMutationService,
+                linkPolicyService,
                 toolInventoryService,
                 feedbackService,
                 npcNameResolver
         );
-        this.talentPageService.configureSavedTalents(persistence);
         this.bondedTalentPageService = new BondedCompanionTalentPageService(
                 bondedCompanions, feedbackService);
         this.companionPlacementService = new CommandCompanionPlacementService();
@@ -320,7 +250,9 @@ public final class CommandItemFeatureHandler {
                 canonicalRecordCommitGate,
                 companionPlacementService,
                 profileActionResolver,
-                RECALL_SAFE_SPAWN_DISTANCE
+                RECALL_SAFE_SPAWN_DISTANCE,
+                restoreFlow,
+                companions
         );
         this.inventoryRepairService =
                 new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
@@ -339,17 +271,19 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 resolutionService,
                 stepExecutionService,
-                companionPlacementService
+                companionPlacementService,
+                companions
         );
-        CommandCompanionRestorationService restorationService =
-                persistenceView != null && restorationAuthor != null
+        CommandCompanionRestorationService restorationService = this.restorationService =
+                persistenceView != null && restoreFlow != null && companions != null
                 ? new CommandCompanionRestorationService(
                         companionPlacementService,
                         persistenceView,
-                        restorationAuthor
+                        restoreFlow,
+                        companions
                 )
                 : null;
-        this.ownedActions = new CommandOwnedActionService(persistence, toolInventoryService,
+        this.ownedActions = new CommandOwnedActionService(companions, toolInventoryService,
                 panelPreferenceService, feedbackService, linkMutationService);
         this.freeRestorationActions =
                 new CommandFreeRestorationActionService(
@@ -359,12 +293,13 @@ public final class CommandItemFeatureHandler {
                         RECALL_SAFE_SPAWN_DISTANCE
                 );
         this.ownerReleaseService = new CommandOwnerReleaseService(
-                linkPolicyService,
                 feedbackService,
-                npcNameResolver,
-                persistence,
-                inventoryRepairService,
-                CommandUiCurrentWorldDispatcher.production()
+                releaseFlow,
+                companions,
+                persistenceView,
+                toolInventoryService,
+                linkMutationService,
+                inventoryRepairService
         );
         this.ownerCullService = new CommandOwnerCullService(
                 linkPolicyService,
@@ -372,7 +307,8 @@ public final class CommandItemFeatureHandler {
                 linkMutationService,
                 feedbackService,
                 npcNameResolver,
-                persistence
+                releaseFlow,
+                companions
         );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
@@ -393,7 +329,7 @@ public final class CommandItemFeatureHandler {
                 feedbackService,
                 npcNameResolver,
                 toolInventoryService,
-                persistence,
+                companions,
                 persistenceView,
                 capturedItemTracker
         );
@@ -430,8 +366,10 @@ public final class CommandItemFeatureHandler {
                         ? null
                         : new CommandPanelFeatureActionService(
                                 featurePresentations,
-                                timedSummoning,
-                                paidRevival,
+                                rosterSummons != null ? rosterSummons : () -> null,
+                                restorationService,
+                                companionPlacementService,
+                                RECALL_SAFE_SPAWN_DISTANCE,
                                 feedbackService
                         );
         this.selectionPageService = new CommandSelectionPageService(
@@ -458,8 +396,8 @@ public final class CommandItemFeatureHandler {
                 bondedRefreshSignals,
                 new CommandLinkedFlightToggleActionService()::toggle
         );
-        if (persistenceView != null) {
-            this.selectionPageService.configureSavedPanelSignals(persistenceView::savedPanelSignals);
+        if (restorationService != null) {
+            restorationService.usePanelRefresh(this.selectionPageService::signalOwnerPanels);
         }
         this.selectionPageService.configureShoulderRideAction(
                 new BondedCompanionShoulderRideActionService(
@@ -565,31 +503,34 @@ public final class CommandItemFeatureHandler {
         }
         String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
         if (toolId == null || toolId.isBlank()) return CommandHotswapHudViewModel.GroupStatus.hidden();
+        // The pill's built-in labels are shown only to this player, so they use this player's language.
+        String language = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         List<LinkedNpcRecord> records = linkedNpcRecordStore.read(itemStack);
         if (records.stream().noneMatch(record -> record != null && record.active)) {
-            return groupStatusResolver.resolveSelectedKeys(Set.of(), List.of(), null);
+            return groupStatusResolver.resolveSelectedKeys(Set.of(), List.of(), null, language);
         }
         // This tick path reads only the selected records. It never builds a panel projection,
         // scans world NPCs, imports legacy groups, or writes a player component.
         if (persistenceView == null) {
-            return groupStatusResolver.customStatus();
+            return groupStatusResolver.customStatus(language);
         }
         UUID ownerUuid = player.getUuid();
-        if (ownerUuid == null) return groupStatusResolver.customStatus();
+        if (ownerUuid == null) return groupStatusResolver.customStatus(language);
         Set<String> selectedKeys = new java.util.HashSet<>();
         for (LinkedNpcRecord record : records) {
             if (record == null || !record.active) continue;
             CommandPersistenceView.ProfileSnapshot profile = persistenceView.find(record).orElse(null);
             if (profile == null || !ownerUuid.equals(profile.ownerUuid())
                     || !linkPolicyService.isRoleAllowed(profile.roleId(), config, true)) {
-                return groupStatusResolver.customStatus();
+                return groupStatusResolver.customStatus(language);
             }
             selectedKeys.add(CommandCompanionGroups.profileKey(profile.profileId().toString()));
         }
         return groupStatusResolver.resolveSelectedKeys(
                 selectedKeys,
                 groupService.readGroups(player, itemStack),
-                groupId -> CommandCompanionGroups.members(player, groupId));
+                groupId -> CommandCompanionGroups.members(player, groupId),
+                language);
     }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
@@ -604,12 +545,39 @@ public final class CommandItemFeatureHandler {
         locateService.close();
         capturedItemTracker.close();
         bondedPanelLifecycle.close();
-        if (persistenceView != null) persistenceView.close();
     }
 
     /** Internal event observers share the command feature's bounded location cache. */
     public com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker() {
         return capturedItemTracker;
+    }
+
+    /**
+     * Lets the panel's release forget a companion in a capture item (spec 8.14); until then that
+     * release reports it is unavailable.
+     */
+    public void configureCaptureItemFlows(@Nullable com.alechilles.alecstamework.companion.item.CaptureItemFlows flows) {
+        ownerReleaseService.useCaptureItemFlows(flows);
+        if (restorationService != null) {
+            restorationService.useCaptureItemFlows(flows);
+        }
+    }
+
+    /**
+     * Lets owners spend and reset the talent points of dead and lost companions in their stored
+     * snapshots, from the panel's Talents button and the managed talent row. Without either
+     * argument those companions have no talent page.
+     */
+    public void configureSavedTalents(@Nullable CompanionQueries companions,
+                                      @Nullable com.alechilles.alecstamework.companion.bonded.BondedTalentUpdates updates) {
+        talentPageService.useSavedTalents(companions == null || updates == null ? null
+                : new CommandSavedTalentPageService(companions, updates, toolInventoryService,
+                        linkMutationService::readLinkedNpcRecords, feedbackService, talentPageService));
+    }
+
+    /** Sets where a recall of a companion in another world is restored; until then it is skipped. */
+    public void configureRecallRestore(@Nullable CompanionRestoreRecallSink recallRestore) {
+        relocationDispatchService.setRecallRestore(recallRestore);
     }
 
     /** Connects command menu opening to the live public provider registry. */
@@ -686,7 +654,9 @@ public final class CommandItemFeatureHandler {
                                 current, config, toolId, genericBinding)),
                 commandId -> withCurrentPlayer(ownerUuid,
                         current -> applyMenuSelection(
-                                current, toolId, config, commandId))
+                                current, toolId, config, commandId)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuForget(current, toolId, config, npcUuid))
         );
         return selectionPageService.open(
                 player, store, config, working, toolId, actions,
@@ -864,6 +834,17 @@ public final class CommandItemFeatureHandler {
         );
     }
 
+    /** The panel's Forget for a companion in a capture item (spec 8.14). */
+    private void applyMenuForget(Player player,
+                                 String toolId,
+                                 TwCommandItemConfig config,
+                                 UUID presentationUuid) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
+            return;
+        }
+        ownerReleaseService.release(player, toolId, config, presentationUuid, true);
+    }
+
     /** Routes item culling through the same durable release path as command culling. */
     public boolean cullFromItemInteraction(Player player, Ref<EntityStore> target,
                                           Store<EntityStore> store,
@@ -891,7 +872,7 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        if (!ownedActions.request(player, toolId, npcUuid,
+        if (!ownedActions.requestRecover(player, toolId, npcUuid,
                 current -> callbackAuthority.allowsGeneric(current, toolId, config),
                 (current, record) -> freeRestorationActions.request(current, toolId, record.npcUuid, record))) {
             freeRestorationActions.request(player, toolId, npcUuid);
@@ -1085,11 +1066,5 @@ public final class CommandItemFeatureHandler {
     private double resolveFiniteDouble(double configured, double fallback) {
         return Double.isFinite(configured) ? configured : fallback;
     }
-
-    @Nullable
-    private static <T> Supplier<T> constant(@Nullable T value) {
-        return value == null ? null : () -> value;
-    }
-
 }
 

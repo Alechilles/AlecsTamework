@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.GetChunkFlags;
@@ -62,24 +64,6 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         requestSourceHints(destinationWorld, destinationWorld, pending);
     }
 
-    void requestSource(World sourceWorld, World destinationWorld, PendingRelocation pending) {
-        if (sourceWorld == null || destinationWorld == null || pending == null) {
-            return;
-        }
-        requestSourceHints(sourceWorld, destinationWorld, pending);
-    }
-
-    boolean isDestinationReady(World destinationWorld, PendingRelocation pending) {
-        if (destinationWorld == null || pending == null) {
-            return false;
-        }
-        return pending.isChunkReady(
-                destinationWorld.getName(),
-                worldAccess.toChunk(pending.destination.x),
-                worldAccess.toChunk(pending.destination.z)
-        );
-    }
-
     private void requestSourceHints(World sourceWorld,
                                     World destinationWorld,
                                     PendingRelocation pending) {
@@ -105,6 +89,10 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         if (position == null) {
             return;
         }
+        // The lease keeps the source chunk loaded until the relocation ends, so the body cannot
+        // unload again between the section load and the move.
+        requestChunk(sourceWorld, destinationWorld, pending,
+                worldAccess.toChunk(position.x), worldAccess.toChunk(position.z));
         requestEntitySection(
                 sourceWorld, destinationWorld, pending, position
         );
@@ -179,7 +167,7 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
                 worldName, chunkX, chunkZ, now, CHUNK_REQUEST_COOLDOWN_MS)) {
             return;
         }
-        chunkWorld.getChunkAsync(chunkX, chunkZ).whenComplete((chunk, failure) -> {
+        HytaleChunkAccess.chunkAsync(chunkWorld, ChunkUtil.indexChunk(chunkX, chunkZ)).whenComplete((chunk, failure) -> {
             if (pendingByNpc.get(pending.npcUuid) != pending) {
                 return;
             }
@@ -188,7 +176,6 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
                     diagnostics.chunkLeaseNotRetained(pending.npcUuid, chunkX, chunkZ);
                     return;
                 }
-                pending.markChunkReady(worldName, chunkX, chunkZ);
                 applyScheduler.schedule(
                         destinationWorld, pending.npcUuid, APPLY_AFTER_LOAD_DELAY_MS);
                 return;

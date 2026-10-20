@@ -71,7 +71,7 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
                             .detail("source", "command")
                             .build()
             );
-            commandContext.sender().sendMessage(Message.raw(error));
+            commandContext.sender().sendMessage(Message.translation("server." + error));
             return;
         }
         plugin.getTelemetryEvents().recordUsage(

@@ -1,0 +1,67 @@
+{
+  "Enabled": true,
+  "Priority": -100,
+  "Underwater": true,
+  "Model": {
+    "ApplyModel": true,
+    "ModelId": "Tamework_Shark_Hammerhead_Avatar",
+    "Scale": 1.0
+  },
+  "Movement": {
+    "MaxForwardSpeed": 8.0,
+    "ForwardAcceleration": 10.0,
+    "MaxBackwardSpeed": 3.0,
+    "BackwardAcceleration": 6.0,
+    "DescendSpeed": 5.0,
+    "AirbrakeDeceleration": 12.0,
+    "HoverHorizontalDamping": 6.0
+  },
+  "Curve": {
+    "BoostedSpeedDecay": 3.0
+  },
+  "Boost": {
+    "ForwardImpulse": 5.0,
+    "CooldownSeconds": 2.0,
+    "DurationSeconds": 0.4,
+    "Directional": true
+  },
+  "Launch": {
+    "Enabled": false
+  },
+  "Vfx": {
+    "Enabled": false
+  },
+  "Audio": {
+    "Enabled": false
+  },
+  "Trails": {
+    "Enabled": false
+  },
+  "Animation": {
+    "IdleAnimation": "SwimIdle",
+    "FlightAnimation": "Swim",
+    "FastFlightAnimation": "SwimFast",
+    "PoseAnimationsEnabled": false
+  },
+  "AbilityAnimation": {
+    "Enabled": false
+  },
+  "RiderVisual": {
+    "ShowRider": true,
+    "IncludeAppearanceAttachments": true,
+    "HideOwnerEquipment": true,
+    "HideOwnerArmor": true,
+    "HideOwnerHands": true,
+    "SeatOffsetX": 0.0,
+    "SeatOffsetY": 0.85,
+    "SeatOffsetZ": 0.1
+  },
+  "Mounting": {
+    "RequireGroundedDismount": false,
+    "RestoreNpcAtLastSafeGround": false,
+    "PlayerDismountOffset": 2.0
+  },
+  "Debug": {
+    "LogControllerTicks": false
+  }
+}

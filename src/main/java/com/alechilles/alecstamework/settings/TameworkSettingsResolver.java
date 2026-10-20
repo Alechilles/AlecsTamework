@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -37,8 +36,9 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.blockOwnerDamage(), defaults.blockOwnerDamage()),
                 resolveBoolean(values.blockAllPlayerDamageIfOwned(), defaults.blockAllPlayerDamageIfOwned()),
                 resolveBoolean(values.invulnerableIfOwned(), defaults.invulnerableIfOwned()),
-                resolveBoolean(values.captureClearsOwner(), defaults.captureClearsOwner()),
-                resolveBoolean(values.spawnSetsOwner(), defaults.spawnSetsOwner()),
+                CaptureItemOwnershipMode.resolve(
+                        values.captureItemOwnership(), values.captureClearsOwner(), values.spawnSetsOwner()
+                ).toConfigValue(),
                 resolveBoolean(values.captureRequiresOwner(), defaults.captureRequiresOwner()),
                 resolveBoolean(values.spawnRequiresOwner(), defaults.spawnRequiresOwner()),
                 resolveBoolean(values.interactionRequiresOwner(), defaults.interactionRequiresOwner()),
@@ -72,7 +72,12 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.animalOldAgeDeathEnabled(), defaults.animalOldAgeDeathEnabled()),
                 resolveCommandPanelCardsPerPage(
                         values.commandPanelCardsPerPage(), defaults.commandPanelCardsPerPage()
-                )
+                ),
+                resolveNonNegativeInt(values.populationLimitPerPlayerDeployedTotal(),
+                        defaults.populationLimitPerPlayerDeployedTotal() != null
+                                ? defaults.populationLimitPerPlayerDeployedTotal() : 0),
+                resolveBoolean(values.avatarFlightUnlimitedVigour(),
+                        Boolean.TRUE.equals(defaults.avatarFlightUnlimitedVigour()))
         );
     }
 

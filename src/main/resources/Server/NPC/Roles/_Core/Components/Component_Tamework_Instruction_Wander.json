@@ -170,6 +170,30 @@
     },
     "Instructions": [
       {
+        "$Comment": "Reset hook: an instruction outside this component that moved the NPC out of a settle sets Tamework_Wander_Reset so the wander cycle restarts from its default instead of resuming the old settle.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Flag",
+          "Name": "Tamework_Wander_Reset"
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Wander_Reset",
+            "SetTo": false
+          },
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Wander_Settled",
+            "SetTo": false
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
         "$Comment": "Initialize sleep gate timers when entering wander mode.",
         "Continue": true,
         "Sensor": {
@@ -270,6 +294,11 @@
             }
           },
           {
+            "Type": "SetFlag",
+            "Name": "Tamework_Wander_Settled",
+            "SetTo": true
+          },
+          {
             "Type": "Timeout",
             "Delay": {
               "Compute": "SettleEntryDelayRange"
@@ -314,6 +343,11 @@
               {
                 "Type": "PlayAnimation",
                 "Slot": "Status"
+              },
+              {
+                "Type": "SetFlag",
+                "Name": "Tamework_Wander_Settled",
+                "SetTo": false
               }
             ]
           }
@@ -456,6 +490,11 @@
             "Slot": "Status"
           },
           {
+            "Type": "SetFlag",
+            "Name": "Tamework_Wander_Settled",
+            "SetTo": false
+          },
+          {
             "Type": "State",
             "State": ".Default"
           }
@@ -494,6 +533,11 @@
           {
             "Type": "PlayAnimation",
             "Slot": "Status"
+          },
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Wander_Settled",
+            "SetTo": false
           },
           {
             "Type": "State",

@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
+> **API `3.0.0`**
 > This reference tracks the current `interactionExtensions()` contract in `TameworkApi`.
 
 Capability: `INTERACTION_EXTENSIONS`

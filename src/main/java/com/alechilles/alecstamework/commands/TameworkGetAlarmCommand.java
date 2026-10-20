@@ -65,17 +65,26 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
         }
 
         UUID npcUuid = npc.getUuid();
-        String remainingText = "";
+        String remainingText = null;
         if (alarm.isSet()) {
             Instant alarmInstant = readAlarmInstant(alarm);
             if (alarmInstant != null) {
                 Duration remaining = Duration.between(now, alarmInstant);
                 if (!remaining.isNegative()) {
-                    remainingText = " Remaining: " + formatDuration(remaining) + ".";
+                    remainingText = formatDuration(remaining);
                 }
             }
         }
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getAlarm.alarm.for.npc.is").param("0", String.valueOf(alarmName)).param("1", String.valueOf(npcUuid)).param("2", String.valueOf(status)).param("3", String.valueOf(remainingText)));
+        Message message = Message.translation(remainingText == null
+                        ? "server.tamework.commands.getAlarm.alarm.for.npc.is"
+                        : "server.tamework.commands.getAlarm.alarm.for.npc.is.remaining")
+                .param("0", String.valueOf(alarmName))
+                .param("1", String.valueOf(npcUuid))
+                .param("2", String.valueOf(status));
+        if (remainingText != null) {
+            message = message.param("3", remainingText);
+        }
+        commandContext.sender().sendMessage(message);
     }
 
     private static Ref<EntityStore> resolveTarget(Store<EntityStore> store,

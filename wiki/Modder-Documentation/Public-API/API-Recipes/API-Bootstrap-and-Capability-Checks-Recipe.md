@@ -25,43 +25,46 @@ if (!capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS)) {
 not a capability check. Do not infer an optional feature from the Tamework
 version or from DTO classes being present.
 
-For durable integration state, resolve a canonical ID through `profiles()` and
-store namespaced data through `profileData()`. Never write Tamework persistence
-directly.
+For durable integration state, resolve a profile ID through `profiles()` and
+store namespaced data through `profileData()`. Never write Tamework's
+companion files directly.
 
-Replacement persistence features are advertised independently. Check the exact
-set your action needs before taking an item, charging a cost, spawning an NPC,
-or changing live state:
+Check the exact set your action needs before taking an item, charging a cost,
+spawning an NPC, or changing live state:
 
 ```java
 EnumSet<TameworkApiCapability> required = EnumSet.of(
         TameworkApiCapability.POPULATION_GROUPS,
-        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
-        TameworkApiCapability.COMMAND_TIMED_SUMMONING
+        TameworkApiCapability.DURABLE_POPULATION_GROUP_COUNTS,
+        TameworkApiCapability.BONDED_COMPANIONS
 );
 if (!capabilities.containsAll(required)) {
     return; // Fail closed before player cost or live mutation.
 }
 
-CommandFamilyRosterApi rosters = api.commandFamilyRosters();
-CommandTimedSummoningApi timed = api.commandTimedSummoning();
 PopulationGroupApi groups = api.populationGroups();
+BondedCompanionApi bonded = api.bondedCompanions();
 ```
 
-The readiness-gated persistence capabilities are:
+Companion store capabilities in API 3.0.0:
 
 | Capability | API or contract |
 | --- | --- |
 | `POPULATION_GROUPS` | `populationGroups()` |
-| `DURABLE_POPULATION_GROUP_COUNTS` | durable owned counts from `populationGroups()` |
-| `LOADED_POPULATION_GROUP_COUNTS` | process-local loaded counts from `populationGroups()` |
-| `COMMAND_FAMILY_ROSTERS` | `commandFamilyRosters()` |
-| `COMMAND_TIMED_SUMMONING` | `commandTimedSummoning()` |
-| `COMPANION_PROVISIONING` | `companionProvisioning()` |
-| `PAID_COMMAND_REVIVAL` | `paidCommandRevival()` |
+| `DURABLE_POPULATION_GROUP_COUNTS` | owned counts from `populationGroups()` |
+| `DURABLE_DEPLOYABLE_POPULATION_COUNTS` | `LIVE` counts from `populationGroups()` |
+| `EXTERNAL_ADMISSION_PROVIDERS` | `policies().admissionProviders()` |
+| `REQUIRED_CONTENT_PROFILES` | `requiredContentProfiles()` |
+| `BONDED_COMPANIONS` | `bondedCompanions()` |
+| `PROFILE_DATA_TRANSACTIONS` | `profileData().compareAndSet(...)` |
 | `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION` | resolved capture-attempt contract |
 | `CAPTURE_TAME_AND_LINK` | successful capture tame/link contract |
-| `PERSISTENCE_RESILIENCE` | replacement persistence health and resilience |
+
+API 3.0.0 removed `COMMAND_FAMILY_ROSTERS`, `COMMAND_TIMED_SUMMONING`,
+`COMPANION_PROVISIONING`, `PAID_COMMAND_REVIVAL`,
+`NAMED_CAPACITY_RESERVATIONS`, and `PERSISTENCE_RESILIENCE`. A mod that looks
+capabilities up by name must drop these names. `Enum.valueOf` throws for them,
+and a required-capability list that still holds one never becomes ready.
 
 Command UI features use four separate capabilities:
 
@@ -84,11 +87,10 @@ contributor-owned server actions. `COMMAND_UI_CUSTOM_FLOWS` permits
 contributor-owned multi-step flows. Check only the exact set that your plugin
 uses, and also require `api.commandUi().available()` before registration.
 
-Capabilities can become available after startup readiness completes or become
-unavailable when their own persistence scope is quarantined. Resolve the
-capability and API for each player action; do not cache startup availability as
-a permanent answer. The default API implementations remain fail-closed for
-older Tamework versions.
+`Tamework.getApi()` returns null until the companion store is ready, and
+capabilities can change while the server runs (for example when Tamework shuts
+a runtime down). Resolve the API and the capability for each player action; do
+not cache startup availability as a permanent answer.
 
 Command HUD features use two capabilities:
 

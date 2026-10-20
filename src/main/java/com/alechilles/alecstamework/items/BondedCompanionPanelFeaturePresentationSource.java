@@ -5,8 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
-import com.alechilles.alecstamework.persistence.operation
-        .BondedCompanionPaymentOperationId;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPaymentOperationId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

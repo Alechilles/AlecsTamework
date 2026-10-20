@@ -22,9 +22,37 @@ support.
   the same creature.
 - Only explicitly enabled coops use this path. Other coops keep their ordinary
   behavior.
-- Coop intake accepts an eligible currently live creature. Supported
-  interactions can also move an eligible canonical filled capture item
-  directly into an available slot while retiring the exact item.
+- Coop intake accepts an eligible creature that is out in the world. Supported
+  interactions can also move an eligible filled capture item directly into an
+  available slot; the item is used up.
+- A companion in a coop still counts toward its owner's "companions owned"
+  limit. It does not count as out in the world.
+
+### Breaking a coop
+
+Breaking a configured coop releases every resident beside the block, the same
+way a vanilla coop does. Your companions come out alive with their saved state,
+still owned by you. Produce already in the coop drops as usual. If a
+companion cannot be released, it keeps showing as housed in the coop; ask a
+server admin, who can restore it for you.
+
+### When coops produce
+
+Coop production follows the vanilla coop:
+
+- Residents produce once a day, in the morning, at the moment the coop lets them
+  out to roam.
+- The clock is the world's game time, not real time and not the time you were
+  online.
+- Each resident's clock starts when it enters the coop. It yields one batch for
+  each production interval (at least one game day) that has started since then.
+  A resident that entered the evening before produces one batch the next morning.
+- If the coop's chunk was not loaded for several days, residents catch up when
+  it loads again, up to a cap.
+- Produce that does not fit in the coop's storage is lost, so empty the coop
+  regularly.
+- Nothing carries over between stays. A resident that leaves and comes back
+  starts a new clock.
 
 ## Feed trough support
 - Needs systems can consume trough resources rather than only hand-fed resources.
@@ -34,9 +62,9 @@ support.
 ## Shared utility systems
 - Optional tooltip integration for spawner items
 - Travel and relocation recovery for off-screen companions
-- Configurable free or item-cost restoration for positively recorded dead or
-  `LOST` companions, with stale-original suppression when a replacement is
-  needed
+- Revive for dead companions (free or with an item cost) and free Recover for
+  `LOST` companions. When a companion is brought back, any old copy of its body
+  or capture item stops working
 - Per-role command travel rules for recalls and world transfer behavior
 
 ## Why this matters to players

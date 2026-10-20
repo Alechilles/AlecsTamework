@@ -12,15 +12,11 @@ class CommandNpcExistenceServiceTest {
     private static final UUID NPC_UUID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     @Test
-    void injectedIndexPreservesUnknownAbsentAndLiveStates() {
+    void injectedIndexPreservesUnknownAndLiveStates() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         CommandNpcExistenceService service = new CommandNpcExistenceService(index);
 
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, service.probe(NPC_UUID).status());
-        assertFalse(service.isKnownLive(NPC_UUID));
-
-        index.markInitializationComplete();
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, service.probe(NPC_UUID).status());
         assertFalse(service.isKnownLive(NPC_UUID));
 
         index.recordAdded(NPC_UUID, new LoadedNpcIdentityIndex.Location("world-a", "store-a"));
@@ -38,10 +34,6 @@ class CommandNpcExistenceServiceTest {
         CommandNpcExistenceService service = new CommandNpcExistenceService(index);
 
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, service.probe(null).status());
-        assertFalse(service.isKnownLive(null));
-
-        index.markInitializationComplete();
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, service.probe(null).status());
         assertFalse(service.isKnownLive(null));
     }
 }

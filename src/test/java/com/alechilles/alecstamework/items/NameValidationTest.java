@@ -59,6 +59,17 @@ class NameValidationTest {
     }
 
     @Test
+    void punctuationPresetAllowsNamePunctuationOnly() {
+        NamingRules rules = NamingRules.builder()
+                .allowedChars(NamingRules.ALLOWED_CHARS_LETTERS_NUMBERS_SPACES_PUNCTUATION)
+                .build();
+        assertTrue(NameValidation.validate("Mr. O'Malley-Whiskers", rules, false, false).isOk());
+        assertTrue(NameValidation.validate("O’Malley", rules, false, false).isOk());
+        assertFalse(NameValidation.validate("Fluffy!", rules, false, false).isOk());
+        assertFalse(NameValidation.validate("<b>Rex</b>", rules, false, false).isOk());
+    }
+
+    @Test
     void enforcesLengthLimits() {
         NamingRules rules = NamingRules.builder()
                 .minLength(2)

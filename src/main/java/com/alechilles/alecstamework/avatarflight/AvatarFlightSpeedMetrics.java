@@ -17,6 +17,12 @@ public final class AvatarFlightSpeedMetrics {
         return Math.sqrt(finiteX * finiteX + finiteZ * finiteZ);
     }
 
+    /** Swimming measures total speed so climbing and diving have the same cruise threshold. */
+    public static double movementSpeed(double x, double y, double z, @Nullable TwAvatarFlightConfig config) {
+        double horizontal = horizontalSpeed(x, y, z);
+        return config != null && config.isUnderwater() ? Math.hypot(horizontal, finiteOrZero(y)) : horizontal;
+    }
+
     public static double boostedHorizontalCap(@Nullable TwAvatarFlightConfig config) {
         if (config == null) {
             return 0.0;
@@ -32,6 +38,9 @@ public final class AvatarFlightSpeedMetrics {
         }
         double maxForwardSpeed = finiteOrZero(config.getMovement().getMaxForwardSpeed());
         double maxGlideSpeed = finiteOrZero(config.getMovement().getMaxGlideSpeed());
+        if (config.isUnderwater()) {
+            return maxForwardSpeed;
+        }
         return Math.max(maxForwardSpeed, maxGlideSpeed);
     }
 

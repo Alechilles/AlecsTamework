@@ -7,11 +7,12 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponen
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.companion.capture.runtime.TameworkCaptureSourceReceiptsComponent;
 import com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent;
+import com.alechilles.alecstamework.companion.migrate.retired.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
-import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.components.TameworkBondedReviveEscrowComponent;
+import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -20,8 +21,8 @@ import com.alechilles.alecstamework.npc.components.TameworkDynamicAttachmentsCom
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
-import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
@@ -37,8 +38,6 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
-import com.alechilles.alecstamework.persistence.runtime.player
-        .TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -53,8 +52,14 @@ final class TameworkComponentRegistrar {
 
     @Nonnull
     static RegisteredComponents register(@Nonnull Tamework plugin) {
+        com.alechilles.alecstamework.compat.runes.RuneInputLeaseComponent.register(plugin);
+        com.alechilles.alecstamework.companion.live.CompanionChangeTracker.register(plugin);
+        com.alechilles.alecstamework.npc.turning.TurnInPlaceState.register(plugin);
+        com.alechilles.alecstamework.companion.live.TameworkCompanionComponent.register(plugin);
+        com.alechilles.alecstamework.npc.movement.NativeSwimRiderComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionGroupsComponent.register(plugin);
         com.alechilles.alecstamework.items.components.TameworkCompanionViewsComponent.register(plugin);
+        com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent.register(plugin);
         ComponentType<EntityStore, TameworkOwnerComponent> owner = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkOwnerComponent.class, "TameworkOwner", TameworkOwnerComponent.CODEC);
         ComponentType<EntityStore, TameworkTamedComponent> tamed = plugin.getEntityStoreRegistry()
@@ -219,6 +224,7 @@ final class TameworkComponentRegistrar {
                         "TameworkCoopCaptureReceipts",
                         TameworkCoopCaptureReceiptsComponent.CODEC
                 );
+        com.alechilles.alecstamework.companion.coop.TameworkCoopSlotsComponent.register(plugin);
         return new RegisteredComponents(
                 owner, tamed, hook, npcName, mountedNameplate, commandLinks, happiness, needs,
                 breeding, alarm, flyingCompanion, rideMount, rideRider, shoulderRide, mountedGlide,

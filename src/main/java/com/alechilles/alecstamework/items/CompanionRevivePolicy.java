@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.damage.TameworkEnvironmentSource;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -17,9 +18,7 @@ public final class CompanionRevivePolicy {
     /** Identifies the actual fatal event, independent of the current revive settings. */
     public static boolean isOldAgeDeath(@Nullable DeathComponent death) {
         var damage = death == null ? null : death.getDeathInfo();
-        return damage != null
-                && damage.getSource() instanceof Damage.EnvironmentSource source
-                && OLD_AGE_SOURCE.equals(source.getType());
+        return damage != null && OLD_AGE_SOURCE.equals(TameworkEnvironmentSource.typeOf(damage.getSource()));
     }
 
     public static boolean featureEnabled(@Nullable String roleId) {

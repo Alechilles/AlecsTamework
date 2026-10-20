@@ -1,12 +1,10 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
-import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
-import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
@@ -15,14 +13,14 @@ import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Binds the dedicated, durable-profile card used by bonded companion rosters.
+ * Binds the dedicated, durable-profile card used by bonded companion rosters: one row of state
+ * plate, portrait, identity and vitals, status, and actions.
  *
  * <p>The card deliberately reads only immutable profile presentation. A live
  * projection may enrich the profile elsewhere, but must never be required for
@@ -31,8 +29,18 @@ import javax.annotation.Nullable;
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
     static final String CANCEL_UNLINK_COMMAND_PREFIX = "__bonded_cancel_unlink__:";
-    private static final int HEALTH_FILL_WIDTH = 258;
-    private static final int XP_FILL_WIDTH = 258;
+    private static final int HEALTH_FILL_WIDTH = 278;
+    private static final int XP_FILL_WIDTH = 278;
+    private static final int TIMER_FILL_WIDTH = 268;
+    /** The icon row: 28 px buttons, 4 px apart, right aligned to the action column's edge at 850. */
+    private static final int ICON_ROW_TOP = 46;
+    private static final int ICON_ROW_RIGHT = 850;
+    private static final int ICON_SIZE = 28;
+    private static final int ICON_GAP = 4;
+    /** The identity column, and the room the 20 px gender icon takes before the name. */
+    private static final int IDENTITY_LEFT = 100;
+    private static final int IDENTITY_RIGHT = 380;
+    private static final int GENDER_ICON_SPACE = 24;
 
     private BondedCompanionCardPresenter() {
     }
@@ -47,55 +55,53 @@ final class BondedCompanionCardPresenter {
             @Nonnull LinkedNpcPanelCardBinder.CardBindingConfig config,
             @Nullable String language
     ) {
-        BondedCompanionStatusPresentation status = row.status();
         ProgressionSummary progression = progressionSummary(row.attributes(),
                 row.roleId());
-        CardLayout layout = layout();
-        commands.setObject(entrySelector + ".Anchor", layout.cardAnchor());
         bindIdentity(commands, entrySelector, row, progression, language);
-        bindState(commands, entrySelector, row, language);
-        bindLayout(commands, entrySelector, layout);
-        bindUnlink(commands, events, entrySelector, cardUuid, pendingUnlink,
-                config, language);
+        bindState(commands, entrySelector, row, pendingUnlink, language);
         bindHealth(commands, entrySelector, row.attributes(), row.status().state());
         bindXpProgress(commands, entrySelector, row, progression, language);
         bindPortrait(commands, entrySelector, row);
-        bindTraits(commands, entrySelector, row, language);
-        bindSessionProgress(commands, entrySelector, row);
-        bindProgression(commands, events, entrySelector, cardUuid, row,
-                progression, pendingUnlink, config, language);
-        bindFlightToggle(commands, events, entrySelector, cardUuid, row,
-                config, language);
-        bindShoulderRide(commands, events, entrySelector, cardUuid, row,
-                config, language);
-        bindPrimaryAction(commands, events, entrySelector, cardUuid, row,
-                pendingUnlink, config, language);
+        bindTalents(commands, entrySelector, progression, pendingUnlink, language);
+        bindFlightToggle(commands, entrySelector, row, pendingUnlink, language);
+        bindShoulderRide(commands, entrySelector, row, pendingUnlink, language);
+        bindUnlink(commands, entrySelector, pendingUnlink);
+        bindIconRow(commands, entrySelector, row);
+        bindPrimaryAction(commands, entrySelector, row, pendingUnlink, language);
+
+        bindUnlinkEvents(events, entrySelector, cardUuid, config);
+        if (!pendingUnlink) {
+            bindProgressionEvents(events, entrySelector, cardUuid, progression,
+                    row.attributes(), config);
+            bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
+            bindShoulderRideEvents(events, entrySelector, cardUuid, row, config);
+            bindPrimaryActionEvents(events, entrySelector, cardUuid, row, config);
+        }
     }
 
     /**
-     * Patches live status text, vitals, and accents without recreating card
-     * controls or their input bindings.
+     * Patches the status sentence, timer bar, vitals, and accents without recreating card
+     * controls or their input bindings. This is the per-tick path of a running timer.
      */
     static void refreshDynamicState(
             @Nonnull UICommandBuilder commands,
             @Nonnull String entrySelector,
             @Nullable BondedCompanionPanelPresentation previous,
             @Nonnull BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
             @Nullable String language
     ) {
-        bindState(commands, entrySelector, row, language);
+        bindState(commands, entrySelector, row, pendingUnlink, language);
         bindHealth(commands, entrySelector, row.attributes(), row.status().state());
         bindXpProgress(commands, entrySelector, row,
                 progressionSummary(row.attributes(), row.roleId()), language);
         bindPortrait(commands, entrySelector, row);
-        bindTraits(commands, entrySelector, row, language);
-        bindSessionProgress(commands, entrySelector, row);
         // Keep the flight control stable during health and countdown updates.
         if (previous == null || flightToggleVisible(previous) != flightToggleVisible(row)
                 || flightToggleAirborne(previous) != flightToggleAirborne(row)) {
-            bindFlightToggle(commands, entrySelector, row, language);
+            bindFlightToggle(commands, entrySelector, row, pendingUnlink, language);
         }
-        bindShoulderRide(commands, entrySelector, row, language);
+        bindShoulderRide(commands, entrySelector, row, pendingUnlink, language);
     }
 
     /** Patches progression-derived labels and tooltips without emitting events. */
@@ -106,28 +112,20 @@ final class BondedCompanionCardPresenter {
         ProgressionSummary progression = progressionSummary(row.attributes(), row.roleId());
         bindIdentity(commands, entrySelector, row, progression, language);
         bindXpProgress(commands, entrySelector, row, progression, language);
-        commands.set(entrySelector + " #BondedProgressionButton.Visible", !pendingUnlink);
-        if (pendingUnlink) commands.set(entrySelector + " #BondedTalentPointAction.Visible", false);
-        commands.set(entrySelector + " #BondedProgressionButton.TooltipText", progression.visible()
-                ? progressionTooltip(progression, row.attributes(), row.roleId(), language) : LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.bonded.talents.tooltip"));
+        bindTalents(commands, entrySelector, progression, pendingUnlink, language);
     }
 
+    /** Abandon keeps its two steps: the icon asks, then Confirm and Cancel replace the actions. */
     private static void bindUnlink(
             UICommandBuilder commands,
-            UIEventBuilder events,
             String entrySelector,
-            UUID cardUuid,
-            boolean pendingUnlink,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
+            boolean pendingUnlink
     ) {
         LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedUnlinkButton",
                 !pendingUnlink);
         commands.set(entrySelector + " #BondedUnlinkConfirmButton.Visible",
                 pendingUnlink);
         commands.set(entrySelector + " #BondedUnlinkCancelButton.Visible", pendingUnlink);
-        bindUnlinkEvents(events, entrySelector, cardUuid, config);
     }
 
     private static void bindUnlinkEvents(
@@ -156,92 +154,86 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         commands.set(entrySelector + " #BondedName.Text", displayName(row, language));
-        commands.set(entrySelector + " #BondedName.TooltipText", displayName(row, language));
-        commands.set(entrySelector + " #BondedSpecies.Text",
-                identityLine(row));
-        String levelLabel = progression.visible() ? LocalizedText.format(language,
-                "tamework.ui.linkedPanel.bonded.talents.level", progression.level())
-                : LocalizedText.resolve(language, "tamework.ui.roster.talents");
-        commands.set(entrySelector + " #BondedLevelText.Visible", false);
-        commands.set(entrySelector + " #BondedLevelText.Text", levelLabel);
-        commands.set(entrySelector + " #BondedProgressionButton.Text", levelLabel);
-        int levelWidth = Math.max(52, levelLabel.length() * 7 + 16);
-        commands.setObject(entrySelector + " #BondedProgressionButton.Anchor",
-                fixedWidthAnchor(428 - levelWidth, 52, levelWidth, 26));
-        commands.setObject(entrySelector + " #BondedTalentPointAction.Anchor",
-                fixedWidthAnchor(428 - levelWidth - 52, 52, 46, 26));
-        boolean pointsAvailable = progression.talentsConfigured() && progression.availablePoints() > 0;
-        commands.set(entrySelector + " #BondedTalentPointAction.Visible", pointsAvailable);
-        commands.set(entrySelector + " #BondedTalentPointCountBadgeBorder.Visible", false);
-        commands.set(entrySelector + " #BondedTalentPointCountBadgeFill.Visible", false);
-        commands.set(entrySelector + " #BondedTalentPointCountShadow.Visible", false);
-        commands.set(entrySelector + " #BondedTalentPointCount.Visible", pointsAvailable);
-        commands.set(entrySelector + " #BondedTalentPointCount.Text", pointsAvailable
-                ? Integer.toString(progression.availablePoints()) : "");
-        commands.set(entrySelector + " #BondedTalentPointButton.TooltipText",
-                LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.talents.tooltip"));
-        commands.set(entrySelector + " #BondedGenderMaleIcon.Visible",
-                "male".equalsIgnoreCase(row.gender()));
-        commands.set(entrySelector + " #BondedGenderFemaleIcon.Visible",
-                "female".equalsIgnoreCase(row.gender()));
+        boolean male = "male".equalsIgnoreCase(row.gender());
+        boolean female = "female".equalsIgnoreCase(row.gender());
+        commands.set(entrySelector + " #BondedGenderMaleIcon.Visible", male);
+        commands.set(entrySelector + " #BondedGenderFemaleIcon.Visible", female);
+        // The name starts right of the gender icon when there is one.
+        int nameLeft = male || female ? IDENTITY_LEFT + GENDER_ICON_SPACE : IDENTITY_LEFT;
+        commands.setObject(entrySelector + " #BondedName.Anchor",
+                fixedWidthAnchor(nameLeft, 4, IDENTITY_RIGHT - nameLeft, 22));
+        commands.set(entrySelector + " #BondedSubtitle.Text", speciesLine(row, language));
+        // The level sits on the portrait's corner; a companion without progression has no chip.
+        commands.set(entrySelector + " #BondedLevelChip.Visible", progression.visible());
+        commands.set(entrySelector + " #BondedLevelText.Text", progression.visible()
+                ? Integer.toString(progression.level()) : "");
     }
 
+    /**
+     * The muted line under the name: the translated role name, only when the companion has a
+     * given name, since the role name is the title otherwise.
+     */
+    private static String speciesLine(
+            BondedCompanionPanelPresentation row,
+            @Nullable String language
+    ) {
+        if (row.displayName() == null || row.displayName().isBlank()) {
+            return "";
+        }
+        String role = BondedCompanionNames.speciesLabel(row.species(),
+                row.attributes().get(BondedCompanionNames.NAME_KEY), row.roleId(), language);
+        return role == null ? "" : role;
+    }
+
+    /**
+     * The state tone (row plate, portrait frame, pill), the status sentence, its timer bar and the
+     * delete confirmation line.
+     */
     private static void bindState(
             UICommandBuilder commands,
             String entrySelector,
             BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
             @Nullable String language
     ) {
         BondedCompanionStatusPresentation status = row.status();
-        BondedCompanionCardStatePresentation.StateCopy copy =
+        for (BondedCompanionStateView state : BondedCompanionStateView.values()) {
+            String tone = entrySelector + " " + toneSelector(state);
+            boolean current = state == status.state();
+            commands.set(tone + ".Visible", current);
+            if (current) {
+                commands.set(tone + " #ChipLabel.Text",
+                        LinkedNpcPanelFeatureBinder.bondedStateText(status, language));
+            }
+        }
+        commands.set(entrySelector + " #BondedUnlinkConfirmText.Visible", pendingUnlink);
+        BondedCompanionCardStatePresentation.Status copy =
                 BondedCompanionCardStatePresentation.resolve(row, language);
-        commands.set(entrySelector + " #BondedStateInWorld.Text", copy.label());
-        commands.set(entrySelector + " #BondedStateStored.Text", copy.label());
-        commands.set(entrySelector + " #BondedStateDead.Text", copy.label());
-        commands.set(entrySelector + " #BondedStateReady.Text", copy.label());
-        commands.set(entrySelector + " #BondedStateDetail.Text", copy.detail());
-        commands.set(entrySelector + " #BondedStateDetailValue.Text",
-                copy.detailValue());
-        commands.set(entrySelector + " #BondedStateInWorld.Visible",
-                status.state() == BondedCompanionStateView.ACTIVE);
-        commands.set(entrySelector + " #BondedStateStored.Visible",
-                status.state() == BondedCompanionStateView.STORED);
-        commands.set(entrySelector + " #BondedStateDead.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && !copy.reviveReady());
-        commands.set(entrySelector + " #BondedStateReady.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && copy.reviveReady());
-        commands.set(entrySelector + " #BondedAccentInWorld.Visible",
-                status.state() == BondedCompanionStateView.ACTIVE);
-        commands.set(entrySelector + " #BondedAccentStored.Visible",
-                status.state() == BondedCompanionStateView.STORED);
-        commands.set(entrySelector + " #BondedAccentDead.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && !copy.reviveReady());
-        commands.set(entrySelector + " #BondedAccentReady.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && copy.reviveReady());
-        commands.set(entrySelector + " #BondedFrameInWorld.Visible",
-                status.state() == BondedCompanionStateView.ACTIVE);
-        commands.set(entrySelector + " #BondedFrameStored.Visible",
-                status.state() == BondedCompanionStateView.STORED);
-        commands.set(entrySelector + " #BondedFrameDead.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && !copy.reviveReady());
-        commands.set(entrySelector + " #BondedFrameReady.Visible",
-                status.state() == BondedCompanionStateView.DEAD
-                        && copy.reviveReady());
-        commands.set(entrySelector + " #BondedStateEmblem.Visible", true);
-        commands.setObject(entrySelector + " #BondedStateEmblem.Background",
-                UiIconStyle.forTexture(stateEmblem(status.state())));
+        boolean hasText = !copy.text().isBlank();
+        commands.set(entrySelector + " #BondedStatusText.Visible", hasText && !copy.warning());
+        commands.set(entrySelector + " #BondedStatusWarning.Visible", hasText && copy.warning());
+        commands.set(entrySelector + (copy.warning() ? " #BondedStatusWarning.Text"
+                : " #BondedStatusText.Text"), copy.text());
+        commands.set(entrySelector + " #BondedStatusSecondary.Visible", !copy.secondary().isBlank());
+        commands.set(entrySelector + " #BondedStatusSecondary.Text", copy.secondary());
+
+        int width = (int) Math.round(TIMER_FILL_WIDTH * copy.ratio());
+        boolean session = copy.timer() == BondedCompanionCardStatePresentation.Timer.SESSION;
+        boolean cooldown = copy.timer() == BondedCompanionCardStatePresentation.Timer.COOLDOWN;
+        commands.set(entrySelector + " #BondedTimerFrame.Visible", session || cooldown);
+        commands.set(entrySelector + " #BondedTimerFillSession.Visible", session && width > 0);
+        commands.set(entrySelector + " #BondedTimerFillCooldown.Visible", cooldown && width > 0);
+        if (session || cooldown) {
+            commands.setObject(entrySelector + (session ? " #BondedTimerFillSession.Anchor"
+                    : " #BondedTimerFillCooldown.Anchor"), fixedWidthAnchor(1, 1, width, 4));
+        }
     }
 
-    private static String stateEmblem(BondedCompanionStateView state) {
+    static String toneSelector(BondedCompanionStateView state) {
         return switch (state) {
-            case ACTIVE -> "Tamework/PanelActions/Recall_Glyph_Default.png";
-            case STORED -> "Tamework/StatusEmblems/Captured.png";
-            case DEAD -> "Tamework/StatusEmblems/Dead.png";
+            case ACTIVE -> "#BondedToneActive";
+            case STORED -> "#BondedToneStored";
+            case DEAD -> "#BondedToneDead";
         };
     }
 
@@ -252,18 +244,32 @@ final class BondedCompanionCardPresenter {
             BondedCompanionStateView state
     ) {
         int maximum = positiveRoundedInt(attributes.get("maxHealth"), 100);
-        int current = state == BondedCompanionStateView.DEAD ? 0
+        // A companion that was never summoned has no recorded health. Its first body spawns at
+        // full health, so the bar is full; the role's maximum is not known without a body, so
+        // no numbers are shown.
+        boolean unrecorded = state != BondedCompanionStateView.DEAD && !healthRecorded(attributes);
+        int current = state == BondedCompanionStateView.DEAD ? 0 : unrecorded ? maximum
                 : boundedInt(attributes.get("currentHealth"), maximum,
                         percent(attributes.get("healthPercent"), maximum));
-        commands.set(entrySelector + " #BondedHealthTextShadow.Text", current + " / " + maximum);
-        commands.set(entrySelector + " #BondedHealthText.Text",
-                current + " / " + maximum);
+        String text = unrecorded ? "" : current + " / " + maximum;
+        commands.set(entrySelector + " #BondedHealthTextShadow.Text", text);
+        commands.set(entrySelector + " #BondedHealthText.Text", text);
         commands.setObject(entrySelector + " #BondedHealthFill.Anchor",
                 fixedWidthAnchor(1, 1, (int) Math.round(HEALTH_FILL_WIDTH
-                        * current / maximum), 22));
+                        * current / maximum), 18));
         commands.set(entrySelector + " #BondedHealthFill.Visible", current > 0);
-        commands.set(entrySelector + " #BondedHealthFill.Background",
-                state == BondedCompanionStateView.ACTIVE ? "#85b99a" : "#737a74");
+        // A full bar that stands for health nobody has measured yet is muted.
+        commands.set(entrySelector + " #BondedHealthFill.Background", unrecorded ? "#3f7a56" : "#57c87a");
+    }
+
+    private static boolean healthRecorded(Map<String, String> attributes) {
+        for (String key : new String[] {"maxHealth", "currentHealth", "healthPercent"}) {
+            String value = attributes.get(key);
+            if (value != null && !value.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void bindXpProgress(
@@ -278,6 +284,7 @@ final class BondedCompanionCardPresenter {
                 attributes.get("levelingConfigId"));
         boolean visible = progression.visible() && config != null && config.isEnabled();
         commands.set(entrySelector + " #BondedXpFrame.Visible", visible);
+        commands.set(entrySelector + " #BondedXpCaption.Visible", visible);
         commands.set(entrySelector + " #BondedXpButton.Visible", visible);
         if (!visible) {
             return;
@@ -288,10 +295,13 @@ final class BondedCompanionCardPresenter {
                 config.getLevels().getBaseXp()
                         * Math.pow(config.getLevels().getGrowthFactor(), level - 1)));
         int currentXp = nonNegativeRoundedInt(attributes.get("currentXp"));
-        int width = level >= maxLevel ? XP_FILL_WIDTH : (int) Math.round(
-                XP_FILL_WIDTH * Math.min(1.0, (double) currentXp / requiredXp));
+        double share = level >= maxLevel ? 1.0 : Math.min(1.0, (double) currentXp / requiredXp);
         commands.setObject(entrySelector + " #BondedXpFill.Anchor",
-                fixedWidthAnchor(0, 0, width, 3));
+                fixedWidthAnchor(1, 1, (int) Math.round(XP_FILL_WIDTH * share), 4));
+        commands.set(entrySelector + " #BondedXpCaption.Text", level >= maxLevel
+                ? LocalizedText.format(language, "tamework.ui.talents.levelSummary.max", level)
+                : LocalizedText.format(language, "tamework.ui.roster.progression.toNext",
+                        (int) Math.floor(share * 100.0), level + 1));
         commands.set(entrySelector + " #BondedXpButton.TooltipText",
                 progressionTooltip(progression, attributes, row.roleId(), language));
     }
@@ -303,85 +313,55 @@ final class BondedCompanionCardPresenter {
     ) {
         LinkedNpcPanelPortraitBinder.bindIcon(commands,
                 entrySelector + " #BondedPortrait", row.attributes().get("portraitIcon"));
+        commands.set(entrySelector + " #BondedPortraitDim.Visible",
+                row.status().state() == BondedCompanionStateView.DEAD);
     }
 
-    private static void bindTraits(
+    /** The talents icon button and its badge of unspent points. */
+    private static void bindTalents(
             UICommandBuilder commands,
             String entrySelector,
-            BondedCompanionPanelPresentation row,
+            ProgressionSummary progression,
+            boolean pendingUnlink,
             @Nullable String language
     ) {
-        LinkedNpcTraitIndicatorBinder.bind(commands, entrySelector,
-                BondedCompanionCardTraitPresentation.resolve(row, language));
+        boolean points = progression.talentsConfigured() && progression.availablePoints() > 0;
+        commands.set(entrySelector + " #BondedTalentPointAction.Visible", !pendingUnlink);
+        commands.set(entrySelector + " #BondedTalentPointBadge.Visible", points);
+        commands.set(entrySelector + " #BondedTalentPointCount.Text", points
+                ? Integer.toString(progression.availablePoints()) : "");
+        commands.set(entrySelector + " #BondedTalentPointButton.TooltipText",
+                LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.talents.tooltip"));
     }
 
-    private static void bindSessionProgress(
+    /**
+     * Places the icon row right aligned with no gaps: Talents, Flight, Shoulder ride, Abandon.
+     * Flight and shoulder ride take a place only when the companion supports them and is active;
+     * a change of either rebuilds the card, so the places are set once per bind.
+     */
+    private static void bindIconRow(
             UICommandBuilder commands,
             String entrySelector,
             BondedCompanionPanelPresentation row
     ) {
-        boolean active = row.status().state() == BondedCompanionStateView.ACTIVE;
-        long duration = nonNegativeLong(row.attributes().get(active
-                ? "sessionDurationMs" : "cooldownDurationMs"));
-        long remaining = active ? nonNegativeLong(row.attributes().get("sessionRemainingMs"))
-                : row.status().cooldownRemainingMs();
-        if (row.status().state() == BondedCompanionStateView.DEAD && row.reviveQuote() != null) {
-            remaining = Math.max(remaining, java.util.concurrent.TimeUnit.SECONDS.toMillis(
-                    row.reviveQuote().cooldownRemainingSeconds()));
+        int left = ICON_ROW_RIGHT - ICON_SIZE;
+        LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedUnlinkButton", iconAnchor(left));
+        if (shoulderRideVisible(row)) {
+            left -= ICON_SIZE + ICON_GAP;
+            LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedShoulderRideButton",
+                    iconAnchor(left));
         }
-        boolean visible = remaining > 0L;
-        commands.set(entrySelector + " #BondedSessionFrame.Visible", visible);
-        if (visible) {
-            // Older/custom profile sources may omit the total; retain a visible timer track.
-            int width = duration > 0L ? (int) Math.round(382D * Math.min(1D,
-                    (double) remaining / duration)) : 0;
-            commands.setObject(entrySelector + " #BondedSessionFill.Anchor",
-                    fixedWidthAnchor(1, 1, width, 12));
-            commands.set(entrySelector + " #BondedSessionFill.Visible", width > 0);
-            commands.set(entrySelector + " #BondedSessionFill.Background",
-                    active ? "#85b99a" : "#c5b47b");
+        if (flightToggleVisible(row)) {
+            left -= ICON_SIZE + ICON_GAP;
+            LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedFlightToggleButton",
+                    iconAnchor(left));
         }
+        left -= ICON_SIZE + ICON_GAP;
+        commands.setObject(entrySelector + " #BondedTalentPointAction.Anchor", iconAnchor(left));
     }
 
-    private static void bindLayout(
-            UICommandBuilder commands,
-            String entrySelector,
-            CardLayout layout
-    ) {
-        Anchor action = fixedWidthAnchor(678, layout.actionTop(), 164, 38);
-        commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
-        commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
-                fixedWidthAnchor(678, layout.actionTop(), 164, 38));
-        commands.setObject(entrySelector + " #BondedPrimaryActionDisabled.Anchor",
-                fixedWidthAnchor(678, layout.actionTop(), 164, 38));
-        commands.setObject(entrySelector
-                        + " #BondedPrimaryActionDisabledNoTooltip.Anchor",
-                fixedWidthAnchor(678, layout.actionTop(), 164, 38));
-        commands.setObject(entrySelector + " #BondedUnlinkConfirmButton.Anchor",
-                fixedWidthAnchor(678, layout.actionTop(), 164, 38));
-    }
-
-    private static void bindProgression(
-            UICommandBuilder commands,
-            UIEventBuilder events,
-            String entrySelector,
-            UUID cardUuid,
-            BondedCompanionPanelPresentation row,
-            ProgressionSummary progression,
-            boolean pendingUnlink,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
-    ) {
-        commands.set(entrySelector + " #BondedProgressionButton.Visible",
-                !pendingUnlink);
-        if (pendingUnlink) commands.set(entrySelector + " #BondedTalentPointAction.Visible", false);
-        commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
-                progression.visible()
-                        ? progressionTooltip(progression, row.attributes(), row.roleId(), language)
-                        : LocalizedText.resolve(language,
-                                "tamework.ui.linkedPanel.bonded.talents.tooltip"));
-        bindProgressionEvents(events, entrySelector, cardUuid, progression,
-                row.attributes(), pendingUnlink, config);
+    private static Anchor iconAnchor(int left) {
+        return fixedWidthAnchor(left, ICON_ROW_TOP, ICON_SIZE, ICON_SIZE);
     }
 
     private static void bindProgressionEvents(
@@ -390,27 +370,19 @@ final class BondedCompanionCardPresenter {
             UUID cardUuid,
             ProgressionSummary progression,
             Map<String, String> attributes,
-            boolean pendingUnlink,
             LinkedNpcPanelCardBinder.CardBindingConfig config
     ) {
         // A saved level is sufficient to inspect the durable talent page. The
         // page itself resolves a saved or role-derived tree and can explain a
         // genuinely missing configuration instead of leaving a silent button.
-        boolean canOpen = !pendingUnlink;
-        if (canOpen) {
-            String commandValue = config.openTalentsCommandPrefix() + cardUuid;
+        String commandValue = config.openTalentsCommandPrefix() + cardUuid;
+        events.addEventBinding(CustomUIEventBindingType.Activating,
+                entrySelector + " #BondedTalentPointButton",
+                EventData.of(config.eventCommandId(), commandValue), false);
+        if (xpProgressVisible(progression, attributes)) {
             events.addEventBinding(CustomUIEventBindingType.Activating,
-                    entrySelector + " #BondedProgressionButton",
+                    entrySelector + " #BondedXpButton",
                     EventData.of(config.eventCommandId(), commandValue), false);
-            // Bind while hidden too: a live level-up can reveal this badge without rebuilding the card.
-            events.addEventBinding(CustomUIEventBindingType.Activating,
-                    entrySelector + " #BondedTalentPointButton",
-                    EventData.of(config.eventCommandId(), commandValue), false);
-            if (xpProgressVisible(progression, attributes)) {
-                events.addEventBinding(CustomUIEventBindingType.Activating,
-                        entrySelector + " #BondedXpButton",
-                        EventData.of(config.eventCommandId(), commandValue), false);
-            }
         }
     }
 
@@ -423,57 +395,28 @@ final class BondedCompanionCardPresenter {
         return progression.visible() && config != null && config.isEnabled();
     }
 
+    /**
+     * The primary button names the action of the row's state. When that action is not possible
+     * the button stays in place, greyed out, and the status line says why. Summon and Revive are
+     * the calls to action; Dismiss is a plain button.
+     */
     private static void bindPrimaryAction(
             UICommandBuilder commands,
-            UIEventBuilder events,
             String entrySelector,
-            UUID cardUuid,
             BondedCompanionPanelPresentation row,
             boolean pendingUnlink,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
             @Nullable String language
     ) {
-        BondedCompanionStatusPresentation status = row.status();
-        String label = actionLabel(status.action(), language);
-        String tooltip = actionTooltip(row, status, language);
-        boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
-        boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
-        boolean tooltipVisible = !tooltip.isBlank();
-        commands.set(entrySelector + " #BondedPrimaryAction.Visible",
-                enabled && tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryAction.Text", "");
-        if (tooltipVisible) {
-            commands.set(entrySelector + " #BondedPrimaryAction.TooltipText", tooltip);
-        }
-        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Visible",
-                enabled && !tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Text", "");
-        commands.set(entrySelector + " #BondedPrimaryActionDisabled.Visible",
-                visible && !enabled && !pendingUnlink && tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryActionDisabled.Text", "");
-        if (tooltipVisible) {
-            commands.set(entrySelector + " #BondedPrimaryActionDisabled.TooltipText",
-                    tooltip);
-        }
-        commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Visible",
-                visible && !enabled && !pendingUnlink && !tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Text",
-                "");
-        commands.set(entrySelector + " #BondedActionContent.Visible", visible || pendingUnlink);
-        commands.set(entrySelector + " #BondedActionLabel.Text", pendingUnlink
-                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.unlink.confirm") : label);
-        commands.set(entrySelector + " #BondedActionLabel.Style.TextColor",
-                enabled || pendingUnlink ? "#e8e4da" : "#afb6b0");
-        String glyph = pendingUnlink ? "Remove" : switch (status.action()) {
-            case SUMMON -> "Recall";
-            case DISMISS -> "Release";
-            case REVIVE -> "Revive";
-            case NONE -> "Recall";
-        };
-        commands.setObject(entrySelector + " #BondedActionIcon.Background",
-                UiIconStyle.forTexture("Tamework/PanelActions/" + glyph + "_Glyph_Default.png"));
-        bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
-                pendingUnlink, config, language);
+        BondedCompanionStatusPresentation.Action action = row.status().action();
+        String button = entrySelector + " #BondedPrimaryAction";
+        commands.set(button + ".Visible", !pendingUnlink
+                && action != BondedCompanionStatusPresentation.Action.NONE);
+        commands.set(button + ".Disabled",
+                !BondedCompanionCardStatePresentation.primaryActionAvailable(row));
+        commands.set(button + ".Style", Value.ref("TameworkSlateStyles.ui",
+                action == BondedCompanionStatusPresentation.Action.DISMISS
+                        ? "PanelButton" : "PanelButtonPrimary"));
+        commands.set(button + ".Text", actionLabel(action, language));
     }
 
     private static void bindPrimaryActionEvents(
@@ -481,60 +424,36 @@ final class BondedCompanionCardPresenter {
             String entrySelector,
             UUID cardUuid,
             BondedCompanionPanelPresentation row,
-            boolean pendingUnlink,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
+            LinkedNpcPanelCardBinder.CardBindingConfig config
     ) {
-        BondedCompanionStatusPresentation status = row.status();
-        String tooltip = actionTooltip(row, status, language);
-        boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
-        boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
-        boolean tooltipVisible = !tooltip.isBlank();
-        if (!enabled) {
+        if (!BondedCompanionCardStatePresentation.primaryActionAvailable(row)) {
             return;
         }
-        String command = switch (status.action()) {
+        String command = switch (row.status().action()) {
             case SUMMON -> config.summonCommandPrefix() + cardUuid;
             case DISMISS -> config.dismissCommandPrefix() + cardUuid;
             case REVIVE -> config.respawnCommandPrefix() + cardUuid;
             case NONE -> null;
         };
         if (command != null) {
-            String actionSelector = tooltipVisible ? " #BondedPrimaryAction"
-                    : " #BondedPrimaryActionNoTooltip";
             events.addEventBinding(CustomUIEventBindingType.Activating,
-                    entrySelector + actionSelector,
+                    entrySelector + " #BondedPrimaryAction",
                     EventData.of(config.eventCommandId(), command), false);
         }
     }
 
     private static void bindFlightToggle(
             UICommandBuilder commands,
-            UIEventBuilder events,
-            String entrySelector,
-            UUID cardUuid,
-            BondedCompanionPanelPresentation row,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
-    ) {
-        bindFlightToggle(commands, entrySelector, row, language);
-        bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
-    }
-
-    private static void bindFlightToggle(
-            UICommandBuilder commands,
             String entrySelector,
             BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
             @Nullable String language
     ) {
         boolean visible = flightToggleVisible(row);
         boolean airborne = flightToggleAirborne(row);
-        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedFlightToggleButton", visible);
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedFlightToggleButton",
+                visible && !pendingUnlink);
         LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedFlightToggleButton", airborne ? "FlightAirborne" : "FlightGrounded");
-        commands.set(entrySelector + " #BondedFlightModeGroundedIcon.Visible",
-                false);
-        commands.set(entrySelector + " #BondedFlightModeAirborneIcon.Visible",
-                false);
         commands.set(entrySelector + " #BondedFlightToggleButton.TooltipText",
                 visible ? LocalizedText.resolve(language, airborne
                         ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
@@ -552,7 +471,7 @@ final class BondedCompanionCardPresenter {
                 BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
     }
 
-    static void bindFlightToggleEvents(
+    private static void bindFlightToggleEvents(
             UIEventBuilder events,
             String entrySelector,
             UUID cardUuid,
@@ -565,98 +484,6 @@ final class BondedCompanionCardPresenter {
                     EventData.of(config.eventCommandId(),
                             config.bondedFlightToggleCommandPrefix() + cardUuid), false);
         }
-    }
-
-    private static String reviveTooltip(
-            @Nullable BondedCompanionReviveQuote quote,
-            BondedCompanionStatusPresentation.Action action,
-            @Nullable String language
-    ) {
-        if (action != BondedCompanionStatusPresentation.Action.REVIVE
-                || quote == null || quote.costs().isEmpty()) {
-            return "";
-        }
-        StringBuilder tooltip = new StringBuilder(LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.bonded.revive.cost"));
-        for (BondedCompanionReviveQuote.CostLine line : quote.costs()) {
-            tooltip.append('\n')
-                    .append(ReviveCostItemText.resolve(line.itemId(), null, language))
-                    .append(" x ")
-                    .append(line.requiredQuantity());
-        }
-        return tooltip.toString();
-    }
-
-    private static String actionTooltip(
-            BondedCompanionPanelPresentation row,
-            BondedCompanionStatusPresentation status,
-            @Nullable String language
-    ) {
-        if (status.action() == BondedCompanionStatusPresentation.Action.REVIVE) {
-            return reviveTooltip(row.reviveQuote(), status.action(), language);
-        }
-        if (status.actionEnabled()) {
-            return "";
-        }
-        if (status.cooldownRemainingMs() > 0L
-                && status.action() == BondedCompanionStatusPresentation.Action.SUMMON) {
-            return LocalizedText.format(language,
-                    "tamework.ui.linkedPanel.bonded.detail.summonIn",
-                    LinkedNpcPanelStatusTextService.formatRemainingTime(
-                            status.cooldownRemainingMs(), language));
-        }
-        if (status.blockReason() == BondedCompanionActionBlockReason.CAPACITY_REACHED) {
-            String capacity = capacityTooltip(row, language);
-            if (!capacity.isEmpty()) {
-                return capacity;
-            }
-        }
-        if (status.blockReason() != null) {
-            return BondedCompanionActionFeedbackMapper.resolve(language,
-                    status.blockReason());
-        }
-        return status.unavailableReason() == null ? ""
-                : status.unavailableReason();
-    }
-
-    private static String capacityTooltip(
-            BondedCompanionPanelPresentation row,
-            @Nullable String language
-    ) {
-        Map<String, String> attributes = row.attributes();
-        int active = nonNegativeInt(attributes.get(
-                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT));
-        int limit = positiveRoundedInt(attributes.get(
-                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT), 0);
-        String label = pluralSpecies(row.species());
-        if (label.isBlank()) {
-            label = attributes.get(
-                    BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL);
-        }
-        if (limit == 0 || label == null || label.isBlank()) {
-            return "";
-        }
-        return LocalizedText.format(language,
-                "tamework.ui.linkedPanel.bonded.tooltip.summonCapacity",
-                label, active, limit);
-    }
-
-    @Nonnull
-    private static String pluralSpecies(@Nullable String species) {
-        if (species == null || species.isBlank()) {
-            return "";
-        }
-        String value = species.trim();
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.endsWith("s") || lower.endsWith("x") || lower.endsWith("z")
-                || lower.endsWith("ch") || lower.endsWith("sh")) {
-            return value + "es";
-        }
-        if (lower.endsWith("y") && value.length() > 1
-                && "aeiou".indexOf(lower.charAt(lower.length() - 2)) < 0) {
-            return value.substring(0, value.length() - 1) + "ies";
-        }
-        return value + "s";
     }
 
     private static String actionLabel(
@@ -681,6 +508,15 @@ final class BondedCompanionCardPresenter {
         int level = positiveRoundedInt(attributes.get("level"), 0);
         String levelingConfig = attributes.get("levelingConfigId");
         String talentConfig = attributes.get("talentConfigId");
+        if (level == 0 && (levelingConfig == null || levelingConfig.isBlank())
+                && !healthRecorded(attributes)) {
+            // Never summoned: the first body starts at level 1 when its role has leveling.
+            TwLevelingConfig roleLeveling = TwLevelingConfig.resolveForRole(roleId);
+            if (roleLeveling != null && roleLeveling.isEnabled()) {
+                level = 1;
+                levelingConfig = roleLeveling.getId();
+            }
+        }
         if (level == 0 || levelingConfig == null || levelingConfig.isBlank()) {
             return ProgressionSummary.hidden();
         }
@@ -694,23 +530,6 @@ final class BondedCompanionCardPresenter {
         return new ProgressionSummary(true, talentsConfigured, level, available);
     }
 
-    private static CardLayout layout() {
-        return new CardLayout(51);
-    }
-
-    private static Anchor fillAnchor(int left, int top, int width, int height) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(top));
-        anchor.setLeft(Value.of(left));
-        if (width > 0) {
-            anchor.setWidth(Value.of(width));
-        } else {
-            anchor.setRight(Value.of(0));
-        }
-        anchor.setHeight(Value.of(height));
-        return anchor;
-    }
-
     private static Anchor fixedWidthAnchor(int left, int top, int width, int height) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(top));
@@ -721,18 +540,8 @@ final class BondedCompanionCardPresenter {
     }
 
     private static String displayName(BondedCompanionPanelPresentation row, @Nullable String language) {
-        if (row.displayName() != null) {
-            return row.displayName();
-        }
-        if (row.species() != null) {
-            return row.species();
-        }
-        return LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.subtitle.defaultNpcName");
-    }
-
-    private static String identityLine(BondedCompanionPanelPresentation row) {
-        return row.species() == null ? "" : row.species();
+        return BondedCompanionNames.displayName(row.displayName(), row.species(),
+                row.attributes().get(BondedCompanionNames.NAME_KEY), row.roleId(), language);
     }
 
     private static String progressionTooltip(
@@ -808,17 +617,6 @@ final class BondedCompanionCardPresenter {
         }
     }
 
-    private static long nonNegativeLong(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return 0L;
-        }
-        try {
-            return Math.max(0L, Long.parseLong(value));
-        } catch (NumberFormatException ignored) {
-            return 0L;
-        }
-    }
-
     private static double nonNegativeDouble(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return 0.0;
@@ -833,30 +631,17 @@ final class BondedCompanionCardPresenter {
 
     private static void bindShoulderRide(
             UICommandBuilder commands,
-            UIEventBuilder events,
-            String entrySelector,
-            UUID cardUuid,
-            BondedCompanionPanelPresentation row,
-            LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
-    ) {
-        bindShoulderRide(commands, entrySelector, row, language);
-        bindShoulderRideEvents(events, entrySelector, cardUuid, row, config);
-    }
-
-    private static void bindShoulderRide(
-            UICommandBuilder commands,
             String entrySelector,
             BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
             @Nullable String language
     ) {
         boolean visible = shoulderRideVisible(row);
         boolean mounted = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED));
-        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedShoulderRideButton", visible);
-        commands.set(entrySelector + " #BondedShoulderRideIcon.Visible", false);
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedShoulderRideButton",
+                visible && !pendingUnlink);
         LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedShoulderRideButton", mounted ? "ShoulderOn" : "ShoulderOff");
-        commands.set(entrySelector + " #BondedShoulderRideButton.Text", "");
         commands.set(entrySelector + " #BondedShoulderRideButton.TooltipText",
                 visible ? LocalizedText.resolve(language, mounted
                         ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"
@@ -870,7 +655,7 @@ final class BondedCompanionCardPresenter {
                 BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE));
     }
 
-    static void bindShoulderRideEvents(
+    private static void bindShoulderRideEvents(
             UIEventBuilder events,
             String entrySelector,
             UUID cardUuid,
@@ -926,16 +711,5 @@ final class BondedCompanionCardPresenter {
             return new ProgressionSummary(false, false, 0, 0);
         }
 
-    }
-
-    /** Stable compact allocation for the bonded roster card. */
-    private record CardLayout(int actionTop) {
-        private int baseHeight() {
-            return 160;
-        }
-
-        private Anchor cardAnchor() {
-            return fillAnchor(0, 3, 0, baseHeight());
-        }
     }
 }

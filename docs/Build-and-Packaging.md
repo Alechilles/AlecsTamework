@@ -19,8 +19,8 @@ art graph.
 - Tamework keeps a direct `beacon-runtime` dependency because its
   conventional project is used by `CrashTelemetryService`. Patchwork carries
   the same runtime transitively for its contributed project. The release line
-  is Patchwork `1.4.1` with Beacon `2.0.2`; Gradle dependency convergence must
-  select `2.0.2` for both edges.
+  is Patchwork `1.4.1` with Beacon `2.0.3`; Gradle dependency convergence must
+  select `2.0.3` for both edges.
 - Beacon implementation classes are isolated in Tamework’s shaded namespace to
   prevent mixed class loading when other mods embed Beacon. Its process-wide
   registry keys stay unchanged so the embedded copies still coordinate.
@@ -30,6 +30,13 @@ art graph.
   writable token per project, while consent remains project-specific.
 - For integration details and the breaking package migration, see the
   [Beacon 2.0 migration guide](https://wiki.hytalemodding.dev/mod/beacon/migrate-to-beacon-2-0).
+- The SQLite JDBC driver is bundled for the one-time legacy importer. The jar
+  keeps only its natives for Windows, Linux, and Mac on x86_64 and aarch64,
+  plus Linux-Musl (Alpine containers) on x86_64 and aarch64; `shadowJar`
+  excludes every other native and the GraalVM `nativeimage` classes to save
+  about 10 MB. Keep `org.sqlite` unrelocated, because the natives' JNI symbols
+  are bound to that package name. `packagingTest` opens a database through the
+  packaged driver to prove the trimmed jar still loads its native library.
 - The shared workspace links both mods' asset files into its `run/mods` tree,
   so edits in Tamework and HyDragon can reload together.
 
@@ -97,7 +104,7 @@ convergence can be inspected with:
 ./gradlew dependencyInsight --dependency beacon-runtime --configuration runtimeClasspath
 ```
 
-The expected selected version is `2.0.2`, whether Beacon is reached directly
+The expected selected version is `2.0.3`, whether Beacon is reached directly
 from Tamework or transitively through Patchwork.
 
 Tamework and Patchwork expose separate telemetry consent entries. The
@@ -111,10 +118,13 @@ cover the ordinary no-claims configuration and the direct SimpleClaims
 integration used for breeding limits and tamed-companion damage.
 
 The [Persistence Replacement Release Checklist](Persistence-Replacement-Release-Checklist.md)
-records the historical first-release acceptance work for 3.0.0. Its candidate
-identity and unchecked items are not a current 4.0.0 release checklist.
+records the historical first-release acceptance work for 3.0.0. It describes
+the SQLite runtime that 5.0.0 removed and is not a current release checklist.
 
 Tamework does not create or restore complete Hytale world backups. Operators
-and hosting platforms remain responsible for consistent world backups.
-Released schema v2-v4 sources are imported read-only into
-`tamework-state.sqlite`; tester-only v5-v9 sources are refused unchanged.
+and hosting platforms remain responsible for consistent world backups. From
+5.0.0, companion data lives in `universe/Tamework/Companions`, so a normal
+world backup includes it. At the first start, 5.0 imports 3.x and 4.x
+databases read-only into that folder and leaves the old files unchanged; 2.x
+saves are refused with a notice to run 4.3.x once first. The release requires
+Hytale server 0.6.0 or later.

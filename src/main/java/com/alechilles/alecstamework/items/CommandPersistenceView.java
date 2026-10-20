@@ -1,101 +1,99 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
-import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
-import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
-import java.util.Comparator;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.StoredReason;
+import com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
+import java.util.HashSet;
 import java.util.List;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Exposes the small, synchronous canonical profile view needed by command gameplay.
  *
- * <p>The replacement profile projection is the only durable status and identity authority.
- * Command-item metadata remains an immutable cache that this view may redirect to the current
- * runtime alias. Storage reads and legacy repository models deliberately do not cross this
- * boundary.</p>
+ * <p>The companion index is the only durable status and identity authority. Command-item
+ * metadata remains an immutable cache that this view may redirect to the current runtime
+ * alias.</p>
  */
 final class CommandPersistenceView {
-    private final ProjectionLookup projections;
-    private CommandSavedNpcPanelCache savedPanels;
-    private java.util.function.Function<ProfileId, ProfileExtensionProjectionValue> checkpointLookup = ignored -> null;
+    private final SnapshotLookup snapshots;
+    private final CompanionQueries companions;
 
-    CommandPersistenceView(@Nonnull PersistenceDomainFacades persistence) {
-        this(new ProjectionLookup() {
-            @Override
-            public Optional<CompanionProfileProjectionState> find(
-                    ProfileId profileId
-            ) {
-                return persistence.queries().projectedProfile(profileId);
-            }
-
-            @Override
-            public Optional<CompanionProfileProjectionState> find(
-                    NpcAlias alias
-            ) {
-                return persistence.queries().projectedProfile(alias);
-            }
-        });
-        checkpointLookup = id -> persistence.queries().projectedExtensions(id,
-                ReplacementCompanionEntityCheckpointSink.NAMESPACE).values().stream()
-                .max(Comparator.comparingLong(ProfileExtensionProjectionValue::updatedAtMs)).orElse(null);
-        savedPanels = new CommandSavedNpcPanelCache(id -> persistence.queries().findProfile(id).thenApply(read -> {
-            if (!(read instanceof PersistenceReadResult.Found<
-                    CompanionProfileReadModel> found)) return null;
-            ProfileExtensionProjectionValue checkpoint = checkpointLookup.apply(id);
-            return CommandSavedNpcPanelSnapshot.decode(found.value(), checkpoint == null ? null : checkpoint.jsonPayload());
-        }));
-    }
-
-    CommandPersistenceView(@Nonnull ProjectionLookup projections) {
-        this.projections = Objects.requireNonNull(
-                projections, "Profile projections are required"
-        );
-    }
-
-    CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
-        ProfileId id = find(record).map(ProfileSnapshot::profileId).orElse(null);
-        CompanionProfileProjectionState projection = id == null ? null : safeFind(id).orElse(null);
-        if (savedPanels == null || projection == null) return null;
-        ProfileExtensionProjectionValue checkpoint = checkpointLookup.apply(id);
-        return savedPanels.peek(id, viewer, new CommandSavedNpcPanelCache.Revision(
-                projection.lastUpdatedAtMs(), checkpoint == null ? null : checkpoint.key().toString(),
-                checkpoint == null ? 0L : checkpoint.revision()));
-    }
-
-    LinkedPanelRefreshSignalSource savedPanelSignals(UUID owner) {
-        return savedPanels == null ? LinkedPanelRefreshSignalSource.none()
-                : savedPanels.signals(owner);
-    }
-
-    void close() { if (savedPanels != null) savedPanels.close(); }
-
-    /** Item records are caches; a known profile's durable links decide panel membership. */
-    List<LinkedNpcRecord> linkedRecordsForTool(List<LinkedNpcRecord> records, @Nullable String toolId) {
-        final UUID tool;
-        try {
-            tool = UUID.fromString(toolId);
-        } catch (IllegalArgumentException | NullPointerException invalidTool) {
-            return records;
-        }
-        return records.stream().filter(record -> find(record)
-                .map(profile -> profile.toolIds().contains(tool)).orElse(true)).toList();
+    /**
+     * Reads profiles from the companion index. The saved panel for unloaded companions comes
+     * from the record's in-memory summary, so it needs no cache or refresh signals.
+     */
+    CommandPersistenceView(@Nonnull CompanionQueries companions) {
+        this(companions, LegacyItemAdoption::profileOf);
     }
 
     /**
-     * Resolves one command record by stable profile first and known alias second.
+     * @param legacyProfile the profile an imported 3.x/4.x world knew an NPC UUID for, or null
+     *                      (plan 7 R19): a link saved by an older version may name a body the
+     *                      companion has since left
+     */
+    CommandPersistenceView(@Nonnull CompanionQueries companions, @Nonnull Function<UUID, UUID> legacyProfile) {
+        this.companions = Objects.requireNonNull(companions, "Companion queries are required");
+        Objects.requireNonNull(legacyProfile, "Legacy profile lookup is required");
+        this.snapshots = new SnapshotLookup() {
+            @Override
+            public Optional<ProfileSnapshot> find(ProfileId profileId) {
+                return Optional.ofNullable(companions.get(profileId.value())).map(CommandPersistenceView::from);
+            }
+
+            @Override
+            public Optional<ProfileSnapshot> find(NpcAlias alias) {
+                CompanionRecord current = companions.byNpcUuid(alias.value());
+                if (current == null) {
+                    UUID legacy = legacyProfile.apply(alias.value());
+                    current = legacy == null ? null : companions.get(legacy);
+                }
+                return Optional.ofNullable(current).map(CommandPersistenceView::from);
+            }
+        };
+    }
+
+    /**
+     * True for a companion imported from 3.x or 4.x whose body has not been seen or located yet:
+     * its recorded position (exactly 0, 0, 0) and world are placeholders and must not be shown.
+     */
+    boolean neverSighted(@Nullable LinkedNpcRecord record) {
+        return find(record).map(profile -> companions.get(profile.profileId().value()))
+                .map(CompanionRecord::neverSighted).orElse(false);
+    }
+
+    /**
+     * The index's last recorded place of a companion that is out in the world, for a card whose
+     * body is not loaded. Empty when the record is not out, or is an import not located yet.
+     */
+    Optional<CompanionLocation> livePlace(@Nullable LinkedNpcRecord record) {
+        return find(record).map(profile -> companions.get(profile.profileId().value()))
+                .filter(current -> current.location().kind() == LocationKind.LIVE && !current.neverSighted()
+                        && current.location().world() != null)
+                .map(CompanionRecord::location);
+    }
+
+    /** The saved panel of an unloaded companion, from its record's in-memory summary. */
+    CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
+        return find(record).map(profile -> companions.get(profile.profileId().value()))
+                .map(CommandSavedNpcPanelSnapshot::fromSummary).orElse(null);
+    }
+
+    /**
+     * Resolves one command record by stable profile first and known alias second. On the
+     * companion index a known alias is the record's current body, else a body an imported world
+     * knew for it.
      *
      * <p>Records created before their first projection use the NPC UUID as their deterministic
      * profile ID. Absence is not interpreted as a lifecycle state.</p>
@@ -107,20 +105,17 @@ final class CommandPersistenceView {
         }
         ProfileId explicit = parseProfileId(record.profileId);
         if (explicit != null) {
-            Optional<CompanionProfileProjectionState> byProfile =
-                    safeFind(explicit);
+            Optional<ProfileSnapshot> byProfile = safeFind(explicit);
             if (byProfile.isPresent()) {
-                return byProfile.map(ProfileSnapshot::from);
+                return byProfile;
             }
         }
-        Optional<CompanionProfileProjectionState> byAlias =
-                safeFind(new NpcAlias(record.npcUuid));
+        Optional<ProfileSnapshot> byAlias = safeFind(new NpcAlias(record.npcUuid));
         if (byAlias.isPresent()) {
-            return byAlias.map(ProfileSnapshot::from);
+            return byAlias;
         }
         if (explicit == null) {
-            return safeFind(new ProfileId(record.npcUuid))
-                    .map(ProfileSnapshot::from);
+            return safeFind(new ProfileId(record.npcUuid));
         }
         return Optional.empty();
     }
@@ -136,7 +131,7 @@ final class CommandPersistenceView {
             return false;
         }
         return safeFind(new NpcAlias(candidate.value()))
-                .map(CompanionProfileProjectionState::profileId)
+                .map(ProfileSnapshot::profileId)
                 .filter(profileId::equals)
                 .isPresent();
     }
@@ -157,25 +152,54 @@ final class CommandPersistenceView {
     }
 
     @Nonnull
-    private Optional<CompanionProfileProjectionState> safeFind(
-            ProfileId profileId
-    ) {
+    private Optional<ProfileSnapshot> safeFind(ProfileId profileId) {
         try {
-            return projections.find(profileId);
+            return snapshots.find(profileId);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
     }
 
     @Nonnull
-    private Optional<CompanionProfileProjectionState> safeFind(
-            NpcAlias alias
-    ) {
+    private Optional<ProfileSnapshot> safeFind(NpcAlias alias) {
         try {
-            return projections.find(alias);
+            return snapshots.find(alias);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Maps one index record to the command-facing snapshot. The location kind decides the
+     * lifecycle state; tool ids that are not UUIDs are skipped.
+     */
+    @Nonnull
+    static ProfileSnapshot from(@Nonnull CompanionRecord record) {
+        Set<UUID> tools = new HashSet<>();
+        for (String raw : record.toolIds()) {
+            try {
+                tools.add(UUID.fromString(raw));
+            } catch (IllegalArgumentException ignored) {
+                // A malformed tool id links nothing.
+            }
+        }
+        return new ProfileSnapshot(new ProfileId(record.profileId()), record.currentNpcUuid(), record.ownerUuid(),
+                record.roleId(), record.displayName(), record.summary().customName(), tools,
+                lifecycleState(record.location()), record.reviveAvailableAtMs(), record.diedAtMs());
+    }
+
+    @Nonnull
+    private static LifecycleState lifecycleState(@Nonnull CompanionLocation location) {
+        return switch (location.kind()) {
+            case LIVE -> LifecycleState.ACTIVE;
+            case ITEM -> LifecycleState.CAPTURED;
+            case COOP -> LifecycleState.COOP;
+            case STORED -> location.reason() == StoredReason.PROVISIONED
+                    ? LifecycleState.PROVISIONED_DORMANT : LifecycleState.ROSTER_STORED;
+            case DEAD -> LifecycleState.DEAD_REVIVABLE;
+            case LOST -> LifecycleState.LOST;
+            case RELEASED -> LifecycleState.RELEASED;
+        };
     }
 
     @Nullable
@@ -191,7 +215,7 @@ final class CommandPersistenceView {
         }
     }
 
-    /** Immutable command-facing subset of one canonical profile projection. */
+    /** Immutable command-facing subset of one companion record. */
     record ProfileSnapshot(
             @Nonnull ProfileId profileId,
             @Nullable UUID currentNpcUuid,
@@ -201,7 +225,8 @@ final class CommandPersistenceView {
             @Nullable String customName,
             @Nonnull Set<UUID> toolIds,
             @Nonnull LifecycleState lifecycleState,
-            long restorationAvailableAtMs
+            long restorationAvailableAtMs,
+            long diedAtMs
     ) {
         ProfileSnapshot {
             Objects.requireNonNull(profileId, "Profile ID is required");
@@ -235,43 +260,24 @@ final class CommandPersistenceView {
             return dead() || lost();
         }
 
+        /** Full revive cooldown of the current death (wall clock), or 0 when the death time is unknown. */
+        long restorationCooldownMs() {
+            return dead() && diedAtMs > 0L && restorationAvailableAtMs >= diedAtMs
+                    ? restorationAvailableAtMs - diedAtMs : 0L;
+        }
+
         boolean blocksLiveAction() {
             return lifecycleState != LifecycleState.ACTIVE
                     && lifecycleState != LifecycleState.UNLOADED;
         }
-
-        @Nonnull
-        private static ProfileSnapshot from(
-                CompanionProfileProjectionState projection
-        ) {
-            return new ProfileSnapshot(
-                    projection.profileId(),
-                    projection.currentAlias() == null
-                            ? null
-                            : projection.currentAlias().value(),
-                    projection.ownerId() == null
-                            ? null
-                            : projection.ownerId().value(),
-                    projection.roleId(),
-                    projection.displayName(),
-                    projection.customName(),
-                    projection.toolIds(),
-                    projection.lifecycleState(),
-                    projection.restorationAvailableAtMs()
-            );
-        }
     }
 
-    /** Adapter seam for deterministic projection tests. */
-    interface ProjectionLookup {
+    /** Profile lookups by id and by NPC alias. */
+    private interface SnapshotLookup {
         @Nonnull
-        Optional<CompanionProfileProjectionState> find(
-                @Nonnull ProfileId profileId
-        );
+        Optional<ProfileSnapshot> find(@Nonnull ProfileId profileId);
 
         @Nonnull
-        Optional<CompanionProfileProjectionState> find(
-                @Nonnull NpcAlias alias
-        );
+        Optional<ProfileSnapshot> find(@Nonnull NpcAlias alias);
     }
 }

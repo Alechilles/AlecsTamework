@@ -28,6 +28,10 @@ public interface ProfileDataApi {
     /**
      * Atomically compare-and-sets one namespaced value and records the outcome under its stable
      * namespace/idempotency-key origin. Queue acceptance is never returned as success.
+     *
+     * <p>The stage may complete on a thread that is not a world thread (the store's writer
+     * thread). A continuation must not block and must not read or change entities, components or
+     * worlds; hop to the owning world with {@code world.execute(...)} first.</p>
      */
     default CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(
             ProfileDataCompareAndSetRequest request
@@ -48,15 +52,4 @@ public interface ProfileDataApi {
         return compareAndSet(new ProfileDataCompareAndSetRequest(
                 profileId, namespace, key, expectedRevision, idempotencyKey, jsonPayload));
     }
-
-    /** Queries durable nonterminal or terminal state after a process/server restart. */
-    default CompletionStage<Optional<ProfileDataOperationView>> findOperation(
-            String namespace,
-            String idempotencyKey
-    ) {
-        ProfileDataValidation.requireText(namespace, "namespace", 128);
-        ProfileDataValidation.requireText(idempotencyKey, "idempotencyKey", 256);
-        return CompletableFuture.completedFuture(Optional.empty());
-    }
 }
-

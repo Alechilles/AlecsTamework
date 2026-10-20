@@ -1,0 +1,9 @@
+{
+  "RequireNewClick": false,
+  "Cooldown": {
+    "Cooldown": 0
+  },
+  "Interactions": [
+    "Tw_Dart_Rifle_Swap_From"
+  ]
+}

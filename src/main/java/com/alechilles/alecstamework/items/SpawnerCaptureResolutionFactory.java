@@ -2,13 +2,14 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.CapturePolicyConfigView;
 import com.alechilles.alecstamework.api.CaptureRequirementSpec;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptFormula;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.List;
@@ -29,6 +30,11 @@ final class SpawnerCaptureResolutionFactory {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    /**
+     * Returns null for a failed roll under {@code SUCCESS_ONLY} consumption: such a roll spends
+     * nothing and starts no cooldown, so it has no terminal resolution.
+     */
+    @Nullable
     CaptureAttemptResolution create(
             CaptureAttemptHandle attempt,
             String sourceItemId,
@@ -43,6 +49,10 @@ final class SpawnerCaptureResolutionFactory {
             throw new IllegalArgumentException(
                     "Complete capture resolution inputs are required"
             );
+        }
+        if (evaluation.outcome() == SpawnerCaptureChanceService.Outcome.FAILED_ROLL
+                && mechanics.sourceConsumption() != CaptureSourceConsumption.RESOLVED_ATTEMPT) {
+            return null;
         }
         SpawnerCaptureMechanicsView item = items
                 .resolveCaptureForItemId(sourceItemId)

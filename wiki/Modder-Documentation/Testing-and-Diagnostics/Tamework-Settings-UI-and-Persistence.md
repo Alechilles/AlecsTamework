@@ -13,8 +13,8 @@ duplicated across content packs.
 
 It writes universe-local JSON under
 `universe/Tamework/Settings/tamework-settings.json`. That settings file is
-separate from the canonical companion database, `tamework-state.sqlite`;
-settings do not form a second companion-lifecycle authority.
+separate from the companion store under `universe/Tamework/Companions`;
+settings never decide where a companion is.
 
 Edits remain pending until you click **Apply**. A bright amber warning below the
 button row marks unsaved changes, with warning icons flashing on and off every
@@ -34,20 +34,45 @@ revives and recall teleportation, disable old-age death, and restore the 2%/3%
 damage rates. Only Hardcore changes the aging mode. Review the form before applying;
 presets preserve ownership, claims, population limits, and other custom policies.
 
-## Population limit
+## Population limits
 
-`LimitPerPlayerOwnedTotal` is a durable canonical owner cap:
+There are two per-player limits. Both use `perPlayerLimitScope` (`PerWorld` or
+`Global`), and `0` means no limit. The default for both is `0`.
 
-- it counts saved profiles with that player as owner, including unloaded,
-  captured, cooped, roster-stored, provisioned, dead, and Lost profiles;
-- `0` disables the cap;
-- `PerPlayerLimitScope` selects `PerWorld` or `Global`;
-- the shared check is used by positive owner-acquisition paths including
-  taming, owner assignment, breeding, NPC spawn, and filled-spawner release;
-- positive acquisitions reserve capacity in their shared persistence operation;
-  and
-- sealed world evidence reconciles startup observations without treating
-  temporary absence as ownership removal.
+| Setting | Key in `tamework-settings.json` | Counts |
+| --- | --- | --- |
+| Max companions out in the world per player | `population.limitPerPlayerDeployedTotal` | Companions that are out in the world, loaded or not. |
+| Max companions owned per player | `population.limitPerPlayerOwnedTotal` | Every owned companion: out, stored, in items, in coops, dead and lost. |
+
+- The deployed limit is checked when a change puts a companion out in the world:
+  a tame, a summon, a release from a capture item, a revive, a recover, a coop
+  release, a birth, or a tamed spawn. Storing or capturing a companion frees a
+  place.
+- The owned limit is checked when a player gets one more companion: a tame, a
+  capture, a provision or a claim. Summoning a companion the player already owns
+  is not an owned-limit change.
+- A change that adds nothing always passes. A player who is already over a
+  lowered limit keeps every companion.
+- Each limit has its own message for the player.
+- Population groups (`TwPopulationGroupConfig`) keep their own owned and
+  deployed limits and are checked as well.
+
+### Upgrading from 4.x
+
+In 4.x, `limitPerPlayerOwnedTotal` counted only the loaded companions out in the
+world. In 5.0 that key counts every owned companion, so the old number would be
+much stricter. To keep the old meaning, a settings file that has
+`limitPerPlayerOwnedTotal` and no `limitPerPlayerDeployedTotal` is changed once
+when it is read: the old value becomes the deployed limit and the owned limit
+becomes `0` (no limit). The file is saved with both keys, and from then on the
+two values are independent. The console logs one line when this happens.
+
+If you edit the file by hand, keep both keys. A file with only the owned key is
+read as a 4.x file.
+
+A companion imported from a 3.x or 4.x world that has not been seen since the
+import does not count toward the deployed limit until its animal is found. It
+counts as owned.
 
 ## SimpleClaims
 
@@ -65,8 +90,59 @@ There is no claim-provider dropdown or QuestLines Claims fallback.
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,
-capture-owner, spawn-owner, and needs-resource settings. Apply
+capture owner requirement, and needs-resource settings. Apply
 changes through the UI so validation and settings-file writes use one path.
+
+**Captured companion ownership** replaces the former "Capture Clears Owner" and
+"Spawn Sets Owner" toggles. It is one choice, saved as
+`ownership.capture.captureItemOwnership`: `FOLLOWS_ITEM` (default, the owner is
+whoever holds the capture item, if their limits allow), `OWNER_ONLY` (only the
+owner can pick up or release the item) or `CHANGES_ON_RELEASE` (whoever
+releases the companion becomes its owner). A settings file that still has only
+the old `captureClearsOwner` and `SpawnSetsOwner` values is mapped on load:
+cleared owner maps to `FOLLOWS_ITEM`, kept owner with assignment to
+`CHANGES_ON_RELEASE`, and kept owner without assignment to `OWNER_ONLY`. See
+the TwSpawnerConfig reference for the full rules.
+
+The "Spawn Requires Owner" toggle is retired: the ownership mode alone decides
+who may release a captured companion (`OWNER_ONLY` is the restriction). A saved
+`ownership.capture.spawnRequiresOwner` value still loads without error and is
+ignored for release.
+
+## Avatar flight
+
+**Unlimited Flight Vigour** is saved as `avatarFlight.unlimitedVigour` and is
+off by default. When it is on, charged launches, upward flaps and forward boosts
+cost no Vigour for any player, and the flight HUD hides the Vigour pips. Boost,
+flap and combat ability cooldowns still apply. Experience presets leave it
+unchanged.
+
+## Companion HUD
+
+**Default HUD Position** sets where the companion HUD appears for players who
+have not moved it themselves. Click Edit to open the placement editor: pick a
+snap point, nudge the sample into place and click Save. Reset in this editor
+returns to the built-in position (top right). Apply or refresh any other
+settings changes first, because the settings page closes while the editor is
+open.
+
+The default is saved to `tamework-companion-hud.json` next to the settings
+file, as a snap point name and an offset:
+
+```json
+{
+  "point": "TOP_RIGHT",
+  "x": -26,
+  "y": 218
+}
+```
+
+Points are `TOP_LEFT`, `TOP`, `TOP_RIGHT`, `LEFT`, `CENTER`, `RIGHT`,
+`BOTTOM_LEFT`, `BOTTOM` and `BOTTOM_RIGHT`. Offsets are HUD canvas units
+measured from that point (+x right, +y down); the screen is 1080 units tall.
+After editing the file by hand, run `/tw reload`. Players who moved their
+own HUD keep their spot; everyone else sees the new default within a few
+seconds.
 
 ## Welcome and announcements
 
@@ -127,20 +203,24 @@ adds the safe defaults `FREEZE_AT_PRIME` and old-age death disabled. Existing
 needs-policy API names remain available for integrations and resolve the same
 shared policy.
 
-Revive enablement controls whether exact `DEAD_REVIVABLE` or `LOST` profiles
-may restore. Role-scoped `TwCompanionConfig.Command.Revive` supplies the
-gameplay cooldown, exact AND item-cost recipe, and optional insufficient-cost
-message for roster-backed revival. Legacy item-linked restoration remains
-free.
+Revive enablement controls whether dead companions may be revived and lost
+companions recovered. Role-scoped `TwCompanionConfig.Command.Revive` supplies
+the gameplay cooldown, the exact AND item-cost recipe, and the optional
+insufficient-cost message for a revive. Recover is free.
 
 ## Troubleshooting
 
-- If the owner cap appears wrong, inspect canonical lifecycle ownership and
-  reconciliation readiness; nearby loaded NPCs are not the complete count.
+- If a limit appears wrong, remember what each one counts. The owned limit
+  counts every owned companion, including those stored, in capture items, in
+  coops, dead and lost. The deployed limit counts companions out in the world,
+  loaded or not. Nearby loaded NPCs are not the complete count. A companion
+  stuck in a capture item that no longer exists can be resolved with Recall or
+  Forget in the panel, or `/tw companions forget|restore`.
 - If breeding is denied, verify the SimpleClaims claim and configured breeding
   limits.
 - SimpleClaims damage integration errors fail open; they do not make a target
   invulnerable.
-- Use `/tw debug persistence [status|health|detail|export]` for bounded
-  replacement persistence diagnostics. None of these actions repairs or
-  mutates saved persistence state; `export` writes only a redacted support ZIP.
+- Tamework 5.0 has no `/tw debug persistence` command; all its subcommands were
+  removed. Collect the server log when you report a problem.
+  For a world updated from 3.x or 4.x, see
+  [World Migration for Server Admins](/mod/alecs-tamework/world-migration-for-server-admins).

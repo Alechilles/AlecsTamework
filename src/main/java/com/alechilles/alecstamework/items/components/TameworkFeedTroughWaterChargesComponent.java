@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.components;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -81,7 +82,7 @@ public final class TameworkFeedTroughWaterChargesComponent implements Component<
         if (componentType == null) {
             return null;
         }
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(x, y, z);
+        Ref<ChunkStore> blockRef = HytaleBlockStateAccess.blockEntityRefAt(chunk, x, y, z);
         if (blockRef == null || !blockRef.isValid()) {
             return null;
         }

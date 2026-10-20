@@ -1,0 +1,14 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Tamework_Shark_Hammerhead_Swim_Example"
+  ],
+  "Interactions": [
+    {
+      "Type": "Tame"
+    },
+    {
+      "Type": "Mount"
+    }
+  ]
+}

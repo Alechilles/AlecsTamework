@@ -221,7 +221,7 @@ final class LinkedNpcPanelStatusTextService {
     private static String resolveLastKnownTooltip(String language) {
         String hint = LocalizedText.resolve(language, LAST_KNOWN_TOOLTIP_KEY);
         return LAST_KNOWN_TOOLTIP_KEY.equals(hint)
-                ? "Last known state; refreshes when loaded."
+                ? resolveLastKnownLabel(language)
                 : hint;
     }
 

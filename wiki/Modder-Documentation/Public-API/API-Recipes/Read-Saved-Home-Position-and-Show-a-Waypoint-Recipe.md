@@ -40,7 +40,9 @@ waypointService.showWaypoint(
 
 ## Notes
 - `hasHomePosition(profileId)` is a cheaper boolean check when coordinates are not needed.
-- `getHomePosition(...)` is best-effort and uses live + cached + persisted link state.
+- `getHomePosition(...)` is best-effort. In API 3.0.0 it answers only while the
+  companion's body is loaded, or was loaded earlier in this server session. An
+  unloaded, stored, captured, dead, or lost companion can report no home.
 
 ## Related Pages
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)

@@ -42,12 +42,13 @@ Each module has one state:
 
 ## Persistence boundary
 
-Generic and bonded persistence are separate authorities. Before either
-authority opens a writer, Tamework uses a bounded read-only probe. A missing
-store with no source data stays dormant and no database file is created.
-Pending durable work starts its recovery authority. Corrupt, unreadable, or
-uncertain evidence fails closed as read-only. A valid WAL sidecar activates
-recovery; an orphan or non-regular sidecar remains read-only.
+Companion persistence is one module over the companion store in
+`universe/Tamework/Companions`. Startup checks only whether files exist: an
+existing companion store, or any old Tamework save file (3.x/4.x databases, a
+2.x database, or 2.x `.dat` bundles), activates persistence even when no asset
+asks for it, so the importer or `/tw persistence start-fresh` can run. With
+neither present and no content that needs it, persistence stays dormant and no
+store folder is created.
 
 ## Fixed topology and reloads
 
@@ -77,7 +78,7 @@ plugin.requestRuntimeCapability(
 Requests after startup are rejected because they would require a topology
 change. After startup, read `getRuntimeActivationState()` and fail closed when
 a required module is unavailable. Do not create a parallel worker or write
-Tamework SQLite rows directly.
+companion store files directly; use the Public API.
 
 For Runeteria Husbandry, installed Runeteria assets provide normal content
 evidence. RuneProfessions must request only the generic capability modules it

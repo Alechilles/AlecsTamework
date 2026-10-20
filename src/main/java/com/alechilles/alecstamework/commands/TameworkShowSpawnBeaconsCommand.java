@@ -56,9 +56,15 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
 
         SpawnBeaconVisualizationService.EnableResult result =
                 visualizationService.enable(world, store, playerRef, parse.radius());
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing").param("0", String.valueOf(formatNumber(result.radius()))).param("1", String.valueOf(result.visibleCount())).param("2", String.valueOf((result.visibleCount() == 1 ? "" : "s"))).param("3", String.valueOf((result.skippedCount() == 0
-                        ? "."
-                        : "; skipped " + result.skippedCount() + " without usable visuals."))));
+        Message enabled = Message.translation(result.skippedCount() == 0
+                        ? "server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing"
+                        : "server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing.skipped")
+                .param("0", String.valueOf(formatNumber(result.radius())))
+                .param("1", String.valueOf(result.visibleCount()));
+        if (result.skippedCount() != 0) {
+            enabled = enabled.param("2", String.valueOf(result.skippedCount()));
+        }
+        commandContext.sender().sendMessage(enabled);
         sendSummaries(commandContext, result.summaries(), result.visibleCount());
     }
 

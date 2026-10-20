@@ -29,6 +29,8 @@ final class AvatarFlightHudBinder {
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
         commandBuilder.set("#TameworkAvatarFlightControls.Visible", model.visible());
+        commandBuilder.set("#LaunchControl.Visible", model.visible() && !model.underwater());
+        commandBuilder.set("#UpwardFlapControl.Visible", model.visible() && !model.underwater());
         bindCombatGlyph(commandBuilder, "#Ability2Control", "#Ability2Glyph", "#Ability2GlyphText",
                 "#Ability2Binding", "#Ability2CooldownShade", "#Ability2CooldownLabel", model.ability2());
         bindCombatGlyph(commandBuilder, "#Ability3Control", "#Ability3Glyph", "#Ability3GlyphText",
@@ -38,7 +40,7 @@ final class AvatarFlightHudBinder {
                 fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
         commandBuilder.set("#LaunchMinChargeMarker.Visible", model.visible() && model.launchChargeVisible());
         commandBuilder.setObject("#LaunchMinChargeMarker.Anchor", launchMarkerAnchor(model.launchMinChargeRatio()));
-        commandBuilder.set("#PitchLabel.Visible", model.visible());
+        commandBuilder.set("#PitchLabel.Visible", model.visible() && !model.underwater());
         commandBuilder.set("#PitchLabel.Text", model.pitchLabel());
         commandBuilder.set("#SpeedTrack.Visible", model.visible());
         commandBuilder.setObject("#SpeedFill.Anchor", fillAnchor(SPEED_FILL_MAX_WIDTH, SPEED_FILL_HEIGHT, model.speedRatio()));

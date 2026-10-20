@@ -130,7 +130,7 @@ class LinkedNpcPanelCardRenderStateTest {
             org.junit.jupiter.api.Assertions.assertTrue(card.getNumber("Height").intValue()
                     > meter.getNumber("Top").intValue() + meter.getNumber("Height").intValue());
             assertEquals(176, card.getNumber("Height").intValue());
-            assertEquals(111, meter.getNumber("Top").intValue());
+            assertEquals(109, meter.getNumber("Top").intValue());
         }
     }
 
@@ -156,6 +156,23 @@ class LinkedNpcPanelCardRenderStateTest {
                 < meters.getNumber("Top").intValue());
         assertVisible(commands, card + " #InlineLocation #CopyButton.Visible", true);
         assertVisible(commands, card + " #LocateButton.Visible", false);
+
+        // A status long enough to wrap keeps its second line clear of the rows and meters below it.
+        UICommandBuilder wrapped = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(wrapped, new UIEventBuilder(), 0, animal.withLocation(
+                new LinkedNpcEntry.Location("Contained in a Soul Lantern in PlayerName's inventory.", "default",
+                        "1054.1, 122.0, 120.4", "220m south, 153m east")).withOwnedActions(), false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        var wrappedStatus = anchor(wrapped, card + " #InlineLocation #Status.Anchor");
+        var wrappedWorld = anchor(wrapped, card + " #InlineLocation #World.Anchor");
+        var wrappedDirections = anchor(wrapped, card + " #InlineLocation #RelativeDistance.Anchor");
+        var wrappedMeters = anchor(wrapped, card + " #CooldownRow.Anchor");
+        assertEquals(wrappedStatus.getNumber("Top").intValue() + 28, wrappedWorld.getNumber("Top").intValue());
+        org.junit.jupiter.api.Assertions.assertTrue(anchor(wrapped, card + " #InlineLocation.Anchor")
+                .getNumber("Top").intValue() + wrappedDirections.getNumber("Top").intValue()
+                + wrappedDirections.getNumber("Height").intValue() < wrappedMeters.getNumber("Top").intValue());
+        org.junit.jupiter.api.Assertions.assertTrue(wrappedMeters.getNumber("Top").intValue()
+                + wrappedMeters.getNumber("Height").intValue() <= 160);
         assertVisible(commands, card + " #LifecycleProgress #Paused.Visible", true);
 
         // Capture may clear ownership; restricting actions must not replace the ordinary card layout.
@@ -168,6 +185,77 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(readOnly, card + " #InlineLocation #CopyButton.Visible", true);
         assertVisible(readOnly, card + " #RemoveButton.Visible", false);
         assertVisible(readOnly, card + " #ActiveToggleInactiveButton.Visible", false);
+    }
+
+    // Catches a dead card without its countdown or progress, a countdown that stops at the first
+    // render, a Revive/Recover button left outside the strip or shown twice, and a stale strip on
+    // a reused live row.
+    @Test
+    void statusStripShowsReviveProgressThenMovesTheRestoreButtonInside() {
+        UUID id = UUID.randomUUID();
+        LinkedNpcEntry dead = new LinkedNpcEntry(id, "Duck", 0, 25,
+                0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
+                false, 1_800_000L, LinkedNpcTraitIndicator.EMPTY).withDeadRespawnTotalMs(3_600_000L);
+        String card = "#TameworkLinkedPanelList[0]";
+        String strip = card + " #StatusStrip";
+        UICommandBuilder counting = bindCard(dead);
+        assertVisible(counting, strip + ".Visible", true);
+        assertText(counting, strip + " #Text #Primary.Text", "Revives in "
+                + LinkedNpcPanelStatusTextService.formatRemainingTime(1_800_000L, "en-US"));
+        assertEquals(140, anchor(counting, strip + " #Bar #BarFill.Anchor").getNumber("Width").intValue());
+        assertVisible(counting, card + " #RespawnButton.Visible", false);
+
+        UICommandBuilder tick = new UICommandBuilder();
+        LinkedNpcPanelCountdownPresenter.refresh(tick, new UIEventBuilder(),
+                new LinkedNpcEntry[] {dead}, Map.of(), ignored -> false, 900_000L, "en-US");
+        assertText(tick, strip + " #Text #Primary.Text", "Revives in "
+                + LinkedNpcPanelStatusTextService.formatRemainingTime(900_000L, "en-US"));
+        assertEquals(210, anchor(tick, strip + " #Bar #BarFill.Anchor").getNumber("Width").intValue());
+
+        LinkedNpcEntry ready = new LinkedNpcEntry(id, "Duck", 0, 25,
+                0, 0, "", 0, 0, 0, 0, false, false, true, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY).withDeadRespawnTotalMs(3_600_000L);
+        UICommandBuilder readyCard = bindCard(ready);
+        assertText(readyCard, strip + " #Text #Primary.Text", "Ready to revive");
+        assertRestoreButtonInsideStrip(readyCard, card);
+
+        LinkedNpcEntry lost = new LinkedNpcEntry(id, "Duck", 0, 0,
+                0, 0, "", 0, 0, 0, 0, false, false, false, false, false,
+                true, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder lostCard = bindCard(lost);
+        assertText(lostCard, strip + " #Text #State.Text", "LOST");
+        assertText(lostCard, strip + " #Text #Primary.Text", "Ready to recover");
+        assertRestoreButtonInsideStrip(lostCard, card);
+
+        assertVisible(bindCard(entryForIdentity(id)), strip + ".Visible", false);
+    }
+
+    private static UICommandBuilder bindCard(LinkedNpcEntry entry) {
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, entry, false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+        return commands;
+    }
+
+    private static void assertRestoreButtonInsideStrip(UICommandBuilder commands, String card) {
+        assertVisible(commands, card + " #RespawnButton.Visible", true);
+        assertVisible(commands, card + " #RespawnButtonCaption.Visible", false);
+        var button = anchor(commands, card + " #RespawnButton.Anchor");
+        int left = button.getNumber("Left").intValue();
+        int top = button.getNumber("Top").intValue();
+        // Strip spans x 432..846 and y 36..100; its text ends at x 774.
+        org.junit.jupiter.api.Assertions.assertTrue(left >= 774
+                && left + button.getNumber("Width").intValue() <= 846);
+        org.junit.jupiter.api.Assertions.assertTrue(top >= 36
+                && top + button.getNumber("Height").intValue() <= 100);
+    }
+
+    private static void assertText(UICommandBuilder commands, String selector, String text) {
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set(selector, text);
+        assertEquals(expected.getCommands()[0].data, Arrays.stream(commands.getCommands())
+                .filter(command -> selector.equals(command.selector))
+                .reduce((first, last) -> last).orElseThrow().data);
     }
 
     private static org.bson.BsonDocument anchor(UICommandBuilder commands, String selector) {

@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.settings;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -19,6 +18,7 @@ public final class TameworkRuntimeSettings {
     private final TwNeedsConfig.TickPolicySettings resolvedNeedsTickPolicy;
     private final TwNeedsConfig.DamageSettings resolvedNeedsDamage;
     private final AnimalAgingMode resolvedAnimalAgingMode;
+    private final CaptureItemOwnershipMode resolvedCaptureItemOwnership;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
         this.values = values;
@@ -37,6 +37,7 @@ public final class TameworkRuntimeSettings {
                 values.needsDamageLethal()
         );
         this.resolvedAnimalAgingMode = AnimalAgingMode.fromConfigValue(values.animalAgingMode());
+        this.resolvedCaptureItemOwnership = values.captureItemOwnershipMode();
     }
 
     @Nonnull
@@ -91,6 +92,11 @@ public final class TameworkRuntimeSettings {
         return values.populationLimitPerPlayerOwnedTotal();
     }
 
+    /** The limit on a player's companions out in the world; 0 = no limit. */
+    public int populationLimitPerPlayerDeployedTotal() {
+        return values.populationLimitPerPlayerDeployedTotal();
+    }
+
     @Nonnull
     public String populationPerPlayerLimitScope() {
         return values.populationPerPlayerLimitScope();
@@ -128,10 +134,20 @@ public final class TameworkRuntimeSettings {
         return values.invulnerableIfOwned();
     }
 
+    /** How a companion held by a capture item changes owner. */
+    @Nonnull
+    public CaptureItemOwnershipMode captureItemOwnership() {
+        return resolvedCaptureItemOwnership;
+    }
+
+    /** @deprecated retired; always false. Use {@link #captureItemOwnership()}. */
+    @Deprecated
     public boolean captureClearsOwner() {
         return values.captureClearsOwner();
     }
 
+    /** @deprecated retired; derived from {@link #captureItemOwnership()}. */
+    @Deprecated
     public boolean spawnSetsOwner() {
         return values.spawnSetsOwner();
     }
@@ -140,8 +156,13 @@ public final class TameworkRuntimeSettings {
         return values.captureRequiresOwner();
     }
 
+    /**
+     * @deprecated retired; the capture item ownership mode alone decides who may release a
+     * captured companion. True when {@link #captureItemOwnership()} is {@code OWNER_ONLY}.
+     */
+    @Deprecated
     public boolean spawnRequiresOwner() {
-        return values.spawnRequiresOwner();
+        return resolvedCaptureItemOwnership == CaptureItemOwnershipMode.OWNER_ONLY;
     }
 
     public boolean interactionRequiresOwner() {
@@ -292,6 +313,11 @@ public final class TameworkRuntimeSettings {
         return values.commandPanelCardsPerPage();
     }
 
+    /** True when avatar-flight launches, flaps and boosts cost no Vigour on this server. */
+    public boolean avatarFlightUnlimitedVigour() {
+        return values.avatarFlightUnlimitedVigour();
+    }
+
     public boolean telemetryEnabled() {
         return values.telemetryEnabled();
     }
@@ -303,6 +329,11 @@ public final class TameworkRuntimeSettings {
     public static int populationLimitPerPlayerOwnedTotal(int configLimit) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.populationLimitPerPlayerOwnedTotal() : configLimit;
+    }
+
+    public static int populationLimitPerPlayerDeployedTotal(int configLimit) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.populationLimitPerPlayerDeployedTotal() : configLimit;
     }
 
     @Nonnull
@@ -360,6 +391,8 @@ public final class TameworkRuntimeSettings {
         return settings != null ? settings.captureRequiresOwner() : configEnabled;
     }
 
+    /** @deprecated retired; see {@link #spawnRequiresOwner()}. */
+    @Deprecated
     public static boolean spawnRequiresOwner(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.spawnRequiresOwner() : configEnabled;

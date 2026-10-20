@@ -40,8 +40,8 @@ implementations and consumers.
 - Use `$mod-integration-bridge` when another mod consumes the existing API or
   when adapting an external integration.
 - Use `$tamework-companion-progression` for progression rules behind an API.
-- Use `$tamework-persistence` for durable mutations, idempotency, snapshots,
-  or recovery semantics.
+- Use `$tamework-persistence` for saved companion state, record changes,
+  snapshots, or restore semantics.
 - Use `$tamework-runtime-safety` for world-thread and ECS mutation boundaries.
 - Use `$hytale-docs-sync` for broad README/wiki/changelog synchronization.
 

@@ -16,7 +16,11 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Executes the legacy item-metadata free restoration path. */
+/**
+ * Runs the panel's free Revive and Recover buttons: finds the companion's record (owned, or linked
+ * in the tool's metadata) and hands it to {@link CommandCompanionRestorationService}. Without that
+ * service (no restore flow) the buttons report that tracking is unavailable.
+ */
 final class CommandFreeRestorationActionService {
     @Nullable
     private final CommandCompanionRestorationService restoration;

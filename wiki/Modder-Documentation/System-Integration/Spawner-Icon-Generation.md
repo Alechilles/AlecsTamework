@@ -59,6 +59,17 @@ Use this flow when renderer jobs already exist, usually from the Python generato
 
 Jobs use the schema `tamework.spawner-icon-render-jobs.v1`. Each job contains the resolved model, texture, selected attachment assets, output icon path, and camera metadata needed by the renderer.
 
+### Base Texture Binding
+
+Each job renders with the texture named in its `baseTextureFile`, even when several variant textures sit next to one `.blockymodel` (for example `RockDrake_Fire.png`, `RockDrake_Stone.png`, and `RockDrake_Ice.png` beside `RockDrake.blockymodel`). The Hytale codec loads every PNG whose name starts with the model name and shows the first one. The renderer then makes the job's texture the project default, rebinds every base model face to it, and rebuilds the face materials before the screenshot. You do not need to copy the model into a folder that holds only one texture.
+
+A job fails, and no PNG is written for it, when:
+
+- `baseTextureFile` is set but the file does not exist or cannot be loaded.
+- Any base model face still resolves to a different texture after rebinding.
+
+Failed jobs are listed in the completion summary and in `.tmp/spawner_icon_debug_last_run.json` next to the jobs file. A job with no `baseTextureFile` keeps the texture the codec picked.
+
 ## Python Single-Model Workflow
 
 The Python generator can create override data and renderer jobs without opening the Blockbench wizard. This is useful for repeatable local scripts or when the render step will happen later through the jobs JSON action.

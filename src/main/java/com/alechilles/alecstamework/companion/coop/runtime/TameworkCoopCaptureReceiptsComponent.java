@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.companion.coop.CoopCaptureReceipt;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.companion.migrate.retired.OperationId;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;

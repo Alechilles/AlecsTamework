@@ -1,87 +1,66 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
-import com.alechilles.alecstamework.api.CommandTimedSummoningView;
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
-import com.alechilles.alecstamework.api.PaidCommandRevivalCostQuoteView;
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
-import com.alechilles.alecstamework.api.PaidCommandRevivalQuoteRequest;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.api.PopulationGroupCountsView;
-import com.alechilles.alecstamework.api.PopulationGroupDefinitionView;
-import com.alechilles.alecstamework.api.PopulationGroupScope;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.flow.RosterSummons;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwItemCostComponent;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
 import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Builds row-scoped command feature presentation exclusively from canonical
- * roster projections and replacement public APIs.
+ * Builds row-scoped command feature presentation for command-family roster members from their
+ * companion index records: state, summon timer and cooldown, and the tightest deployed group limit
+ * of the member's role. A dead member's revive row shows its role's {@code Command.Revive.Costs}
+ * against the items the player holds and the record's revive cooldown; {@link
+ * CommandCompanionRestorationService} checks and charges the same terms when the player confirms.
  */
 final class CommandPanelFeaturePresentationSource {
-    private static final long QUOTE_REFRESH_INTERVAL_MS = 750L;
-    private static final String QUERY_KEY = "command-panel-query";
+    private static final String REVIVE_TERMS_REVISION = "index";
 
     private final CommandRosterPanelRecordSource rosterSource;
-    private final Supplier<CommandTimedSummoningApi> timedSummoning;
-    private final Supplier<PaidCommandRevivalApi> paidRevival;
-    private final Supplier<PopulationGroupApi> populationGroups;
+    private final Function<String, ReviveTerms> reviveTerms;
+    private final Function<UUID, List<CompanionRecord>> ownedRecords;
+    private final Supplier<CompanionAdmission.Rules> admissionRules;
     private final LongSupplier clock;
-    private final ConcurrentHashMap<QuoteKey, QuoteCache> quoteCache =
-            new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<QuoteKey, Boolean> quotesInFlight =
-            new ConcurrentHashMap<>();
 
+    /**
+     * @param reviveTerms    a role's revive terms; a failing read shows revive as unavailable
+     * @param ownedRecords   every non-released record of an owner, for the deployed group counts
+     * @param admissionRules the current population rules; a null or failing read shows no limit
+     */
     CommandPanelFeaturePresentationSource(
             @Nonnull CommandRosterPanelRecordSource rosterSource,
-            @Nonnull CommandTimedSummoningApi timedSummoning,
-            @Nonnull PaidCommandRevivalApi paidRevival,
-            @Nonnull PopulationGroupApi populationGroups,
-            @Nonnull LongSupplier clock
-    ) {
-        this(
-                rosterSource,
-                () -> timedSummoning,
-                () -> paidRevival,
-                () -> populationGroups,
-                clock
-        );
-    }
-
-    CommandPanelFeaturePresentationSource(
-            @Nonnull CommandRosterPanelRecordSource rosterSource,
-            @Nonnull Supplier<CommandTimedSummoningApi> timedSummoning,
-            @Nonnull Supplier<PaidCommandRevivalApi> paidRevival,
-            @Nonnull Supplier<PopulationGroupApi> populationGroups,
+            @Nonnull Function<String, ReviveTerms> reviveTerms,
+            @Nonnull Function<UUID, List<CompanionRecord>> ownedRecords,
+            @Nonnull Supplier<CompanionAdmission.Rules> admissionRules,
             @Nonnull LongSupplier clock
     ) {
         this.rosterSource = Objects.requireNonNull(
                 rosterSource, "Roster source is required"
         );
-        this.timedSummoning = Objects.requireNonNull(
-                timedSummoning, "Timed summon API is required"
-        );
-        this.paidRevival = Objects.requireNonNull(
-                paidRevival, "Paid revival API is required"
-        );
-        this.populationGroups = Objects.requireNonNull(
-                populationGroups, "Population group API is required"
-        );
+        this.reviveTerms = Objects.requireNonNull(reviveTerms, "Revive terms are required");
+        this.ownedRecords = Objects.requireNonNull(ownedRecords, "Owned records are required");
+        this.admissionRules = Objects.requireNonNull(admissionRules, "Admission rules are required");
         this.clock = Objects.requireNonNull(clock, "Clock is required");
     }
 
@@ -98,20 +77,24 @@ final class CommandPanelFeaturePresentationSource {
         List<CommandRosterPanelRecordSource.PanelMember> members =
                 rosterSource.membersFor(ownerUuid, familyId);
         return snapshotForMembers(
-                ownerUuid, ownershipWorldName, familyId, members
+                ownerUuid, ownershipWorldName, familyId, members, null
         );
     }
 
     /**
      * Builds feature rows from the exact roster member set used to create the
      * accompanying command-panel cards.
+     *
+     * @param heldItems how many of an item id the viewing player holds, for the revive cost
+     *                  lines; null shows every cost as not held
      */
     @Nonnull
     Map<UUID, CommandPanelFeaturePresentation> snapshotForMembers(
             @Nullable UUID ownerUuid,
             @Nullable String ownershipWorldName,
             @Nullable String familyId,
-            @Nullable List<CommandRosterPanelRecordSource.PanelMember> members
+            @Nullable List<CommandRosterPanelRecordSource.PanelMember> members,
+            @Nullable ToIntFunction<String> heldItems
     ) {
         if (ownerUuid == null || familyId == null || familyId.isBlank()) {
             return Map.of();
@@ -120,15 +103,21 @@ final class CommandPanelFeaturePresentationSource {
             return Map.of();
         }
         long nowMs = clock.getAsLong();
+        int deployedMembers = 0;
+        for (CommandRosterPanelRecordSource.PanelMember member : members) {
+            if (member.record().isDeployed()) {
+                deployedMembers++;
+            }
+        }
         LinkedHashMap<UUID, CommandPanelFeaturePresentation> result =
                 new LinkedHashMap<>();
         for (CommandRosterPanelRecordSource.PanelMember member : members) {
             CommandRosterStatusPresentation roster = roster(
-                    ownerUuid, ownershipWorldName, familyId, member, nowMs
+                    ownerUuid, ownershipWorldName, familyId, member, deployedMembers, nowMs
             );
             CommandReviveCostPresentation revival =
                     roster.paidRevivalState()
-                            ? revival(ownerUuid, familyId, member, nowMs)
+                            ? revival(member, heldItems, nowMs)
                             : null;
             result.put(
                     member.presentationUuid(),
@@ -177,52 +166,26 @@ final class CommandPanelFeaturePresentationSource {
             String ownershipWorldName,
             String familyId,
             CommandRosterPanelRecordSource.PanelMember member,
+            int deployedMembers,
             long nowMs
     ) {
-        CommandTimedSummoningState state =
-                fallbackState(member.lifecycleState());
-        long revision = member.view().membership().membershipRevision();
-        Long remainingMs = null;
-        boolean unlimited = false;
-        long cooldownRemainingMs = 0L;
-        try {
-            CommandTimedSummoningRequest identity =
-                    new CommandTimedSummoningRequest(
-                            ownerUuid,
-                            familyId,
-                            member.profileId(),
-                            QUERY_KEY
-                    );
-            CommandTimedSummoningView timed =
-                    currentTimedSummoning().get(identity).orElse(null);
-            if (timed != null) {
-                state = timed.state();
-                revision = timed.revision();
-                remainingMs = timed.remainingMs();
-                unlimited = timed.unlimited();
-                cooldownRemainingMs = remaining(
-                        timed.cooldownUntilMs(), nowMs
-                );
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // The canonical lifecycle remains a safe read-only fallback.
-        }
-        long configuredDurationMs = TwCompanionConfig
-                .resolveEffectiveForRole(member.roleId())
-                .getSummon()
-                .getActiveDurationMs();
+        CompanionRecord record = member.record();
+        boolean summoned = record.location().kind() == LocationKind.LIVE;
+        Long remainingMs = summoned && record.summonedUntilMs() != 0L
+                ? remaining(record.summonedUntilMs(), nowMs) : null;
+        long configuredDurationMs = configuredDurationMs(member.roleId());
         Capacity capacity = capacity(
-                ownerUuid, ownershipWorldName, member.roleId()
+                ownerUuid, ownershipWorldName, member.roleId(), deployedMembers
         );
         return new CommandRosterStatusPresentation(
                 member.profileId(),
                 familyId,
-                state,
-                revision,
+                state(member),
+                record.revision(),
                 remainingMs,
                 configuredDurationMs,
-                unlimited || configuredDurationMs == 0L,
-                cooldownRemainingMs,
+                remainingMs == null && (summoned || configuredDurationMs == 0L),
+                remaining(record.summonCooldownUntilMs(), nowMs),
                 capacity.activeCount(),
                 capacity.activeLimit(),
                 capacity.blockingGroupId(),
@@ -230,141 +193,136 @@ final class CommandPanelFeaturePresentationSource {
         );
     }
 
+    /**
+     * LIVE with a loaded body is summoned and LIVE without one is unloaded; STORED is stored and
+     * DEAD is dead. A member in an item or a coop has no roster actions.
+     */
+    static CommandTimedSummoningState state(
+            CommandRosterPanelRecordSource.PanelMember member
+    ) {
+        return switch (member.record().location().kind()) {
+            case LIVE -> member.bodyLoaded()
+                    ? CommandTimedSummoningState.ACTIVE
+                    : CommandTimedSummoningState.UNLOADED;
+            case STORED -> CommandTimedSummoningState.ROSTER_STORED;
+            case DEAD -> CommandTimedSummoningState.DEAD_REVIVABLE;
+            case LOST -> CommandTimedSummoningState.LOST;
+            case ITEM, COOP, RELEASED -> CommandTimedSummoningState.UNAVAILABLE;
+        };
+    }
+
+    /** The role's timed summon duration; 0 when summons are untimed or the config cannot be read. */
+    private static long configuredDurationMs(String roleId) {
+        try {
+            return RosterSummons.Policy.forRole(roleId).durationMs();
+        } catch (RuntimeException | LinkageError ignored) {
+            return 0L;
+        }
+    }
+
+    /**
+     * The revive row of a dead or lost member. Recovering a lost member is free and has no
+     * cooldown. A dead member follows the checks of {@link CommandCompanionRestorationService}:
+     * revive turned on for its role, the record's wall-clock cooldown, then the item cost.
+     * Null when the role's terms cannot be read.
+     */
     @Nullable
     private CommandReviveCostPresentation revival(
-            UUID ownerUuid,
-            String familyId,
             CommandRosterPanelRecordSource.PanelMember member,
+            @Nullable ToIntFunction<String> heldItems,
             long nowMs
     ) {
-        QuoteKey key = new QuoteKey(
-                ownerUuid, familyId, member.profileId()
-        );
-        QuoteCache cached = quoteCache.get(key);
-        if (cached == null || cached.stale(nowMs)) {
-            requestQuote(key, nowMs);
-            cached = quoteCache.get(key);
+        CompanionRecord record = member.record();
+        if (record.location().kind() != LocationKind.DEAD) {
+            return revival(PaidCommandRevivalQuote.Status.READY, 0L, List.of());
         }
-        return cached == null ? null : presentation(cached.quote());
-    }
-
-    private void requestQuote(QuoteKey key, long requestedAtMs) {
-        if (quotesInFlight.putIfAbsent(key, Boolean.TRUE) != null) {
-            return;
-        }
-        PaidCommandRevivalQuoteRequest request =
-                new PaidCommandRevivalQuoteRequest(
-                        key.ownerUuid(), key.profileId(), key.familyId()
-                );
+        ReviveTerms terms;
         try {
-            var stage = currentPaidRevival().quote(request);
-            if (stage == null) {
-                quotesInFlight.remove(key);
-                return;
-            }
-            stage.whenComplete((quote, failure) -> {
-                try {
-                    if (failure == null && matches(key, quote)) {
-                        quoteCache.put(
-                                key,
-                                new QuoteCache(
-                                        quote,
-                                        Math.max(
-                                                requestedAtMs,
-                                                clock.getAsLong()
-                                        )
-                                )
-                        );
-                    }
-                } finally {
-                    quotesInFlight.remove(key);
-                }
-            });
-        } catch (RuntimeException | LinkageError failure) {
-            quotesInFlight.remove(key);
+            terms = reviveTerms.apply(member.roleId());
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
         }
+        if (terms == null) {
+            return null;
+        }
+        List<CommandReviveCostPresentation.CostLine> costs = new ArrayList<>(terms.costs().size());
+        boolean affordable = true;
+        for (TwItemCostComponent cost : terms.costs()) {
+            int held = heldItems == null ? 0 : Math.max(0, heldItems.applyAsInt(cost.getItemId()));
+            affordable &= held >= cost.getQuantity();
+            costs.add(new CommandReviveCostPresentation.CostLine(
+                    cost.getItemId(), cost.getItemId(), null, held, cost.getQuantity()));
+        }
+        long cooldownMs = remaining(record.reviveAvailableAtMs(), nowMs);
+        PaidCommandRevivalQuote.Status status = !terms.enabled()
+                ? PaidCommandRevivalQuote.Status.DISABLED
+                : cooldownMs > 0L
+                ? PaidCommandRevivalQuote.Status.COOLDOWN
+                : affordable
+                ? PaidCommandRevivalQuote.Status.READY
+                : PaidCommandRevivalQuote.Status.INSUFFICIENT_COST;
+        return revival(status, cooldownMs, costs);
     }
 
-    private boolean matches(QuoteKey key, PaidCommandRevivalQuote quote) {
-        return quote != null
-                && key.ownerUuid().equals(quote.ownerUuid())
-                && key.familyId().equals(quote.commandFamilyId())
-                && key.profileId().equals(quote.profileId());
-    }
-
-    private CommandReviveCostPresentation presentation(
-            PaidCommandRevivalQuote quote
+    private static CommandReviveCostPresentation revival(
+            PaidCommandRevivalQuote.Status status,
+            long cooldownMs,
+            List<CommandReviveCostPresentation.CostLine> costs
     ) {
-        List<CommandReviveCostPresentation.CostLine> costs =
-                quote.costs().stream()
-                        .map(CommandPanelFeaturePresentationSource::cost)
-                        .toList();
         return new CommandReviveCostPresentation(
-                quote.status(),
-                quote.cooldownRemainingMs(),
-                costs,
-                quote.configRevision(),
-                quote.messageKey(),
-                quote.reason()
-        );
+                status, cooldownMs, costs, REVIVE_TERMS_REVISION, null, null);
     }
 
-    private static CommandReviveCostPresentation.CostLine cost(
-            PaidCommandRevivalCostQuoteView cost
-    ) {
-        String localizedName = cost.localizedName() == null
-                ? cost.itemId()
-                : cost.localizedName();
-        return new CommandReviveCostPresentation.CostLine(
-                cost.itemId(),
-                localizedName,
-                cost.iconAssetId(),
-                cost.ownedQuantity(),
-                cost.requiredQuantity()
-        );
-    }
-
+    /**
+     * The member role's deployed group with the least headroom, counted as {@link
+     * CompanionAdmission} counts it: the owner's LIVE records in that group, in the player's world
+     * for a per-world group. Groups without a deployed limit are skipped. When no limit applies,
+     * the count is this roster's deployed members, so the row never reads zero beside a summoned
+     * member.
+     */
     private Capacity capacity(
             UUID ownerUuid,
             String ownershipWorldName,
-            String roleId
+            String roleId,
+            int deployedMembers
     ) {
         long selectedActive = 0L;
         long selectedLimit = 0L;
         long smallestHeadroom = Long.MAX_VALUE;
         String selectedGroup = null;
         try {
-            PopulationGroupApi groups = currentPopulationGroups();
-            for (PopulationGroupDefinitionView definition
-                    : groups.resolveForRole(roleId)) {
-                String world = definition.scope()
-                        == PopulationGroupScope.PER_WORLD
-                        ? normalize(ownershipWorldName)
-                        : null;
-                if (definition.scope() == PopulationGroupScope.PER_WORLD
-                        && world == null) {
+            CompanionAdmission.Rules rules = admissionRules.get();
+            if (rules == null) {
+                return Capacity.unlimited(deployedMembers);
+            }
+            List<CompanionRecord> owned = ownedRecords.apply(ownerUuid);
+            String world = normalize(ownershipWorldName);
+            for (PopulationGroupPolicy group : rules.groupsForRole().apply(roleId)) {
+                boolean perWorld = group.scope() == PopulationGroupScope.PER_WORLD;
+                if (group.maxActivePerOwner() <= 0 || perWorld && world == null) {
                     continue;
                 }
-                PopulationGroupCountsView counts =
-                        groups.getCounts(
-                                ownerUuid, definition.groupId(), world
-                        ).orElse(null);
-                if (counts == null || counts.maxActive() <= 0L) {
-                    continue;
+                long active = 0L;
+                for (CompanionRecord record : owned) {
+                    if (record.isDeployed() && record.countsAsOwned()
+                            && (!perWorld || world.equals(CompanionAdmission.scopeWorld(record)))
+                            && CompanionAdmission.inGroup(rules, record, group.groupId())) {
+                        active++;
+                    }
                 }
-                long active = saturatedAdd(
-                        counts.committedActive(), counts.pendingActive()
-                );
-                long headroom = counts.maxActive() - active;
+                long headroom = group.maxActivePerOwner() - active;
                 if (headroom < smallestHeadroom) {
                     smallestHeadroom = headroom;
                     selectedActive = active;
-                    selectedLimit = counts.maxActive();
-                    selectedGroup = definition.groupId();
+                    selectedLimit = group.maxActivePerOwner();
+                    selectedGroup = group.groupId();
                 }
             }
         } catch (RuntimeException | LinkageError ignored) {
-            return Capacity.unlimited();
+            return Capacity.unlimited(deployedMembers);
+        }
+        if (selectedGroup == null) {
+            return Capacity.unlimited(deployedMembers);
         }
         return new Capacity(
                 saturatedInt(selectedActive),
@@ -374,22 +332,6 @@ final class CommandPanelFeaturePresentationSource {
                         ? "active-cap-reached"
                         : null
         );
-    }
-
-    private static CommandTimedSummoningState fallbackState(
-            LifecycleState state
-    ) {
-        return switch (state) {
-            case ACTIVE -> CommandTimedSummoningState.ACTIVE;
-            case UNLOADED -> CommandTimedSummoningState.UNLOADED;
-            case ROSTER_STORED ->
-                    CommandTimedSummoningState.ROSTER_STORED;
-            case DEAD_REVIVABLE ->
-                    CommandTimedSummoningState.DEAD_REVIVABLE;
-            case LOST -> CommandTimedSummoningState.LOST;
-            case UNRESOLVED -> CommandTimedSummoningState.UNAVAILABLE;
-            default -> CommandTimedSummoningState.UNLOADED;
-        };
     }
 
     private static long remaining(long untilMs, long nowMs) {
@@ -403,41 +345,8 @@ final class CommandPanelFeaturePresentationSource {
         }
     }
 
-    private static long saturatedAdd(long left, long right) {
-        try {
-            return Math.addExact(left, right);
-        } catch (ArithmeticException overflow) {
-            return Long.MAX_VALUE;
-        }
-    }
-
     private static int saturatedInt(long value) {
         return (int) Math.min(Integer.MAX_VALUE, Math.max(0L, value));
-    }
-
-    private CommandTimedSummoningApi currentTimedSummoning() {
-        return resolve(
-                timedSummoning, CommandTimedSummoningApi.unavailable()
-        );
-    }
-
-    private PaidCommandRevivalApi currentPaidRevival() {
-        return resolve(paidRevival, PaidCommandRevivalApi.unavailable());
-    }
-
-    private PopulationGroupApi currentPopulationGroups() {
-        return resolve(
-                populationGroups, PopulationGroupApi.unavailable()
-        );
-    }
-
-    private static <T> T resolve(Supplier<T> source, T unavailable) {
-        try {
-            T resolved = source.get();
-            return resolved == null ? unavailable : resolved;
-        } catch (RuntimeException | LinkageError ignored) {
-            return unavailable;
-        }
     }
 
     @Nullable
@@ -453,35 +362,18 @@ final class CommandPanelFeaturePresentationSource {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private record QuoteKey(
-            @Nonnull UUID ownerUuid,
-            @Nonnull String familyId,
-            @Nonnull String profileId
-    ) {
-        QuoteKey {
-            Objects.requireNonNull(ownerUuid, "Owner is required");
-            familyId = Objects.requireNonNull(
-                    normalize(familyId), "Family is required"
-            );
-            profileId = Objects.requireNonNull(
-                    normalize(profileId), "Profile is required"
-            );
-        }
-    }
-
-    private record QuoteCache(
-            @Nonnull PaidCommandRevivalQuote quote,
-            long observedAtMs
-    ) {
-        QuoteCache {
-            Objects.requireNonNull(quote, "Quote is required");
+    /** Whether revive is turned on for a role, and the items one revive costs. */
+    record ReviveTerms(boolean enabled, @Nonnull List<TwItemCostComponent> costs) {
+        ReviveTerms {
+            costs = List.copyOf(costs);
         }
 
-        private boolean stale(long nowMs) {
-            return quote.status()
-                    == PaidCommandRevivalQuote.Status.UNAVAILABLE
-                    || nowMs < observedAtMs
-                    || nowMs - observedAtMs >= QUOTE_REFRESH_INTERVAL_MS;
+        /** The live terms, as {@link CommandCompanionRestorationService} reads them. */
+        @Nonnull
+        static ReviveTerms forRole(@Nullable String roleId) {
+            return new ReviveTerms(
+                    CompanionRevivePolicy.featureEnabled(roleId),
+                    List.of(TwCompanionConfig.resolveEffectiveForRole(roleId).getRevive().getCosts()));
         }
     }
 
@@ -491,8 +383,8 @@ final class CommandPanelFeaturePresentationSource {
             @Nullable String blockingGroupId,
             @Nullable String blockingReason
     ) {
-        private static Capacity unlimited() {
-            return new Capacity(0, 0, null, null);
+        private static Capacity unlimited(int activeCount) {
+            return new Capacity(activeCount, 0, null, null);
         }
     }
 }

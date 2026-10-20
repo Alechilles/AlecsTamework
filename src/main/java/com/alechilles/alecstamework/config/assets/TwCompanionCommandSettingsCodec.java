@@ -176,7 +176,8 @@ final class TwCompanionCommandSettingsCodec {
                     settings -> settings.getOnTransferFailure().name()
             )
             .documentation(
-                    "Fallback behavior to use when world transfer fails."
+                    "Ignored since 5.0: companions no longer transfer between worlds. "
+                            + "Still read so older configs load."
             )
             .add()
             .<Boolean>append(

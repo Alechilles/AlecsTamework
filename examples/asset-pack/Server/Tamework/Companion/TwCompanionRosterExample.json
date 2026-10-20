@@ -1,0 +1,29 @@
+{
+  "Parent": "TwCompanionDefault",
+  "Enabled": true,
+  "Priority": 10,
+  "RoleIds": [
+    "Tamed_Sheep"
+  ],
+  "Command": {
+    "Summon": {
+      "Enabled": true,
+      "ActiveDurationMs": 60000,
+      "ResummonCooldownMs": 10000,
+      "AutoStoreOnOwnerLogout": true,
+      "ExpiryWarningThresholdsMs": [
+        10000
+      ]
+    },
+    "Revive": {
+      "Enabled": true,
+      "GameplayCooldownMs": 5000,
+      "Costs": [
+        {
+          "ItemId": "Ingredient_Bar_Copper",
+          "Quantity": 2
+        }
+      ]
+    }
+  }
+}

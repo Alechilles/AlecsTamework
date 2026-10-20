@@ -15,10 +15,14 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NameItemConfigView;
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
@@ -28,7 +32,6 @@ import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
-import com.alechilles.alecstamework.api.ProfileDataOperationView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
@@ -43,6 +46,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -123,11 +127,13 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "2.0.0";
-    private static final String SNAPSHOT_CAPTURE = "capture";
-    private static final String SNAPSHOT_DEATH = "death";
-    private static final String SNAPSHOT_LOST = "lost";
-    private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {SNAPSHOT_CAPTURE, SNAPSHOT_DEATH, SNAPSHOT_LOST};
+    static final String API_VERSION = "3.0.0";
+    private volatile AdmissionProviderApi admissionProviders = AdmissionProviderApi.unavailable();
+    private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {
+            CompanionRecordApiMapper.SNAPSHOT_CAPTURE,
+            CompanionRecordApiMapper.SNAPSHOT_DEATH,
+            CompanionRecordApiMapper.SNAPSHOT_LOST
+    };
 
     private final NpcProfilesApi profilesApi;
     private final ProfileDataApi profileDataApi;
@@ -146,7 +152,14 @@ public final class TameworkApiImpl
             new CapturedItemDisplayRegistry();
     private final BreedingCooldownResetService breedingCooldownResetService =
             new BreedingCooldownResetService();
-    private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
+    private final CommandLinksApi commandLinksApi = new CommandLinks();
+
+    /**
+     * A public named class, not an anonymous one: the NPC Debug Inspector looks methods up on the
+     * returned object's own class, and a method declared by a non-public class cannot be invoked
+     * from another mod.
+     */
+    public final class CommandLinks implements CommandLinksApi {
         @Override
         public Optional<CommandLinkView> getByProfileId(String profileId) {
             return getCommandLinkByProfileId(profileId);
@@ -171,8 +184,11 @@ public final class TameworkApiImpl
         public boolean hasHomePosition(String profileId) {
             return hasHomePositionInternal(profileId);
         }
-    };
-    private final ProgressionApi progressionApi = new ProgressionApi() {
+    }
+    private final ProgressionApi progressionApi = new Progression();
+
+    /** A public named class for the same reason as {@link CommandLinks}. */
+    public final class Progression implements ProgressionApi {
         @Override
         public Optional<ProgressionView> getByProfileId(String profileId) {
             return getProgressionByProfileId(profileId);
@@ -272,7 +288,7 @@ public final class TameworkApiImpl
         public ProgressionMutationResult syncStoredAttachments(UUID npcUuid) {
             return syncStoredAttachmentsByNpcUuid(npcUuid);
         }
-    };
+    }
     private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
             TameworkApiCapability.PROFILES,
             TameworkApiCapability.COMMAND_LINKS,
@@ -421,7 +437,10 @@ public final class TameworkApiImpl
         }
     }
 
-    /** Activates the API surface only after capture journal recovery has succeeded. */
+    /**
+     * Gives the config reads their capture item and capture policy registries and advertises
+     * {@link TameworkApiCapability#CAPTURE_POLICY}. Call it once capture is wired.
+     */
     public void activateCapturePolicyRuntime(@Nonnull ItemFeatureRegistry itemConfigs,
                                              @Nonnull CapturePolicyRegistry policyRegistry) {
         captureItemConfigs = Objects.requireNonNull(itemConfigs, "itemConfigs");
@@ -429,6 +448,17 @@ public final class TameworkApiImpl
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.CAPTURE_POLICY);
         }
+    }
+
+    /** Serves {@code policies().admissionProviders()} from {@code registry} instead of the fail-closed default. */
+    public void useAdmissionProviders(@Nonnull AdmissionProviderApi registry) {
+        admissionProviders = Objects.requireNonNull(registry, "registry");
+    }
+
+    @Override
+    @Nonnull
+    public AdmissionProviderApi admissionProviders() {
+        return admissionProviders;
     }
 
     /** Drops reflected optional-claim contracts after a settings change. */
@@ -731,14 +761,6 @@ public final class TameworkApiImpl
             ProfileDataCompareAndSetRequest request
     ) {
         return profileDataApi.compareAndSet(request);
-    }
-
-    @Override
-    public CompletionStage<Optional<ProfileDataOperationView>> findOperation(
-            String namespace,
-            String idempotencyKey
-    ) {
-        return profileDataApi.findOperation(namespace, idempotencyKey);
     }
 
     @Override
@@ -1086,6 +1108,51 @@ public final class TameworkApiImpl
                 decision.scope() != null ? decision.scope().name() : null,
                 decision.reason()
         );
+    }
+
+    /**
+     * Answers from the owner's records in the companion index: every owned companion in the
+     * request's scope counts, loaded or not. This is the owned limit only. The request names no
+     * role, so population-group limits are not part of this answer, and neither is the per-player
+     * deployed limit ({@code GlobalConfigView.PopulationView#limitPerPlayerDeployedTotal}).
+     */
+    @Nonnull
+    @Override
+    public OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
+        Objects.requireNonNull(request, "request");
+        Tamework plugin = Tamework.getInstance();
+        CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
+        return ownerCapV2(request, companions != null, OwnerPopulationCapService.evaluateAcquisition(
+                TwGlobalConfig.resolveActive(), companions, request.worldName(), request.ownerUuid()));
+    }
+
+    /** Maps a one-slot owner cap decision to the answer for {@code request.requestedSlots()} slots. */
+    @Nonnull
+    static OwnerPopulationCapDecisionViewV2 ownerCapV2(@Nonnull OwnerPopulationCapRequestV2 request,
+                                                       boolean indexAvailable,
+                                                       @Nonnull OwnerPopulationCapService.Decision decision) {
+        boolean perWorld = decision.scope() == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD;
+        OwnerPopulationCapDecisionViewV2.Scope scope = perWorld
+                ? OwnerPopulationCapDecisionViewV2.Scope.PER_WORLD
+                : OwnerPopulationCapDecisionViewV2.Scope.GLOBAL;
+        boolean counted = indexAvailable && decision.currentCount() >= 0
+                && !(perWorld && request.worldName() == null);
+        if (!counted && decision.capEnabled()) {
+            return OwnerPopulationCapDecisionViewV2.unavailable(request, scope, decision.reason());
+        }
+        long count = counted ? decision.currentCount() : OwnerPopulationCapDecisionViewV2.UNKNOWN_COUNT;
+        long pending = counted ? 0L : OwnerPopulationCapDecisionViewV2.UNKNOWN_COUNT;
+        if (!decision.capEnabled()) {
+            return new OwnerPopulationCapDecisionViewV2(request.ownerUuid(), request.worldName(),
+                    request.requestedSlots(), true, false, counted, 0, count, pending, Integer.MAX_VALUE,
+                    scope, OwnerPopulationCapDecisionViewV2.Readiness.READY, decision.reason());
+        }
+        long headroom = Math.max(0L, (long) decision.limit() - count);
+        boolean allowed = request.requestedSlots() <= headroom;
+        return new OwnerPopulationCapDecisionViewV2(request.ownerUuid(), request.worldName(),
+                request.requestedSlots(), allowed, true, true, decision.limit(), count, 0L, headroom,
+                scope, OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                allowed ? "owner-cap-allow" : "owner-cap-reached");
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(
@@ -1983,6 +2050,10 @@ public final class TameworkApiImpl
                 cachedState.lastKnownPosition(),
                 persistedState.lastKnownPosition()
         );
+        if (lastKnownPosition == null && profilesApi instanceof IndexNpcProfilesApi indexProfiles) {
+            // An unloaded companion in a world or a coop: the index record keeps its position.
+            lastKnownPosition = indexProfiles.lastKnownPosition(profile.profileId());
+        }
 
         if (isEmpty(resolvedToolIds)
                 && homePosition == null

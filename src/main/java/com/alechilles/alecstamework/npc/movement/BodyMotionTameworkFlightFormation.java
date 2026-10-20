@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.movement;
 
-import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
@@ -235,7 +234,7 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
                     accessor.getResource(EntityModule.get().getEntitySpatialResourceType());
             if (spatial != null && membership != null) {
                 List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
-                HytaleSpatialAccess.collect(spatial.getSpatialStructure(), self, spacing * 4.0, nearby);
+                spatial.getSpatialStructure().collect(self, spacing * 4.0, nearby);
                 try {
                     for (Ref<EntityStore> candidate : nearby) {
                         if (!candidate.isValid() || candidate.equals(ref)) continue;

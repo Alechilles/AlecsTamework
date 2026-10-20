@@ -8,7 +8,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Read-only population-group definitions, counts, and reconciliation authority. */
+/** Read-only population-group definitions and counts. */
 public interface PopulationGroupApi {
     @Nonnull
     Optional<PopulationGroupDefinitionView> getDefinition(@Nonnull String groupId);
@@ -54,9 +54,9 @@ public interface PopulationGroupApi {
     }
 
     /**
-     * Counts durable animals out in the world, including unloaded and unresolved
-     * profiles. Captured, stored, released and dead profiles do not count.
-     * This projected read is a prompt precheck, not a capacity reservation.
+     * Counts LIVE companions only: those with a body in a world, loaded or not.
+     * Captured, housed, stored, dead, lost and released companions do not count.
+     * This read is a prompt precheck, not a capacity reservation.
      */
     @Nonnull
     default OptionalLong getDurableDeployableCount(
@@ -67,9 +67,6 @@ public interface PopulationGroupApi {
         if (groupIds == null) throw new NullPointerException("groupIds");
         return OptionalLong.empty();
     }
-
-    @Nonnull
-    PopulationGroupReconciliationView getReconciliationStatus();
 
     /** Compatibility fallback for implementations without group authority. */
     static PopulationGroupApi unavailable() {
@@ -97,11 +94,6 @@ public interface PopulationGroupApi {
                 if (ownerUuid == null) throw new NullPointerException("ownerUuid");
                 if (groupId == null) throw new NullPointerException("groupId");
                 return Optional.empty();
-            }
-
-            @Override
-            public PopulationGroupReconciliationView getReconciliationStatus() {
-                return PopulationGroupReconciliationView.unavailable();
             }
         };
 

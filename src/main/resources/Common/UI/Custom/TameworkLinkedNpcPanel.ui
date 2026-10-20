@@ -1,11 +1,12 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 $C = "Common.ui";
+@ReviveSummaryReady = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #7fe08f, HorizontalAlignment: Start, VerticalAlignment: Center);
+@ReviveSummaryBlocked = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #f0b45a, HorizontalAlignment: Start, VerticalAlignment: Center);
 Group #TameworkLinkedPanelRoot {
   Anchor: (Top: 54, Left: 176, Width: 928, Height: 790);
  Visible: false;
  Group #TameworkLinkedPanelContainer {
   Anchor: (Top: 0, Left: 0, Width: 928, Height: 790);
- Background: #181c1a;
 Group #Title {
             Anchor: (Top: 10, Left: 10, Right: 10, Height: 30);
 
@@ -15,9 +16,7 @@ Group #TameworkLinkedPanelActiveHighlightControls {
 
                 CheckBox #TameworkLinkedPanelActiveHighlightCheck {
                     Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-                    Background: (Color: #252c27);
-                    OutlineColor: #4a5a50;
-                    OutlineSize: 1;
+                    Background: $A.@SlateQuiet;
                     Padding: (Full: 4);
                     Style: $C.@DefaultCheckBoxStyle;
                 }
@@ -25,7 +24,7 @@ Group #TameworkLinkedPanelActiveHighlightControls {
                 Label #TameworkLinkedPanelActiveHighlightLabel {
                     Anchor: (Right: 0, Width: 104, Height: 28);
                     Text: %server.tamework.ui.linkedPanel.activeHighlight.label;
-                    Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
             }
             Group #TameworkLinkedPanelAutoLinkControls {
@@ -33,9 +32,7 @@ Group #TameworkLinkedPanelActiveHighlightControls {
 
                 CheckBox #TameworkLinkedPanelAutoLinkCheck {
                     Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-                    Background: (Color: #252c27);
-                    OutlineColor: #4a5a50;
-                    OutlineSize: 1;
+                    Background: $A.@SlateQuiet;
                     Padding: (Full: 4);
                     Style: $C.@DefaultCheckBoxStyle;
                 }
@@ -43,16 +40,14 @@ Group #TameworkLinkedPanelActiveHighlightControls {
                 Label #TameworkLinkedPanelAutoLinkLabel {
                     Anchor: (Left: 28, Width: 66, Height: 28);
                     Text: %server.tamework.ui.linkedPanel.autoLink.label;
-                    Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
             }
 
             DropdownBox #TameworkLinkedPanelModeDropdown {
                 Visible: false;
                 Anchor: (Top: 2, Left: 0, Width: 230, Height: 28);
-                OutlineColor: #454e48;
-                OutlineSize: 1;
-                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, RenderBold: true, FontSize: 13));
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, RenderBold: true, FontSize: 13));
                 MaxSelection: 1;
                 NoItemsText: %server.tamework.ui.linkedPanel.mode.noModes;
             }
@@ -65,16 +60,16 @@ Group #TameworkLinkedPanelActiveHighlightControls {
         // Generic companion roster tabs stay hidden for the legacy managed and bonded flows.
         // The command page positions this group beside the shared toolbar when enabled.
         Group #CompanionModeTabs {
-          Anchor: (Top: 0, Left: 0, Width: 404, Height: 30);
+          Anchor: (Top: 0, Left: 0, Width: 470, Height: 30);
           LayoutMode: Left;
           Visible: false;
-          TextButton #CompanionInWorld { Anchor: (Width: 104, Height: 28); Text: %server.tamework.ui.companions.inWorld; Style: $A.@CompanionTabButton; OutlineColor: #4a5a50; OutlineSize: 1; }
+          TextButton #CompanionInWorld { Anchor: (Width: 116, Height: 30); Text: %server.tamework.ui.companions.inWorld; Style: $A.@CompanionTabButton; }
           Group { Anchor: (Width: 4); }
-          TextButton #CompanionStored { Anchor: (Width: 84, Height: 28); Text: %server.tamework.ui.companions.stored; Style: $A.@CompanionTabButton; OutlineColor: #4a5a50; OutlineSize: 1; }
+          TextButton #CompanionStored { Anchor: (Width: 96, Height: 30); Text: %server.tamework.ui.companions.stored; Style: $A.@CompanionTabButton; }
           Group { Anchor: (Width: 4); }
-          TextButton #CompanionLostDead { Anchor: (Width: 124, Height: 28); Text: %server.tamework.ui.companions.lostDead; Style: $A.@CompanionTabButton; OutlineColor: #4a5a50; OutlineSize: 1; }
+          TextButton #CompanionLostDead { Anchor: (Width: 144, Height: 30); Text: %server.tamework.ui.companions.lostDead; Style: $A.@CompanionTabButton; }
           Group { Anchor: (Width: 4); }
-          TextButton #CompanionAll { Anchor: (Width: 70, Height: 28); Text: %server.tamework.ui.companions.all; Style: $A.@CompanionTabButton; OutlineColor: #4a5a50; OutlineSize: 1; }
+          TextButton #CompanionAll { Anchor: (Width: 80, Height: 30); Text: %server.tamework.ui.companions.all; Style: $A.@CompanionTabButton; }
         }
 
         Group #CompanionNearbyControls {
@@ -82,16 +77,14 @@ Group #TameworkLinkedPanelActiveHighlightControls {
           Visible: false;
           CheckBox #CompanionNearbyCheck {
             Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-            Background: (Color: #252c27);
-            OutlineColor: #4a5a50;
-            OutlineSize: 1;
+            Background: $A.@SlateQuiet;
             Padding: (Full: 4);
             Style: $C.@DefaultCheckBoxStyle;
           }
           Label #CompanionNearbyLabel {
             Anchor: (Left: 28, Width: 100, Height: 28);
             Text: %server.tamework.ui.companions.nearby;
-            Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
           }
         }
 
@@ -101,7 +94,7 @@ Group #BondedRosterModeTabs { Anchor: (Top: 0, Left: 0, Width: 284, Height: 30);
     TextButton #BondedRosterStored { Anchor: (Left: 144, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.stored; Style: $A.@PanelButton; }
     TextButton #BondedRosterDead { Anchor: (Left: 216, Width: 68, Height: 28); Text: %server.tamework.ui.roster.filter.dead; Style: $A.@PanelButton; }
 }
-Label #BondedRosterCapacity { Anchor: (Top: 0, Right: 0, Width: 180, Height: 28); Visible: false; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+Label #BondedRosterCapacity { Anchor: (Top: 0, Right: 0, Width: 250, Height: 28); Visible: false; Style: (FontSize: 11, TextColor: #bfcdd5, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
 
 
 Group #TameworkLinkedPanelControlsSecondary {
@@ -111,7 +104,7 @@ Group #TameworkLinkedPanelControlsSecondary {
                 Label #TameworkLinkedPanelSortLabel {
                     Anchor: (Width: 26, Height: 24);
                     Text: %server.tamework.ui.linkedPanel.sort.label;
-                    Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
                 Group {
@@ -120,9 +113,7 @@ Group #TameworkLinkedPanelControlsSecondary {
 
                 DropdownBox #TameworkLinkedPanelSortDropdown {
                     Anchor: (Width: 92, Height: 28);
-                    OutlineColor: #454e48;
-                OutlineSize: 1;
-                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, RenderBold: true, FontSize: 13));
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, RenderBold: true, FontSize: 13));
                     MaxSelection: 1;
                     NoItemsText: %server.tamework.ui.linkedPanel.sort.noneOptions;
                 }
@@ -134,7 +125,7 @@ Group #TameworkLinkedPanelControlsSecondary {
                 Label #TameworkLinkedPanelFilterLabel {
                     Anchor: (Width: 34, Height: 24);
                     Text: %server.tamework.ui.linkedPanel.filter.label;
-                    Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
                 Group {
@@ -143,9 +134,7 @@ Group #TameworkLinkedPanelControlsSecondary {
 
                 DropdownBox #TameworkLinkedPanelFilterDropdown {
                     Anchor: (Width: 96, Height: 28);
-                    OutlineColor: #454e48;
-                OutlineSize: 1;
-                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, RenderBold: true, FontSize: 13));
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, RenderBold: true, FontSize: 13));
                     MaxSelection: 1;
                     NoItemsText: %server.tamework.ui.linkedPanel.filter.noneOptions;
                 }
@@ -162,12 +151,10 @@ Group #TameworkLinkedPanelControlsSecondary {
                     TextField #TameworkLinkedPanelFilterInput {
                         Style: $A.@PanelInputFieldStyle;
                         PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-                        Background: (Color: #252c27);
-                        OutlineColor: #4a5a50;
-                        OutlineSize: 1;
+                        Background: $A.@SlateQuiet;
                         Decoration: (
-                            Default: (Background: (Color: #252c27), OutlineColor: #4a5a50, OutlineSize: 1),
-                            Focused: (Background: (Color: #2d3831), OutlineColor: #91b59b, OutlineSize: 1)
+                            Default: (Background: $A.@SlateQuiet),
+                            Focused: (Background: $A.@SlateQuietFocus)
                         );
                         Anchor: (Width: 96, Height: 28);
                         Padding: (Horizontal: 8);
@@ -201,7 +188,7 @@ Group #TameworkLinkedPanelSubtitleRadiusSlot {
                         Label #TameworkLinkedPanelRadiusValue {
                             Anchor: (Width: 68, Height: 28);
                             Text: %server.tamework.ui.linkedPanel.radius.value.default;
-                            Style: (FontSize: 12, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center);
+                            Style: (FontSize: 12, TextColor: #eef2f6, HorizontalAlignment: Center, VerticalAlignment: Center);
                         }
 
                         Group {
@@ -226,9 +213,7 @@ Group #TameworkLinkedPanelSubtitleRadiusSlot {
  Group #TameworkLinkedPanelSubtitleRow { Visible: false; Anchor: (Top: 0, Left: 0, Width: 158, Height: 28);
 DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
                     Anchor: (Top: 0, Left: 0, Width: 152, Height: 28);
-                    OutlineColor: #454e48;
-                OutlineSize: 1;
-                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, RenderBold: true, FontSize: 13));
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 13), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, RenderBold: true, FontSize: 13));
                     MaxSelection: 1;
                     NoItemsText: %server.tamework.ui.linkedPanel.groupSelector.noneGroups;
                 }
@@ -239,7 +224,7 @@ DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
 Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);
                 Text: %server.tamework.ui.linkedPanel.emptyState;
-                Style: (FontSize: 14, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start);
+                Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Start);
                 Visible: false;
             }
 Group #TameworkLinkedPanelListViewport {
@@ -259,11 +244,11 @@ Group #TameworkLinkedPanelPagination {
     Anchor: (Height: 34);
     LayoutMode: Left;
     Visible: false;
-    Background: #202723;
+    Background: #000000(0.22);
     Padding: (Left: 7, Right: 2);
     Label #TameworkLinkedPanelPageRange {
         Anchor: (Width: 330, Height: 28);
-        Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
+        Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
     TextButton #CompanionSelectMatching {
         Anchor: (Width: 170, Height: 28);
@@ -288,11 +273,9 @@ Group #TameworkLinkedPanelPagination {
         }
         Label #TameworkLinkedPanelPageStatus {
             Anchor: (Width: 124, Height: 28);
-            Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
         TextButton #TameworkLinkedPanelPageNext {
-            OutlineColor: #7acb88;
-            OutlineSize: 1;
             Anchor: (Width: 96, Height: 28);
             Style: $A.@PanelButton;
             Text: %server.tamework.ui.linkedPanel.pagination.next;
@@ -302,30 +285,28 @@ Group #TameworkLinkedPanelPagination {
 }
         Group #TameworkLinkedPanelGroupAssignOverlay {
             Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-            Background: #101311(0.78);
+            Background: #05080b(0.8);
             Visible: false;
 
             Group #TameworkLinkedPanelGroupAssignModal {
                 Anchor: (Top: 190, Left: 285, Width: 358, Height: 176);
-                Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+                Background: $A.@SlateModal;
 
                 Label #TameworkLinkedPanelGroupAssignTitle {
                     Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
                     Text: %server.tamework.ui.linkedPanel.groupAssign.title;
-                    Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 18, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
                 Label #TameworkLinkedPanelGroupAssignSubtitle {
                     Anchor: (Top: 40, Left: 14, Width: 330, Height: 24);
                     Text: %server.tamework.ui.linkedPanel.groupAssign.prompt;
-                    Style: (FontSize: 12, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
                 DropdownBox #TameworkLinkedPanelGroupAssignDropdown {
                     Anchor: (Top: 72, Left: 14, Width: 330, Height: 26);
-                    OutlineColor: #454e48;
-                OutlineSize: 1;
-                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, FontSize: 12), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0, RenderUppercase: false, RenderBold: true, FontSize: 12));
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, FontSize: 12), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #bfcdd5, RenderUppercase: false, RenderBold: true, FontSize: 12));
                     MaxSelection: 1;
                     NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.noneGroups;
                 }
@@ -349,7 +330,7 @@ Group #TameworkLinkedPanelPagination {
                     }
 
                     TextButton #TameworkLinkedPanelGroupAssignApplyButton {
-                        Style: $A.@PanelButton;
+                        Style: $A.@PanelButtonPrimary;
                         Anchor: (Width: 161, Height: 28);
                         Text: %server.tamework.ui.shared.button.apply;
                     }
@@ -359,56 +340,76 @@ Group #TameworkLinkedPanelPagination {
 
         Group #TameworkLinkedPanelReviveOverlay {
             Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-            Background: #101311(0.82);
+            Background: #05080b(0.82);
             Visible: false;
 
+            // Sized and placed by LinkedNpcPanelReviveOverlayState: it grows with the number of cost lines.
             Group #TameworkLinkedPanelReviveModal {
-                Anchor: (Top: 230, Left: 273, Width: 382, Height: 180);
-                Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+                Anchor: (Top: 200, Left: 254, Width: 420, Height: 276);
+                Background: $A.@SlateWindowHeader48;
 
                 Label #TameworkLinkedPanelReviveTitle {
-                    Anchor: (Top: 10, Left: 14, Width: 354, Height: 24);
+                    Anchor: (Top: 0, Left: 22, Width: 376, Height: 48);
                     Text: %server.tamework.ui.linkedPanel.revive.title;
-                    Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
+                    Style: $A.@SlateTitle;
+                }
+
+                Label #TameworkLinkedPanelReviveSubtitle {
+                    Anchor: (Top: 58, Left: 16, Width: 388, Height: 18);
+                    Text: "";
+                    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Label {
+                    Anchor: (Top: 80, Left: 16, Width: 388, Height: 16);
+                    Text: %server.tamework.ui.linkedPanel.revive.costHeader;
+                    Style: $A.@SlateSectionLabel;
                 }
 
                 Group #TameworkLinkedPanelReviveCostViewport {
-                    Anchor: (Top: 44, Left: 14, Width: 354, Height: 88);
+                    Anchor: (Top: 100, Left: 16, Width: 388, Height: 96);
                     KeepScrollPosition: true;
                     ScrollbarStyle: $C.@DefaultScrollbarStyle;
                     LayoutMode: TopScrolling;
 
                     Group #TameworkLinkedPanelReviveCostList {
                         LayoutMode: Top;
-                        Anchor: (Bottom: 4);
                     }
                 }
 
+                Label #TameworkLinkedPanelReviveSummary {
+                    Anchor: (Top: 202, Left: 16, Width: 388, Height: 18);
+                    Text: "";
+                    Style: @ReviveSummaryBlocked;
+                }
+
                 Group #TameworkLinkedPanelReviveActions {
-                    Anchor: (Top: 146, Left: 14, Width: 354, Height: 24);
+                    Anchor: (Top: 232, Left: 16, Width: 388, Height: 30);
                     LayoutMode: Left;
 
                     Group { Anchor: (Width: 158); }
 
                     TextButton #TameworkLinkedPanelReviveCancelButton {
-                        Style: $A.@PanelButton;
-                        Anchor: (Width: 88, Height: 24);
+                        Style: $A.@PanelButtonQuiet;
+                        Anchor: (Width: 100, Height: 30);
                         Text: %server.tamework.ui.shared.button.cancel;
                     }
 
-                    Group { Anchor: (Width: 8); }
+                    Group { Anchor: (Width: 10); }
 
                     TextButton #TameworkLinkedPanelReviveConfirmButton {
-                        Style: $A.@PanelButton;
-                        Anchor: (Width: 100, Height: 24);
+                        Style: $A.@PanelButtonPrimary;
+                        Anchor: (Width: 120, Height: 30);
                         Text: %server.tamework.ui.linkedPanel.revive.confirm;
                         Visible: false;
                     }
 
+                    // Shown in place of the confirm button while the cost cannot be paid: the same button, greyed out.
                     Label #TameworkLinkedPanelReviveBlockedButton {
-                        Anchor: (Width: 100, Height: 24);
+                        Anchor: (Width: 120, Height: 30);
                         Text: %server.tamework.ui.linkedPanel.revive.confirm;
-                        Style: (FontSize: 13, RenderBold: true, TextColor: #7d877f, HorizontalAlignment: Center, VerticalAlignment: Center);
+                        Background: $A.@SlateDisabled;
+                        Style: (FontSize: 12, RenderBold: true, TextColor: #445974, HorizontalAlignment: Center, VerticalAlignment: Center);
                         Visible: false;
                     }
                 }

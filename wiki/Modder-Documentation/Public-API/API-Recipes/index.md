@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
-> **Stable API Contract (`1.0.0`)**
+> **API `3.0.0`**
 > Gate recipe behavior behind runtime capability checks.
 
 ## Child Pages

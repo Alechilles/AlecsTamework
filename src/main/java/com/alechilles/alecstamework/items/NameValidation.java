@@ -88,6 +88,8 @@ final class NameValidation {
         switch (normalized) {
             case "lettersnumbersspaces":
                 return Pattern.compile("^[\\p{L}\\p{N} ]+$");
+            case "lettersnumbersspacespunctuation":
+                return Pattern.compile("^[\\p{L}\\p{N} '’.\\-]+$");
             case "lettersnumbers":
                 return Pattern.compile("^[\\p{L}\\p{N}]+$");
             case "lettersspaces":

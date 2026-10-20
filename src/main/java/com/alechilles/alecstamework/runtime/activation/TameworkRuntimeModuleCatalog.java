@@ -147,9 +147,13 @@ public final class TameworkRuntimeModuleCatalog {
                         core,
                         TameworkRuntimeModule.DORMANT_PERSISTENCE
                 ),
+                // A bonded summon is a companion body: the body, death and ownership systems, summon
+                // expiry and the logout and world-change stores are all registered under generic
+                // persistence, so a bonded-only server needs it too.
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.BONDED_PERSISTENCE,
-                        core
+                        core,
+                        persistence
                 ),
                 TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.HSTATS),
                 TameworkRuntimeModuleDescriptor.of(

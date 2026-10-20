@@ -6,6 +6,7 @@ import com.alechilles.beacon.api.TelemetryEventContext;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,6 +36,13 @@ public final class NeedsTelemetryDiagnostics {
         private Fingerprints() {
         }
     }
+
+    private static final String CONTAINER_FOOD_FAILURE_PREFIX = "no_container_food_consumed(";
+    private static final Set<String> EXPECTED_CONTAINER_STATUSES =
+            Set.of("NO_ALLOWED_FOOD_IN_RANGE", "NO_CONTAINER_IN_RANGE", "NO_ITEMS_CONSUMED");
+    private static final Set<String> EXPECTED_CONSUME_REASONS = Set.of(
+            "not_near_water", "food_refill_disabled", "water_refill_disabled",
+            "no_refill_applied");
 
     public static void recordSeekFailure(@Nullable String roleId,
                                          @Nonnull String resourceType,
@@ -82,6 +90,9 @@ public final class NeedsTelemetryDiagnostics {
                 || "success".equals(reason)
                 || "success_happiness_only".equals(reason)
                 || !isRuntimeEnabled()) {
+            return;
+        }
+        if (!isReportableConsumeFailureReason(reason)) {
             return;
         }
         String resource = normalizeResource(mode);
@@ -175,6 +186,30 @@ public final class NeedsTelemetryDiagnostics {
                 || "needs_config_missing_or_disabled".equals(reason);
     }
 
+    /**
+     * A source that ran dry, was emptied by another animal or is switched off in config is normal
+     * play, not a fault. Only failures of the consume machinery itself are worth an error event.
+     */
+    static boolean isReportableConsumeFailureReason(@Nonnull String reason) {
+        String remaining = reason;
+        int start = remaining.indexOf(CONTAINER_FOOD_FAILURE_PREFIX);
+        if (start >= 0) {
+            int end = remaining.indexOf(')', start);
+            String status = parseContainerSummary(remaining).get("status");
+            if (end < 0 || status == null || !EXPECTED_CONTAINER_STATUSES.contains(status)) {
+                return true;
+            }
+            remaining = remaining.substring(0, start) + remaining.substring(end + 1);
+        }
+        for (String token : remaining.split(",")) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty() && !EXPECTED_CONSUME_REASONS.contains(trimmed)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Nonnull
     static String seekFailureStage(@Nonnull String reason) {
         if (reason.contains("_source_found_but_no_stand_target")) {
@@ -201,7 +236,7 @@ public final class NeedsTelemetryDiagnostics {
     static ConsumeFailureContext consumeFailureContext(@Nullable String reason) {
         String rawReason = reason == null ? "" : reason.trim();
         Map<String, String> containerSummary = parseContainerSummary(rawReason);
-        boolean containerFoodFailed = rawReason.contains("no_container_food_consumed(");
+        boolean containerFoodFailed = rawReason.contains(CONTAINER_FOOD_FAILURE_PREFIX);
         boolean waterFailed = rawReason.contains("not_near_water");
         String telemetryReason;
         if (containerFoodFailed && waterFailed) {
@@ -218,11 +253,11 @@ public final class NeedsTelemetryDiagnostics {
 
     @Nonnull
     private static Map<String, String> parseContainerSummary(@Nonnull String reason) {
-        int start = reason.indexOf("no_container_food_consumed(");
+        int start = reason.indexOf(CONTAINER_FOOD_FAILURE_PREFIX);
         if (start < 0) {
             return Map.of();
         }
-        start += "no_container_food_consumed(".length();
+        start += CONTAINER_FOOD_FAILURE_PREFIX.length();
         int end = reason.indexOf(')', start);
         if (end <= start) {
             return Map.of();

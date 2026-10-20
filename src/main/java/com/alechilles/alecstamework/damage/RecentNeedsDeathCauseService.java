@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
+import com.alechilles.alecstamework.companion.flow.DeathCauseKind;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +28,7 @@ public final class RecentNeedsDeathCauseService {
     }
 
     public void record(@Nullable UUID npcUuid,
-                       @Nullable DeathSnapshotV2Payload.DeathCauseKind causeKind,
+                       @Nullable DeathCauseKind causeKind,
                        long nowMs) {
         if (npcUuid == null || causeKind == null) {
             return;
@@ -38,7 +38,7 @@ public final class RecentNeedsDeathCauseService {
     }
 
     @Nullable
-    public DeathSnapshotV2Payload.DeathCauseKind consumeRecent(
+    public DeathCauseKind consumeRecent(
             @Nullable UUID npcUuid,
             long nowMs
     ) {
@@ -75,7 +75,7 @@ public final class RecentNeedsDeathCauseService {
     }
 
     private record NeedsDeathCauseHint(
-                                       @Nonnull DeathSnapshotV2Payload.DeathCauseKind causeKind,
+                                       @Nonnull DeathCauseKind causeKind,
                                        long recordedAtMs) {
     }
 }

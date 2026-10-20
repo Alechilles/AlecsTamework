@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
+> **API `3.0.0`**
 > This reference tracks the current `configs()` contract in `TameworkApi`.
 
 Capability: `CONFIG_READ`
@@ -51,6 +51,17 @@ API 0.9 capture views:
 - `CommandItemConfigView`
 - `SpawnerCaptureMechanicsView`
 - `CapturePolicyConfigView`
+
+## Global population limits
+`GlobalConfigView.population()` returns the effective per-player limits (the
+`/tw settings` values). `0` means no limit, and both limits use
+`perPlayerLimitScope()` (`PerWorld` or `Global`).
+
+- `limitPerPlayerOwnedTotal()`: every companion the player owns (out in the
+  world, stored, in items, in coops, dead and lost).
+- `limitPerPlayerDeployedTotal()`: the player's companions out in the world,
+  loaded or not. Added in 5.0. The two-argument `PopulationView` constructor
+  remains and sets it to `0`.
 
 ## Notes
 - Returned views are detached immutable DTOs.

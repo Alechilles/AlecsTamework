@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.damage.TameworkEnvironmentSource;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -202,10 +203,8 @@ public final class CompanionHappinessService {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
-        if (damage != null
-                && damage.getSource() instanceof Damage.EnvironmentSource environmentSource
-                && environmentSource.getType() != null
-                && environmentSource.getType().equalsIgnoreCase(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE)) {
+        if (damage != null && CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE.equalsIgnoreCase(
+                TameworkEnvironmentSource.typeOf(damage.getSource()))) {
             return false;
         }
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();

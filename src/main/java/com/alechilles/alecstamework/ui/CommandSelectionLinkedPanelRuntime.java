@@ -457,7 +457,7 @@ final class CommandSelectionLinkedPanelRuntime {
             // Group definitions change on the manager page, which rebuilds this page on return.
             if (append) {
                 commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
-                        "TameworkPanelActionStyles.ui", "CompanionGroupDropdown"));
+                        "TameworkSlateStyles.ui", "CompanionGroupDropdown"));
                 commands.set(selector + ".MaxSelection", 0);
                 commands.set(selector + ".Entries", entries);
             }
@@ -475,7 +475,7 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         commands.set(selector + ".MaxSelection", 1);
         commands.set(selector + ".Style", com.hypixel.hytale.server.core.ui.Value.ref(
-                "TameworkPanelActionStyles.ui", "GroupDropdown"));
+                "TameworkSlateStyles.ui", "GroupDropdown"));
         String selectedGroup = LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId());
         commands.set(selector + ".Entries", entries);
         commands.set(selector + ".Value", selectedGroup);

@@ -1,0 +1,88 @@
+{
+  "Enabled": true,
+  "ItemIds": [
+    "Tamework_Command_Roster_Example"
+  ],
+  "RosterStorage": "OwnerCommandFamily",
+  "CommandFamilyId": "example_roster",
+  "LinkEnabled": true,
+  "RequireOwner": true,
+  "RequireTamed": true,
+  "MembershipMode": "LinkedOnly",
+  "Radius": -1,
+  "MaxTargets": 25,
+  "MaxActive": 0,
+  "CooldownSeconds": 2,
+  "RequireLineOfSight": false,
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [
+      "Tamed_Sheep"
+    ]
+  },
+  "CommandList": [
+    {
+      "Id": "Follow",
+      "DisplayName": "tamework.commands.follow.name",
+      "Default": true,
+      "Feedback": {
+        "HudMessage": "tamework.commands.follow.hud",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Follow"
+      },
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Follow"
+        },
+        {
+          "Type": "SetTarget",
+          "TargetSlot": "MasterTarget",
+          "Source": "OwnerPlayer"
+        }
+      ]
+    },
+    {
+      "Id": "Hold",
+      "DisplayName": "tamework.commands.hold.name",
+      "Feedback": {
+        "HudMessage": "tamework.commands.hold.hud",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Hold"
+      },
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Hold"
+        }
+      ]
+    },
+    {
+      "Id": "Recall",
+      "DisplayName": "tamework.commands.recall.name",
+      "Feedback": {
+        "HudMessage": "tamework.commands.recall.hud",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Poof_Small"
+      },
+      "Steps": [
+        {
+          "Type": "ClearCombat",
+          "State": "Follow",
+          "TargetSlots": [
+            "LockedTarget"
+          ],
+          "AssignOwnerAsMasterTarget": true
+        }
+      ]
+    }
+  ]
+}

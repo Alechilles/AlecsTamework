@@ -8,9 +8,9 @@ import javax.annotation.Nullable;
 /**
  * Context-complete owner-cap preflight result.
  *
- * <p>Evaluation is informational. A caller must use {@link PopulationAdmissionApi} to bind a
- * mutation to reserved capacity. Unknown counts use {@link #UNKNOWN_COUNT}, never a misleading
- * zero.
+ * <p>Evaluation is informational and reserves nothing. The binding check runs in the step that
+ * changes the companion record, so a later change by the same owner can still be refused.
+ * Unknown counts use {@link #UNKNOWN_COUNT}, never a misleading zero.
  */
 public record OwnerPopulationCapDecisionViewV2(@Nonnull UUID ownerUuid,
                                                @Nullable String worldName,

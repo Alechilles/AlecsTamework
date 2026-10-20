@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -96,23 +95,6 @@ public final class RespawnTraceLogSupport {
             return;
         }
         log(trace, "snapshot stage=" + stage + " " + describeSnapshot(snapshot));
-    }
-
-    /** Logs either a decoded stored projection or its stable decode failure. */
-    public static void logDecodedProjection(
-            @Nullable RecentRespawnTraceService.Trace trace,
-            @Nonnull String stage,
-            @Nonnull SnapshotDecodeResult<
-                    CoopResidentStateSnapshotService.CoopResidentStateSnapshot> decoded) {
-        if (decoded instanceof SnapshotDecodeResult.Decoded<
-                CoopResidentStateSnapshotService.CoopResidentStateSnapshot> found) {
-            logSnapshot(trace, stage, found.value());
-            return;
-        }
-        SnapshotDecodeResult.Failed<?> failed =
-                (SnapshotDecodeResult.Failed<?>) decoded;
-        warn(trace, "snapshot stage=" + stage
-                + " decode=failed code=" + failed.code());
     }
 
     /**

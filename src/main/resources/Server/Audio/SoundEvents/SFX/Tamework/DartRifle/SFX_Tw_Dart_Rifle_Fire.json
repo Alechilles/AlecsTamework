@@ -1,0 +1,39 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/DartRifle/Dart_Rifle_Fire_01.ogg",
+        "Sounds/Tamework/DartRifle/Dart_Rifle_Fire_02.ogg",
+        "Sounds/Tamework/DartRifle/Dart_Rifle_Fire_03.ogg",
+        "Sounds/Tamework/DartRifle/Dart_Rifle_Fire_04.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1,
+        "MaxPitch": 1,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": 0.0
+    },
+    {
+      "Files": [
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_01.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_02.ogg",
+        "Sounds/Weapons/Guns/Rifle/Rifle_Shot_Mechanism_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1,
+        "MaxPitch": 1,
+        "MinVolume": -1,
+        "MaxVolume": 0
+      },
+      "Volume": -2.0
+    }
+  ],
+  "Volume": 0.0,
+  "Pitch": 0.0,
+  "PreventSoundInterruption": true,
+  "MaxInstance": 6,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

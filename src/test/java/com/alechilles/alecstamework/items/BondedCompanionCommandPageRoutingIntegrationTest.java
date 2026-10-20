@@ -23,8 +23,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.items.components
-        .TameworkBondedReviveEscrowComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
@@ -106,10 +104,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     new BondedCompanionPanelActionRouter(
                             new BondedCompanionPanelActionService(() -> api),
                             new CommandFeedbackService(null),
-                            new HytaleBondedCompanionActionContextFactory(
-                                    new ComponentType<EntityStore,
-                                            TameworkBondedReviveEscrowComponent>(),
-                                    null), (owner, roster) -> { },
+                            new HytaleBondedCompanionActionContextFactory(), (owner, roster) -> { },
                             (owner, currentRef, currentStore) -> player);
             CommandSelectionPageService service = new CommandSelectionPageService(
                     null, null, null, null, null, null, null, bonded);
@@ -160,7 +155,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             new BondedCompanionPanelActionService(
                                     () -> recordingApi(captured)),
                             new CommandFeedbackService(null),
-                            new HytaleBondedCompanionActionContextFactory(null, null),
+                            new HytaleBondedCompanionActionContextFactory(),
                             (owner, roster) -> { },
                             (owner, currentRef, currentStore) -> player);
             CommandSelectionPageService service = new CommandSelectionPageService(
@@ -464,7 +459,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
                     new BondedCompanionPanelActionService(() -> recordingApi(captured)),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    new HytaleBondedCompanionActionContextFactory(),
                     (owner, roster) -> { },
                     (owner, eventRef, eventStore) -> {
                         resolvedStore.set(eventStore);
@@ -599,7 +594,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     new BondedCompanionPanelActionService(
                             () -> rejectingApi(BondedCompanionResultCode.REVISION_CONFLICT)),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    new HytaleBondedCompanionActionContextFactory(),
                     (owner, roster) -> refreshed.set(owner + ":" + roster),
                     (owner, eventRef, eventStore) -> player);
 
@@ -607,6 +602,55 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     BondedCompanionPanelActionService.Action.STORE, ignored -> true);
 
             assertEquals(OWNER + ":hydragon:dragons", refreshed.get());
+        }
+    }
+
+    /** A revived companion comes back active, so the revive needs a placement like a summon. */
+    @Test
+    void reviveAndSummonRequestAPlacementAndStoreDoesNot() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(world);
+            player.setReference(actor);
+            AtomicReference<Boolean> placementRequested = new AtomicReference<>();
+            HytaleBondedCompanionActionContextFactory contexts =
+                    new HytaleBondedCompanionActionContextFactory() {
+                        @Override
+                        com.alechilles.alecstamework.api.BondedCompanionActionContext create(
+                                Player contextPlayer, Store<EntityStore> contextStore,
+                                String roleId, boolean placementRequired) {
+                            placementRequested.set(placementRequired);
+                            return null;
+                        }
+                    };
+            BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
+                    new BondedCompanionPanelActionService(
+                            () -> rejectingApi(BondedCompanionResultCode.REVISION_CONFLICT)),
+                    new CommandFeedbackService(null), contexts, (owner, roster) -> { },
+                    (owner, eventRef, eventStore) -> player);
+            // The rows are not actionable, so the service denies them before any API call.
+            for (var action : List.of(BondedCompanionPanelActionService.Action.REVIVE,
+                    BondedCompanionPanelActionService.Action.SUMMON,
+                    BondedCompanionPanelActionService.Action.STORE)) {
+                placementRequested.set(null);
+                router.route(OWNER, actor, store, bondedConfig(),
+                        CommandPanelFeaturePresentation.bonded(new BondedCompanionPanelPresentation(
+                                "profile-7", "hydragon:dragons", "Bonded_Miniwyvern_Storm", 7L,
+                                "Nimbus", "Miniwyvern", "Female", null, Map.of(), Map.of(),
+                                new BondedCompanionStatusPresentation(
+                                        BondedCompanionStateView.DEAD,
+                                        BondedCompanionStatusPresentation.Action.NONE,
+                                        false, null, 0L), null)),
+                        action, ignored -> true);
+
+                assertEquals(action != BondedCompanionPanelActionService.Action.STORE,
+                        placementRequested.get(), action.name());
+            }
         }
     }
 
@@ -632,10 +676,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
                     new BondedCompanionPanelActionService(() -> api),
                     new CommandFeedbackService(null),
-                    new HytaleBondedCompanionActionContextFactory(
-                            new ComponentType<EntityStore,
-                                    TameworkBondedReviveEscrowComponent>(),
-                            null), (owner, roster) -> { },
+                    new HytaleBondedCompanionActionContextFactory(), (owner, roster) -> { },
                     (owner, currentRef, currentStore) -> player);
             ItemStack horn = commandStack("test:horn", "horn-tool");
             installInventory(player, horn);

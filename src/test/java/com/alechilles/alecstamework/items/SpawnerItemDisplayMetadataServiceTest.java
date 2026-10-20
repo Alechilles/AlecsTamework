@@ -108,6 +108,30 @@ class SpawnerItemDisplayMetadataServiceTest {
     }
 
     @Test
+    void theLastTooltipLineNamesTheOwnerFollowsATransferAndIsClearedWithTheCapture() {
+        CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
+        SpawnerItemDisplayMetadataService service = service(writer, null);
+        var items = new SpawnerItemStackMetadataService(null, new SpawnerCaptureMetadataService(null, null), null);
+        ItemFeatureConfig config = config(ItemFeatureConfig.SpawnerTooltipMode.REPLACE);
+        ItemStack unowned = stack(capturedMetadata("Fluffy", "Mob_Cat", "Fluffy"));
+
+        // An unowned wild capture has no owner line.
+        service.applyCapturedDisplayMetadata(unowned, config);
+        assertEquals("Fluffy - Mob_Cat", plainText(writer.metadata.getDescription()));
+
+        ItemStack owned = items.applyOwnerMetadata(unowned, java.util.UUID.randomUUID(), "Alec");
+        service.applyCapturedDisplayMetadata(owned, config);
+        assertEquals("Fluffy - Mob_Cat\n\nOwner: Alec", plainText(writer.metadata.getDescription()));
+
+        ItemStack moved = items.applyOwnerMetadata(owned, java.util.UUID.randomUUID(), "Blake");
+        service.applyCapturedDisplayMetadata(moved, config);
+        assertEquals("Fluffy - Mob_Cat\n\nOwner: Blake", plainText(writer.metadata.getDescription()));
+
+        org.junit.jupiter.api.Assertions.assertNull(items.clearCapturedMetadata(moved).getFromMetadataOrNull(
+                TameworkMetadataKeys.OWNER_NAME, com.hypixel.hytale.codec.Codec.STRING));
+    }
+
+    @Test
     void additiveModeWritesBaseDescriptionAndCapturedLines() {
         CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
         SpawnerItemDisplayMetadataService service = service(writer, Message.raw("Base description"));

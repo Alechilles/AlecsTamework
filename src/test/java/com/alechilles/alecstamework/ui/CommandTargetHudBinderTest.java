@@ -21,7 +21,7 @@ class CommandTargetHudBinderTest {
         expected.set("#Root #NeedThirst #NeedValueText.Text", "60%");
         Anchor fill = new Anchor();
         fill.setLeft(Value.of(0));
-        fill.setTop(Value.of(26));
+        fill.setTop(Value.of(22));
         fill.setWidth(Value.of(80));
         fill.setHeight(Value.of(6));
         expected.setObject("#NeedHappiness #MeterFill.Anchor", fill);
@@ -63,9 +63,9 @@ class CommandTargetHudBinderTest {
         expected.set("#AgeCountdown.Text", "Adult in 1m");
         assertCommands(expected, commands);
         Anchor fill = new Anchor();
-        fill.setTop(Value.of(16));
-        fill.setLeft(Value.of(0));
-        fill.setWidth(Value.of(40));
+        fill.setTop(Value.of(15));
+        fill.setLeft(Value.of(22));
+        fill.setWidth(Value.of(31));
         fill.setHeight(Value.of(6));
         Assertions.assertEquals(expectedObject(fill), data(commands, "#AgeMeterFill.Anchor"));
     }

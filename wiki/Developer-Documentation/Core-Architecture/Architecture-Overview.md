@@ -21,9 +21,12 @@ Tamework is split into two broad layers:
 - Linked-panel and command UI under `ui/`
 - Progression systems under `npc/progression/` and `npc/systems/`
 - Ownership and damage behavior under `ownership/` and `damage/`
-- Replacement persistence contracts and runtime under `persistence/`, SQLite
-  adapters under `persistence/adapter/sqlite/`, and gameplay authors under
-  `items/persistence/`
+- Companion persistence under `companion/`: the in-memory index (`index/`),
+  the file store and writer (`store/`), live body rules and the generation fence
+  (`live/`), capture, release, restore, store and death flows (`flow/`), capture
+  items (`item/`), coops (`coop/`), population admission (`admission/`), the
+  3.x/4.x importer (`migrate/`), and the module that wires them (`runtime/`)
+- Settings and data-path stores under `settings/`
 - Commands under `commands/`
 - Metrics and integrations under `metrics/` and `integration/`
 
@@ -33,24 +36,29 @@ The codebase prefers a thin orchestrator plus focused collaborator services.
 That pattern is most visible in the spawner, naming, command, and persistence
 runtimes.
 
-Persistence has one production composition and one facade bundle. Gameplay
-authors submit canonical capture, release, coop, population, roster,
-timed-summon, provisioning, revival, dormant, restoration, and profile-data
-operations through those facades; tick and ECS systems freeze live facts and
-do not own storage.
+Companion persistence has one authority: the companion index. Each companion
+is one immutable record with a stable profile ID, an owner, a location
+(`LIVE`, `ITEM`, `COOP`, `STORED`, `DEAD`, `LOST` or `RELEASED`) and a
+generation. The live body, a capture item or a coop slot only holds the
+companion; it carries the profile ID and generation, and the record says which
+holder is current.
 
-The persistence database is `tamework-state.sqlite`, beginning with a fresh
-schema-v1 lineage. Released v2-v4 SQLite sources and the released DAT bundle are
-read-only import inputs. Unreleased v5-v9 databases are refused unchanged.
+Writes go through one global index lock and are saved by a write-behind thread
+as JSON files under `universe/Tamework/Companions`. Reads are lock-free. Flows
+that remove or spawn a body commit the record to disk first, then apply the live
+effect. The world thread never reads or writes companion files. There is no
+database; 3.x and 4.x SQLite data is imported once at the first 5.0 start, and
+2.x data is not imported.
+
+See [Companion Store and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
+for the files, the writer and the generation fence.
 
 ## Where to start
 
 - Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
-- Persistence composition:
-  `src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java`
-- Persistence decisions: `docs/decisions/0001-0007`
-- Restored feature inventory:
-  `docs/Required-Persistence-Feature-Inventory.md`
+- Companion persistence module:
+  `src/main/java/com/alechilles/alecstamework/companion/runtime/CompanionPersistenceModule.java`
+- Persistence decision: `docs/decisions/0011-companion-index-persistence.md`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Config assets: `src/main/java/com/alechilles/alecstamework/config/assets`
 - Framework assets: `src/main/resources/Server/Tamework`

@@ -46,21 +46,6 @@ final class SpawnerNpcProgressionMetadataService {
         return applyLifeStageMetadata(updated, npcRef, store);
     }
 
-    void applyNpcProgressionFromItem(@Nullable ItemStack stack,
-                                     @Nullable Ref<EntityStore> npcRef,
-                                     @Nullable Store<EntityStore> store) {
-        if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
-            return;
-        }
-        restoreNeedsComponent(stack, npcRef, store);
-        restoreHappinessComponent(stack, npcRef, store);
-        SpawnerBreedingStateRestoreService.restore(stack, npcRef, store);
-        restoreLevelingComponent(stack, npcRef, store);
-        restoreTraitsComponent(stack, npcRef, store);
-        restoreTalentsComponent(stack, npcRef, store);
-        restoreLifeStageComponent(stack, npcRef, store);
-    }
-
     ItemStack clearProgressionMetadata(@Nullable ItemStack stack) {
         ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HEALTH_PERCENT);
         updated = clearNeedsMetadata(updated);

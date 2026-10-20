@@ -34,7 +34,7 @@ public abstract class TameworkActionBase extends ActionBase {
     }
 
     /**
-     * Update 5 callback retained for one JAR that can run on both supported API generations.
+     * Role-based callback that subclasses implement. The engine callback below delegates here.
      */
     public boolean canExecute(Ref<EntityStore> ref,
                               Role role,
@@ -59,7 +59,7 @@ public abstract class TameworkActionBase extends ActionBase {
     }
 
     /**
-     * Update 5 callback retained for one JAR that can run on both supported API generations.
+     * Role-based callback that subclasses implement. The engine callback below delegates here.
      */
     public boolean execute(Ref<EntityStore> ref,
                            Role role,
@@ -84,7 +84,7 @@ public abstract class TameworkActionBase extends ActionBase {
         }
     }
 
-    /** Update 5 lifecycle callback. */
+    /** Role-based lifecycle callback that subclasses override. */
     public void activate(Role role, InfoProvider infoProvider) {
         active = true;
     }
@@ -99,7 +99,7 @@ public abstract class TameworkActionBase extends ActionBase {
         }
     }
 
-    /** Update 5 lifecycle callback. */
+    /** Role-based lifecycle callback that subclasses override. */
     public void deactivate(Role role, InfoProvider infoProvider) {
         active = false;
     }

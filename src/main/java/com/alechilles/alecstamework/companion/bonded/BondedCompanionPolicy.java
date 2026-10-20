@@ -22,9 +22,11 @@ public record BondedCompanionPolicy(
         @Nullable String summonAuraEffectId,
         @Nullable String expiryWarningEffectId,
         @Nullable RevivePrice revivePrice,
-        @Nonnull FeatureFlags features
+        @Nonnull FeatureFlags features,
+        @Nullable String nameKey
 ) {
     public BondedCompanionPolicy {
+        nameKey = nameKey == null || nameKey.isBlank() ? null : nameKey.trim();
         rosterId = text(rosterId, "rosterId");
         familyId = text(familyId, "familyId");
         allowedRoles = Set.copyOf(Objects.requireNonNull(
@@ -45,6 +47,21 @@ public record BondedCompanionPolicy(
         }
     }
 
+    /** A policy whose family has no display name key. */
+    public BondedCompanionPolicy(
+            long revision, String rosterId, String familyId,
+            Set<String> allowedRoles, int maximumOwned, int maximumActive,
+            long sessionDurationSeconds, long summonCooldownSeconds,
+            long reviveCooldownSeconds, @Nullable String summonAuraEffectId,
+            @Nullable String expiryWarningEffectId,
+            @Nullable RevivePrice revivePrice, FeatureFlags features
+    ) {
+        this(revision, rosterId, familyId, allowedRoles, maximumOwned,
+                maximumActive, sessionDurationSeconds, summonCooldownSeconds,
+                reviveCooldownSeconds, summonAuraEffectId,
+                expiryWarningEffectId, revivePrice, features, null);
+    }
+
     public BondedCompanionPolicy(
             long revision, String rosterId, String familyId,
             Set<String> allowedRoles, int maximumOwned, int maximumActive,
@@ -54,7 +71,7 @@ public record BondedCompanionPolicy(
     ) {
         this(revision, rosterId, familyId, allowedRoles, maximumOwned,
                 maximumActive, sessionDurationSeconds, summonCooldownSeconds,
-                0L, summonAuraEffectId, null, revivePrice, features);
+                0L, summonAuraEffectId, null, revivePrice, features, null);
     }
 
     public BondedCompanionPolicy(
@@ -65,7 +82,7 @@ public record BondedCompanionPolicy(
     ) {
         this(revision, rosterId, familyId, allowedRoles, maximumOwned,
                 maximumActive, sessionDurationSeconds, summonCooldownSeconds,
-                0L, null, null, revivePrice, features);
+                0L, null, null, revivePrice, features, null);
     }
 
     /** Resolves the revive deadline while preserving zero as the disabled sentinel. */

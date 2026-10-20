@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
@@ -63,14 +64,16 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
      * start from the target role's default state.
      */
     // Marks the NPC as tamed and assigns owner based on the interacting player.
+    // targetRoleId is the role the tame leaves the NPC in, or null when it keeps its role.
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
                              Player player,
+                             @Nullable String targetRoleId,
                              @Nullable TameAppliedContinuation continuation) {
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
                 TameworkOwnerComponent.getComponentType();
         if (isNewPlayerOwnershipAcquisitionDenied(
-                npcRef, store, player, ownerType
+                npcRef, store, player, ownerType, targetRoleId
         )) {
             return false;
         }
@@ -139,11 +142,13 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         return true;
     }
 
-    // Sets the owner component based on the configured source.
+    // Sets the owner component based on the configured source. targetRoleId is the role the
+    // interaction leaves the NPC in, or null when it keeps its role.
     boolean applySetOwner(SetOwnerEffect effect,
                           Ref<EntityStore> npcRef,
                           Store<EntityStore> store,
                           Player player,
+                          @Nullable String targetRoleId,
                           @Nullable OwnerAppliedContinuation continuation) {
         if (effect == null || npcRef == null || store == null) {
             return false;
@@ -153,7 +158,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         if (ownerType == null) {
             return false;
         }
-        ResolvedOwner owner = resolveOwner(effect, npcRef, store, player, ownerType);
+        ResolvedOwner owner = resolveOwner(effect, npcRef, store, player, ownerType, targetRoleId);
         if (owner == null) {
             return false;
         }
@@ -174,7 +179,8 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
             Ref<EntityStore> npcRef,
             Store<EntityStore> store,
             @Nullable Player player,
-            ComponentType<EntityStore, TameworkOwnerComponent> ownerType
+            ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nullable String targetRoleId
     ) {
         OwnerSource source = effect.getSource();
         if (source == null) {
@@ -182,7 +188,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         }
         if (source == OwnerSource.Player) {
             if (player == null || isNewPlayerOwnershipAcquisitionDenied(
-                    npcRef, store, player, ownerType
+                    npcRef, store, player, ownerType, targetRoleId
             )) {
                 return null;
             }
@@ -217,7 +223,8 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
             Ref<EntityStore> npcRef,
             Store<EntityStore> store,
             Player player,
-            ComponentType<EntityStore, TameworkOwnerComponent> ownerType
+            ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nullable String targetRoleId
     ) {
         if (npcRef == null || !npcRef.isValid() || store == null
                 || player == null || ownerType == null || player.getUuid() == null) {
@@ -227,12 +234,13 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         if (existing != null && existing.getOwnerId() != null) {
             return false;
         }
+        // The caps count the companion in the role it has once tamed.
+        String roleId = targetRoleId != null && !targetRoleId.isBlank()
+                ? targetRoleId : CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         OwnerPopulationCapService.Decision ownerCap =
-                OwnerPopulationCapService.evaluateAcquisition(store, player.getUuid());
+                OwnerPopulationCapService.evaluateAcquisition(store, player.getUuid(), roleId);
         if (!ownerCap.allowed()) {
-            OwnerMessageUtil.sendPopulationCapReached(
-                    player, ownerCap.currentCount(), ownerCap.limit(), ownerCap.scope()
-            );
+            OwnerMessageUtil.sendAcquisitionDenied(player, ownerCap);
             return true;
         }
         BreedingClaimLimitPolicyService.Decision claimCap =

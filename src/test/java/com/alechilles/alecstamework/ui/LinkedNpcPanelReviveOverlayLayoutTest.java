@@ -24,9 +24,9 @@ class LinkedNpcPanelReviveOverlayLayoutTest {
 
         overlay.applyTo(commands, "en-US");
 
-        assertCommand(commands, "#TameworkLinkedPanelReviveModal.Anchor", "180");
-        assertCommand(commands, "#TameworkLinkedPanelReviveCostViewport.Anchor", "88");
-        assertCommand(commands, "#TameworkLinkedPanelReviveActions.Anchor", "146");
+        assertCommand(commands, "#TameworkLinkedPanelReviveModal.Anchor", "276");
+        assertCommand(commands, "#TameworkLinkedPanelReviveCostViewport.Anchor", "96");
+        assertCommand(commands, "#TameworkLinkedPanelReviveActions.Anchor", "232");
     }
 
     private static LinkedNpcEntry entry() {

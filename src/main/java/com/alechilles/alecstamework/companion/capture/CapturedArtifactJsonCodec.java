@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
-import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.util.Sha256Hash;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Comparator;

@@ -5,15 +5,10 @@ import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.npc.components
-        .TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -37,8 +32,10 @@ import org.joml.Vector3d;
  * Selects command recipients from exact active bonded leases.
  *
  * <p>Bonded profiles, not command-link components or item metadata, own membership. A live NPC
- * becomes actionable only when its UUID and projection marker exactly match the current profile
- * lease in the player's roster and world.</p>
+ * becomes actionable only when its UUID is the one the profile's lease names and its
+ * {@link TameworkCompanionComponent} stamp carries the profile id and the lease's generation
+ * (the lease token is the record generation). A body left over from an earlier summon has an
+ * older generation and is never commanded.</p>
  */
 final class BondedCompanionCommandRecipientSource {
     private final ProfileSource profiles;
@@ -85,31 +82,18 @@ final class BondedCompanionCommandRecipientSource {
                 context.player.getUuid(), rosterId, worldKey,
                 context.config, playerPosition, radiusSq,
                 Math.max(1, context.config.getMaxTargets()));
-        return select(
-                request,
-                uuid -> readProjection(context, world, uuid),
-                physicalMarkerMultiplicity(context.store));
+        return select(request, uuid -> readProjection(context, world, uuid));
     }
 
     @Nonnull
     List<Candidate> select(
             @Nonnull Request request,
             @Nonnull ProjectionReader projectionReader) {
-        return select(request, projectionReader, ProjectionMultiplicity.trusted());
-    }
-
-    @Nonnull
-    List<Candidate> select(
-            @Nonnull Request request,
-            @Nonnull ProjectionReader projectionReader,
-            @Nonnull ProjectionMultiplicity projectionMultiplicity) {
-        Objects.requireNonNull(projectionMultiplicity, "projectionMultiplicity");
         Map<UUID, Authority> authorities = activeAuthorities(request);
         if (authorities.isEmpty()) return List.of();
         ArrayList<Selected> selected = new ArrayList<>(authorities.size());
         for (Map.Entry<UUID, Authority> entry : authorities.entrySet()) {
             Authority authority = entry.getValue();
-            if (!isUnique(projectionMultiplicity, authority)) continue;
             LoadedProjection projection = readSafely(
                     projectionReader, entry.getKey());
             if (!matches(authority, projection)
@@ -149,44 +133,6 @@ final class BondedCompanionCommandRecipientSource {
         } catch (RuntimeException | LinkageError failure) {
             return null;
         }
-    }
-
-    private boolean isUnique(
-            ProjectionMultiplicity multiplicity, Authority authority) {
-        try {
-            return multiplicity.isUnique(
-                    authority.profileId(), authority.leaseToken());
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
-    }
-
-    private ProjectionMultiplicity physicalMarkerMultiplicity(
-            Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        if (store == null || markerType == null) {
-            return ProjectionMultiplicity.unavailable();
-        }
-        HashMap<MarkerIdentity, Integer> counts = new HashMap<>();
-        try {
-            store.forEachChunk(
-                    Query.and(markerType),
-                    (ArchetypeChunk<EntityStore> chunk,
-                            CommandBuffer<EntityStore> commandBuffer) -> {
-                        for (int index = 0; index < chunk.size(); index++) {
-                            TameworkProjectionIdentityComponent marker =
-                                    chunk.getComponent(index, markerType);
-                            MarkerIdentity identity = MarkerIdentity.from(marker);
-                            if (identity != null) counts.merge(identity, 1, Integer::sum);
-                        }
-                    });
-        } catch (RuntimeException | LinkageError failure) {
-            return ProjectionMultiplicity.unavailable();
-        }
-        Map<MarkerIdentity, Integer> snapshot = Map.copyOf(counts);
-        return (profileId, leaseToken) -> snapshot.getOrDefault(
-                new MarkerIdentity(profileId, leaseToken), 0) == 1;
     }
 
     private Map<UUID, Authority> activeAuthorities(Request request) {
@@ -231,9 +177,9 @@ final class BondedCompanionCommandRecipientSource {
         return projection != null
                 && projection.ref().isValid()
                 && authority.liveNpcUuid().equals(projection.npc().getUuid())
-                && projection.marker().matches(
-                        TameworkProjectionIdentityComponent.KIND_BONDED_COMPANION,
-                        authority.leaseToken(), authority.profileId());
+                && projection.stampProfileId() != null
+                && authority.profileId().equals(projection.stampProfileId().toString())
+                && authority.leaseToken().equals(Long.toString(projection.stampGeneration()));
     }
 
     private double distanceSq(
@@ -250,19 +196,19 @@ final class BondedCompanionCommandRecipientSource {
             Context context, World world, UUID liveNpcUuid) {
         Ref<EntityStore> ref = world.getEntityRef(liveNpcUuid);
         if (ref == null || !ref.isValid() || ref.getStore() != context.store) return null;
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        if (markerType == null) return null;
+        ComponentType<EntityStore, TameworkCompanionComponent> stampType =
+                TameworkCompanionComponent.getComponentType();
+        if (stampType == null) return null;
         NPCEntity npc = context.store.getComponent(ref, NPCEntity.getComponentType());
-        TameworkProjectionIdentityComponent marker = context.store.getComponent(
-                ref, markerType);
-        if (npc == null || marker == null) return null;
+        TameworkCompanionComponent stamp = context.store.getComponent(ref, stampType);
+        if (npc == null || stamp == null) return null;
         TransformComponent transform = context.store.getComponent(
                 ref, TransformComponent.getComponentType());
         Vector3d position = transform == null
                 ? null : new Vector3d(transform.getPosition());
         return new LoadedProjection(
-                ref, npc, marker, position, rolePolicy.resolveRoleId(npc));
+                ref, npc, stamp.getProfileId(), stamp.getGeneration(), position,
+                rolePolicy.resolveRoleId(npc));
     }
 
     private static List<BondedCompanionProfileView> readProfiles(
@@ -294,19 +240,6 @@ final class BondedCompanionCommandRecipientSource {
         @Nullable LoadedProjection read(UUID liveNpcUuid);
     }
 
-    @FunctionalInterface
-    interface ProjectionMultiplicity {
-        boolean isUnique(String profileId, String leaseToken);
-
-        static ProjectionMultiplicity trusted() {
-            return (profileId, leaseToken) -> true;
-        }
-
-        static ProjectionMultiplicity unavailable() {
-            return (profileId, leaseToken) -> false;
-        }
-    }
-
     record Request(
             @Nonnull UUID ownerUuid,
             @Nonnull String rosterId,
@@ -326,34 +259,23 @@ final class BondedCompanionCommandRecipientSource {
         }
     }
 
+    /** A loaded body with the profile id and generation of its companion stamp. */
     record LoadedProjection(
             @Nonnull Ref<EntityStore> ref,
             @Nonnull NPCEntity npc,
-            @Nonnull TameworkProjectionIdentityComponent marker,
+            @Nullable UUID stampProfileId,
+            long stampGeneration,
             @Nullable Vector3d position,
             @Nullable String roleId) {
         LoadedProjection {
             Objects.requireNonNull(ref, "ref");
             Objects.requireNonNull(npc, "npc");
-            Objects.requireNonNull(marker, "marker");
             position = position == null ? null : new Vector3d(position);
         }
     }
 
     private record Authority(String profileId, String leaseToken,
                              UUID liveNpcUuid) { }
-
-    private record MarkerIdentity(String profileId, String leaseToken) {
-        @Nullable
-        private static MarkerIdentity from(
-                @Nullable TameworkProjectionIdentityComponent marker) {
-            if (marker == null || !marker.isBondedCompanion()
-                    || marker.getProfileId() == null
-                    || marker.getBondedLeaseToken() == null) return null;
-            return new MarkerIdentity(
-                    marker.getProfileId(), marker.getBondedLeaseToken());
-        }
-    }
 
     private record Selected(String profileId, LoadedProjection projection,
                             double distanceSq) { }

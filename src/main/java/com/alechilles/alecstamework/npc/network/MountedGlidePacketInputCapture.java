@@ -41,7 +41,11 @@ final class MountedGlidePacketInputCapture {
         }
         Store<EntityStore> store = riderRef.getStore();
         World world = store.getExternalData().getWorld();
-        world.execute(() -> captureOnWorld(packet, riderRef, store));
+        try {
+            world.execute(() -> captureOnWorld(packet, riderRef, store));
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; this input sample is dropped.
+        }
     }
 
     void capture(@Nonnull MountMovement packet, @Nonnull IPacketHandler packetHandler) {
@@ -55,7 +59,11 @@ final class MountedGlidePacketInputCapture {
         }
         Store<EntityStore> store = riderRef.getStore();
         World world = store.getExternalData().getWorld();
-        world.execute(() -> captureOnWorld(packet, riderRef, store));
+        try {
+            world.execute(() -> captureOnWorld(packet, riderRef, store));
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; this input sample is dropped.
+        }
     }
 
     private void captureOnWorld(@Nonnull ClientMovement packet,

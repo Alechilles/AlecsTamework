@@ -9,7 +9,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
+import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -28,9 +28,11 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -41,17 +43,28 @@ public final class NamingFeatureHandler {
     private static final long REQUEST_TIMEOUT_MS = 300000L;
     private static final String CANCEL_TOKEN = "cancel";
     private static final int DEFAULT_UI_NAME_MAX_LENGTH = 32;
+    private static final int RANDOM_NAME_ATTEMPTS = 8;
     private static final String[] EMPTY_RANDOM_NAME_POOL = new String[0];
 
     private final NameItemRegistry registry;
     private final NamingEffectService effectService;
     private final NamingNpcInfoService npcInfoService;
     private final ConcurrentHashMap<UUID, PendingNameRequest> pendingByPlayer = new ConcurrentHashMap<>();
+    @Nullable
+    private volatile BiConsumer<Ref<EntityStore>, Store<EntityStore>> nameClearedListener;
 
     public NamingFeatureHandler(NameItemRegistry registry, TranslationRegistry translationRegistry) {
         this.registry = registry;
         this.effectService = new NamingEffectService();
         this.npcInfoService = new NamingNpcInfoService(translationRegistry);
+    }
+
+    /**
+     * Sets the hook told when a player clears a name, so the companion record drops it too.
+     * Removing the name component alone does not: a body can lose it without being renamed.
+     */
+    public void setNameClearedListener(@Nullable BiConsumer<Ref<EntityStore>, Store<EntityStore>> listener) {
+        this.nameClearedListener = listener;
     }
 
     // Begins a naming request for the player. Runs on the store thread.
@@ -194,13 +207,21 @@ public final class NamingFeatureHandler {
         if (world == null) {
             return;
         }
-        world.execute(() -> {
-            Player player = store.getComponent(playerRef, Player.getComponentType());
-            if (player == null) {
-                return;
-            }
-            applyNameFromInput(player, request, content);
-        });
+        try {
+            world.execute(() -> {
+                // The player may have left or changed world since the chat event.
+                if (!playerRef.isValid() || playerRef.getStore() != store) {
+                    return;
+                }
+                Player player = store.getComponent(playerRef, Player.getComponentType());
+                if (player == null) {
+                    return;
+                }
+                applyNameFromInput(player, request, content);
+            });
+        } catch (RuntimeException ignored) {
+            // The world is stopping and takes no more tasks; the pending name is dropped.
+        }
     }
 
     public void onPlayerDisconnect(PlayerDisconnectEvent event) {
@@ -251,6 +272,9 @@ public final class NamingFeatureHandler {
                 input -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input),
                 request.randomNamePool != null && request.randomNamePool.length > 0
                         ? () -> handleUiRandomRequested(player, request.playerUuid, request.requestId)
+                        : null,
+                existingName != null && canClearName(rules)
+                        ? () -> handleUiNameCleared(player, request.playerUuid, request.requestId)
                         : null
         );
         try {
@@ -302,6 +326,25 @@ public final class NamingFeatureHandler {
         applyNameFromInput(player, request, rawName);
     }
 
+    private void handleUiNameCleared(Player player, UUID playerUuid, UUID requestId) {
+        if (player == null || playerUuid == null || requestId == null) {
+            return;
+        }
+        PendingNameRequest request = pendingByPlayer.get(playerUuid);
+        if (request == null || request.inputMode != InputMode.Ui || !requestId.equals(request.requestId)) {
+            return;
+        }
+        if (!pendingByPlayer.remove(playerUuid, request)) {
+            return;
+        }
+        clearName(player, request);
+    }
+
+    /** Clearing replaces an existing name with none, so it needs both rename permissions. */
+    private static boolean canClearName(NamingRules rules) {
+        return rules != null && rules.isAllowRename() && rules.isReplaceExisting();
+    }
+
     @Nullable
     private String handleUiRandomRequested(Player player, UUID playerUuid, UUID requestId) {
         if (player == null || playerUuid == null || requestId == null) {
@@ -319,86 +362,30 @@ public final class NamingFeatureHandler {
         if (request.randomNamePool == null || request.randomNamePool.length == 0) {
             return null;
         }
-        int index = ThreadLocalRandom.current().nextInt(request.randomNamePool.length);
-        return request.randomNamePool[index];
+        // The random button must not suggest a name the server's filter would then reject.
+        NameFilter filter = NameFilter.current();
+        for (int attempt = 0; attempt < RANDOM_NAME_ATTEMPTS; attempt++) {
+            int index = ThreadLocalRandom.current().nextInt(request.randomNamePool.length);
+            String candidate = request.randomNamePool[index];
+            if (!filter.isBlocked(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void applyNameFromInput(Player player,
                                     PendingNameRequest request,
                                     String rawName) {
-        if (player == null || request == null) {
+        NamingTarget target = resolveNamingTarget(player, request);
+        if (target == null) {
             return;
         }
-        UUID playerUuid = player.getUuid();
-        if (playerUuid == null || !playerUuid.equals(request.playerUuid)) {
-            return;
-        }
-        if (isRequestExpired(request)) {
-            sendMessageKey(player, "tamework.ui.notifications.name.requestExpired");
-            return;
-        }
-        Ref<EntityStore> playerEntityRef = player.getReference();
-        if (playerEntityRef == null || !playerEntityRef.isValid()) {
-            return;
-        }
-        Store<EntityStore> store = playerEntityRef.getStore();
-        if (store == null) {
-            return;
-        }
-        if (request.npcRef == null || !request.npcRef.isValid()) {
-            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
-            return;
-        }
-        NPCEntity npc = store.getComponent(request.npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
-            return;
-        }
-
-        ItemStack activeItem = getActiveItem(player);
-        if (activeItem == null || activeItem.isEmpty()) {
-            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
-            return;
-        }
-        String activeItemId = activeItem.getItemId();
-        if (activeItemId == null || !activeItemId.equals(request.itemId)) {
-            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
-            return;
-        }
-
-        TwNameItemConfig config = resolveConfig(activeItemId, request.configIdOverride);
-        NamingRules rules = resolveRules(config, request.overrides);
-
-        if (isCooldownActive(activeItem, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
-            sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
-            return;
-        }
-
-        String roleId = npcInfoService.resolveRoleId(npc);
-        if (!isRoleAllowed(roleId, config)) {
-            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
-            return;
-        }
-
-        if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
-            String npcName = npcInfoService.resolveDisplayName(npc);
-            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
-            return;
-        }
-
-        UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
-        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
-            if (ownerUuid == null) {
-                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
-                return;
-            }
-            if (rules.isRequireOwner()) {
-                String npcName = npcInfoService.resolveDisplayName(npc);
-                String ownerName = npcInfoService.resolveOwnerName(request.npcRef, store);
-                OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
-                return;
-            }
-        }
+        Store<EntityStore> store = target.store();
+        NPCEntity npc = target.npc();
+        NamingRules rules = target.rules();
+        UUID ownerUuid = target.ownerUuid();
+        UUID playerUuid = request.playerUuid;
 
         boolean hasTameworkName = npcInfoService.hasTameworkName(request.npcRef, store);
         boolean hasAnyName = npcInfoService.hasAnyName(request.npcRef, store, npc);
@@ -424,7 +411,12 @@ public final class NamingFeatureHandler {
             return;
         }
 
-        NpcDisplayNameAccess.set(request.npcRef, finalName, store);
+        if (NameFilter.current().isBlocked(finalName)) {
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.notAllowed");
+            return;
+        }
+
+        DisplayNameSupport.setDisplayName(request.npcRef, finalName, store);
         ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
         if (type != null) {
             store.putComponent(
@@ -439,7 +431,7 @@ public final class NamingFeatureHandler {
             );
         }
 
-        applyItemChanges(player, rules);
+        applyItemChanges(player, rules, rules.isConsumeItem());
         effectService.playSuccessEffects(
                 player.getWorld(),
                 request.npcRef,
@@ -447,6 +439,122 @@ public final class NamingFeatureHandler {
                 rules.getSoundEvent()
         );
         sendMessageKey(player, "tamework.ui.notifications.name.success", finalName);
+    }
+
+    /** Removes the companion's name. The naming item is not consumed; only its cooldown applies. */
+    private void clearName(Player player, PendingNameRequest request) {
+        NamingTarget target = resolveNamingTarget(player, request);
+        if (target == null) {
+            return;
+        }
+        if (!canClearName(target.rules())) {
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyNamed");
+            return;
+        }
+        Store<EntityStore> store = target.store();
+        DisplayNameSupport.setDisplayName(request.npcRef, null, true, store);
+        ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
+        if (type != null) {
+            store.tryRemoveComponent(request.npcRef, type);
+        }
+        // A ridden companion restores its hidden name on dismount; forget the cleared one.
+        ComponentType<EntityStore, TameworkMountedNameplateComponent> mountedType =
+                TameworkMountedNameplateComponent.getComponentType();
+        TameworkMountedNameplateComponent mounted = mountedType != null
+                ? store.getComponent(request.npcRef, mountedType)
+                : null;
+        if (mounted != null) {
+            mounted.setCachedDisplayName(null);
+        }
+        BiConsumer<Ref<EntityStore>, Store<EntityStore>> listener = nameClearedListener;
+        if (listener != null) {
+            listener.accept(request.npcRef, store);
+        }
+        applyItemChanges(player, target.rules(), false);
+        sendMessageKey(player, "tamework.ui.notifications.name.cleared");
+    }
+
+    /**
+     * Re-checks everything a pending request depends on (target, held item, cooldown, role, tamed
+     * state and ownership) at submission time. Sends the player the reason and returns null on failure.
+     */
+    @Nullable
+    private NamingTarget resolveNamingTarget(Player player, PendingNameRequest request) {
+        if (player == null || request == null) {
+            return null;
+        }
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null || !playerUuid.equals(request.playerUuid)) {
+            return null;
+        }
+        if (isRequestExpired(request)) {
+            sendMessageKey(player, "tamework.ui.notifications.name.requestExpired");
+            return null;
+        }
+        Ref<EntityStore> playerEntityRef = player.getReference();
+        if (playerEntityRef == null || !playerEntityRef.isValid()) {
+            return null;
+        }
+        Store<EntityStore> store = playerEntityRef.getStore();
+        if (store == null) {
+            return null;
+        }
+        if (request.npcRef == null || !request.npcRef.isValid()) {
+            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
+            return null;
+        }
+        NPCEntity npc = store.getComponent(request.npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
+            return null;
+        }
+
+        ItemStack activeItem = getActiveItem(player);
+        if (activeItem == null || activeItem.isEmpty()) {
+            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
+            return null;
+        }
+        String activeItemId = activeItem.getItemId();
+        if (activeItemId == null || !activeItemId.equals(request.itemId)) {
+            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
+            return null;
+        }
+
+        TwNameItemConfig config = resolveConfig(activeItemId, request.configIdOverride);
+        NamingRules rules = resolveRules(config, request.overrides);
+
+        if (isCooldownActive(activeItem, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
+            sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
+            return null;
+        }
+
+        String roleId = npcInfoService.resolveRoleId(npc);
+        if (!isRoleAllowed(roleId, config)) {
+            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
+            return null;
+        }
+
+        if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
+            String npcName = npcInfoService.resolveDisplayName(npc);
+            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
+            return null;
+        }
+
+        UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
+        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
+            if (ownerUuid == null) {
+                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
+                return null;
+            }
+            if (rules.isRequireOwner()) {
+                String npcName = npcInfoService.resolveDisplayName(npc);
+                String ownerName = npcInfoService.resolveOwnerName(request.npcRef, store);
+                OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
+                return null;
+            }
+        }
+
+        return new NamingTarget(store, npc, rules, ownerUuid);
     }
 
     private boolean isRequestExpired(PendingNameRequest request) {
@@ -603,7 +711,7 @@ public final class NamingFeatureHandler {
         return stack;
     }
 
-    private void applyItemChanges(Player player, NamingRules rules) {
+    private void applyItemChanges(Player player, NamingRules rules, boolean consumeItem) {
         if (player == null || rules == null) {
             return;
         }
@@ -620,7 +728,7 @@ public final class NamingFeatureHandler {
             return;
         }
 
-        if (rules.isConsumeItem()) {
+        if (consumeItem) {
             hotbar.removeItemStackFromSlot((short) slot, 1);
         }
 
@@ -679,6 +787,9 @@ public final class NamingFeatureHandler {
             return;
         }
         playerRef.sendMessage(Message.raw(message));
+    }
+
+    private record NamingTarget(Store<EntityStore> store, NPCEntity npc, NamingRules rules, @Nullable UUID ownerUuid) {
     }
 
     private enum InputMode {

@@ -33,6 +33,8 @@ Naming items let you attach a reusable naming flow to any item without building 
 - The system can require tame state
 - The system can require ownership, while optionally allowing unowned NPCs through a narrow escape hatch
 - Submission is re-validated on the server after the naming UI is opened
+- A server-wide blocked-word filter runs after the item's own rules. Server owners manage it in `/tw settings` under **Naming** (on by default, with a built-in word list plus their own blocked and allowed words). Naming item configs cannot bypass it
+- When the NPC already has a name and the config allows both `AllowRename` and `ReplaceExisting`, the naming UI offers `Clear Name`
 
 ## Persistence behavior
 - Tamework names are stored on the NPC

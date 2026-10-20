@@ -17,19 +17,23 @@ participate in feed-trough hydration or refill flows.
 - Keyed by `CoopId`
 - Used for companion capture policy, resident capacity, roam/release timing,
   produce, and state continuity
-- Tamework scans loaded configured coops, captures an eligible live NPC into a
-  canonical coop slot, and later releases that resident as a live NPC.
+- Tamework scans loaded configured coops, takes an eligible NPC that is out in
+  the world into a coop slot, and later releases that resident into the world.
 - The managed capture-crate interaction and filled spawner interaction can
-  submit an eligible canonical captured item directly to an available slot.
-  The operation commits one resident and retires the exact source item; a
-  denial or unavailable feature leaves the item unchanged.
+  submit an eligible filled capture item directly to an available slot. One
+  resident is saved and the item is consumed; a denial or unavailable feature
+  leaves the item unchanged.
+- Breaking the coop block releases every resident beside the block.
+- Production follows the vanilla coop: game time, once per morning roam
+  window, with catch-up. See
+  [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference).
 - Coops without an enabled matching config retain their ordinary behavior.
 - Stable profile identity survives the release UUID change, so command links
   follow the profile rather than assuming one permanent entity UUID.
 
-Live and captured-item intake share the same coop operation and canonical
-resident ledger. There is no second captured-item ledger, feature-specific
-recovery journal, vanilla resident importer, or coop repair command surface.
+Live and captured-item intake share the same flow. An owned resident is one
+companion record located in the coop slot; the coop block stores the slot
+entries. There is no separate captured-item ledger.
 
 ## Feed-trough support
 - Enabled through feature wiring and, optionally, `TwGlobalConfig.AssetSets.FeedTrough`
@@ -46,10 +50,10 @@ recovery journal, vanilla resident importer, or coop repair command surface.
   receive a new entity UUID while retaining its stable profile.
 - Patch capture-crate behavior to
   `TameworkManagedCoopCaptureCrate` when the vanilla item should participate in
-  canonical captured-item intake. Tamework's bundled capture-crate patch is the
+  captured-item intake. Tamework's bundled capture-crate patch is the
   reference wiring.
-- Use `/tw debug log coop` for coop-specific runtime logging and `/tw debug
-  persistence status` for bounded replacement-persistence status.
+- Use `/tw debug log coop` for coop-specific runtime logging. An admin can
+  restore a companion stuck in a coop with `/tw companions restore`.
 
 ## Related Pages
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)

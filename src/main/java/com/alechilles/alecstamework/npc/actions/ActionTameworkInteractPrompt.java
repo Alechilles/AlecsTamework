@@ -108,10 +108,12 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             ctx = buildContextSnapshot(player, interactionTarget, role, activeItem, playerId);
             config = resolveConfig(role, ctx);
             if (config != null && config.isEnabled()) {
-                boolean adoptionPending = claimLegacyOwnershipForPrompt(npcRef, store, player);
-                if (!adoptionPending) {
-                    resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+                // Showing a prompt never claims an unowned tamed NPC: the interaction itself does.
+                // The prompt is the one the player would get once that interaction claimed it.
+                if (LegacyTamedOwnershipBridge.isClaimableByInteraction(npcRef, store)) {
+                    ctx.cachedPlayerIsOwner = true;
                 }
+                resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
             }
             if (resolved != null && resolved.entry instanceof HarvestInteraction) {
                 HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
@@ -157,18 +159,6 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 store
         );
         return true;
-    }
-
-    private boolean claimLegacyOwnershipForPrompt(Ref<EntityStore> npcRef,
-                                                  Store<EntityStore> store,
-                                                  Player player) {
-        LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
-                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(npcRef, store, player);
-        if (ownerBridgeResult.isScheduled()) {
-            logDebug("TameworkPrompt: legacy tamed ownership scheduled.");
-            return true;
-        }
-        return false;
     }
 
     // Determines the prompt state (visibility + hint key) for the selected entry.

@@ -13,13 +13,6 @@ class TranquilizerStackDisplayServiceTest {
     }
 
     @Test
-    void resolvesPeakDurationFromTrackedAndCurrentValues() {
-        Assertions.assertEquals(90.0, TranquilizerStackDisplayService.resolvePeakDuration(90.0, 30.0));
-        Assertions.assertEquals(45.0, TranquilizerStackDisplayService.resolvePeakDuration(0.0, 45.0));
-        Assertions.assertEquals(0.0, TranquilizerStackDisplayService.resolvePeakDuration(-5.0, Double.NaN));
-    }
-
-    @Test
     void formatsRemainingDurationForHudAndNameplates() {
         Assertions.assertEquals("0s", TranquilizerStackDisplayService.formatRemainingDuration(0.0));
         Assertions.assertEquals("12s", TranquilizerStackDisplayService.formatRemainingDuration(11.2));

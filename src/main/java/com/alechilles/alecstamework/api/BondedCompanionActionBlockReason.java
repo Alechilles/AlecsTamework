@@ -8,6 +8,8 @@ public enum BondedCompanionActionBlockReason {
     AUTHORITY_UNAVAILABLE,
     COOLDOWN_ACTIVE,
     CAPACITY_REACHED,
+    /** The owner's owned companion limit (general or family) is reached; the active limit is {@link #CAPACITY_REACHED}. */
+    OWNED_LIMIT_REACHED,
     FEATURE_DISABLED,
     POLICY_DENIED,
     ROLE_NOT_ALLOWED,
@@ -19,5 +21,7 @@ public enum BondedCompanionActionBlockReason {
     NOT_OWNER,
     INVALID_STATE,
     VALIDATION_FAILED,
-    GENERIC_FAILURE
+    GENERIC_FAILURE,
+    /** The owner's limit of companions out in the world is reached. */
+    DEPLOYED_LIMIT_REACHED
 }

@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.avatarflight;
 
-import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.FlyMode;
+import com.hypixel.hytale.protocol.MovementSettings;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -44,15 +45,16 @@ public final class AvatarFlightClientFlightProbe {
         }
 
         MovementStates movementStates = movementStatesComponent.getMovementStates();
+        MovementSettings defaultSettings = movementManager.getDefaultSettings();
         SNAPSHOTS.computeIfAbsent(playerUuid, ignored -> new Snapshot(
-                HytaleMovementSettingsAccess.readFlightSetting(movementManager.getSettings()),
-                HytaleMovementSettingsAccess.readFlightSetting(movementManager.getDefaultSettings()),
+                movementManager.getSettings().fly,
+                defaultSettings == null ? null : defaultSettings.fly,
                 movementStates.flying
         ));
 
-        HytaleMovementSettingsAccess.allowFlight(movementManager.getSettings());
-        if (movementManager.getDefaultSettings() != null) {
-            HytaleMovementSettingsAccess.allowFlight(movementManager.getDefaultSettings());
+        movementManager.getSettings().fly = FlyMode.Allowed;
+        if (defaultSettings != null) {
+            defaultSettings.fly = FlyMode.Allowed;
         }
         movementManager.update(packetHandler);
         Player.applyMovementStates(ref, new SavedMovementStates(true), movementStates, store);
@@ -72,12 +74,10 @@ public final class AvatarFlightClientFlightProbe {
                 store.getComponent(ref, MovementStatesComponent.getComponentType());
         PacketHandler packetHandler = resolvePacketHandler(store, ref);
         if (movementManager != null && movementManager.getSettings() != null) {
-            HytaleMovementSettingsAccess.restoreFlightSetting(
-                    movementManager.getSettings(), snapshot.flightSetting());
+            movementManager.getSettings().fly = snapshot.flightSetting();
             if (movementManager.getDefaultSettings() != null
                     && snapshot.defaultFlightSetting() != null) {
-                HytaleMovementSettingsAccess.restoreFlightSetting(
-                        movementManager.getDefaultSettings(), snapshot.defaultFlightSetting());
+                movementManager.getDefaultSettings().fly = snapshot.defaultFlightSetting();
             }
             if (packetHandler != null) {
                 movementManager.update(packetHandler);
@@ -111,8 +111,8 @@ public final class AvatarFlightClientFlightProbe {
     }
 
     private record Snapshot(
-            @Nonnull Object flightSetting,
-            @Nullable Object defaultFlightSetting,
+            @Nonnull FlyMode flightSetting,
+            @Nullable FlyMode defaultFlightSetting,
             boolean flying) {
     }
 

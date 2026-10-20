@@ -21,4 +21,9 @@ public final class AvatarFlightStaleOwnerRecoveryRegistry {
     public static boolean claim(@Nullable UUID ownerUuid) {
         return ownerUuid != null && OWNERS.remove(ownerUuid);
     }
+
+    /** Drops unclaimed owners on plugin shutdown; nothing claims them while timed summons are absent. */
+    public static void clear() {
+        OWNERS.clear();
+    }
 }

@@ -1,6 +1,6 @@
-$A = "TameworkPanelActionStyles.ui";
+$A = "TameworkSlateStyles.ui";
 Group {
- Anchor: (Left: 0, Right: 0, Height: 34);
- TextButton #QuickGroupButton { Anchor: (Top: 0, Left: 0, Right: 0, Height: 32); Text: ""; Style: $A.@GroupRow; Padding: (Left: 25, Right: 4); }
- Group #QuickGroupColor { Anchor: (Top: 10, Left: 7, Width: 12, Height: 12); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #ffffff); HitTestVisible: false; }
+ Anchor: (Left: 0, Right: 0, Height: 32);
+ TextButton #QuickGroupButton { Anchor: (Top: 0, Left: 0, Right: 0, Height: 28); Text: ""; Style: $A.@GroupRow; Padding: (Left: 25, Right: 4); }
+ Group #QuickGroupColor { Anchor: (Top: 8, Left: 8, Width: 12, Height: 12); Background: (TexturePath: "Tamework/PanelControls/GroupDiamond.png", Color: #ffffff); HitTestVisible: false; }
 }

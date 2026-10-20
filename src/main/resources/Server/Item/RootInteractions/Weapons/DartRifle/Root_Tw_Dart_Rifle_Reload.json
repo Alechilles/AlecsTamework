@@ -1,0 +1,7 @@
+{
+  "RequireNewClick": true,
+  "HudInputBindingEntry": "server.hud.inputBinding.reload",
+  "Interactions": [
+    "Tw_Dart_Rifle_Reload"
+  ]
+}

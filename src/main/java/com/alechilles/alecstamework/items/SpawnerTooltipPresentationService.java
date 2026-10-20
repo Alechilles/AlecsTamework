@@ -124,7 +124,8 @@ final class SpawnerTooltipPresentationService {
                     Message.translation("server.tamework.ui.spawnerTooltip.appearance").color(APPEARANCE_HEADER).bold(true),
                     appearanceLines));
         }
-        if (sections.isEmpty()) {
+        Message owner = ownerLine(metadata);
+        if (sections.isEmpty() && owner == null) {
             return summary;
         }
         List<Message> parts = new ArrayList<>();
@@ -133,7 +134,25 @@ final class SpawnerTooltipPresentationService {
             parts.add(Message.raw("\n\n"));
             parts.add(section);
         }
+        if (owner != null) {
+            parts.add(Message.raw("\n\n"));
+            parts.add(owner);
+        }
         return join(parts);
+    }
+
+    /**
+     * The last tooltip line, "Owner: name", translated by the client. Null for an unowned capture
+     * and for an owner whose name is not on the item.
+     */
+    @Nullable
+    static Message ownerLine(@Nullable BsonDocument metadata) {
+        if (metadata == null || readString(metadata, TameworkMetadataKeys.OWNER_UUID) == null) {
+            return null;
+        }
+        String name = normalize(readString(metadata, TameworkMetadataKeys.OWNER_NAME));
+        return name == null ? null
+                : Message.translation("server.tamework.ui.spawnerTooltip.owner").param("0", name).color(WHITE);
     }
 
     @Nullable

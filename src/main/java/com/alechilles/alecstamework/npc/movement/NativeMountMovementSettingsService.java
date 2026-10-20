@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
@@ -68,8 +68,7 @@ public final class NativeMountMovementSettingsService {
             return false;
         }
         MovementConfig settings = copyWithScaledBaseSpeed(profile, quantizedMultiplier);
-        if (!HytaleMovementSettingsAccess.setDefaultProfile(
-                manager, settings, physics, rider.getGameMode())) {
+        if (!setDefaultProfile(manager, settings, physics, rider.getGameMode())) {
             return false;
         }
         manager.applyDefaultSettings();
@@ -77,6 +76,26 @@ public final class NativeMountMovementSettingsService {
         logAppliedSettings(
                 sourceRoleId, movementConfigId, profile.getBaseSpeed(), settings.getBaseSpeed());
         return true;
+    }
+
+    /**
+     * Sets the default movement profile of a player. Returns false, without throwing, when an
+     * input is missing or the engine rejects the profile, so mount and glide flows treat it as
+     * not applied.
+     */
+    public static boolean setDefaultProfile(@Nullable MovementManager manager,
+                                            @Nullable MovementConfig profile,
+                                            @Nullable PhysicsValues physics,
+                                            @Nullable GameMode gameMode) {
+        if (manager == null || profile == null || physics == null || gameMode == null) {
+            return false;
+        }
+        try {
+            manager.setDefaultSettings(profile, physics, gameMode);
+            return true;
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
     }
 
     /** Returns the active role ID, retaining the pre-Empty_Role role while natively mounted. */

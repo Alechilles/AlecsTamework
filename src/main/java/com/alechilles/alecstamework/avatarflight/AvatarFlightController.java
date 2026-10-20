@@ -37,6 +37,9 @@ public final class AvatarFlightController {
                                 @Nonnull AvatarFlightProgressionTuning tuning,
                                 double dt,
                                 long nowMs) {
+        if (config.isUnderwater()) {
+            return AvatarSwimController.update(state, input, config, tuning, dt, nowMs);
+        }
         dt = Math.max(0.0, dt);
         TwAvatarFlightConfig.MovementSettings movement = config.getMovement();
         double yaw = input.yawRadians();
@@ -294,7 +297,7 @@ public final class AvatarFlightController {
     }
 
     @Nonnull
-    private static Output groundedOutput(@Nonnull State state) {
+    static Output groundedOutput(@Nonnull State state) {
         return new Output(
                 AvatarFlightMode.GROUNDED,
                 0.0,

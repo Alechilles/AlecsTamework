@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.companion.bonded.BondedRecords;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.Map;
 import java.util.UUID;
 
@@ -42,6 +44,118 @@ class BondedCompanionPanelChromeTest {
         assertArrayEquals(entries, BondedCompanionPanelChrome.filter(entries, features, "All"));
         // Two active companions count against policy even though only one active row is listed here.
         assertEquals("Active 2 / 3", BondedCompanionPanelChrome.capacityText(features, "en-US"));
+    }
+
+    @Test
+    void headerShowsActiveAndOwnedCountsAndLeavesOutAnUnlimitedPart() {
+        Map<String, String> active = Map.of("bonded.activeCapacity.count", "1", "bonded.activeCapacity.limit", "1");
+        Map<String, String> owned = Map.of(BondedRecords.OWNED_CAPACITY_COUNT, "4",
+                BondedRecords.OWNED_CAPACITY_LIMIT, "6");
+        java.util.HashMap<String, String> both = new java.util.HashMap<>(active);
+        both.putAll(owned);
+
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.activeOwnedCapacity", "1", "1", "4", "6"),
+                BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(both)), "en-US"));
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.ownedCapacity", "4", "6"),
+                BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(owned)), "en-US"));
+        assertEquals("", BondedCompanionPanelChrome.capacityText(Map.of(UUID.randomUUID(), feature(Map.of())),
+                "en-US"));
+    }
+
+    /** A roster family has no display name, so several unnamed families show the label once. */
+    @Test
+    void severalFamiliesShowEachActiveCountInTheHeaderAndKeepOwnedCountsInTheTooltip() {
+        Map<UUID, CommandPanelFeaturePresentation> features = Map.of(
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "0",
+                        "bonded.activeCapacity.limit", "1", "bonded.activeCapacity.label", "Full Dragons")),
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "1",
+                        "bonded.activeCapacity.limit", "2", "bonded.activeCapacity.label", "Soulbound Mini",
+                        BondedRecords.OWNED_CAPACITY_COUNT, "1", BondedRecords.OWNED_CAPACITY_LIMIT, "3")));
+
+        String header = BondedCompanionPanelChrome.capacityHeader(features, "en-US");
+        String tooltip = BondedCompanionPanelChrome.capacityText(features, "en-US");
+
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.activeCapacity", "0", "1") + ", "
+                + LocalizedText.format("en-US", "tamework.ui.roster.capacityCount", "1", "2"), header);
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.activeCapacity", "0", "1") + "\n"
+                + LocalizedText.format("en-US", "tamework.ui.roster.activeOwnedCapacity", "1", "2", "1", "3"),
+                tooltip);
+        // The label built from the family id tells the families apart but is never shown.
+        assertTrue(!header.contains("Dragons") && !tooltip.contains("Soulbound"));
+    }
+
+    @Test
+    void familiesThatAllowOneRoleAreNamedByThatRoleInTheViewersLanguage() {
+        // Any key the language files hold stands in for another mod's role name key.
+        String first = "tamework.ui.shared.item";
+        String second = "tamework.ui.roster.filter.stored";
+        Map<UUID, CommandPanelFeaturePresentation> features = Map.of(
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "0",
+                        "bonded.activeCapacity.limit", "1", "bonded.activeCapacity.label", "A",
+                        BondedRecords.FAMILY_SOLE_ROLE_ID, first)),
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "2",
+                        "bonded.activeCapacity.limit", "2", "bonded.activeCapacity.label", "B",
+                        BondedRecords.FAMILY_SOLE_ROLE_ID, second)));
+
+        for (String language : java.util.List.of("en-US", "de-DE")) {
+            assertEquals(LocalizedText.format(language, "tamework.ui.roster.familyCapacity",
+                            LocalizedText.resolve(language, first), "0", "1") + " \u00b7 "
+                            + LocalizedText.format(language, "tamework.ui.roster.familyCapacity",
+                            LocalizedText.resolve(language, second), "2", "2"),
+                    BondedCompanionPanelChrome.capacityHeader(features, language));
+        }
+    }
+
+    @Test
+    void aFamilyNameKeyNamesItsSegmentAndTooltipLineBeforeTheSingleRoleName() {
+        // Any key the language files hold stands in for another mod's family name key.
+        String dragons = "tamework.ui.shared.item";
+        String minis = "tamework.ui.roster.filter.stored";
+        Map<UUID, CommandPanelFeaturePresentation> features = Map.of(
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "0",
+                        "bonded.activeCapacity.limit", "1", BondedRecords.FAMILY_ID, "mod:a",
+                        BondedRecords.FAMILY_NAME_KEY, dragons,
+                        BondedRecords.FAMILY_SOLE_ROLE_ID, "tamework.ui.roster.filter.dead")),
+                UUID.randomUUID(), feature(Map.of("bonded.activeCapacity.count", "1",
+                        "bonded.activeCapacity.limit", "1", BondedRecords.FAMILY_ID, "mod:b",
+                        BondedRecords.FAMILY_NAME_KEY, minis,
+                        BondedRecords.OWNED_CAPACITY_COUNT, "1", BondedRecords.OWNED_CAPACITY_LIMIT, "1")));
+
+        for (String language : java.util.List.of("en-US", "fr-FR")) {
+            String first = LocalizedText.resolve(language, dragons);
+            String second = LocalizedText.resolve(language, minis);
+            assertEquals(LocalizedText.format(language, "tamework.ui.roster.familyCapacity", first, "0", "1")
+                            + " \u00b7 "
+                            + LocalizedText.format(language, "tamework.ui.roster.familyCapacity", second, "1", "1"),
+                    BondedCompanionPanelChrome.capacityHeader(features, language));
+            assertEquals(LocalizedText.format(language, "tamework.ui.roster.familyLine", first,
+                            LocalizedText.format(language, "tamework.ui.roster.activeCapacity", "0", "1")) + "\n"
+                            + LocalizedText.format(language, "tamework.ui.roster.familyLine", second,
+                            LocalizedText.format(language, "tamework.ui.roster.activeOwnedCapacity",
+                                    "1", "1", "1", "1")),
+                    BondedCompanionPanelChrome.capacityText(features, language));
+        }
+    }
+
+    /** Families are told apart by their id, so two with only an owned limit stay two. */
+    @Test
+    void twoFamiliesWithOnlyAnOwnedLimitKeepSeparateCounts() {
+        Map<UUID, CommandPanelFeaturePresentation> features = Map.of(
+                UUID.randomUUID(), feature(Map.of(BondedRecords.FAMILY_ID, "mod:a",
+                        BondedRecords.OWNED_CAPACITY_COUNT, "1", BondedRecords.OWNED_CAPACITY_LIMIT, "2")),
+                UUID.randomUUID(), feature(Map.of(BondedRecords.FAMILY_ID, "mod:b",
+                        BondedRecords.OWNED_CAPACITY_COUNT, "3", BondedRecords.OWNED_CAPACITY_LIMIT, "4")));
+
+        assertEquals(LocalizedText.format("en-US", "tamework.ui.roster.ownedCapacity", "1", "2") + ", "
+                        + LocalizedText.format("en-US", "tamework.ui.roster.capacityCount", "3", "4"),
+                BondedCompanionPanelChrome.capacityHeader(features, "en-US"));
+    }
+
+    private static CommandPanelFeaturePresentation feature(Map<String, String> attributes) {
+        return CommandPanelFeaturePresentation.bonded(new BondedCompanionPanelPresentation(
+                "profile", "roster", "Wolf", 1L, "Wolf", "Wolf", null, null, attributes, Map.of(),
+                new BondedCompanionStatusPresentation(BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.NONE, false, null, null, 0L), null));
     }
 
     private static LinkedNpcEntry entry(UUID id) {

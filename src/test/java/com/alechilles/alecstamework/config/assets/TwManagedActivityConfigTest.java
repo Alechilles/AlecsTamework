@@ -5,6 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
+import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
+import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
+import com.alechilles.alecstamework.companion.index.CompanionLocation;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
@@ -18,6 +23,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -522,6 +528,39 @@ class TwManagedActivityConfigTest {
         assertFalse(registry.resolveRole("RoleA").isPresent());
         assertFalse(registry.readiness(PROFILE).available());
         assertEquals("profile-not-found", registry.readiness(PROFILE).detail());
+    }
+
+    /**
+     * While the managed config no longer matches the population groups, its roles resolve to
+     * nothing. They are still managed: an admission must fail closed, not pass with no provider.
+     */
+    @Test
+    void aRoleOfAStaleManagedConfigIsRefusedAsUnavailableNotPassedAsUnmanaged()
+            throws Exception {
+        PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+        assertTrue(groups.replace(
+                List.of(group("groupA", "runeteria:family_a", "RoleA")), 1L
+        ).applied());
+        ManagedActivityConfigRegistry registry =
+                new ManagedActivityConfigRegistry(groups);
+        assertTrue(registry.replace(List.of(decode("valid", profileJson(
+                PROFILE, "runeteria:gate_a", "RoleA", "runeteria:husbandry/feed"
+        ))), 1L).applied());
+        CompanionRecord managed = CompanionRecord
+                .builder(UUID.randomUUID(), "RoleA", CompanionLocation.live("w", 0, 0, 0))
+                .ownerUuid(UUID.randomUUID()).homeWorld("w").build();
+        CompanionRecord unmanaged = managed.toBuilder().roleId("RoleZ").build();
+
+        try (AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            ProviderAdmission admission = ProviderAdmission.of(registry, providers);
+            assertTrue(groups.replace(List.of(), 2L).applied());
+
+            ProviderAdmission.Outcome stale =
+                    admission.evaluate(null, managed).toCompletableFuture().join();
+            assertEquals(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE, stale.refusal());
+            assertEquals(CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY, stale.messageKey());
+            assertTrue(admission.evaluate(null, unmanaged).toCompletableFuture().join().admitted());
+        }
     }
 
     private static String profileJson(

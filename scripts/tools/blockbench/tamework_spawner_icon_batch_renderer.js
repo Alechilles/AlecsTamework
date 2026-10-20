@@ -1636,20 +1636,65 @@
       }
     );
     await waitFrame();
+    const project = getNewModelProject(beforeProjects, previousProject);
     if (texturePath) {
-      const texture = setDefaultTexture(texturePath);
-      if (texture && texture.uuid) {
-        const aliasKeys = collectTextureAliasKeys(texture);
-        const detectedKey = normalizeTextureKey(detectPrimaryTextureKey(texturePath));
-        if (detectedKey) {
-          aliasKeys.add(detectedKey);
-        }
-        remapFaceTextureKeys(Array.from(aliasKeys), texture.uuid);
+      try {
+        bindBaseModelToTexture(texturePath);
+      } catch (error) {
+        await closeManagedModelProject(project);
+        throw error;
       }
-      ensureFacesTextured(texture);
       await waitFrame();
     }
-    return getNewModelProject(beforeProjects, previousProject);
+    return project;
+  }
+
+  function refreshFaceMaterials() {
+    if (typeof Canvas !== "undefined" && typeof Canvas.updateAllFaces === "function") {
+      Canvas.updateAllFaces();
+    }
+  }
+
+  // The Hytale codec loads every PNG that shares the model's name prefix and
+  // builds the face materials from the first one. Rebind every base face to the
+  // job's texture and rebuild the materials, or the render shows a sibling variant.
+  function bindBaseModelToTexture(texturePath) {
+    const texture = setDefaultTexture(texturePath);
+    if (!texture || !texture.uuid) {
+      throw new Error(`Base texture not found or could not be loaded: ${texturePath}`);
+    }
+    const cubes = typeof Cube !== "undefined" && Array.isArray(Cube.all) ? Cube.all : [];
+    for (const cube of cubes) {
+      for (const faceKey of Object.keys((cube && cube.faces) || {})) {
+        const face = cube.faces[faceKey];
+        if (face && normalizeTextureKey(face.texture)) {
+          face.texture = texture.uuid;
+        }
+      }
+    }
+    ensureFacesTextured(texture);
+    refreshFaceMaterials();
+
+    const strayCounts = new Map();
+    for (const cube of cubes) {
+      for (const faceKey of Object.keys((cube && cube.faces) || {})) {
+        const face = cube.faces[faceKey];
+        if (!face || !normalizeTextureKey(face.texture)) {
+          continue;
+        }
+        const resolved = typeof face.getTexture === "function" ? face.getTexture() : null;
+        if (resolved !== texture) {
+          const name = resolved && resolved.name ? resolved.name : "no texture";
+          strayCounts.set(name, (strayCounts.get(name) || 0) + 1);
+        }
+      }
+    }
+    if (strayCounts.size) {
+      const strays = Array.from(strayCounts.entries())
+        .map(([name, count]) => `${count} on ${name}`)
+        .join(", ");
+      throw new Error(`Could not bind all model faces to ${texturePath}. Faces still resolve elsewhere: ${strays}.`);
+    }
   }
 
   function buildAttachmentCollection(name, content, modelPath, texturePath) {
@@ -2490,13 +2535,14 @@
       );
       if (baseTextureOverride) {
         const texture = setDefaultTexture(baseTextureOverride);
-        let remappedFaces = 0;
-        if (texture && texture.uuid) {
-          remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
+        if (!texture || !texture.uuid) {
+          throw new Error(`Base texture could not be loaded: ${baseTextureOverride}`);
         }
+        const remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
         if (remappedFaces === 0) {
           ensureFacesTextured(texture);
         }
+        refreshFaceMaterials();
         const debugRow = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
         const jobId = typeof job.id === "string" ? job.id : job.comboSlug || "job";
         if (debugRow && debugRow.id === jobId) {
@@ -3843,7 +3889,7 @@
     icon: "view_in_ar",
     description:
       "Render dynamic companion icons in bulk from generate_spawner_icon_overrides.py renderer-jobs JSON.",
-    version: "0.2.0",
+    version: "0.2.1",
     variant: "desktop",
     min_version: "5.0.5",
     onload() {

@@ -1,0 +1,9 @@
+{
+  "RequireNewClick": true,
+  "Interactions": [
+    {
+      "Type": "TameworkRuneInput",
+      "Slot": "Ability2"
+    }
+  ]
+}

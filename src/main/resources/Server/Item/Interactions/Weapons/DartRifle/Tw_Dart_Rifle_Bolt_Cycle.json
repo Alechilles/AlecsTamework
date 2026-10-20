@@ -1,0 +1,11 @@
+{
+  "Type": "Simple",
+  "RunTime": 1.0,
+  "HorizontalSpeedMultiplier": 0.85,
+  "Effects": {
+    "ItemAnimationId": "BoltCycle",
+    "ClearAnimationOnFinish": true,
+    "WorldSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Cycle",
+    "LocalSoundEventId": "SFX_Tw_Dart_Rifle_Bolt_Cycle"
+  }
+}

@@ -4,12 +4,16 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
+import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
-import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
+import com.alechilles.alecstamework.settings.NameFilterSettings;
+import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
+import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -19,6 +23,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
@@ -29,6 +34,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -48,10 +54,16 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_LOAD_PRESET = "LoadPreset";
     private static final String ACTION_CLOSE = "Close";
     private static final String ACTION_EDIT = "Edit";
+    private static final String ACTION_EDIT_HUD_DEFAULT = "EditHudDefault";
 
     private static final String KEY_ANNOUNCEMENTS_ENABLED = "@AnnouncementsEnabled";
+    private static final String KEY_NAME_FILTER_ENABLED = "@NameFilterEnabled";
+    private static final String KEY_NAME_FILTER_USE_STOCK_LIST = "@NameFilterUseStockList";
+    private static final String KEY_NAME_FILTER_BLOCKED_WORDS = "@NameFilterBlockedWords";
+    private static final String KEY_NAME_FILTER_ALLOWED_WORDS = "@NameFilterAllowedWords";
     private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
+    private static final String KEY_POP_DEPLOYED_LIMIT = "@PopulationDeployedLimit";
     private static final String KEY_POP_SCOPE = "@PopulationScope";
     private static final String KEY_COMMAND_PANEL_CARDS_PER_PAGE = "@CommandPanelCardsPerPage";
     private static final String KEY_SIMPLE_CLAIMS_ENABLED = "@SimpleClaimsEnabled";
@@ -62,10 +74,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE = "@OwnershipBlockOwnerDamage";
     private static final String KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED = "@OwnershipBlockAllDamageIfOwned";
     private static final String KEY_OWNERSHIP_INVULNERABLE_IF_OWNED = "@OwnershipInvulnerableIfOwned";
-    private static final String KEY_CAPTURE_CLEARS_OWNER = "@CaptureClearsOwner";
-    private static final String KEY_SPAWN_SETS_OWNER = "@SpawnSetsOwner";
+    private static final String KEY_CAPTURE_ITEM_OWNERSHIP = "@CaptureItemOwnership";
     private static final String KEY_CAPTURE_REQUIRES_OWNER = "@CaptureRequiresOwner";
-    private static final String KEY_SPAWN_REQUIRES_OWNER = "@SpawnRequiresOwner";
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
     private static final String KEY_LINKING_REQUIRES_OWNER = "@LinkingRequiresOwner";
     private static final String KEY_NEEDS_ENABLED = "@NeedsEnabled";
@@ -90,6 +100,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_TALENTS_ENABLED = "@TalentsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
+    private static final String KEY_FLIGHT_UNLIMITED_VIGOUR = "@AvatarFlightUnlimitedVigour";
 
     private final Tamework plugin;
     private final World world;
@@ -97,11 +108,16 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private TameworkSettingsValues currentValues;
     private TameworkSettingsValues savedValues;
+    /** The name filter is saved to its own file, so it is tracked beside the main values. */
+    private NameFilterSettings currentNameFilter;
+    private NameFilterSettings savedNameFilter;
     private EventPayload draftPayload;
     private boolean unsavedChanges;
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
+    /** Set when this page hands over to the HUD default editor, which returns here; skips the leaving reminder. */
+    private boolean openingHudDefaultEditor;
 
     public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
                                 @Nonnull Tamework plugin,
@@ -157,6 +173,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data, store);
+            case ACTION_EDIT_HUD_DEFAULT -> onEditHudDefault(data, ref, store);
             default -> {
             }
         }
@@ -164,6 +181,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        if (openingHudDefaultEditor) {
+            return;
+        }
         playerRef.sendMessage(Message.raw(resolveText("tamework.ui.settings.dismissReminder")));
     }
 
@@ -195,6 +215,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
+                "#TwSettingsHudDefaultEditButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_EDIT_HUD_DEFAULT)),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
                 "#TwSettingsApplyButton",
                 appendFormEventData(EventData.of(ACTION, ACTION_APPLY)),
                 false
@@ -206,6 +232,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         return eventData
                 .append(KEY_PRESET, "#TwSettingsPresetDropdown.Value")
                 .append(KEY_POP_LIMIT, "#TwSettingsPopulationLimitInput.Value")
+                .append(KEY_POP_DEPLOYED_LIMIT, "#TwSettingsPopulationDeployedLimitInput.Value")
                 .append(KEY_POP_SCOPE, "#TwSettingsPopulationScopeDropdown.Value")
                 .append(KEY_COMMAND_PANEL_CARDS_PER_PAGE, "#TwSettingsCommandPanelCardsPerPageInput.Value")
                 .append(KEY_SIMPLE_CLAIMS_ENABLED, "#TwSettingsSimpleClaimsEnabledCheck.Value")
@@ -216,10 +243,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, "#TwSettingsBlockOwnerDamageCheck.Value")
                 .append(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, "#TwSettingsBlockAllDamageIfOwnedCheck.Value")
                 .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
-                .append(KEY_CAPTURE_CLEARS_OWNER, "#TwSettingsCaptureClearsOwnerCheck.Value")
-                .append(KEY_SPAWN_SETS_OWNER, "#TwSettingsSpawnSetsOwnerCheck.Value")
+                .append(KEY_CAPTURE_ITEM_OWNERSHIP, "#TwSettingsCaptureItemOwnershipDropdown.Value")
                 .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
-                .append(KEY_SPAWN_REQUIRES_OWNER, "#TwSettingsSpawnRequiresOwnerCheck.Value")
                 .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
                 .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
                 .append(KEY_NEEDS_ENABLED, "#TwSettingsNeedsEnabledCheck.Value")
@@ -244,15 +269,27 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_TALENTS_ENABLED, "#TwSettingsTalentsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
                 .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
-                .append(KEY_ANNOUNCEMENTS_ENABLED, "#TwSettingsAnnouncementsEnabledCheck.Value");
+                .append(KEY_FLIGHT_UNLIMITED_VIGOUR, "#TwSettingsFlightUnlimitedVigourCheck.Value")
+                .append(KEY_ANNOUNCEMENTS_ENABLED, "#TwSettingsAnnouncementsEnabledCheck.Value")
+                .append(KEY_NAME_FILTER_ENABLED, "#TwSettingsNameFilterEnabledCheck.Value")
+                .append(KEY_NAME_FILTER_USE_STOCK_LIST, "#TwSettingsNameFilterUseStockListCheck.Value")
+                .append(KEY_NAME_FILTER_BLOCKED_WORDS, "#TwSettingsNameFilterBlockedWordsInput.Value")
+                .append(KEY_NAME_FILTER_ALLOWED_WORDS, "#TwSettingsNameFilterAllowedWordsInput.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
+        CompanionHudPlacement hudDefault = CompanionHudDefaultsStore.current();
+        commandBuilder.set("#TwSettingsHudDefaultValue.Text", LocalizedText.format(playerRef,
+                "tamework.ui.hudPlacement.summary",
+                LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.point." + hudDefault.point().key()),
+                hudDefault.x(), hudDefault.y()));
         renderFeedback(commandBuilder);
         commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries(resolveLanguage()));
         commandBuilder.set("#TwSettingsPresetDropdown.Value", TameworkSettingsPreset.match(currentValues).value());
         commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal()));
+        commandBuilder.set("#TwSettingsPopulationDeployedLimitInput.Value",
+                String.valueOf(currentValues.populationLimitPerPlayerDeployedTotal()));
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
         commandBuilder.set("#TwSettingsCommandPanelCardsPerPageInput.Value", String.valueOf(currentValues.commandPanelCardsPerPage()));
@@ -264,10 +301,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsBlockOwnerDamageCheck.Value", currentValues.blockOwnerDamage());
         commandBuilder.set("#TwSettingsBlockAllDamageIfOwnedCheck.Value", currentValues.blockAllPlayerDamageIfOwned());
         commandBuilder.set("#TwSettingsInvulnerableIfOwnedCheck.Value", currentValues.invulnerableIfOwned());
-        commandBuilder.set("#TwSettingsCaptureClearsOwnerCheck.Value", currentValues.captureClearsOwner());
-        commandBuilder.set("#TwSettingsSpawnSetsOwnerCheck.Value", currentValues.spawnSetsOwner());
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Entries", captureItemOwnershipEntries());
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Value",
+                currentValues.captureItemOwnership().toConfigValue());
+        renderCaptureItemOwnershipNote(commandBuilder, currentValues.captureItemOwnership());
         commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner());
-        commandBuilder.set("#TwSettingsSpawnRequiresOwnerCheck.Value", currentValues.spawnRequiresOwner());
         commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
         commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner());
         commandBuilder.set("#TwSettingsNeedsEnabledCheck.Value", currentValues.needsEnabled());
@@ -297,15 +335,39 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsTalentsEnabledCheck.Value", currentValues.talentsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
+        commandBuilder.set("#TwSettingsFlightUnlimitedVigourCheck.Value", currentValues.avatarFlightUnlimitedVigour());
         commandBuilder.set("#TwSettingsAnnouncementsEnabledCheck.Value", currentValues.announcementsEnabled());
+        commandBuilder.set("#TwSettingsNameFilterEnabledCheck.Value", currentNameFilter.enabled());
+        commandBuilder.set("#TwSettingsNameFilterUseStockListCheck.Value", currentNameFilter.useStockList());
+        commandBuilder.set("#TwSettingsNameFilterBlockedWordsInput.Value",
+                NameFilterSettings.formatWordList(currentNameFilter.blockedWords()));
+        commandBuilder.set("#TwSettingsNameFilterAllowedWordsInput.Value",
+                NameFilterSettings.formatWordList(currentNameFilter.allowedWords()));
+    }
+
+    /** The name filter the form holds; a control missing from the payload keeps its current value. */
+    @Nonnull
+    private NameFilterSettings nameFilterFrom(@Nonnull EventPayload payload) {
+        return new NameFilterSettings(
+                payload.nameFilterEnabled != null ? payload.nameFilterEnabled : currentNameFilter.enabled(),
+                payload.nameFilterUseStockList != null
+                        ? payload.nameFilterUseStockList
+                        : currentNameFilter.useStockList(),
+                payload.nameFilterBlockedWords != null
+                        ? NameFilterSettings.parseWordList(payload.nameFilterBlockedWords)
+                        : currentNameFilter.blockedWords(),
+                payload.nameFilterAllowedWords != null
+                        ? NameFilterSettings.parseWordList(payload.nameFilterAllowedWords)
+                        : currentNameFilter.allowedWords());
     }
 
     private void updateUnsavedChanges() {
         if (draftPayload == null) {
-            unsavedChanges = !currentValues.equals(savedValues);
+            unsavedChanges = !currentValues.equals(savedValues) || !currentNameFilter.equals(savedNameFilter);
             return;
         }
-        unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues);
+        unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues)
+                || !nameFilterFrom(draftPayload).equals(savedNameFilter);
     }
 
     private void renderFeedback(@Nonnull UICommandBuilder commandBuilder) {
@@ -331,8 +393,55 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                     : TameworkSettingsPreset.CUSTOM;
             // A changed form must allow selecting the previous preset again.
             commandBuilder.set("#TwSettingsPresetDropdown.Value", preset.value());
+            // The note under the ownership choice describes the mode selected in the form.
+            renderCaptureItemOwnershipNote(commandBuilder, CaptureItemOwnershipMode.fromConfigValue(
+                    draftPayload.captureItemOwnership == null
+                            ? currentValues.captureItemOwnership().toConfigValue()
+                            : draftPayload.captureItemOwnership));
         }
         sendUpdate(commandBuilder, null, false);
+    }
+
+    /**
+     * Opens the HUD placement editor for the server default. Unapplied form edits would be lost when this page
+     * closes, so the editor only opens once they are applied or refreshed away.
+     */
+    private void onEditHudDefault(@Nonnull EventPayload payload,
+                                  @Nonnull Ref<EntityStore> ref,
+                                  @Nonnull Store<EntityStore> store) {
+        draftPayload = payload;
+        updateUnsavedChanges();
+        if (unsavedChanges || applyInProgress) {
+            warningLine = resolveText("tamework.ui.settings.warning.applyBeforeHudDefault");
+            statusLine = "";
+            refreshFeedback();
+            return;
+        }
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null) {
+            return;
+        }
+        openingHudDefaultEditor = true;
+        try {
+            player.getPageManager().openCustomPage(ref, store, new TameworkHudPlacementPage(
+                    playerRef, TameworkHudPlacementPage.Mode.SERVER_DEFAULT, this::reopenSettings));
+        } catch (RuntimeException failure) {
+            // The settings page stays open, so it should still remind the player when it does close.
+            openingHudDefaultEditor = false;
+            throw failure;
+        }
+    }
+
+    private void reopenSettings() {
+        Ref<EntityStore> currentRef = playerRef.getReference();
+        if (currentRef == null || !currentRef.isValid()) {
+            return;
+        }
+        String error = TameworkSettingsPageService.openSettingsPage(
+                currentRef, currentRef.getStore(), "hud_placement", "settings_hud_default");
+        if (error != null) {
+            playerRef.sendMessage(Message.raw(error));
+        }
     }
 
     private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
@@ -354,14 +463,17 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
 
         TameworkSettingsValues requested = parseResult.values();
+        NameFilterSettings requestedNameFilter = nameFilterFrom(payload);
+        NameFilterSettings previousNameFilter = savedNameFilter;
         currentValues = requested;
+        currentNameFilter = requestedNameFilter;
         applyInProgress = true;
         statusLine = resolveText("tamework.ui.settings.status.applying");
         warningLine = "";
         refreshFeedback();
 
         CompletableFuture
-                .supplyAsync(() -> applySettings(requested))
+                .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter))
                 .whenComplete((outcome, throwable) -> world.execute(() -> {
                     applyInProgress = false;
                     if (throwable != null) {
@@ -376,12 +488,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                     } else if (outcome.partial()) {
                         savedValues = loadSettingsValues();
+                        savedNameFilter = NameFilterSettingsStore.current();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = outcome.warning();
                     } else if (outcome.success()) {
                         savedValues = loadSettingsValues();
+                        savedNameFilter = NameFilterSettingsStore.current();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -407,6 +521,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 ? parseResult.values()
                 : currentValues;
         currentValues = preset.applyTo(baseValues);
+        // Presets do not cover the name filter; keep what the form holds.
+        currentNameFilter = nameFilterFrom(payload);
         draftPayload = null;
         updateUnsavedChanges();
         statusLine = parseResult.success()
@@ -417,18 +533,29 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     @Nonnull
-    private ApplyOutcome applySettings(@Nonnull TameworkSettingsValues values) {
+    private ApplyOutcome applySettings(@Nonnull TameworkSettingsValues values,
+                                       @Nonnull NameFilterSettings nameFilter,
+                                       @Nonnull NameFilterSettings savedFilter) {
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
         plugin.onRuntimeSettingsChanged();
+        List<String> warnings = new ArrayList<>();
+        // An unchanged filter is not rewritten, so a hand edit to its file survives other applies.
+        if (!nameFilter.equals(savedFilter) && !NameFilterSettingsStore.save(
+                NameFilterSettingsStore.resolveFile(plugin), nameFilter, plugin.getLogger())) {
+            warnings.add(resolveText("tamework.ui.settings.warning.nameFilterSaveFailed"));
+        }
         if (!TameworkSettingsAnnouncementStore.saveEnabled(
                 TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin),
                 values.announcementsEnabled(), plugin.getLogger())) {
+            warnings.add(resolveText("tamework.ui.settings.warning.announcementSaveFailed"));
+        }
+        if (!warnings.isEmpty()) {
             return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.applied"),
-                    resolveText("tamework.ui.settings.warning.announcementSaveFailed"));
+                    String.join(" ", warnings));
         }
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
@@ -474,6 +601,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void loadCurrentValues() {
         currentValues = loadSettingsValues();
         savedValues = currentValues;
+        currentNameFilter = NameFilterSettingsStore.current();
+        savedNameFilter = currentNameFilter;
         draftPayload = null;
         unsavedChanges = false;
         warningLine = "";
@@ -490,6 +619,33 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         TwNeedsConfig.TickPolicyMode.ANY_LOADED_PLAYER.toConfigValue()
                 )
         );
+    }
+
+    private List<DropdownEntryInfo> captureItemOwnershipEntries() {
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        for (CaptureItemOwnershipMode mode : CaptureItemOwnershipMode.values()) {
+            entries.add(new DropdownEntryInfo(
+                    LocalizableString.fromString(resolveText(captureItemOwnershipKey(mode))),
+                    mode.toConfigValue()
+            ));
+        }
+        return entries;
+    }
+
+    /** The one-line description of {@code mode}, shown under the ownership choice. */
+    private void renderCaptureItemOwnershipNote(@Nonnull UICommandBuilder commandBuilder,
+                                                @Nonnull CaptureItemOwnershipMode mode) {
+        commandBuilder.set("#TwSettingsCaptureItemOwnershipNoteLabel.Text",
+                resolveText(captureItemOwnershipKey(mode) + ".description"));
+    }
+
+    @Nonnull
+    private static String captureItemOwnershipKey(@Nonnull CaptureItemOwnershipMode mode) {
+        return "tamework.ui.settings.captureItemOwnership." + switch (mode) {
+            case FOLLOWS_ITEM -> "followsItem";
+            case OWNER_ONLY -> "ownerOnly";
+            case CHANGES_ON_RELEASE -> "changesOnRelease";
+        };
     }
 
     private List<DropdownEntryInfo> animalAgingModeEntries() {
@@ -592,6 +748,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(ACTION, Codec.STRING), (x, v) -> x.action = v, x -> x.action).add()
                 .<String>append(new KeyedCodec<>(KEY_PRESET, Codec.STRING), (x, v) -> x.preset = v, x -> x.preset).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_LIMIT, Codec.STRING), (x, v) -> x.populationLimit = v, x -> x.populationLimit).add()
+                .<String>append(new KeyedCodec<>(KEY_POP_DEPLOYED_LIMIT, Codec.STRING), (x, v) -> x.populationDeployedLimit = v, x -> x.populationDeployedLimit).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_SCOPE, Codec.STRING), (x, v) -> x.populationScope = v, x -> x.populationScope).add()
                 .<String>append(new KeyedCodec<>(KEY_COMMAND_PANEL_CARDS_PER_PAGE, Codec.STRING), (x, v) -> x.commandPanelCardsPerPage = v, x -> x.commandPanelCardsPerPage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_SIMPLE_CLAIMS_ENABLED, Codec.BOOLEAN), (x, v) -> x.simpleClaimsEnabled = v, x -> x.simpleClaimsEnabled).add()
@@ -602,10 +759,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, Codec.BOOLEAN), (x, v) -> x.blockOwnerDamage = v, x -> x.blockOwnerDamage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.blockAllDamageIfOwned = v, x -> x.blockAllDamageIfOwned).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.invulnerableIfOwned = v, x -> x.invulnerableIfOwned).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_CLEARS_OWNER, Codec.BOOLEAN), (x, v) -> x.captureClearsOwner = v, x -> x.captureClearsOwner).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_SETS_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnSetsOwner = v, x -> x.spawnSetsOwner).add()
+                .<String>append(new KeyedCodec<>(KEY_CAPTURE_ITEM_OWNERSHIP, Codec.STRING), (x, v) -> x.captureItemOwnership = v, x -> x.captureItemOwnership).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.captureRequiresOwner = v, x -> x.captureRequiresOwner).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnRequiresOwner = v, x -> x.spawnRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_LINKING_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.linkingRequiresOwner = v, x -> x.linkingRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsEnabled = v, x -> x.needsEnabled).add()
@@ -630,12 +785,18 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_TALENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.talentsEnabled = v, x -> x.talentsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_FLIGHT_UNLIMITED_VIGOUR, Codec.BOOLEAN), (x, v) -> x.avatarFlightUnlimitedVigour = v, x -> x.avatarFlightUnlimitedVigour).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_ANNOUNCEMENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.announcementsEnabled = v, x -> x.announcementsEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_NAME_FILTER_ENABLED, Codec.BOOLEAN), (x, v) -> x.nameFilterEnabled = v, x -> x.nameFilterEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_NAME_FILTER_USE_STOCK_LIST, Codec.BOOLEAN), (x, v) -> x.nameFilterUseStockList = v, x -> x.nameFilterUseStockList).add()
+                .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_BLOCKED_WORDS, Codec.STRING), (x, v) -> x.nameFilterBlockedWords = v, x -> x.nameFilterBlockedWords).add()
+                .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_ALLOWED_WORDS, Codec.STRING), (x, v) -> x.nameFilterAllowedWords = v, x -> x.nameFilterAllowedWords).add()
                 .build();
 
         String action;
         String preset;
         String populationLimit;
+        String populationDeployedLimit;
         String populationScope;
         String commandPanelCardsPerPage;
         Boolean simpleClaimsEnabled;
@@ -646,10 +807,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean blockOwnerDamage;
         Boolean blockAllDamageIfOwned;
         Boolean invulnerableIfOwned;
-        Boolean captureClearsOwner;
-        Boolean spawnSetsOwner;
+        String captureItemOwnership;
         Boolean captureRequiresOwner;
-        Boolean spawnRequiresOwner;
         Boolean interactionRequiresOwner;
         Boolean linkingRequiresOwner;
         Boolean needsEnabled;
@@ -674,6 +833,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean talentsEnabled;
         Boolean reviveSystemEnabled;
         Boolean recallTeleportingEnabled;
+        Boolean avatarFlightUnlimitedVigour;
         Boolean announcementsEnabled;
+        Boolean nameFilterEnabled;
+        Boolean nameFilterUseStockList;
+        String nameFilterBlockedWords;
+        String nameFilterAllowedWords;
     }
 }

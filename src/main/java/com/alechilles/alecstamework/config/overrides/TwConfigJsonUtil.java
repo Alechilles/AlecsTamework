@@ -43,10 +43,10 @@ public final class TwConfigJsonUtil {
 
     @Nullable
     public static JsonObject readObject(@Nullable Path path) {
-        if (path == null || !Files.isRegularFile(path)) {
-            return null;
-        }
         try {
+            if (path == null || !Files.isRegularFile(path)) {
+                return null;
+            }
             String raw = Files.readString(path);
             JsonElement parsed = JsonParser.parseString(raw);
             if (!parsed.isJsonObject()) {

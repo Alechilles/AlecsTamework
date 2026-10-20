@@ -62,8 +62,21 @@ public record GlobalConfigView(@Nullable String id,
                                 boolean carnivoreFeed) {
     }
 
+    /**
+     * The per-player limits; 0 means no limit, and both use {@code perPlayerLimitScope}.
+     *
+     * @param limitPerPlayerOwnedTotal    every companion the player owns: out in the world, stored,
+     *                                    in items, in coops, dead and lost
+     * @param perPlayerLimitScope         {@code PerWorld} or {@code Global}
+     * @param limitPerPlayerDeployedTotal the player's companions out in the world, loaded or not
+     */
     public record PopulationView(int limitPerPlayerOwnedTotal,
-                                 @Nonnull String perPlayerLimitScope) {
+                                 @Nonnull String perPlayerLimitScope,
+                                 int limitPerPlayerDeployedTotal) {
+        /** Compatibility constructor for callers compiled before the deployed limit: no deployed limit. */
+        public PopulationView(int limitPerPlayerOwnedTotal, @Nonnull String perPlayerLimitScope) {
+            this(limitPerPlayerOwnedTotal, perPlayerLimitScope, 0);
+        }
     }
 
     public record SimpleClaimsView(boolean enabled,

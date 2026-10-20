@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -22,23 +22,25 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Suppresses NPC death drops for linked companions that are configured as dead-respawn enabled.
+ * Suppresses NPC death drops for companion bodies (stamped with {@link TameworkCompanionComponent})
+ * whose role has dead-respawn enabled, so a revived companion keeps its items (spec 8.6 step 2).
+ * An old-age death still drops.
  */
 public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSystems.OnDeathSystem {
     @Nonnull
     @Override
     public Query<EntityStore> getQuery() {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
-                TameworkCommandLinksComponent.getComponentType();
-        if (npcType != null && linksType != null) {
-            return Query.and(npcType, linksType);
+        ComponentType<EntityStore, TameworkCompanionComponent> stampType =
+                TameworkCompanionComponent.getComponentType();
+        if (npcType != null && stampType != null) {
+            return Query.and(npcType, stampType);
         }
         if (npcType != null) {
             return Query.and(npcType);
         }
-        if (linksType != null) {
-            return Query.and(linksType);
+        if (stampType != null) {
+            return Query.and(stampType);
         }
         return Query.any();
     }
@@ -54,28 +56,23 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
                                  @Nonnull DeathComponent component,
                                  @Nonnull Store<EntityStore> store,
                                  @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
-                TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
+        ComponentType<EntityStore, TameworkCompanionComponent> stampType =
+                TameworkCompanionComponent.getComponentType();
+        if (stampType == null) {
             return;
         }
-        TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, linksType);
+        TameworkCompanionComponent stamp = commandBuffer.getComponent(ref, stampType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         boolean deadRespawnEnabled = CompanionRevivePolicy.featureEnabled(roleId);
         if (CompanionRevivePolicy.isOldAgeDeath(component)
-                || !shouldSuppressDrops(links, deadRespawnEnabled)) {
+                || !shouldSuppressDrops(stamp, deadRespawnEnabled)) {
             return;
         }
         component.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);
     }
 
-    static boolean shouldSuppressDrops(@Nullable TameworkCommandLinksComponent links,
+    static boolean shouldSuppressDrops(@Nullable TameworkCompanionComponent stamp,
                                        boolean deadRespawnEnabled) {
-        if (!deadRespawnEnabled) {
-            return false;
-        }
-        if (links == null) return false;
-        String[] toolIds = links.getToolIds();
-        return toolIds != null && toolIds.length > 0;
+        return deadRespawnEnabled && stamp != null;
     }
 }

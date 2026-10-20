@@ -1,46 +1,31 @@
 package com.alechilles.alecstamework.npc.compat;
 
-import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.instructions.ExecutionSupport;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.CombatSupport;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
-import com.hypixel.hytale.server.npc.role.support.PositionCache;
-import com.hypixel.hytale.server.npc.role.support.RoleStats;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.role.support.WorldSupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Resolves NPC support objects from Update 6 ECS components or Update 5 Role getters.
+ * Resolves NPC support objects from their ECS components.
  *
- * <p>Update 5 method handles are bound once. Update 6 callbacks bind their supplied
- * execution support for the callback duration so repeated reads do not repeat ECS lookups.
+ * <p>NPC callbacks bind their supplied execution support for the callback duration so
+ * repeated reads do not repeat ECS lookups.
  */
 public final class NpcSupportAccess {
     private static final ThreadLocal<Binding> ACTIVE_EXECUTION_SUPPORT = new ThreadLocal<>();
-    private static final MethodHandle LEGACY_STATE = legacyGetter("getStateSupport", StateSupport.class);
-    private static final MethodHandle LEGACY_MARKED_ENTITY =
-            legacyGetter("getMarkedEntitySupport", MarkedEntitySupport.class);
-    private static final MethodHandle LEGACY_WORLD = legacyGetter("getWorldSupport", WorldSupport.class);
-    private static final MethodHandle LEGACY_ENTITY = legacyGetter("getEntitySupport", EntitySupport.class);
-    private static final MethodHandle LEGACY_COMBAT = legacyGetter("getCombatSupport", CombatSupport.class);
-    private static final MethodHandle LEGACY_POSITION_CACHE = legacyGetter("getPositionCache", PositionCache.class);
-    private static final MethodHandle LEGACY_ROLE_STATS = legacyGetter("getRoleStats", RoleStats.class);
 
     private NpcSupportAccess() {
     }
 
-    /** Binds Update 6 callback support and returns the previous nested value. */
+    /** Binds callback support and returns the previous nested value. */
     @Nullable
     public static ExecutionSupport push(@Nullable ExecutionSupport support) {
         Binding previous = ACTIVE_EXECUTION_SUPPORT.get();
@@ -61,117 +46,43 @@ public final class NpcSupportAccess {
         ACTIVE_EXECUTION_SUPPORT.set(new Binding(previous.getRole(), previous));
     }
 
-    /**
-     * Resolves support without a live reference only inside a bound NPC callback on Update 6.
-     */
+    /** Resolves support without a live reference only inside a bound NPC callback. */
     @Nullable
     public static StateSupport state(@Nullable Role role) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getStateSupport() : null;
-        }
-        return invokeLegacy(LEGACY_STATE, role, StateSupport.class);
+        ExecutionSupport active = matchingActiveSupport(role);
+        return active != null ? active.getStateSupport() : null;
     }
 
     @Nullable
     public static StateSupport state(@Nullable Role role,
                                      @Nullable Ref<EntityStore> ref,
                                      ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getStateSupport() : getState(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_STATE, role, StateSupport.class);
+        ExecutionSupport active = matchingActiveSupport(role);
+        return active != null ? active.getStateSupport() : getState(ref, accessor);
     }
 
     @Nullable
     public static MarkedEntitySupport markedEntity(@Nullable Role role,
                                                     @Nullable Ref<EntityStore> ref,
                                                     ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getMarkedEntitySupport() : getMarkedEntity(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_MARKED_ENTITY, role, MarkedEntitySupport.class);
-    }
-
-    /**
-     * Resolves support without a live reference only inside a bound NPC callback on Update 6.
-     */
-    @Nullable
-    public static WorldSupport world(@Nullable Role role) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getWorldSupport() : null;
-        }
-        return invokeLegacy(LEGACY_WORLD, role, WorldSupport.class);
+        ExecutionSupport active = matchingActiveSupport(role);
+        return active != null ? active.getMarkedEntitySupport() : getMarkedEntity(ref, accessor);
     }
 
     @Nullable
     public static WorldSupport world(@Nullable Role role,
                                      @Nullable Ref<EntityStore> ref,
                                      ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getWorldSupport() : getWorld(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_WORLD, role, WorldSupport.class);
-    }
-
-    /**
-     * Resolves support without a live reference only inside a bound NPC callback on Update 6.
-     */
-    @Nullable
-    public static EntitySupport entity(@Nullable Role role) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getEntitySupport() : null;
-        }
-        return invokeLegacy(LEGACY_ENTITY, role, EntitySupport.class);
+        ExecutionSupport active = matchingActiveSupport(role);
+        return active != null ? active.getWorldSupport() : getWorld(ref, accessor);
     }
 
     @Nullable
     public static EntitySupport entity(@Nullable Role role,
                                        @Nullable Ref<EntityStore> ref,
                                        ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getEntitySupport() : getEntity(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_ENTITY, role, EntitySupport.class);
-    }
-
-    @Nullable
-    public static CombatSupport combat(@Nullable Role role,
-                                       @Nullable Ref<EntityStore> ref,
-                                       ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getCombatSupport() : getCombat(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_COMBAT, role, CombatSupport.class);
-    }
-
-    @Nullable
-    public static PositionCache positionCache(@Nullable Role role,
-                                              @Nullable Ref<EntityStore> ref,
-                                              ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            ExecutionSupport active = matchingActiveSupport(role);
-            return active != null ? active.getPositionCache() : getPositionCache(ref, accessor);
-        }
-        return invokeLegacy(LEGACY_POSITION_CACHE, role, PositionCache.class);
-    }
-
-    @Nullable
-    public static RoleStats roleStats(@Nullable Role role,
-                                      @Nullable Ref<EntityStore> ref,
-                                      ComponentAccessor<EntityStore> accessor) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            PositionCache positionCache = positionCache(role, ref, accessor);
-            return positionCache != null ? positionCache.getRoleStats() : null;
-        }
-        return invokeLegacy(LEGACY_ROLE_STATS, role, RoleStats.class);
+        ExecutionSupport active = matchingActiveSupport(role);
+        return active != null ? active.getEntitySupport() : getEntity(ref, accessor);
     }
 
     @Nullable
@@ -231,53 +142,9 @@ public final class NpcSupportAccess {
         return isUsable(ref, accessor) ? EntitySupport.get(ref, accessor) : null;
     }
 
-    @Nullable
-    private static CombatSupport getCombat(@Nullable Ref<EntityStore> ref,
-                                           ComponentAccessor<EntityStore> accessor) {
-        return isUsable(ref, accessor) ? CombatSupport.get(ref, accessor) : null;
-    }
-
-    @Nullable
-    private static PositionCache getPositionCache(@Nullable Ref<EntityStore> ref,
-                                                  ComponentAccessor<EntityStore> accessor) {
-        return isUsable(ref, accessor) ? PositionCache.get(ref, accessor) : null;
-    }
-
     private static boolean isUsable(@Nullable Ref<EntityStore> ref,
                                     @Nullable ComponentAccessor<EntityStore> accessor) {
         return ref != null && ref.isValid() && accessor != null;
-    }
-
-    @Nullable
-    private static MethodHandle legacyGetter(String methodName, Class<?> returnType) {
-        if (HytaleApiLevel.isUpdate6OrLater()) {
-            return null;
-        }
-        try {
-            return MethodHandles.publicLookup().findVirtual(
-                    Role.class,
-                    methodName,
-                    MethodType.methodType(returnType));
-        } catch (NoSuchMethodException | IllegalAccessException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
-
-    @Nullable
-    private static <T> T invokeLegacy(@Nullable MethodHandle handle,
-                                      @Nullable Role role,
-                                      Class<T> returnType) {
-        if (role == null) {
-            return null;
-        }
-        if (handle == null) {
-            throw new IllegalStateException("Missing Update 5 Role support accessor for " + returnType.getSimpleName());
-        }
-        try {
-            return returnType.cast(handle.invoke(role));
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Could not resolve Update 5 " + returnType.getSimpleName(), throwable);
-        }
     }
 
     record Binding(@Nullable Role role, @Nonnull ExecutionSupport support) {

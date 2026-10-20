@@ -222,7 +222,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     new Vector3d(originX, originY, originZ),
                     nowMs
             );
-            if (recent != null) {
+            if (recent != null
+                    && !NeedsResourceTargetCacheAdapter.isTargetRejected(npcUuid, resourceType.kind, recent, nowMs)) {
                 result = targetCache.adoptTarget(
                         npcUuid,
                         worldName,

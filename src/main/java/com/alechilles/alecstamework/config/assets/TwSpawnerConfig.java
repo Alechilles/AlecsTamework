@@ -157,7 +157,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (settings, value) -> settings.assignsOwner = value,
             settings -> settings.assignsOwner
         )
-        .documentation("Assign the interacting player as owner on spawn.")
+        .documentation("Retired and ignored: the server setting captureItemOwnership in /tw settings decides who owns a released companion.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
@@ -394,7 +394,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (parent.capture == null) {
             return;
         }
-        if (!nestedExplicitKeys.contains("ClearsOwner")) capture.clearsOwner = parent.capture.clearsOwner;
+        if (!nestedExplicitKeys.contains("BlockIneligibleHolders")) capture.blockIneligibleHolders = parent.capture.blockIneligibleHolders;
         if (!nestedExplicitKeys.contains("RequireTamed")) capture.requireTamed = parent.capture.requireTamed;
         if (!nestedExplicitKeys.contains("TamesTarget")) capture.tamesTarget = parent.capture.tamesTarget;
         if (!nestedExplicitKeys.contains("MaxHealthPercent")) capture.maxHealthPercent = parent.capture.maxHealthPercent;
@@ -481,11 +481,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
         return ItemFeatureConfig.builder()
             .spawnerEnabled(true)
-            .captureClearsOwner(captureSettings.clearsOwner)
+            .captureBlockIneligibleHolders(captureSettings.blockIneligibleHolders)
             .captureRequireTamed(captureSettings.requireTamed)
             .captureTamesTarget(captureSettings.tamesTarget)
             .captureOwnerRestricted(captureSettings.ownerRestricted)
-            .spawnAssignsOwner(spawnSettings.assignsOwner)
             .spawnOwnerRestricted(spawnSettings.ownerRestricted)
             .spawnerRoleAllowlist(toList(allowlist))
             .spawnerRoleDenylist(toList(denylist))
@@ -579,7 +578,9 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     }
 
     public static final class CaptureSettings {
+        /** Retired: still parsed so old assets load, never read. */
         boolean clearsOwner = true;
+        boolean blockIneligibleHolders = true;
         boolean requireTamed = true;
         boolean tamesTarget;
         Double maxHealthPercent;
@@ -617,6 +618,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     }
 
     public static final class SpawnSettings {
+        /** Retired: still parsed so old assets load, never read. */
         private boolean assignsOwner = true;
         private boolean ownerRestricted = true;
         private Boolean requireOwner;

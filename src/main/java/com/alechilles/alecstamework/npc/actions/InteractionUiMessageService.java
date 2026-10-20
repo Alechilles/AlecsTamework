@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -9,7 +10,10 @@ final class InteractionUiMessageService {
     private final TameworkUiMessageService delegate = new TameworkUiMessageService();
 
     boolean show(Player player, String message) {
-        return delegate.show(player, message);
+        if (player == null || message == null || message.isBlank()) {
+            return false;
+        }
+        return delegate.show(player, LocalizedText.resolve(player, message));
     }
 
     boolean showSuccessKey(Player player, String key, Object... args) {

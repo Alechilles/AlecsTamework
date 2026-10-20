@@ -13,7 +13,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
 
     enum Status {
         PAIRED,
-        SUBMITTED,
         WAITING_FOR_MATE,
         NO_OFFSPRING,
         COOLDOWN,
@@ -23,7 +22,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
         LOW_HAPPINESS,
         CAPACITY_REACHED,
         CLAIM_REQUIRED,
-        PROGRESSION_REQUIRED,
         INTEGRATION_UNAVAILABLE,
         BIRTH_PENDING,
         UNAVAILABLE
@@ -31,10 +29,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
 
     static BreedingInteractionOutcome paired() {
         return new BreedingInteractionOutcome(Status.PAIRED, 0);
-    }
-
-    static BreedingInteractionOutcome submitted() {
-        return new BreedingInteractionOutcome(Status.SUBMITTED, 0);
     }
 
     static BreedingInteractionOutcome waitingForMate() {
@@ -75,10 +69,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
         return new BreedingInteractionOutcome(Status.CLAIM_REQUIRED, 0);
     }
 
-    static BreedingInteractionOutcome progressionRequired() {
-        return new BreedingInteractionOutcome(Status.PROGRESSION_REQUIRED, 0);
-    }
-
     static BreedingInteractionOutcome integrationUnavailable() {
         return new BreedingInteractionOutcome(Status.INTEGRATION_UNAVAILABLE, 0);
     }
@@ -92,25 +82,22 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
     }
 
     boolean accepted() {
-        return status == Status.PAIRED || status == Status.SUBMITTED
+        return status == Status.PAIRED
                 || status == Status.WAITING_FOR_MATE
                 || status == Status.NO_OFFSPRING;
     }
 
     boolean completedPair() {
-        return status == Status.PAIRED || status == Status.SUBMITTED
-                || status == Status.NO_OFFSPRING;
+        return status == Status.PAIRED || status == Status.NO_OFFSPRING;
     }
 
     boolean warning() {
-        return status != Status.PAIRED && status != Status.SUBMITTED
-                && status != Status.WAITING_FOR_MATE;
+        return status != Status.PAIRED && status != Status.WAITING_FOR_MATE;
     }
 
     Feedback feedback() {
         return switch (status) {
             case PAIRED -> text("paired");
-            case SUBMITTED -> text("submitted");
             case WAITING_FOR_MATE -> text("selectMate");
             case NO_OFFSPRING -> text("noOffspring");
             case COOLDOWN -> text("cooldown");
@@ -120,7 +107,6 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
             case LOW_HAPPINESS -> text("happinessTooLow", requiredHappiness);
             case CAPACITY_REACHED -> text("capacityReached");
             case CLAIM_REQUIRED -> text("claimRequired");
-            case PROGRESSION_REQUIRED -> text("progressionRequired");
             case INTEGRATION_UNAVAILABLE -> text("integrationUnavailable");
             case BIRTH_PENDING -> text("birthPending");
             case UNAVAILABLE -> text("unavailable");

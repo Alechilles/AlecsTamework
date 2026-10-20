@@ -46,6 +46,19 @@ public final class MountedNpcSnapshotRoleResolver {
         );
     }
 
+    /**
+     * The NPC's durable role: its live role, or the original role hidden by mount or avatar-flight
+     * parking. Null while parked in Empty_Role with no known original, so callers keep the role
+     * they already have instead of recording the parking role.
+     */
+    @Nullable
+    public static String durableRoleId(@Nullable String liveRoleId,
+                                       @Nonnull Ref<EntityStore> npcRef,
+                                       @Nonnull Store<EntityStore> store) {
+        String roleId = resolve(liveRoleId, npcRef, store).roleId();
+        return CanonicalCompanionRolePolicy.isTemporaryParkingRole(roleId) ? null : roleId;
+    }
+
     @Nonnull
     static Resolution resolveNativeParking(@Nullable String liveRoleId,
                                            int originalRoleIndex,

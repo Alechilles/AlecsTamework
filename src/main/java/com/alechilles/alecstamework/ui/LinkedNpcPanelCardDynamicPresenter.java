@@ -46,6 +46,12 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     (current.recallLostRemainingMs() + 999L) / 1_000L
             ));
         }
+        // Ready and disabled transitions rebuild the card (LinkedNpcPanelCardDynamicState).
+        if (current.dead() && (previous.deadRespawnRemainingMs() != current.deadRespawnRemainingMs()
+                || previous.deadRespawnTotalMs() != current.deadRespawnTotalMs())) {
+            LinkedNpcPanelStatusStrip.refresh(commands, selector, current,
+                    current.deadRespawnRemainingMs(), false, language);
+        }
         refreshProgression(commands, selector, previous, current);
         if (previous.flightToggleAirborne() != current.flightToggleAirborne()) {
             refreshFlightMode(commands, selector, current, language);
@@ -65,7 +71,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
     ) {
         BondedCompanionCardPresenter.refreshDynamicState(
                 commands, selector, previous == null ? null : previous.bonded(),
-                current.bonded(), language);
+                current.bonded(), pendingUnlink, language);
         BondedCompanionCardPresenter.refreshProgressionState(
                 commands, selector, current.bonded(), pendingUnlink, language);
     }

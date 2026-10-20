@@ -1,0 +1,23 @@
+{
+  "$Comment": "Update 7 rune inputs require a held weapon. Keep legacy tool classification when rune assets are absent.",
+  "Id": "Tamework_Update7_Whistle_Input",
+  "Target": "Server/Item/Items/Commands/Tamework_Command_Whistle_Example.json",
+  "When": {
+    "AssetExists": "Server/Item/Items/Rune/Ability/Rune_Enrage.json"
+  },
+  "Operations": [
+    {
+      "Id": "enable-rune-input",
+      "Op": "Merge",
+      "Path": "",
+      "Value": {
+        "Weapon": {},
+        "Tags": {
+          "Family": [
+            "TameworkInput"
+          ]
+        }
+      }
+    }
+  ]
+}

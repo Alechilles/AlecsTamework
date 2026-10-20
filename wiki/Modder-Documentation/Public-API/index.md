@@ -10,12 +10,14 @@ Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation) | [Alec
 
 This subsection is the parent category for all public Java API docs.
 
-> **Stable API Contract (`2.0.0`)**
-> This is the supported public integration surface. Keep capability checks in
-> downstream mods because optional and reduced-function runtimes can omit API
-> families.
+> **API `3.0.0`**
+> This is the supported public integration surface. It ships with Tamework
+> 5.0.0 and is not compatible with API 2.x. Keep capability checks in
+> downstream mods because a runtime can omit API families.
 
-These pages describe the stable `2.0.0` API that ships with Tamework 3.3.0.
+These pages describe API `3.0.0`. The
+[Public API Overview](/mod/alecs-tamework/public-api-overview) lists what was
+removed and changed since 2.x.
 
 ## Child Pages
 - [API Reference](/mod/alecs-tamework/api-reference)
