@@ -11,7 +11,6 @@ import com.hypixel.hytale.component.system.EntityEventSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.ecs.BreathingCheckEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.systems.NPCSystems;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -37,7 +36,8 @@ public final class NativeSwimBreathingSystem extends EntityEventSystem<EntitySto
 
     @Override @Nonnull
     public Query<EntityStore> getQuery() {
-        return Query.and(NPCEntity.getComponentType(), NPCMountComponent.getComponentType(), UUIDComponent.getComponentType());
+        // NPCMountComponent only occurs on NPCs, while NPCEntity's type can still be unavailable here at startup.
+        return Query.and(NPCMountComponent.getComponentType(), UUIDComponent.getComponentType());
     }
 
     @Override @Nonnull
