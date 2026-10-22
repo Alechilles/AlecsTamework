@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.2 - Telemetry Upload Hotfix - 2026-10-22
+
+### Fixed
+
+- Updated the embedded Beacon telemetry runtime to 2.0.5. When a telemetry upload hits a JVM error, such as
+  running out of memory or native threads, it now counts as a failed upload and is retried later instead of
+  crashing the upload thread and creating a flood of new crash reports.
+
 ## 5.5.1 - Startup Crash Fix - 2026-10-20
 
 ### Fixed
