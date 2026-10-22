@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `/tw debug get wander <role filter>` lists every NPC whose role contains the filter with its state, position,
+  leash point, distance to the leash point, and whether it stands in water. It works from the server console.
+- `/tw debug set state <npc uuid> <state>` sets an NPC's role state the way a command item does, so the role's
+  state transitions run. It works from the server console.
+
 ## 5.5.1 - Startup Crash Fix - 2026-10-20
 
 ### Fixed

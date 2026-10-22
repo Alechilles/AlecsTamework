@@ -16,5 +16,6 @@ public final class TameworkDebugGetCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkGetOwnerCommand());
         addSubCommand(new TameworkGetAlarmCommand());
         addSubCommand(new TameworkGetFlockDebugCommand());
+        addSubCommand(new TameworkGetWanderCommand());
     }
 }
