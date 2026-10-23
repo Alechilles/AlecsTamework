@@ -209,6 +209,7 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.system.ISystem;
 import com.hypixel.hytale.component.system.EcsEvent;
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
@@ -262,6 +263,7 @@ import com.alechilles.alecstamework.companion.flow.CompanionStartupAdmission;
 import com.alechilles.alecstamework.companion.flow.CompanionWorldRemovalListener;
 import com.alechilles.alecstamework.companion.live.CompanionBodySystem;
 import com.alechilles.alecstamework.settings.TameworkDataPathLayout;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
@@ -1421,12 +1423,7 @@ public class Tamework extends JavaPlugin {
     }
 
     private void startInternal() {
-        if (NPCEntity.getComponentType() == null) {
-            // Every companion system queries this type; without it they fail later with an
-            // unexplained null query.
-            throw new IllegalStateException("The Hytale NPC plugin has not registered its NPC component type,"
-                    + " so Alec's Tamework! cannot start. Check the server log for an earlier Hytale:NPC failure.");
-        }
+        requireNpcComponentType("at start");
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
@@ -1441,6 +1438,9 @@ public class Tamework extends JavaPlugin {
                     managedActivityAssetRegistrar.initialize();
                 },
                 this::rebuildCapturePolicyIndex, this::rebuildBondedCompanionRosterIndex);
+        // Seen on live servers: the type was present above and gone here, because Hytale:NPC was
+        // disabled on another thread mid-start. Name that instead of failing on a null query.
+        requireNpcComponentType("after it was present at start");
         preflightDeclaredRuntimeParticipants();
         initializeRuntimeServices();
         registerRuntimeParticipants();
@@ -1959,6 +1959,21 @@ public class Tamework extends JavaPlugin {
                 service::onPlayerDisconnect,
                 "companion migration popup session reset"
         );
+    }
+
+    /**
+     * Fails start when NPCEntity's type is missing. Every companion system queries it; without it
+     * they fail later with an unexplained null query.
+     */
+    private static void requireNpcComponentType(String when) {
+        if (NPCEntity.getComponentType() != null) {
+            return;
+        }
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        throw new IllegalStateException("The Hytale NPC component type is missing " + when
+                + " (Hytale:NPC state " + (npcPlugin == null ? "missing" : npcPlugin.getState())
+                + ", server shutting down " + HytaleServer.get().isShuttingDown()
+                + "), so Alec's Tamework! cannot start. Check the server log for a Hytale:NPC failure.");
     }
 
     /** Validates setup-declared factories before persistence can mutate state. */
