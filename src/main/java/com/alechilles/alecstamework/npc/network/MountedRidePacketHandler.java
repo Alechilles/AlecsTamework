@@ -29,6 +29,7 @@ import com.hypixel.hytale.protocol.packets.player.ClientMovement;
 import com.hypixel.hytale.protocol.packets.player.MouseInteraction;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.io.handlers.IPacketHandler;
 import com.hypixel.hytale.server.core.io.handlers.SubPacketHandler;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
@@ -54,6 +55,9 @@ import javax.annotation.Nullable;
  */
 public final class MountedRidePacketHandler implements SubPacketHandler {
     private static final ConcurrentMap<UUID, RideSession> ACTIVE_TAMEWORK_RIDES = new ConcurrentHashMap<>();
+    // Created at class init, while the plugin class loader is still open.
+    private static final SubPacketHandler INERT_HANDLER = () -> { };
+    private static volatile boolean acceptingConnections;
     private final IPacketHandler packetHandler;
     private final NativeSwimInputCapture swimInputCapture = new NativeSwimInputCapture();
     private Consumer<ToServerPacket> clientMovementDelegate;
@@ -69,6 +73,29 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
 
     public MountedRidePacketHandler(@Nonnull IPacketHandler packetHandler) {
         this.packetHandler = packetHandler;
+    }
+
+    /**
+     * Registers the per-connection handler factory with the server.
+     *
+     * <p>ServerManager cannot unregister a factory, so it keeps calling this one after Tamework
+     * unloads and its class loader closes. Building a full handler then fails to load its field
+     * classes and aborts the player's join, so the factory hands out an inert handler once
+     * {@link #stopAcceptingConnections()} has run. A reloaded Tamework registers its own factory.
+     */
+    public static void registerFactory() {
+        acceptingConnections = true;
+        ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::create);
+    }
+
+    /** Makes the registered factory return an inert handler for connections opened from now on. */
+    public static void stopAcceptingConnections() {
+        acceptingConnections = false;
+    }
+
+    @Nonnull
+    private static SubPacketHandler create(@Nonnull IPacketHandler packetHandler) {
+        return acceptingConnections ? new MountedRidePacketHandler(packetHandler) : INERT_HANDLER;
     }
 
     public static void registerRide(@Nonnull UUID riderEntityUuid, @Nonnull UUID mountUuid, @Nonnull World world) {

@@ -11,6 +11,10 @@
 - `/tw debug set target <npc uuid> [slot]` points an NPC's target slot (`MasterTarget` by default) at its owner,
   as the Follow command does. It works from the server console.
 
+### Fixed
+
+- Fixed players failing to join when Tamework had been unloaded or reloaded while the server kept running.
+
 ## 5.5.1 - Startup Crash Fix - 2026-10-20
 
 ### Fixed

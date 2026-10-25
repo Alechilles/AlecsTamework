@@ -218,7 +218,6 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
-import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
@@ -562,7 +561,7 @@ public class Tamework extends JavaPlugin {
         deferGlobalListener(
                 TameworkRuntimeModule.MOUNTS,
                 "mounted-ride-packet-handler",
-                () -> ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new)
+                MountedRidePacketHandler::registerFactory
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
@@ -2049,6 +2048,7 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
+        MountedRidePacketHandler.stopAcceptingConnections();
         com.alechilles.alecstamework.npc.progression.CompanionLifeStageService.shutdown();
         HusbandryHarvestUseContext.clearPendingUses();
         TameworkNpcCullService.clearPendingItemUses();
