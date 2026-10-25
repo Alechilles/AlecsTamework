@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.CapturedItemDisplayApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
+import com.alechilles.alecstamework.api.HusbandryRewardTableApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.PolicyApi;
@@ -214,6 +215,11 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     @Override
     public HusbandryOutcomeApi husbandryOutcomes() {
         return base.husbandryOutcomes();
+    }
+
+    @Override
+    public HusbandryRewardTableApi husbandryRewardTables() {
+        return base.husbandryRewardTables();
     }
 
     @Override

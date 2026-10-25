@@ -52,9 +52,14 @@ Resolved by role id + `Priority`:
   profile resolves an exact role through its population-group-backed family,
   exposes named capacity domains and activity mappings, and reports explicit
   readiness by profile id. Optional `CullSuccess` and `CullDropLists` fields
-  map authorized `TameworkCullNpc` item interactions to one activity and one
-  domestic drop table per family. Duplicate roles inside one profile are
-  rejected.
+  map authorized culls (the `TameworkCullNpc` item interaction and the command
+  menu's Cull) to one activity and one domestic drop table per family. A
+  family listed in `CullDropLists` is a managed-cull family. Its value may be
+  blank (`""`) when a husbandry reward table provider supplies the table; with
+  neither a provider table nor a list, the normal death drops apply. Optional
+  `OwnerKillCountsAsCull` (default `false`, requires `CullDropLists`) treats an
+  owner's killing blow on an owned animal of a managed-cull family as a cull.
+  Duplicate roles inside one profile are rejected.
 
 ### Dynamic icon family
 - `TwDynamicIconConfig` selects one enabled config per normalized role ID: higher `Priority`, then case-insensitive lowest asset ID.
@@ -129,7 +134,8 @@ Behavior summary:
   mapping arrays as replacement sections when authored. An explicit
   `Activities` object inherits only its omitted nested fields. This prevents a
   child from silently combining two family or domain lists. An explicit
-  `CullDropLists` map replaces the parent map.
+  `CullDropLists` map replaces the parent map. An omitted
+  `OwnerKillCountsAsCull` inherits the parent value.
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.

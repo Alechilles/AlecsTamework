@@ -34,6 +34,7 @@ behavior.
   and `admissionProviders()`;
 - `interactionExtensions()` and `traitEffects()` for registered extensions;
 - `husbandryOutcomes()` for bounded, owner-scoped husbandry modifiers;
+- `husbandryRewardTables()` for the base reward table of a managed cull;
 - `profileData()` for namespaced data on a companion;
 - `events()` for immutable notifications;
 - `activities()` for the live activity feed;
@@ -65,8 +66,8 @@ Advertised while their runtime is available: `CAPTURE_POLICY`,
 `COMMAND_UI_CUSTOM_ACTIONS`, `COMMAND_UI_CUSTOM_FLOWS`,
 `COMMAND_HUD_RENDERERS`, `COMMAND_HUD_CONTRIBUTORS`, `HUSBANDRY_OUTCOMES`,
 `HUSBANDRY_TOOL_CONTEXT`, `HUSBANDRY_TOOL_BONUSES`, `HUSBANDRY_CARE_BONUSES`,
-`HUSBANDRY_FLAT_CARE_BONUS`, `HUSBANDRY_BREEDING_GENETICS`, and
-`CAPTURED_ITEM_DISPLAY`.
+`HUSBANDRY_FLAT_CARE_BONUS`, `HUSBANDRY_BREEDING_GENETICS`,
+`CAPTURED_ITEM_DISPLAY`, and `HUSBANDRY_REWARD_TABLES`.
 
 In the enum but not advertised in 3.0.0: `LOADED_POPULATION_GROUP_COUNTS` and
 `DURABLE_OUTPUT_OPERATIONS`.

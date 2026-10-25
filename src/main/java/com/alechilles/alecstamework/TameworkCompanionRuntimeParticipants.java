@@ -14,6 +14,7 @@ import com.hypixel.hytale.builtin.encountermanager.EncounterBossBarState;
 import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
+import com.alechilles.alecstamework.items.OwnerKillCullSystem;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
 import com.alechilles.alecstamework.npc.progression.CompanionPopulationSpatialIndex;
@@ -292,6 +293,8 @@ public final class TameworkCompanionRuntimeParticipants {
                         plugin.getLifeStageComponentType()));
         participants.optionalEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-linked-revivable-drop-suppression", CommandLinkedRevivableDropSuppressionSystem::new);
+        participants.optionalEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "owner-kill-cull", OwnerKillCullSystem::new);
         participants.entitySystem(TameworkRuntimeModule.ATTACHMENTS, "dynamicattachmentevaluationsystem",
                 () -> new DynamicAttachmentEvaluationSystem(NPCEntity.getComponentType(),
                         plugin.getAttachmentsComponentType(), plugin.getDynamicAttachmentsComponentType(),

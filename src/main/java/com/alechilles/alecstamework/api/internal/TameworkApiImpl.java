@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.GlobalConfigView;
 import com.alechilles.alecstamework.api.CapturedItemDisplayApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
+import com.alechilles.alecstamework.api.HusbandryRewardTableApi;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NameItemConfigView;
@@ -148,6 +149,8 @@ public final class TameworkApiImpl
     private final CommandHudRegistry commandHudRegistry;
     private final HusbandryOutcomeRegistry husbandryOutcomeRegistry =
             new HusbandryOutcomeRegistry();
+    private final HusbandryRewardTableRegistry husbandryRewardTableRegistry =
+            new HusbandryRewardTableRegistry();
     private final CapturedItemDisplayRegistry capturedItemDisplayRegistry =
             new CapturedItemDisplayRegistry();
     private final BreedingCooldownResetService breedingCooldownResetService =
@@ -314,7 +317,8 @@ public final class TameworkApiImpl
             TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
             TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS,
             TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS,
-            TameworkApiCapability.CAPTURED_ITEM_DISPLAY
+            TameworkApiCapability.CAPTURED_ITEM_DISPLAY,
+            TameworkApiCapability.HUSBANDRY_REWARD_TABLES
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -401,6 +405,7 @@ public final class TameworkApiImpl
                 "commandHudRegistry"
         );
         HusbandryOutcomeRuntime.install(husbandryOutcomeRegistry);
+        HusbandryOutcomeRuntime.installRewardTables(husbandryRewardTableRegistry);
     }
 
     @Override
@@ -432,6 +437,9 @@ public final class TameworkApiImpl
             }
             if (!capturedItemDisplayRegistry.available()) {
                 current.remove(TameworkApiCapability.CAPTURED_ITEM_DISPLAY);
+            }
+            if (!husbandryRewardTableRegistry.available()) {
+                current.remove(TameworkApiCapability.HUSBANDRY_REWARD_TABLES);
             }
             return current;
         }
@@ -474,6 +482,8 @@ public final class TameworkApiImpl
             commandHudRegistry.close();
             husbandryOutcomeRegistry.close();
             HusbandryOutcomeRuntime.clear(husbandryOutcomeRegistry);
+            husbandryRewardTableRegistry.close();
+            HusbandryOutcomeRuntime.clearRewardTables(husbandryRewardTableRegistry);
             capturedItemDisplayRegistry.close();
             synchronized (capabilities) {
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
@@ -489,6 +499,7 @@ public final class TameworkApiImpl
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
                 capabilities.remove(TameworkApiCapability.CAPTURED_ITEM_DISPLAY);
+                capabilities.remove(TameworkApiCapability.HUSBANDRY_REWARD_TABLES);
             }
         } finally {
             damagePolicy.close();
@@ -518,6 +529,11 @@ public final class TameworkApiImpl
     @Override
     public HusbandryOutcomeApi husbandryOutcomes() {
         return husbandryOutcomeRegistry;
+    }
+
+    @Override
+    public HusbandryRewardTableApi husbandryRewardTables() {
+        return husbandryRewardTableRegistry;
     }
 
     @Override

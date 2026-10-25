@@ -13,6 +13,7 @@ import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -193,7 +194,24 @@ public final class TwManagedActivityConfig
                     )
                     .documentation(
                             "Optional map of population-group IDs to domestic item drop-list IDs. "
+                                    + "A listed family is a managed-cull family. Its value may be blank "
+                                    + "(\"\") when a husbandry reward table provider supplies the table; "
+                                    + "with no provider table and no list, the normal death drops apply. "
                                     + "An explicit child map replaces the parent map."
+                    )
+                    .add()
+                    .<Boolean>append(
+                            new KeyedCodec<>("OwnerKillCountsAsCull", Codec.BOOLEAN),
+                            (settings, value) -> settings.ownerKillCountsAsCull =
+                                    value != null && value,
+                            settings -> settings.ownerKillCountsAsCull
+                    )
+                    .documentation(
+                            "When true, an owned animal of a CullDropLists family that its owner "
+                                    + "kills is treated as a cull: it pays managed cull rewards instead "
+                                    + "of its normal death drops and emits the CullSuccess activity. "
+                                    + "Kills by anyone else are unchanged. Requires CullDropLists. "
+                                    + "Default false."
                     )
                     .add()
                     .build();
@@ -444,6 +462,9 @@ public final class TwManagedActivityConfig
         if (!nested.contains("CullDropLists")) {
             activities.cullDropLists = parent.activities.cullDropLists;
         }
+        if (!nested.contains("OwnerKillCountsAsCull")) {
+            activities.ownerKillCountsAsCull = parent.activities.ownerKillCountsAsCull;
+        }
     }
 
     /** Validates fields that do not require the population-group registry. */
@@ -568,6 +589,11 @@ public final class TwManagedActivityConfig
                 && !settings.cullSuccess.isBlank();
         boolean hasDrops = settings.cullDropLists != null
                 && !settings.cullDropLists.isEmpty();
+        if (settings.ownerKillCountsAsCull && !hasDrops) {
+            throw new IllegalArgumentException(
+                    "OwnerKillCountsAsCull requires CullDropLists in " + configId
+            );
+        }
         if (!hasActivity && !hasDrops) {
             return;
         }
@@ -580,8 +606,9 @@ public final class TwManagedActivityConfig
         }
         for (Map.Entry<String, String> entry
                 : settings.cullDropLists.entrySet()) {
+            // A blank value is valid: the family is still a managed-cull family and its
+            // base table comes from a husbandry reward table provider.
             requireNamespaced(entry.getKey(), "CullDropLists key", configId);
-            requireText(entry.getValue(), "CullDropLists value");
         }
     }
 
@@ -730,6 +757,7 @@ public final class TwManagedActivityConfig
         private String needSatisfied;
         private String cullSuccess;
         private Map<String, String> cullDropLists = Map.of();
+        private boolean ownerKillCountsAsCull;
 
         private ActivitySettings() {
         }
@@ -767,10 +795,21 @@ public final class TwManagedActivityConfig
             return cullSuccess;
         }
 
+        /** Returns the managed-cull families; a blank or null value means no configured list. */
         public Map<String, String> getCullDropLists() {
-            return cullDropLists == null
-                    ? Map.of()
-                    : Map.copyOf(cullDropLists);
+            if (cullDropLists == null || cullDropLists.isEmpty()) {
+                return Map.of();
+            }
+            LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : cullDropLists.entrySet()) {
+                copy.put(entry.getKey(), entry.getValue() == null ? "" : entry.getValue().trim());
+            }
+            return Map.copyOf(copy);
+        }
+
+        /** Returns whether an owner's killing blow on a managed-cull family counts as a cull. */
+        public boolean isOwnerKillCountsAsCull() {
+            return ownerKillCountsAsCull;
         }
     }
 }

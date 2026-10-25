@@ -265,9 +265,13 @@ For replacement and empty-hand removal, use the exchange requirement and effect 
 
 `TameworkCullNpc` is a terminal item interaction that kills one targeted NPC
 through Tamework's cull path. It applies fatal command damage. The NPC's usual
-death effects and drops occur unless its managed activity profile maps the
-role's family through `Activities.CullDropLists`. A resolved domestic table is
-rolled once and replaces the normal death drops.
+death effects and drops occur unless its managed activity profile lists the
+role's family in `Activities.CullDropLists`. For a listed family, a husbandry
+reward table provider's table, when it returns one, is the base roll;
+otherwise the configured drop list is. The result is rolled once and replaces
+the normal death drops. A listed family with a blank list and no provider
+table keeps the normal death drops. The command menu's Cull pays the same
+managed rewards, with no tool, and emits the same activity.
 
 The interaction has no matching `Tw*Config` asset. Put it on a consumer mod's
 item and use that item's native interaction chain for range, cooldown,
@@ -295,6 +299,19 @@ native `Charging` interaction. For example, use
 `My_Butchers_Knife_Cull_Complete` as `{ "Type": "TameworkCullNpc" }` in a
 separate interaction file. Tamework supplies no standalone culling item or
 confirmation UI.
+
+#### Owner kills as culls
+
+Set `Activities.OwnerKillCountsAsCull` to `true` in the managed activity
+profile to treat an owner's own kill as a cull. When an owned animal of a
+listed family dies from a killing blow its owner dealt (a melee hit or the
+owner's projectile) and its death would drop items, Tamework pays the managed
+cull rewards instead of the role's death drops and emits
+`tamework:cull_success`. The owner's held item is the cull's tool only when the
+husbandry outcome provider authorizes it for the cull; otherwise the cull has
+no tool. An owner kill applies no extra tool wear. Kills by anyone else,
+revivable companions (whose deaths keep their items), and bonded companions
+are unchanged. Companion records, death and revive handling are unchanged.
 
 ### `TameworkCaptureChannel`
 

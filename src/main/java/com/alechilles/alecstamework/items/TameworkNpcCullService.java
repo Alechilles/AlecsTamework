@@ -157,9 +157,8 @@ public final class TameworkNpcCullService {
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(target, store);
-        CullRewardService.PreparedOutcome preparedRewards = CullRewardService.prepare(
-                ActivityRuntime.resolveCullDropList(roleId), target, store, roleId, tool,
-                player == null ? null : player.getUuid());
+        CullRewardService.PreparedOutcome preparedRewards = CullRewardService.prepareManaged(
+                target, store, roleId, tool, player == null ? null : player.getUuid());
         CapturedItemUse use = CapturedItemUse.capture(
                 player == null ? null : player.getUuid(), tool, capturedHotbarSlot, preparedRewards);
         CullUseKey key = CullUseKey.from(player == null ? null : player.getUuid(), target, store);
@@ -185,6 +184,38 @@ public final class TameworkNpcCullService {
                  boolean requireOwner,
                  boolean requireTamed) {
         return cull(player, target, store, requireOwner, requireTamed, false);
+    }
+
+    /**
+     * Culls a target chosen from the command menu. A managed-cull family pays its managed
+     * rewards with no tool, as a knife cull does, and publishes the cull activity; any other
+     * target keeps its normal death drops.
+     */
+    Outcome cullFromCommandMenu(@Nullable Player player,
+                                @Nullable Ref<EntityStore> target,
+                                @Nullable Store<EntityStore> store,
+                                boolean requireOwner,
+                                boolean requireTamed) {
+        if (player == null || target == null || !target.isValid() || store == null) {
+            return Outcome.UNAVAILABLE;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(target, store);
+        if (!ActivityRuntime.hasManagedCullRewards(roleId)) {
+            return cull(player, target, store, requireOwner, requireTamed, false);
+        }
+        CullRewardService.PreparedOutcome preparedRewards = CullRewardService.prepareManaged(
+                target, store, roleId, null, player.getUuid());
+        CullUseKey key = CullUseKey.from(player.getUuid(), target, store);
+        if (key != null) {
+            prunePendingItemUses();
+            PENDING_ITEM_USES.put(key, CapturedItemUse.capture(
+                    player.getUuid(), null, (byte) -1, preparedRewards));
+        }
+        Outcome outcome = cull(player, target, store, requireOwner, requireTamed, true);
+        if (outcome != Outcome.CULLED && outcome != Outcome.QUEUED && key != null) {
+            PENDING_ITEM_USES.remove(key);
+        }
+        return outcome;
     }
 
     /** Culls an item-interaction target after durable capacity release. */
@@ -377,7 +408,8 @@ public final class TameworkNpcCullService {
                                                    @Nullable Ref<EntityStore> target,
                                                    @Nullable Store<EntityStore> store) {
         CullUseKey key = CullUseKey.from(actorUuid, target, store);
-        return key == null ? CapturedItemUse.empty() : PENDING_ITEM_USES.remove(key);
+        CapturedItemUse use = key == null ? null : PENDING_ITEM_USES.remove(key);
+        return use == null ? CapturedItemUse.empty() : use;
     }
 
     private static void applyItemUseWear(@Nullable Player player,

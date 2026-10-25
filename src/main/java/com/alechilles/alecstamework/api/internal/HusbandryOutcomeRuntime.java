@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryRewardTable;
+import com.alechilles.alecstamework.api.HusbandryRewardTableApi;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.hypixel.hytale.component.Ref;
@@ -24,6 +26,10 @@ public final class HusbandryOutcomeRuntime {
     private static final HusbandryOutcomeApi UNAVAILABLE = HusbandryOutcomeApi.unavailable();
     private static final AtomicReference<HusbandryOutcomeApi> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
+    private static final HusbandryRewardTableApi UNAVAILABLE_TABLES =
+            HusbandryRewardTableApi.unavailable();
+    private static final AtomicReference<HusbandryRewardTableApi> CURRENT_TABLES =
+            new AtomicReference<>(UNAVAILABLE_TABLES);
 
     private HusbandryOutcomeRuntime() {
     }
@@ -37,6 +43,42 @@ public final class HusbandryOutcomeRuntime {
     static void clear(@Nullable HusbandryOutcomeApi expected) {
         if (expected != null) {
             CURRENT.compareAndSet(expected, UNAVAILABLE);
+        }
+    }
+
+    /** Installs one live reward-table facade for authoritative Tamework actions. */
+    static void installRewardTables(@Nonnull HusbandryRewardTableApi api) {
+        CURRENT_TABLES.set(api);
+    }
+
+    /** Clears the live reward-table facade only when it is still the supplied instance. */
+    static void clearRewardTables(@Nullable HusbandryRewardTableApi expected) {
+        if (expected != null) {
+            CURRENT_TABLES.compareAndSet(expected, UNAVAILABLE_TABLES);
+        }
+    }
+
+    /**
+     * Resolves the provider's base reward table for one world-thread action, or
+     * {@code null} to keep the configured drop list (no provider, null answer or failure).
+     */
+    @Nullable
+    public static HusbandryRewardTable resolveRewardTable(
+            @Nonnull HusbandryOutcomeKind kind,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
+        HusbandryRewardTableApi tables = CURRENT_TABLES.get();
+        if (!tables.available()) {
+            return null;
+        }
+        try {
+            return tables.resolve(buildContext(kind, npcRef, store, roleId, null, tool, actorId));
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 

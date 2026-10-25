@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -327,6 +328,32 @@ class ApiSurfaceCompatibilityTest {
         assertInstanceOf(AutoCloseable.class, handle).close();
         assertInstanceOf(AutoCloseable.class, runeteria("HusbandryOutcomeApi", outcomes, "register",
                 types(providerType), proxy(providerType)));
+    }
+
+    @Test
+    void runeteriaSuppliesAHusbandryRewardTableThroughAProxyBuiltByReflection() throws Exception {
+        assertTrue(((Collection<?>) runeteria("TameworkApi", api, "getCapabilities"))
+                .contains(TameworkApiCapability.valueOf("HUSBANDRY_REWARD_TABLES")));
+        Class<?> providerType = Class.forName(API_PACKAGE + "HusbandryRewardTableProvider");
+        Class<?> tableType = Class.forName(API_PACKAGE + "HusbandryRewardTable");
+        Class<?> entryType = Class.forName(API_PACKAGE + "HusbandryRewardEntry");
+        Object entry = entryType.getConstructor(String.class, int.class, int.class, double.class)
+                .newInstance("Food_Beef_Raw", 1, 3, 0.5);
+        Object table = tableType.getConstructor(List.class).newInstance(List.of(entry));
+        Object provider = Proxy.newProxyInstance(providerType.getClassLoader(), new Class<?>[] {providerType},
+                (proxy, method, args) -> "resolve".equals(method.getName()) ? table : null);
+        Object tables = runeteria("TameworkApi", api, "husbandryRewardTables");
+
+        Object handle = runeteria("HusbandryRewardTableApi", tables, "register", types(providerType), provider);
+        Object resolved = runeteria("HusbandryRewardTableApi", tables, "resolve",
+                types(HusbandryOutcomeContext.class), new HusbandryOutcomeContext(HusbandryOutcomeKind.CULL_YIELD,
+                        OWNER, NPC, "Sheep", profileId, Set.of(GROUP), null));
+
+        assertEquals(table, resolved);
+        assertInstanceOf(AutoCloseable.class, handle).close();
+        assertNull(runeteria("HusbandryRewardTableApi", tables, "resolve",
+                types(HusbandryOutcomeContext.class), new HusbandryOutcomeContext(HusbandryOutcomeKind.CULL_YIELD,
+                        OWNER, NPC, "Sheep", profileId, Set.of(GROUP), null)));
     }
 
     @Test

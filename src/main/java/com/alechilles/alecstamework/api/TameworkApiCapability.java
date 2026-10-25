@@ -69,6 +69,8 @@ public enum TameworkApiCapability {
     /** Owner-scoped inheritance bonuses and harmful-mutation reroll chances. */
     HUSBANDRY_BREEDING_GENETICS,
     /** External providers can contribute captured-item tooltip and quality presentation. */
-    CAPTURED_ITEM_DISPLAY
+    CAPTURED_ITEM_DISPLAY,
+    /** External husbandry providers can supply the base reward table rolled for a managed cull. */
+    HUSBANDRY_REWARD_TABLES
 }
 

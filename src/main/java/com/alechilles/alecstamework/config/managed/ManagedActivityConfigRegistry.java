@@ -396,7 +396,8 @@ public final class ManagedActivityConfigRegistry {
                         normalize(settings.getTameSuccess()),
                         normalize(settings.getNeedSatisfied()),
                         settings.getCullSuccess(),
-                        settings.getCullDropLists()
+                        settings.getCullDropLists(),
+                        settings.isOwnerKillCountsAsCull()
                 );
         return new ManagedActivityProfile(
                 normalize(config.getProfileId()),

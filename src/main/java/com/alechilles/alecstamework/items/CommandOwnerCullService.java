@@ -70,7 +70,7 @@ final class CommandOwnerCullService {
         if (target == null) {
             return;
         }
-        TameworkNpcCullService.Outcome outcome = cullService.cull(
+        TameworkNpcCullService.Outcome outcome = cullService.cullFromCommandMenu(
                 player,
                 target.reference(),
                 target.store(),

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.activity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -271,13 +272,45 @@ class ManagedActivityPublisherTest {
         );
     }
 
+    @Test
+    void aBlankCullListStillMakesAManagedCullFamilyForAProviderTable() throws Exception {
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(activity -> { },
+                managedRegistry("""
+                        "CullDropLists":{"runeteria:family":""},
+                        "OwnerKillCountsAsCull":true"""));
+
+        assertTrue(publisher.hasManagedCullRewards("RoleA"));
+        assertNull(publisher.resolveCullDropList("RoleA"));
+        assertTrue(publisher.ownerKillCountsAsCull("RoleA"));
+        assertFalse(publisher.hasManagedCullRewards("RoleB"));
+        assertFalse(publisher.ownerKillCountsAsCull("RoleB"));
+    }
+
+    @Test
+    void anOwnerKillIsNotACullUnlessTheProfileSaysSo() throws Exception {
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(activity -> { }, managedRegistry());
+
+        assertTrue(publisher.hasManagedCullRewards("RoleA"));
+        assertFalse(publisher.ownerKillCountsAsCull("RoleA"));
+    }
+
     private static ManagedActivityConfigRegistry managedRegistry() throws Exception {
+        return managedRegistry("""
+                "CullDropLists":{"runeteria:family":"RH_Slaughter_Cow"}""");
+    }
+
+    private static ManagedActivityConfigRegistry managedRegistry(String cullFields) throws Exception {
         PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
         assertTrue(groups.replace(
                 List.of(group("group", "runeteria:family", "RoleA")), 1L
         ).applied());
         ManagedActivityConfigRegistry managed = new ManagedActivityConfigRegistry(groups);
-        TwManagedActivityConfig profile = decode("husbandry", """
+        assertTrue(managed.replace(List.of(profile(cullFields)), 1L).applied());
+        return managed;
+    }
+
+    private static TwManagedActivityConfig profile(String cullFields) throws Exception {
+        return decode("husbandry", """
                 {
                   "ProfileId": "runeteria:husbandry",
                   "ProviderId": "runeteria:provider",
@@ -293,12 +326,10 @@ class ManagedActivityPublisherTest {
                     "TameSuccess":"runeteria:tame_success",
                     "NeedSatisfied":"runeteria:feed",
                     "CullSuccess":"runeteria:cull_success",
-                    "CullDropLists":{"runeteria:family":"RH_Slaughter_Cow"}
+                    %s
                   }
                 }
-                """);
-        assertTrue(managed.replace(List.of(profile), 1L).applied());
-        return managed;
+                """.formatted(cullFields));
     }
 
     private static TwManagedActivityConfig decode(String id, String json) throws Exception {

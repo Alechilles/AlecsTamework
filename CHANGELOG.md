@@ -10,6 +10,16 @@
   state transitions run. It works from the server console.
 - `/tw debug set target <npc uuid> [slot]` points an NPC's target slot (`MasterTarget` by default) at its owner,
   as the Follow command does. It works from the server console.
+- Managed activity profiles can set `Activities.OwnerKillCountsAsCull` to `true`. An owned farm animal that its
+  owner kills then gives its cull rewards instead of its normal drops, the same as a knife cull. Kills by other
+  players are unchanged.
+- Mods can supply the cull rewards for an animal through the new `husbandryRewardTables()` API. A family listed in
+  `CullDropLists` can leave its drop list blank when a mod supplies the rewards.
+
+### Changed
+
+- Culling an animal from the command menu now gives the same cull rewards as a knife cull when its family has
+  managed cull rewards, and counts as a cull for other mods.
 
 ### Fixed
 

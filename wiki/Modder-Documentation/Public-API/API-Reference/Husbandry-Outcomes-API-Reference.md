@@ -126,6 +126,53 @@ keeps the better of the two rolls. `TwTraitConfig.Traits[].MutationPreference`
 must define the preferred direction; `NONE` preserves ordinary mutation behavior.
 Zero bonuses preserve the existing seeded roll sequence.
 
+## Reward Tables
+
+Capability: `HUSBANDRY_REWARD_TABLES` (development addition).
+
+`TameworkApi.husbandryRewardTables() -> HusbandryRewardTableApi` registers one
+`HusbandryRewardTableProvider` with the same lifecycle as the outcome provider:
+check the capability and `available()`, keep the returned `AutoCloseable`, and
+expect `IllegalStateException` while another provider is active. Older or
+degraded compositions return an unavailable facade that resolves `null`.
+
+```java
+@FunctionalInterface
+public interface HusbandryRewardTableProvider {
+    @Nullable HusbandryRewardTable resolve(@Nonnull HusbandryOutcomeContext context);
+}
+
+public record HusbandryRewardTable(List<HusbandryRewardEntry> entries) { }
+public record HusbandryRewardEntry(String itemId, int min, int max, double chance) { }
+```
+
+Tamework consults the provider for `CULL_YIELD` only, and only for a role whose
+managed activity family is listed in `Activities.CullDropLists`. It is not
+consulted for `HARVEST_YIELD` or any other kind. The context is the same
+`HusbandryOutcomeContext` the outcome provider receives, with `productId` null.
+
+- A non-null table replaces the family's configured drop list as the base roll.
+  Each valid entry rolls its `chance` once, then drops a uniform quantity from
+  `min` to `max`, both inclusive.
+- An empty table (`HusbandryRewardTable.empty()`) is an explicit answer: the
+  cull rolls nothing and the normal death drops are still replaced.
+- `null`, a provider that throws, or no provider keeps the configured drop list.
+  If the family has no configured list either, the normal death drops apply.
+
+Everything after the base roll is unchanged: `CULL_YIELD` modifiers, trait
+bonuses, the age multiplier (juveniles pay nothing, partial yield before prime,
+decline after), output conversions and tool wear.
+
+Constructors bound malformed values instead of rejecting them. Quantities are
+clamped to `0..1000` with `max >= min`, a non-finite chance becomes `0`, and
+`chance` is clamped to `0..1`. Null entries are dropped and a table keeps at
+most 64 entries. An entry with no item, `max == 0` or `chance == 0` never drops.
+An item ID that is not a loaded item asset is skipped.
+
+The provider is side-effect-free, like the outcome provider. Build the records
+from plain values; a reflective consumer can construct both through their
+canonical constructors and implement the provider with `java.lang.reflect.Proxy`.
+
 ## Authority Boundary
 
 Providers calculate modifiers only. They must not change inventories, ECS

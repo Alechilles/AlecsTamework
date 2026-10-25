@@ -122,7 +122,13 @@ public record ManagedActivityProfile(
         }
     }
 
-    /** Stable activity IDs and item/context mappings used by generic runtime code. */
+    /**
+     * Stable activity IDs and item/context mappings used by generic runtime code.
+     *
+     * <p>Each {@code cullDropLists} key is a managed-cull family. Its value is the
+     * configured drop-list ID, or {@code ""} when a husbandry reward table provider
+     * supplies the base table.</p>
+     */
     public record ActivityMapping(
             @Nonnull String feed,
             @Nonnull Map<String, String> harvestContexts,
@@ -131,7 +137,8 @@ public record ManagedActivityProfile(
             @Nonnull String tameSuccess,
             @Nonnull String needSatisfied,
             @Nullable String cullSuccess,
-            @Nonnull Map<String, String> cullDropLists
+            @Nonnull Map<String, String> cullDropLists,
+            boolean ownerKillCountsAsCull
     ) {
         public ActivityMapping {
             feed = requireText(feed, "activities.feed");
@@ -156,10 +163,43 @@ public record ManagedActivityProfile(
                     "activities.needSatisfied"
             );
             cullSuccess = normalizeOptional(cullSuccess);
-            cullDropLists = immutableStringMap(
+            cullDropLists = immutableOptionalValueMap(
                     cullDropLists,
                     "activities.cullDropLists"
             );
+        }
+
+        /** Compatibility constructor for mappings without the owner-kill cull flag. */
+        public ActivityMapping(
+                @Nonnull String feed,
+                @Nonnull Map<String, String> harvestContexts,
+                @Nonnull Map<String, String> pendingOutputItems,
+                @Nonnull String breedingSuccess,
+                @Nonnull String tameSuccess,
+                @Nonnull String needSatisfied,
+                @Nullable String cullSuccess,
+                @Nonnull Map<String, String> cullDropLists
+        ) {
+            this(feed, harvestContexts, pendingOutputItems, breedingSuccess, tameSuccess,
+                    needSatisfied, cullSuccess, cullDropLists, false);
+        }
+
+        private static Map<String, String> immutableOptionalValueMap(
+                Map<String, String> values,
+                String label
+        ) {
+            if (values == null) {
+                throw new IllegalArgumentException(label + " are required");
+            }
+            LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                String value = entry.getValue();
+                copy.put(
+                        requireText(entry.getKey(), label + " key"),
+                        value == null ? "" : value.trim()
+                );
+            }
+            return Map.copyOf(copy);
         }
 
         private static Map<String, String> immutableStringMap(

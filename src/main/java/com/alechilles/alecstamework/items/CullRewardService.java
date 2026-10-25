@@ -1,13 +1,21 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryRewardEntry;
+import com.alechilles.alecstamework.api.HusbandryRewardTable;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.asset.type.item.config.container.ItemDropContainer;
@@ -42,7 +50,29 @@ final class CullRewardService {
         return apply(prepare(dropListId, npcRef, store, roleId, tool, actorId), npcRef, store);
     }
 
-    /** Resolves one authorized cull batch before a deferred durable release. */
+    /**
+     * Resolves the managed cull batch for one role, or an unavailable outcome when its family is
+     * not listed in {@code CullDropLists} (the normal death drops then apply).
+     */
+    static PreparedOutcome prepareManaged(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable java.util.UUID actorId
+    ) {
+        if (!ActivityRuntime.hasManagedCullRewards(roleId)) {
+            return PreparedOutcome.unavailable();
+        }
+        return prepare(ActivityRuntime.resolveCullDropList(roleId), npcRef, store, roleId, tool, actorId);
+    }
+
+    /**
+     * Resolves one authorized managed-cull batch before a deferred durable release.
+     *
+     * <p>A reward table provider's table, when it returns one, replaces the configured drop list
+     * as the base roll. Modifiers, the age multiplier and conversions apply to either.</p>
+     */
     static PreparedOutcome prepare(
             @Nullable String dropListId,
             Ref<EntityStore> npcRef,
@@ -51,14 +81,18 @@ final class CullRewardService {
             @Nullable HusbandryToolContext tool,
             @Nullable java.util.UUID actorId
     ) {
-        ItemDropList dropList = resolve(dropListId);
-        if (dropList == null || dropList.getContainer() == null) {
+        Random random = ThreadLocalRandom.current();
+        HusbandryRewardTable table = HusbandryOutcomeRuntime.resolveRewardTable(
+                HusbandryOutcomeKind.CULL_YIELD, npcRef, store, roleId, tool, actorId);
+        Roll roll = baseRoll(table, table == null ? resolve(dropListId) : null, random);
+        if (roll == null) {
             return PreparedOutcome.unavailable();
         }
-        Random random = ThreadLocalRandom.current();
-        Roll roll = roll(dropList, random);
         List<ItemStack> stacks = new ArrayList<>();
         for (Reward reward : roll.rewards()) {
+            if (table != null && !isKnownItem(reward.itemId())) {
+                continue;
+            }
             stacks.add(new ItemStack(
                     reward.itemId(),
                     reward.quantity(),
@@ -66,6 +100,7 @@ final class CullRewardService {
             ));
         }
         double[] wearMultiplier = {1.0};
+        double age = AnimalProgressionService.slaughterMultiplier(npcRef, store, roleId);
         FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
                 stacks,
                 stack -> {
@@ -76,8 +111,6 @@ final class CullRewardService {
                     }
                     wearMultiplier[0] = Math.min(wearMultiplier[0], modifiers.toolWearMultiplier());
                     double bonus = HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
-                    double age = com.alechilles.alecstamework.npc.progression.AnimalProgressionService
-                            .slaughterMultiplier(npcRef, store, roleId);
                     return (1.0 + bonus) * age - 1.0;
                 },
                 random::nextDouble);
@@ -88,7 +121,7 @@ final class CullRewardService {
 
     static Outcome apply(@Nullable PreparedOutcome prepared,
                          Ref<EntityStore> npcRef,
-                         Store<EntityStore> store) {
+                         ComponentAccessor<EntityStore> store) {
         if (prepared == null || !prepared.domesticDropsPrepared()) {
             return Outcome.unavailable();
         }
@@ -120,6 +153,51 @@ final class CullRewardService {
             return 0;
         }
         return rollChance(safe.tripleOutputChance(), random) ? 2 : 1;
+    }
+
+    /**
+     * Picks the base roll: a provider table wins (an empty one rolls nothing), otherwise the
+     * configured list. Returns {@code null} when neither exists.
+     */
+    @Nullable
+    static Roll baseRoll(@Nullable HusbandryRewardTable table,
+                         @Nullable ItemDropList dropList,
+                         Random random) {
+        if (table != null) {
+            return roll(table, random);
+        }
+        if (dropList == null || dropList.getContainer() == null) {
+            return null;
+        }
+        return roll(dropList, random);
+    }
+
+    /** Rolls each valid entry's chance once, then a uniform quantity in its inclusive range. */
+    static Roll roll(@Nonnull HusbandryRewardTable table, @Nonnull Random random) {
+        List<Reward> rewards = new ArrayList<>();
+        Map<String, Integer> quantities = new LinkedHashMap<>();
+        for (HusbandryRewardEntry entry : table.entries()) {
+            if (!entry.valid() || random.nextDouble() >= entry.chance()) {
+                continue;
+            }
+            int quantity = entry.min() + random.nextInt(entry.max() - entry.min() + 1);
+            if (quantity <= 0) {
+                continue;
+            }
+            rewards.add(new Reward(entry.itemId(), quantity, null));
+            quantities.merge(entry.itemId(), quantity, Integer::sum);
+        }
+        return new Roll(rewards, quantities);
+    }
+
+    /** Provider tables are not asset-validated, so an unknown item is skipped instead of dropped. */
+    private static boolean isKnownItem(String itemId) {
+        try {
+            DefaultAssetMap<String, Item> items = Item.getAssetMap();
+            return items != null && items.getAsset(itemId) != null;
+        } catch (RuntimeException unavailableAssetStore) {
+            return false;
+        }
     }
 
     static Roll roll(ItemDropList dropList, Random random) {

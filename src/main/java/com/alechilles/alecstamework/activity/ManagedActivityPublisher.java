@@ -223,6 +223,27 @@ public final class ManagedActivityPublisher {
                 ? null : dropList.trim();
     }
 
+    /**
+     * Returns whether one managed role's family is listed in {@code CullDropLists}, so a cull
+     * pays managed rewards (its configured list or a provider table) instead of death drops.
+     */
+    public boolean hasManagedCullRewards(@Nullable String roleId) {
+        ManagedActivityConfigRegistry.RoleResolution resolution =
+                resolveRole(roleId);
+        return resolution != null && resolution.family() != null
+                && resolution.profile().activities().cullDropLists()
+                .containsKey(resolution.family().groupId());
+    }
+
+    /** Returns whether an owner's killing blow on this managed-cull role counts as a cull. */
+    public boolean ownerKillCountsAsCull(@Nullable String roleId) {
+        ManagedActivityConfigRegistry.RoleResolution resolution =
+                resolveRole(roleId);
+        return resolution != null
+                && resolution.profile().activities().ownerKillCountsAsCull()
+                && hasManagedCullRewards(roleId);
+    }
+
     /** Publishes one committed autonomous food or water need change. */
     public void publishNeedSatisfied(
             @Nonnull UUID operationId,

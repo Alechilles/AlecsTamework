@@ -74,6 +74,11 @@ public interface TameworkApi {
         return HusbandryOutcomeApi.unavailable();
     }
 
+    /** Returns the optional synchronous husbandry reward table provider facade. */
+    default HusbandryRewardTableApi husbandryRewardTables() {
+        return HusbandryRewardTableApi.unavailable();
+    }
+
     /** Returns the optional synchronous captured-item display provider facade. */
     default CapturedItemDisplayApi capturedItemDisplay() {
         return CapturedItemDisplayApi.unavailable();

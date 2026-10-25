@@ -228,6 +228,18 @@ public final class ActivityRuntime {
         return publisher == null ? null : publisher.resolveCullDropList(roleId);
     }
 
+    /** Returns whether one managed role's family pays managed cull rewards. */
+    public static boolean hasManagedCullRewards(@Nullable String roleId) {
+        ManagedActivityPublisher publisher = CURRENT.get().publisher;
+        return publisher != null && publisher.hasManagedCullRewards(roleId);
+    }
+
+    /** Returns whether an owner's killing blow on this managed-cull role counts as a cull. */
+    public static boolean ownerKillCountsAsCull(@Nullable String roleId) {
+        ManagedActivityPublisher publisher = CURRENT.get().publisher;
+        return publisher != null && publisher.ownerKillCountsAsCull(roleId);
+    }
+
     /** Publishes one authorized cull after death processing is committed. */
     public static void publishCull(
             @Nonnull UUID operationId,
