@@ -1299,7 +1299,8 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
-            case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
+            // Refused before anything changed: the item keeps its companion.
+            case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOY_BLOCKED ->
                     showPopulationLimit(player, outcome.messageKey());
             // The network's copy could not be read: the item stays as it is.
             case CONFLICT -> warn(player, RestoreFlow.ARRIVING_MESSAGE_KEY.equals(outcome.messageKey())

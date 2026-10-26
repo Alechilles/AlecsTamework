@@ -96,6 +96,7 @@ public final class OwnerPopulationCapService {
             case GROUP_OWNED, GROUP_DEPLOYED -> REASON_GROUP_CAP;
             case PROVIDER_DENIED -> REASON_PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> REASON_PROVIDER_UNAVAILABLE;
+            case DEPLOY_BLOCKED -> "deploy-blocked";
         };
         int limit = denial.refusal() == CompanionAdmission.Refusal.DEPLOYED
                 ? rules.deployedLimit() : rules.ownedLimit();

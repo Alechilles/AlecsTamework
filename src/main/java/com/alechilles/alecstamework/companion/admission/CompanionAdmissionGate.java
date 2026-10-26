@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,6 +36,8 @@ public final class CompanionAdmissionGate {
     @Nullable private final ProviderDecisionCache providerDecisions;
     /** The records an owner's limits count: the index's, or the network's (see {@link #useOwnerRecords}). */
     private volatile Function<UUID, List<CompanionRecord>> recordsOf;
+    /** Whether owned companions may come out in a world (see {@link #useDeployRule}); everywhere by default. */
+    private volatile Predicate<String> deployRule = world -> true;
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
@@ -63,6 +66,29 @@ public final class CompanionAdmissionGate {
      */
     public void useOwnerRecords(@Nonnull Function<UUID, List<CompanionRecord>> ownerRecords) {
         recordsOf = Objects.requireNonNull(ownerRecords, "ownerRecords");
+    }
+
+    /**
+     * Where owned companions may come out: {@code worldAllowed} answers for a world name (the
+     * server's {@code DeployPlaces} rule). A change that puts an owned companion out (LIVE) in a world
+     * it was not already out in is refused with {@link CompanionAdmission.Refusal#DEPLOY_BLOCKED} where
+     * the answer is false. It must be lock-free and do no I/O: the gate calls it under the index lock.
+     */
+    public void useDeployRule(@Nonnull Predicate<String> worldAllowed) {
+        deployRule = Objects.requireNonNull(worldAllowed, "worldAllowed");
+    }
+
+    /** The deploy-rule refusal of the change, or null: only an owned record coming out in a new world is checked. */
+    @Nullable
+    private Denial deployDenial(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+        if (after.ownerUuid() == null || !after.isDeployed()) {
+            return null;
+        }
+        String world = after.location().world();
+        if (before != null && before.isDeployed() && Objects.equals(before.location().world(), world)) {
+            return null;
+        }
+        return deployRule.test(world) ? null : Denial.of(CompanionAdmission.Refusal.DEPLOY_BLOCKED);
     }
 
     /** A gate with fixed rules instead of the configured ones; {@code rules} is read on each check. */
@@ -115,6 +141,10 @@ public final class CompanionAdmissionGate {
 
     private Admission admit(Collection<CompanionRecord> ownerRecords, @Nullable CompanionRecord before,
                             CompanionRecord after) {
+        Denial blocked = deployDenial(before, after);
+        if (blocked != null) {
+            return new Admission(blocked, after);
+        }
         CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
                 CompanionAdmission.Provided.none());
         if (caps != null) {
@@ -179,6 +209,7 @@ public final class CompanionAdmissionGate {
                 case GROUP_OWNED, GROUP_DEPLOYED -> GROUP_LIMIT_MESSAGE_KEY;
                 case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
                 case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
+                case DEPLOY_BLOCKED -> CompanionAdmission.DEPLOY_BLOCKED_MESSAGE_KEY;
             });
         }
     }
@@ -201,6 +232,10 @@ public final class CompanionAdmissionGate {
                        @Nonnull CompanionAdmission.Provided provided) {
         if (after.ownerUuid() == null) {
             return null;
+        }
+        Denial blocked = deployDenial(before, after);
+        if (blocked != null) {
+            return blocked;
         }
         var ownerRecords = recordsOf.apply(after.ownerUuid());
         CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),

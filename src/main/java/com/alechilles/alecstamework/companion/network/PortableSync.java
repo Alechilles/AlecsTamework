@@ -85,6 +85,7 @@ public final class PortableSync implements AutoCloseable {
 
     private final Object lock = new Object();
     @Nullable private volatile PortableCompanionStore store;
+    @Nullable private volatile String holderId;
     /** Changed since last pushed: profile id to the newest changed revision. Guarded by {@link #lock}. */
     private final Map<UUID, Long> candidates = new HashMap<>();
     /** Written and waiting to be pushed: profile id to the record to push. Guarded by {@link #lock}. */
@@ -126,6 +127,12 @@ public final class PortableSync implements AutoCloseable {
         return store != null && !closed;
     }
 
+    /** This server's id in the network (the store's {@code holderId}), or null without a store. Lock-free. */
+    @Nullable
+    public String holderId() {
+        return store == null ? null : holderId;
+    }
+
     /**
      * Installs the store and queues every owned record this server holds for a first push.
      *
@@ -142,6 +149,7 @@ public final class PortableSync implements AutoCloseable {
                 throw new IllegalStateException("a portable companion store is already registered");
             }
             store = newStore;
+            holderId = newStore.holderId();
             index.forEach(record -> {
                 if (record.ownerUuid() != null && !isElsewhere(record)) {
                     outbox.put(record.profileId(), record);

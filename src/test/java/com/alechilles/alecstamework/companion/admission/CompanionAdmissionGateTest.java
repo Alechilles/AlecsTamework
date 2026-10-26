@@ -66,6 +66,26 @@ class CompanionAdmissionGateTest {
         assertEquals(CompanionAdmission.Refusal.GROUP_DEPLOYED, gate.precheck(owner, "Dragon_Fire", "w"));
     }
 
+    /** A world where companions may not come out: no tame or release there, but items and moves within it pass. */
+    @Test
+    void aBlockedWorldRefusesCompanionsComingOutButNotItemsOrCompanionsAlreadyThere() {
+        gate.useDeployRule(world -> !"hub".equals(world));
+        CompanionRecord lantern = CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.item())
+                .ownerUuid(owner).homeWorld("w").build();
+        CompanionRecord alreadyOut = CompanionRecord.builder(UUID.randomUUID(), "Sheep",
+                CompanionLocation.live("hub", 1, 64, 1)).ownerUuid(owner).homeWorld("hub").build();
+
+        assertEquals(CompanionAdmission.Refusal.DEPLOY_BLOCKED, gate.precheck(owner, "Sheep", "hub"), "no tame");
+        assertNull(gate.precheck(owner, "Sheep", "hub", false), "a capture into an item is fine");
+        assertEquals(CompanionAdmission.Refusal.DEPLOY_BLOCKED,
+                gate.refuse(lantern, lantern.toBuilder().location(CompanionLocation.live("hub", 5, 64, 5)).build()),
+                "no release from a lantern");
+        assertNull(gate.refuse(alreadyOut, alreadyOut.toBuilder()
+                .location(CompanionLocation.live("hub", 9, 64, 9)).build()), "one already out may move about");
+        assertNull(gate.refuse(lantern, lantern.toBuilder().location(CompanionLocation.live("w", 5, 64, 5)).build()),
+                "other worlds are fine");
+    }
+
     /** A capture into an item creates an ITEM record: the deployed limit does not apply, the owned one does. */
     @Test
     void aCaptureStylePrecheckIgnoresTheDeployedLimitButNotTheOwnedOne() {

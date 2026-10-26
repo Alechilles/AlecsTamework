@@ -53,7 +53,9 @@ public final class RestoreFlow<R> {
      * decision. Nothing changed.
      */
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED,
-        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOYED_LIMIT }
+        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOYED_LIMIT,
+        /** The server does not let companions come out in the destination world ({@code DeployPlaces}). */
+        DEPLOY_BLOCKED }
 
     /**
      * A restore's result with the translation key of a population refusal (a cap, a provider's
@@ -446,6 +448,7 @@ public final class RestoreFlow<R> {
             case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
             case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;
+            case DEPLOY_BLOCKED -> Result.DEPLOY_BLOCKED;
         };
     }
 

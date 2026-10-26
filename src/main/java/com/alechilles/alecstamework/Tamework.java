@@ -737,6 +737,11 @@ public class Tamework extends JavaPlugin {
             portableSync = network;
             // Owner limits count the companions other servers of a network hold too.
             admissionGate.useOwnerRecords(network::ownerRecords);
+            // Where companions may come out: read once here, then only from memory (the gate runs under the index lock).
+            com.alechilles.alecstamework.settings.DeployPlacesStore.load(
+                    com.alechilles.alecstamework.settings.DeployPlacesStore.resolveFile(this), getLogger());
+            admissionGate.useDeployRule(world -> com.alechilles.alecstamework.settings.DeployPlacesStore
+                    .cachedOrDefault().allows(network.holderId(), world));
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
             restoreFlow = createRestoreFlow(companionModule, providerAdmission, admissionGate, bondedFamilies);
             restoreFlow.usePortableRefresh(network::refresh);
