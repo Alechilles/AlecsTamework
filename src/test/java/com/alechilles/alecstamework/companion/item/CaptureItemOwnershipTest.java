@@ -171,6 +171,14 @@ class CaptureItemOwnershipTest {
     }
 
     @Test
+    void anItemNewerThanItsRecordIsNeitherStaleNorMoved() {
+        CompanionRecord behind = inItem(2).toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+        assertFalse(CaptureItemOwnership.isStale(behind, 3));
+        assertFalse(CaptureItemOwnership.isStale(inItem(2), 3));
+        assertEquals(Decision.IGNORE, CaptureItemOwnership.decide(behind, 3, UUID.randomUUID(), null));
+    }
+
+    @Test
     void ownerOnlyRefusesAReleaseBySomeoneElseOnlyWhileTheItemStillHoldsItsCompanion() {
         Release byOther = CaptureItemOwnership.release(CaptureItemOwnershipMode.OWNER_ONLY, owner, holder);
 

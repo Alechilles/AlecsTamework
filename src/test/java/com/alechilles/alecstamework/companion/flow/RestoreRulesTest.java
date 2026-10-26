@@ -100,6 +100,15 @@ class RestoreRulesTest {
     }
 
     @Test
+    void anItemNewerThanTheRecordIsNotFoundSoItIsKeptRatherThanEmptied() {
+        // Filled again on another server: this server's copy is behind, wherever it says the companion is.
+        CompanionRecord item = CompanionRecord.builder(UUID.randomUUID(), "r", CompanionLocation.item()).generation(4).build();
+        CompanionRecord live = item.toBuilder().location(CompanionLocation.live("w", 0, 0, 0)).build();
+        assertEquals(Verdict.NOT_FOUND, RestoreRules.forRecord(item, Reason.RELEASE, 0, 5));
+        assertEquals(Verdict.NOT_FOUND, RestoreRules.forRecord(live, Reason.RELEASE, 0, 5));
+    }
+
+    @Test
     void summonWaitsForItsCooldown() {
         CompanionRecord stored = CompanionRecord.builder(UUID.randomUUID(), "r", CompanionLocation.stored(StoredReason.ROSTER))
                 .summonCooldownUntilMs(1_000).build();
