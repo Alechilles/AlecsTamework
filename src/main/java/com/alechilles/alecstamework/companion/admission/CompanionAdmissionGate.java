@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,9 +31,10 @@ public final class CompanionAdmissionGate {
     /** Message key of a refused group limit. */
     public static final String GROUP_LIMIT_MESSAGE_KEY = "tamework.ui.population.groupLimit";
 
-    private final CompanionIndex index;
     private final Supplier<CompanionAdmission.Rules> rules;
     @Nullable private final ProviderDecisionCache providerDecisions;
+    /** The records an owner's limits count: the index's, or the network's (see {@link #useOwnerRecords}). */
+    private volatile Function<UUID, List<CompanionRecord>> recordsOf;
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
@@ -42,16 +44,25 @@ public final class CompanionAdmissionGate {
     public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups,
                                   @Nullable ProviderDecisionCache providerDecisions) {
         Objects.requireNonNull(groups, "groups");
-        this.index = Objects.requireNonNull(index, "index");
+        this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = () -> configuredRules(groups.get());
         this.providerDecisions = providerDecisions;
     }
 
     private CompanionAdmissionGate(Supplier<CompanionAdmission.Rules> rules, CompanionIndex index,
                                    @Nullable ProviderDecisionCache providerDecisions) {
-        this.index = Objects.requireNonNull(index, "index");
+        this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = Objects.requireNonNull(rules, "rules");
         this.providerDecisions = providerDecisions;
+    }
+
+    /**
+     * Server networks: count each owner's limits over {@code ownerRecords} instead of the index alone,
+     * so companions other servers hold count too. It must be lock-free and include every record the
+     * index files under the owner.
+     */
+    public void useOwnerRecords(@Nonnull Function<UUID, List<CompanionRecord>> ownerRecords) {
+        recordsOf = Objects.requireNonNull(ownerRecords, "ownerRecords");
     }
 
     /** A gate with fixed rules instead of the configured ones; {@code rules} is read on each check. */
@@ -99,7 +110,7 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return new Admission(null, after);
         }
-        return admit(index.fileRecords(after.ownerUuid()), before, after);
+        return admit(recordsOf.apply(after.ownerUuid()), before, after);
     }
 
     private Admission admit(Collection<CompanionRecord> ownerRecords, @Nullable CompanionRecord before,
@@ -146,7 +157,7 @@ public final class CompanionAdmissionGate {
      */
     @Nullable
     public Denial denyBatch(@Nonnull UUID owner, @Nonnull List<CompanionRecord> candidates) {
-        List<CompanionRecord> working = new ArrayList<>(index.fileRecords(owner));
+        List<CompanionRecord> working = new ArrayList<>(recordsOf.apply(owner));
         for (CompanionRecord candidate : candidates) {
             Admission admission = admit(working, null, candidate);
             if (!admission.admitted()) {
@@ -191,7 +202,7 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return null;
         }
-        var ownerRecords = index.fileRecords(after.ownerUuid());
+        var ownerRecords = recordsOf.apply(after.ownerUuid());
         CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
                 CompanionAdmission.Provided.none());
         if (caps != null) {
@@ -234,7 +245,7 @@ public final class CompanionAdmissionGate {
                 ? CompanionLocation.live(world, 0, 0, 0) : CompanionLocation.item();
         CompanionRecord candidate = CompanionRecord.builder(UUID.randomUUID(), roleId, at)
                 .ownerUuid(owner).homeWorld(world).build();
-        return admit(index.fileRecords(owner), null, candidate).denial();
+        return admit(recordsOf.apply(owner), null, candidate).denial();
     }
 
     /** The rules the gate checks with now, for callers that check a whole batch (a litter). */

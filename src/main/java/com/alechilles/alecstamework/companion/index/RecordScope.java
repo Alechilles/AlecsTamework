@@ -12,16 +12,16 @@ public enum RecordScope {
     WORLD_BOUND, PORTABLE;
 
     /**
-     * The scope a record has, decided by its location alone: STORED, and ITEM with an owner, follow
-     * the owner. LIVE, COOP, DEAD, LOST, RELEASED and unowned ITEM stay with the world. DEAD and LOST
-     * stay world-bound until the network phase decides when they may move (spec 13.2).
+     * The scope a record has, decided by its location alone: STORED, and ITEM, DEAD and LOST with an
+     * owner, follow the owner, who can restore, revive or recover them on any server. LIVE, COOP,
+     * RELEASED and unowned ITEM, DEAD and LOST stay with the world.
      */
     @Nonnull
     public static RecordScope of(@Nonnull LocationKind kind, @Nullable UUID ownerUuid) {
         return switch (kind) {
             case STORED -> PORTABLE;
-            case ITEM -> ownerUuid != null ? PORTABLE : WORLD_BOUND;
-            case LIVE, COOP, DEAD, LOST, RELEASED -> WORLD_BOUND;
+            case ITEM, DEAD, LOST -> ownerUuid != null ? PORTABLE : WORLD_BOUND;
+            case LIVE, COOP, RELEASED -> WORLD_BOUND;
         };
     }
 }

@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.api.internal.IndexNpcProfilesApi;
 import com.alechilles.alecstamework.api.internal.IndexPopulationGroupApi;
 import com.alechilles.alecstamework.api.internal.IndexProfileDataApi;
 import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
+import com.alechilles.alecstamework.api.internal.PortableCompanionsFacade;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
@@ -268,6 +269,7 @@ import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.HytaleSummarySources;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
+import com.alechilles.alecstamework.companion.network.PortableSync;
 import com.alechilles.alecstamework.companion.runtime.CompanionPersistenceModule;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.companion.store.CompanionStorage;
@@ -314,6 +316,9 @@ public class Tamework extends JavaPlugin {
     @Nullable
     private volatile IndexTameworkApi api;
     private CompanionPersistenceModule companionModule;
+    /** Server network sync; inert until a network mod installs a store. Null unless the companion module is ready. */
+    @Nullable
+    private volatile PortableSync portableSync;
     /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
     private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
     /** Drops a cleared name from the companion record; a no-op until the companion index is registered. */
@@ -728,8 +733,13 @@ public class Tamework extends JavaPlugin {
             ProviderDecisionCache providerDecisions = startProviderDecisionCache(providerAdmission);
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot,
                     providerDecisions);
+            PortableSync network = startPortableSync(companionModule);
+            portableSync = network;
+            // Owner limits count the companions other servers of a network hold too.
+            admissionGate.useOwnerRecords(network::ownerRecords);
             OwnerPopulationCapService.useAdmissionGate(admissionGate);
             restoreFlow = createRestoreFlow(companionModule, providerAdmission, admissionGate, bondedFamilies);
+            restoreFlow.usePortableRefresh(network::refresh);
             captureItemFlows = new CaptureItemFlows(companionModule.index(),
                     companionModule.writer()::queueSnapshotDelete, restoreFlow);
             recallRestore = new CompanionRestoreRecallSink(restoreFlow, companionQueries);
@@ -791,12 +801,18 @@ public class Tamework extends JavaPlugin {
                 "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
         if (profilesApi != null) {
             CompanionPersistenceModule apiModule = companionModule;
+            IndexPopulationGroupApi populationGroups =
+                    new IndexPopulationGroupApi(apiModule.index(), populationGroupConfigRegistry::snapshot);
+            PortableSync network = portableSync;
+            if (network != null) {
+                populationGroups.useOwnerRecords(network::ownerRecords);
+            }
             IndexTameworkApi indexApi = new IndexTameworkApi(
                     profilesApi,
                     new IndexProfileDataApi(apiModule.index(), apiModule.writer()::flushNow),
                     new IndexDiagnosticsApi(apiModule.index(), apiModule.writer()::status,
                             apiModule.root().toString(), apiModule::folderBytes, apiModule::unreadableCount),
-                    new IndexPopulationGroupApi(apiModule.index(), populationGroupConfigRegistry::snapshot),
+                    populationGroups,
                     apiEventBus,
                     commandLinkedNpcStateSnapshotService,
                     interactionExtensionRegistry,
@@ -810,6 +826,9 @@ public class Tamework extends JavaPlugin {
                     managedActivityConfigRegistry);
             ActivityRuntime.install(indexApi.activityPublisher(), managedActivityConfigRegistry);
             indexApi.useBondedCompanions(bondedCompanionApi);
+            if (network != null) {
+                indexApi.usePortableCompanions(new PortableCompanionsFacade(network));
+            }
             api = indexApi;
             // Companion events go out after the index lock is released, on the changing thread (spec 9).
             apiModule.addAfterUnlockListener(new CompanionEventPublisher(
@@ -870,6 +889,7 @@ public class Tamework extends JavaPlugin {
                     new com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption(module.index(),
                             module.legacyAliases(), module.writer()::queueSnapshot,
                             admissionGate::admit, System::currentTimeMillis));
+            spawnerFeatureHandler.usePortableSync(portableSync);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1542,6 +1562,48 @@ public class Tamework extends JavaPlugin {
     }
 
     /**
+     * Server network support: hears every index change and every written owner file, and reads an
+     * owner's network copies when they connect. It does nothing until a network mod registers a
+     * store through {@code portableCompanions()}. Its thread is stopped in the -28 shutdown handler.
+     */
+    private PortableSync startPortableSync(CompanionPersistenceModule module) {
+        PortableSync sync = new PortableSync(module.index(), module::readSnapshot, module.writer()::queueSnapshot,
+                module.writer()::queueSnapshotDelete,
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+                    Thread thread = new Thread(runnable, "tamework-portable-store");
+                    thread.setDaemon(true);
+                    return thread;
+                }),
+                System::currentTimeMillis);
+        module.addAfterUnlockListener(sync::onRecordChanged);
+        module.writer().addWrittenListener(sync::onWritten);
+        sync.start();
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "portable-companions-connect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerConnectEvent.class,
+                        event -> {
+                            java.util.UUID owner = event == null || event.getPlayerRef() == null
+                                    ? null : event.getPlayerRef().getUuid();
+                            if (owner != null) {
+                                sync.ownerJoined(owner);
+                            }
+                        },
+                        "network companion load on connect"
+                )
+        );
+        return sync;
+    }
+
+    /** The server network sync, or null when the companion module is not ready. */
+    @Nullable
+    public PortableSync getPortableSync() {
+        return portableSync;
+    }
+
+    /**
      * Builds the restore used by recall, world-change follow and the panel's Recover and Revive.
      * The snapshot is a fresh capture when the body is loaded, otherwise the stored one.
      */
@@ -1892,6 +1954,11 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register((short) -28, ShutdownEvent.class, event -> {
             com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
             module.shutdown(System.currentTimeMillis() + 10_000L);
+            // After the files are written: what they hold goes to the network store, best effort.
+            PortableSync network = portableSync;
+            if (network != null) {
+                network.shutdown(3_000L);
+            }
         });
     }
 
@@ -2056,6 +2123,12 @@ public class Tamework extends JavaPlugin {
                         "Companion saves were not fully written before shutdown.");
             }
             companionModule = null;
+        }
+        PortableSync network = portableSync;
+        portableSync = null;
+        if (network != null) {
+            // Does nothing when the -28 ShutdownEvent handler already sent and stopped it.
+            network.shutdown(1_000L);
         }
         OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;

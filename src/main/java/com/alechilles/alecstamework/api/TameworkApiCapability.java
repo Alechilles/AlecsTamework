@@ -69,6 +69,8 @@ public enum TameworkApiCapability {
     /** Owner-scoped inheritance bonuses and harmful-mutation reroll chances. */
     HUSBANDRY_BREEDING_GENETICS,
     /** External providers can contribute captured-item tooltip and quality presentation. */
-    CAPTURED_ITEM_DISPLAY
+    CAPTURED_ITEM_DISPLAY,
+    /** A server network can install a shared store that companions follow their owner through. */
+    PORTABLE_COMPANION_STORE
 }
 

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.RecordScope;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -142,6 +143,7 @@ public final class RestoreFlow<R> {
     private final LongSupplier clock;
     private final ProviderAdmission providers;
     private final CompanionAdmissionGate.Check admission;
+    @Nullable private volatile Function<UUID, CompletableFuture<Void>> portableRefresh;
 
     /** A flow with no admission providers; {@code admission} is the built-in caps only. */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -193,9 +195,30 @@ public final class RestoreFlow<R> {
         return restoreOutcome(request).thenApply(Outcome::result);
     }
 
+    /**
+     * Server networks: before a companion that follows its owner (a portable record, or one this
+     * server does not know) is restored, {@code refresh} reads the network's copy of that profile into
+     * the index, so a restore never starts from a copy another server has moved on from. It must
+     * complete normally once done or given up; the restore then uses whatever the index holds.
+     */
+    public void usePortableRefresh(@Nonnull Function<UUID, CompletableFuture<Void>> refresh) {
+        portableRefresh = Objects.requireNonNull(refresh, "refresh");
+    }
+
     /** As {@link #restore(Request)}, with the message key of a population refusal. */
     @Nonnull
     public CompletableFuture<Outcome> restoreOutcome(@Nonnull Request request) {
+        Function<UUID, CompletableFuture<Void>> refresh = portableRefresh;
+        CompanionRecord current = index.get(request.profileId());
+        if (refresh == null || current != null && current.scope() != RecordScope.PORTABLE) {
+            return restoreLocal(request);
+        }
+        return refresh.apply(request.profileId())
+                .handle((ignored, error) -> restoreLocal(request))
+                .thenCompose(outcome -> outcome);
+    }
+
+    private CompletableFuture<Outcome> restoreLocal(Request request) {
         UUID profileId = request.profileId();
         CompanionRecord before = index.get(profileId);
         RestoreRules.Verdict verdict = RestoreRules.forRecord(before, request.reason(), clock.getAsLong(),

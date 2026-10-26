@@ -1236,6 +1236,7 @@ tamework.ui.notifications.spawner.releaseInvalidContext=This capture item does n
 tamework.ui.notifications.spawner.releaseEvidenceFailed=The stored companion state could not be verified.
 tamework.ui.notifications.spawner.captureEvidenceFailed=The companion state could not be verified for capture.
 tamework.ui.notifications.spawner.releaseProfileConflict=This capture item no longer matches the companion record.
+tamework.ui.notifications.spawner.releaseArriving=This companion is still arriving from another server. Try again in a moment.
 tamework.ui.notifications.spawner.captureProfileConflict=The companion record changed before capture completed.
 tamework.ui.notifications.spawner.captureLegacyBody=This animal is a leftover copy from before the update and cannot be captured.
 tamework.ui.notifications.spawner.captureUnavailable=Capture is temporarily unavailable. Try again shortly.

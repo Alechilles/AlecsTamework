@@ -78,5 +78,10 @@ public interface TameworkApi {
     default CapturedItemDisplayApi capturedItemDisplay() {
         return CapturedItemDisplayApi.unavailable();
     }
+
+    /** Returns the optional server network store facade. */
+    default PortableCompanionsApi portableCompanions() {
+        return PortableCompanionsApi.unavailable();
+    }
 }
 

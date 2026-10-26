@@ -50,6 +50,22 @@ class CompanionAdmissionGateTest {
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.precheck(owner, "Dragon_Fire", "w"));
     }
 
+    /** Server networks: a dragon out in another server's world fills the group's active limit here too. */
+    @Test
+    void companionsHeldByAnotherServerCountTowardTheOwnersLimits() {
+        CompanionRecord onServerB = CompanionRecord.builder(UUID.randomUUID(), "Dragon_Ice",
+                CompanionLocation.live("B/w", 1, 64, 1)).ownerUuid(owner).homeWorld("B/w").build();
+        assertNull(gate.precheck(owner, "Dragon_Fire", "w"));
+
+        gate.useOwnerRecords(o -> {
+            List<CompanionRecord> all = new java.util.ArrayList<>(index.fileRecords(o));
+            all.add(onServerB);
+            return all;
+        });
+
+        assertEquals(CompanionAdmission.Refusal.GROUP_DEPLOYED, gate.precheck(owner, "Dragon_Fire", "w"));
+    }
+
     /** A capture into an item creates an ITEM record: the deployed limit does not apply, the owned one does. */
     @Test
     void aCaptureStylePrecheckIgnoresTheDeployedLimitButNotTheOwnedOne() {

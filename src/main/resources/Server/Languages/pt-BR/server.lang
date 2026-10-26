@@ -1236,6 +1236,7 @@ tamework.ui.notifications.spawner.releaseInvalidContext=Este item de captura nã
 tamework.ui.notifications.spawner.releaseEvidenceFailed=Não foi possível verificar o estado salvo do companheiro.
 tamework.ui.notifications.spawner.captureEvidenceFailed=Não foi possível verificar o estado do companheiro para captura.
 tamework.ui.notifications.spawner.releaseProfileConflict=Este item de captura não corresponde mais ao registro do companheiro.
+tamework.ui.notifications.spawner.releaseArriving=Este companheiro ainda está chegando de outro servidor. Tente novamente em instantes.
 tamework.ui.notifications.spawner.captureProfileConflict=O registro do companheiro mudou antes da conclusão da captura.
 tamework.ui.notifications.spawner.captureLegacyBody=Este animal é uma cópia remanescente de antes da atualização e não pode ser capturado.
 tamework.ui.notifications.spawner.captureUnavailable=A captura está temporariamente indisponível. Tente novamente em breve.

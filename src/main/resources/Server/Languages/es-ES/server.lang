@@ -1080,6 +1080,7 @@ tamework.ui.notifications.spawner.releaseEvidenceFailed=No se pudo verificar el 
 tamework.ui.notifications.spawner.releaseFailed=No se pudo completar la liberación del compañero.
 tamework.ui.notifications.spawner.releaseInvalidContext=Este objeto de captura no contiene un compañero válido.
 tamework.ui.notifications.spawner.releaseProfileConflict=Este objeto de captura ya no coincide con el registro del compañero.
+tamework.ui.notifications.spawner.releaseArriving=Este compañero todavía está llegando desde otro servidor. Inténtalo de nuevo en un momento.
 tamework.ui.population.action.capture=capturar
 tamework.ui.population.action.default=acción
 tamework.ui.population.action.release=liberar

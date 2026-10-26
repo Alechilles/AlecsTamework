@@ -1236,6 +1236,7 @@ tamework.ui.notifications.spawner.releaseInvalidContext=Dieses Fangobjekt enthä
 tamework.ui.notifications.spawner.releaseEvidenceFailed=Der gespeicherte Begleiterzustand konnte nicht überprüft werden.
 tamework.ui.notifications.spawner.captureEvidenceFailed=Der Begleiterzustand konnte für das Fangen nicht überprüft werden.
 tamework.ui.notifications.spawner.releaseProfileConflict=Dieses Fangobjekt stimmt nicht mehr mit dem Begleitereintrag überein.
+tamework.ui.notifications.spawner.releaseArriving=Dieser Begleiter ist noch auf dem Weg von einem anderen Server. Versuche es gleich noch einmal.
 tamework.ui.notifications.spawner.captureProfileConflict=Der Begleitereintrag hat sich vor Abschluss des Fangens geändert.
 tamework.ui.notifications.spawner.captureLegacyBody=Dieses Tier ist eine übrig gebliebene Kopie aus der Zeit vor dem Update und kann nicht gefangen werden.
 tamework.ui.notifications.spawner.captureUnavailable=Das Fangen ist vorübergehend nicht verfügbar. Versuche es gleich erneut.
