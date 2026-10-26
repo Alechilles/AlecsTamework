@@ -26,6 +26,9 @@ class TameworkSettingsRenderingTest {
         Field nameFilter = TameworkSettingsPage.class.getDeclaredField("currentNameFilter");
         nameFilter.setAccessible(true);
         nameFilter.set(page, NameFilterSettings.DEFAULT);
+        Field deploy = TameworkSettingsPage.class.getDeclaredField("currentDeploy");
+        deploy.setAccessible(true);
+        deploy.set(page, com.alechilles.alecstamework.settings.DeployPlaces.DEFAULT);
         UICommandBuilder commands = new UICommandBuilder();
         var events = new com.hypixel.hytale.server.core.ui.builder.UIEventBuilder();
         page.build(null, commands, events, null);

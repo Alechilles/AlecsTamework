@@ -81,6 +81,15 @@ again. When the store cannot be read and this server has not read the owner's
 entries since they joined, the restore waits the same way, so two servers never
 restore one companion.
 
+## Where companions can come out
+
+Admins choose this per server in `/tw settings`, under Where Companions Can
+Come Out: everywhere except the listed places, or only in them. A place is a
+world name, a server id (the store's `holderId`) or `server/world`, so one
+`tamework-deploy-places.json` can be shared by every server of a network. For
+example, list your hub servers to keep animals out of them while players still
+carry and trade lanterns there. Without a store, only world names match.
+
 ## Limits
 
 - Durability is best effort, like the rest of the store. A crash right after a

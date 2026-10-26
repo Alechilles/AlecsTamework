@@ -9,6 +9,13 @@
   capture items, stored, dead or lost then follow their owner to every server,
   and owner and group limits count the companions other servers hold. Without
   such a mod nothing changes.
+- `/tw settings` has a new section, Where Companions Can Come Out. Choose
+  "everywhere except these places" or "only in these places", and list world
+  names, server ids or `server/world`. In a blocked place companions cannot be
+  released, summoned, recalled, revived, recovered, tamed or born, but capture
+  items and stored companions still travel and can be traded there. Companions
+  already out stay where they are. The list is saved in
+  `tamework-deploy-places.json`, so a network can share one file.
 
 ### Fixed
 

@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
+import com.alechilles.alecstamework.settings.DeployPlaces;
+import com.alechilles.alecstamework.settings.DeployPlacesStore;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -61,6 +63,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_NAME_FILTER_USE_STOCK_LIST = "@NameFilterUseStockList";
     private static final String KEY_NAME_FILTER_BLOCKED_WORDS = "@NameFilterBlockedWords";
     private static final String KEY_NAME_FILTER_ALLOWED_WORDS = "@NameFilterAllowedWords";
+    private static final String KEY_DEPLOY_MODE = "@DeployMode";
+    private static final String KEY_DEPLOY_PLACES = "@DeployPlaces";
     private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
     private static final String KEY_POP_DEPLOYED_LIMIT = "@PopulationDeployedLimit";
@@ -111,6 +115,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     /** The name filter is saved to its own file, so it is tracked beside the main values. */
     private NameFilterSettings currentNameFilter;
     private NameFilterSettings savedNameFilter;
+    /** Where companions may come out, saved to its own file like the name filter. */
+    private DeployPlaces currentDeploy;
+    private DeployPlaces savedDeploy;
     private EventPayload draftPayload;
     private boolean unsavedChanges;
     private String statusLine = "";
@@ -274,7 +281,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_NAME_FILTER_ENABLED, "#TwSettingsNameFilterEnabledCheck.Value")
                 .append(KEY_NAME_FILTER_USE_STOCK_LIST, "#TwSettingsNameFilterUseStockListCheck.Value")
                 .append(KEY_NAME_FILTER_BLOCKED_WORDS, "#TwSettingsNameFilterBlockedWordsInput.Value")
-                .append(KEY_NAME_FILTER_ALLOWED_WORDS, "#TwSettingsNameFilterAllowedWordsInput.Value");
+                .append(KEY_NAME_FILTER_ALLOWED_WORDS, "#TwSettingsNameFilterAllowedWordsInput.Value")
+                .append(KEY_DEPLOY_MODE, "#TwSettingsDeployModeDropdown.Value")
+                .append(KEY_DEPLOY_PLACES, "#TwSettingsDeployPlacesInput.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
@@ -343,6 +352,27 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 NameFilterSettings.formatWordList(currentNameFilter.blockedWords()));
         commandBuilder.set("#TwSettingsNameFilterAllowedWordsInput.Value",
                 NameFilterSettings.formatWordList(currentNameFilter.allowedWords()));
+        commandBuilder.set("#TwSettingsDeployModeDropdown.Entries", deployModeEntries());
+        commandBuilder.set("#TwSettingsDeployModeDropdown.Value", currentDeploy.mode().configValue());
+        commandBuilder.set("#TwSettingsDeployPlacesInput.Value", DeployPlaces.formatPlaces(currentDeploy.places()));
+    }
+
+    /** Where companions may come out, as the form holds it; a control missing from the payload keeps its value. */
+    @Nonnull
+    private DeployPlaces deployFrom(@Nonnull EventPayload payload) {
+        return new DeployPlaces(
+                payload.deployMode != null ? DeployPlaces.Mode.fromConfigValue(payload.deployMode) : currentDeploy.mode(),
+                payload.deployPlaces != null ? DeployPlaces.parsePlaces(payload.deployPlaces) : currentDeploy.places());
+    }
+
+    private List<DropdownEntryInfo> deployModeEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.deployMode.everywhereExcept")),
+                        DeployPlaces.Mode.EVERYWHERE_EXCEPT.configValue()),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.deployMode.onlyListed")),
+                        DeployPlaces.Mode.ONLY_LISTED.configValue()));
     }
 
     /** The name filter the form holds; a control missing from the payload keeps its current value. */
@@ -363,11 +393,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void updateUnsavedChanges() {
         if (draftPayload == null) {
-            unsavedChanges = !currentValues.equals(savedValues) || !currentNameFilter.equals(savedNameFilter);
+            unsavedChanges = !currentValues.equals(savedValues) || !currentNameFilter.equals(savedNameFilter)
+                    || !currentDeploy.equals(savedDeploy);
             return;
         }
         unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues)
-                || !nameFilterFrom(draftPayload).equals(savedNameFilter);
+                || !nameFilterFrom(draftPayload).equals(savedNameFilter)
+                || !deployFrom(draftPayload).equals(savedDeploy);
     }
 
     private void renderFeedback(@Nonnull UICommandBuilder commandBuilder) {
@@ -465,15 +497,19 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         TameworkSettingsValues requested = parseResult.values();
         NameFilterSettings requestedNameFilter = nameFilterFrom(payload);
         NameFilterSettings previousNameFilter = savedNameFilter;
+        DeployPlaces requestedDeploy = deployFrom(payload);
+        DeployPlaces previousDeploy = savedDeploy;
         currentValues = requested;
         currentNameFilter = requestedNameFilter;
+        currentDeploy = requestedDeploy;
         applyInProgress = true;
         statusLine = resolveText("tamework.ui.settings.status.applying");
         warningLine = "";
         refreshFeedback();
 
         CompletableFuture
-                .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter))
+                .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter,
+                        requestedDeploy, previousDeploy))
                 .whenComplete((outcome, throwable) -> world.execute(() -> {
                     applyInProgress = false;
                     if (throwable != null) {
@@ -489,6 +525,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                     } else if (outcome.partial()) {
                         savedValues = loadSettingsValues();
                         savedNameFilter = NameFilterSettingsStore.current();
+                        savedDeploy = DeployPlacesStore.cachedOrDefault();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -496,6 +533,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                     } else if (outcome.success()) {
                         savedValues = loadSettingsValues();
                         savedNameFilter = NameFilterSettingsStore.current();
+                        savedDeploy = DeployPlacesStore.cachedOrDefault();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -521,8 +559,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 ? parseResult.values()
                 : currentValues;
         currentValues = preset.applyTo(baseValues);
-        // Presets do not cover the name filter; keep what the form holds.
+        // Presets do not cover the name filter or where companions may come out; keep what the form holds.
         currentNameFilter = nameFilterFrom(payload);
+        currentDeploy = deployFrom(payload);
         draftPayload = null;
         updateUnsavedChanges();
         statusLine = parseResult.success()
@@ -535,7 +574,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     @Nonnull
     private ApplyOutcome applySettings(@Nonnull TameworkSettingsValues values,
                                        @Nonnull NameFilterSettings nameFilter,
-                                       @Nonnull NameFilterSettings savedFilter) {
+                                       @Nonnull NameFilterSettings savedFilter,
+                                       @Nonnull DeployPlaces deploy,
+                                       @Nonnull DeployPlaces savedDeployPlaces) {
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
@@ -547,6 +588,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         if (!nameFilter.equals(savedFilter) && !NameFilterSettingsStore.save(
                 NameFilterSettingsStore.resolveFile(plugin), nameFilter, plugin.getLogger())) {
             warnings.add(resolveText("tamework.ui.settings.warning.nameFilterSaveFailed"));
+        }
+        if (!deploy.equals(savedDeployPlaces) && !DeployPlacesStore.save(
+                DeployPlacesStore.resolveFile(plugin), deploy, plugin.getLogger())) {
+            warnings.add(resolveText("tamework.ui.settings.warning.deploySaveFailed"));
         }
         if (!TameworkSettingsAnnouncementStore.saveEnabled(
                 TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin),
@@ -603,6 +648,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         savedValues = currentValues;
         currentNameFilter = NameFilterSettingsStore.current();
         savedNameFilter = currentNameFilter;
+        currentDeploy = DeployPlacesStore.cachedOrDefault();
+        savedDeploy = currentDeploy;
         draftPayload = null;
         unsavedChanges = false;
         warningLine = "";
@@ -791,6 +838,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_NAME_FILTER_USE_STOCK_LIST, Codec.BOOLEAN), (x, v) -> x.nameFilterUseStockList = v, x -> x.nameFilterUseStockList).add()
                 .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_BLOCKED_WORDS, Codec.STRING), (x, v) -> x.nameFilterBlockedWords = v, x -> x.nameFilterBlockedWords).add()
                 .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_ALLOWED_WORDS, Codec.STRING), (x, v) -> x.nameFilterAllowedWords = v, x -> x.nameFilterAllowedWords).add()
+                .<String>append(new KeyedCodec<>(KEY_DEPLOY_MODE, Codec.STRING), (x, v) -> x.deployMode = v, x -> x.deployMode).add()
+                .<String>append(new KeyedCodec<>(KEY_DEPLOY_PLACES, Codec.STRING), (x, v) -> x.deployPlaces = v, x -> x.deployPlaces).add()
                 .build();
 
         String action;
@@ -839,5 +888,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean nameFilterUseStockList;
         String nameFilterBlockedWords;
         String nameFilterAllowedWords;
+        String deployMode;
+        String deployPlaces;
     }
 }
