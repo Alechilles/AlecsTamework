@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Server networks: a network mod can install a shared store
+  (`portableCompanions()`, capability `PORTABLE_COMPANION_STORE`). Companions in
+  capture items, stored, dead or lost then follow their owner to every server,
+  and owner and group limits count the companions other servers hold. Without
+  such a mod nothing changes.
+
+### Fixed
+
+- Animals stop growing again while they are in a capture item, stored, dead or
+  lost, as before 5.0. They resume where they left off when released, summoned,
+  revived or recovered.
+- A capture item that is newer than the server's copy of its companion (for
+  example after restoring an old backup of the companion folder) is no longer
+  emptied when it is used.
+
 ## 5.5.2 - Telemetry Upload Hotfix - 2026-10-22
 
 ### Fixed
