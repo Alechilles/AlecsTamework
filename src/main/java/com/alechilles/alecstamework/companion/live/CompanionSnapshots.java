@@ -42,8 +42,18 @@ public final class CompanionSnapshots {
         this.ownerClock = ownerClock;
     }
 
+    /** Snapshots of bodies that stay in a world (unload saves, recalls, coops): growth goes on as before. */
     @Nonnull
     public static CompanionSnapshots production() {
+        return new CompanionSnapshots(EntityStore.REGISTRY::serialize);
+    }
+
+    /**
+     * Snapshots of bodies leaving the world (capture into an item, store, death, loss): they record the owner's
+     * progression clock, so growth pauses until the companion is restored, on any server.
+     */
+    @Nonnull
+    public static CompanionSnapshots leavingWorld() {
         return new CompanionSnapshots(EntityStore.REGISTRY::serialize, AnimalProgressionClock.get()::current);
     }
 
