@@ -142,13 +142,25 @@ public final class PortableSync implements AutoCloseable {
         }
         LOGGER.at(Level.INFO).log("Companions follow their owners through the network store as server %s",
                 newStore.holderId());
-        return () -> {
+        return new Registration(newStore);
+    }
+
+    /** Removes the store it installed; idempotent. Public so a mod can close it by reflection. */
+    public final class Registration implements AutoCloseable {
+        private final PortableCompanionStore installed;
+
+        private Registration(PortableCompanionStore installed) {
+            this.installed = installed;
+        }
+
+        @Override
+        public void close() {
             synchronized (lock) {
-                if (store == newStore) {
+                if (store == installed) {
                     store = null;
                 }
             }
-        };
+        }
     }
 
     // --- push -------------------------------------------------------------------------------

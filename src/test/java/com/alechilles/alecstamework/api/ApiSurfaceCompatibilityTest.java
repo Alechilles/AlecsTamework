@@ -284,6 +284,47 @@ class ApiSurfaceCompatibilityTest {
     }
 
     @Test
+    void runeteriaRegistersANetworkStoreThroughAProxyAndBuildsEntriesByReflection() throws Exception {
+        java.util.concurrent.ScheduledExecutorService executor =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        com.alechilles.alecstamework.companion.network.PortableSync sync =
+                new com.alechilles.alecstamework.companion.network.PortableSync(index,
+                        id -> CompletableFuture.completedFuture(null), snapshot -> { }, id -> { }, executor,
+                        () -> 1_000L);
+        try {
+            ((IndexTameworkApi) api).usePortableCompanions(
+                    new com.alechilles.alecstamework.api.internal.PortableCompanionsFacade(sync));
+            Collection<?> capabilities = (Collection<?>) runeteria("TameworkApi", api, "getCapabilities");
+            assertTrue(capabilities.stream().anyMatch(c -> "PORTABLE_COMPANION_STORE".equals(((Enum<?>) c).name())));
+            Class<?> storeType = Class.forName(API_PACKAGE + "PortableCompanionStore");
+            Class<?> entryType = Class.forName(API_PACKAGE + "PortableCompanionEntry");
+            Object entry = entryType.getConstructor(UUID.class, UUID.class, long.class, long.class, boolean.class,
+                    String.class, String.class, String.class, String.class, String.class)
+                    .newInstance(UUID.randomUUID(), OWNER, 2L, 5L, true, "ITEM", "Cow", null, "{}", null);
+            for (String accessor : List.of("profileId", "ownerUuid", "generation", "version", "portable",
+                    "locationKind", "roleId", "holder", "recordJson", "snapshotJson")) {
+                entryType.getMethod(accessor).invoke(entry);
+            }
+            Object store = Proxy.newProxyInstance(storeType.getClassLoader(), new Class<?>[] {storeType},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "holderId" -> "lobby-1";
+                        case "load" -> List.of(entry);
+                        default -> null;
+                    });
+            Object facade = runeteria("TameworkApi", api, "portableCompanions");
+            assertEquals(Boolean.TRUE, runeteria("PortableCompanionsApi", facade, "available"));
+
+            Object handle = runeteria("PortableCompanionsApi", facade, "register", types(storeType), store);
+
+            assertEquals(Boolean.TRUE, runeteria("PortableCompanionsApi", facade, "active"));
+            inspector(handle, "close");
+            assertEquals(Boolean.FALSE, runeteria("PortableCompanionsApi", facade, "active"));
+        } finally {
+            sync.close();
+        }
+    }
+
+    @Test
     void runeteriaReadsRequiredContentProfileReadiness() {
         Object profiles = runeteria("TameworkApi", api, "requiredContentProfiles");
 
