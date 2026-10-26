@@ -466,7 +466,7 @@ public final class PortableSync implements AutoCloseable {
         if (!holderId.equals(entry.holder())) {
             if (local.scope() == RecordScope.PORTABLE) {
                 if (PortableEntries.supersedes(entry, local)) {
-                    markElsewhere(local, entry.generation());
+                    markElsewhere(local);
                 } else {
                     queue(local);
                 }
@@ -500,9 +500,13 @@ public final class PortableSync implements AutoCloseable {
         });
     }
 
-    private void markElsewhere(CompanionRecord local, long generation) {
+    /**
+     * Leaves a tombstone at the local generation: a holder of it here (an item, a body) is stale, as it
+     * should be, and a reverted network copy at that generation (see {@link PortableCompanionEntry#replaces})
+     * can still come back.
+     */
+    private void markElsewhere(CompanionRecord local) {
         CompanionIndex.Mutation result = index.update(local.profileId(), local.revision(), b -> b
-                .generation(Math.max(local.generation(), generation))
                 .location(CompanionLocation.released(CAUSE_ELSEWHERE))
                 .currentNpcUuid(null)
                 .summonedUntilMs(0L));

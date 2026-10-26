@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.item.CaptureItemOwnership;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -162,7 +163,7 @@ class PortableSyncTest {
 
         CompanionRecord left = a.index.get(cow);
         assertTrue(PortableSync.isElsewhere(left), "A keeps a tombstone that no longer counts");
-        assertEquals(2L, left.generation(), "the tombstone fences A's older holders");
+        assertTrue(CaptureItemOwnership.isStale(left, 1), "A's old lantern is stale against the tombstone");
         assertNull(a.snapshots.get(cow), "A drops its stale snapshot");
         List<CompanionRecord> counted = a.sync.ownerRecords(ALICE);
         CompanionRecord standIn = counted.stream().filter(r -> r.profileId().equals(cow) && r.isDeployed())
