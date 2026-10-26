@@ -67,7 +67,6 @@ public final class HusbandryYieldResolver {
         double traitBonus = resolveTraitHarvestYieldBonus(npcRef, store, productId);
         return boundedBonus(traitBonus)
                 + boundedBonus(legacyDropDuplicateBonus)
-                + expectedLegacyProviderBonusCopies(modifiers)
                 + boundedBonus(modifiers == null ? 0.0 : modifiers.yieldBonus());
     }
 
@@ -77,8 +76,7 @@ public final class HusbandryYieldResolver {
             @Nullable String productId,
             HusbandryOutcomeModifiers modifiers
     ) {
-        double bonus = expectedLegacyProviderBonusCopies(modifiers)
-                + boundedBonus(modifiers == null ? 0.0 : modifiers.yieldBonus());
+        double bonus = boundedBonus(modifiers == null ? 0.0 : modifiers.yieldBonus());
         if (isMeatOrHideProduct(productId)) {
             bonus += TraitModifierService.resolveSizeMeatHideYieldBonus(npcRef, store);
         }
@@ -221,12 +219,37 @@ public final class HusbandryYieldResolver {
         }, random);
     }
 
-    /** Preserves the historical gated provider-roll expectation without replaying rolls. */
-    public static double expectedLegacyProviderBonusCopies(@Nullable HusbandryOutcomeModifiers modifiers) {
-        HusbandryOutcomeModifiers safe = modifiers == null
-                ? HusbandryOutcomeModifiers.identity() : modifiers;
-        return clampChance(safe.bonusOutputChance())
-                * (1.0 + clampChance(safe.tripleOutputChance()));
+    /**
+     * How many times one harvest or cull batch drops: once, twice when {@code bonusOutputChance} rolls, three times
+     * when {@code tripleOutputChance} rolls on top of that. The yield bonus, traits, size and age scale the batch
+     * first; this roll repeats the finished batch, so it reads as a double rather than a few more items.
+     */
+    public static int rollBatchCopies(@Nullable HusbandryOutcomeModifiers modifiers, @Nullable DoubleSupplier random) {
+        HusbandryOutcomeModifiers safe = modifiers == null ? HusbandryOutcomeModifiers.identity() : modifiers;
+        if (random == null || random.getAsDouble() >= clampChance(safe.bonusOutputChance())) {
+            return 1;
+        }
+        return random.getAsDouble() < clampChance(safe.tripleOutputChance()) ? 3 : 2;
+    }
+
+    /**
+     * One {@link #rollBatchCopies} per harvest or cull, made when the first product asks, so every product of the
+     * batch doubles together.
+     */
+    public static final class BatchRoll {
+        private final DoubleSupplier random;
+        private int copies;
+
+        public BatchRoll(DoubleSupplier random) {
+            this.random = random;
+        }
+
+        public int copies(@Nullable HusbandryOutcomeModifiers modifiers) {
+            if (copies == 0) {
+                copies = rollBatchCopies(modifiers, random);
+            }
+            return copies;
+        }
     }
 
     private static double boundedBonus(double value) {

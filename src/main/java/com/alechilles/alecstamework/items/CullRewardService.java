@@ -101,6 +101,7 @@ final class CullRewardService {
         }
         double[] wearMultiplier = {1.0};
         double age = AnimalProgressionService.slaughterMultiplier(npcRef, store, roleId);
+        HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(random::nextDouble);
         FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
                 stacks,
                 stack -> {
@@ -111,7 +112,7 @@ final class CullRewardService {
                     }
                     wearMultiplier[0] = Math.min(wearMultiplier[0], modifiers.toolWearMultiplier());
                     double bonus = HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
-                    return (1.0 + bonus) * age - 1.0;
+                    return (1.0 + bonus) * age * batch.copies(modifiers) - 1.0;
                 },
                 random::nextDouble);
         output = HusbandryYieldResolver.applyCullConversions(
@@ -147,12 +148,7 @@ final class CullRewardService {
             @Nullable HusbandryOutcomeModifiers modifiers,
             @Nonnull DoubleSupplier random
     ) {
-        HusbandryOutcomeModifiers safe = modifiers == null
-                ? HusbandryOutcomeModifiers.identity() : modifiers;
-        if (!rollChance(safe.bonusOutputChance(), random)) {
-            return 0;
-        }
-        return rollChance(safe.tripleOutputChance(), random) ? 2 : 1;
+        return HusbandryYieldResolver.rollBatchCopies(modifiers, random) - 1;
     }
 
     /**
@@ -224,14 +220,6 @@ final class CullRewardService {
             quantities.merge(itemId, quantity, Integer::sum);
         }
         return new Roll(rewards, quantities);
-    }
-
-    private static boolean rollChance(double chance, @Nonnull DoubleSupplier random) {
-        if (!Double.isFinite(chance)) {
-            return false;
-        }
-        double bounded = Math.max(0.0, Math.min(1.0, chance));
-        return random.getAsDouble() < bounded;
     }
 
     @Nullable

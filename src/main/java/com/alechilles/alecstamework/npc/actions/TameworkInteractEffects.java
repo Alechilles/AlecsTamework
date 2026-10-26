@@ -554,9 +554,11 @@ final class TameworkInteractEffects {
                 npcRef, store, role == null ? null : role.getRoleName(), productId,
                 toolUse == null ? null : toolUse.tool(), player == null ? null : player.getUuid());
         double bonus = modifiers.toolAuthorized()
-                ? HusbandryYieldResolver.harvestYieldBonus(
+                ? (1.0 + HusbandryYieldResolver.harvestYieldBonus(
                         npcRef, store, productId, modifiers,
-                        CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role))
+                        CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role)))
+                        * HusbandryYieldResolver.rollBatchCopies(modifiers, ThreadLocalRandom.current()::nextDouble)
+                        - 1.0
                 : 0.0;
         int requestedCopies = Math.max(0, CompanionOutputService.resolveExpectedQuantity(
                 baseQuantity, bonus, ThreadLocalRandom.current()::nextDouble) - baseQuantity);

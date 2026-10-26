@@ -42,11 +42,28 @@ class HusbandryYieldResolverTest {
     }
 
     @Test
-    void preservesGatedLegacyProviderExpectation() {
-        assertEquals(0.0, HusbandryYieldResolver.expectedLegacyProviderBonusCopies(
-                new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0)));
-        assertEquals(0.75, HusbandryYieldResolver.expectedLegacyProviderBonusCopies(
-                new HusbandryOutcomeModifiers(1.0, 1.0, 0.5, 0.5, 1.0)));
+    void doublesTheWholeBatchOnOneRollInsteadOfAddingFlatYield() {
+        HusbandryOutcomeModifiers modifiers = new HusbandryOutcomeModifiers(1.0, 1.0, 0.25, 0.5, 1.0);
+        // The double chance is a roll on the finished batch, not part of the flat yield.
+        assertEquals(0.0, HusbandryYieldResolver.cullYieldBonus(null, null, "Ingredient_Fabric_Scrap_Wool", modifiers));
+
+        assertEquals(Map.of("Ingredient_Fabric_Scrap_Wool", 4, "Ingredient_Feathers_Light", 2),
+                harvestWithRolls(modifiers, 0.1, 0.9).itemQuantities());   // double: one roll for both products
+        assertEquals(Map.of("Ingredient_Fabric_Scrap_Wool", 6, "Ingredient_Feathers_Light", 3),
+                harvestWithRolls(modifiers, 0.1, 0.2).itemQuantities());   // triple
+        assertEquals(Map.of("Ingredient_Fabric_Scrap_Wool", 2, "Ingredient_Feathers_Light", 1),
+                harvestWithRolls(modifiers, 0.3).itemQuantities());        // no double
+    }
+
+    private static CompanionOutputService.FinalizedOutput harvestWithRolls(
+            HusbandryOutcomeModifiers modifiers, double... rolls) {
+        int[] next = {0};
+        HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(() -> rolls[next[0]++]);
+        return CompanionOutputService.finalizeExpectedQuantity(
+                List.of(new TestItemStack("Ingredient_Fabric_Scrap_Wool", 2),
+                        new TestItemStack("Ingredient_Feathers_Light", 1)),
+                stack -> batch.copies(modifiers) - 1.0,
+                () -> 0.0);
     }
 
     @Test

@@ -96,10 +96,14 @@ cooldown modifiers to their matching husbandry actions. Output modifiers apply
 to harvest and cull results. For `HUSBANDRY_TOOL_CONTEXT`, Tamework resolves
 each existing product independently as `floor(base * max(0, 1 + sum(bonuses)))`
 plus one fractional Bernoulli roll. It never creates a product that the base
-drop did not resolve. Legacy `bonusOutputChance` and `tripleOutputChance` are
-converted to their historical gated-roll expectation, where expected extra
-copies are `bonusOutputChance * (1 + tripleOutputChance)`. New providers must
-return zero for those fields and use `yieldBonus`.
+drop did not resolve. `bonusOutputChance` and `tripleOutputChance` are then a
+real roll, once per harvest or cull: when `bonusOutputChance` succeeds the whole
+finished batch drops twice, and when `tripleOutputChance` also succeeds it drops
+three times. The roll repeats the finished batch, so it also multiplies the
+yield bonus, traits, size and age. One roll covers every product of the action,
+using the chances returned for its first authorized product. Use these fields
+for a chance to double; use `yieldBonus` for a flat increase. Earlier versions
+added `bonusOutputChance * (1 + tripleOutputChance)` to the flat yield instead.
 Standard manual shear and item-cull actions resolve their actual product batch
 before deferred completion. That accepted batch survives actor disconnects and
 later tool changes. A matching moved hotbar tool receives wear; unrelated

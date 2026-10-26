@@ -237,6 +237,8 @@ final class InteractionInventoryEffects {
         DropItemOutcome output;
         if (harvestInteraction) {
             HusbandryHarvestUseContext.CapturedUse toolUse = HusbandryHarvestUseContext.current(npcRef, store);
+            HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
+                    ThreadLocalRandom.current()::nextDouble);
             CompanionOutputService.FinalizedOutput finalized = CompanionOutputService.finalizeExpectedQuantity(
                     drops,
                     stack -> {
@@ -244,10 +246,11 @@ final class InteractionInventoryEffects {
                                 npcRef, store, role == null ? null : role.getRoleName(), stack.getItemId(),
                                 toolUse.tool(), toolUse.actorId());
                         return modifiers.toolAuthorized()
-                                ? HusbandryYieldResolver.harvestYieldBonus(
+                                ? (1.0 + HusbandryYieldResolver.harvestYieldBonus(
                                         npcRef, store, stack.getItemId(), modifiers,
                                         CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(
-                                                npcRef, store, role))
+                                                npcRef, store, role)))
+                                        * batch.copies(modifiers) - 1.0
                                 : -1.0;
                     },
                     ThreadLocalRandom.current()::nextDouble);

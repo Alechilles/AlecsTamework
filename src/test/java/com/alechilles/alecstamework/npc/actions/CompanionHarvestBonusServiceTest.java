@@ -60,14 +60,6 @@ class CompanionHarvestBonusServiceTest {
     }
 
     @Test
-    void legacyProviderExpectationKeepsTripleConditionalOnPrimary() {
-        assertEquals(0.0, CompanionHarvestBonusService.expectedLegacyProviderBonusCopies(
-                new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0)));
-        assertEquals(0.75, CompanionHarvestBonusService.expectedLegacyProviderBonusCopies(
-                new HusbandryOutcomeModifiers(1.0, 1.0, 0.5, 0.5, 1.0)));
-    }
-
-    @Test
     void legacyTraitExpectationAppliesOnlyInDropDuplicateMode() {
         assertEquals(0.25,
                 CompanionHarvestBonusService.expectedDropDuplicateYieldBonus("DropDuplicate", 1.25));

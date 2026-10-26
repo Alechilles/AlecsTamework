@@ -18,6 +18,9 @@
 
 ### Changed
 
+- A husbandry provider's `bonusOutputChance` and `tripleOutputChance` are now a real roll on each harvest and cull:
+  the whole finished batch drops twice (three times with the triple chance) instead of a small flat yield increase.
+  Because the double repeats the finished batch, it now multiplies tool, trait, size and age bonuses too.
 - Culling an animal from the command menu now gives the same cull rewards as a knife cull when its family has
   managed cull rewards, and counts as a cull for other mods.
 

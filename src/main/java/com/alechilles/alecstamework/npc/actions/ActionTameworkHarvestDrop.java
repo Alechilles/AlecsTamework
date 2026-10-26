@@ -71,6 +71,8 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
+        HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
         FinalizedOutput output = preparedOutput != null ? preparedOutput
                 : CompanionOutputService.finalizeExpectedQuantity(
                         baseDrops,
@@ -80,9 +82,10 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                                     usesCapturedTool ? toolUse.tool() : null,
                                     usesCapturedTool ? toolUse.actorId() : null);
                             return modifiers.toolAuthorized()
-                                    ? HusbandryYieldResolver.harvestYieldBonus(
+                                    ? (1.0 + HusbandryYieldResolver.harvestYieldBonus(
                                             ref, store, stack.getItemId(), modifiers,
-                                            CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(ref, store, role))
+                                            CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(ref, store, role)))
+                                            * batch.copies(modifiers) - 1.0
                                     : -1.0;
                         },
                         java.util.concurrent.ThreadLocalRandom.current()::nextDouble

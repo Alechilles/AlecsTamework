@@ -83,17 +83,7 @@ final class CompanionHarvestBonusService {
                                   @Nullable HusbandryOutcomeModifiers modifiers,
                                   @Nonnull DoubleSupplier random) {
         int copies = traitDuplicate ? 1 : 0;
-        HusbandryOutcomeModifiers safe = modifiers == null
-                ? HusbandryOutcomeModifiers.identity() : modifiers;
-        if (rollChance(safe.bonusOutputChance(), random)) {
-            copies += rollChance(safe.tripleOutputChance(), random) ? 2 : 1;
-        }
-        return copies;
-    }
-
-    /** Expected additional copies from the legacy gated provider rolls. */
-    static double expectedLegacyProviderBonusCopies(@Nullable HusbandryOutcomeModifiers modifiers) {
-        return HusbandryYieldResolver.expectedLegacyProviderBonusCopies(modifiers);
+        return copies + HusbandryYieldResolver.rollBatchCopies(modifiers, random) - 1;
     }
 
     /** Expected legacy trait bonus when the role is configured for duplicate output. */
@@ -193,18 +183,6 @@ final class CompanionHarvestBonusService {
         }
         double chance = Math.max(0.0, Math.min(1.0, multiplier - 1.0));
         return chance > 0.0 && random.getAsDouble() < chance;
-    }
-
-    private static boolean rollChance(double chance, @Nonnull DoubleSupplier random) {
-        double bounded = clampChance(chance);
-        return random.getAsDouble() < bounded;
-    }
-
-    private static double clampChance(double chance) {
-        if (!Double.isFinite(chance)) {
-            return 0.0;
-        }
-        return Math.max(0.0, Math.min(1.0, chance));
     }
 
     private static double resolveHarvestMultiplier(@Nullable Ref<EntityStore> npcRef,

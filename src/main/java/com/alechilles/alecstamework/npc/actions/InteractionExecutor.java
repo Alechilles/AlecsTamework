@@ -504,6 +504,8 @@ final class InteractionExecutor {
             return use;
         }
         List<ItemStack> baseDrops = itemModule.getRandomItemDrops(dropList);
+        HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
         CompanionOutputService.FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
                 baseDrops,
                 stack -> {
@@ -511,9 +513,10 @@ final class InteractionExecutor {
                             npcRef, store, role == null ? null : role.getRoleName(), stack.getItemId(),
                             use.tool(), use.actorId());
                     return productModifiers.toolAuthorized()
-                            ? HusbandryYieldResolver.harvestYieldBonus(
+                            ? (1.0 + HusbandryYieldResolver.harvestYieldBonus(
                                     npcRef, store, stack.getItemId(), productModifiers,
-                                    CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role))
+                                    CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role)))
+                                    * batch.copies(productModifiers) - 1.0
                             : -1.0;
                 },
                 java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
