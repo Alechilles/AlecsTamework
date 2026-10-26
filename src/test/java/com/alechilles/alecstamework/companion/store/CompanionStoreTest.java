@@ -68,22 +68,24 @@ class CompanionStoreTest {
     }
 
     @Test
-    void storedAndOwnedItemRecordsGoToThePortableSectionAndEverythingElseStaysWorldBound() throws Exception {
+    void storedAndOwnedItemDeadAndLostRecordsGoToThePortableSectionAndEverythingElseStaysWorldBound()
+            throws Exception {
         CompanionRecord stored = record(ALICE, 0, CompanionLocation.stored(StoredReason.ROSTER));
         CompanionRecord ownedItem = record(ALICE, 0, CompanionLocation.item());
+        CompanionRecord dead = record(ALICE, 0, CompanionLocation.dead("fall"));
+        CompanionRecord lost = record(ALICE, 0, CompanionLocation.lost("gone"));
         List<CompanionRecord> worldBound = List.of(
                 record(ALICE, 0),
                 record(ALICE, 0, CompanionLocation.coop("default", 1, 2, 3, 0)),
-                record(ALICE, 0, CompanionLocation.dead("fall")),
-                record(ALICE, 0, CompanionLocation.lost("gone")),
                 record(ALICE, 0, CompanionLocation.released("freed")),
                 record(null, 0, CompanionLocation.item()));
-        List<CompanionRecord> all = new java.util.ArrayList<>(List.of(stored, ownedItem));
+        List<CompanionRecord> all = new java.util.ArrayList<>(List.of(stored, ownedItem, dead, lost));
         all.addAll(worldBound);
 
         store().writeOwner(CompanionStore.ownerKey(ALICE), 1, all, List.of()).join();
 
-        assertEquals(List.of(stored.profileId(), ownedItem.profileId()), section(ALICE, "Portable"));
+        assertEquals(List.of(stored.profileId(), ownedItem.profileId(), dead.profileId(), lost.profileId()),
+                section(ALICE, "Portable"));
         assertEquals(worldBound.stream().map(CompanionRecord::profileId).toList(), section(ALICE, "WorldBound"));
         assertEquals(all.size(), store().loadAll().records().size());
     }
