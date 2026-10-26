@@ -22,14 +22,14 @@ final class PortableEntries {
     private PortableEntries() {
     }
 
-    /** The entry for {@code record}; {@code holder} names this server for a world-bound record. */
+    /** The entry for {@code record}, written by this server ({@code holder}). */
     @Nonnull
     static PortableCompanionEntry entry(@Nonnull CompanionRecord record, @Nullable SnapshotEnvelope snapshot,
                                         @Nonnull String holder) {
         boolean portable = record.scope() == RecordScope.PORTABLE;
         return new PortableCompanionEntry(record.profileId(), record.ownerUuid(), record.generation(),
                 record.updatedAtMs(), portable, record.location().kind().name(), record.roleId(),
-                portable ? null : holder, CompanionRecordBson.encode(record).toJson(JSON),
+                holder, CompanionRecordBson.encode(record).toJson(JSON),
                 portable && snapshot != null ? snapshot.toBson().toJson(JSON) : null);
     }
 

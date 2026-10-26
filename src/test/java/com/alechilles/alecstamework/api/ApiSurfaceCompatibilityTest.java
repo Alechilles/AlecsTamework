@@ -289,7 +289,7 @@ class ApiSurfaceCompatibilityTest {
                 java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         com.alechilles.alecstamework.companion.network.PortableSync sync =
                 new com.alechilles.alecstamework.companion.network.PortableSync(index,
-                        id -> CompletableFuture.completedFuture(null), snapshot -> { }, id -> { }, executor,
+                        id -> null, snapshot -> { }, id -> { }, executor,
                         () -> 1_000L);
         try {
             ((IndexTameworkApi) api).usePortableCompanions(

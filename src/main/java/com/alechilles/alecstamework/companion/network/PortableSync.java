@@ -27,7 +27,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -39,7 +38,9 @@ import javax.annotation.Nullable;
  *
  * <ul>
  * <li><b>Push.</b> A change to an owned record is pushed once the writer has written its owner
- * file, so a commit that is later reverted never leaves the server. Portable records go with their
+ * file, so a commit whose write failed never leaves the server. Every entry names this server as
+ * its writer, and a store lets a writer replace its own row even with a lower generation, so a
+ * commit reverted after its write (a failed spawn) is corrected too. Portable records go with their
  * snapshot; world-bound records go without one, and only when something that counts toward limits
  * changed (not every position update). When a store is installed every owned record is pushed once,
  * so the store learns what this server holds.</li>
@@ -52,9 +53,10 @@ import javax.annotation.Nullable;
  * stand-in records ({@link #ownerRecords}), so owner limits count the whole network.</li>
  * </ul>
  *
- * <p>Every store call runs on the single {@code tamework-portable-store} thread. The index listener
- * and the writer listener only record ids and records. Failures keep the work queued and retry with
- * backoff from 1 s to 30 s. Durability is best effort, like the rest of the store.</p>
+ * <p>Every store call and every snapshot read runs on the single {@code tamework-portable-store}
+ * thread. The index listener and the writer listener only record ids and records. Failures keep the
+ * work queued and retry with backoff from 1 s to 30 s. Durability is best effort, like the rest of
+ * the store.</p>
  */
 public final class PortableSync implements AutoCloseable {
     /** The cause of a tombstone left for a companion that another server holds now. */
@@ -62,14 +64,20 @@ public final class PortableSync implements AutoCloseable {
     static final long PUSH_INTERVAL_MS = 500L;
     static final int PUSH_BATCH = 100;
     static final long MAX_BACKOFF_MS = 30_000L;
-    static final long SNAPSHOT_WAIT_MS = 5_000L;
     static final long REFRESH_TIMEOUT_MS = 3_000L;
     private static final long[] LOAD_RETRY_MS = {5_000L, 15_000L, 30_000L};
     private static final long WARN_INTERVAL_MS = 60_000L;
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
+    /** Reads a profile's latest snapshot, blocking; null when there is none. Called on the store thread only. */
+    @FunctionalInterface
+    public interface SnapshotReader {
+        @Nullable
+        SnapshotEnvelope read(@Nonnull UUID profileId) throws Exception;
+    }
+
     private final CompanionIndex index;
-    private final Function<UUID, CompletableFuture<SnapshotEnvelope>> readSnapshot;
+    private final SnapshotReader readSnapshot;
     private final Consumer<SnapshotEnvelope> queueSnapshot;
     private final Consumer<UUID> deleteSnapshot;
     private final ScheduledExecutorService executor;
@@ -83,21 +91,21 @@ public final class PortableSync implements AutoCloseable {
     private final Map<UUID, CompanionRecord> outbox = new LinkedHashMap<>();
     /** Owner to the stand-ins for their companions held in other servers' worlds. */
     private final Map<UUID, Map<UUID, CompanionRecord>> elsewhere = new ConcurrentHashMap<>();
-    private final ThreadLocal<Boolean> applying = ThreadLocal.withInitial(() -> false);
+    /** Owners whose entries were read since they joined: this server's copies of them are current. */
+    private final Set<UUID> loadedOwners = ConcurrentHashMap.newKeySet();
     private long backoffMs;
     private long nextPushAtMs;
     private long nextWarnAtMs = Long.MIN_VALUE;
     private volatile boolean closed;
 
     /**
-     * @param readSnapshot   the profile's latest snapshot, off the caller's thread; null when there is none
+     * @param readSnapshot   the profile's latest snapshot (the writer's pending one first, then the file)
      * @param queueSnapshot  hands a snapshot to the writer (before the record change that uses it)
      * @param deleteSnapshot queues the delete of a profile's snapshot
      * @param executor       a dedicated single-thread executor, owned by this object
      * @param clock          wall clock
      */
-    public PortableSync(@Nonnull CompanionIndex index,
-                        @Nonnull Function<UUID, CompletableFuture<SnapshotEnvelope>> readSnapshot,
+    public PortableSync(@Nonnull CompanionIndex index, @Nonnull SnapshotReader readSnapshot,
                         @Nonnull Consumer<SnapshotEnvelope> queueSnapshot, @Nonnull Consumer<UUID> deleteSnapshot,
                         @Nonnull ScheduledExecutorService executor, @Nonnull LongSupplier clock) {
         this.index = Objects.requireNonNull(index, "index");
@@ -165,9 +173,12 @@ public final class PortableSync implements AutoCloseable {
 
     // --- push -------------------------------------------------------------------------------
 
-    /** Index after-unlock listener: notes a change that the network must hear about. */
+    /**
+     * Index after-unlock listener: notes a change that the network must hear about. A copy just taken
+     * from the store comes back here too; pushing it again is harmless (the store keeps the row as it is).
+     */
     public void onRecordChanged(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
-        if (store == null || applying.get() || !mustPush(before, after)) {
+        if (store == null || !mustPush(before, after)) {
             return;
         }
         synchronized (lock) {
@@ -229,7 +240,10 @@ public final class PortableSync implements AutoCloseable {
         }
     }
 
-    /** Sends up to {@code max} queued records; returns how many were sent. Runs on the executor thread. */
+    /**
+     * Sends up to {@code max} queued records; returns how many left the outbox (sent, or dropped as
+     * superseded). Runs on the executor thread.
+     */
     int push(int max) {
         PortableCompanionStore target = store;
         if (target == null || clock.getAsLong() < nextPushAtMs) {
@@ -256,11 +270,7 @@ public final class PortableSync implements AutoCloseable {
             }
             SnapshotEnvelope snapshot;
             try {
-                snapshot = readSnapshot.apply(record.profileId()).get(SNAPSHOT_WAIT_MS, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                retry.put(record.profileId(), record);
-                continue;
+                snapshot = readSnapshot.read(record.profileId());
             } catch (Exception unreadable) {
                 // Never send a portable copy without its snapshot: the other server would lose it.
                 retry.put(record.profileId(), record);
@@ -290,7 +300,13 @@ public final class PortableSync implements AutoCloseable {
                 retry.forEach(outbox::putIfAbsent);
             }
         }
-        return entries.size();
+        return batch.size() - retry.size();
+    }
+
+    private int outboxSize() {
+        synchronized (lock) {
+            return outbox.size();
+        }
     }
 
     // --- pull -------------------------------------------------------------------------------
@@ -298,9 +314,18 @@ public final class PortableSync implements AutoCloseable {
     /** Reads an owner's entries in the background (call when they join). */
     public void ownerJoined(@Nonnull UUID owner) {
         Objects.requireNonNull(owner, "owner");
+        loadedOwners.remove(owner);
         if (active()) {
             submitLoad(owner, 0);
         }
+    }
+
+    /**
+     * The owner left this server: their copies here may fall behind until they join again, so a
+     * restore of them needs a working store from now on (see {@link #refresh}).
+     */
+    public void ownerLeft(@Nonnull UUID owner) {
+        loadedOwners.remove(Objects.requireNonNull(owner, "owner"));
     }
 
     private void submitLoad(UUID owner, int attempt) {
@@ -364,20 +389,23 @@ public final class PortableSync implements AutoCloseable {
                 queue(record);
             }
         }
+        loadedOwners.add(owner);
     }
 
     /**
      * Reads one profile from the store and applies it, so a restore starts from the network's latest
-     * copy. Completes normally once done, on failure, after {@link #REFRESH_TIMEOUT_MS}, or at once
-     * without a store; the caller goes on with whatever the index holds then.
+     * copy. Completes with true when the index is safe to restore from: the store answered (within
+     * {@link #REFRESH_TIMEOUT_MS}), no store is installed, or the store did not answer but this server
+     * read the owner's entries since they joined (only the server they are on changes their portable
+     * companions). False otherwise: the restore must wait, or two servers could each restore a copy.
      */
     @Nonnull
-    public CompletableFuture<Void> refresh(@Nonnull UUID profileId) {
+    public CompletableFuture<Boolean> refresh(@Nonnull UUID profileId) {
         Objects.requireNonNull(profileId, "profileId");
         if (!active()) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.completedFuture(true);
         }
-        CompletableFuture<Void> done = new CompletableFuture<>();
+        CompletableFuture<Boolean> done = new CompletableFuture<>();
         try {
             executor.execute(() -> {
                 try {
@@ -385,16 +413,23 @@ public final class PortableSync implements AutoCloseable {
                     if (source != null) {
                         apply(source.load(null, List.of(profileId)), source.holderId());
                     }
+                    done.complete(true);
                 } catch (Exception failure) {
                     warn("The network store could not be read for companion " + profileId, failure);
-                } finally {
-                    done.complete(null);
+                    done.complete(currentHere(profileId));
                 }
             });
         } catch (RejectedExecutionException shutDown) {
-            done.complete(null);
+            done.complete(currentHere(profileId));
         }
-        return done.completeOnTimeout(null, REFRESH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        return done.completeOnTimeout(null, REFRESH_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .thenApply(fresh -> fresh != null ? fresh : currentHere(profileId));
+    }
+
+    /** True when this server's copy of the profile is current without asking the store. */
+    private boolean currentHere(UUID profileId) {
+        CompanionRecord record = index.get(profileId);
+        return record != null && record.ownerUuid() != null && loadedOwners.contains(record.ownerUuid());
     }
 
     /**
@@ -417,9 +452,8 @@ public final class PortableSync implements AutoCloseable {
 
     private void applyOne(PortableCompanionEntry entry, String holderId) {
         CompanionRecord local = index.get(entry.profileId());
-        boolean localFollows = local != null && (local.scope() == RecordScope.PORTABLE || isElsewhere(local));
         if (entry.portable()) {
-            if (local == null || localFollows && PortableEntries.supersedes(entry, local)) {
+            if (takesNetworkCopy(local, entry)) {
                 adopt(entry);
             } else if (local.scope() == RecordScope.PORTABLE && PortableEntries.supersedes(local, entry)) {
                 queue(local);
@@ -442,43 +476,38 @@ public final class PortableSync implements AutoCloseable {
         }
     }
 
+    /** Whether a portable network copy replaces the local record: none here, or an older one that follows. */
+    private static boolean takesNetworkCopy(@Nullable CompanionRecord local, PortableCompanionEntry entry) {
+        return local == null || (local.scope() == RecordScope.PORTABLE || isElsewhere(local))
+                && PortableEntries.supersedes(entry, local);
+    }
+
     private void adopt(PortableCompanionEntry entry) {
         CompanionRecord incoming = PortableEntries.record(entry);
         SnapshotEnvelope snapshot = PortableEntries.snapshot(entry);
-        applying.set(true);
-        try {
-            // One locked step: a local change that raced ahead keeps both its record and its snapshot.
-            index.atomically(() -> {
-                CompanionRecord now = index.get(incoming.profileId());
-                if (now != null && now.generation() > incoming.generation()) {
-                    return null;
-                }
-                // The snapshot is queued before the record that uses it (the writer's contract).
-                if (snapshot != null) {
-                    queueSnapshot.accept(snapshot);
-                } else {
-                    deleteSnapshot.accept(incoming.profileId());
-                }
-                return index.adopt(incoming);
-            });
-        } finally {
-            applying.set(false);
-        }
+        // One locked step: a local change that raced ahead keeps both its record and its snapshot.
+        index.atomically(() -> {
+            if (!takesNetworkCopy(index.get(incoming.profileId()), entry)) {
+                return null;
+            }
+            // The snapshot is queued before the record that uses it (the writer's contract).
+            if (snapshot != null) {
+                queueSnapshot.accept(snapshot);
+            } else {
+                deleteSnapshot.accept(incoming.profileId());
+            }
+            return index.adopt(incoming);
+        });
     }
 
     private void markElsewhere(CompanionRecord local, long generation) {
-        applying.set(true);
-        try {
-            CompanionIndex.Mutation result = index.update(local.profileId(), local.revision(), b -> b
-                    .generation(Math.max(local.generation(), generation))
-                    .location(CompanionLocation.released(CAUSE_ELSEWHERE))
-                    .currentNpcUuid(null)
-                    .summonedUntilMs(0L));
-            if (result.applied()) {
-                deleteSnapshot.accept(local.profileId());
-            }
-        } finally {
-            applying.set(false);
+        CompanionIndex.Mutation result = index.update(local.profileId(), local.revision(), b -> b
+                .generation(Math.max(local.generation(), generation))
+                .location(CompanionLocation.released(CAUSE_ELSEWHERE))
+                .currentNpcUuid(null)
+                .summonedUntilMs(0L));
+        if (result.applied()) {
+            deleteSnapshot.accept(local.profileId());
         }
     }
 
@@ -541,8 +570,9 @@ public final class PortableSync implements AutoCloseable {
     // --- lifecycle --------------------------------------------------------------------------
 
     /**
-     * Sends what is queued within {@code timeoutMs}, then stops. Best effort: what is left is pushed by
-     * the next start's first push. Never call it on a world thread.
+     * Sends what is queued within {@code timeoutMs}, then stops. Call it after the writer's final
+     * flush: snapshots are read from their files on this object's own thread. Best effort: what is
+     * left is pushed by the next start's first push. Never call it on a world thread.
      */
     public void shutdown(long timeoutMs) {
         if (closed) {
@@ -551,12 +581,11 @@ public final class PortableSync implements AutoCloseable {
         try {
             Future<?> last = executor.submit(() -> {
                 nextPushAtMs = 0L;
-                while (push(PUSH_BATCH) > 0) {
-                    // Keep sending until the outbox is empty or a save fails.
-                    if (nextPushAtMs != 0L) {
-                        break;
-                    }
-                }
+                int sent;
+                do {
+                    sent = push(PUSH_BATCH);
+                    // Until the outbox is empty, a save fails, or nothing more can be sent.
+                } while (sent > 0 && nextPushAtMs == 0L && outboxSize() > 0);
             });
             last.get(Math.max(0L, timeoutMs), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
@@ -566,6 +595,10 @@ public final class PortableSync implements AutoCloseable {
                     + " the next start sends them");
         } finally {
             close();
+        }
+        if (outboxSize() > 0) {
+            LOGGER.at(Level.WARNING).log("%d companions were not sent to the network store before shutdown;"
+                    + " the next start sends them", outboxSize());
         }
     }
 

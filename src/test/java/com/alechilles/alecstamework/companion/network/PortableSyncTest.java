@@ -66,7 +66,7 @@ class PortableSyncTest {
                         throw new IllegalStateException("store down");
                     }
                     for (PortableCompanionEntry entry : entries) {
-                        rows.merge(entry.profileId(), entry, (old, next) -> next.supersedes(old) ? next : old);
+                        rows.merge(entry.profileId(), entry, (old, next) -> next.replaces(old) ? next : old);
                     }
                 }
             };
@@ -88,8 +88,12 @@ class PortableSyncTest {
             ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
             executors.add(executor);
             sync = new PortableSync(index,
-                    profileId -> snapshotReadsFail ? CompletableFuture.failedFuture(new IllegalStateException("disk"))
-                            : CompletableFuture.completedFuture(snapshots.get(profileId)),
+                    profileId -> {
+                        if (snapshotReadsFail) {
+                            throw new IllegalStateException("disk");
+                        }
+                        return snapshots.get(profileId);
+                    },
                     snapshot -> snapshots.put(snapshot.profileId(), snapshot), snapshots::remove,
                     executor, CLOCK::get);
             index.addAfterUnlockListener(sync::onRecordChanged);
@@ -239,9 +243,48 @@ class PortableSyncTest {
         a.sync.push(100);
 
         assertTrue(b.sync.mayBeBehind(b.index.get(cow), 2));
-        b.sync.refresh(cow).get(5, TimeUnit.SECONDS);
+        assertTrue(b.sync.refresh(cow).get(5, TimeUnit.SECONDS));
 
         assertEquals(2L, b.index.get(cow).generation());
         assertFalse(b.sync.mayBeBehind(b.index.get(cow), 2));
+    }
+
+    @Test
+    void aServerUndoesItsOwnCommitWhenItRevertsItAfterTheWrite() {
+        Server a = new Server("A");
+        UUID cow = UUID.randomUUID();
+        CompanionRecord inLantern = a.capture(cow, 1);
+        a.written();
+        a.sync.push(100);
+        // The release commits and is written, then the spawn fails and the release is reverted.
+        a.release(cow);
+        a.written();
+        a.sync.push(100);
+        assertEquals(2L, network.rows.get(cow).generation());
+        CompanionRecord released = a.index.get(cow);
+        a.index.revert(cow, released.revision(), inLantern);
+        a.written();
+        a.sync.push(100);
+
+        assertEquals(1L, network.rows.get(cow).generation(), "the network follows A back to the lantern");
+        assertTrue(network.rows.get(cow).portable());
+    }
+
+    @Test
+    void aRestoreWaitsWhenTheNetworkCannotBeReadUnlessTheOwnerWasReadHereSinceJoining() throws Exception {
+        Server a = new Server("A");
+        UUID cow = UUID.randomUUID();
+        a.capture(cow, 1);
+        network.down = true;
+
+        assertFalse(a.sync.refresh(cow).get(5, TimeUnit.SECONDS), "this copy may be behind another server's");
+
+        network.down = false;
+        a.sync.ownerJoined(ALICE);   // the join's read, in the background
+        assertTrue(a.sync.refresh(cow).get(5, TimeUnit.SECONDS));
+        network.down = true;
+        assertTrue(a.sync.refresh(cow).get(5, TimeUnit.SECONDS), "read since the owner joined: current here");
+        a.sync.ownerLeft(ALICE);
+        assertFalse(a.sync.refresh(cow).get(5, TimeUnit.SECONDS), "once they left, no longer");
     }
 }

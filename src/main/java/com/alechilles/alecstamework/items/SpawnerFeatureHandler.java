@@ -1301,6 +1301,9 @@ public final class SpawnerFeatureHandler {
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
             case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
                     showPopulationLimit(player, outcome.messageKey());
+            // The network's copy could not be read: the item stays as it is.
+            case CONFLICT -> warn(player, RestoreFlow.ARRIVING_MESSAGE_KEY.equals(outcome.messageKey())
+                    ? "releaseArriving" : "releaseFailed");
             default -> warn(player, "releaseFailed");
         }
     }

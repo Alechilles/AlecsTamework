@@ -12,13 +12,14 @@ import javax.annotation.Nullable;
  * capture item, stored (roster, bonded, timed, provisioned), dead or lost. It carries the record
  * and the latest snapshot, which Tamework encodes and reads back; a store keeps both as opaque text.
  * A <b>world-bound</b> entry ({@code portable} false) is held in one server's world (out in the
- * world, in a coop, or released). It carries the record only and names that server in
- * {@code holder}, so other servers can count it toward the owner's limits.</p>
+ * world, in a coop, or released). It carries the record only, so other servers can count it toward
+ * the owner's limits.</p>
  *
  * <p>Entries are ordered by {@code generation}, then {@code version} (the record's wall-clock
  * {@code updatedAtMs}): every holder change raises the generation, so moves are always ordered,
- * and an edit within one generation goes to the later clock. A store keeps, per profile, only the
- * entry that {@link #supersedes} every other it was given.</p>
+ * and an edit within one generation goes to the later clock. A store keeps, per profile, the
+ * newest entry it was given, except that the server that wrote the stored entry may always
+ * replace it ({@link #replaces}): that is how a commit it reverted after writing it is undone.</p>
  *
  * @param profileId    the companion's stable id
  * @param ownerUuid    the owner, or null for an unowned companion
@@ -28,8 +29,8 @@ import javax.annotation.Nullable;
  * @param locationKind where the companion is: {@code LIVE}, {@code ITEM}, {@code COOP}, {@code STORED},
  *                     {@code DEAD}, {@code LOST} or {@code RELEASED}
  * @param roleId       the companion's NPC role
- * @param holder       for a world-bound entry, the {@link PortableCompanionStore#holderId()} of the
- *                     server whose world holds it; null for a portable entry
+ * @param holder       the {@link PortableCompanionStore#holderId()} of the server that wrote the
+ *                     entry; for a world-bound entry, the server whose world holds it
  * @param recordJson   the encoded record; Tamework writes and reads it, a store keeps it as text
  * @param snapshotJson the encoded snapshot of a portable entry, or null when it has none
  */
@@ -55,9 +56,17 @@ public record PortableCompanionEntry(
         }
     }
 
-    /** True when this entry replaces {@code other}: a higher generation, or the same one and a later version. */
+    /** True when this entry is newer than {@code other}: a higher generation, or the same one and a later version. */
     public boolean supersedes(@Nonnull PortableCompanionEntry other) {
         return supersedes(generation, version, other.generation, other.version);
+    }
+
+    /**
+     * The store's rule: true when this entry replaces the stored one, because it {@link #supersedes} it or
+     * comes from the server that wrote it ({@code holder} equal and not null).
+     */
+    public boolean replaces(@Nonnull PortableCompanionEntry stored) {
+        return supersedes(stored) || holder != null && holder.equals(stored.holder);
     }
 
     /**

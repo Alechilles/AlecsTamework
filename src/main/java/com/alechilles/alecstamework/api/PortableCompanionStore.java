@@ -33,9 +33,10 @@ public interface PortableCompanionStore {
             throws Exception;
 
     /**
-     * Stores each entry that {@link PortableCompanionEntry#supersedes supersedes} the entry stored for
-     * its profile, or has none, replacing it whole; others are skipped without an error. Each entry
-     * must be compared and written in one atomic step, because other servers write too.
+     * Stores each entry that {@link PortableCompanionEntry#replaces replaces} the entry stored for its
+     * profile (it is newer, or the stored one has the same {@code holder}), or has none, replacing it
+     * whole; others are skipped without an error. Each entry must be compared and written in one
+     * atomic step, because other servers write too.
      */
     void save(@Nonnull List<PortableCompanionEntry> entries) throws Exception;
 }

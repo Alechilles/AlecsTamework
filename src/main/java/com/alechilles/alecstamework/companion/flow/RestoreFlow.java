@@ -143,7 +143,7 @@ public final class RestoreFlow<R> {
     private final LongSupplier clock;
     private final ProviderAdmission providers;
     private final CompanionAdmissionGate.Check admission;
-    @Nullable private volatile Function<UUID, CompletableFuture<Void>> portableRefresh;
+    @Nullable private volatile Function<UUID, CompletableFuture<Boolean>> portableRefresh;
 
     /** A flow with no admission providers; {@code admission} is the built-in caps only. */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -195,26 +195,31 @@ public final class RestoreFlow<R> {
         return restoreOutcome(request).thenApply(Outcome::result);
     }
 
+    /** Message key of a restore refused because the network's copy could not be read. */
+    public static final String ARRIVING_MESSAGE_KEY = "tamework.ui.notifications.spawner.releaseArriving";
+
     /**
      * Server networks: before a companion that follows its owner (a portable record, or one this
      * server does not know) is restored, {@code refresh} reads the network's copy of that profile into
-     * the index, so a restore never starts from a copy another server has moved on from. It must
-     * complete normally once done or given up; the restore then uses whatever the index holds.
+     * the index, so a restore never starts from a copy another server has moved on from. It completes
+     * with true when the index may be restored from, and false when it may be behind: the restore is
+     * then refused with {@link Result#CONFLICT} and {@link #ARRIVING_MESSAGE_KEY}, and nothing changes.
      */
-    public void usePortableRefresh(@Nonnull Function<UUID, CompletableFuture<Void>> refresh) {
+    public void usePortableRefresh(@Nonnull Function<UUID, CompletableFuture<Boolean>> refresh) {
         portableRefresh = Objects.requireNonNull(refresh, "refresh");
     }
 
     /** As {@link #restore(Request)}, with the message key of a population refusal. */
     @Nonnull
     public CompletableFuture<Outcome> restoreOutcome(@Nonnull Request request) {
-        Function<UUID, CompletableFuture<Void>> refresh = portableRefresh;
+        Function<UUID, CompletableFuture<Boolean>> refresh = portableRefresh;
         CompanionRecord current = index.get(request.profileId());
         if (refresh == null || current != null && current.scope() != RecordScope.PORTABLE) {
             return restoreLocal(request);
         }
         return refresh.apply(request.profileId())
-                .handle((ignored, error) -> restoreLocal(request))
+                .handle((fresh, error) -> error == null && Boolean.TRUE.equals(fresh) ? restoreLocal(request)
+                        : CompletableFuture.completedFuture(new Outcome(Result.CONFLICT, ARRIVING_MESSAGE_KEY)))
                 .thenCompose(outcome -> outcome);
     }
 

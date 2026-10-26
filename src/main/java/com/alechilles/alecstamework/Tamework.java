@@ -881,9 +881,9 @@ public class Tamework extends JavaPlugin {
                                     admissionGate::deny, module.index()::fileRecords, bondedFamilies),
                             // A leftover 4.x body is never captured into a second record (plan 7 R14).
                             companionLegacyBody),
-                    restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.production(),
+                    restoreFlow, new HytaleCaptureDelivery(module.index(), CompanionSnapshots.leavingWorld(),
                             module.writer()::queueSnapshot),
-                    CompanionSnapshots.production(), new CompanionSummaries(new HytaleSummarySources()),
+                    CompanionSnapshots.leavingWorld(), new CompanionSummaries(new HytaleSummarySources()),
                     admissionGate, commandItemRegistry, apiEventBus::publishPersistenceEvent, bondedFamilies,
                     // A 2.x capture item gets its record and stored state on its first release (plan 7 R18).
                     new com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption(module.index(),
@@ -1567,8 +1567,8 @@ public class Tamework extends JavaPlugin {
      * store through {@code portableCompanions()}. Its thread is stopped in the -28 shutdown handler.
      */
     private PortableSync startPortableSync(CompanionPersistenceModule module) {
-        PortableSync sync = new PortableSync(module.index(), module::readSnapshot, module.writer()::queueSnapshot,
-                module.writer()::queueSnapshotDelete,
+        PortableSync sync = new PortableSync(module.index(), module::readSnapshotBlocking,
+                module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete,
                 java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "tamework-portable-store");
                     thread.setDaemon(true);
@@ -1592,6 +1592,22 @@ public class Tamework extends JavaPlugin {
                             }
                         },
                         "network companion load on connect"
+                )
+        );
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "portable-companions-disconnect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            java.util.UUID owner = event == null || event.getPlayerRef() == null
+                                    ? null : event.getPlayerRef().getUuid();
+                            if (owner != null) {
+                                sync.ownerLeft(owner);
+                            }
+                        },
+                        "network companion owner left"
                 )
         );
         return sync;
@@ -1687,7 +1703,7 @@ public class Tamework extends JavaPlugin {
      */
     private static StoreFlow<Ref<EntityStore>> createStoreFlow(CompanionPersistenceModule module) {
         return new StoreFlow<>(module.index(), module.loaded(),
-                new HytaleStoreCapture(CompanionSnapshots.production(),
+                new HytaleStoreCapture(CompanionSnapshots.leavingWorld(),
                         new CompanionSummaries(new HytaleSummarySources())),
                 module::readSnapshot, (profileId, snapshot) -> module.writer().queueSnapshot(snapshot),
                 module.writer()::flushNow, (profileId, body) -> CompanionBodies.removeOnOwnWorld(body),
@@ -1890,7 +1906,7 @@ public class Tamework extends JavaPlugin {
         CompanionBodyLifecycle lifecycle = new CompanionBodyLifecycle(
                 module.index(), module.writer(), module.loaded(),
                 TameworkCompanionComponent.getComponentType(),
-                CompanionSnapshots.production(),
+                CompanionSnapshots.leavingWorld(),
                 new CompanionSummaries(new HytaleSummarySources()),
                 module.warnings(), System::currentTimeMillis, admissionGate::admit, bondedFamilies,
                 module.legacyAliases(), module.unreadable());
