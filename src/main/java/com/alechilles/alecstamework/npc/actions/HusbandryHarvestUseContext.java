@@ -37,7 +37,8 @@ public final class HusbandryHarvestUseContext {
                 HusbandryOutcomeModifiers.identity(),
                 null,
                 null,
-                0L
+                0L,
+                0
         );
     }
 
@@ -50,7 +51,8 @@ public final class HusbandryHarvestUseContext {
             return;
         }
         CapturedUse captured = use == null ? CapturedUse.empty() : use;
-        if (!captured.tool().present()) {
+        // A toolless harvest (a milking) is kept too once it has rolled, so its drops share that roll.
+        if (!captured.tool().present() && captured.batchCopies() <= 0) {
             USES.remove(npcId);
             return;
         }
@@ -162,26 +164,32 @@ public final class HusbandryHarvestUseContext {
 
     record CapturedUse(UUID actorId, byte hotbarSlot, HusbandryToolContext tool, String fingerprint,
                        double wearMultiplier, HusbandryOutcomeModifiers genericModifiers, String preparedDropList,
-                       FinalizedOutput preparedOutput, long startedAtNanos) {
+                       FinalizedOutput preparedOutput, long startedAtNanos, int batchCopies) {
         CapturedUse withWearMultiplier(double nextMultiplier) {
             return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, nextMultiplier,
-                    genericModifiers, preparedDropList, preparedOutput, startedAtNanos);
+                    genericModifiers, preparedDropList, preparedOutput, startedAtNanos, batchCopies);
         }
 
         CapturedUse withModifiers(HusbandryOutcomeModifiers generic) {
             return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, wearMultiplier,
                     generic == null ? HusbandryOutcomeModifiers.identity() : generic,
-                    preparedDropList, preparedOutput, startedAtNanos);
+                    preparedDropList, preparedOutput, startedAtNanos, batchCopies);
         }
 
         CapturedUse withPreparedOutput(String dropList, FinalizedOutput output) {
             return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, wearMultiplier,
-                    genericModifiers, dropList, output, startedAtNanos);
+                    genericModifiers, dropList, output, startedAtNanos, batchCopies);
+        }
+
+        /** The action's one double/triple roll (1, 2 or 3; 0 = not rolled), shared by everything it pays. */
+        CapturedUse withBatchCopies(int copies) {
+            return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, wearMultiplier,
+                    genericModifiers, preparedDropList, preparedOutput, startedAtNanos, copies);
         }
 
         CapturedUse startedAtNanos(long value) {
             return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, wearMultiplier,
-                    genericModifiers, preparedDropList, preparedOutput, value);
+                    genericModifiers, preparedDropList, preparedOutput, value, batchCopies);
         }
 
         FinalizedOutput preparedOutputFor(String dropList, boolean manualHarvest) {
@@ -197,7 +205,7 @@ public final class HusbandryHarvestUseContext {
         static CapturedUse empty() {
             return new CapturedUse(null, (byte) -1, new HusbandryToolContext(null, 0, 0.0, 0.0, null),
                     "", 1.0, HusbandryOutcomeModifiers.identity(),
-                    null, null, 0L);
+                    null, null, 0L, 0);
         }
     }
 }

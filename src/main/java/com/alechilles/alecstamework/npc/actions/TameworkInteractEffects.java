@@ -557,13 +557,24 @@ final class TameworkInteractEffects {
                 ? (1.0 + HusbandryYieldResolver.harvestYieldBonus(
                         npcRef, store, productId, modifiers,
                         CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role)))
-                        * HusbandryYieldResolver.rollBatchCopies(modifiers, ThreadLocalRandom.current()::nextDouble)
+                        * (toolUse != null && toolUse.batchCopies() > 0 ? toolUse.batchCopies()
+                                : HusbandryYieldResolver.rollBatchCopies(modifiers, ThreadLocalRandom.current()::nextDouble))
                         - 1.0
                 : 0.0;
         int requestedCopies = Math.max(0, CompanionOutputService.resolveExpectedQuantity(
                 baseQuantity, bonus, ThreadLocalRandom.current()::nextDouble) - baseQuantity);
-        int committedCopies = inventoryEffects.addOutputCopies(
-                player, productId, requestedCopies);
+        // Every extra copy fills another empty container of the kind just used - never one from nothing.
+        String emptyContainer = ctx == null ? null : ctx.activeItemId;
+        int spare = takeEmptyContainers(player, emptyContainer, requestedCopies);
+        int committedCopies = inventoryEffects.addOutputCopies(player, productId, spare);
+        if (committedCopies < spare) {
+            inventoryEffects.addOutputCopies(player, emptyContainer, spare - committedCopies);
+        }
+        if (committedCopies < requestedCopies && !outcome.preserveCooldown) {
+            // No spare container for the rest: the animal stays ready to be harvested again instead.
+            CompanionHarvestBonusService.markCooldownSkip(npcRef, store);
+            outcome = outcome.withPreserveCooldown();
+        }
         int resolvedQuantity = Math.max(0, baseQuantity + committedCopies);
         CompanionOutputService.FinalizedOutput converted = HusbandryYieldResolver.applyHarvestConversions(
                 CompanionOutputService.finalizeQuantities(Map.of(productId, resolvedQuantity)),
@@ -604,6 +615,18 @@ final class TameworkInteractEffects {
             committedQuantities.put(productId, remaining);
         }
         return outcome.withItemQuantities(committedQuantities);
+    }
+
+    /** Takes up to {@code wanted} of {@code itemId} from the player's inventory; returns how many it took. */
+    private int takeEmptyContainers(Player player, String itemId, int wanted) {
+        if (itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        int taken = 0;
+        while (taken < wanted && inventoryEffects.removeOutputCopies(player, itemId, 1) == 1) {
+            taken++;
+        }
+        return taken;
     }
 
     private void rollbackConvertedOutputs(Player player, Map<String, Integer> addedOutputs) {
@@ -840,6 +863,10 @@ final class TameworkInteractEffects {
 
         HarvestContainerOutcome withItemQuantities(Map<String, Integer> quantities) {
             return new HarvestContainerOutcome(result, preserveCooldown, quantities);
+        }
+
+        HarvestContainerOutcome withPreserveCooldown() {
+            return new HarvestContainerOutcome(result, true, itemQuantities);
         }
     }
 

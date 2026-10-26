@@ -72,7 +72,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             return true;
         }
         HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
-                java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble, awardXp ? toolUse.batchCopies() : 0);
         FinalizedOutput output = preparedOutput != null ? preparedOutput
                 : CompanionOutputService.finalizeExpectedQuantity(
                         baseDrops,

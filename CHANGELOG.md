@@ -21,6 +21,9 @@
 - A husbandry provider's `bonusOutputChance` and `tripleOutputChance` are now a real roll on each harvest and cull:
   the whole finished batch drops twice (three times with the triple chance) instead of a small flat yield increase.
   Because the double repeats the finished batch, it now multiplies tool, trait, size and age bonuses too.
+- A bucket harvest (milking) no longer creates filled buckets from nothing for its extra copies: each extra copy fills
+  a spare empty bucket of the same kind from the inventory. When there is no spare bucket, the animal stays ready to
+  be harvested again instead. A harvest's other drops, such as a cow's manure, share that harvest's double roll.
 - Culling an animal from the command menu now gives the same cull rewards as a knife cull when its family has
   managed cull rewards, and counts as a cull for other mods.
 

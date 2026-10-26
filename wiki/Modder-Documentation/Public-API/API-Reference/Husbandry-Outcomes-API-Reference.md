@@ -104,6 +104,10 @@ yield bonus, traits, size and age. One roll covers every product of the action,
 using the chances returned for its first authorized product. Use these fields
 for a chance to double; use `yieldBonus` for a flat increase. Earlier versions
 added `bonusOutputChance * (1 + tripleOutputChance)` to the flat yield instead.
+A harvest makes this roll once, and its drop list (for example a cow's manure)
+uses the same result. A bucket harvest's extra copies each fill a spare empty
+bucket of the kind used, taken from the player's inventory; copies it cannot
+fill keep the animal ready to be harvested again rather than creating buckets.
 Standard manual shear and item-cull actions resolve their actual product batch
 before deferred completion. That accepted batch survives actor disconnects and
 later tool changes. A matching moved hotbar tool receives wear; unrelated

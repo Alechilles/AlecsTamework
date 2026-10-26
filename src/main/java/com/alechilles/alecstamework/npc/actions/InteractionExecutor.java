@@ -206,7 +206,9 @@ final class InteractionExecutor {
             }
             HusbandryHarvestUseContext.CapturedUse resolvedToolUse = toolUse
                     .withWearMultiplier(authorization.toolWearMultiplier())
-                    .withModifiers(authorization);
+                    .withModifiers(authorization)
+                    .withBatchCopies(HusbandryYieldResolver.rollBatchCopies(
+                            authorization, java.util.concurrent.ThreadLocalRandom.current()::nextDouble));
             resolvedToolUse = prepareShearOutput(npcRef, store, role, ctx, resolvedToolUse);
             if (!effects.isHarvestCooldownReady(npcRef, role, store, ctx)) {
                 effects.logHarvestExecution("cooldown-blocked", interactionConfigId, interactionIndex, role, ctx);
@@ -505,7 +507,7 @@ final class InteractionExecutor {
         }
         List<ItemStack> baseDrops = itemModule.getRandomItemDrops(dropList);
         HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
-                java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble, use.batchCopies());
         CompanionOutputService.FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
                 baseDrops,
                 stack -> {

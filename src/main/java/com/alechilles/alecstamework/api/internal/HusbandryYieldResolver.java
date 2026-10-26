@@ -241,7 +241,13 @@ public final class HusbandryYieldResolver {
         private int copies;
 
         public BatchRoll(DoubleSupplier random) {
+            this(random, 0);
+        }
+
+        /** Uses {@code rolled} (1, 2 or 3) when the action already rolled; 0 rolls on first use. */
+        public BatchRoll(DoubleSupplier random, int rolled) {
             this.random = random;
+            this.copies = rolled > 0 ? rolled : 0;
         }
 
         public int copies(@Nullable HusbandryOutcomeModifiers modifiers) {

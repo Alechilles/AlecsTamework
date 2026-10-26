@@ -238,7 +238,7 @@ final class InteractionInventoryEffects {
         if (harvestInteraction) {
             HusbandryHarvestUseContext.CapturedUse toolUse = HusbandryHarvestUseContext.current(npcRef, store);
             HusbandryYieldResolver.BatchRoll batch = new HusbandryYieldResolver.BatchRoll(
-                    ThreadLocalRandom.current()::nextDouble);
+                    ThreadLocalRandom.current()::nextDouble, toolUse.batchCopies());
             CompanionOutputService.FinalizedOutput finalized = CompanionOutputService.finalizeExpectedQuantity(
                     drops,
                     stack -> {
