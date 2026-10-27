@@ -31,6 +31,7 @@ public final class CommandRestorationCompletionListener {
             case GROUP_LIMIT -> "tamework.ui.population.groupLimit";
             case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
             case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
+            case DEPLOY_BLOCKED -> CompanionAdmission.DEPLOY_BLOCKED_MESSAGE_KEY;
         };
     }
 

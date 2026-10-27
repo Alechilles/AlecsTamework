@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -30,14 +31,23 @@ import javax.annotation.Nullable;
  * A count is empty only for an unknown group or a per-world group asked without a world.
  */
 public final class IndexPopulationGroupApi implements PopulationGroupApi {
-    private final CompanionIndex index;
     private final Supplier<PopulationGroupConfigIndex> groups;
+    /** The records counted for an owner: the index's, or the network's (see {@link #useOwnerRecords}). */
+    private volatile Function<UUID, List<CompanionRecord>> recordsOf;
 
     /** {@code groups} returns the current population-group config; null is read as no groups. */
     public IndexPopulationGroupApi(@Nonnull CompanionIndex index,
                                    @Nonnull Supplier<PopulationGroupConfigIndex> groups) {
-        this.index = Objects.requireNonNull(index, "index");
+        this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.groups = Objects.requireNonNull(groups, "groups");
+    }
+
+    /**
+     * Server networks: count over {@code ownerRecords} instead of the index alone, so companions other
+     * servers hold count too. It must be lock-free and include every record the index files under the owner.
+     */
+    public void useOwnerRecords(@Nonnull Function<UUID, List<CompanionRecord>> ownerRecords) {
+        recordsOf = Objects.requireNonNull(ownerRecords, "ownerRecords");
     }
 
     @Override
@@ -75,8 +85,9 @@ public final class IndexPopulationGroupApi implements PopulationGroupApi {
         Set<String> roles = configured.roleIds();
         Predicate<CompanionRecord> bucket = record -> record.countsAsOwned() && roles.contains(record.roleId())
                 && (!perWorld || CompanionAdmission.scopeWorld(record).equals(world));
-        long owned = index.count(ownerUuid, bucket);
-        long deployed = index.count(ownerUuid, bucket.and(CompanionRecord::countsAsDeployed));
+        List<CompanionRecord> records = recordsOf.apply(ownerUuid);
+        long owned = count(records, bucket);
+        long deployed = count(records, bucket.and(CompanionRecord::countsAsDeployed));
         return Optional.of(new PopulationGroupCountsView(
                 ownerUuid,
                 policy.groupId(),
@@ -120,7 +131,17 @@ public final class IndexPopulationGroupApi implements PopulationGroupApi {
             }
             roles.addAll(configured.roleIds());
         }
-        return OptionalLong.of(index.count(ownerUuid, counted.and(record -> roles.contains(record.roleId()))));
+        return OptionalLong.of(count(recordsOf.apply(ownerUuid), counted.and(record -> roles.contains(record.roleId()))));
+    }
+
+    private static long count(List<CompanionRecord> records, Predicate<CompanionRecord> filter) {
+        long n = 0;
+        for (CompanionRecord record : records) {
+            if (filter.test(record)) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private PopulationGroupConfigIndex config() {

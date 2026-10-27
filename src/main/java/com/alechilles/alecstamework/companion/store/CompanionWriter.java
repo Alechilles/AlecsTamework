@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -98,6 +99,22 @@ public final class CompanionWriter {
     private volatile long lastFlushAtMs;
     /** Earliest time of the next flush-failure WARN. Used only on the executor thread. */
     private long nextFailureWarnAtMs = Long.MIN_VALUE;
+    private final List<WrittenListener> writtenListeners = new CopyOnWriteArrayList<>();
+
+    /** Hears the records of each owner file once it is on disk. */
+    @FunctionalInterface
+    public interface WrittenListener {
+        /**
+         * Runs on the writer thread right after the file is written, with the records exactly as
+         * written. Must be cheap and must not block or take the index lock.
+         */
+        void onWritten(@Nonnull List<CompanionRecord> records);
+    }
+
+    /** Adds a listener for owner files written from now on. A listener that throws is logged and skipped. */
+    public void addWrittenListener(@Nonnull WrittenListener listener) {
+        writtenListeners.add(Objects.requireNonNull(listener, "listener"));
+    }
 
     /**
      * @param executor a dedicated single-thread executor. The writer owns it: flushes rely on
@@ -405,6 +422,7 @@ public final class CompanionWriter {
                         ownersLeft.remove(owner);
                         ownersWritten.add(owner);
                         complete(taken.remove(owner), null);
+                        notifyWritten(records);
                     } catch (Throwable t) {
                         failure = unwrap(t);
                         ownersFailed.put(owner, failure);
@@ -468,6 +486,16 @@ public final class CompanionWriter {
             // Last, so a failing logger cannot leave a waiter uncompleted.
             if (failure != null) {
                 warnFlushFailed(failure);
+            }
+        }
+    }
+
+    private void notifyWritten(List<CompanionRecord> records) {
+        for (WrittenListener listener : writtenListeners) {
+            try {
+                listener.onWritten(records);
+            } catch (RuntimeException | LinkageError failure) {
+                LOGGER.at(Level.WARNING).withCause(failure).log("A companion file listener failed; the file stands");
             }
         }
     }

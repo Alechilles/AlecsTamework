@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,9 +32,12 @@ public final class CompanionAdmissionGate {
     /** Message key of a refused group limit. */
     public static final String GROUP_LIMIT_MESSAGE_KEY = "tamework.ui.population.groupLimit";
 
-    private final CompanionIndex index;
     private final Supplier<CompanionAdmission.Rules> rules;
     @Nullable private final ProviderDecisionCache providerDecisions;
+    /** The records an owner's limits count: the index's, or the network's (see {@link #useOwnerRecords}). */
+    private volatile Function<UUID, List<CompanionRecord>> recordsOf;
+    /** Whether owned companions may come out in a world (see {@link #useDeployRule}); everywhere by default. */
+    private volatile Predicate<String> deployRule = world -> true;
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
@@ -42,16 +47,48 @@ public final class CompanionAdmissionGate {
     public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups,
                                   @Nullable ProviderDecisionCache providerDecisions) {
         Objects.requireNonNull(groups, "groups");
-        this.index = Objects.requireNonNull(index, "index");
+        this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = () -> configuredRules(groups.get());
         this.providerDecisions = providerDecisions;
     }
 
     private CompanionAdmissionGate(Supplier<CompanionAdmission.Rules> rules, CompanionIndex index,
                                    @Nullable ProviderDecisionCache providerDecisions) {
-        this.index = Objects.requireNonNull(index, "index");
+        this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = Objects.requireNonNull(rules, "rules");
         this.providerDecisions = providerDecisions;
+    }
+
+    /**
+     * Server networks: count each owner's limits over {@code ownerRecords} instead of the index alone,
+     * so companions other servers hold count too. It must be lock-free and include every record the
+     * index files under the owner.
+     */
+    public void useOwnerRecords(@Nonnull Function<UUID, List<CompanionRecord>> ownerRecords) {
+        recordsOf = Objects.requireNonNull(ownerRecords, "ownerRecords");
+    }
+
+    /**
+     * Where owned companions may come out: {@code worldAllowed} answers for a world name (the
+     * server's {@code DeployPlaces} rule). A change that puts an owned companion out (LIVE) in a world
+     * it was not already out in is refused with {@link CompanionAdmission.Refusal#DEPLOY_BLOCKED} where
+     * the answer is false. It must be lock-free and do no I/O: the gate calls it under the index lock.
+     */
+    public void useDeployRule(@Nonnull Predicate<String> worldAllowed) {
+        deployRule = Objects.requireNonNull(worldAllowed, "worldAllowed");
+    }
+
+    /** The deploy-rule refusal of the change, or null: only an owned record coming out in a new world is checked. */
+    @Nullable
+    private Denial deployDenial(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+        if (after.ownerUuid() == null || !after.isDeployed()) {
+            return null;
+        }
+        String world = after.location().world();
+        if (before != null && before.isDeployed() && Objects.equals(before.location().world(), world)) {
+            return null;
+        }
+        return deployRule.test(world) ? null : Denial.of(CompanionAdmission.Refusal.DEPLOY_BLOCKED);
     }
 
     /** A gate with fixed rules instead of the configured ones; {@code rules} is read on each check. */
@@ -99,11 +136,15 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return new Admission(null, after);
         }
-        return admit(index.fileRecords(after.ownerUuid()), before, after);
+        return admit(recordsOf.apply(after.ownerUuid()), before, after);
     }
 
     private Admission admit(Collection<CompanionRecord> ownerRecords, @Nullable CompanionRecord before,
                             CompanionRecord after) {
+        Denial blocked = deployDenial(before, after);
+        if (blocked != null) {
+            return new Admission(blocked, after);
+        }
         CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
                 CompanionAdmission.Provided.none());
         if (caps != null) {
@@ -146,7 +187,7 @@ public final class CompanionAdmissionGate {
      */
     @Nullable
     public Denial denyBatch(@Nonnull UUID owner, @Nonnull List<CompanionRecord> candidates) {
-        List<CompanionRecord> working = new ArrayList<>(index.fileRecords(owner));
+        List<CompanionRecord> working = new ArrayList<>(recordsOf.apply(owner));
         for (CompanionRecord candidate : candidates) {
             Admission admission = admit(working, null, candidate);
             if (!admission.admitted()) {
@@ -168,6 +209,7 @@ public final class CompanionAdmissionGate {
                 case GROUP_OWNED, GROUP_DEPLOYED -> GROUP_LIMIT_MESSAGE_KEY;
                 case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
                 case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
+                case DEPLOY_BLOCKED -> CompanionAdmission.DEPLOY_BLOCKED_MESSAGE_KEY;
             });
         }
     }
@@ -191,7 +233,11 @@ public final class CompanionAdmissionGate {
         if (after.ownerUuid() == null) {
             return null;
         }
-        var ownerRecords = index.fileRecords(after.ownerUuid());
+        Denial blocked = deployDenial(before, after);
+        if (blocked != null) {
+            return blocked;
+        }
+        var ownerRecords = recordsOf.apply(after.ownerUuid());
         CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
                 CompanionAdmission.Provided.none());
         if (caps != null) {
@@ -234,7 +280,7 @@ public final class CompanionAdmissionGate {
                 ? CompanionLocation.live(world, 0, 0, 0) : CompanionLocation.item();
         CompanionRecord candidate = CompanionRecord.builder(UUID.randomUUID(), roleId, at)
                 .ownerUuid(owner).homeWorld(world).build();
-        return admit(index.fileRecords(owner), null, candidate).denial();
+        return admit(recordsOf.apply(owner), null, candidate).denial();
     }
 
     /** The rules the gate checks with now, for callers that check a whole batch (a litter). */

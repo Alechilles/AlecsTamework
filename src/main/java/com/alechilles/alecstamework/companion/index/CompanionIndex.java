@@ -316,6 +316,40 @@ public final class CompanionIndex {
     }
 
     /**
+     * Takes another server's copy of a record (server networks, spec 13.2): inserts {@code incoming},
+     * or replaces the record of its profile, keeping every field of {@code incoming}, its
+     * {@code updatedAtMs} included, so the copy compares the same on every server. The local
+     * revision goes up by one as for any update. Refused with CONFLICT when the local generation is
+     * higher, and with DUPLICATE when another profile holds its origin.
+     */
+    @Nonnull
+    public Mutation adopt(@Nonnull CompanionRecord incoming) {
+        UUID profileId = incoming.profileId();
+        return atomically(() -> {
+            CompanionRecord before = records.get(profileId);
+            if (before != null && incoming.generation() < before.generation()) {
+                return new Mutation(Status.CONFLICT, before, null);
+            }
+            String origin = originKey(incoming);
+            UUID originHolder = origin == null ? null : profileByOrigin.get(origin);
+            if (originHolder != null && !originHolder.equals(profileId)) {
+                return new Mutation(Status.DUPLICATE, records.get(originHolder), null);
+            }
+            CompanionRecord after = incoming.toBuilder()
+                    .revision(before == null ? 0L : before.revision() + 1)
+                    .build();
+            if (before == null) {
+                records.put(profileId, after);
+                addToMaps(after);
+            } else {
+                replaceInMaps(before, after);
+            }
+            changed(before, after);
+            return new Mutation(Status.APPLIED, before, after);
+        });
+    }
+
+    /**
      * Swaps {@code before} for {@code after} without a window where lock-free readers miss the
      * record: only changed secondary keys are touched, new keys are added before the record is
      * replaced, and old keys are removed after. Empty owner sets are left in place.

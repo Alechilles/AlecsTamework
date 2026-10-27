@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.flow.HytaleCaptureDelivery;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.item.CaptureItemKeys;
+import com.alechilles.alecstamework.companion.network.PortableSync;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopAuthor;
 import com.alechilles.alecstamework.items.coop.CapturedItemCoopTarget;
@@ -161,6 +162,14 @@ public final class HytaleCapturedItemCoopInteractionService {
         UUID actor = source.actorUuid();
         try {
             CompanionRecord record = intake.record(item.profileId());
+            Tamework plugin = Tamework.getInstance();
+            PortableSync network = plugin == null ? null : plugin.getPortableSync();
+            if (network != null && network.mayBeBehind(record, item.generation())) {
+                // Filled on another server and not here yet: fetch it and keep the item as it is.
+                network.refresh(item.profileId());
+                warnLater(actor, "releaseArriving");
+                return Result.FAILED_CLOSED;
+            }
             if (record == null || record.location().kind() != LocationKind.ITEM
                     || record.generation() != item.generation()) {
                 warnLater(actor, "releaseProfileConflict");

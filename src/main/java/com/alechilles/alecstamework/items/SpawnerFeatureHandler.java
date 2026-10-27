@@ -36,6 +36,7 @@ import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
+import com.alechilles.alecstamework.companion.network.PortableSync;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -148,6 +149,12 @@ public final class SpawnerFeatureHandler {
     private final Set<UUID> capturing = ConcurrentHashMap.newKeySet();
     /** Profiles with a release in flight. */
     private final Set<UUID> releasing = ConcurrentHashMap.newKeySet();
+    @Nullable private volatile PortableSync portableSync;
+
+    /** Server networks: releases first fetch a companion this server has not caught up with. */
+    public void usePortableSync(@Nullable PortableSync sync) {
+        portableSync = sync;
+    }
 
     public SpawnerFeatureHandler(
             @Nonnull HytaleLogger logger,
@@ -1185,6 +1192,14 @@ public final class SpawnerFeatureHandler {
             }
         }
         CompanionRecord record = index.get(ref.profileId());
+        PortableSync network = portableSync;
+        if (network != null && network.mayBeBehind(record, ref.generation())) {
+            // Filled on another server of the network and not here yet: fetch it, keep the item as it
+            // is, and let the player try again. Never released unowned or emptied from a stale copy.
+            network.refresh(ref.profileId());
+            warn(player, "releaseArriving");
+            return false;
+        }
         CaptureItemOwnership.Release ownership = CaptureItemOwnership.release(
                 TameworkRuntimeSettings.current().captureItemOwnership(),
                 record == null ? null : record.ownerUuid(), player.getUuid(),
@@ -1284,8 +1299,12 @@ public final class SpawnerFeatureHandler {
             }
             case NOT_FOUND -> warn(player, "releaseProfileConflict");
             case NO_SNAPSHOT -> warn(player, "releaseEvidenceFailed");
-            case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE ->
+            // Refused before anything changed: the item keeps its companion.
+            case OWNED_LIMIT, DEPLOYED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOY_BLOCKED ->
                     showPopulationLimit(player, outcome.messageKey());
+            // The network's copy could not be read: the item stays as it is.
+            case CONFLICT -> warn(player, RestoreFlow.ARRIVING_MESSAGE_KEY.equals(outcome.messageKey())
+                    ? "releaseArriving" : "releaseFailed");
             default -> warn(player, "releaseFailed");
         }
     }

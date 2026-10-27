@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionBodyCallbacks;
 import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.live.SnapshotProgressionClock;
 import com.alechilles.alecstamework.companion.live.CompanionSummaries;
 import com.alechilles.alecstamework.companion.live.FenceAction;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
@@ -649,6 +650,10 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
                 world.getName(), CompanionWorldTime.gameTimeMs(store));
         if (envelope == null) {
             return null;
+        }
+        if (generation == record.generation()) {
+            // An unload save of a body that stays LIVE: its growth goes on in the world, so no pause reading.
+            envelope.data().remove(SnapshotProgressionClock.OWNER_CLOCK_MS);
         }
         writer.queueSnapshot(envelope);
         return clock.getAsLong();

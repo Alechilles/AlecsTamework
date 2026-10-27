@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.live;
 
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -28,20 +29,39 @@ public final class CompanionSnapshots {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     private final Function<Holder<EntityStore>, BsonDocument> serializer;
+    @Nullable private final SnapshotProgressionClock.OwnerClock ownerClock;
 
+    /** Snapshots that record no owner clock reading (tests). */
     public CompanionSnapshots(@Nonnull Function<Holder<EntityStore>, BsonDocument> serializer) {
-        this.serializer = Objects.requireNonNull(serializer, "serializer");
+        this(serializer, null);
     }
 
+    public CompanionSnapshots(@Nonnull Function<Holder<EntityStore>, BsonDocument> serializer,
+                              @Nullable SnapshotProgressionClock.OwnerClock ownerClock) {
+        this.serializer = Objects.requireNonNull(serializer, "serializer");
+        this.ownerClock = ownerClock;
+    }
+
+    /** Snapshots of bodies that stay in a world (unload saves, recalls, coops): growth goes on as before. */
     @Nonnull
     public static CompanionSnapshots production() {
         return new CompanionSnapshots(EntityStore.REGISTRY::serialize);
     }
 
     /**
+     * Snapshots of bodies leaving the world (capture into an item, store, death, loss): they record the owner's
+     * progression clock, so growth pauses until the companion is restored, on any server.
+     */
+    @Nonnull
+    public static CompanionSnapshots leavingWorld() {
+        return new CompanionSnapshots(EntityStore.REGISTRY::serialize, AnimalProgressionClock.get()::current);
+    }
+
+    /**
      * Returns the snapshot, or null when the entity could not be copied or serialized
      * (logged as WARN with the profile id). {@code worldGameTimeMs} is the source world's game
-     * time, kept so phase 3 can re-base alarms after a cross-world respawn.
+     * time, kept so phase 3 can re-base alarms after a cross-world respawn. The owner's progression
+     * clock is recorded too ({@link SnapshotProgressionClock}), so growth pauses until the restore.
      */
     @Nullable
     public SnapshotEnvelope capture(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
@@ -53,6 +73,9 @@ public final class CompanionSnapshots {
             BsonDocument data = new BsonDocument("Entity", entity)
                     .append("World", new BsonString(worldName))
                     .append("GameTimeMs", new BsonInt64(worldGameTimeMs));
+            if (ownerClock != null) {
+                SnapshotProgressionClock.withReading(data, entity, ownerClock);
+            }
             return new SnapshotEnvelope(profileId, FORMAT, generation, data);
         } catch (RuntimeException | LinkageError failure) {
             LOGGER.at(Level.WARNING).withCause(failure).log("Companion snapshot failed for profile %s", profileId);

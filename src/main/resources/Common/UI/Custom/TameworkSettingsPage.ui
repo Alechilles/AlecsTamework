@@ -1618,6 +1618,83 @@ $C.@PageOverlay {
               Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #e8aa35; }
               Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
 
+              Label #TwSettingsDeploySectionLabel {
+                Anchor: (Left: 14, Right: 12, Height: 34);
+                Text: %server.tamework.ui.settings.label.deploySection;
+                Style: @SettingsSectionLabel;
+              }
+
+              TextButton #TwSettingsDeploySectionTooltip {
+                Anchor: (Left: 0, Right: 12, Height: 34);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.deploySection;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsDeployModeLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.deployMode;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsDeployModeTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.deployMode;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsDeployModeDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: %server.tamework.ui.settings.noItems.deployMode;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsDeployPlacesLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.deployPlaces;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsDeployPlacesTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.deployPlaces;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              TextField #TwSettingsDeployPlacesInput {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: $A.@SlateQuiet;
+                Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
+                Padding: (Horizontal: 8);
+                PlaceholderText: "";
+                MaxLength: 2000;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Group { Anchor: (Left: 0, Top: 7, Width: 4, Height: 20); Background: #e8aa35; }
+              Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
+
               Label #TwSettingsCompanionHudSectionLabel {
                 Anchor: (Left: 14, Right: 12, Height: 34);
                 Text: %server.tamework.ui.settings.label.companionHudSection;

@@ -44,6 +44,9 @@ public final class CaptureItemOwnership {
     }
 
     /**
+     * An item newer than the record ({@link #isNewerThanRecord}) is ignored: this server's copy is
+     * behind, so the item is neither stale nor anyone's to move.
+     *
      * @param record  the profile's record, or null
      * @param itemGen the generation on the item
      * @param holder  the player now holding the item
@@ -52,7 +55,7 @@ public final class CaptureItemOwnership {
     @Nonnull
     public static Decision decide(@Nullable CompanionRecord record, long itemGen, @Nonnull UUID holder,
                                   @Nullable CompanionAdmission.Refusal refusal) {
-        if (record == null) {
+        if (record == null || isNewerThanRecord(record, itemGen)) {
             return Decision.IGNORE;
         }
         if (record.location().kind() != LocationKind.ITEM || record.generation() != itemGen) {
@@ -173,10 +176,21 @@ public final class CaptureItemOwnership {
 
     /**
      * True when an item at {@code itemGen} no longer holds its companion: the record is gone, is
-     * not in an item, or moved on to another generation (Recall, Forget, a later capture).
+     * not in an item, or moved on to another generation (Recall, Forget, a later capture). An item
+     * {@link #isNewerThanRecord newer than the record} is not stale.
      */
     public static boolean isStale(@Nullable CompanionRecord record, long itemGen) {
-        return record == null || record.location().kind() != LocationKind.ITEM || record.generation() != itemGen;
+        return record == null || !isNewerThanRecord(record, itemGen)
+                && (record.location().kind() != LocationKind.ITEM || record.generation() != itemGen);
+    }
+
+    /**
+     * True when the item carries a higher generation than the record: the companion moved on
+     * somewhere this server has not seen yet (another server of a network, or a store restored
+     * from a backup). Such an item is kept as it is and never emptied.
+     */
+    public static boolean isNewerThanRecord(@Nonnull CompanionRecord record, long itemGen) {
+        return itemGen > record.generation();
     }
 
     /** The record as the new holder would own it; generation unchanged, the item still holds it. */

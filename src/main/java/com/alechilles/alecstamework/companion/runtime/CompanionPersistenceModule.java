@@ -445,6 +445,27 @@ public final class CompanionPersistenceModule {
     }
 
     /**
+     * {@link #readSnapshot} on the caller's thread: the writer's pending snapshot, null when its delete
+     * is pending, otherwise the file. Blocks on file I/O, so only a dedicated I/O thread may call it
+     * (the network store thread), never a world thread. Works after {@link #shutdown}, while the
+     * server's storage still runs.
+     *
+     * @throws IllegalStateException when the module is not {@link State#READY}.
+     */
+    @Nullable
+    public SnapshotEnvelope readSnapshotBlocking(@Nonnull UUID profileId) throws IOException {
+        CompanionWriter w = require(writer);
+        SnapshotEnvelope pending = w.pendingSnapshot(profileId);
+        if (pending != null) {
+            return pending;
+        }
+        if (w.isSnapshotDeletePending(profileId)) {
+            return null;
+        }
+        return require(store).readSnapshotNow(profileId);
+    }
+
+    /**
      * Final flush (spec 6.9), given an absolute wall-clock {@code deadlineMs} on this module's
      * clock. Called from the ShutdownEvent handler at priority -28 and again from the plugin's
      * shutdown; the second call returns the first call's result at once. Reads no ECS state.

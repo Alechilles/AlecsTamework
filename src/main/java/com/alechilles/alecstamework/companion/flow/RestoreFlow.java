@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
+import com.alechilles.alecstamework.companion.index.RecordScope;
 import com.alechilles.alecstamework.companion.live.LoadedBodies;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
@@ -52,7 +53,9 @@ public final class RestoreFlow<R> {
      * decision. Nothing changed.
      */
     public enum Result { RESTORED, NOT_FOUND, NOT_ALLOWED, COOLDOWN, NO_SNAPSHOT, CONFLICT, COMMIT_FAILED, SPAWN_FAILED,
-        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOYED_LIMIT }
+        STALE, OWNED_LIMIT, GROUP_LIMIT, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOYED_LIMIT,
+        /** The server does not let companions come out in the destination world ({@code DeployPlaces}). */
+        DEPLOY_BLOCKED }
 
     /**
      * A restore's result with the translation key of a population refusal (a cap, a provider's
@@ -142,6 +145,7 @@ public final class RestoreFlow<R> {
     private final LongSupplier clock;
     private final ProviderAdmission providers;
     private final CompanionAdmissionGate.Check admission;
+    @Nullable private volatile Function<UUID, CompletableFuture<Boolean>> portableRefresh;
 
     /** A flow with no admission providers; {@code admission} is the built-in caps only. */
     public RestoreFlow(@Nonnull CompanionIndex index, @Nonnull LoadedBodies<R> loaded,
@@ -193,9 +197,35 @@ public final class RestoreFlow<R> {
         return restoreOutcome(request).thenApply(Outcome::result);
     }
 
+    /** Message key of a restore refused because the network's copy could not be read. */
+    public static final String ARRIVING_MESSAGE_KEY = "tamework.ui.notifications.spawner.releaseArriving";
+
+    /**
+     * Server networks: before a companion that follows its owner (a portable record, or one this
+     * server does not know) is restored, {@code refresh} reads the network's copy of that profile into
+     * the index, so a restore never starts from a copy another server has moved on from. It completes
+     * with true when the index may be restored from, and false when it may be behind: the restore is
+     * then refused with {@link Result#CONFLICT} and {@link #ARRIVING_MESSAGE_KEY}, and nothing changes.
+     */
+    public void usePortableRefresh(@Nonnull Function<UUID, CompletableFuture<Boolean>> refresh) {
+        portableRefresh = Objects.requireNonNull(refresh, "refresh");
+    }
+
     /** As {@link #restore(Request)}, with the message key of a population refusal. */
     @Nonnull
     public CompletableFuture<Outcome> restoreOutcome(@Nonnull Request request) {
+        Function<UUID, CompletableFuture<Boolean>> refresh = portableRefresh;
+        CompanionRecord current = index.get(request.profileId());
+        if (refresh == null || current != null && current.scope() != RecordScope.PORTABLE) {
+            return restoreLocal(request);
+        }
+        return refresh.apply(request.profileId())
+                .handle((fresh, error) -> error == null && Boolean.TRUE.equals(fresh) ? restoreLocal(request)
+                        : CompletableFuture.completedFuture(new Outcome(Result.CONFLICT, ARRIVING_MESSAGE_KEY)))
+                .thenCompose(outcome -> outcome);
+    }
+
+    private CompletableFuture<Outcome> restoreLocal(Request request) {
         UUID profileId = request.profileId();
         CompanionRecord before = index.get(profileId);
         RestoreRules.Verdict verdict = RestoreRules.forRecord(before, request.reason(), clock.getAsLong(),
@@ -418,6 +448,7 @@ public final class RestoreFlow<R> {
             case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
             case PROVIDER_DENIED -> Result.PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;
+            case DEPLOY_BLOCKED -> Result.DEPLOY_BLOCKED;
         };
     }
 

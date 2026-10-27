@@ -71,6 +71,8 @@ public enum TameworkApiCapability {
     /** External providers can contribute captured-item tooltip and quality presentation. */
     CAPTURED_ITEM_DISPLAY,
     /** External husbandry providers can supply the base reward table rolled for a managed cull. */
-    HUSBANDRY_REWARD_TABLES
+    HUSBANDRY_REWARD_TABLES,
+    /** A server network can install a shared store that companions follow their owner through. */
+    PORTABLE_COMPANION_STORE
 }
 

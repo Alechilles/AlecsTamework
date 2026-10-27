@@ -36,11 +36,15 @@ public final class RestoreRules {
      * LOST, LIVE (no visible body), ITEM (the item may be gone) or COOP; REVIVE needs DEAD past
      * its wall-clock cooldown; RELEASE needs ITEM; SUMMON needs STORED for ROSTER, TIMED or BONDED,
      * or PROVISIONED on a bonded record, past {@code summonCooldownUntilMs}; COOP_RELEASE needs COOP.
+     *
+     * <p>A holder with a higher generation than the record is newer than this server's copy (it moved
+     * on on another server of a network, or the store was restored from a backup): NOT_FOUND, so it
+     * is kept as it is, never emptied as STALE.</p>
      */
     @Nonnull
     public static Verdict forRecord(@Nullable CompanionRecord record, @Nonnull Reason reason, long nowMs,
                                     long expectedGeneration) {
-        if (record == null) {
+        if (record == null || expectedGeneration > record.generation()) {
             return Verdict.NOT_FOUND;
         }
         LocationKind kind = record.location().kind();

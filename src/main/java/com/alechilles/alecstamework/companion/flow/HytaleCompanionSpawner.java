@@ -6,12 +6,14 @@ import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.live.CompanionRespawn;
 import com.alechilles.alecstamework.companion.live.CompanionSaves;
 import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
+import com.alechilles.alecstamework.companion.live.SnapshotProgressionClock;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
 import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateRestorer;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
@@ -229,6 +231,10 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             BsonDocument doc = CompanionRespawn.stripDocument(CompanionSnapshots.entity(snapshot));
             worldGameTimeMs = CompanionWorldTime.gameTimeMs(store);
             doc = SnapshotPatch.rebaseAlarms(doc, gameTimeDelta(worldGameTimeMs, CompanionSnapshots.gameTimeMs(snapshot)));
+            if (reason != RestoreRules.Reason.COOP_RELEASE) {
+                // Growth paused while out of a world; coop residents keep their own rules.
+                doc = SnapshotProgressionClock.rebase(doc, snapshot.data(), AnimalProgressionClock.get()::current);
+            }
             if (reason == RestoreRules.Reason.REVIVE) {
                 doc = SnapshotPatch.forRevive(doc);
             }

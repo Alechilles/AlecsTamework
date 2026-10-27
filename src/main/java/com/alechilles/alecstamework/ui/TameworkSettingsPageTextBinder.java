@@ -22,6 +22,9 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsNameFilterUseStockListLabel", "tamework.ui.settings.label.nameFilterUseStockList"},
             {"#TwSettingsNameFilterBlockedWordsLabel", "tamework.ui.settings.label.nameFilterBlockedWords"},
             {"#TwSettingsNameFilterAllowedWordsLabel", "tamework.ui.settings.label.nameFilterAllowedWords"},
+            {"#TwSettingsDeploySectionLabel", "tamework.ui.settings.label.deploySection"},
+            {"#TwSettingsDeployModeLabel", "tamework.ui.settings.label.deployMode"},
+            {"#TwSettingsDeployPlacesLabel", "tamework.ui.settings.label.deployPlaces"},
             {"#TwSettingsRecallTeleportingLabel", "tamework.ui.settings.label.recallTeleporting"},
             {"#TwSettingsFlightSectionLabel", "tamework.ui.settings.label.flightSection"},
             {"#TwSettingsFlightUnlimitedVigourLabel", "tamework.ui.settings.label.flightUnlimitedVigour"},
@@ -134,6 +137,9 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsNameFilterUseStockListTooltip", "tamework.ui.settings.tooltip.nameFilterUseStockList"},
             {"#TwSettingsNameFilterBlockedWordsTooltip", "tamework.ui.settings.tooltip.nameFilterBlockedWords"},
             {"#TwSettingsNameFilterAllowedWordsTooltip", "tamework.ui.settings.tooltip.nameFilterAllowedWords"},
+            {"#TwSettingsDeploySectionTooltip", "tamework.ui.settings.tooltip.deploySection"},
+            {"#TwSettingsDeployModeTooltip", "tamework.ui.settings.tooltip.deployMode"},
+            {"#TwSettingsDeployPlacesTooltip", "tamework.ui.settings.tooltip.deployPlaces"},
             {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"}
     };
 
@@ -143,6 +149,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsNeedsTickPolicyModeDropdown", "tamework.ui.settings.noItems.policy"},
             {"#TwSettingsAnimalAgingModeDropdown", "tamework.ui.settings.noItems.agingMode"},
             {"#TwSettingsCaptureItemOwnershipDropdown", "tamework.ui.settings.noItems.captureItemOwnership"},
+            {"#TwSettingsDeployModeDropdown", "tamework.ui.settings.noItems.deployMode"},
             {"#TwSettingsNeedsDamageModelDropdown", "tamework.ui.settings.noItems.model"},
             {"#TwSettingsNeedsDamageDualNeedRuleDropdown", "tamework.ui.settings.noItems.rule"},
             {"#TwSettingsPopulationScopeDropdown", "tamework.ui.settings.noItems.scope"}

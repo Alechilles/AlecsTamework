@@ -45,6 +45,8 @@ public final class CompanionAdmission {
     public static final String PROVIDER_DENIED_MESSAGE_KEY = "tamework.ui.population.providerDenied";
     /** Message key of {@link Refusal#PROVIDER_UNAVAILABLE}. */
     public static final String PROVIDER_UNAVAILABLE_MESSAGE_KEY = "tamework.ui.population.providerUnavailable";
+    /** Message key of {@link Refusal#DEPLOY_BLOCKED}. */
+    public static final String DEPLOY_BLOCKED_MESSAGE_KEY = "tamework.ui.population.deployBlocked";
 
     /**
      * {@code OWNED} and {@code DEPLOYED}: the owner's built-in owned or deployed limit is reached.
@@ -52,7 +54,7 @@ public final class CompanionAdmission {
      * limits is reached ({@link #checkDomains} names the message key). {@code PROVIDER_UNAVAILABLE}:
      * the provider gave no decision; {@link #check} never returns it.
      */
-    public enum Refusal { OWNED, DEPLOYED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE }
+    public enum Refusal { OWNED, DEPLOYED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOY_BLOCKED }
 
     /**
      * What an admission provider allowed for the record being changed: the domain claims the
