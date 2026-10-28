@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ActivityFeedApi;
+import com.alechilles.alecstamework.api.AvatarFlightApi;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CapturedItemDisplayApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
@@ -48,6 +49,7 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     private final RequiredContentProfileApi requiredContentProfiles;
     private final LiveActivityFeed activities = new LiveActivityFeed();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AvatarFlightLoanApi avatarFlight = new AvatarFlightLoanApi();
     @Nullable private volatile BondedCompanionApi bondedCompanions;
     @Nullable private volatile PortableCompanionsApi portableCompanions;
 
@@ -136,6 +138,9 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         }
         if (portableCompanions().available()) {
             result.add(TameworkApiCapability.PORTABLE_COMPANION_STORE);
+        }
+        if (avatarFlight().available()) {
+            result.add(TameworkApiCapability.AVATAR_FLIGHT_LOANS);
         }
         if (activities.isOpen()) {
             result.add(TameworkApiCapability.ACTIVITY_FEED_V2);
@@ -246,11 +251,17 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         return current == null || closed.get() ? PortableCompanionsApi.unavailable() : current;
     }
 
+    @Override
+    public AvatarFlightApi avatarFlight() {
+        return closed.get() ? AvatarFlightApi.unavailable() : avatarFlight;
+    }
+
     /** Closes the feed and the registries. Clear {@code ActivityRuntime} before calling this. */
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
             activities.close();
+            avatarFlight.close();
             base.close();
         }
     }

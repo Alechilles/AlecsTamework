@@ -30,6 +30,21 @@ class AvatarFlightMountComponentsTest {
         assertTrue(AvatarFlightRuntimeEpoch.isCurrent(copy.getRuntimeEpoch()));
     }
 
+    /** A loan saved before a restart must still end as a loan, at its return point. */
+    @Test
+    void savedLoanSessionStaysALoan() {
+        AvatarFlightMountSessionComponent loan = new AvatarFlightMountSessionComponent(
+                null, "world", "race-mount", 42L);
+        loan.setLenderId("Rune_GaleCircuit");
+
+        AvatarFlightMountSessionComponent persisted = AvatarFlightMountSessionComponent.CODEC.decode(
+                AvatarFlightMountSessionComponent.CODEC.encode(loan.clone(), new ExtraInfo()),
+                new ExtraInfo());
+
+        assertTrue(persisted.isLoan());
+        assertEquals("Rune_GaleCircuit", persisted.getLenderId());
+    }
+
     @Test
     void sourceCloneAndCodecPreserveRecoverySnapshot() {
         AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("rider", "Tamed_Drake", 7);

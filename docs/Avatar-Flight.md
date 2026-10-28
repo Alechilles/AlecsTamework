@@ -6,9 +6,9 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 
 ## Underwater Mounts
 
-Set `Underwater` to `true` on a `TwAvatarFlightConfig` to use swimming propulsion with the same mount session, talisman, visual rider, source NPC preservation, and dismount/recovery lifecycle. Keep `MountMode=TameworkAvatarFlight` and give the role an explicit `AvatarFlightConfig` id. Existing profiles default to `Underwater=false`. Omitted `Underwater` inherits from the parent; an explicit value overrides it. The existing avatar-flight asset loader, overrides, editor schema, and reload behavior apply.
+Set `Underwater` to `true` on a `TwAvatarFlightConfig` to use swimming propulsion with the same mount session, controls, visual rider, source NPC preservation, and dismount/recovery lifecycle. Keep `MountMode=TameworkAvatarFlight` and give the role an explicit `AvatarFlightConfig` id. Existing profiles default to `Underwater=false`. Omitted `Underwater` inherits from the parent; an explicit value overrides it. The existing avatar-flight asset loader, overrides, editor schema, and reload behavior apply.
 
-Underwater movement starts automatically while the player has native `inFluid` or `swimming` state. W accelerates along mouse look, S reverses, A/D strafe, Space rises, and crouch descends. Right-click brakes and Q boosts through Flightmaster's Talisman. F dismounts. No launch charge or upward flap is available. Pitch changes direction without giving dive speed, climb penalties, gravity sink, or stall. Launch/flap HUD controls and the pitch readout are hidden. Flight XP is not awarded for swimming.
+Underwater movement starts automatically while the player has native `inFluid` or `swimming` state. W accelerates along mouse look, S reverses, A/D strafe, Space rises, and crouch descends. Right-click brakes and Q boosts. F dismounts. No launch charge or upward flap is available. Pitch changes direction without giving dive speed, climb penalties, gravity sink, or stall. Launch/flap HUD controls and the pitch readout are hidden. Flight XP is not awarded for swimming.
 
 The normal cruising limit applies to total 3D speed, including combined directional inputs. `Movement.MaxForwardSpeed` sets cruise and `Movement.ForwardAcceleration` sets acceleration. `MaxBackwardSpeed` and `BackwardAcceleration` tune reverse; `DescendSpeed` also controls direct rise/descend and strafe speed, capped at cruise. `HoverHorizontalDamping` slows coasting and `AirbrakeDeceleration` controls braking. Boost uses `Boost.ForwardImpulse`, `DurationSeconds`, and `CooldownSeconds`, plus the existing Vigour cost. Its maximum speed is cruise plus the forward impulse. Above-cruise speed decays using `Curve.BoostedSpeedDecay`; use a positive value. Swimming ignores `MaxGlideSpeed` and all pitch/load/launch/flap tuning. The speed HUD, fast animation, and fast-movement Vigour recharge use total speed.
 
@@ -34,25 +34,31 @@ The player and source NPC carry paired `TameworkAvatarFlightMountSession` and `T
 
 On a clean disconnect, Tamework queues that cleanup on the player's world thread before the entity is discarded. If the player is already gone after a client crash, the source-side watchdog detects the missing rider and restores the parked NPC. Persisted mount pairs also include a server-runtime epoch, so a pair saved before a server crash or restart is treated as stale instead of silently resuming in the next process. When that stale source belongs to an active command-roster summon, Tamework stores and despawns it through the roster transition when its owner next joins a world. Stale player sessions restore the ordinary player model from the saved skin when the process-local pre-mount model snapshot is no longer available. Source-missing cleanup returns the player to the latest recorded safe-ground position. Other exceptional cleanup restores the companion at its original mount position; the last-safe-ground option applies only to normal dismounts.
 
+## Lent Flight
+
+Another plugin can lend avatar flight through `avatarFlight()` (capability `AVATAR_FLIGHT_LOANS`): the player becomes the flyer from a named `TwAvatarFlightConfig`, with no companion. A loan is a mount session with a lender id and no source NPC, so the session's death, disconnect, world-transfer, missing-config, restart and dismount endings apply to it. Every ending except death and a world change puts the player at the return point the lender gave, and the lender's `onLoanEnded` listeners hear why. Loans are available only while the avatar-flight runtime is active, which an enabled flight config besides Tamework's default turns on. A loan saved before a restart is ended when the player loads; it never resumes. Vigour, the HUD and the controls work as in any flight. No companion flight XP is awarded. The lender can add Vigour charges, for example for pickups, up to the config's maximum.
+
 ## Controls
+
+Flight controls are bound on the flying player's own interactions while avatar flight is active (root interactions `Root_Tamework_Flight_*`), so no held item is needed. The engine resolves an entity binding before the held item and rune slots, and the client mirrors that lookup. Tamework takes over its own command-item E/R bindings for the flight and leaves any input another owner has bound. The bindings are removed when flight ends.
 
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
 - Grounded directional movement is locked while a launch is charging. Mouse look and charge release remain available.
-- Avatar flight starts only from a charged launch release, left-click flap, or Q boost from Flightmaster's Talisman. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
-- Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
-- Right-click with Flightmaster's Talisman applies the airbrake.
-- Q with Flightmaster's Talisman performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
-- Flightmaster's Talisman binds `Ability2` and `Ability3` to optional configured combat roots. In Hytale's default layout those slots are E and R, respectively. They are slot names, not literal-key listeners: players who remap either native ability binding still activate the matching configured root. On Update 7, Tamework binds the two slots on the player's own interactions during avatar flight and removes the bindings on dismount or item switch. The player's runes stay in their slots. Update 6 keeps the direct item controls.
-- Flightmaster's Talisman must already be selected before mounting or enabling avatar flight. Activation fails before changing the player model when another hotbar item is held.
-- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman keeps its dedicated flight controls, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
+- Avatar flight starts only from a charged launch release, left-click flap, or Q boost. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
+- Left-click performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
+- Right-click applies the airbrake.
+- Q performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
+- `Ability2` and `Ability3` run optional configured combat roots. In Hytale's default layout those slots are E and R, respectively. They are slot names, not literal-key listeners: players who remap either native ability binding still activate the matching configured root. The player's runes stay in their slots.
+- No item needs to be held to mount or start avatar flight. Flightmaster's Talisman is no longer needed; while flight lasts, the flight bindings take over its inputs too.
+- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Active utility equipment is temporarily deselected, and hotbar selection stays locked to the slot selected when flight began. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
 - Press F to immediately dismount from an NPC-backed avatar-flight session, including while airborne. An airborne normal dismount restores the companion at the current flight position. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
-While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and talisman actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
+While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and flight actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
 
 ## Vigour
 
@@ -254,7 +260,7 @@ Omitting `Animation` inherits the complete parent section. An explicit `Animatio
 - `GlyphTexturePath`: optional custom UI texture path for the glyph, relative to the mod's `Common/UI/Custom` directory. It replaces Tamework's built-in artwork for that ability while keeping the standard avatar-flight frame and layout. Leave it blank to use a built-in texture for known glyphs or the `Glyph` text fallback.
 - `CooldownSeconds`: optional real-time cooldown for this slot. It defaults to `0`; each transformed player's Ability2 and Ability3 timers are independent and begin only after the server accepts the configured root. During cooldown, the matching HUD control is dimmed and shows a whole-second countdown; it refreshes at least once per second regardless of the regular HUD resend setting.
 
-The Flightmaster's Talisman maps its native `Ability2` and `Ability3` item interactions to this map. E and R are the default Hytale bindings for those slots, not hard-coded input keys. A player can remap native ability bindings and the same slot still resolves; custom roots must not depend on literal E/R input events.
+Flight binds the native `Ability2` and `Ability3` inputs to this map. E and R are the default Hytale bindings for those slots, not hard-coded input keys. A player can remap native ability bindings and the same slot still resolves; custom roots must not depend on literal E/R input events.
 
 `CombatAbilities` has whole-map inheritance. If a child omits the property, it inherits the complete parent map. If a child supplies the property, including `{}`, it replaces the complete parent map; entries are not merged per slot. To keep one inherited ability while changing the other, repeat the retained entry in the child map. An explicit blank `RootInteraction` disables that entry in the replacement map.
 
@@ -279,7 +285,7 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 
 - `Enabled`: enables charged launch.
 - `PreferredInput`: primary launch input path. `CrouchHold` is the default built-in packet path because it is reliable and visually reads as a launch coil. `JumpHold` remains supported, and the legacy `ReinsPrimaryHold` config identifier is reserved for future/custom item hold integrations.
-- `FallbackInput`: fallback launch input path. Defaults to `CrouchHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Talisman item.
+- `FallbackInput`: fallback launch input path. Defaults to `CrouchHold`; `ReinsPrimaryHold` is not wired by the default flight controls.
 - `MinChargeMs`: minimum hold before release applies launch.
 - `MaxChargeMs`: hold duration that reaches full launch charge.
 - `ChargeExponent`: exponent applied to normalized charge amount.

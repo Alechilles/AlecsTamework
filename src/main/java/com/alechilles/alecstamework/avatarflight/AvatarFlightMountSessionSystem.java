@@ -128,6 +128,16 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
         if (config == null || !config.isEnabled()) {
             return AvatarFlightMountLifecycleService.EndReason.CONFIG_UNAVAILABLE;
         }
+        if (session.isLoan()) {
+            // A missing config resolves to the active one; a loan of a config that is gone ends.
+            if (config.getId() == null || !config.getId().equalsIgnoreCase(session.getConfigId())) {
+                return AvatarFlightMountLifecycleService.EndReason.CONFIG_UNAVAILABLE;
+            }
+            // A disconnect cleanup that found no player leaves the session behind; a loan has no
+            // source-side watchdog, so a rejoin in the same process ends it here.
+            return AvatarFlightSessionRegistry.isActive(playerUuid)
+                    ? null : AvatarFlightMountLifecycleService.EndReason.DISCONNECT;
+        }
         Ref<EntityStore> sourceRef = resolve(store, session.getSourceNpcUuid());
         if (sourceRef == null || !sourceRef.isValid()) {
             return AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING;
@@ -183,6 +193,7 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
 
     @Nullable
     private static Ref<EntityStore> resolve(Store<EntityStore> store, String uuid) {
+        if (uuid == null || uuid.isBlank()) return null;
         try {
             return store.getExternalData().getWorld().getEntityRef(UUID.fromString(uuid));
         } catch (IllegalArgumentException ignored) {

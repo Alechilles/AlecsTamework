@@ -10,7 +10,10 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Player-side durable linkage and recovery state for an NPC-backed avatar-flight session. */
+/**
+ * Player-side durable linkage and recovery state for an avatar-flight session: NPC-backed, or lent
+ * by another plugin with no source NPC (see {@link #isLoan()}).
+ */
 public final class AvatarFlightMountSessionComponent implements Component<EntityStore> {
     public static final BuilderCodec<AvatarFlightMountSessionComponent> CODEC = BuilderCodec.builder(
             AvatarFlightMountSessionComponent.class,
@@ -64,6 +67,9 @@ public final class AvatarFlightMountSessionComponent implements Component<Entity
             .append(new KeyedCodec<>("DismountHoldStartedAtMs", Codec.LONG),
                     AvatarFlightMountSessionComponent::setDismountHoldStartedAtMs,
                     AvatarFlightMountSessionComponent::getDismountHoldStartedAtMs).add()
+            .append(new KeyedCodec<>("LenderId", Codec.STRING),
+                    AvatarFlightMountSessionComponent::setLenderId,
+                    AvatarFlightMountSessionComponent::getLenderId).add()
             .build();
 
     private String sourceNpcUuid = "";
@@ -82,6 +88,7 @@ public final class AvatarFlightMountSessionComponent implements Component<Entity
     private double lastSafeGroundZ;
     private float lastSafeGroundYaw;
     private long dismountHoldStartedAtMs;
+    private String lenderId = "";
 
     public AvatarFlightMountSessionComponent() {
     }
@@ -152,6 +159,10 @@ public final class AvatarFlightMountSessionComponent implements Component<Entity
     public void setLastSafeGroundYaw(float value) { lastSafeGroundYaw = finite(value); }
     public long getDismountHoldStartedAtMs() { return dismountHoldStartedAtMs; }
     public void setDismountHoldStartedAtMs(long value) { dismountHoldStartedAtMs = value; }
+    @Nonnull public String getLenderId() { return clean(lenderId); }
+    public void setLenderId(@Nullable String value) { lenderId = clean(value); }
+    /** A lent flight: no source NPC, and it ends with the player at the origin. */
+    public boolean isLoan() { return !getLenderId().isEmpty(); }
 
     @Override
     public AvatarFlightMountSessionComponent clone() {
@@ -166,6 +177,7 @@ public final class AvatarFlightMountSessionComponent implements Component<Entity
         copy.lastSafeGroundZ = lastSafeGroundZ;
         copy.lastSafeGroundYaw = lastSafeGroundYaw;
         copy.dismountHoldStartedAtMs = dismountHoldStartedAtMs;
+        copy.lenderId = lenderId;
         return copy;
     }
 

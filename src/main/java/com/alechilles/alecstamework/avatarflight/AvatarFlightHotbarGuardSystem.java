@@ -15,7 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Restores the talisman after hotbar swap interactions while avatar flight is active. */
+/** Restores the locked hotbar slot after hotbar swap interactions while avatar flight is active. */
 public final class AvatarFlightHotbarGuardSystem
         extends EntityEventSystem<EntityStore, InventorySetActiveSlotEvent> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;

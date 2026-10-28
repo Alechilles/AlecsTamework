@@ -82,6 +82,16 @@ public final class AvatarFlightMountPreflight {
         return prepare(store, npcRef, playerRef, role, configId).ok();
     }
 
+    /** True when the player is dead, already in avatar flight, or riding any mount. */
+    public static boolean isPlayerBusy(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> playerRef) {
+        return store.getComponent(playerRef, DeathComponent.getComponentType()) != null
+                || has(store, playerRef, AvatarFlightMountSessionComponent.getComponentType())
+                || has(store, playerRef, AvatarFlightComponent.getComponentType())
+                || has(store, playerRef, MountedComponent.getComponentType())
+                || has(store, playerRef, TameworkRideRiderComponent.getComponentType())
+                || has(store, playerRef, TameworkMountedGlideRiderComponent.getComponentType());
+    }
+
     private static boolean hasExistingMountState(Store<EntityStore> store,
                                                  Ref<EntityStore> npcRef,
                                                  Ref<EntityStore> playerRef) {

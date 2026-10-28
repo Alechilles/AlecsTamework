@@ -180,7 +180,6 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
         String key = switch (text) {
             case "Avatar flight component types are not registered." -> "tamework.commands.debugDragonFlight.result.avatar.flight.component.types.are.not.registered";
             case "Avatar flight is already active." -> "tamework.commands.debugDragonFlight.result.avatar.flight.is.already.active";
-            case "Hold Flightmaster's Talisman before starting avatar flight." -> "tamework.commands.debugDragonFlight.result.hold.flightmaster.s.talisman.before.starting.avatar.flight";
             case "Avatar flight disabled, but no saved model or skin fallback was available." -> "tamework.commands.debugDragonFlight.result.avatar.flight.disabled.but.no.saved.model.or.skin";
             case "Client flight probe failed: MovementManager is unavailable." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementmanager.is.unavailable";
             case "Client flight probe failed: MovementStatesComponent is unavailable." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementstatescomponent.is.unavailable";

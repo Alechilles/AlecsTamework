@@ -88,5 +88,10 @@ public interface TameworkApi {
     default PortableCompanionsApi portableCompanions() {
         return PortableCompanionsApi.unavailable();
     }
+
+    /** Returns the optional lent avatar-flight facade. */
+    default AvatarFlightApi avatarFlight() {
+        return AvatarFlightApi.unavailable();
+    }
 }
 

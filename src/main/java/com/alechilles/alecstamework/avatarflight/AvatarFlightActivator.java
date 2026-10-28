@@ -55,9 +55,6 @@ public final class AvatarFlightActivator {
         if (store.getComponent(ref, flightType) != null) {
             return Result.ok("Avatar flight is already active.");
         }
-        if (!inventoryGuard.isTalismanSelected(store, ref)) {
-            return Result.fail("Hold Flightmaster's Talisman before starting avatar flight.");
-        }
         boolean applyModel = config.getModel().isApplyModel();
         if (applyModel && !modelService.apply(store, ref, playerUuid, config, sourceAttachmentIds)) {
             return Result.fail("Avatar flight model asset not found: " + config.getModel().getModelId());
@@ -71,6 +68,7 @@ public final class AvatarFlightActivator {
         flight.setLastVigourUpdateAtMs(enabledAtMs);
         flight.setVigourRechargeMode(AvatarFlightVigourService.RechargeMode.NONE.name());
         store.putComponent(ref, flightType, flight);
+        AvatarFlightEntityInput.bind(store, ref);
         AvatarFlightInputComponent input = store.getComponent(ref, inputType);
         if (input == null) {
             store.putComponent(ref, inputType, new AvatarFlightInputComponent());
@@ -97,6 +95,8 @@ public final class AvatarFlightActivator {
         if (flight != null) {
             groundMovementService.restore(store, ref, flight);
         }
+        // Before the flight component goes, so command items can claim E/R again on its removal.
+        AvatarFlightEntityInput.unbind(store, ref);
         if (flightType != null) {
             resetFlightXpTracker(flight, System.currentTimeMillis());
             store.tryRemoveComponent(ref, flightType);

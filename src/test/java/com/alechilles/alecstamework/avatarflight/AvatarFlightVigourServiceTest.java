@@ -39,6 +39,18 @@ class AvatarFlightVigourServiceTest {
     }
 
     @Test
+    void grantStopsAtMaxChargesAndLeavesTheRechargeDelay() {
+        double max = CONFIG.getVigour().getMaxCharges();
+
+        AvatarFlightVigourService.State granted = AvatarFlightVigourService.grant(
+                new AvatarFlightVigourService.State(max - 0.5, 1000L, 4000L), CONFIG, null, 3.0);
+
+        assertEquals(max, granted.charges(), EPSILON);
+        assertEquals(1000L, granted.lastUpdateAtMs());
+        assertEquals(4000L, granted.rechargeBlockedUntilMs());
+    }
+
+    @Test
     void rechargeRateMultiplierDividesSecondsPerCharge() {
         AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.0, 1.15, 1.0, 1.0, 1.0, 1.0);
 
