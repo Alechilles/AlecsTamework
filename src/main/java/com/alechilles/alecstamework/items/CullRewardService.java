@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.HusbandryRewardEntry;
@@ -117,7 +118,8 @@ final class CullRewardService {
                 random::nextDouble);
         output = HusbandryYieldResolver.applyCullConversions(
                 output, npcRef, store, roleId, tool, actorId, random::nextDouble);
-        return new PreparedOutcome(true, output.itemStacks(), output.itemQuantities(), wearMultiplier[0]);
+        return new PreparedOutcome(true, output.itemStacks(), output.itemQuantities(), wearMultiplier[0],
+                AnimalProgressionService.ageStage(npcRef, store, roleId));
     }
 
     static Outcome apply(@Nullable PreparedOutcome prepared,
@@ -129,7 +131,7 @@ final class CullRewardService {
         for (ItemStack stack : prepared.itemStacks()) {
             ItemUtils.dropItem(npcRef, stack, store);
         }
-        return new Outcome(true, prepared.itemQuantities(), prepared.toolWearMultiplier());
+        return new Outcome(true, prepared.itemQuantities(), prepared.toolWearMultiplier(), prepared.ageStage());
     }
 
     /** Resolves one cull batch bonus from the current husbandry provider. */
@@ -258,29 +260,32 @@ final class CullRewardService {
         }
     }
 
+    /** {@code ageStage} is the culled animal's age when its batch was prepared (null: aging disabled). */
     record Outcome(boolean domesticDropsApplied,
                    Map<String, Integer> itemQuantities,
-                   double toolWearMultiplier) {
+                   double toolWearMultiplier,
+                   @Nullable AnimalAgeStage ageStage) {
         Outcome {
             itemQuantities = Map.copyOf(itemQuantities);
         }
 
         static Outcome unavailable() {
-            return new Outcome(false, Map.of(), 1.0);
+            return new Outcome(false, Map.of(), 1.0, null);
         }
     }
 
     record PreparedOutcome(boolean domesticDropsPrepared,
                            List<ItemStack> itemStacks,
                            Map<String, Integer> itemQuantities,
-                           double toolWearMultiplier) {
+                           double toolWearMultiplier,
+                           @Nullable AnimalAgeStage ageStage) {
         PreparedOutcome {
             itemStacks = List.copyOf(itemStacks);
             itemQuantities = Map.copyOf(itemQuantities);
         }
 
         static PreparedOutcome unavailable() {
-            return new PreparedOutcome(false, List.of(), Map.of(), 1.0);
+            return new PreparedOutcome(false, List.of(), Map.of(), 1.0, null);
         }
     }
 }

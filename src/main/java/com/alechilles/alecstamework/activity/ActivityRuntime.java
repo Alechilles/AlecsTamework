@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.activity;
 
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.CombatContributionView;
 import com.alechilles.alecstamework.api.CombatParticipantView;
@@ -261,6 +262,20 @@ public final class ActivityRuntime {
             @Nullable HusbandryToolContext tool,
             @Nullable UUID actorId
     ) {
+        publishCull(operationId, roleId, ownerId, companionId, itemQuantities, tool, actorId, null);
+    }
+
+    /** Publishes a cull with the tool, the actor and the culled animal's age captured at authorization. */
+    public static void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId,
+            @Nullable AnimalAgeStage ageStage
+    ) {
         ManagedActivityPublisher publisher = CURRENT.get().publisher;
         if (publisher != null) {
             publisher.publishCull(
@@ -270,7 +285,8 @@ public final class ActivityRuntime {
                     companionId,
                     itemQuantities,
                     tool,
-                    actorId
+                    actorId,
+                    ageStage
             );
         }
     }

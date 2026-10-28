@@ -15,6 +15,8 @@
 - Managed activity profiles can set `Activities.OwnerKillCountsAsCull` to `true`. An owned farm animal that its
   owner kills then gives its cull rewards instead of its normal drops, the same as a knife cull. Kills by other
   players are unchanged.
+- A cull's `ManagedActivityView` reports the animal's age stage (`ageStage`: juvenile, adult, prime or senior),
+  so a progression mod can pay for animals raised to prime instead of culled straight after taming.
 - Mods can supply the cull rewards for an animal through the new `husbandryRewardTables()` API. A family listed in
   `CullDropLists` can leave its drop list blank when a mod supplies the rewards.
 - Server networks: a network mod can install a shared store

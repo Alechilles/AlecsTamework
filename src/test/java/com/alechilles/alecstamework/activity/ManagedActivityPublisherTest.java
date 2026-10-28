@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ActivityView;
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
@@ -91,7 +92,10 @@ class ManagedActivityPublisherTest {
                 "RoleA",
                 OWNER,
                 COMPANION,
-                Map.of("Food_Beef_Raw", 3, "Ingredient_Hide_Medium", 1)
+                Map.of("Food_Beef_Raw", 3, "Ingredient_Hide_Medium", 1),
+                null,
+                null,
+                AnimalAgeStage.PRIME
         );
 
         assertEquals(4, published.size());
@@ -159,6 +163,8 @@ class ManagedActivityPublisherTest {
         assertEquals(ActivityIds.CULL_SUCCESS, cull.header().actionId());
         assertEquals(cullOperation, cull.header().operationId());
         assertEquals("runeteria:cull_success", cull.mappedActivityId());
+        assertEquals(AnimalAgeStage.PRIME, cull.ageStage());
+        assertNull(harvest.ageStage());
         assertEquals(Map.of(
                 "Food_Beef_Raw", 3,
                 "Ingredient_Hide_Medium", 1

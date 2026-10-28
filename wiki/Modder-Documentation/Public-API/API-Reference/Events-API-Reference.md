@@ -153,6 +153,12 @@ the resolved family group, the profile's mapped activity ID, and the domestic
 item quantities. A profile that omits cull configuration publishes no cull
 activity and keeps normal death drops.
 
+A cull's `ageStage` is the animal's `AnimalAgeStage` when its batch was
+rolled: `JUVENILE` before it is grown, otherwise `ADULT`, `PRIME` or `SENIOR`
+from its breeding config's aging lifecycle. It is null when the role's aging is
+disabled, and on every other managed activity. Integrations can use it to
+reward animals raised to prime rather than culled as soon as they are tamed.
+
 `RevivalActivityView` includes the persistent companion profile identity and,
 when Tamework can resolve the active managed role, `roleId` and immutable
 `groupIds`. The role is nullable and the group set can be empty for older or

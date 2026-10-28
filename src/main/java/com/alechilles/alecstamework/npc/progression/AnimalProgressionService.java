@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.config.assets.AnimalAgingSettings;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -141,6 +142,22 @@ public final class AnimalProgressionService {
         if (!CompanionLifeStageService.isAdult(ref, store, role)) return 0;
         AnimalAgingPolicy.Progress value = aging(ref, store, role);
         return value == null ? 1 : value.dead() ? 0 : value.yieldMultiplier();
+    }
+
+    /**
+     * The animal's age as the slaughter rule reads it: {@code JUVENILE} before it is grown, else its aging
+     * stage, or null when the role's aging is disabled (it then yields in full at any adult age).
+     */
+    @Nullable
+    public static AnimalAgeStage ageStage(Ref<EntityStore> ref, Store<EntityStore> store, String role) {
+        if (!CompanionLifeStageService.isAdult(ref, store, role)) return AnimalAgeStage.JUVENILE;
+        AnimalAgingPolicy.Progress value = aging(ref, store, role);
+        if (value == null) return null;
+        return switch (value.stage()) {
+            case ADULT -> AnimalAgeStage.ADULT;
+            case PRIME -> AnimalAgeStage.PRIME;
+            case SENIOR -> AnimalAgeStage.SENIOR;
+        };
     }
 
     /** Freeze a detached capture snapshot; never mutate a component still owned by ECS. */

@@ -101,7 +101,8 @@ public final class OwnerKillCullSystem extends DeathSystems.OnDeathSystem {
                 npc == null ? null : npc.getUuid(),
                 rewards.itemQuantities(),
                 tool,
-                tool == null ? null : killerId
+                tool == null ? null : killerId,
+                rewards.ageStage()
         );
     }
 

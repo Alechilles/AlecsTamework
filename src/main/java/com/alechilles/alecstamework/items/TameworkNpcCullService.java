@@ -387,7 +387,8 @@ public final class TameworkNpcCullService {
                     npc == null ? null : npc.getUuid(),
                     rewards.itemQuantities(),
                     itemUse.tool().present() ? itemUse.tool() : null,
-                    itemUse.tool().present() ? itemUse.actorId() : null
+                    itemUse.tool().present() ? itemUse.actorId() : null,
+                    rewards.ageStage()
             );
         }
         return Outcome.CULLED;

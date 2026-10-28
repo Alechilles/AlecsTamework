@@ -22,7 +22,8 @@ public record ManagedActivityView(
         @Nullable CompanionXpOutcomeView companionXpOutcome,
         @Nullable CareCreditOutcomeView careCreditOutcome,
         @Nullable HusbandryToolContext tool,
-        @Nullable UUID actorId
+        @Nullable UUID actorId,
+        @Nullable AnimalAgeStage ageStage
 ) implements ActivityView {
     public ManagedActivityView {
         header = Objects.requireNonNull(header, "header");
@@ -33,6 +34,28 @@ public record ManagedActivityView(
                 mappedActivityId, "mappedActivityId");
         itemQuantities = immutablePositiveQuantities(itemQuantities);
         offspringIds = immutableIds(offspringIds, "offspringIds");
+    }
+
+    /**
+     * Compatibility constructor for activity producers before the age stage. {@code ageStage} is reported on
+     * culls only: the culled animal's age when it died, or null when its role has aging disabled.
+     */
+    public ManagedActivityView(
+            @Nonnull ActivityHeader header,
+            @Nonnull String profileId,
+            @Nonnull Set<String> groupIds,
+            @Nonnull List<ActivityParticipantView> participants,
+            @Nonnull String mappedActivityId,
+            @Nonnull Map<String, Integer> itemQuantities,
+            @Nonnull List<UUID> offspringIds,
+            @Nullable CompanionXpOutcomeView companionXpOutcome,
+            @Nullable CareCreditOutcomeView careCreditOutcome,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
+        this(header, profileId, groupIds, participants, mappedActivityId,
+                itemQuantities, offspringIds, companionXpOutcome, careCreditOutcome,
+                tool, actorId, null);
     }
 
     /** Compatibility constructor for activity producers before husbandry tool receipts. */
@@ -49,7 +72,7 @@ public record ManagedActivityView(
     ) {
         this(header, profileId, groupIds, participants, mappedActivityId,
                 itemQuantities, offspringIds, companionXpOutcome, careCreditOutcome,
-                null, null);
+                null, null, null);
     }
 
     @Override
@@ -64,7 +87,7 @@ public record ManagedActivityView(
         return new ManagedActivityView(
                 nextHeader, profileId, groupIds, participants,
                 mappedActivityId, itemQuantities, offspringIds,
-                companionXpOutcome, careCreditOutcome, tool, actorId);
+                companionXpOutcome, careCreditOutcome, tool, actorId, ageStage);
     }
 
     /** Alias retained for consumers that name the optional outcome by type. */

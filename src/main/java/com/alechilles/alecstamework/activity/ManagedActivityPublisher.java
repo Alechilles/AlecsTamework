@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.activity;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
@@ -122,7 +123,8 @@ public final class ManagedActivityPublisher {
                 xpTransition,
                 null,
                 tool,
-                actorId
+                actorId,
+                null
         );
     }
 
@@ -185,6 +187,20 @@ public final class ManagedActivityPublisher {
             @Nullable HusbandryToolContext tool,
             @Nullable UUID actorId
     ) {
+        publishCull(operationId, roleId, ownerId, companionId, itemQuantities, tool, actorId, null);
+    }
+
+    /** Publishes one authorized cull with the culled animal's age when its batch was prepared. */
+    public void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId,
+            @Nullable AnimalAgeStage ageStage
+    ) {
         if (ownerId == null || companionId == null) {
             return;
         }
@@ -205,7 +221,8 @@ public final class ManagedActivityPublisher {
                 null,
                 null,
                 tool,
-                actorId
+                actorId,
+                ageStage
         );
     }
 
@@ -308,7 +325,7 @@ public final class ManagedActivityPublisher {
             CareCreditOutcomeView careCredit
     ) {
         publish(operationId, actionId, profile, groupIds, participants, mappedActivityId,
-                itemQuantities, offspringIds, xpTransition, careCredit, null, null);
+                itemQuantities, offspringIds, xpTransition, careCredit, null, null, null);
     }
 
     private void publish(
@@ -323,7 +340,8 @@ public final class ManagedActivityPublisher {
             CompanionXpTransition xpTransition,
             CareCreditOutcomeView careCredit,
             @Nullable HusbandryToolContext tool,
-            @Nullable UUID actorId
+            @Nullable UUID actorId,
+            @Nullable AnimalAgeStage ageStage
     ) {
         if (operationId == null || profile == null
                 || groupIds == null || groupIds.isEmpty()
@@ -344,7 +362,8 @@ public final class ManagedActivityPublisher {
                     xpTransition == null ? null : xpTransition.toOutcomeView(),
                     careCredit,
                     tool,
-                    actorId
+                    actorId,
+                    ageStage
             );
             publisher.publish(activity);
         } catch (RuntimeException | LinkageError ignored) {
