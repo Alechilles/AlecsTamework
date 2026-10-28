@@ -87,6 +87,20 @@ The supported claims integration is direct SimpleClaims behavior:
 
 There is no claim-provider dropdown or QuestLines Claims fallback.
 
+## Where companions can come out
+
+This section chooses where companions can be released, summoned, recalled,
+revived, recovered, tamed or born. Pick **Everywhere except these places** or
+**Only in these places**, then list places separated by commas. A place is a
+world name, a server id or `server/world`; server ids match only when a network
+mod connects the server to a network. Capture items and stored companions still
+travel and can be traded in a blocked place, and companions already out stay
+where they are.
+
+The list is saved in `tamework-deploy-places.json` next to
+`tamework-settings.json`, so a network can share one file. See the Portable
+Companions API reference for network use.
+
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,

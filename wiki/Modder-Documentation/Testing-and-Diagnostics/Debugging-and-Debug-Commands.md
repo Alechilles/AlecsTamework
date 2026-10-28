@@ -25,6 +25,9 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw config reload`
 - `/tw debug get happiness`, `/tw debug get traits`, `/tw debug get lifestage`
 - `/tw debug set lifestage <baby|adolescent|adult|prime|senior> [NPC selectors]`
+- `/tw debug get wander <role filter>`
+- `/tw debug set state <npc uuid> <state>`
+- `/tw debug set target <npc uuid> [slot]`
 - `/tw npc find <uuid>`
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
@@ -55,6 +58,13 @@ The harvest-readiness setter uses the alarm name from
 clears that alarm so harvesting is ready immediately. `false` restarts the role's
 normal `HarvestTimeout`, including configured progression modifiers. `toggle`
 switches between those states.
+
+`/tw debug get wander` lists every NPC whose role contains the filter, with its
+state, position, leash point, distance to the leash point, and whether it stands
+in water. `/tw debug set state` sets an NPC's role state the way a command item
+does, so the role's state transitions run. `/tw debug set target` points an
+NPC's target slot (`MasterTarget` by default) at its owner, as the Follow
+command does. All three work from the server console.
 
 `/tw debug view spawn-beacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model
