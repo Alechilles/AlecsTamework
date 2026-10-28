@@ -133,6 +133,8 @@ public final class CrashTelemetryService {
         legacyMigrationExecutor.execute(() ->
                 migrateLegacyTelemetryData(newTelemetryRoot, legacyTelemetryRootCandidates, logger)
         );
+        // One-shot job: let the queued migration finish, then release the worker thread.
+        legacyMigrationExecutor.shutdown();
     }
 
     public synchronized void applyEnabledSetting(boolean enabled) {
