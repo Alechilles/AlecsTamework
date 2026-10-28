@@ -1,0 +1,10 @@
+{
+  "$Comment": "Avatar-flight combat ability 2, bound on the flying player's own interactions instead of a held item.",
+  "Interactions": [
+    {
+      "Type": "TameworkAvatarFlightCombatAbility",
+      "Slot": "Ability2",
+      "RequireNewClick": true
+    }
+  ]
+}

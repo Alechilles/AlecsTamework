@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Mods can lend avatar flight through the new `avatarFlight()` API (capability `AVATAR_FLIGHT_LOANS`): a player
+  becomes a flyer from a named flight config, with no companion, and is put back at a chosen point when the loan
+  ends for any reason. The lender can add Vigour charges and hears when and why each loan ended.
+
+### Changed
+
+- Avatar flight no longer needs Flightmaster's Talisman in hand. Flap, airbrake, boost and the E/R combat
+  abilities are bound on the flying player while flight lasts, so no item is needed and the held item does nothing
+  in flight. The hotbar stays on the slot selected when flight began. Flightmaster's Talisman is no longer needed.
+
 ## 5.6.0 - Server Networks and Husbandry Rewards - 2026-10-28
 
 ### Added

@@ -57,9 +57,6 @@ client before using a new profile in a published pack.
 - A `TwAvatarFlightConfig` asset under `Server/Tamework/AvatarFlight/`.
 - A valid server model asset for the transformed flight form when
   `Model.ApplyModel` is enabled.
-- The player's selected hotbar item must be Tamework's
-  `Tamework_Flightmasters_Talisman` before mounting. Include a way for players
-  to obtain that item in your modpack's normal progression.
 
 ## 1. Add the Mount Interaction
 
@@ -178,8 +175,9 @@ footstep index when its model changes.
 
 ## Player Controls and Lifecycle
 
-Players select Flightmaster's Talisman, crouch-interact with their companion,
-and then use its flight controls:
+Players crouch-interact with their companion and then use its flight controls.
+No item needs to be held; the controls are bound on the player while flight
+lasts:
 
 - Hold and release crouch on the ground to charge and launch.
 - Left-click to flap, right-click to airbrake, and Q to boost.
@@ -195,7 +193,7 @@ transfer ends the session.
 
 1. Confirm the NPC shows the normal mount prompt only when its interaction
    requirements pass.
-2. With Flightmaster's Talisman selected, mount the NPC, launch, flap,
+2. Holding any item, mount the NPC, launch, flap,
    airbrake, boost, and dismount on both ground and in the air.
 3. After dismounting, verify that the original NPC—not a newly spawned copy—is
    back with its owner, name, health, inventory, and companion data intact.
@@ -209,7 +207,7 @@ transfer ends the session.
 | Symptom | Check |
 | --- | --- |
 | The NPC does not offer a mount prompt. | Confirm `TameworkInteractPrompt`, the matching `Mount` config, `IsMountable`, and the interaction requirements. |
-| Mounting is refused. | Select `Tamework_Flightmasters_Talisman`, then confirm an enabled resolved profile, a valid model id, and no existing mount state. |
+| Mounting is refused. | Confirm an enabled resolved profile, a valid model id, and no existing mount state. |
 | The NPC uses the wrong flight profile. | Check the exact `AvatarFlightConfig` id. A blank or unresolved id intentionally falls back to the active profile. |
 | The player transforms but has no expected flight animation. | Confirm the transformed server model declares the exact `IdleAnimation`, `FlightAnimation`, and `FastFlightAnimation` ids. |
 | The fake rider deforms or animates with the dragon. | Generate and use the namespaced AvatarFlight model variant, keeping `MountAnchor` unchanged. |

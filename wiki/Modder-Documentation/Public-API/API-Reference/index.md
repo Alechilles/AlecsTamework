@@ -29,6 +29,7 @@ This subsection contains the reference contract for each public API family.
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
 - [Captured Item Display API Reference](/mod/alecs-tamework/captured-item-display-api-reference)
 - [Portable Companions API Reference](/mod/alecs-tamework/portable-companions-api-reference)
+- [Avatar Flight API Reference](/mod/alecs-tamework/avatar-flight-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
 - [Admission Providers API Reference](/mod/alecs-tamework/admission-providers-api-reference)
 - [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)

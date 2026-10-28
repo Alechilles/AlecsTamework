@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.AvatarFlightLoan;
+import com.alechilles.alecstamework.api.AvatarFlightLoanEnded;
 import com.alechilles.alecstamework.config.assets.AvatarFlightMountingSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -18,7 +20,10 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Orchestrates transactional start, rollback, and idempotent end of NPC-backed avatar flight. */
+/**
+ * Orchestrates transactional start, rollback, and idempotent end of avatar flight sessions: NPC-backed
+ * mounts, and loans that another plugin starts with no source NPC.
+ */
 public final class AvatarFlightMountLifecycleService {
     private final AvatarFlightMountPreflight preflight;
     private final AvatarFlightNpcParkingService parking;
@@ -84,6 +89,39 @@ public final class AvatarFlightMountLifecycleService {
         return Result.ok("Avatar flight mounted with config=" + safeConfigId(prepared.config()));
     }
 
+    /**
+     * Starts a lent flight: a session with no source NPC, so the session system's restart, death,
+     * world-change, config and dismount endings apply to it, and {@link #end} puts the player at
+     * the return point. The caller has checked that the player is not already flying.
+     */
+    @Nonnull
+    public Result lend(@Nonnull Store<EntityStore> store,
+                       @Nonnull Ref<EntityStore> playerRef,
+                       @Nonnull UUID playerUuid,
+                       @Nonnull String lenderId,
+                       @Nonnull String configId,
+                       double returnX, double returnY, double returnZ, float returnYaw) {
+        ComponentType<EntityStore, AvatarFlightMountSessionComponent> sessionType =
+                AvatarFlightMountSessionComponent.getComponentType();
+        if (sessionType == null) {
+            return Result.fail("Avatar-flight loan rejected: component_type_unavailable");
+        }
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                null, store.getExternalData().getWorld().getName(), configId, System.currentTimeMillis());
+        session.setLenderId(lenderId);
+        session.captureOrigin(returnX, returnY, returnZ, returnYaw);
+        session.captureLastSafeGround(returnX, returnY, returnZ, returnYaw);
+        store.putComponent(playerRef, sessionType, session);
+        AvatarFlightActivator.Result enabled = activator.enable(store, playerRef, playerUuid, configId);
+        if (!enabled.ok()) {
+            store.tryRemoveComponent(playerRef, sessionType);
+            return Result.fail(enabled.message());
+        }
+        session.setPhase(AvatarFlightMountPhase.ACTIVE);
+        log(Level.INFO, "started", session, null);
+        return Result.ok("Avatar flight lent with config=" + configId);
+    }
+
     @Nonnull
     public Result end(@Nonnull Store<EntityStore> store,
                       @Nonnull Ref<EntityStore> playerRef,
@@ -101,6 +139,9 @@ public final class AvatarFlightMountLifecycleService {
             return Result.ok("Avatar-flight mount cleanup already in progress.");
         }
         session.setPhase(AvatarFlightMountPhase.RESTORING);
+        if (session.isLoan()) {
+            return endLoan(store, playerRef, playerUuid, session, sessionType, reason);
+        }
         AvatarFlightRestorationPolicy.Position restoration = selectRestorationPosition(
                 store, playerRef, session, reason);
         AvatarFlightActivator.Result disabled = activator.disable(store, playerRef, playerUuid);
@@ -112,6 +153,44 @@ public final class AvatarFlightMountLifecycleService {
         }
         return Result.ok("Avatar-flight mount restored; player flight state was already absent. "
                 + disabled.message());
+    }
+
+    /**
+     * A loan ends at its return point, except after death, where respawn places the player, and a
+     * world change, where the point belongs to the old world.
+     */
+    private Result endLoan(Store<EntityStore> store,
+                           Ref<EntityStore> playerRef,
+                           UUID playerUuid,
+                           AvatarFlightMountSessionComponent session,
+                           ComponentType<EntityStore, AvatarFlightMountSessionComponent> sessionType,
+                           EndReason reason) {
+        AvatarFlightActivator.Result disabled = activator.disable(store, playerRef, playerUuid);
+        if (reason != EndReason.PLAYER_DEAD && reason != EndReason.WORLD_TRANSFER) {
+            placePlayer(store, playerRef, new AvatarFlightRestorationPolicy.Position(
+                    session.getOriginX(), session.getOriginY(), session.getOriginZ(), session.getOriginYaw()));
+        }
+        store.tryRemoveComponent(playerRef, sessionType);
+        log(reason == EndReason.NORMAL || reason == EndReason.LENDER ? Level.INFO : Level.WARNING,
+                "ended", session, reason);
+        AvatarFlightLoanListeners.publish(new AvatarFlightLoanEnded(
+                new AvatarFlightLoan(playerUuid, session.getLenderId(), session.getConfigId()),
+                loanReason(reason)));
+        return disabled.ok() ? Result.ok(disabled.message())
+                : Result.ok("Avatar-flight loan ended; player flight state was already absent. " + disabled.message());
+    }
+
+    private static AvatarFlightLoanEnded.Reason loanReason(EndReason reason) {
+        return switch (reason) {
+            case LENDER -> AvatarFlightLoanEnded.Reason.LENDER;
+            case NORMAL -> AvatarFlightLoanEnded.Reason.DISMOUNT;
+            case PLAYER_DEAD -> AvatarFlightLoanEnded.Reason.DEATH;
+            case DISCONNECT -> AvatarFlightLoanEnded.Reason.DISCONNECT;
+            case WORLD_TRANSFER -> AvatarFlightLoanEnded.Reason.WORLD_CHANGE;
+            case CONFIG_UNAVAILABLE -> AvatarFlightLoanEnded.Reason.CONFIG_UNAVAILABLE;
+            case SERVER_RESTART -> AvatarFlightLoanEnded.Reason.SERVER_RESTART;
+            default -> AvatarFlightLoanEnded.Reason.OTHER;
+        };
     }
 
     public boolean hasMountSession(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> playerRef) {
@@ -283,7 +362,9 @@ public final class AvatarFlightMountLifecycleService {
         WORLD_TRANSFER,
         DISCONNECT,
         SERVER_RESTART,
-        ORPHAN_RECOVERY
+        ORPHAN_RECOVERY,
+        /** The plugin that lent the flight ended it. */
+        LENDER
     }
 
     public record Result(boolean ok, @Nonnull String message) {

@@ -121,6 +121,25 @@ public final class AvatarFlightVigourService {
         return new State(spent, nowMs, nextBlockedUntilMs);
     }
 
+    /**
+     * Adds charges from outside flight's own recharge, up to the maximum. The recharge clock and any
+     * recharge delay are left as they are. Nothing changes when Vigour does not limit this flight.
+     */
+    @Nonnull
+    public static State grant(@Nonnull State state,
+                              @Nullable TwAvatarFlightConfig config,
+                              @Nullable AvatarFlightProgressionTuning tuning,
+                              double charges) {
+        Objects.requireNonNull(state, "state");
+        if (!isEnabled(config) || !Double.isFinite(charges) || charges <= 0.0) {
+            return state;
+        }
+        double maxCharges = maxCharges(config,
+                tuning == null ? AvatarFlightProgressionTuning.neutral() : tuning);
+        double granted = clamp(state.charges() + charges, 0.0, maxCharges);
+        return new State(granted, state.lastUpdateAtMs(), state.rechargeBlockedUntilMs());
+    }
+
     @Nonnull
     private static RechargeCadence rechargeCadence(@Nonnull TwAvatarFlightConfig config,
                                                    @Nonnull AvatarFlightProgressionTuning tuning,

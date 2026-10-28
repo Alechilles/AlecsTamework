@@ -50,6 +50,11 @@ public final class RuneInputRuntime {
 
     private RuneInputRuntime() { }
 
+    /** True for the root a command item's E/R binding uses. Avatar flight takes those inputs over. */
+    public static boolean isRuneInputRoot(@Nullable String rootId) {
+        return ROOTS[0].equals(rootId) || ROOTS[1].equals(rootId);
+    }
+
     public static boolean isSupported() {
         return NativeRuneSlots.isSupported();
     }
