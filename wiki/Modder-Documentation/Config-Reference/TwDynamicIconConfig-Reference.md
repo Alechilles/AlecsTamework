@@ -54,6 +54,27 @@ asset, placing more specific predicates first. Alec's Cats uses priority `100`
 so its coat variants take precedence over Animal Husbandry's generic cat asset
 at priority `0`.
 
+## High-resolution panel portraits
+
+Item icons must be 64x64; larger item icons render as stripes. To show a sharper
+portrait on command and bonded panel cards, add `PortraitDefault` beside
+`IconDefault`, and `Portrait` beside an override's `Icon`:
+
+```json
+{
+  "RoleIds": ["Sheep", "Tamed_Sheep"],
+  "IconDefault": "Icons/ItemsGenerated/MyMod/Sheep/base.png",
+  "PortraitDefault": "MyMod/Portraits/Sheep/base.png"
+}
+```
+
+Portrait paths are relative to `Common/UI/Custom/`, so the PNGs are packed into
+the client UI atlas that all mods share (8192x8192). Panel cards draw the
+portrait instead of the item icon whenever the resolved icon has one; capture
+items keep the 64x64 icon. Both fields are optional. 128x128 portraits look
+sharp on the 92px card slot. Each one costs atlas space, so add them only for a
+small set of roles and variants.
+
 ## Inheritance and reload
 
 Omitted fields inherit from `Parent`. Explicit scalar values replace parent

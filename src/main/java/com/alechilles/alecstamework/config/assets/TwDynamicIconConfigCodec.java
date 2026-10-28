@@ -19,6 +19,11 @@ public final class TwDynamicIconConfigCodec {
                     TwDynamicIconConfig.IconOverride::getIcon)
             .documentation("PNG icon asset path selected when this override matches.")
             .add()
+            .<String>append(new KeyedCodec<>("Portrait", Codec.STRING),
+                    TwDynamicIconConfig.IconOverride::setPortrait,
+                    TwDynamicIconConfig.IconOverride::getPortrait)
+            .documentation("Optional high-resolution panel portrait for this override's Icon, relative to Common/UI/Custom. Panel cards draw it instead of the 64x64 item icon.")
+            .add()
             .<Map<String, String>>append(new KeyedCodec<>("Attachments", MapCodec.STRING_HASH_MAP_CODEC),
                     TwDynamicIconConfig.IconOverride::setAttachments,
                     TwDynamicIconConfig.IconOverride::getAttachments)
@@ -58,6 +63,11 @@ public final class TwDynamicIconConfigCodec {
                     TwDynamicIconConfig::setIconDefault,
                     TwDynamicIconConfig::getIconDefault)
             .documentation("Fallback PNG icon path when no attachment override matches. Inheritance: omitted inherits from the parent.")
+            .add()
+            .<String>append(new KeyedCodec<>("PortraitDefault", Codec.STRING),
+                    TwDynamicIconConfig::setPortraitDefault,
+                    TwDynamicIconConfig::getPortraitDefault)
+            .documentation("Optional high-resolution panel portrait for IconDefault, relative to Common/UI/Custom. Item icons must stay 64x64, so panel cards draw this UI texture instead when set. Inheritance: omitted inherits from the parent.")
             .add()
             .<TwDynamicIconConfig.IconOverride[]>append(new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
                     TwDynamicIconConfig::setIconOverrides,

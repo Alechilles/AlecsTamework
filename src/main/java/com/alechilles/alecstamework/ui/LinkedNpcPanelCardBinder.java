@@ -866,7 +866,9 @@ final class LinkedNpcPanelCardBinder {
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {
         LinkedNpcPanelPortraitBinder.bind(commands, card, entry);
         commands.set(card + " #Portrait.Style", Value.ref("TameworkLinkedNpcPanelCard.ui", compact ? "PortraitCompactStyle" : "PortraitStyle"));
-        commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 30 : 39, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92));
+        Anchor portraitAnchor = fixedAnchor(compact ? 30 : 39, compact ? 96 : 27, compact ? 48 : 92, compact ? 48 : 92);
+        commands.setObject(card + " #Portrait.Anchor", portraitAnchor);
+        commands.setObject(card + " #PortraitArt.Anchor", portraitAnchor);
         int activeTop = compact ? 56 : 96;
         boolean portrait = !entry.portraitIcon().isBlank();
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(

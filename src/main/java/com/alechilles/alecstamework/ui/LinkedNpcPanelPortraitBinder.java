@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -15,10 +16,19 @@ final class LinkedNpcPanelPortraitBinder {
         bindIcon(commands, card + " #Portrait", entry.portraitIcon());
     }
 
+    /**
+     * Binds the item-icon grid at {@code selector} and its sibling {@code selector + "Art"} Group.
+     * A configured high-resolution portrait draws in the Group; item icons are limited to 64x64.
+     */
     static void bindIcon(UICommandBuilder commands, String selector, @Nullable String icon) {
-        ItemGridSlot slot = portraitSlot(icon);
+        String art = TwDynamicIconConfig.resolvePortrait(icon);
+        ItemGridSlot slot = art == null ? portraitSlot(icon) : null;
         commands.set(selector + ".Visible", slot != null);
         commands.set(selector + ".Slots", slot == null ? List.<ItemGridSlot>of() : List.of(slot));
+        commands.set(selector + "Art.Visible", art != null);
+        if (art != null) {
+            commands.set(selector + "Art.Background", art);
+        }
     }
 
     @Nullable

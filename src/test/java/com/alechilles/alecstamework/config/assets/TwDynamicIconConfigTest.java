@@ -84,6 +84,32 @@ class TwDynamicIconConfigTest {
                 List.of(explicitEmpty), "Tamed_Goat", Map.of("Coat", "White")));
     }
 
+    @Test
+    void codecPairsPortraitsWithResolvedIconsOfWinningConfigs() {
+        TwDynamicIconConfig config = decode("""
+                {
+                  "RoleIds": ["Tamed_Camel"],
+                  "IconDefault": "Icons/Camel.png",
+                  "PortraitDefault": "Pack/Portraits/Camel.png",
+                  "IconOverrides": [
+                    { "Icon": "Icons/Camel-Red.png", "Portrait": "Pack/Portraits/Camel-Red.png", "Attachments": { "Shell": "Red" } },
+                    { "Icon": "Icons/Camel-Blue.png", "Attachments": { "Shell": "Blue" } }
+                  ]
+                }
+                """);
+        config.setId("Pack:Camel");
+        TwDynamicIconConfig disabled = decode("""
+                { "Enabled": false, "RoleIds": ["Tamed_Cow"], "IconDefault": "Icons/Cow.png", "PortraitDefault": "Pack/Cow.png" }
+                """);
+        disabled.setId("Pack:Cow");
+        List<TwDynamicIconConfig> configs = List.of(config, disabled);
+
+        assertEquals("Pack/Portraits/Camel.png", TwDynamicIconConfig.resolvePortraitForTest(configs, "Icons/Camel.png"));
+        assertEquals("Pack/Portraits/Camel-Red.png", TwDynamicIconConfig.resolvePortraitForTest(configs, "Icons/Camel-Red.png"));
+        assertNull(TwDynamicIconConfig.resolvePortraitForTest(configs, "Icons/Camel-Blue.png"));
+        assertNull(TwDynamicIconConfig.resolvePortraitForTest(configs, "Icons/Cow.png"));
+    }
+
     private static TwDynamicIconConfig decode(String json) {
         return TwDynamicIconConfig.CODEC.decode(BsonDocument.parse(json), new ExtraInfo());
     }

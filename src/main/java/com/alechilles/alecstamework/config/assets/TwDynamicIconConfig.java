@@ -8,6 +8,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -27,7 +28,7 @@ public final class TwDynamicIconConfig
     private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
-    private static volatile Map<String, TwDynamicIconConfig> ROLE_CACHE = Map.of();
+    private static volatile Caches CACHES = new Caches(Map.of(), Map.of());
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -35,6 +36,7 @@ public final class TwDynamicIconConfig
     private int priority;
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private String iconDefault;
+    private String portraitDefault;
     private IconOverride[] iconOverrides = EMPTY_ICON_OVERRIDES;
 
     TwDynamicIconConfig() {
@@ -73,22 +75,41 @@ public final class TwDynamicIconConfig
         if (normalizedRoleId.isEmpty()) {
             return null;
         }
+        Caches caches = currentCaches();
+        TwDynamicIconConfig config = caches == null ? null : caches.roles().get(normalizedRoleId);
+        return config == null ? null : config.resolve(attachments);
+    }
+
+    /**
+     * Returns the high-resolution UI portrait paired with a resolved icon, or null when none is configured.
+     * The path is relative to {@code Common/UI/Custom}; the 64x64 item icon stays the fallback.
+     */
+    @Nullable
+    public static String resolvePortrait(@Nullable String icon) {
+        if (icon == null || icon.isBlank()) {
+            return null;
+        }
+        Caches caches = currentCaches();
+        return caches == null ? null : caches.portraits().get(icon);
+    }
+
+    @Nullable
+    private static Caches currentCaches() {
         DefaultAssetMap<String, TwDynamicIconConfig> assetMap = getAssetMap();
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwDynamicIconConfig> cache = ROLE_CACHE;
-        if (ROLE_CACHE_DIRTY || cache == null) {
+        Caches caches = CACHES;
+        if (ROLE_CACHE_DIRTY) {
             synchronized (ROLE_CACHE_LOCK) {
-                if (ROLE_CACHE_DIRTY || ROLE_CACHE == null) {
-                    ROLE_CACHE = buildRoleCache(assetMap.getAssetMap().values());
+                if (ROLE_CACHE_DIRTY) {
+                    CACHES = buildCaches(assetMap.getAssetMap().values());
                     ROLE_CACHE_DIRTY = false;
                 }
-                cache = ROLE_CACHE;
+                caches = CACHES;
             }
         }
-        TwDynamicIconConfig config = cache.get(normalizedRoleId);
-        return config == null ? null : config.resolve(attachments);
+        return caches;
     }
 
     @Nullable
@@ -97,6 +118,30 @@ public final class TwDynamicIconConfig
                                      @Nullable Map<String, String> attachments) {
         TwDynamicIconConfig config = buildRoleCache(configs).get(TwConfigLookup.normalizeRoleId(roleId));
         return config == null ? null : config.resolve(attachments);
+    }
+
+    @Nullable
+    static String resolvePortraitForTest(@Nullable Collection<TwDynamicIconConfig> configs, @Nullable String icon) {
+        return buildCaches(configs).portraits().get(icon);
+    }
+
+    @Nonnull
+    private static Caches buildCaches(@Nullable Collection<TwDynamicIconConfig> configs) {
+        Map<String, TwDynamicIconConfig> roles = buildRoleCache(configs);
+        // Panel cards only carry the resolved icon path, so portraits are looked up by that icon.
+        // Only role-winning configs contribute, and the first mapping for an icon wins.
+        Map<String, String> portraits = new HashMap<>();
+        for (TwDynamicIconConfig config : roles.values()) {
+            putPortrait(portraits, config.getIconDefault(), config.getPortraitDefault());
+            for (IconOverride override : config.getIconOverrides()) {
+                if (override != null) putPortrait(portraits, override.getIcon(), override.getPortrait());
+            }
+        }
+        return new Caches(roles, Map.copyOf(portraits));
+    }
+
+    private static void putPortrait(Map<String, String> portraits, @Nullable String icon, @Nullable String portrait) {
+        if (icon != null && portrait != null) portraits.putIfAbsent(icon, portrait);
     }
 
     @Nonnull
@@ -148,6 +193,7 @@ public final class TwDynamicIconConfig
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
         if (!explicitTopLevelKeys.contains("IconDefault")) iconDefault = parent.iconDefault;
+        if (!explicitTopLevelKeys.contains("PortraitDefault")) portraitDefault = parent.portraitDefault;
         if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
     }
 
@@ -175,6 +221,11 @@ public final class TwDynamicIconConfig
         return nonBlankOrNull(iconDefault);
     }
 
+    @Nullable
+    public String getPortraitDefault() {
+        return nonBlankOrNull(portraitDefault);
+    }
+
     @Nonnull
     public IconOverride[] getIconOverrides() {
         return iconOverrides == null ? EMPTY_ICON_OVERRIDES : iconOverrides;
@@ -187,6 +238,7 @@ public final class TwDynamicIconConfig
     void setPriority(@Nullable Integer value) { priority = value == null ? 0 : value; }
     void setRoleIds(@Nullable String[] value) { roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value; }
     void setIconDefault(@Nullable String value) { iconDefault = value; }
+    void setPortraitDefault(@Nullable String value) { portraitDefault = value; }
     void setIconOverrides(@Nullable IconOverride[] value) {
         iconOverrides = value == null ? EMPTY_ICON_OVERRIDES : value;
     }
@@ -196,9 +248,14 @@ public final class TwDynamicIconConfig
         return value == null || value.isBlank() ? null : value;
     }
 
+    /** Role winners and their icon-to-portrait pairs, swapped together on reload. */
+    private record Caches(Map<String, TwDynamicIconConfig> roles, Map<String, String> portraits) {
+    }
+
     /** One ordered attachment-specific icon override. */
     public static final class IconOverride {
         private String icon;
+        private String portrait;
         private Map<String, String> attachments = Map.of();
 
         IconOverride() {
@@ -207,6 +264,11 @@ public final class TwDynamicIconConfig
         @Nullable
         public String getIcon() {
             return nonBlankOrNull(icon);
+        }
+
+        @Nullable
+        public String getPortrait() {
+            return nonBlankOrNull(portrait);
         }
 
         @Nonnull
@@ -229,6 +291,7 @@ public final class TwDynamicIconConfig
         }
 
         void setIcon(@Nullable String value) { icon = value; }
+        void setPortrait(@Nullable String value) { portrait = value; }
         void setAttachments(@Nullable Map<String, String> value) { attachments = value == null ? Map.of() : value; }
     }
 }
