@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.6.0 - Server Networks and Husbandry Rewards - 2026-10-28
 
 ### Added
 
