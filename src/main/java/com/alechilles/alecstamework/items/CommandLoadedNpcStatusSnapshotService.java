@@ -12,7 +12,9 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
 import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionNames;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
@@ -117,7 +119,12 @@ public final class CommandLoadedNpcStatusSnapshotService {
             displayName = resolvedContext.fallbackDisplayName();
         }
         String speciesId = resolvedRoleId;
-        String speciesLabel = resolvedRoleId;
+        String speciesLabel = firstNonBlank(
+                BondedCompanionNames.speciesLabel(null,
+                        firstNonBlank(RoleNameResolver.resolveRoleNameKey(roleResolution.roleId()),
+                                resolvedContext.cachedNameKey(), null),
+                        roleResolution.roleId(), language),
+                resolvedRoleId, null);
         String gender = CompanionGenderService.resolveGender(npcRef, store, resolvedRoleId, null);
         boolean hasHome = resolvedContext.hasHome();
         TameworkCommandLinksComponent links = safeGetComponent(store, npcRef, TameworkCommandLinksComponent.getComponentType());
