@@ -82,8 +82,12 @@ public final class RoleNameResolver {
         if (npcPlugin == null) {
             return null;
         }
-        int roleIndex = npcPlugin.getIndex(roleId.trim());
-        return resolveRoleNameKey(roleIndex, npcPlugin);
+        try {
+            return resolveRoleNameKey(npcPlugin.getIndex(roleId.trim()), npcPlugin);
+        } catch (RuntimeException ignored) {
+            // NPCPlugin exists before its role builders load.
+            return null;
+        }
     }
 
     @Nullable
