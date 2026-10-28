@@ -50,6 +50,8 @@
 - A capture item that is newer than the server's copy of its companion (for
   example after restoring an old backup of the companion folder) is no longer
   emptied when it is used.
+- A command flute's tooltip shows a saved view's species by their names (for example "Cow")
+  instead of role ids such as `tamed_cow`.
 
 ## 5.5.2 - Telemetry Upload Hotfix - 2026-10-22
 
