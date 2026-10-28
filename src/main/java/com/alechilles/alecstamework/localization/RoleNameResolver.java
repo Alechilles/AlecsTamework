@@ -73,10 +73,6 @@ public final class RoleNameResolver {
         return resolveRoleNameKey(role.getRoleName());
     }
 
-    /**
-     * Resolves a role's name key from its ID in any letter case. Saved companion views store species
-     * IDs lowercased, so an exact miss falls back to a case-insensitive scan of the role names.
-     */
     @Nullable
     public static String resolveRoleNameKey(@Nullable String roleId) {
         if (roleId == null || roleId.isBlank()) {
@@ -86,16 +82,7 @@ public final class RoleNameResolver {
         if (npcPlugin == null) {
             return null;
         }
-        String id = roleId.trim();
-        int roleIndex = npcPlugin.getIndex(id);
-        if (roleIndex < 0) {
-            for (String roleName : npcPlugin.getRoleTemplateNames(false)) {
-                if (roleName.equalsIgnoreCase(id)) {
-                    roleIndex = npcPlugin.getIndex(roleName);
-                    break;
-                }
-            }
-        }
+        int roleIndex = npcPlugin.getIndex(roleId.trim());
         return resolveRoleNameKey(roleIndex, npcPlugin);
     }
 

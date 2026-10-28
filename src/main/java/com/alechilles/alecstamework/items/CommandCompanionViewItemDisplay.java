@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.ui.CompanionViewSettings;
 import com.hypixel.hytale.server.core.Message;
@@ -65,10 +66,8 @@ final class CommandCompanionViewItemDisplay {
         }
         if (settings.nearby()) lines.add(Message.translation(PREFIX + "nearby"));
         if (!settings.speciesIds().isEmpty()) {
-            lines.add(line("species", join(settings.speciesIds().stream().map(id -> {
-                String key = RoleNameResolver.resolveRoleNameKey(id);
-                return key == null ? Message.raw(id) : Message.translation(key);
-            }).toList())));
+            lines.add(line("species", join(settings.speciesIds().stream()
+                    .map(CommandCompanionViewItemDisplay::speciesName).toList())));
         }
         if (!settings.groupIds().isEmpty()) {
             Map<String, String> groups = new CommandGroupService().readGroups(player, stack).stream()
@@ -90,6 +89,24 @@ final class CommandCompanionViewItemDisplay {
             content.add(line.color(FILTER_LABEL));
         }
         return Message.join(content.toArray(Message[]::new));
+    }
+
+    /**
+     * A species as a client translation. Views store species as lowercased role ids, which the role
+     * registry may not match, so this falls back to the first role-name key the server can translate.
+     */
+    private static Message speciesName(String id) {
+        String key = RoleNameResolver.resolveRoleNameKey(id);
+        if (key == null) {
+            for (String candidate : RoleNameResolver.buildNameKeyCandidates(id)) {
+                if (candidate.startsWith("server.")
+                        && !LocalizedText.resolve((String) null, candidate).equals(candidate)) {
+                    key = candidate;
+                    break;
+                }
+            }
+        }
+        return key == null ? Message.raw(id) : Message.translation(key);
     }
 
     private static Message line(String key, Message value) {
