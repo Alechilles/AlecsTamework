@@ -26,6 +26,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 - `TwManagedActivityConfig`: `<ModRoot>/Server/Tamework/ManagedActivities/*.json`
 - `TwBondedCompanionRosterConfig`: `<ModRoot>/Server/Tamework/BondedCompanions/Rosters/*.json`
+- `TwModSettingsConfig`: `<ModRoot>/Server/Tamework/ModSettings/*.json` (one group of server settings per file; see the Mod Settings Guide)
 
 ## Resolution patterns
 ### Single active global config

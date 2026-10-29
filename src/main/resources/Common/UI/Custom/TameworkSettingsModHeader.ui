@@ -1,0 +1,15 @@
+// One mod's heading on the Mod Settings tab of TameworkSettingsPage.ui; Java sets the manifest name.
+@ModHeaderLabelStyle = LabelStyle(FontSize: 13, FontName: "Secondary", RenderUppercase: true, LetterSpacing: 1, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 42);
+
+  Group { Anchor: (Left: 0, Top: 15, Width: 4, Height: 20); Background: #e8aa35; }
+  Group { Anchor: (Left: 0, Right: 12, Bottom: 0, Height: 1); Background: #ffffff(0.1); }
+
+  Label #ModHeaderLabel {
+    Anchor: (Top: 8, Left: 14, Right: 12, Height: 34);
+    Text: "";
+    Style: @ModHeaderLabelStyle;
+  }
+}

@@ -57,6 +57,27 @@ $C.@PageOverlay {
       Anchor: (Top: 52, Left: 12, Right: 12, Bottom: 12);
       LayoutMode: Top;
 
+      // General holds the Tamework settings; Mod Settings lists settings that installed mods declare.
+      // Java swaps the selected style and which panel is visible.
+      Group #TwSettingsTabs {
+        Anchor: (Left: 8, Right: 8, Height: 30);
+        LayoutMode: Left;
+
+        TextButton #TwSettingsGeneralTab {
+          Anchor: (Width: 230, Height: 30);
+          Text: %server.tamework.ui.settings.tab.general;
+          Style: $A.@CompanionTabButtonSelected;
+        }
+
+        Group { Anchor: (Width: 4); }
+
+        TextButton #TwSettingsModSettingsTab {
+          Anchor: (Width: 230, Height: 30);
+          Text: %server.tamework.ui.settings.tab.modSettings;
+          Style: $A.@CompanionTabButton;
+        }
+      }
+
       Group #TwSettingsUnsavedWarning {
         Anchor: (Left: 8, Right: 8, Height: 20);
         Visible: false;
@@ -92,7 +113,7 @@ $C.@PageOverlay {
       }
 
       // The scrolling rows sit in an inset well.
-      Group {
+      Group #TwSettingsGeneralPanel {
         Anchor: (Top: 6);
         FlexWeight: 1;
         Background: $A.@SlateTray;
@@ -1774,6 +1795,41 @@ $C.@PageOverlay {
               }
             }
           }
+        }
+      }
+
+      // Mod Settings tab. Java appends a heading per mod and group and one row per setting.
+      Group #TwModSettingsPanel {
+        Anchor: (Top: 6);
+        FlexWeight: 1;
+        Background: $A.@SlateTray;
+        Padding: (Left: 12, Right: 6, Top: 8, Bottom: 8);
+        Visible: false;
+
+        Label #TwModSettingsScopeNote {
+          Anchor: (Top: 0, Left: 2, Right: 12, Height: 20);
+          Text: %server.tamework.ui.settings.modSettings.scopeNote;
+          Style: (FontSize: 11, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        }
+
+        Group #TwModSettingsViewport {
+          Anchor: (Top: 24, Left: 0, Right: 0, Bottom: 0);
+          LayoutMode: TopScrolling;
+          KeepScrollPosition: true;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          Padding: (Left: 2, Right: 0, Top: 2, Bottom: 2);
+
+          Group #TwModSettingsRows {
+            LayoutMode: Top;
+            Anchor: (Left: 0, Right: 0, Bottom: 0);
+          }
+        }
+
+        Label #TwModSettingsEmptyLabel {
+          Anchor: (Top: 30, Left: 2, Right: 12, Height: 22);
+          Text: %server.tamework.ui.settings.modSettings.empty;
+          Style: (FontSize: 13, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Visible: false;
         }
       }
     }

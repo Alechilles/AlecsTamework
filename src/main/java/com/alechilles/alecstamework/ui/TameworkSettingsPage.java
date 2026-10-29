@@ -17,6 +17,8 @@ import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
+import com.alechilles.alecstamework.settings.mods.ModSettingsService;
+import com.google.gson.JsonPrimitive;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -29,6 +31,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -38,6 +41,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -45,7 +49,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Curated /tw settings page for common global settings.
+ * Curated /tw settings page for common global settings. The General tab holds Tamework's own settings;
+ * the Mod Settings tab ({@link TameworkSettingsModTab}) holds settings that installed mods declare.
+ * Edits on both tabs wait for Apply, which saves them together.
  */
 public final class TameworkSettingsPage extends InteractiveCustomUIPage<TameworkSettingsPage.EventPayload> {
     public static final String UI_PATH = "TameworkSettingsPage.ui";
@@ -57,6 +63,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_CLOSE = "Close";
     private static final String ACTION_EDIT = "Edit";
     private static final String ACTION_EDIT_HUD_DEFAULT = "EditHudDefault";
+    private static final String ACTION_SELECT_TAB = "SelectTab";
+    private static final String KEY_TAB = "Tab";
+    private static final String TAB_GENERAL = "General";
+    private static final String TAB_MOD_SETTINGS = "ModSettings";
+    private static final String SLATE_STYLES = "TameworkSlateStyles.ui";
 
     private static final String KEY_ANNOUNCEMENTS_ENABLED = "@AnnouncementsEnabled";
     private static final String KEY_NAME_FILTER_ENABLED = "@NameFilterEnabled";
@@ -109,6 +120,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private final Tamework plugin;
     private final World world;
     private final TameworkSettingsFormParser formParser;
+    /** Settings that other mods declare; their edits wait for Apply like the rest of the page. */
+    private final TameworkSettingsModTab modTab;
 
     private TameworkSettingsValues currentValues;
     private TameworkSettingsValues savedValues;
@@ -125,6 +138,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private boolean applyInProgress;
     /** Set when this page hands over to the HUD default editor, which returns here; skips the leaving reminder. */
     private boolean openingHudDefaultEditor;
+    private boolean modSettingsTabSelected;
 
     public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
                                 @Nonnull Tamework plugin,
@@ -133,6 +147,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
         this.formParser = new TameworkSettingsFormParser(playerRef, plugin.getLogger());
+        this.modTab = new TameworkSettingsModTab(playerRef, plugin);
         loadCurrentValues();
     }
 
@@ -145,6 +160,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             commandBuilder.append(UI_PATH);
             bindStaticEvents(eventBuilder);
             render(commandBuilder);
+            modTab.render(commandBuilder, eventBuilder);
         } catch (Throwable throwable) {
             plugin.getLogger().at(Level.WARNING).withCause(throwable)
                     .log("Failed to build Tamework settings page.");
@@ -181,9 +197,39 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data, store);
             case ACTION_EDIT_HUD_DEFAULT -> onEditHudDefault(data, ref, store);
+            case ACTION_SELECT_TAB -> onSelectTab(data);
+            case TameworkSettingsModTab.ACTION_BOOL, TameworkSettingsModTab.ACTION_CHOICE,
+                 TameworkSettingsModTab.ACTION_TEXT, TameworkSettingsModTab.ACTION_RESET -> onModSettingEdit(action, data);
             default -> {
             }
         }
+    }
+
+    private void onSelectTab(@Nonnull EventPayload payload) {
+        modSettingsTabSelected = TAB_MOD_SETTINGS.equals(trim(payload.tab));
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        renderTabs(commandBuilder);
+        sendUpdate(commandBuilder, null, false);
+    }
+
+    private void onModSettingEdit(@Nonnull String action, @Nonnull EventPayload payload) {
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        if (!modTab.onEvent(action, payload.modSettingId, payload.modSettingBool, payload.modSettingValue, commandBuilder)) {
+            return;
+        }
+        warningLine = "";
+        updateUnsavedChanges();
+        appendFeedback(commandBuilder);
+        sendUpdate(commandBuilder, null, false);
+    }
+
+    private void renderTabs(@Nonnull UICommandBuilder commandBuilder) {
+        commandBuilder.set("#TwSettingsGeneralPanel.Visible", !modSettingsTabSelected);
+        commandBuilder.set("#TwModSettingsPanel.Visible", modSettingsTabSelected);
+        commandBuilder.set("#TwSettingsGeneralTab.Style", Value.ref(SLATE_STYLES,
+                modSettingsTabSelected ? "CompanionTabButton" : "CompanionTabButtonSelected"));
+        commandBuilder.set("#TwSettingsModSettingsTab.Style", Value.ref(SLATE_STYLES,
+                modSettingsTabSelected ? "CompanionTabButtonSelected" : "CompanionTabButton"));
     }
 
     @Override
@@ -202,6 +248,18 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             String selector = valueSelector.substring(0, valueSelector.length() - ".Value".length());
             eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, selector, editEvent, false);
         }
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TwSettingsGeneralTab",
+                EventData.of(ACTION, ACTION_SELECT_TAB).append(KEY_TAB, TAB_GENERAL),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TwSettingsModSettingsTab",
+                EventData.of(ACTION, ACTION_SELECT_TAB).append(KEY_TAB, TAB_MOD_SETTINGS),
+                false
+        );
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TwSettingsRefreshButton",
@@ -288,6 +346,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
+        renderTabs(commandBuilder);
         CompanionHudPlacement hudDefault = CompanionHudDefaultsStore.current();
         commandBuilder.set("#TwSettingsHudDefaultValue.Text", LocalizedText.format(playerRef,
                 "tamework.ui.hudPlacement.summary",
@@ -394,12 +453,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void updateUnsavedChanges() {
         if (draftPayload == null) {
             unsavedChanges = !currentValues.equals(savedValues) || !currentNameFilter.equals(savedNameFilter)
-                    || !currentDeploy.equals(savedDeploy);
+                    || !currentDeploy.equals(savedDeploy) || modTab.hasPendingEdits();
             return;
         }
         unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues)
                 || !nameFilterFrom(draftPayload).equals(savedNameFilter)
-                || !deployFrom(draftPayload).equals(savedDeploy);
+                || !deployFrom(draftPayload).equals(savedDeploy)
+                || modTab.hasPendingEdits();
     }
 
     private void renderFeedback(@Nonnull UICommandBuilder commandBuilder) {
@@ -417,6 +477,21 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void refreshFeedback() {
         UICommandBuilder commandBuilder = new UICommandBuilder();
+        appendFeedback(commandBuilder);
+        sendUpdate(commandBuilder, null, false);
+    }
+
+    /** Rebuilds the mod setting rows, for example to show values saved by Apply, along with the feedback. */
+    private void refreshModSettingRows() {
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        UIEventBuilder eventBuilder = new UIEventBuilder();
+        bindStaticEvents(eventBuilder);
+        modTab.render(commandBuilder, eventBuilder);
+        appendFeedback(commandBuilder);
+        sendUpdate(commandBuilder, eventBuilder, false);
+    }
+
+    private void appendFeedback(@Nonnull UICommandBuilder commandBuilder) {
         renderFeedback(commandBuilder);
         if (draftPayload != null) {
             TameworkSettingsFormParser.ParseResult draft = parseValues(draftPayload);
@@ -431,7 +506,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                             ? currentValues.captureItemOwnership().toConfigValue()
                             : draftPayload.captureItemOwnership));
         }
-        sendUpdate(commandBuilder, null, false);
     }
 
     /**
@@ -493,6 +567,15 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             refreshFeedback();
             return;
         }
+        TameworkSettingsModTab.Collected modEdits = modTab.collect();
+        if (modEdits.invalidLabel() != null) {
+            warningLine = formatText("tamework.ui.settings.modSettings.warning.invalidNumber", modEdits.invalidLabel());
+            statusLine = "";
+            refreshFeedback();
+            return;
+        }
+        Map<String, JsonPrimitive> modChanges = modEdits.changes();
+        ModSettingsService modService = plugin.getModSettingsService();
 
         TameworkSettingsValues requested = parseResult.values();
         NameFilterSettings requestedNameFilter = nameFilterFrom(payload);
@@ -507,18 +590,21 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         warningLine = "";
         refreshFeedback();
 
+        // Both saves run off the world thread; the mod settings save waits for the main one to succeed.
         CompletableFuture
                 .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter,
                         requestedDeploy, previousDeploy))
-                .whenComplete((outcome, throwable) -> world.execute(() -> {
+                .thenCompose(outcome -> applyModSettings(outcome, modService, modChanges))
+                .whenComplete((result, throwable) -> world.execute(() -> {
                     applyInProgress = false;
-                    if (throwable != null) {
+                    if (throwable != null || result == null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Tamework settings apply failed.");
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                         refreshFeedback();
                         return;
                     }
+                    ApplyOutcome outcome = result.settings();
                     if (outcome == null) {
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
@@ -542,8 +628,60 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         statusLine = "";
                         warningLine = outcome.warning();
                     }
-                    refreshFeedback();
+                    if (modChanges.isEmpty() || outcome == null || !outcome.success()) {
+                        refreshFeedback();
+                        return;
+                    }
+                    showModApplyResult(result, modEdits);
+                    refreshModSettingRows();
                 }));
+    }
+
+    /** Saves mod setting edits after the main settings saved; completes with both results. */
+    @Nonnull
+    private static CompletableFuture<ApplyResult> applyModSettings(@Nullable ApplyOutcome outcome,
+                                                                   @Nullable ModSettingsService service,
+                                                                   @Nonnull Map<String, JsonPrimitive> changes) {
+        if (outcome == null || !outcome.success() || changes.isEmpty()) {
+            return CompletableFuture.completedFuture(new ApplyResult(outcome, null, null));
+        }
+        if (service == null) {
+            return CompletableFuture.completedFuture(new ApplyResult(outcome, null,
+                    new IllegalStateException("Mod settings service is not available.")));
+        }
+        try {
+            return service.apply(changes)
+                    .handle((mods, failure) -> new ApplyResult(outcome, mods, failure))
+                    .toCompletableFuture();
+        } catch (RuntimeException failure) {
+            return CompletableFuture.completedFuture(new ApplyResult(outcome, null, failure));
+        }
+    }
+
+    /** Adds the mod settings outcome to the status line; a failed save keeps the edits pending. */
+    private void showModApplyResult(@Nonnull ApplyResult result, @Nonnull TameworkSettingsModTab.Collected modEdits) {
+        if (result.modFailure() != null || result.mods() == null) {
+            plugin.getLogger().at(Level.WARNING).withCause(result.modFailure()).log("Saving mod settings from /tw settings failed.");
+            warningLine = joinSentences(warningLine, resolveText("tamework.ui.settings.modSettings.warning.saveFailed"));
+            return;
+        }
+        modTab.markApplied(modEdits);
+        updateUnsavedChanges();
+        switch (result.mods()) {
+            case APPLIED -> statusLine = joinSentences(statusLine,
+                    resolveText("tamework.ui.settings.modSettings.status.applied"));
+            case RESTART_REQUIRED -> statusLine = joinSentences(statusLine,
+                    resolveText("tamework.ui.settings.modSettings.status.restart"));
+            case PATCH_FAILURES -> warningLine = joinSentences(warningLine,
+                    resolveText("tamework.ui.settings.modSettings.warning.patchFailures"));
+            case NOT_REGENERATED -> warningLine = joinSentences(warningLine,
+                    resolveText("tamework.ui.settings.modSettings.warning.notRegenerated"));
+        }
+    }
+
+    @Nonnull
+    private static String joinSentences(@Nonnull String first, @Nonnull String second) {
+        return first.isBlank() ? second : first + " " + second;
     }
 
     private void onLoadPreset(@Nonnull EventPayload payload) {
@@ -621,6 +759,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         UIEventBuilder eventBuilder = new UIEventBuilder();
         render(commandBuilder);
         bindStaticEvents(eventBuilder);
+        modTab.render(commandBuilder, eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
     }
 
@@ -650,6 +789,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         savedNameFilter = currentNameFilter;
         currentDeploy = DeployPlacesStore.cachedOrDefault();
         savedDeploy = currentDeploy;
+        modTab.discardPendingEdits();
         draftPayload = null;
         unsavedChanges = false;
         warningLine = "";
@@ -789,6 +929,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
     }
 
+    /** The main settings outcome, plus the mod settings outcome or failure when mod edits were saved. */
+    private record ApplyResult(@Nullable ApplyOutcome settings,
+                               @Nullable ModSettingsService.ApplyOutcome mods,
+                               @Nullable Throwable modFailure) {
+    }
+
     /** Event payload for settings page actions. */
     public static final class EventPayload {
         public static final BuilderCodec<EventPayload> CODEC = BuilderCodec.builder(EventPayload.class, EventPayload::new)
@@ -840,6 +986,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_ALLOWED_WORDS, Codec.STRING), (x, v) -> x.nameFilterAllowedWords = v, x -> x.nameFilterAllowedWords).add()
                 .<String>append(new KeyedCodec<>(KEY_DEPLOY_MODE, Codec.STRING), (x, v) -> x.deployMode = v, x -> x.deployMode).add()
                 .<String>append(new KeyedCodec<>(KEY_DEPLOY_PLACES, Codec.STRING), (x, v) -> x.deployPlaces = v, x -> x.deployPlaces).add()
+                .<String>append(new KeyedCodec<>(KEY_TAB, Codec.STRING), (x, v) -> x.tab = v, x -> x.tab).add()
+                .<String>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_ID, Codec.STRING), (x, v) -> x.modSettingId = v, x -> x.modSettingId).add()
+                .<Boolean>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_BOOL, Codec.BOOLEAN), (x, v) -> x.modSettingBool = v, x -> x.modSettingBool).add()
+                .<String>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_VALUE, Codec.STRING), (x, v) -> x.modSettingValue = v, x -> x.modSettingValue).add()
                 .build();
 
         String action;
@@ -890,5 +1040,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String nameFilterAllowedWords;
         String deployMode;
         String deployPlaces;
+        String tab;
+        String modSettingId;
+        Boolean modSettingBool;
+        String modSettingValue;
     }
 }

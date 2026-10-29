@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Mods can add their own server settings. A mod declares a group of settings in `Server/Tamework/ModSettings/*.json`
+  (checkbox, dropdown, or number) and its Patchwork patches read them with the new `Setting` condition or `$Setting`
+  values, so changing a setting changes the mod's assets. No Java is needed. See the Mod Settings Guide.
+- `/tw settings` has a new **Mod Settings** tab that lists every installed mod's settings grouped by mod and group.
+  After **Apply**, Tamework rebuilds the affected patches and says whether the change is live or needs a restart.
+- `/tw modsetting list|get|set|reset` changes the same settings from chat or the server console.
+
+### Changed
+
+- Embeds Patchwork 1.5.0.
+
 ## 5.6.0 - Server Networks and Husbandry Rewards - 2026-10-28
 
 ### Added

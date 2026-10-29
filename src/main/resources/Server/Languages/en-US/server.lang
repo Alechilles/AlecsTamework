@@ -2016,3 +2016,39 @@ tamework.commands.setTarget.owner.not.found=NPC {0} has no owner in this world.
 tamework.commands.setTarget.no.slots=Role {0} has no target slots.
 tamework.commands.setTarget.done=Set target slot {1} of NPC {0} to its owner.
 tamework.commands.setTarget.unknown.slot=Role {1} has no target slot {0}.
+tamework.commands.modSetting.description=View and change settings that mods add.
+tamework.commands.modSetting.list.description=List every mod setting and its value.
+tamework.commands.modSetting.get.description=Show the value of one mod setting.
+tamework.commands.modSetting.set.description=Change a mod setting.
+tamework.commands.modSetting.reset.description=Put a mod setting back to its default.
+tamework.commands.modSetting.argument.id=Setting ID, such as AH_WildDragons.
+tamework.commands.modSetting.argument.value=New value.
+tamework.commands.modSetting.unavailable=Mod settings are not available yet.
+tamework.commands.modSetting.none=No installed mod adds settings.
+tamework.commands.modSetting.groupHeader={0} > {1}
+tamework.commands.modSetting.value=  {0} ({1}) = {2}
+tamework.commands.modSetting.valueDefault=  {0} ({1}) = {2} (default)
+tamework.commands.modSetting.options=Allowed values: {0}
+tamework.commands.modSetting.range=Allowed range: {0} to {1}
+tamework.commands.modSetting.unknown=No mod setting has the ID {0}. Use /tw modsetting list to see them all.
+tamework.commands.modSetting.invalidValue={0} is not a valid value for {1}.
+tamework.commands.modSetting.saveFailed=Could not save the setting. Check the server log.
+tamework.commands.modSetting.saved.applied=Saved {0} = {1}. The change is live.
+tamework.commands.modSetting.saved.restart=Saved {0} = {1}. Restart the server to finish applying it.
+tamework.commands.modSetting.saved.failures=Saved {0} = {1}, but some patches failed. Check /patchwork status.
+tamework.commands.modSetting.saved.notRegenerated=Saved {0} = {1}. Run /patchwork reload or restart the server to apply it.
+tamework.ui.settings.tab.general=General
+tamework.ui.settings.tab.modSettings=Mod Settings
+tamework.ui.settings.modSettings.scopeNote=These settings apply to the whole server.
+tamework.ui.settings.modSettings.empty=No installed mods add settings yet.
+tamework.ui.settings.modSettings.noOptions=No options
+tamework.ui.settings.modSettings.resetTooltip=Put this setting back to its default when you apply.
+tamework.ui.settings.modSettings.range.between=Allowed range: {0} to {1}
+tamework.ui.settings.modSettings.range.min=Lowest allowed value: {0}
+tamework.ui.settings.modSettings.range.max=Highest allowed value: {0}
+tamework.ui.settings.modSettings.warning.invalidNumber={0} needs a number.
+tamework.ui.settings.modSettings.status.applied=Mod settings are live.
+tamework.ui.settings.modSettings.status.restart=Mod settings saved. Restart the server to finish applying them.
+tamework.ui.settings.modSettings.warning.patchFailures=Mod settings saved, but some patches failed. Check /patchwork status.
+tamework.ui.settings.modSettings.warning.notRegenerated=Mod settings saved but not applied yet. Run /patchwork reload or restart the server.
+tamework.ui.settings.modSettings.warning.saveFailed=Could not save mod settings. Check the server log.

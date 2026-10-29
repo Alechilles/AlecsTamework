@@ -70,6 +70,7 @@ import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwModSettingsConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
@@ -189,6 +190,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.settings.TameworkDataPathService;
+import com.alechilles.alecstamework.settings.mods.ModSettingsService;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
@@ -297,6 +299,7 @@ public class Tamework extends JavaPlugin {
     private CommandHudDirtySink commandHudDirtySink;
     private TameworkAssetEditorPackService assetEditorPackService;
     private TameworkPatchworkRuntime patchworkRuntime;
+    private ModSettingsService modSettingsService;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -400,6 +403,7 @@ public class Tamework extends JavaPlugin {
     private boolean coopAssetsRegistered;
     private boolean foodAssetsRegistered;
     private boolean happinessAssetsRegistered;
+    private boolean modSettingsAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
     private boolean attachmentMigrationAssetsRegistered;
@@ -546,9 +550,12 @@ public class Tamework extends JavaPlugin {
         );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
         // Patchwork must subscribe to Hytale's one-time LoadAssetEvent before plugin setup returns.
+        modSettingsService = new ModSettingsService(getDataDirectory(), getLogger());
         try {
-            patchworkRuntime = new TameworkPatchworkRuntime(this);
+            patchworkRuntime = new TameworkPatchworkRuntime(this, modSettingsService::patchworkSnapshot);
             patchworkRuntime.start();
+            TameworkPatchworkRuntime startedPatchwork = patchworkRuntime;
+            modSettingsService.setRegenerator(startedPatchwork::requestRegeneration);
             configOverrideManager = new TwConfigOverrideManager(
                     this, patchworkRuntime::generatedPatchRoot
             );
@@ -596,6 +603,7 @@ public class Tamework extends JavaPlugin {
         registerAvatarFlightAssets();
         registerFoodAssets();
         registerHappinessAssets();
+        registerModSettingsAssets();
         registerNeedsAssets();
         registerBreedingAssets();
         registerAttachmentMigrationAssets();
@@ -2398,6 +2406,12 @@ public class Tamework extends JavaPlugin {
         return configOverrideManager;
     }
 
+    /** Mod settings declared by asset packs and shown in the Mod Settings tab; null before setup. */
+    @Nullable
+    public ModSettingsService getModSettingsService() {
+        return modSettingsService;
+    }
+
     @Nullable
     public Path getRuntimeDataDirectory() {
         return runtimeDataDirectory;
@@ -3014,6 +3028,38 @@ public class Tamework extends JavaPlugin {
         deferAssetSubscription(TameworkRuntimeModule.HAPPINESS, "happiness-config-assets-removed",
                 () -> getEventRegistry().register(RemovedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsRemoved));
         happinessAssetsRegistered = true;
+    }
+
+    private void registerModSettingsAssets() {
+        if (modSettingsAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwModSettingsConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/ModSettings")
+                        .setCodec(TwModSettingsConfig.CODEC)
+                        .setKeyFunction(TwModSettingsConfig::getId)
+                        .build()
+        );
+        // The startup Patchwork pass can run before these assets load; the activation call
+        // regenerates once if that pass used different values.
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "mod-settings-assets-loaded", () -> {
+            getEventRegistry().register(LoadedAssetsEvent.class, TwModSettingsConfig.class, this::onModSettingsAssetsLoaded);
+            modSettingsService.onDeclarationsChanged();
+        });
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "mod-settings-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwModSettingsConfig.class, this::onModSettingsAssetsRemoved));
+        modSettingsAssetsRegistered = true;
+    }
+
+    private void onModSettingsAssetsLoaded(
+            LoadedAssetsEvent<String, TwModSettingsConfig, DefaultAssetMap<String, TwModSettingsConfig>> event) {
+        modSettingsService.onDeclarationsChanged();
+    }
+
+    private void onModSettingsAssetsRemoved(
+            RemovedAssetsEvent<String, TwModSettingsConfig, DefaultAssetMap<String, TwModSettingsConfig>> event) {
+        modSettingsService.onDeclarationsChanged();
     }
 
     private void registerFoodAssets() {

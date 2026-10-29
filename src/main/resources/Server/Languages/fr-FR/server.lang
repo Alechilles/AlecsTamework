@@ -2004,3 +2004,39 @@ tamework.commands.setTarget.owner.not.found=Le PNJ {0} n'a pas de propriétaire 
 tamework.commands.setTarget.no.slots=Le rôle {0} n'a pas d'emplacement de cible.
 tamework.commands.setTarget.done=L'emplacement de cible {1} du PNJ {0} pointe maintenant vers son propriétaire.
 tamework.commands.setTarget.unknown.slot=Le rôle {1} n'a pas d'emplacement de cible {0}.
+tamework.commands.modSetting.description=Afficher et modifier les paramètres ajoutés par les mods.
+tamework.commands.modSetting.list.description=Lister tous les paramètres de mods et leur valeur.
+tamework.commands.modSetting.get.description=Afficher la valeur d'un paramètre de mod.
+tamework.commands.modSetting.set.description=Modifier un paramètre de mod.
+tamework.commands.modSetting.reset.description=Remettre un paramètre de mod à sa valeur par défaut.
+tamework.commands.modSetting.argument.id=ID du paramètre, par exemple AH_WildDragons.
+tamework.commands.modSetting.argument.value=Nouvelle valeur.
+tamework.commands.modSetting.unavailable=Les paramètres de mods ne sont pas encore disponibles.
+tamework.commands.modSetting.none=Aucun mod installé n'ajoute de paramètres.
+tamework.commands.modSetting.groupHeader={0} > {1}
+tamework.commands.modSetting.value=  {0} ({1}) = {2}
+tamework.commands.modSetting.valueDefault=  {0} ({1}) = {2} (par défaut)
+tamework.commands.modSetting.options=Valeurs autorisées : {0}
+tamework.commands.modSetting.range=Plage autorisée : de {0} à {1}
+tamework.commands.modSetting.unknown=Aucun paramètre de mod n'a l'ID {0}. Utilise /tw modsetting list pour tous les voir.
+tamework.commands.modSetting.invalidValue={0} n'est pas une valeur valide pour {1}.
+tamework.commands.modSetting.saveFailed=Impossible d'enregistrer le paramètre. Consulte le journal du serveur.
+tamework.commands.modSetting.saved.applied={0} = {1} enregistré. Le changement est actif.
+tamework.commands.modSetting.saved.restart={0} = {1} enregistré. Redémarre le serveur pour finir de l'appliquer.
+tamework.commands.modSetting.saved.failures={0} = {1} enregistré, mais certains patchs ont échoué. Consulte /patchwork status.
+tamework.commands.modSetting.saved.notRegenerated={0} = {1} enregistré. Lance /patchwork reload ou redémarre le serveur pour l'appliquer.
+tamework.ui.settings.tab.general=Général
+tamework.ui.settings.tab.modSettings=Paramètres des mods
+tamework.ui.settings.modSettings.scopeNote=Ces paramètres s'appliquent à tout le serveur.
+tamework.ui.settings.modSettings.empty=Aucun mod installé n'ajoute encore de paramètres.
+tamework.ui.settings.modSettings.noOptions=Aucune option
+tamework.ui.settings.modSettings.resetTooltip=Remet ce paramètre à sa valeur par défaut lors de l'application.
+tamework.ui.settings.modSettings.range.between=Plage autorisée : de {0} à {1}
+tamework.ui.settings.modSettings.range.min=Valeur minimale autorisée : {0}
+tamework.ui.settings.modSettings.range.max=Valeur maximale autorisée : {0}
+tamework.ui.settings.modSettings.warning.invalidNumber={0} doit être un nombre.
+tamework.ui.settings.modSettings.status.applied=Les paramètres des mods sont actifs.
+tamework.ui.settings.modSettings.status.restart=Paramètres des mods enregistrés. Redémarre le serveur pour finir de les appliquer.
+tamework.ui.settings.modSettings.warning.patchFailures=Paramètres des mods enregistrés, mais certains patchs ont échoué. Consulte /patchwork status.
+tamework.ui.settings.modSettings.warning.notRegenerated=Paramètres des mods enregistrés, mais pas encore appliqués. Lance /patchwork reload ou redémarre le serveur.
+tamework.ui.settings.modSettings.warning.saveFailed=Impossible d'enregistrer les paramètres des mods. Consulte le journal du serveur.

@@ -1960,3 +1960,39 @@ tamework.commands.setTarget.owner.not.found=El PNJ {0} no tiene dueño en este m
 tamework.commands.setTarget.no.slots=El rol {0} no tiene espacios de objetivo.
 tamework.commands.setTarget.done=El espacio de objetivo {1} del PNJ {0} ahora apunta a su dueño.
 tamework.commands.setTarget.unknown.slot=El rol {1} no tiene el espacio de objetivo {0}.
+tamework.commands.modSetting.description=Ver y cambiar los ajustes que añaden los mods.
+tamework.commands.modSetting.list.description=Lista todos los ajustes de mods y sus valores.
+tamework.commands.modSetting.get.description=Muestra el valor de un ajuste de mod.
+tamework.commands.modSetting.set.description=Cambia un ajuste de mod.
+tamework.commands.modSetting.reset.description=Restablece un ajuste de mod a su valor predeterminado.
+tamework.commands.modSetting.argument.id=ID del ajuste, por ejemplo AH_WildDragons.
+tamework.commands.modSetting.argument.value=Nuevo valor.
+tamework.commands.modSetting.unavailable=Los ajustes de mods aún no están disponibles.
+tamework.commands.modSetting.none=Ningún mod instalado añade ajustes.
+tamework.commands.modSetting.groupHeader={0} > {1}
+tamework.commands.modSetting.value=  {0} ({1}) = {2}
+tamework.commands.modSetting.valueDefault=  {0} ({1}) = {2} (predeterminado)
+tamework.commands.modSetting.options=Valores permitidos: {0}
+tamework.commands.modSetting.range=Rango permitido: de {0} a {1}
+tamework.commands.modSetting.unknown=Ningún ajuste de mod tiene el ID {0}. Usa /tw modsetting list para verlos todos.
+tamework.commands.modSetting.invalidValue={0} no es un valor válido para {1}.
+tamework.commands.modSetting.saveFailed=No se pudo guardar el ajuste. Revisa el registro del servidor.
+tamework.commands.modSetting.saved.applied=Guardado {0} = {1}. El cambio ya está activo.
+tamework.commands.modSetting.saved.restart=Guardado {0} = {1}. Reinicia el servidor para terminar de aplicarlo.
+tamework.commands.modSetting.saved.failures=Guardado {0} = {1}, pero algunos parches fallaron. Revisa /patchwork status.
+tamework.commands.modSetting.saved.notRegenerated=Guardado {0} = {1}. Ejecuta /patchwork reload o reinicia el servidor para aplicarlo.
+tamework.ui.settings.tab.general=General
+tamework.ui.settings.tab.modSettings=Ajustes de mods
+tamework.ui.settings.modSettings.scopeNote=Estos ajustes se aplican a todo el servidor.
+tamework.ui.settings.modSettings.empty=Ningún mod instalado añade ajustes todavía.
+tamework.ui.settings.modSettings.noOptions=Sin opciones
+tamework.ui.settings.modSettings.resetTooltip=Devuelve este ajuste a su valor predeterminado al aplicar.
+tamework.ui.settings.modSettings.range.between=Rango permitido: de {0} a {1}
+tamework.ui.settings.modSettings.range.min=Valor mínimo permitido: {0}
+tamework.ui.settings.modSettings.range.max=Valor máximo permitido: {0}
+tamework.ui.settings.modSettings.warning.invalidNumber={0} necesita un número.
+tamework.ui.settings.modSettings.status.applied=Los ajustes de mods ya están activos.
+tamework.ui.settings.modSettings.status.restart=Ajustes de mods guardados. Reinicia el servidor para terminar de aplicarlos.
+tamework.ui.settings.modSettings.warning.patchFailures=Ajustes de mods guardados, pero algunos parches fallaron. Revisa /patchwork status.
+tamework.ui.settings.modSettings.warning.notRegenerated=Ajustes de mods guardados, pero aún no aplicados. Ejecuta /patchwork reload o reinicia el servidor.
+tamework.ui.settings.modSettings.warning.saveFailed=No se pudieron guardar los ajustes de mods. Revisa el registro del servidor.

@@ -5,9 +5,16 @@ import com.alechilles.patchwork.embedded.EmbeddedPatchworkService;
 import com.alechilles.patchwork.embedded.PatchworkContributionHandle;
 import com.alechilles.patchwork.embedded.PatchworkHostContribution;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.alechilles.alecstamework.settings.mods.ModSettingsService;
+import com.alechilles.patchwork.embedded.PatchworkRegenerationResult;
+import com.google.gson.JsonElement;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Owns Tamework's embedded Patchwork service lifecycle until the host contribution and reload bridge
@@ -22,9 +29,10 @@ public final class TameworkPatchworkRuntime implements AutoCloseable {
     private boolean closed;
 
     /** Creates a runtime that uses Patchwork's production embedded bootstrap. */
-    public TameworkPatchworkRuntime(JavaPlugin plugin) {
+    public TameworkPatchworkRuntime(JavaPlugin plugin, Supplier<Map<String, JsonElement>> settingValues) {
         this(plugin, EmbeddedPatchworkBootstrap::bootstrap,
-                candidate -> new TameworkPatchworkContribution(candidate.getManifest().getVersion().toString()));
+                candidate -> new TameworkPatchworkContribution(
+                        candidate.getManifest().getVersion().toString(), settingValues));
     }
 
     TameworkPatchworkRuntime(
@@ -72,6 +80,28 @@ public final class TameworkPatchworkRuntime implements AutoCloseable {
                 service.generatedPatchRoot(),
                 "Active Patchwork runtime returned no generated root."
         );
+    }
+
+    /**
+     * Asks the elected runtime to regenerate patches, for example after a mod setting changed.
+     * Completes with {@link ModSettingsService.ApplyOutcome#NOT_REGENERATED} when no pass started.
+     */
+    public CompletionStage<ModSettingsService.ApplyOutcome> requestRegeneration() {
+        EmbeddedPatchworkService current;
+        synchronized (this) {
+            current = service;
+        }
+        if (current == null) {
+            return CompletableFuture.completedFuture(ModSettingsService.ApplyOutcome.NOT_REGENERATED);
+        }
+        return current.requestRegeneration().thenApply(TameworkPatchworkRuntime::outcome);
+    }
+
+    static ModSettingsService.ApplyOutcome outcome(PatchworkRegenerationResult result) {
+        if (result == null || !result.started()) return ModSettingsService.ApplyOutcome.NOT_REGENERATED;
+        if (result.failedTargets() > 0) return ModSettingsService.ApplyOutcome.PATCH_FAILURES;
+        if (result.restartRequiredTargets() > 0) return ModSettingsService.ApplyOutcome.RESTART_REQUIRED;
+        return ModSettingsService.ApplyOutcome.APPLIED;
     }
 
     /**

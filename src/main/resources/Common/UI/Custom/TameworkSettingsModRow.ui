@@ -1,0 +1,66 @@
+$A = "TameworkSlateStyles.ui";
+$C = "Common.ui";
+
+// One mod setting on the Mod Settings tab of TameworkSettingsPage.ui. Java shows the one control that
+// fits the setting's type, the description tooltip when there is one, and Reset when it would change something.
+@ModSettingTooltipButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+  Hovered: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+  Pressed: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+  Disabled: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000))
+);
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 34);
+
+  Label #ModSettingLabel {
+    Anchor: (Left: 0, Width: 340, Height: 28);
+    Text: "";
+    Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+  }
+
+  TextButton #ModSettingTooltip {
+    Anchor: (Left: 0, Width: 340, Height: 28);
+    Text: "";
+    TooltipText: "";
+    TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+    Style: @ModSettingTooltipButtonStyle;
+    Visible: false;
+  }
+
+  CheckBox #ModSettingCheck {
+    Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+    Background: $A.@SlateQuiet;
+    Padding: (Full: 4);
+    Style: $C.@DefaultCheckBoxStyle;
+    Visible: false;
+  }
+
+  DropdownBox #ModSettingDropdown {
+    Anchor: (Left: 356, Width: 210, Height: 28);
+    Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+    MaxSelection: 1;
+    NoItemsText: %server.tamework.ui.settings.modSettings.noOptions;
+    Visible: false;
+  }
+
+  TextField #ModSettingInput {
+    Anchor: (Left: 356, Width: 210, Height: 28);
+    Style: $A.@PanelInputFieldStyle;
+    PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+    Background: $A.@SlateQuiet;
+    Decoration: (Default: (Background: $A.@SlateQuiet), Focused: (Background: $A.@SlateQuietFocus));
+    Padding: (Horizontal: 8);
+    MaxLength: 32;
+    Visible: false;
+  }
+
+  TextButton #ModSettingResetButton {
+    Anchor: (Left: 576, Width: 70, Height: 28);
+    Text: %server.tamework.ui.shared.button.reset;
+    TooltipText: %server.tamework.ui.settings.modSettings.resetTooltip;
+    TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+    Style: $A.@PanelButtonQuiet;
+    Visible: false;
+  }
+}

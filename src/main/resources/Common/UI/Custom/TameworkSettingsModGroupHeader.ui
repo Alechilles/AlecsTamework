@@ -1,0 +1,12 @@
+// One settings group's heading on the Mod Settings tab of TameworkSettingsPage.ui; Java sets the label.
+@ModGroupLabelStyle = LabelStyle(FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, HorizontalAlignment: Start, VerticalAlignment: Center);
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 26);
+
+  Label #ModGroupLabel {
+    Anchor: (Top: 8, Left: 0, Right: 12, Height: 18);
+    Text: "";
+    Style: @ModGroupLabelStyle;
+  }
+}

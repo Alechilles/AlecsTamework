@@ -192,6 +192,12 @@ class TameworkPatchworkRuntimeTest {
         }
 
         @Override
+        public java.util.concurrent.CompletionStage<com.alechilles.patchwork.embedded.PatchworkRegenerationResult> requestRegeneration() {
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                    new com.alechilles.patchwork.embedded.PatchworkRegenerationResult(false, 0, 0, 0));
+        }
+
+        @Override
         public void close() {
             closes++;
             appendLifecycle("service-close");

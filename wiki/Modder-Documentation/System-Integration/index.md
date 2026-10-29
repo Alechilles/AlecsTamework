@@ -23,5 +23,6 @@ This subsection covers feature-system implementation guides for core Tamework ga
 - [AvatarFlight NPC Integration Guide](/mod/alecs-tamework/avatarflight-npc-integration-guide)
 - [Flight Formation Guide](/mod/alecs-tamework/flight-formation-guide)
 - [Turn-in-Place Animations](/mod/alecs-tamework/turn-in-place-animations)
+- [Mod Settings Guide](/mod/alecs-tamework/mod-settings-guide)
 
 

@@ -29,6 +29,12 @@ class TameworkSettingsRenderingTest {
         Field deploy = TameworkSettingsPage.class.getDeclaredField("currentDeploy");
         deploy.setAccessible(true);
         deploy.set(page, com.alechilles.alecstamework.settings.DeployPlaces.DEFAULT);
+        // No mod settings service: the Mod Settings tab renders its empty state.
+        Field modTab = TameworkSettingsPage.class.getDeclaredField("modTab");
+        modTab.setAccessible(true);
+        modTab.set(page, new TameworkSettingsModTab(
+                (com.hypixel.hytale.server.core.universe.PlayerRef) unsafe.allocateInstance(com.hypixel.hytale.server.core.universe.PlayerRef.class),
+                (com.alechilles.alecstamework.Tamework) unsafe.allocateInstance(com.alechilles.alecstamework.Tamework.class)));
         UICommandBuilder commands = new UICommandBuilder();
         var events = new com.hypixel.hytale.server.core.ui.builder.UIEventBuilder();
         page.build(null, commands, events, null);

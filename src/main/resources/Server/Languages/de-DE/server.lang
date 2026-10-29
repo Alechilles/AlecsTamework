@@ -2004,3 +2004,39 @@ tamework.commands.setTarget.owner.not.found=NPC {0} hat in dieser Welt keinen Be
 tamework.commands.setTarget.no.slots=Die Rolle {0} hat keine Ziel-Slots.
 tamework.commands.setTarget.done=Ziel-Slot {1} von NPC {0} zeigt jetzt auf seinen Besitzer.
 tamework.commands.setTarget.unknown.slot=Die Rolle {1} hat keinen Ziel-Slot {0}.
+tamework.commands.modSetting.description=Einstellungen anzeigen und ändern, die Mods hinzufügen.
+tamework.commands.modSetting.list.description=Alle Mod-Einstellungen und ihre Werte auflisten.
+tamework.commands.modSetting.get.description=Den Wert einer Mod-Einstellung anzeigen.
+tamework.commands.modSetting.set.description=Eine Mod-Einstellung ändern.
+tamework.commands.modSetting.reset.description=Eine Mod-Einstellung auf den Standardwert zurücksetzen.
+tamework.commands.modSetting.argument.id=Einstellungs-ID, zum Beispiel AH_WildDragons.
+tamework.commands.modSetting.argument.value=Neuer Wert.
+tamework.commands.modSetting.unavailable=Mod-Einstellungen sind noch nicht verfügbar.
+tamework.commands.modSetting.none=Kein installierter Mod fügt Einstellungen hinzu.
+tamework.commands.modSetting.groupHeader={0} > {1}
+tamework.commands.modSetting.value=  {0} ({1}) = {2}
+tamework.commands.modSetting.valueDefault=  {0} ({1}) = {2} (Standard)
+tamework.commands.modSetting.options=Erlaubte Werte: {0}
+tamework.commands.modSetting.range=Erlaubter Bereich: {0} bis {1}
+tamework.commands.modSetting.unknown=Keine Mod-Einstellung hat die ID {0}. Mit /tw modsetting list siehst du alle.
+tamework.commands.modSetting.invalidValue={0} ist kein gültiger Wert für {1}.
+tamework.commands.modSetting.saveFailed=Die Einstellung konnte nicht gespeichert werden. Prüfe das Serverprotokoll.
+tamework.commands.modSetting.saved.applied={0} = {1} gespeichert. Die Änderung ist aktiv.
+tamework.commands.modSetting.saved.restart={0} = {1} gespeichert. Starte den Server neu, um die Änderung vollständig anzuwenden.
+tamework.commands.modSetting.saved.failures={0} = {1} gespeichert, aber einige Patches sind fehlgeschlagen. Prüfe /patchwork status.
+tamework.commands.modSetting.saved.notRegenerated={0} = {1} gespeichert. Führe /patchwork reload aus oder starte den Server neu, um es anzuwenden.
+tamework.ui.settings.tab.general=Allgemein
+tamework.ui.settings.tab.modSettings=Mod-Einstellungen
+tamework.ui.settings.modSettings.scopeNote=Diese Einstellungen gelten für den ganzen Server.
+tamework.ui.settings.modSettings.empty=Noch kein installierter Mod fügt Einstellungen hinzu.
+tamework.ui.settings.modSettings.noOptions=Keine Optionen
+tamework.ui.settings.modSettings.resetTooltip=Setzt diese Einstellung beim Anwenden auf den Standardwert zurück.
+tamework.ui.settings.modSettings.range.between=Erlaubter Bereich: {0} bis {1}
+tamework.ui.settings.modSettings.range.min=Kleinster erlaubter Wert: {0}
+tamework.ui.settings.modSettings.range.max=Größter erlaubter Wert: {0}
+tamework.ui.settings.modSettings.warning.invalidNumber={0} braucht eine Zahl.
+tamework.ui.settings.modSettings.status.applied=Mod-Einstellungen sind aktiv.
+tamework.ui.settings.modSettings.status.restart=Mod-Einstellungen gespeichert. Starte den Server neu, um sie vollständig anzuwenden.
+tamework.ui.settings.modSettings.warning.patchFailures=Mod-Einstellungen gespeichert, aber einige Patches sind fehlgeschlagen. Prüfe /patchwork status.
+tamework.ui.settings.modSettings.warning.notRegenerated=Mod-Einstellungen gespeichert, aber noch nicht angewendet. Führe /patchwork reload aus oder starte den Server neu.
+tamework.ui.settings.modSettings.warning.saveFailed=Mod-Einstellungen konnten nicht gespeichert werden. Prüfe das Serverprotokoll.
