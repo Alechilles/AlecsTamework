@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.7.0 - Mod Settings - 2026-10-29
 
 ### Added
 
@@ -13,7 +13,9 @@
 
 ### Changed
 
-- Embeds Patchwork 1.5.0.
+- Embeds Patchwork 1.5.0. Besides mod settings, it fixes `/patchwork reload` failing on servers that load an asset
+  pack whose name is not a `Group:Name` ID, and reloads live when a patch stops applying and the original asset
+  comes back, instead of rolling back.
 
 ## 5.6.0 - Server Networks and Husbandry Rewards - 2026-10-28
 
