@@ -141,7 +141,9 @@ public final class ModSettingsService {
             }
             saved = Collections.unmodifiableMap(next);
         }
-        return regenerate();
+        return regenerate().whenComplete((outcome, failure) -> logger.at(Level.INFO).log(
+                "Mod settings saved (%s); Patchwork regeneration: %s.",
+                String.join(", ", changes.keySet()), failure != null ? "failed: " + failure : outcome));
     }
 
     /**
