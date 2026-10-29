@@ -199,5 +199,6 @@ tasks.register('packagingTest', Test) {
     include '**/*IT.class'
     useJUnitPlatform()
     systemProperty 'patchwork.packagedJar', tasks.named('shadowJar', ShadowJar).get().archiveFile.get().asFile.absolutePath
+    systemProperty 'patchwork.expectedVersion', patchworkVersion
     systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
 }
