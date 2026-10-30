@@ -25,6 +25,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 
 /** Restores tranquilized sleep after Hytale's fire-and-forget hit animation. */
@@ -32,7 +33,7 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final String SLEEP_ANIMATION_ID = "Sleep";
     private static final int UNRESOLVED_EFFECT_INDEX = Integer.MIN_VALUE;
-    private static final Set<Dependency<EntityStore>> DEPENDENCIES = Set.of(
+    private static final Set<Dependency<EntityStore>> AFTER_HIT_ANIMATION = Set.of(
             new SystemDependency<>(Order.AFTER, DamageSystems.HitAnimation.class)
     );
 
@@ -41,6 +42,7 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
     private final Query<EntityStore> query;
     private final IntSupplier tranquilizerEffectIndex;
     private final AnimationEmitter animationEmitter;
+    private final BooleanSupplier hitAnimationRegistered;
 
     public TranquilizedSleepAnimationRestoreSystem() {
         this(
@@ -54,7 +56,8 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
                         animationId,
                         true,
                         componentAccessor
-                )
+                ),
+                () -> EntityStore.REGISTRY.hasSystemClass(DamageSystems.HitAnimation.class)
         );
     }
 
@@ -63,13 +66,15 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
             ComponentType<EntityStore, EffectControllerComponent> effectType,
             ComponentType<EntityStore, ActiveAnimationComponent> animationType,
             IntSupplier tranquilizerEffectIndex,
-            AnimationEmitter animationEmitter
+            AnimationEmitter animationEmitter,
+            BooleanSupplier hitAnimationRegistered
     ) {
         this.effectType = effectType;
         this.animationType = animationType;
         this.query = Query.and(npcType, effectType, animationType);
         this.tranquilizerEffectIndex = tranquilizerEffectIndex;
         this.animationEmitter = animationEmitter;
+        this.hitAnimationRegistered = hitAnimationRegistered;
     }
 
     @Override
@@ -77,10 +82,11 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
         return DamageModule.get().getInspectDamageGroup();
     }
 
+    /** Another mod can unregister the hit animation; a dependency on it would then fail startup. */
     @Nonnull
     @Override
     public Set<Dependency<EntityStore>> getDependencies() {
-        return DEPENDENCIES;
+        return hitAnimationRegistered.getAsBoolean() ? AFTER_HIT_ANIMATION : Set.of();
     }
 
     @Override
