@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.asset.type.model.config.ModelAttachment;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -130,6 +131,21 @@ public final class CompanionModelAttachmentService {
             filtered.put(setId, valueId);
         }
         return filtered.isEmpty() ? Collections.emptyMap() : Collections.unmodifiableMap(filtered);
+    }
+
+    /**
+     * Copies selections into the map type {@code ModelAsset.generateRandomAttachmentIds} uses.
+     *
+     * <p>{@code ModelAsset.getAttachments} lists attachments in the iteration order of the selection map,
+     * and the client draws them in that order. Packs with overlapping sets (for example a full recolored
+     * body copy plus a mane) are authored against vanilla's order, so rebuilt models must match it.</p>
+     */
+    public static Map<String, String> inEngineAttachmentOrder(@Nullable Map<String, String> selections) {
+        Object2ObjectOpenHashMap<String, String> ordered = new Object2ObjectOpenHashMap<>();
+        if (selections != null) {
+            ordered.putAll(selections);
+        }
+        return ordered;
     }
 
     public static boolean applyAttachments(@Nullable Ref<EntityStore> npcRef,

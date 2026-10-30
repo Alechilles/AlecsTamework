@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Companions whose model has several overlapping attachment sets (such as Aures' horse skins, which layer a recolored
+  body under the mane) no longer show misplaced manes or markings after Tamework scales, restores, or changes their
+  attachments. Rebuilt models now list attachments in the same order as a vanilla spawn.
+
 ## 5.7.0 - Mod Settings - 2026-10-29
 
 ### Added

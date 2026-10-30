@@ -118,7 +118,8 @@ public final class AvatarFlightModelService {
         );
         Model baseModel = attachmentSelections.isEmpty()
                 ? Model.createScaledModel(modelAsset, scale)
-                : Model.createScaledModel(modelAsset, scale, attachmentSelections);
+                : Model.createScaledModel(modelAsset, scale,
+                        CompanionModelAttachmentService.inEngineAttachmentOrder(attachmentSelections));
         boolean hasCameraOverride = modelSettings.getCameraPositionOffset() != null;
         boolean hasEyeHeightOverride = modelSettings.getEyeHeight() != null;
         if (!animation.isPoseAnimationsEnabled() && !hasCameraOverride && !hasEyeHeightOverride) {

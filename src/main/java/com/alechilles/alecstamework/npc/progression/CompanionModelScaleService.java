@@ -87,7 +87,7 @@ public final class CompanionModelScaleService {
             return null;
         }
         double safeScale = sanitizeScale(targetScale);
-        Map<String, String> safeAttachments = attachments == null ? Collections.emptyMap() : attachments;
+        Map<String, String> safeAttachments = CompanionModelAttachmentService.inEngineAttachmentOrder(attachments);
         if (!isJuvenileLifeStage(npcRef, store)) {
             return Model.createScaledModel(modelAsset, (float) safeScale, safeAttachments);
         }
