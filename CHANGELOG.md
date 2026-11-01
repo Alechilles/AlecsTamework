@@ -17,6 +17,8 @@
 - Companions whose model has several overlapping attachment sets (such as Aures' horse skins, which layer a recolored
   body under the mane) no longer show misplaced manes or markings after Tamework scales, restores, or changes their
   attachments. Rebuilt models now list attachments in the same order as a vanilla spawn.
+- Riding, gliding, swimming, and avatar flight input no longer log `Assert not in thread!` errors when server shutdown
+  has to abandon a stuck world thread.
 
 ## 5.7.0 - Mod Settings - 2026-10-29
 

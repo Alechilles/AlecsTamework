@@ -370,6 +370,10 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleOnWorldThread(@Nonnull Ref<EntityStore> riderRef, @Nonnull Store<EntityStore> store) {
+        // Shutdown drains the queue on another thread if it abandoned a stuck world thread.
+        if (!store.isInThread()) {
+            return;
+        }
         Player player = store.getComponent(riderRef, Player.getComponentType());
         if (player == null) {
             return;
@@ -422,7 +426,8 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
                                                @Nonnull Store<EntityStore> store) {
         ComponentType<EntityStore, AvatarFlightMountSessionComponent> sessionType =
                 AvatarFlightMountSessionComponent.getComponentType();
-        if (sessionType == null || store.getComponent(riderRef, sessionType) == null) {
+        // Reached directly from the interaction-chain task, so the shutdown drain can land here too.
+        if (!store.isInThread() || sessionType == null || store.getComponent(riderRef, sessionType) == null) {
             return false;
         }
         UUIDComponent identity = store.getComponent(riderRef, UUIDComponent.getComponentType());

@@ -26,6 +26,8 @@ final class NativeSwimInputCapture {
                 var type = NativeSwimRiderComponent.getComponentType();
                 if (ref == null || !ref.isValid() || type == null) return;
                 var store = world.getEntityStore().getStore();
+                // Shutdown drains the queue on another thread if it abandoned a stuck world thread.
+                if (!store.isInThread()) return;
                 var rider = store.getComponent(ref, type);
                 if (rider == null || rider.settings == null) return;
                 rider.captureInput(forward, vertical, crouching, jumping, receivedAt);

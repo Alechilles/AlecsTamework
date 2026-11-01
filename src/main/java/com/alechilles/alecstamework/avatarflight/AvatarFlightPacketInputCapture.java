@@ -67,7 +67,8 @@ public final class AvatarFlightPacketInputCapture {
                                 @Nonnull UUID playerUuid,
                                 @Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store) {
-        if (!ref.isValid() || !AvatarFlightSessionRegistry.isActive(playerUuid)
+        // Shutdown drains the queue on another thread if it abandoned a stuck world thread.
+        if (!store.isInThread() || !ref.isValid() || !AvatarFlightSessionRegistry.isActive(playerUuid)
                 || AvatarFlightSessionRegistry.isDisconnecting(playerUuid)) {
             return;
         }

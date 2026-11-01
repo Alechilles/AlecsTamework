@@ -69,8 +69,9 @@ final class MountedGlidePacketInputCapture {
     private void captureOnWorld(@Nonnull ClientMovement packet,
                                 @Nonnull Ref<EntityStore> riderRef,
                                 @Nonnull Store<EntityStore> store) {
-        // The player may have transferred worlds after the packet callback queued this task.
-        if (!riderRef.isValid()) {
+        // The player may have transferred worlds after the packet callback queued this task, and
+        // shutdown drains the queue on another thread if it had to abandon a stuck world thread.
+        if (!store.isInThread() || !riderRef.isValid()) {
             return;
         }
         Tamework instance = Tamework.getInstance();
@@ -128,8 +129,9 @@ final class MountedGlidePacketInputCapture {
     private void captureOnWorld(@Nonnull MountMovement packet,
                                 @Nonnull Ref<EntityStore> riderRef,
                                 @Nonnull Store<EntityStore> store) {
-        // The player may have transferred worlds after the packet callback queued this task.
-        if (!riderRef.isValid()) {
+        // The player may have transferred worlds after the packet callback queued this task, and
+        // shutdown drains the queue on another thread if it had to abandon a stuck world thread.
+        if (!store.isInThread() || !riderRef.isValid()) {
             return;
         }
         Tamework instance = Tamework.getInstance();
