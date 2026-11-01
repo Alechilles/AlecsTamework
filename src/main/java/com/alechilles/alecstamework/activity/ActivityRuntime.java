@@ -222,6 +222,14 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Publishes one player opening a command item's panel. */
+    public static void publishCommandPanelOpen(@Nullable UUID playerId) {
+        RuntimeState state = CURRENT.get();
+        if (state.publisher != null) {
+            state.publisher.publishCommandPanelOpen(playerId);
+        }
+    }
+
     /** Publishes one player putting food or water in a feed trough. */
     public static void publishTroughFill(@Nullable UUID playerId, @Nonnull String resource) {
         RuntimeState state = CURRENT.get();

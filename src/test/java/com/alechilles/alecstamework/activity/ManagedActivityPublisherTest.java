@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.AnimalAgeStage;
@@ -266,6 +267,19 @@ class ManagedActivityPublisherTest {
         assertEquals(ActivityIds.TROUGH_FILL, activity.header().actionId());
         assertEquals(OWNER, activity.playerId());
         assertEquals(TroughFillActivityView.WATER, activity.resource());
+    }
+
+    @Test
+    void aCommandPanelOpenNamesThePlayerWithNoManagedRoleBehindIt() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(published::add, managedRegistry());
+
+        publisher.publishCommandPanelOpen(OWNER);
+
+        CommandPanelOpenActivityView activity =
+                assertInstanceOf(CommandPanelOpenActivityView.class, published.getFirst());
+        assertEquals(ActivityIds.COMMAND_PANEL_OPEN, activity.header().actionId());
+        assertEquals(OWNER, activity.playerId());
     }
 
     private static CompanionXpTransition feedTransition() {
