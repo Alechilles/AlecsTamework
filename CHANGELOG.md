@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Managed coops no longer run vanilla residents. An old coop could keep a vanilla resident list, and the game then
+  despawned those animals at dusk and spawned untracked copies at dawn, which marked tamed animals as lost and could
+  duplicate them once recovered. Each managed coop now empties that list when it loads: animals in the world stay as
+  ordinary NPCs, and animals inside the coop are spawned beside it once.
+- A vanilla-filled capture crate can no longer be used on a managed coop. It can still be released on the ground.
+
 ## 5.7.0 - Mod Settings - 2026-10-29
 
 ### Added

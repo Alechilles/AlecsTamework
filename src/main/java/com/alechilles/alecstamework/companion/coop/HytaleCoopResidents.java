@@ -10,11 +10,16 @@ import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.CoopResidentReleasePositionService;
 import com.alechilles.alecstamework.items.DirectLiveCoopProduceService;
 import com.alechilles.alecstamework.items.HytaleDirectLiveCoopScanner;
+import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
+import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
 import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.reference.PersistentRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -24,6 +29,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -224,6 +230,65 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
                 return;
             }
         }
+    }
+
+    /**
+     * Empties the engine's own resident list on a managed coop. Old blocks can still hold one
+     * (vanilla crates, wild capture before Tamework managed the coop), and while an animal is
+     * listed the engine's coop tick despawns it at dusk and spawns a new plain copy at dawn. For a
+     * tamed animal that loses its record and leaves an untracked twin, so a recovered animal
+     * exists twice. An animal already in the world stays there as an ordinary NPC. One inside the
+     * coop exists nowhere else, so it is spawned beside the coop once. Nothing is deleted, because
+     * a listed animal cannot be told from a twin. A resident that cannot be spawned yet stays
+     * listed for the next sweep.
+     */
+    public void retireVanillaResidents(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop) {
+        Vector3i b = coop.block();
+        HytaleCoopIntake.Block block = HytaleCoopIntake.block(world, b.x, b.y, b.z);
+        ComponentType<ChunkStore, CoopBlock> type = CoopBlock.getComponentType();
+        CoopBlock state = block == null || type == null ? null : block.store().getComponent(block.ref(), type);
+        List<CoopBlock.CoopResident> listed = state == null ? null : VanillaCoopResidents.of(state);
+        if (listed == null || listed.isEmpty()) {
+            return;
+        }
+        Store<EntityStore> entities = world.getEntityStore().getStore();
+        List<String> retired = new ArrayList<>();
+        for (Iterator<CoopBlock.CoopResident> residents = listed.iterator(); residents.hasNext(); ) {
+            CoopBlock.CoopResident resident = residents.next();
+            String role = resident.getMetadata() == null ? null : resident.getMetadata().getNpcNameKey();
+            boolean inside = resident.getPersistentRef() == null && !resident.getDeployedToWorld();
+            if (inside ? role == null || spawnPlain(world, entities, coop, role) : release(entities, resident)) {
+                residents.remove();
+                retired.add(role + (inside ? " (inside)" : " (in world)"));
+            }
+        }
+        if (!retired.isEmpty()) {
+            block.info().markNeedsSaving(block.store());
+            LOGGER.at(Level.INFO).log("Retired vanilla residents of the coop at %s in world %s: %s", b, world.getName(),
+                    retired);
+        }
+    }
+
+    /** Frees a loaded body from the engine's coop, so its tick cannot despawn it; true always. */
+    private static boolean release(Store<EntityStore> entities, CoopBlock.CoopResident resident) {
+        PersistentRef persistentRef = resident.getPersistentRef();
+        Ref<EntityStore> body = persistentRef == null ? null : persistentRef.getEntity(entities);
+        if (body != null && body.isValid()) {
+            entities.tryRemoveComponent(body, CoopResidentComponent.getComponentType());
+        }
+        return true;
+    }
+
+    /** Spawns an ordinary NPC of {@code roleId} at the coop's release position; false when that cannot happen now. */
+    private boolean spawnPlain(World world, Store<EntityStore> entities, HytaleDirectLiveCoopScanner.LoadedCoop coop,
+                               String roleId) {
+        if (roleBuilder(roleId) == null) {
+            return false;
+        }
+        RestoreFlow.Destination at = destination(world, roleId, coop.block(), coop.rotationIndex(), coop.config());
+        NPCPlugin plugin = NPCPlugin.get();
+        return plugin.spawnEntity(entities, plugin.getIndex(roleId), new Vector3d(at.x(), at.y(), at.z()),
+                Rotation3f.IDENTITY, null, null) != null;
     }
 
     /** Shows the produce-ready block state while the coop holds produce. */

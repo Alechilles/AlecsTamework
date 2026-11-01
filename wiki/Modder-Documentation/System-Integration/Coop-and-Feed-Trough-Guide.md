@@ -28,6 +28,11 @@ participate in feed-trough hydration or refill flows.
   window, with catch-up. See
   [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference).
 - Coops without an enabled matching config retain their ordinary behavior.
+- A managed coop runs no vanilla residents. Tamework empties any vanilla
+  resident list on a loaded managed coop: animals in the world stay as ordinary
+  NPCs, and animals inside it are spawned beside it once. Set the block's
+  `CaptureWildNPCsInRange` to `false` in its vanilla `FarmingCoopAsset` as well,
+  so the engine does not keep listing animals between sweeps.
 - Stable profile identity survives the release UUID change, so command links
   follow the profile rather than assuming one permanent entity UUID.
 

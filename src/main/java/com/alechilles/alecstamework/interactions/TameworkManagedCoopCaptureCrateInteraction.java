@@ -18,10 +18,10 @@ import org.joml.Vector3i;
 /**
  * Capture-crate cutover for current canonical artifacts placed into configured managed coops.
  *
- * <p>Unmanaged blocks and noncanonical artifacts retain vanilla behavior. A canonical artifact
- * aimed at a managed coop is submitted to the shared receipt-first operation before vanilla can
- * copy metadata into {@code CoopBlock} and clear the item. Receipt-marked artifacts always fail
- * closed and can never re-enter vanilla placement.</p>
+ * <p>Unmanaged blocks retain vanilla behavior. A canonical artifact aimed at a managed coop is
+ * submitted to the shared receipt-first operation before vanilla can copy metadata into
+ * {@code CoopBlock} and clear the item. Older, vanilla-filled and receipt-marked artifacts always
+ * fail closed there and can never re-enter vanilla placement.</p>
  */
 public final class TameworkManagedCoopCaptureCrateInteraction
         extends UseCaptureCrateInteraction {
