@@ -43,6 +43,9 @@ public final class TameworkInteractionCodecRegistrar {
         Interaction.CODEC.register("TameworkClearFeedTroughWater",
                 TameworkClearFeedTroughWaterInteraction.class,
                 TameworkClearFeedTroughWaterInteraction.CODEC);
+        Interaction.CODEC.register(TameworkFeedTroughWaterFilledInteraction.TYPE_ID,
+                TameworkFeedTroughWaterFilledInteraction.class,
+                TameworkFeedTroughWaterFilledInteraction.CODEC);
         Interaction.CODEC.register("TameworkLaunchProjectile", TameworkLaunchProjectileInteraction.class,
                 TameworkLaunchProjectileInteraction.CODEC);
         Interaction.CODEC.register("TameworkLaunchHomingVisualProjectile",

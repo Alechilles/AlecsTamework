@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
+import com.alechilles.alecstamework.api.TroughFillActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
@@ -309,6 +310,22 @@ public final class ManagedActivityPublisher {
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the already committed need change.
+        }
+    }
+
+    /** Publishes one player putting food or water in a feed trough. */
+    public void publishTroughFill(@Nullable UUID playerId, @Nonnull String resource) {
+        if (playerId == null) {
+            return;
+        }
+        try {
+            publisher.publish(new TroughFillActivityView(
+                    new ActivityHeader(UUID.randomUUID(), ActivityIds.TROUGH_FILL, Instant.now()),
+                    playerId,
+                    resource
+            ));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Publication cannot undo the already committed fill.
         }
     }
 

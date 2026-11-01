@@ -26,9 +26,12 @@
                 "**Tw_Feed_Trough_State_Water_State_10": "**Tw_Feed_Trough_State_Water_State_Full"
               },
               "Next": {
-                "Type": "ModifyInventory",
-                "AdjustHeldItemDurability": -1,
-                "BrokenItem": "Deco_Bucket"
+                "Type": "TameworkFeedTroughWaterFilled",
+                "Next": {
+                  "Type": "ModifyInventory",
+                  "AdjustHeldItemDurability": -1,
+                  "BrokenItem": "Deco_Bucket"
+                }
               },
               "Failed": {
                 "Type": "PlaceFluid",

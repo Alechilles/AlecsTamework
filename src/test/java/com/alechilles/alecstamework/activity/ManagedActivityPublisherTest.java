@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
+import com.alechilles.alecstamework.api.TroughFillActivityView;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
@@ -252,6 +253,19 @@ class ManagedActivityPublisherTest {
         assertEquals("Food_Wheat", activity.resourceId());
         assertEquals(transition.toOutcomeView(), activity.companionXpOutcome());
         assertEquals(care, activity.careCreditOutcome());
+    }
+
+    @Test
+    void aTroughFillNamesThePlayerWithNoManagedRoleBehindIt() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(published::add, managedRegistry());
+
+        publisher.publishTroughFill(OWNER, TroughFillActivityView.WATER);
+
+        TroughFillActivityView activity = assertInstanceOf(TroughFillActivityView.class, published.getFirst());
+        assertEquals(ActivityIds.TROUGH_FILL, activity.header().actionId());
+        assertEquals(OWNER, activity.playerId());
+        assertEquals(TroughFillActivityView.WATER, activity.resource());
     }
 
     private static CompanionXpTransition feedTransition() {

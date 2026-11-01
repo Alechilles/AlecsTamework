@@ -222,6 +222,14 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Publishes one player putting food or water in a feed trough. */
+    public static void publishTroughFill(@Nullable UUID playerId, @Nonnull String resource) {
+        RuntimeState state = CURRENT.get();
+        if (state.publisher != null) {
+            state.publisher.publishTroughFill(playerId, resource);
+        }
+    }
+
     /** Resolves the configured domestic cull drop list for one managed role. */
     @Nullable
     public static String resolveCullDropList(@Nullable String roleId) {

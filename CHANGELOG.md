@@ -6,6 +6,9 @@
 
 - `TameActivityView` now carries the tamed animal's `gender` ("Male", "Female", or null). The old
   seven-field constructor still works.
+- `tamework:trough_fill` (`TroughFillActivityView`) reports a player moving food into a feed trough or
+  filling one from a bucket. Custom bucket patches need the new `TameworkFeedTroughWaterFilled` step on
+  their ChangeBlock `Next` path to report water.
 
 ### Fixed
 

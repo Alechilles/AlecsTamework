@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.TroughFillActivityView;
 import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -25,6 +27,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,7 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Registers one inventory-change listener per loaded trough container state and updates visual state only when
  * the trough inventory actually changes. If any trough container window is open, visual sync is deferred until the
- * window closes so players do not get kicked out of the UI while moving items.
+ * window closes so players do not get kicked out of the UI while moving items. The same listener reports
+ * food a player moves in.
  */
 public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
     private static final int DEFAULT_EMPTY_SLOT_MAX_STACK = 100;
@@ -48,6 +52,7 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
     private final Map<Ref<ChunkStore>, Map<UUID, EventRegistration<Void, Window.WindowCloseEvent>>> closeRegistrations =
             new ConcurrentHashMap<>();
     private final Map<Ref<ChunkStore>, Store<ChunkStore>> storesByReference = new ConcurrentHashMap<>();
+    private final Map<Ref<ChunkStore>, Long> foodTotals = new ConcurrentHashMap<>();
 
     @Nullable
     private volatile ComponentType<ChunkStore, ?> itemContainerComponentType;
@@ -120,6 +125,7 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         }
         unregisterCloseEvents(ref);
         storesByReference.remove(ref);
+        foodTotals.remove(ref);
     }
 
     private void onContainerChanged(@Nonnull Ref<ChunkStore> ref, @Nullable Object state) {
@@ -128,12 +134,40 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             return;
         }
         Map<UUID, ContainerBlockWindow> windows = resolveWindows(state);
+        reportFoodAdded(ref, state, windows.keySet());
         if (windows == null || windows.isEmpty()) {
             unregisterCloseEvents(ref);
             syncStateVisual(ref, state);
             return;
         }
         registerWindowCloseSync(ref, state, windows);
+    }
+
+    private void reportFoodAdded(@Nonnull Ref<ChunkStore> ref, @Nonnull Object state, @Nonnull Set<UUID> viewers) {
+        ItemContainer container = resolveItemContainer(state);
+        if (container == null) {
+            return;
+        }
+        long total = 0L;
+        for (short slot = 0; slot < container.getCapacity(); slot++) {
+            ItemStack stack = container.getItemStack(slot);
+            if (!ItemStack.isEmpty(stack)) {
+                total += Math.max(0, stack.getQuantity());
+            }
+        }
+        for (UUID filler : fillers(foodTotals.put(ref, total), total, viewers)) {
+            ActivityRuntime.publishTroughFill(filler, TroughFillActivityView.FOOD);
+        }
+    }
+
+    /**
+     * Who put food in: everyone viewing a trough whose contents grew. An animal eating shrinks them, and
+     * the first read of a trough (a null {@code previousTotal}) is food that was already there. Two players
+     * at one trough both count, since the change does not say who moved the item.
+     */
+    @Nonnull
+    static Set<UUID> fillers(@Nullable Long previousTotal, long total, @Nonnull Set<UUID> viewers) {
+        return previousTotal != null && total > previousTotal ? viewers : Set.of();
     }
 
     private void registerWindowCloseSync(@Nonnull Ref<ChunkStore> ref,
