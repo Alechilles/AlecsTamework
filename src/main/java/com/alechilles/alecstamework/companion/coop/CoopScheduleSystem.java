@@ -39,6 +39,8 @@ import org.joml.Vector3i;
  * ({@link HytaleCoopResidents#roam}). A coop seen loaded for the first time also gets back the
  * residents imported from 3.x or 4.x ({@link HytaleCoopResidents#ensureImportedResidents}); that
  * adds no scan: it reads the same coop list and a map of waiting sites that empties as coops load.
+ * Every sweep also empties any vanilla resident list a loaded coop still has
+ * ({@link HytaleCoopResidents#retireVanillaResidents}), so the engine's coop tick has nobody to act on.
  *
  * <p>Why a tick: intake depends on the time of day and on NPCs wandering into range, for which
  * there is no event. Scope and cost match the old sweep: one scan of loaded coop blocks per world
@@ -109,8 +111,8 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
     }
 
     /**
-     * Imported residents, then production and release for roaming coops, and the produce-ready
-     * state of every coop, on the world thread.
+     * Imported residents, then production and release for roaming coops, then the vanilla resident
+     * cleanup and produce-ready state of every coop, on the world thread.
      */
     private void queueResidentWork(World world, List<HytaleDirectLiveCoopScanner.LoadedCoop> roamingCoops,
                                    List<HytaleDirectLiveCoopScanner.LoadedCoop> coops,
@@ -145,9 +147,10 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
                 }
                 for (HytaleDirectLiveCoopScanner.LoadedCoop coop : coops) {
                     try {
+                        residents.retireVanillaResidents(world, coop);
                         residents.syncInteractionState(world, coop);
                     } catch (RuntimeException | LinkageError failure) {
-                        warnThrottled(world, coop, "produce-ready state", failure);
+                        warnThrottled(world, coop, "vanilla residents or produce-ready state", failure);
                     }
                 }
             });

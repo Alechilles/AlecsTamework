@@ -27,6 +27,7 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.util.InteractionValidation;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -91,7 +92,9 @@ public final class HytaleCapturedItemCoopInteractionService {
         }
         CaptureItemKeys.Ref item = CaptureItemKeys.readIndexItem(held);
         if (item == null) {
-            // An older capture item must not fall through to vanilla crate handling.
+            // An older or vanilla-filled capture item must not fall through to vanilla crate
+            // handling, which would add a vanilla resident to a managed coop. It can still be
+            // released on the ground.
             return olderCaptureItem(held) ? Result.FAILED_CLOSED : Result.NOT_MANAGED;
         }
         CapturedArtifact artifact = artifact(held);
@@ -122,7 +125,8 @@ public final class HytaleCapturedItemCoopInteractionService {
         }
         try {
             return held.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID, Codec.STRING) != null
-                    || held.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.STRING) != null;
+                    || held.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.STRING) != null
+                    || held.getFromMetadataOrNull(CapturedNPCMetadata.KEY, CapturedNPCMetadata.CODEC) != null;
         } catch (RuntimeException | LinkageError unreadable) {
             return true;
         }
