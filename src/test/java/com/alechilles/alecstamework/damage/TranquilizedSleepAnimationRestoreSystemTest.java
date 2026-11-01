@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentRegistry;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
@@ -62,6 +63,23 @@ class TranquilizedSleepAnimationRestoreSystemTest {
         assertNull(replayedAnimation.get());
     }
 
+    @Test
+    void dependenciesStayValidWhenAnotherModRemovedHitAnimation() {
+        TranquilizedSleepAnimationRestoreSystem system =
+                new TranquilizedSleepAnimationRestoreSystem(
+                        new ComponentType<>(),
+                        new ComponentType<>(),
+                        new ComponentType<>(),
+                        () -> TRANQUILIZER_EFFECT_INDEX,
+                        (ref, animationId, componentAccessor) -> { },
+                        () -> false
+                );
+        ComponentRegistry<EntityStore> registryWithoutHitAnimation = new ComponentRegistry<>();
+
+        system.getDependencies().forEach(
+                dependency -> dependency.validate(registryWithoutHitAnimation));
+    }
+
     private static void runDamage(
             String trackedStatusAnimation,
             float damageAmount,
@@ -95,7 +113,8 @@ class TranquilizedSleepAnimationRestoreSystemTest {
                             effectType,
                             animationType,
                             () -> TRANQUILIZER_EFFECT_INDEX,
-                            emitter
+                            emitter,
+                            () -> true
                     );
             Damage damage = new Damage(
                     new Damage.EnvironmentSource("test"),
