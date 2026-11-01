@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.activity;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
+import com.alechilles.alecstamework.api.CompanionCaptureActivityView;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
@@ -315,6 +316,21 @@ public final class ManagedActivityPublisher {
     }
 
     /** Publishes one player putting food or water in a feed trough. */
+    public void publishCompanionCapture(@Nullable UUID playerId, @Nullable String roleId) {
+        if (playerId == null || roleId == null || roleId.isBlank()) {
+            return;
+        }
+        try {
+            publisher.publish(new CompanionCaptureActivityView(
+                    new ActivityHeader(UUID.randomUUID(), ActivityIds.COMPANION_CAPTURE, Instant.now()),
+                    playerId,
+                    roleId
+            ));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Publication cannot undo the capture that already committed.
+        }
+    }
+
     public void publishCommandPanelOpen(@Nullable UUID playerId) {
         if (playerId == null) {
             return;

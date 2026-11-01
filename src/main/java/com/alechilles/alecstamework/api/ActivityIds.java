@@ -10,6 +10,7 @@ public final class ActivityIds {
     public static final String NEED_SATISFIED = "tamework:need_satisfied";
     public static final String TROUGH_FILL = "tamework:trough_fill";
     public static final String COMMAND_PANEL_OPEN = "tamework:command_panel_open";
+    public static final String COMPANION_CAPTURE = "tamework:companion_capture";
     public static final String REVIVE_SUCCESS = "tamework:revive_success";
     public static final String COMBAT_DAMAGE = "tamework:combat_damage";
     public static final String COMBAT_DEFEAT = "tamework:combat_defeat";
