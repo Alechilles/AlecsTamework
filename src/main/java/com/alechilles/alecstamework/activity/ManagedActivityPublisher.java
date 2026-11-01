@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.activity;
 
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
@@ -314,6 +315,20 @@ public final class ManagedActivityPublisher {
     }
 
     /** Publishes one player putting food or water in a feed trough. */
+    public void publishCommandPanelOpen(@Nullable UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        try {
+            publisher.publish(new CommandPanelOpenActivityView(
+                    new ActivityHeader(UUID.randomUUID(), ActivityIds.COMMAND_PANEL_OPEN, Instant.now()),
+                    playerId
+            ));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Publication cannot undo the panel that already opened.
+        }
+    }
+
     public void publishTroughFill(@Nullable UUID playerId, @Nonnull String resource) {
         if (playerId == null) {
             return;

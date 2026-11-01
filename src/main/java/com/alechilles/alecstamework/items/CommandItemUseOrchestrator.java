@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
@@ -149,7 +150,9 @@ final class CommandItemUseOrchestrator {
             boolean opened = selectionMenuOpener.open(
                     use.player, use.store, use.config, use.workingItem, use.toolId
             );
-            if (!opened) {
+            if (opened) {
+                ActivityRuntime.publishCommandPanelOpen(use.player.getUuid());
+            } else {
                 feedbackService.showWarningKey(
                         use.player, "tamework.ui.notifications.command.selection.noChoices");
             }
