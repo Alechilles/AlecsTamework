@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.output.CompanionOutputService;
@@ -137,7 +138,9 @@ final class InteractionExecutor {
                                 TamedStateResolver.isTamed(
                                         liveNpcRef, liveStore),
                                 finalRoleId,
-                                resolveCompanionId(liveNpcRef, liveStore)
+                                resolveCompanionId(liveNpcRef, liveStore),
+                                CompanionGenderService.resolveGender(
+                                        liveNpcRef, liveStore, finalRoleId, null)
                         );
                         if (livePlayer != null) {
                             CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(
@@ -358,14 +361,15 @@ final class InteractionExecutor {
             UUID finalOwnerId,
             boolean finalTamed,
             String finalRoleId,
-            UUID companionId
+            UUID companionId,
+            String gender
     ) {
         if (!acquired || !finalTamed || acquiringOwnerId == null
                 || !acquiringOwnerId.equals(finalOwnerId)) {
             return;
         }
         ActivityRuntime.publishTame(
-                operationId, finalRoleId, finalOwnerId, companionId);
+                operationId, finalRoleId, finalOwnerId, companionId, gender);
     }
 
     private static String resolveRoleId(

@@ -335,10 +335,21 @@ public final class ActivityRuntime {
             @Nullable UUID ownerId,
             @Nullable UUID companionId
     ) {
+        publishTame(operationId, roleId, ownerId, companionId, null);
+    }
+
+    /** Publishes one post-commit tame activity naming the animal's gender. */
+    public static void publishTame(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable String gender
+    ) {
         RuntimeState state = CURRENT.get();
         if (state.tamePublisher != null) {
             state.tamePublisher.publish(
-                    operationId, roleId, ownerId, companionId);
+                    operationId, roleId, ownerId, companionId, gender);
         }
     }
 

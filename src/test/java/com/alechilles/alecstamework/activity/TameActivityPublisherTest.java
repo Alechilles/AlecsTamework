@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.TameActivityView;
@@ -27,6 +28,21 @@ class TameActivityPublisherTest {
             "10000000-0000-0000-0000-000000000001");
     private static final UUID COMPANION = UUID.fromString(
             "20000000-0000-0000-0000-000000000001");
+
+    @Test
+    void theAnimalsGenderSurvivesTheFeedsHeaderRewrite() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        TameActivityPublisher publisher = new TameActivityPublisher(
+                published::add, managedRegistry());
+
+        publisher.publish(UUID.randomUUID(), "RoleA", OWNER, COMPANION, "Female");
+
+        TameActivityView activity = assertInstanceOf(
+                TameActivityView.class, published.getFirst());
+        ActivityHeader next = new ActivityHeader(
+                UUID.randomUUID(), ActivityIds.TAME_SUCCESS, activity.header().occurredAt());
+        assertEquals("Female", activity.withHeader(next).gender());
+    }
 
     @Test
     void publishesMappedTameOutcomeAndIgnoresUnmanagedRoles() throws Exception {

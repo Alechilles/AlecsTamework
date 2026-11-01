@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `TameActivityView` now carries the tamed animal's `gender` ("Male", "Female", or null). The old
+  seven-field constructor still works.
+
 ### Fixed
 
+- Births publish `tamework:breed_success` again. The call was lost when the old persistence runtime
+  was removed, so mods listening for breeding, such as Husbandry XP, never heard about a litter.
 - Companions whose model has several overlapping attachment sets (such as Aures' horse skins, which layer a recolored
   body under the mane) no longer show misplaced manes or markings after Tamework scales, restores, or changes their
   attachments. Rebuilt models now list attachments in the same order as a vanilla spawn.

@@ -33,6 +33,17 @@ public final class TameActivityPublisher {
             @Nullable UUID ownerId,
             @Nullable UUID companionId
     ) {
+        publish(operationId, roleId, ownerId, companionId, null);
+    }
+
+    /** Publishes one acquisition, naming the animal's gender when it has one. */
+    public void publish(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable String gender
+    ) {
         if (operationId == null || roleId == null || roleId.isBlank()
                 || ownerId == null || companionId == null) {
             return;
@@ -52,7 +63,8 @@ public final class TameActivityPublisher {
                     resolution.roleId(),
                     ownerId,
                     companionId,
-                    resolution.profile().activities().tameSuccess()
+                    resolution.profile().activities().tameSuccess(),
+                    gender
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the committed acquisition.

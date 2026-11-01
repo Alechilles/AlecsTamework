@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -126,10 +127,10 @@ final class BreedingOffspringBirthService {
             }
             return;
         }
-        int spawnedCount = spawnChildren(
+        List<UUID> offspring = spawnChildren(
                 store, parents, liveContext, setup, allowance, plan.resolvedRoles()
         );
-        finishLitter(store, parents, liveContext, fertility, spawnedCount);
+        finishLitter(store, parents, liveContext, setup, fertility, offspring);
     }
 
     @Nullable
@@ -365,7 +366,7 @@ final class BreedingOffspringBirthService {
         return allowed;
     }
 
-    private int spawnChildren(
+    private List<UUID> spawnChildren(
             @Nonnull Store<EntityStore> store,
             @Nonnull ParentRefs parents,
             @Nonnull BreedingPairContext context,
@@ -373,7 +374,7 @@ final class BreedingOffspringBirthService {
             @Nonnull BirthAllowance allowance,
             @Nonnull List<BreedingResolvedSpawnRole> roles
     ) {
-        int spawned = 0;
+        List<UUID> spawned = new ArrayList<>();
         for (int index = 0; index < allowance.count(); index++) {
             BreedingResolvedSpawnRole role = roles.get(index);
             if (role == null) {
@@ -388,7 +389,7 @@ final class BreedingOffspringBirthService {
                 continue;
             }
             if (finishChild(store, parents, context, setup.config(), role, child)) {
-                spawned++;
+                spawned.add(child.second().getUuid());
             }
         }
         return spawned;
@@ -437,12 +438,24 @@ final class BreedingOffspringBirthService {
             @Nonnull Store<EntityStore> store,
             @Nonnull ParentRefs parents,
             @Nonnull BreedingPairContext context,
+            @Nonnull SpawnSetup setup,
             @Nonnull BreedingFertilityOffspringService.FertilityRoll fertility,
-            int spawnedCount
+            @Nonnull List<UUID> offspring
     ) {
+        int spawnedCount = offspring.size();
         if (spawnedCount > 0) {
             CompanionLevelingService.awardBreedingXp(parents.parentA(), store);
             CompanionLevelingService.awardBreedingXp(parents.parentB(), store);
+            ActivityRuntime.publishBreeding(
+                    UUID.randomUUID(),
+                    firstNonBlank(setup.parentARole(), context.parentARoleId()),
+                    context.parentAOwner().ownerId(),
+                    context.parentAUuid(),
+                    firstNonBlank(setup.parentBRole(), context.parentBRoleId()),
+                    context.parentBOwner().ownerId(),
+                    context.parentBUuid(),
+                    offspring
+            );
         }
         if (spawnedCount > 1) {
             logInfo(String.format(
