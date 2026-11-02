@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.BondedCompanionCaptureEvidenceView;
 import com.alechilles.alecstamework.api.BondedCompanionCaptureResolvedEvent;
 import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
@@ -398,7 +399,10 @@ public final class SpawnerFeatureHandler {
         }
         UUID actor = player.getUuid();
         String sourceItemId = source.getItemId();
-        Consumer<UUID> resolved = profileId -> publishResolved(actor, sourceItemId, roll, profileId);
+        Consumer<UUID> resolved = profileId -> {
+            publishResolved(actor, sourceItemId, roll, profileId);
+            ActivityRuntime.publishCompanionCapture(actor, roll.roleId());
+        };
         if (config.getCaptureMechanics().successDisposition() == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
             return tameAndLink(player, targetRef, config, attempt, prepared.targetRole(),
                     captureParticleSystemOverride, resolved);

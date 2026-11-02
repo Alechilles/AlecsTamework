@@ -6,6 +6,8 @@
 
 - `TameActivityView` now carries the tamed animal's `gender` ("Male", "Female", or null). The old
   seven-field constructor still works.
+- `tamework:companion_capture` (`CompanionCaptureActivityView`) reports a player capturing an animal into
+  an item, with the role it had.
 - `tamework:command_panel_open` (`CommandPanelOpenActivityView`) reports a player opening a command
   item's panel.
 - `tamework:trough_fill` (`TroughFillActivityView`) reports a player moving food into a feed trough or

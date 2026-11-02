@@ -222,6 +222,14 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Publishes one player capturing an animal into an item. */
+    public static void publishCompanionCapture(@Nullable UUID playerId, @Nullable String roleId) {
+        RuntimeState state = CURRENT.get();
+        if (state.publisher != null) {
+            state.publisher.publishCompanionCapture(playerId, roleId);
+        }
+    }
+
     /** Publishes one player opening a command item's panel. */
     public static void publishCommandPanelOpen(@Nullable UUID playerId) {
         RuntimeState state = CURRENT.get();

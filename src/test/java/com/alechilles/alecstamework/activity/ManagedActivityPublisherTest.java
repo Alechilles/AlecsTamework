@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
+import com.alechilles.alecstamework.api.CompanionCaptureActivityView;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.AnimalAgeStage;
@@ -280,6 +281,20 @@ class ManagedActivityPublisherTest {
                 assertInstanceOf(CommandPanelOpenActivityView.class, published.getFirst());
         assertEquals(ActivityIds.COMMAND_PANEL_OPEN, activity.header().actionId());
         assertEquals(OWNER, activity.playerId());
+    }
+
+    @Test
+    void aCaptureNamesThePlayerAndTheRoleTheAnimalHad() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(published::add, managedRegistry());
+
+        publisher.publishCompanionCapture(OWNER, "Tamed_Cow_Calf");
+
+        CompanionCaptureActivityView activity =
+                assertInstanceOf(CompanionCaptureActivityView.class, published.getFirst());
+        assertEquals(ActivityIds.COMPANION_CAPTURE, activity.header().actionId());
+        assertEquals(OWNER, activity.playerId());
+        assertEquals("Tamed_Cow_Calf", activity.roleId());
     }
 
     private static CompanionXpTransition feedTransition() {
