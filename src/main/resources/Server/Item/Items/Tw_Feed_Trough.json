@@ -58,9 +58,6 @@
       "Use": "Open_Container"
     },
     "InteractionHint": "server.interactionHints.openTrough",
-    "Flags": {
-      "IsUsable": true
-    },
     "Supporting": {
       "Up": [
         {
@@ -148,9 +145,6 @@
             }
         },
         "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-          "IsUsable": true
-        },
         "Supporting": {
           "Up": [
             {
@@ -217,9 +211,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -286,9 +277,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -355,9 +343,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -424,9 +409,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -493,9 +475,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -562,9 +541,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -631,9 +607,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -700,9 +673,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -769,9 +739,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -838,9 +805,6 @@
             }
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -901,9 +865,6 @@
           "Use": "Open_Container"
         },
         "InteractionHint": "server.interactionHints.openTrough",
-        "Flags": {
-          "IsUsable": true
-        },
         "Supporting": {
           "Up": [
             {
@@ -957,9 +918,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1013,9 +971,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1069,9 +1024,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1125,9 +1077,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1181,9 +1130,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1237,9 +1183,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1293,9 +1236,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1349,9 +1289,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1405,9 +1342,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {
@@ -1461,9 +1395,6 @@
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
-            "Flags": {
-              "IsUsable": true
-            },
             "Supporting": {
               "Up": [
                 {

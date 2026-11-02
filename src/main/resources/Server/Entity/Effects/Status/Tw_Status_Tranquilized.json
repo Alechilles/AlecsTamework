@@ -6,8 +6,7 @@
     "LocalSoundEventId": "SFX_Effect_Poison_Local",
     "Particles": [
       {
-        "SystemId": "Effect_Tranquilizer",
-        "LifeSpan": 1.2
+        "SystemId": "Effect_Tranquilizer"
       }
     ]
   },
