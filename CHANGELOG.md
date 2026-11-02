@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.8.0 - Activity Reports and Coop Fixes - 2026-11-01
 
 ### Added
 
@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- Tamework no longer crashes on startup when another mod removes the game's hit animation system.
 - Births publish `tamework:breed_success` again. The call was lost when the old persistence runtime
   was removed, so mods listening for breeding, such as Husbandry XP, never heard about a litter.
 - Companions whose model has several overlapping attachment sets (such as Aures' horse skins, which layer a recolored

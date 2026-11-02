@@ -166,6 +166,19 @@ unmanaged revival routes. Consumers must ignore a revival when they require
 family policy data and these fields are unavailable. Check the
 `REVIVAL_ACTIVITY_CONTEXT` capability before relying on these fields.
 
+`TameActivityView.gender` is `"Male"`, `"Female"`, or null when the role has no
+genders or Tamework could not read one.
+
+Three player activities carry the acting player's `playerId`:
+
+- `tamework:companion_capture` (`CompanionCaptureActivityView`): a player
+  captured an animal into an item. `roleId` is the role it had when captured.
+- `tamework:command_panel_open` (`CommandPanelOpenActivityView`): a player
+  opened a command item's panel.
+- `tamework:trough_fill` (`TroughFillActivityView`): a player put food or water
+  in a feed trough. `resource` is `TroughFillActivityView.FOOD` or `WATER`. Food
+  is whatever the player moved in; it is not checked against any animal's diet.
+
 ## `CompanionXpAwardedEvent`
 Use this successful-only event when an integration wants to credit external player progression from companion activity.
 
