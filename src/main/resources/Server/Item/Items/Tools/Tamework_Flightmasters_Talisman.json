@@ -29,20 +29,20 @@
       ]
     },
     "Ability2": {
+      "RequireNewClick": true,
       "Interactions": [
         {
           "Type": "TameworkAvatarFlightCombatAbility",
-          "Slot": "Ability2",
-          "RequireNewClick": true
+          "Slot": "Ability2"
         }
       ]
     },
     "Ability3": {
+      "RequireNewClick": true,
       "Interactions": [
         {
           "Type": "TameworkAvatarFlightCombatAbility",
-          "Slot": "Ability3",
-          "RequireNewClick": true
+          "Slot": "Ability3"
         }
       ]
     }

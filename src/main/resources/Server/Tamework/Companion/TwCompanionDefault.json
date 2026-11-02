@@ -1,8 +1,6 @@
 {
-  "General": {
-    "Enabled": true,
-    "Priority": 0
-  },
+  "Enabled": true,
+  "Priority": 0,
   "RoleIds": [],
   "Command": {
     "ReturnHomeTeleportDistance": 96.0,
