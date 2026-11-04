@@ -42,9 +42,9 @@ public final class CompanionLifeStageService {
     private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
-    // Maps each growing NPC to the world running its ticker, so a tick left behind in a world the
-    // NPC has moved out of cannot cancel the ticker of the world it moved to.
-    private static final Map<UUID, World> ACTIVE_GROWTH_TICKERS = new ConcurrentHashMap<>();
+    // Maps each growing NPC to its current ticker. A tick left behind when the NPC moved between
+    // worlds belongs to an older ticker, so it neither runs nor cancels the current one.
+    private static final Map<UUID, GrowthTicker> ACTIVE_GROWTH_TICKERS = new ConcurrentHashMap<>();
     private static final BreedingCooldownResetService BREEDING_COOLDOWN_RESET = new BreedingCooldownResetService();
 
     /** Controls whether offspring initialization may reinterpret a missing planned family. */
@@ -658,10 +658,15 @@ public final class CompanionLifeStageService {
             npcUuid = resolvedNpc != null ? resolvedNpc.getUuid() : null;
         }
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        if (npcUuid == null || world == null || ACTIVE_GROWTH_TICKERS.put(npcUuid, world) == world) {
+        if (npcUuid == null || world == null) {
             return;
         }
-        scheduleGrowthTick(world, npcUuid);
+        GrowthTicker ticker = new GrowthTicker(world);
+        if (ACTIVE_GROWTH_TICKERS.compute(npcUuid,
+                (id, current) -> current != null && current.world == world ? current : ticker) != ticker) {
+            return;
+        }
+        scheduleGrowthTick(ticker, npcUuid);
     }
 
     public static boolean isAdult(@Nullable Ref<EntityStore> npcRef,
@@ -1183,14 +1188,14 @@ public final class CompanionLifeStageService {
         return resolveLifecycleFamilyForProgression(breedingConfig, spawnedRoleId);
     }
 
-    private static void scheduleGrowthTick(@Nonnull World world, @Nonnull UUID npcUuid) {
+    private static void scheduleGrowthTick(@Nonnull GrowthTicker ticker, @Nonnull UUID npcUuid) {
         CompletableFuture.runAsync(
                 () -> {
                     try {
-                        world.execute(() -> onGrowthTick(world, npcUuid));
+                        ticker.world.execute(() -> onGrowthTick(ticker, npcUuid));
                     } catch (RuntimeException rejected) {
                         // The world stopped first. Clear the entry so the NPC can tick again on load.
-                        ACTIVE_GROWTH_TICKERS.remove(npcUuid, world);
+                        ACTIVE_GROWTH_TICKERS.remove(npcUuid, ticker);
                     }
                 },
                 CompletableFuture.delayedExecutor(GROWTH_TICK_INTERVAL_MS, TimeUnit.MILLISECONDS)
@@ -1296,27 +1301,36 @@ public final class CompanionLifeStageService {
         );
     }
 
-    private static void onGrowthTick(World world, UUID npcUuid) {
-        if (world == null || npcUuid == null || ACTIVE_GROWTH_TICKERS.get(npcUuid) != world) {
+    private static void onGrowthTick(GrowthTicker ticker, UUID npcUuid) {
+        if (ticker == null || npcUuid == null || ACTIVE_GROWTH_TICKERS.get(npcUuid) != ticker) {
             return;
         }
         boolean rescheduled = false;
         try {
-            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-            Store<EntityStore> store = world.getEntityStore().getStore();
+            Ref<EntityStore> npcRef = ticker.world.getEntityRef(npcUuid);
+            Store<EntityStore> store = ticker.world.getEntityStore().getStore();
             if (npcRef == null || !npcRef.isValid() || store == null) {
                 return;
             }
             NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
             refreshLifeStage(npcRef, npc, store, true);
             if (isGrowthInProgress(npcRef, store)) {
-                scheduleGrowthTick(world, npcUuid);
+                scheduleGrowthTick(ticker, npcUuid);
                 rescheduled = true;
             }
         } finally {
             if (!rescheduled) {
-                ACTIVE_GROWTH_TICKERS.remove(npcUuid, world);
+                ACTIVE_GROWTH_TICKERS.remove(npcUuid, ticker);
             }
+        }
+    }
+
+    /** One scheduled growth ticker. Compared by identity, so each schedule is its own token. */
+    private static final class GrowthTicker {
+        private final World world;
+
+        private GrowthTicker(World world) {
+            this.world = world;
         }
     }
 
