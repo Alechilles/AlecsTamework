@@ -5,7 +5,7 @@
     "prerelease": false
   },
   "packaging": "jar",
-  "artifactNameTemplate": "Alec's Tamework! v{version}.jar",
+  "artifactNameTemplate": "Alecs-Tamework-v{version}.jar",
   "versionSource": "manifest",
   "versionFile": "src/main/resources/manifest.json",
   "requiresTameworkDependency": false,

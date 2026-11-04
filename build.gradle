@@ -122,7 +122,7 @@ tasks.register('exampleAssetPack', Zip) {
     description = 'Packages the optional Tamework example asset pack.'
     group = 'hytale'
     dependsOn(tasks.named('prepareExampleAssetPack'))
-    archiveFileName = "Alec's Tamework! Examples v${project.version}.zip"
+    archiveFileName = "Alecs-Tamework-Examples-v${project.version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(exampleAssetPackDirectory)
 }
@@ -140,7 +140,7 @@ tasks.named('jar') {
 }
 
 tasks.named('shadowJar', ShadowJar) {
-    archiveFileName = "Alec's Tamework! v${project.version}.jar"
+    archiveFileName = "Alecs-Tamework-v${project.version}.jar"
     archiveClassifier = ''
     // Beacon is embedded implementation detail. Keep its runtime classes private to Tamework so
     // another mod's Beacon copy cannot supply an incompatible nested command-runtime class.
