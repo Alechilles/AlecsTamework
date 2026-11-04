@@ -1499,6 +1499,11 @@ public class Tamework extends JavaPlugin {
                 && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             assetEditorPackService.ensurePackVisible();
         }
+        // The engine shuts down only ENABLED plugins, so a stop that began during start has
+        // already passed this one. Failing start makes the engine run shutdown(), which saves.
+        if (HytaleServer.get().isShuttingDown()) {
+            throw new IllegalStateException("The server began shutting down while Alec's Tamework! was starting.");
+        }
     }
 
     private void registerCommandRoot() {
@@ -2151,35 +2156,27 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
-        MountedRidePacketHandler.stopAcceptingConnections();
-        com.alechilles.alecstamework.npc.progression.CompanionLifeStageService.shutdown();
-        HusbandryHarvestUseContext.clearPendingUses();
-        TameworkNpcCullService.clearPendingItemUses();
-        TameworkShutdownSequence.run(
-                this::closeRuntimeParticipants,
-                this::closeRuntimeApiDependents,
-                this::closeApiComposition);
-        simpleClaimsCapabilityRuntime.close();
-        if (commandNpcRelocationService != null) {
-            commandNpcRelocationService.close();
-            commandNpcRelocationService = null;
-        }
-        com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
-        com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(
-                com.alechilles.alecstamework.companion.migrate.LegacyAliases.EMPTY);
-        if (companionModule != null) {
-            // Returns the -28 ShutdownEvent flush result when that already ran.
-            if (!companionModule.shutdown(System.currentTimeMillis() + 2_000L)) {
-                getLogger().at(Level.SEVERE).log(
-                        "Companion saves were not fully written before shutdown.");
+        try {
+            MountedRidePacketHandler.stopAcceptingConnections();
+            com.alechilles.alecstamework.npc.progression.CompanionLifeStageService.shutdown();
+            HusbandryHarvestUseContext.clearPendingUses();
+            TameworkNpcCullService.clearPendingItemUses();
+            TameworkShutdownSequence.run(
+                    this::closeRuntimeParticipants,
+                    this::closeRuntimeApiDependents,
+                    this::closeApiComposition);
+            simpleClaimsCapabilityRuntime.close();
+            if (commandNpcRelocationService != null) {
+                commandNpcRelocationService.close();
+                commandNpcRelocationService = null;
             }
-            companionModule = null;
-        }
-        PortableSync network = portableSync;
-        portableSync = null;
-        if (network != null) {
-            // Does nothing when the -28 ShutdownEvent handler already sent and stopped it.
-            network.shutdown(1_000L);
+            com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+            com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(
+                    com.alechilles.alecstamework.companion.migrate.LegacyAliases.EMPTY);
+        } finally {
+            // A close above that throws must not skip the final companion save. After a failed
+            // start this is the only flush, because the -28 ShutdownEvent handler never ran.
+            shutdownCompanionPersistence();
         }
         OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;
@@ -2216,6 +2213,23 @@ public class Tamework extends JavaPlugin {
         settingsAnnouncementService = null;
         runtimeActivationState = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
+    }
+
+    private void shutdownCompanionPersistence() {
+        if (companionModule != null) {
+            // Returns the -28 ShutdownEvent flush result when that already ran.
+            if (!companionModule.shutdown(System.currentTimeMillis() + 2_000L)) {
+                getLogger().at(Level.SEVERE).log(
+                        "Companion saves were not fully written before shutdown.");
+            }
+            companionModule = null;
+        }
+        PortableSync network = portableSync;
+        portableSync = null;
+        if (network != null) {
+            // Does nothing when the -28 ShutdownEvent handler already sent and stopped it.
+            network.shutdown(1_000L);
+        }
     }
 
     private void closeRuntimeParticipants() {
