@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.9.0 - Owner-Only Damage - 2026-11-03
 
 ### Added
 
@@ -8,6 +8,11 @@
   other than the owner cannot hurt an owned companion. The owner can still hurt it while **Block Owner Damage** is
   off. The option is off by default. `OwnershipPolicyView` and `GlobalConfigView.OwnershipProtectionView` report it as
   `blockNonOwnerPlayerDamage`; their old constructors still work.
+
+### Fixed
+
+- The Flightmaster's Talisman's Ability2 and Ability3 combat abilities now need a new press for each use. Holding the
+  key no longer fires them again.
 
 ## 5.8.0 - Activity Reports and Coop Fixes - 2026-11-01
 
