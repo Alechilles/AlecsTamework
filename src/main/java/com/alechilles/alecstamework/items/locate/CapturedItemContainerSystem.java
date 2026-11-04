@@ -29,7 +29,8 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
     private static final Set<Dependency<ChunkStore>> DEPENDENCIES = Set.of(
             new SystemDependency<>(Order.AFTER, ItemContainerSystems.OnAddedOrRemoved.class));
     private final CapturedItemTracker tracker;
-    private final Map<BlockEntityKey, Registration> registrations
+    // Keyed by the Ref itself: its index shifts whenever another chunk entity is removed.
+    private final Map<Ref<ChunkStore>, Registration> registrations
             = new ConcurrentHashMap<>();
     public CapturedItemContainerSystem(CapturedItemTracker tracker) {
         this.tracker = tracker;
@@ -47,10 +48,9 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
         Holder holder = holder(ref, store, buffer);
         var block = buffer.getComponent(ref, ItemContainerBlock.getComponentType());
         if (holder == null || block == null || block.getItemContainer() == null) return;
-        BlockEntityKey key = new BlockEntityKey(holder.worldName(), ref.getIndex());
-        var previous = registrations.remove(key);
+        var previous = registrations.remove(ref);
         if (previous != null) previous.event().unregister();
-        registrations.put(key, new Registration(holder, block.getItemContainer().registerChangeEvent(
+        registrations.put(ref, new Registration(holder, block.getItemContainer().registerChangeEvent(
                 EventPriority.LAST, event -> {
                     if (CapturedItemMetadata.affectsCapture(event.transaction())) tracker.queue(holder);
                 })));
@@ -58,14 +58,13 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
     }
     @Override public void onEntityRemove(@Nonnull Ref<ChunkStore> ref, @Nonnull RemoveReason reason,
             @Nonnull Store<ChunkStore> store, @Nonnull CommandBuffer<ChunkStore> buffer) {
-        var registration = registrations.remove(new BlockEntityKey(store.getExternalData().getWorld().getName(), ref.getIndex()));
+        var registration = registrations.remove(ref);
         if (registration == null) return;
         registration.event().unregister();
         Holder holder = registration.holder();
         if (reason == RemoveReason.UNLOAD) tracker.index().unload(holder);
         else tracker.index().observe(holder, List.of(), System.currentTimeMillis());
     }
-    private record BlockEntityKey(String world, int index) { }
     private record Registration(Holder holder, EventRegistration<Void, ItemContainer.ItemContainerChangeEvent> event) { }
     @Nullable private Holder holder(Ref<ChunkStore> ref, Store<ChunkStore> store, CommandBuffer<ChunkStore> buffer) {
         var info = buffer.getComponent(ref, BlockModule.get().getBlockStateInfoComponentType());

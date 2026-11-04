@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.spawning.suppression.component.SpawnSuppressionComponent;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /** Returns a placed Tamework scarecrow to the player and unregisters its suppression. */
 public final class TameworkCollectScarecrowInteraction extends SimpleInstantInteraction {
@@ -65,15 +66,21 @@ public final class TameworkCollectScarecrowInteraction extends SimpleInstantInte
                 targetRef,
                 TransformComponent.getComponentType()
         );
-        ItemStack returnedItem = new ItemStack(ScarecrowIds.ITEM_ID, 1);
-        var transaction = Player.giveItem(returnedItem, actorRef, commandBuffer);
-        if (!ItemStack.isEmpty(transaction.getRemainder())) {
-            context.getState().state = InteractionState.Failed;
-            return;
-        }
-
-        commandBuffer.removeEntity(targetRef, RemoveReason.REMOVE);
-        Player.notifyPickupItem(actorRef, returnedItem, targetTransform.getPosition(), commandBuffer);
+        Vector3d position = new Vector3d(targetTransform.getPosition());
+        // Two players can collect the same scarecrow in one tick, and both see it valid here because
+        // removal is queued. Only the collect that still finds it gives the item and removes it.
+        commandBuffer.run(store -> {
+            if (!targetRef.isValid() || !actorRef.isValid()) {
+                return;
+            }
+            ItemStack returnedItem = new ItemStack(ScarecrowIds.ITEM_ID, 1);
+            var transaction = Player.giveItem(returnedItem, actorRef, store);
+            if (!ItemStack.isEmpty(transaction.getRemainder())) {
+                return;
+            }
+            store.removeEntity(targetRef, RemoveReason.REMOVE);
+            Player.notifyPickupItem(actorRef, returnedItem, position, store);
+        });
     }
 
     private static boolean isScarecrow(

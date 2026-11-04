@@ -124,7 +124,14 @@ public final class HytaleBlockStateAccess {
 
     @Nullable
     private static ChunkStore chunkStore(@Nonnull WorldChunk chunk) {
-        Ref<ChunkStore> ref = chunk.getReference();
+        Ref<ChunkStore> ref;
+        try {
+            ref = chunk.getReference();
+        } catch (LinkageError unsupportedEngine) {
+            // Hytale 0.8.0 pre-releases removed WorldChunk.getReference. Callers run inside world
+            // ticks and chunk-load callbacks, where a throw removes the whole world.
+            return null;
+        }
         return ref != null && ref.isValid() ? ref.getStore().getExternalData() : null;
     }
 
