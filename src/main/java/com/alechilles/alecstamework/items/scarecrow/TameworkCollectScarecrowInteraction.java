@@ -10,7 +10,9 @@ import com.hypixel.hytale.protocol.WaitForDataFrom;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.InventoryUtils;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerSettings;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
@@ -66,6 +68,13 @@ public final class TameworkCollectScarecrowInteraction extends SimpleInstantInte
                 targetRef,
                 TransformComponent.getComponentType()
         );
+        ItemStack probe = new ItemStack(ScarecrowIds.ITEM_ID, 1);
+        PlayerSettings settings = commandBuffer.getComponent(actorRef, PlayerSettings.getComponentType());
+        if (!InventoryUtils.getContainerForItemPickup(actorRef, probe.getItem(),
+                settings != null ? settings : PlayerSettings.defaults(), commandBuffer).canAddItemStack(probe)) {
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
         Vector3d position = new Vector3d(targetTransform.getPosition());
         // Two players can collect the same scarecrow in one tick, and both see it valid here because
         // removal is queued. Only the collect that still finds it gives the item and removes it.

@@ -16,9 +16,11 @@ import com.hypixel.hytale.server.core.modules.block.BlockModule;
 import com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock;
 import com.hypixel.hytale.server.core.modules.block.system.ItemContainerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -32,6 +34,7 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
     // Keyed by the Ref itself: its index shifts whenever another chunk entity is removed.
     private final Map<Ref<ChunkStore>, Registration> registrations
             = new ConcurrentHashMap<>();
+    private final Set<Store<ChunkStore>> seenStores = Collections.newSetFromMap(new WeakHashMap<>());
     public CapturedItemContainerSystem(CapturedItemTracker tracker) {
         this.tracker = tracker;
         tracker.onClose(() -> {
@@ -45,6 +48,7 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
     @Override public Set<Dependency<ChunkStore>> getDependencies() { return DEPENDENCIES; }
     @Override public void onEntityAdded(@Nonnull Ref<ChunkStore> ref, @Nonnull AddReason reason,
             @Nonnull Store<ChunkStore> store, @Nonnull CommandBuffer<ChunkStore> buffer) {
+        forgetRemovedWorlds(store);
         Holder holder = holder(ref, store, buffer);
         var block = buffer.getComponent(ref, ItemContainerBlock.getComponentType());
         if (holder == null || block == null || block.getItemContainer() == null) return;
@@ -64,6 +68,22 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
         Holder holder = registration.holder();
         if (reason == RemoveReason.UNLOAD) tracker.index().unload(holder);
         else tracker.index().observe(holder, List.of(), System.currentTimeMillis());
+    }
+    /**
+     * A removed world shuts its store down without calling onEntityRemove, and each key holds its
+     * store, so drop the entries of shut-down stores whenever a new store first adds a container.
+     */
+    private void forgetRemovedWorlds(Store<ChunkStore> store) {
+        synchronized (seenStores) {
+            if (!seenStores.add(store)) return;
+            seenStores.removeIf(Store::isShutdown);
+        }
+        registrations.entrySet().removeIf(entry -> {
+            if (!entry.getKey().getStore().isShutdown()) return false;
+            entry.getValue().event().unregister();
+            tracker.index().unload(entry.getValue().holder());
+            return true;
+        });
     }
     private record Registration(Holder holder, EventRegistration<Void, ItemContainer.ItemContainerChangeEvent> event) { }
     @Nullable private Holder holder(Ref<ChunkStore> ref, Store<ChunkStore> store, CommandBuffer<ChunkStore> buffer) {
