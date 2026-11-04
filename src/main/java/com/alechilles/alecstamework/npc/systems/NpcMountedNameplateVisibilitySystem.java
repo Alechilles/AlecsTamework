@@ -102,7 +102,9 @@ public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<Ent
         if (!hasVisibleName && !hasCustomName(reference, store)) {
             return;
         }
-        if (resolveCachedDisplayName(reference, store) != null && resolveVisibleDisplayName(reference, store) == null) {
+        // Already hidden. Only the nameplate and runtime name are checked: hiding never clears the
+        // persistent name, so including it here would re-hide every named mount on each pass.
+        if (resolveCachedDisplayName(reference, store) != null && isNameHidden(reference, store)) {
             return;
         }
         if (hasVisibleName) {
@@ -216,6 +218,13 @@ public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<Ent
             }
         }
         return NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(reference, store);
+    }
+
+    private boolean isNameHidden(Ref<EntityStore> reference, Store<EntityStore> store) {
+        Nameplate nameplate = store.getComponent(reference, Nameplate.getComponentType());
+        String text = nameplate == null ? null : nameplate.getText();
+        String runtime = NpcDisplayNameComponentService.resolveRuntimeName(reference, store);
+        return (text == null || text.isBlank()) && (runtime == null || runtime.isBlank());
     }
 
     private void setVisibleName(Ref<EntityStore> reference,
