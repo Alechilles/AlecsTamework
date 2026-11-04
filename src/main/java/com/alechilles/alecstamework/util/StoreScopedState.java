@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.util;
 
+import com.hypixel.hytale.component.Store;
 import java.util.Map;
 import java.util.Objects;
 import java.util.WeakHashMap;
@@ -24,7 +25,15 @@ public final class StoreScopedState<T> {
     public T get(@Nonnull Object store) {
         Objects.requireNonNull(store, "store");
         synchronized (statesByStore) {
-            return statesByStore.computeIfAbsent(store, ignored -> factory.get());
+            T state = statesByStore.get(store);
+            if (state == null) {
+                // States often hold Refs, which reference their store, so the weak keys of a removed
+                // world are never collected. Drop shut-down stores when a new one first appears.
+                statesByStore.keySet().removeIf(key -> key instanceof Store<?> s && s.isShutdown());
+                state = factory.get();
+                statesByStore.put(store, state);
+            }
+            return state;
         }
     }
 
