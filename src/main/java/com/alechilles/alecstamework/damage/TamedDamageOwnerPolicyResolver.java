@@ -54,7 +54,8 @@ public final class TamedDamageOwnerPolicyResolver {
                 TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(
                         settings.isBlockAllPlayerDamageIfOwned()
                 ),
-                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned())
+                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned()),
+                TameworkRuntimeSettings.blockNonOwnerPlayerDamage(settings.isBlockNonOwnerPlayerDamage())
         ), roleId);
     }
 

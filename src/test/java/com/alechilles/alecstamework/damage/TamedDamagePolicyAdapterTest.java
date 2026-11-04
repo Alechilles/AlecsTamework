@@ -17,7 +17,7 @@ class TamedDamagePolicyAdapterTest {
     @Test
     void ownerProtectionPrecedesDisabledClaimProtection() {
         TamedDamageDecision decision = adapter.evaluatePreconditions(
-                new TamedDamageOwnerPolicy(OWNER, true, false, false),
+                new TamedDamageOwnerPolicy(OWNER, true, false, false, false),
                 OWNER,
                 false,
                 false,
@@ -32,7 +32,7 @@ class TamedDamagePolicyAdapterTest {
     @Test
     void invulnerableOwnerPolicyStillAppliesToUnattributedDamage() {
         TamedDamageDecision decision = adapter.evaluatePreconditions(
-                new TamedDamageOwnerPolicy(OWNER, false, false, true),
+                new TamedDamageOwnerPolicy(OWNER, false, false, true, false),
                 null,
                 true,
                 true,
@@ -46,7 +46,7 @@ class TamedDamagePolicyAdapterTest {
     @Test
     void ownedButNotTamedTargetSkipsClaimPolicy() {
         TamedDamageDecision decision = adapter.evaluatePreconditions(
-                new TamedDamageOwnerPolicy(OWNER, false, false, false),
+                new TamedDamageOwnerPolicy(OWNER, false, false, false, false),
                 OUTSIDER,
                 true,
                 true,
@@ -56,6 +56,30 @@ class TamedDamagePolicyAdapterTest {
         assertTrue(decision.allowed());
         assertEquals(TamedDamageDecision.Status.ALLOW_SKIPPED, decision.status());
         assertEquals("target-not-tamed", decision.reason());
+    }
+
+    @Test
+    void nonOwnerPlayerDamageBlockDeniesOtherPlayersButNotTheOwner() {
+        TamedDamageOwnerPolicy policy = new TamedDamageOwnerPolicy(OWNER, false, false, false, true);
+
+        TamedDamageDecision outsider = adapter.evaluatePreconditions(
+                policy,
+                OUTSIDER,
+                false,
+                false,
+                TamedDamageTargetEligibilityResolver.Status.ELIGIBLE
+        ).orElseThrow();
+        TamedDamageDecision owner = adapter.evaluatePreconditions(
+                policy,
+                OWNER,
+                false,
+                false,
+                TamedDamageTargetEligibilityResolver.Status.ELIGIBLE
+        ).orElseThrow();
+
+        assertEquals(TamedDamageDecision.Status.DENY_OWNER, outsider.status());
+        assertEquals("block-non-owner-player-damage", outsider.reason());
+        assertTrue(owner.allowed());
     }
 
     @Test

@@ -52,7 +52,69 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean announcementsEnabled,
                                      int commandPanelCardsPerPage,
                                      int populationLimitPerPlayerDeployedTotal,
-                                     boolean avatarFlightUnlimitedVigour) {
+                                     boolean avatarFlightUnlimitedVigour,
+                                     boolean blockNonOwnerPlayerDamage) {
+
+    /** Compatibility constructor for callers compiled before the non-owner player damage setting: non-owners can still deal damage. */
+    public TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
+                                  @Nonnull TwGlobalConfig.PerPlayerLimitScope populationPerPlayerLimitScope,
+                                  boolean simpleClaimsEnabled,
+                                  int simpleClaimsLimitPerClaimChunk,
+                                  int simpleClaimsLimitPerClaimTotal,
+                                  boolean simpleClaimsBreedingRequiresClaim,
+                                  boolean simpleClaimsProtectTamedFromNonMembers,
+                                  boolean blockOwnerDamage,
+                                  boolean blockAllPlayerDamageIfOwned,
+                                  boolean invulnerableIfOwned,
+                                  @Nonnull CaptureItemOwnershipMode captureItemOwnership,
+                                  boolean captureRequiresOwner,
+                                  boolean interactionRequiresOwner,
+                                  boolean linkingRequiresOwner,
+                                  boolean needsEnabled,
+                                  @Nonnull String needsResourceMode,
+                                  boolean needsDamageEnabled,
+                                  @Nonnull TwNeedsConfig.TickPolicyMode needsTickPolicyMode,
+                                  double needsOwnerOfflineGraceHours,
+                                  double needsOwnerOfflineDecayMultiplier,
+                                  @Nonnull TwNeedsConfig.DamageModel needsDamageModel,
+                                  @Nonnull TwNeedsConfig.DualNeedRule needsDamageDualNeedRule,
+                                  double needsStarvationDamagePerMinute,
+                                  double needsDehydrationDamagePerMinute,
+                                  boolean needsDamageLethal,
+                                  boolean happinessEnabled,
+                                  boolean passiveBreedingEnabled,
+                                  boolean breedingRequiresHappiness,
+                                  boolean breedingGenderEnabled,
+                                  boolean traitsEnabled,
+                                  boolean levelingEnabled,
+                                  boolean talentsEnabled,
+                                  boolean reviveSystemEnabled,
+                                  boolean recallTeleportingEnabled,
+                                  boolean telemetryEnabled,
+                                  boolean telemetryBreadcrumbsEnabled,
+                                  @Nonnull AnimalAgingMode animalAgingMode,
+                                  boolean animalOldAgeDeathEnabled,
+                                  boolean announcementsEnabled,
+                                  int commandPanelCardsPerPage,
+                                  int populationLimitPerPlayerDeployedTotal,
+                                  boolean avatarFlightUnlimitedVigour) {
+        this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership,
+                captureRequiresOwner, interactionRequiresOwner, linkingRequiresOwner,
+                needsEnabled, needsResourceMode, needsDamageEnabled, needsTickPolicyMode,
+                needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
+                needsDamageModel, needsDamageDualNeedRule, needsStarvationDamagePerMinute,
+                needsDehydrationDamagePerMinute, needsDamageLethal, happinessEnabled,
+                passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
+                traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
+                animalAgingMode, animalOldAgeDeathEnabled, announcementsEnabled,
+                commandPanelCardsPerPage, populationLimitPerPlayerDeployedTotal,
+                avatarFlightUnlimitedVigour, false);
+    }
 
     /** Compatibility constructor for callers compiled before the unlimited flight Vigour setting: Vigour stays limited. */
     public TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
@@ -283,7 +345,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 animalOldAgeDeathEnabled,
                 commandPanelCardsPerPage,
                 populationLimitPerPlayerDeployedTotal,
-                avatarFlightUnlimitedVigour
+                avatarFlightUnlimitedVigour,
+                blockNonOwnerPlayerDamage
         );
     }
 
@@ -342,7 +405,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 announcementsEnabled,
                 commandPanelCardsPerPage,
                 populationLimitPerPlayerDeployedTotal,
-                avatarFlightUnlimitedVigour
+                avatarFlightUnlimitedVigour,
+                blockNonOwnerPlayerDamage
         );
     }
 
@@ -400,7 +464,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 announcementsEnabled,
                 settings.commandPanelCardsPerPage(),
                 settings.populationLimitPerPlayerDeployedTotal(),
-                settings.avatarFlightUnlimitedVigour()
+                settings.avatarFlightUnlimitedVigour(),
+                settings.blockNonOwnerPlayerDamage()
         );
     }
 }

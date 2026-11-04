@@ -130,6 +130,11 @@ public final class TameworkRuntimeSettings {
         return values.blockAllPlayerDamageIfOwned();
     }
 
+    /** True when owned companions ignore damage from every player except their owner. */
+    public boolean blockNonOwnerPlayerDamage() {
+        return values.blockNonOwnerPlayerDamage();
+    }
+
     public boolean invulnerableIfOwned() {
         return values.invulnerableIfOwned();
     }
@@ -379,6 +384,11 @@ public final class TameworkRuntimeSettings {
     public static boolean blockAllPlayerDamageIfOwned(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.blockAllPlayerDamageIfOwned() : configEnabled;
+    }
+
+    public static boolean blockNonOwnerPlayerDamage(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.blockNonOwnerPlayerDamage() : configEnabled;
     }
 
     public static boolean invulnerableIfOwned(boolean configEnabled) {

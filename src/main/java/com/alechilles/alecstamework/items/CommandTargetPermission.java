@@ -14,7 +14,7 @@ final class CommandTargetPermission {
                              boolean playerTargetingAllowed,
                              boolean targetPlayerSpawnProtected,
                              boolean targetHasOwner,
-                             boolean blockAllPlayerDamageIfOwned,
+                             boolean blockPlayerDamageFromCommander,
                              boolean invulnerableIfOwned) {
         if (targetIsCommander || targetIsCommandedNpc || targetOwnedByCommander) {
             return false;
@@ -27,7 +27,7 @@ final class CommandTargetPermission {
         if (!targetHasOwner) {
             return true;
         }
-        if (invulnerableIfOwned || blockAllPlayerDamageIfOwned) {
+        if (invulnerableIfOwned || blockPlayerDamageFromCommander) {
             return false;
         }
         return true;
