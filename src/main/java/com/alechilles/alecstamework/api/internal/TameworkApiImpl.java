@@ -1091,7 +1091,8 @@ public final class TameworkApiImpl
                         effectivePolicy.ownerUuid(),
                         effectivePolicy.blockOwnerDamage(),
                         effectivePolicy.blockAllPlayerDamageIfOwned(),
-                        effectivePolicy.invulnerableIfOwned()
+                        effectivePolicy.invulnerableIfOwned(),
+                        effectivePolicy.blockNonOwnerPlayerDamage()
                 ),
                 liveNpc != null ? liveNpc.reference() : null,
                 liveNpc != null ? liveNpc.store() : null,
@@ -2035,7 +2036,8 @@ public final class TameworkApiImpl
                 profile.coopSlot(),
                 TameworkRuntimeSettings.blockOwnerDamage(settings.isBlockOwnerDamage()),
                 TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned()),
-                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned())
+                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned()),
+                TameworkRuntimeSettings.blockNonOwnerPlayerDamage(settings.isBlockNonOwnerPlayerDamage())
         );
     }
 

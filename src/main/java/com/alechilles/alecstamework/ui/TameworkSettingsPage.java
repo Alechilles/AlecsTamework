@@ -88,6 +88,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_SIMPLE_CLAIMS_PROTECT = "@SimpleClaimsProtect";
     private static final String KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE = "@OwnershipBlockOwnerDamage";
     private static final String KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED = "@OwnershipBlockAllDamageIfOwned";
+    private static final String KEY_OWNERSHIP_BLOCK_NON_OWNER_PLAYER_DAMAGE = "@OwnershipBlockNonOwnerPlayerDamage";
     private static final String KEY_OWNERSHIP_INVULNERABLE_IF_OWNED = "@OwnershipInvulnerableIfOwned";
     private static final String KEY_CAPTURE_ITEM_OWNERSHIP = "@CaptureItemOwnership";
     private static final String KEY_CAPTURE_REQUIRES_OWNER = "@CaptureRequiresOwner";
@@ -307,6 +308,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_SIMPLE_CLAIMS_PROTECT, "#TwSettingsSimpleClaimsProtectCheck.Value")
                 .append(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, "#TwSettingsBlockOwnerDamageCheck.Value")
                 .append(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, "#TwSettingsBlockAllDamageIfOwnedCheck.Value")
+                .append(KEY_OWNERSHIP_BLOCK_NON_OWNER_PLAYER_DAMAGE, "#TwSettingsBlockNonOwnerPlayerDamageCheck.Value")
                 .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
                 .append(KEY_CAPTURE_ITEM_OWNERSHIP, "#TwSettingsCaptureItemOwnershipDropdown.Value")
                 .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
@@ -368,6 +370,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsSimpleClaimsProtectCheck.Value", currentValues.simpleClaimsProtectTamedFromNonMembers());
         commandBuilder.set("#TwSettingsBlockOwnerDamageCheck.Value", currentValues.blockOwnerDamage());
         commandBuilder.set("#TwSettingsBlockAllDamageIfOwnedCheck.Value", currentValues.blockAllPlayerDamageIfOwned());
+        commandBuilder.set("#TwSettingsBlockNonOwnerPlayerDamageCheck.Value", currentValues.blockNonOwnerPlayerDamage());
         commandBuilder.set("#TwSettingsInvulnerableIfOwnedCheck.Value", currentValues.invulnerableIfOwned());
         commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Entries", captureItemOwnershipEntries());
         commandBuilder.set("#TwSettingsCaptureItemOwnershipDropdown.Value",
@@ -951,6 +954,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_SIMPLE_CLAIMS_PROTECT, Codec.BOOLEAN), (x, v) -> x.simpleClaimsProtect = v, x -> x.simpleClaimsProtect).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, Codec.BOOLEAN), (x, v) -> x.blockOwnerDamage = v, x -> x.blockOwnerDamage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.blockAllDamageIfOwned = v, x -> x.blockAllDamageIfOwned).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_BLOCK_NON_OWNER_PLAYER_DAMAGE, Codec.BOOLEAN), (x, v) -> x.blockNonOwnerPlayerDamage = v, x -> x.blockNonOwnerPlayerDamage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, Codec.BOOLEAN), (x, v) -> x.invulnerableIfOwned = v, x -> x.invulnerableIfOwned).add()
                 .<String>append(new KeyedCodec<>(KEY_CAPTURE_ITEM_OWNERSHIP, Codec.STRING), (x, v) -> x.captureItemOwnership = v, x -> x.captureItemOwnership).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.captureRequiresOwner = v, x -> x.captureRequiresOwner).add()
@@ -1005,6 +1009,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean simpleClaimsProtect;
         Boolean blockOwnerDamage;
         Boolean blockAllDamageIfOwned;
+        Boolean blockNonOwnerPlayerDamage;
         Boolean invulnerableIfOwned;
         String captureItemOwnership;
         Boolean captureRequiresOwner;

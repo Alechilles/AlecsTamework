@@ -41,6 +41,13 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             .documentation("Blocks all player damage if owned when enabled.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("BlockNonOwnerPlayerDamage", Codec.BOOLEAN),
+                    (settings, value) -> settings.blockNonOwnerPlayerDamage = value,
+                    settings -> settings.blockNonOwnerPlayerDamage
+            )
+            .documentation("Blocks damage from every player except the owner when enabled.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.invulnerableIfOwned = value,
                     settings -> settings.invulnerableIfOwned
@@ -327,6 +334,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         return getOwnershipProtection().isBlockAllPlayerDamageIfOwned();
     }
 
+    public boolean isBlockNonOwnerPlayerDamage() {
+        return getOwnershipProtection().isBlockNonOwnerPlayerDamage();
+    }
+
     public boolean isInvulnerableIfOwned() {
         return getOwnershipProtection().isInvulnerableIfOwned();
     }
@@ -351,6 +362,9 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
         if (!nestedExplicit.contains("BlockAllPlayerDamageIfOwned")) {
             currentSettings.blockAllPlayerDamageIfOwned = parentSettings.blockAllPlayerDamageIfOwned;
+        }
+        if (!nestedExplicit.contains("BlockNonOwnerPlayerDamage")) {
+            currentSettings.blockNonOwnerPlayerDamage = parentSettings.blockNonOwnerPlayerDamage;
         }
         if (!nestedExplicit.contains("InvulnerableIfOwned")) {
             currentSettings.invulnerableIfOwned = parentSettings.invulnerableIfOwned;
@@ -398,6 +412,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     public static final class OwnershipProtectionSettings {
         private boolean blockOwnerDamage = true;
         private boolean blockAllPlayerDamageIfOwned;
+        private boolean blockNonOwnerPlayerDamage;
         private boolean invulnerableIfOwned;
 
         public boolean isBlockOwnerDamage() {
@@ -408,6 +423,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return blockAllPlayerDamageIfOwned;
         }
 
+        public boolean isBlockNonOwnerPlayerDamage() {
+            return blockNonOwnerPlayerDamage;
+        }
+
         public boolean isInvulnerableIfOwned() {
             return invulnerableIfOwned;
         }
@@ -416,6 +435,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             OwnershipProtectionSettings copy = new OwnershipProtectionSettings();
             copy.blockOwnerDamage = blockOwnerDamage;
             copy.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
+            copy.blockNonOwnerPlayerDamage = blockNonOwnerPlayerDamage;
             copy.invulnerableIfOwned = invulnerableIfOwned;
             return copy;
         }
@@ -430,6 +450,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     public static final class EffectiveSettings {
         private final boolean blockOwnerDamage;
         private final boolean blockAllPlayerDamageIfOwned;
+        private final boolean blockNonOwnerPlayerDamage;
         private final boolean invulnerableIfOwned;
         private final double returnHomeTeleportDistance;
         private final double returnHomePathDistanceBeforeTeleport;
@@ -456,6 +477,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
         private EffectiveSettings(boolean blockOwnerDamage,
                                   boolean blockAllPlayerDamageIfOwned,
+                                  boolean blockNonOwnerPlayerDamage,
                                   boolean invulnerableIfOwned,
                                   double returnHomeTeleportDistance,
                                   double returnHomePathDistanceBeforeTeleport,
@@ -481,6 +503,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   @Nullable String[] followMasterOnWorldChangeStateFilter) {
             this.blockOwnerDamage = blockOwnerDamage;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
+            this.blockNonOwnerPlayerDamage = blockNonOwnerPlayerDamage;
             this.invulnerableIfOwned = invulnerableIfOwned;
             this.returnHomeTeleportDistance = returnHomeTeleportDistance;
             this.returnHomePathDistanceBeforeTeleport = returnHomePathDistanceBeforeTeleport;
@@ -538,12 +561,16 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                 boolean blockAllPlayerDamageIfOwned = global != null
                         ? global.isBlockAllPlayerDamageIfOwned()
                         : ownership.isBlockAllPlayerDamageIfOwned();
+                boolean blockNonOwnerPlayerDamage = global != null
+                        ? global.isBlockNonOwnerPlayerDamage()
+                        : ownership.isBlockNonOwnerPlayerDamage();
                 boolean invulnerableIfOwned = global != null
                         ? global.isInvulnerableIfOwned()
                         : ownership.isInvulnerableIfOwned();
                 return new EffectiveSettings(
                         blockOwnerDamage,
                         blockAllPlayerDamageIfOwned,
+                        blockNonOwnerPlayerDamage,
                         invulnerableIfOwned,
                         command.getReturnHomeTeleportDistance(),
                         command.getReturnHomePathDistanceBeforeTeleport(),
@@ -590,6 +617,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return new EffectiveSettings(
                     global != null && global.isBlockOwnerDamage(),
                     global != null && global.isBlockAllPlayerDamageIfOwned(),
+                    global != null && global.isBlockNonOwnerPlayerDamage(),
                     global != null && global.isInvulnerableIfOwned(),
                     global != null
                             ? global.getCommandReturnHomeTeleportDistance()
@@ -648,6 +676,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
         public boolean isBlockAllPlayerDamageIfOwned() {
             return blockAllPlayerDamageIfOwned;
+        }
+
+        public boolean isBlockNonOwnerPlayerDamage() {
+            return blockNonOwnerPlayerDamage;
         }
 
         public boolean isInvulnerableIfOwned() {

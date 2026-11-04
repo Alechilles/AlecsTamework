@@ -185,7 +185,7 @@ class SimpleClaimsTamedDamagePolicyTest {
         TwGlobalConfig config = config(true, true);
 
         TamedDamageDecision nonTamed = policy.evaluateResolvedEligibility(
-                new TamedDamageOwnerPolicy(UUID.randomUUID(), false, false, false),
+                new TamedDamageOwnerPolicy(UUID.randomUUID(), false, false, false, false),
                 TamedDamageTargetEligibilityResolver.Status.INELIGIBLE,
                 "world",
                 POSITION,

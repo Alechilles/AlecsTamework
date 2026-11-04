@@ -63,6 +63,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .documentation("Blocks all player damage if owned when enabled.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("BlockNonOwnerPlayerDamage", Codec.BOOLEAN),
+                    (section, value) -> section.blockNonOwnerPlayerDamage = value,
+                    section -> section.blockNonOwnerPlayerDamage
+            )
+            .documentation("Blocks damage from every player except the owner when enabled.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (section, value) -> section.invulnerableIfOwned = value,
                     section -> section.invulnerableIfOwned
@@ -537,6 +544,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int priority;
     private boolean blockOwnerDamage;
     private boolean blockAllPlayerDamageIfOwned;
+    private boolean blockNonOwnerPlayerDamage;
     private boolean invulnerableIfOwned;
     private boolean ownershipCaptureRequiresOwner;
     private boolean ownershipSpawnRequiresOwner;
@@ -833,6 +841,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return blockAllPlayerDamageIfOwned;
     }
 
+    public boolean isBlockNonOwnerPlayerDamage() {
+        return blockNonOwnerPlayerDamage;
+    }
+
     public boolean isInvulnerableIfOwned() {
         return invulnerableIfOwned;
     }
@@ -1074,6 +1086,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.blockAllPlayerDamageIfOwned != null) {
             blockAllPlayerDamageIfOwned = section.blockAllPlayerDamageIfOwned;
         }
+        if (section.blockNonOwnerPlayerDamage != null) {
+            blockNonOwnerPlayerDamage = section.blockNonOwnerPlayerDamage;
+        }
         if (section.invulnerableIfOwned != null) {
             invulnerableIfOwned = section.invulnerableIfOwned;
         }
@@ -1083,6 +1098,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         OwnershipProtectionSection section = new OwnershipProtectionSection();
         section.blockOwnerDamage = blockOwnerDamage;
         section.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
+        section.blockNonOwnerPlayerDamage = blockNonOwnerPlayerDamage;
         section.invulnerableIfOwned = invulnerableIfOwned;
         return section;
     }
@@ -1395,6 +1411,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (!explicitTopLevelKeys.contains("OwnershipProtection")) {
             blockOwnerDamage = parent.blockOwnerDamage;
             blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
+            blockNonOwnerPlayerDamage = parent.blockNonOwnerPlayerDamage;
             invulnerableIfOwned = parent.invulnerableIfOwned;
             return;
         }
@@ -1409,6 +1426,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("BlockAllPlayerDamageIfOwned")) {
             blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
+        }
+        if (!nestedExplicit.contains("BlockNonOwnerPlayerDamage")) {
+            blockNonOwnerPlayerDamage = parent.blockNonOwnerPlayerDamage;
         }
         if (!nestedExplicit.contains("InvulnerableIfOwned")) {
             invulnerableIfOwned = parent.invulnerableIfOwned;
@@ -1734,6 +1754,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private static final class OwnershipProtectionSection {
         private Boolean blockOwnerDamage;
         private Boolean blockAllPlayerDamageIfOwned;
+        private Boolean blockNonOwnerPlayerDamage;
         private Boolean invulnerableIfOwned;
     }
 

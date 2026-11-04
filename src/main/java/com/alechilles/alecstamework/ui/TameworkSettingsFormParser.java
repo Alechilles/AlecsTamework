@@ -189,7 +189,8 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.announcementsEnabled, current.announcementsEnabled()),
                 numbers.commandPanelCardsPerPage(),
                 numbers.deployedLimit(),
-                boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour())
+                boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour()),
+                boolOrDefault(payload.blockNonOwnerPlayerDamage, current.blockNonOwnerPlayerDamage())
         );
     }
 

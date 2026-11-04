@@ -16,7 +16,15 @@ public record GlobalConfigView(@Nullable String id,
                                @Nonnull SimpleClaimsView simpleClaims) {
     public record OwnershipProtectionView(boolean blockOwnerDamage,
                                           boolean blockAllPlayerDamageIfOwned,
-                                          boolean invulnerableIfOwned) {
+                                          boolean invulnerableIfOwned,
+                                          boolean blockNonOwnerPlayerDamage) {
+
+        /** Compatibility constructor for callers compiled before the non-owner player damage flag: reports it as off. */
+        public OwnershipProtectionView(boolean blockOwnerDamage,
+                                       boolean blockAllPlayerDamageIfOwned,
+                                       boolean invulnerableIfOwned) {
+            this(blockOwnerDamage, blockAllPlayerDamageIfOwned, invulnerableIfOwned, false);
+        }
     }
 
     public record OwnershipRequirementsView(boolean captureRequiresOwner,

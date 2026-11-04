@@ -101,6 +101,17 @@ The list is saved in `tamework-deploy-places.json` next to
 `tamework-settings.json`, so a network can share one file. See the Portable
 Companions API reference for network use.
 
+## Damage protection
+
+**Block Non-Owner Player Damage** is saved as
+`ownership.damageProtection.blockNonOwnerPlayerDamage` and is off by default.
+When it is on, an owned companion ignores damage from every player except its
+owner, including their arrows and other projectiles. Companions commanded by
+another player cannot target it either. Whether the owner can still hurt it is
+decided by **Block Owner Damage**, so turn that off too when owners should keep
+that ability. **Block All Player Damage If Owned** still blocks every player,
+the owner included.
+
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,

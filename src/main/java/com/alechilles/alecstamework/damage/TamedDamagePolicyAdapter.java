@@ -92,6 +92,9 @@ final class TamedDamagePolicyAdapter {
         if (ownerPolicy.blockAllPlayerDamageIfOwned()) {
             return TamedDamageDecision.denyOwner("block-all-player-damage-if-owned");
         }
+        if (ownerPolicy.blockNonOwnerPlayerDamage() && !ownerPolicy.ownerUuid().equals(attackerPlayerUuid)) {
+            return TamedDamageDecision.denyOwner("block-non-owner-player-damage");
+        }
         if (ownerPolicy.blockOwnerDamage() && ownerPolicy.ownerUuid().equals(attackerPlayerUuid)) {
             return TamedDamageDecision.denyOwner("block-owner-damage");
         }

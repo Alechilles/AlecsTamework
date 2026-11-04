@@ -274,7 +274,8 @@ final class ApiMapper {
                 new GlobalConfigView.OwnershipProtectionView(
                         TameworkRuntimeSettings.blockOwnerDamage(config.isBlockOwnerDamage()),
                         TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(config.isBlockAllPlayerDamageIfOwned()),
-                        TameworkRuntimeSettings.invulnerableIfOwned(config.isInvulnerableIfOwned())
+                        TameworkRuntimeSettings.invulnerableIfOwned(config.isInvulnerableIfOwned()),
+                        TameworkRuntimeSettings.blockNonOwnerPlayerDamage(config.isBlockNonOwnerPlayerDamage())
                 ),
                 new GlobalConfigView.OwnershipRequirementsView(
                         TameworkRuntimeSettings.captureRequiresOwner(config.isOwnershipCaptureRequiresOwner()),

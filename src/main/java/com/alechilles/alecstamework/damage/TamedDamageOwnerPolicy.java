@@ -10,9 +10,11 @@ import javax.annotation.Nullable;
 public record TamedDamageOwnerPolicy(@Nullable UUID ownerUuid,
                                      boolean blockOwnerDamage,
                                      boolean blockAllPlayerDamageIfOwned,
-                                     boolean invulnerableIfOwned) {
+                                     boolean invulnerableIfOwned,
+                                     boolean blockNonOwnerPlayerDamage) {
     private static final TamedDamageOwnerPolicy UNOWNED = new TamedDamageOwnerPolicy(
             null,
+            false,
             false,
             false,
             false

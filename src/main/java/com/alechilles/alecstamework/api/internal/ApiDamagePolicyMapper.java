@@ -81,7 +81,8 @@ final class ApiDamagePolicyMapper {
                 persisted.coopSlot(),
                 live.policy().blockOwnerDamage(),
                 live.policy().blockAllPlayerDamageIfOwned(),
-                live.policy().invulnerableIfOwned()
+                live.policy().invulnerableIfOwned(),
+                live.policy().blockNonOwnerPlayerDamage()
         );
     }
 

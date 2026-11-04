@@ -288,6 +288,8 @@ final class CommandStepExecutionService {
                 targetOwnerId != null,
                 TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(
                         companionSettings.isBlockAllPlayerDamageIfOwned()
+                ) || TameworkRuntimeSettings.blockNonOwnerPlayerDamage(
+                        companionSettings.isBlockNonOwnerPlayerDamage()
                 ),
                 TameworkRuntimeSettings.invulnerableIfOwned(companionSettings.isInvulnerableIfOwned())
         );

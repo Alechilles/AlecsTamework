@@ -1022,6 +1022,31 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 34);
 
+              Label #TwSettingsBlockNonOwnerPlayerDamageLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.blockNonOwnerPlayerDamage;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsBlockNonOwnerPlayerDamageTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.blockNonOwnerPlayerDamage;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsBlockNonOwnerPlayerDamageCheck {
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: $A.@SlateQuiet;
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
               Label #TwSettingsInvulnerableIfOwnedLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.invulnerableIfOwned;

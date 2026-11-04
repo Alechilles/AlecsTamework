@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `/tw settings` has a **Block Non-Owner Player Damage** option under Damage Protection. When it is on, players
+  other than the owner cannot hurt an owned companion. The owner can still hurt it while **Block Owner Damage** is
+  off. The option is off by default. `OwnershipPolicyView` and `GlobalConfigView.OwnershipProtectionView` report it as
+  `blockNonOwnerPlayerDamage`; their old constructors still work.
+
 ## 5.8.0 - Activity Reports and Coop Fixes - 2026-11-01
 
 ### Added
