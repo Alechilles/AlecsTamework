@@ -1413,6 +1413,13 @@ public class Tamework extends JavaPlugin {
                 diagnosticRuntime.recordStartCompleted();
             }
         } catch (Throwable throwable) {
+            if (HytaleServer.get().isShuttingDown()) {
+                // A server stopping mid-boot shuts down plugins that are already enabled, Hytale:NPC
+                // among them, so start fails on a missing NPC type. Nothing to report as a crash.
+                getLogger().at(Level.INFO).log(
+                        "The server began shutting down while Alec's Tamework! was starting, so start stopped early.");
+                throw throwable;
+            }
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
             telemetryEvents.recordLifecycle(
                     "plugin_start",
