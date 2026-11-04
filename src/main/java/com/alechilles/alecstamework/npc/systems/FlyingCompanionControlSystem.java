@@ -384,9 +384,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         if (markedEntitySupport == null) {
             return null;
         }
-        Ref<EntityStore> targetRef = markedEntitySupport.getMarkedEntityRef(
-                (int) component.getLandingTargetSlotIndex()
-        );
+        // The index is saved with the component but belongs to the role that set it; a role with
+        // fewer slots (role swap, edited asset) would throw past the engine's unchecked lookup.
+        long slotIndex = component.getLandingTargetSlotIndex();
+        if (slotIndex < 0 || slotIndex >= markedEntitySupport.getEntityTargets().length) {
+            return null;
+        }
+        Ref<EntityStore> targetRef = markedEntitySupport.getMarkedEntityRef((int) slotIndex);
         if (targetRef == null || !targetRef.isValid()) {
             return null;
         }

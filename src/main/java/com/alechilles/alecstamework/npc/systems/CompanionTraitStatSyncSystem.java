@@ -50,7 +50,13 @@ public final class CompanionTraitStatSyncSystem extends RefSystem<EntityStore> {
         if (store.getComponent(reference, traitsType) == null) {
             return;
         }
-        CompanionStatModifierService.applyTraitModifiers(reference, store);
+        // The store is locked while entities are added, so registered trait effects that add or
+        // remove components would fail here. Run them once the buffer is consumed.
+        commandBuffer.run(bufferStore -> {
+            if (reference.isValid()) {
+                CompanionStatModifierService.applyTraitModifiers(reference, bufferStore);
+            }
+        });
     }
 
     @Override
