@@ -16,7 +16,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +42,9 @@ public final class CompanionLifeStageService {
     private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
-    private static final Set<UUID> ACTIVE_GROWTH_TICKERS = ConcurrentHashMap.newKeySet();
+    // Maps each growing NPC to the world running its ticker, so a tick left behind in a world the
+    // NPC has moved out of cannot cancel the ticker of the world it moved to.
+    private static final Map<UUID, World> ACTIVE_GROWTH_TICKERS = new ConcurrentHashMap<>();
     private static final BreedingCooldownResetService BREEDING_COOLDOWN_RESET = new BreedingCooldownResetService();
 
     /** Controls whether offspring initialization may reinterpret a missing planned family. */
@@ -655,10 +657,11 @@ public final class CompanionLifeStageService {
             NPCEntity resolvedNpc = store.getComponent(npcRef, NPCEntity.getComponentType());
             npcUuid = resolvedNpc != null ? resolvedNpc.getUuid() : null;
         }
-        if (npcUuid == null || !ACTIVE_GROWTH_TICKERS.add(npcUuid)) {
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (npcUuid == null || world == null || ACTIVE_GROWTH_TICKERS.put(npcUuid, world) == world) {
             return;
         }
-        scheduleGrowthTick(npcRef, npc, store);
+        scheduleGrowthTick(world, npcUuid);
     }
 
     public static boolean isAdult(@Nullable Ref<EntityStore> npcRef,
@@ -1180,16 +1183,16 @@ public final class CompanionLifeStageService {
         return resolveLifecycleFamilyForProgression(breedingConfig, spawnedRoleId);
     }
 
-    private static void scheduleGrowthTick(Ref<EntityStore> npcRef,
-                                           @Nullable NPCEntity npc,
-                                           Store<EntityStore> store) {
-        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        UUID npcUuid = npc != null ? npc.getUuid() : null;
-        if (world == null || npcUuid == null) {
-            return;
-        }
+    private static void scheduleGrowthTick(@Nonnull World world, @Nonnull UUID npcUuid) {
         CompletableFuture.runAsync(
-                () -> world.execute(() -> onGrowthTick(world, npcUuid)),
+                () -> {
+                    try {
+                        world.execute(() -> onGrowthTick(world, npcUuid));
+                    } catch (RuntimeException rejected) {
+                        // The world stopped first. Clear the entry so the NPC can tick again on load.
+                        ACTIVE_GROWTH_TICKERS.remove(npcUuid, world);
+                    }
+                },
                 CompletableFuture.delayedExecutor(GROWTH_TICK_INTERVAL_MS, TimeUnit.MILLISECONDS)
         );
     }
@@ -1294,26 +1297,27 @@ public final class CompanionLifeStageService {
     }
 
     private static void onGrowthTick(World world, UUID npcUuid) {
-        if (world == null || npcUuid == null || !ACTIVE_GROWTH_TICKERS.contains(npcUuid)) {
+        if (world == null || npcUuid == null || ACTIVE_GROWTH_TICKERS.get(npcUuid) != world) {
             return;
         }
-        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-        if (npcRef == null || !npcRef.isValid()) {
-            ACTIVE_GROWTH_TICKERS.remove(npcUuid);
-            return;
+        boolean rescheduled = false;
+        try {
+            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            if (npcRef == null || !npcRef.isValid() || store == null) {
+                return;
+            }
+            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+            refreshLifeStage(npcRef, npc, store, true);
+            if (isGrowthInProgress(npcRef, store)) {
+                scheduleGrowthTick(world, npcUuid);
+                rescheduled = true;
+            }
+        } finally {
+            if (!rescheduled) {
+                ACTIVE_GROWTH_TICKERS.remove(npcUuid, world);
+            }
         }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            ACTIVE_GROWTH_TICKERS.remove(npcUuid);
-            return;
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        refreshLifeStage(npcRef, npc, store, true);
-        if (isGrowthInProgress(npcRef, store)) {
-            scheduleGrowthTick(npcRef, npc, store);
-            return;
-        }
-        ACTIVE_GROWTH_TICKERS.remove(npcUuid);
     }
 
     private static boolean isGrowthInProgress(Ref<EntityStore> npcRef, Store<EntityStore> store) {
