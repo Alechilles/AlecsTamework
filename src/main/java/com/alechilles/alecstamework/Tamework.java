@@ -233,6 +233,8 @@ import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.permissions.provider.HytalePermissionsProvider;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.plugin.PluginManager;
+import com.hypixel.hytale.server.core.plugin.PluginState;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -1499,9 +1501,10 @@ public class Tamework extends JavaPlugin {
                 && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             assetEditorPackService.ensurePackVisible();
         }
-        // The engine shuts down only ENABLED plugins, so a stop that began during start has
-        // already passed this one. Failing start makes the engine run shutdown(), which saves.
-        if (HytaleServer.get().isShuttingDown()) {
+        // PluginManager reaches SHUTDOWN after the ShutdownEvent (worlds saved, -28 flush) and then
+        // shuts down only ENABLED plugins, so it has already passed this one. Failing start makes
+        // the engine run shutdown(), which saves. Earlier in a stop, finishing start is correct.
+        if (PluginManager.get().getState() == PluginState.SHUTDOWN) {
             throw new IllegalStateException("The server began shutting down while Alec's Tamework! was starting.");
         }
     }
@@ -2176,7 +2179,12 @@ public class Tamework extends JavaPlugin {
         } finally {
             // A close above that throws must not skip the final companion save. After a failed
             // start this is the only flush, because the -28 ShutdownEvent handler never ran.
-            shutdownCompanionPersistence();
+            try {
+                shutdownCompanionPersistence();
+            } catch (RuntimeException exception) {
+                // Logged here so it cannot replace an earlier shutdown error.
+                getLogger().at(Level.SEVERE).withCause(exception).log("Companion persistence did not shut down cleanly.");
+            }
         }
         OwnerPopulationCapService.useAdmissionGate(null);
         companionReleaseFlow = null;
