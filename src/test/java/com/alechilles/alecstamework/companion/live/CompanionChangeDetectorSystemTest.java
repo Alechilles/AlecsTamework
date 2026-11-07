@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.companion.live;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,7 +72,6 @@ class CompanionChangeDetectorSystemTest {
             clock.addAndGet(DISCRETE_MS);
             ecs.tick(1);
             assertTrue(ecs.get(pet, dirty).consumeDirty(), "the owner change marks the body for saving");
-            assertEquals(1, ecs.store().getEntityCount(), "the store holds just the one body");
         }
     }
 

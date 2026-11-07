@@ -107,10 +107,13 @@ public final class EcsFixture implements AutoCloseable {
     @Override
     public void close() throws Exception {
         try {
-            if (store != null) {
-                registry.removeStore(store);
+            try {
+                if (store != null) {
+                    registry.removeStore(store);
+                }
+            } finally {
+                registry.shutdown();    // stops the registry's holder-reference worker thread
             }
-            registry.shutdown();    // stops the registry's holder-reference worker thread
         } finally {
             if (moduleInstalled) {
                 field(EntityModule.class, "instance").set(null, previousModule);
