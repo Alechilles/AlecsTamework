@@ -14,7 +14,11 @@ Codify behavior expectations as repeatable tests.
 3. Name the exact production regression and observable result. If the test only
    proves source shape, registration, declaration order, or file/asset
    presence, do not add it.
-4. Write the smallest fixture that invokes production behavior.
+4. Write the smallest fixture that invokes production behavior. For an ECS
+   system's real tick (query, command-buffer writes, Dirty marks), use
+   `src/test/java/com/alechilles/alecstamework/testsupport/EcsFixture.java`: a
+   real engine registry and store with no server. Its Javadoc lists what needs a
+   live rig instead (World, chunks, assets, players, vanilla system groups).
 5. Assert a returned value, persisted state, emitted effect/event,
    authorization decision, recovery outcome, or user-visible output.
 6. When expected behavior depends on base Hytale API/gamedata semantics, use `hytale-workshop-mcp` to ground the contract before writing assertions.
