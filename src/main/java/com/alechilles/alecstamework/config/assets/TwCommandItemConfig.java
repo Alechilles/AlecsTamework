@@ -868,7 +868,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             return icon;
         }
 
-        /** Whether this command is rendered in the bounded command radial. */
+        /**
+         * Legacy {@code ShowInRadial} value. The command radial was removed, so Tamework no longer reads it; it stays
+         * readable for older assets and for command UI contributors that still use it.
+         */
         public boolean isShowInRadial() {
             return showInRadial;
         }

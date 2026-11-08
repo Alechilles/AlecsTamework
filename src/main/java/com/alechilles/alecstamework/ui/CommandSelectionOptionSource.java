@@ -71,34 +71,6 @@ final class CommandSelectionOptionSource {
         return false;
     }
 
-    static String currentLabel(
-            Option[] options,
-            String selectedCommandId,
-            String language
-    ) {
-        if (selectedCommandId == null || selectedCommandId.isBlank()) {
-            return LocalizedText.resolve(
-                    language, "tamework.ui.commandMenu.current.none"
-            );
-        }
-        for (Option option : options) {
-            if (option != null && CommandUiIdParser.commandIdEquals(
-                    option.id(), selectedCommandId
-            )) {
-                return LocalizedText.format(
-                        language,
-                        "tamework.ui.commandMenu.current.value",
-                        option.label()
-                );
-            }
-        }
-        return LocalizedText.format(
-                language,
-                "tamework.ui.commandMenu.current.value",
-                selectedCommandId
-        );
-    }
-
     record Option(@Nonnull String id, @Nonnull String label) {
     }
 }

@@ -108,31 +108,5 @@ $C.@PageOverlay {
     }
    }
   }
-    // Legacy wheel selectors stay mounted for existing page bindings, but the
-    // command sidebar is the only visible command-selection surface.
-    Group #TameworkCommandLegacyWheel {
-      Anchor: (Top: 0, Left: 0, Width: 1, Height: 1);
-      Visible: false;
-
-      Label #TameworkCommandMenuCurrent { Text: ""; }
-
-      TextButton #CommandButton0 { Text: ""; }
-      TextButton #CommandButton1 { Text: ""; }
-      TextButton #CommandButton2 { Text: ""; }
-      TextButton #CommandButton3 { Text: ""; }
-      TextButton #CommandButton4 { Text: ""; }
-      TextButton #CommandButton5 { Text: ""; }
-      TextButton #CommandButton6 { Text: ""; }
-      TextButton #CommandButton7 { Text: ""; }
-
-      Label #CommandLabel0 { Text: ""; }
-      Label #CommandLabel1 { Text: ""; }
-      Label #CommandLabel2 { Text: ""; }
-      Label #CommandLabel3 { Text: ""; }
-      Label #CommandLabel4 { Text: ""; }
-      Label #CommandLabel5 { Text: ""; }
-      Label #CommandLabel6 { Text: ""; }
-      Label #CommandLabel7 { Text: ""; }
-    }
   }
 }

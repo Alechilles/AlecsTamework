@@ -268,8 +268,6 @@ tamework.ui.guide.topic.worldUtilities.visual=Cuida de tus animales
 tamework.ui.guide.topic.worldUtilities.note=Un espantapájaros no elimina a los animales que ya están cerca. Usa comederos para cuidarlos y corrales para guardarlos.
 
 # ===== Tamework UI: Spanish localization additions =====
-tamework.ui.commandMenu.current.none=Actual: Ninguno
-tamework.ui.commandMenu.current.value=Actual: {0}
 tamework.ui.commandMenu.feedback = Comentarios
 tamework.ui.commandMenu.feedbackTooltip = Informar un problema o sugerir una mejora.
 tamework.ui.commandMenu.feedbackUnavailable = El formulario de comentarios no está disponible actualmente.

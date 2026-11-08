@@ -49,14 +49,12 @@ public final class TameworkCommandSelectionPage
     static final String PANEL_MODE_OWNED = "OwnedMode";
     static final String PANEL_SORT_DEFAULT = "Default";
     static final String PANEL_FILTER_NONE = "None";
-    private static final int MAX_COMMAND_BUTTONS = 8;
     static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
     private static final String REMOVAL_CONFIRM_COMMAND_PREFIX = "__removal_confirm__:";
     private static final String REMOVAL_CONFIRM_CANCEL_COMMAND_ID = "__removal_confirm_cancel__";
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
-    private final CommandSelectionOptionSource.Option[] options;
     /** LMB accepts every command, including hotswap-only entries hidden from the radial. */
     private final CommandSelectionOptionSource.Option[] primaryOptions;
     final TwCommandItemConfig config;
@@ -332,13 +330,6 @@ public final class TameworkCommandSelectionPage
         this.hotswapController = new CommandSelectionHotswapController(config, this::resolveLanguage);
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
         markLinkedPanelOwner();
-        this.options = CommandSelectionOptionSource.build(
-                config,
-                entry -> entry.isShowInRadial()
-                        && (commandOptionPredicate == null || commandOptionPredicate.test(entry)),
-                resolveLanguage(),
-                MAX_COMMAND_BUTTONS
-        );
         this.primaryOptions = CommandSelectionOptionSource.build(
                 config, commandOptionPredicate, resolveLanguage(), Integer.MAX_VALUE);
         this.cardBindingConfig = LinkedNpcPanelCardBindingFactory.create(
@@ -497,12 +488,6 @@ public final class TameworkCommandSelectionPage
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
             commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
             commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
-            commandBuilder.set(
-                    "#TameworkCommandMenuCurrent.Text",
-                    CommandSelectionOptionSource.currentLabel(
-                            primaryOptions, selectedCommandId, resolveLanguage()
-                    )
-            );
             hotswapController.build(commandBuilder, primaryOptions, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.append("#TameworkLinkedPanelRoot",
@@ -532,7 +517,6 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", pendingFilterTextInput != null ? pendingFilterTextInput : LinkedNpcPanelPresentationSupport.input(panelFilterInputValueSupplier));
             refreshTransaction.applyGroupOverlay(groupAssignOverlay, commandBuilder, resolveLanguage());
             refreshTransaction.applyReviveOverlay(featureController, commandBuilder, resolveLanguage());
-            CommandPageButtonBinder.bind(commandBuilder, eventBuilder, options);
             buildLinkedNpcPanel(commandBuilder, eventBuilder);
             CommandSelectionPageEventBinder.bindPanelControls(
                     eventBuilder, featureController
@@ -1093,14 +1077,8 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
-        if (!CommandSelectionOptionSource.contains(options, commandId)) {
-            pendingUnlinkNpcUuid = null;
-            closePage();
-            return;
-        }
         pendingUnlinkNpcUuid = null;
         closePage();
-        selectionCallback.accept(commandId);
     }
 
     /** Supplies the physical flute snapshot and mutation authority after page construction. */

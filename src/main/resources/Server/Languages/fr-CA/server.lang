@@ -56,8 +56,6 @@ tamework.ui.shared.label.group=Groupe
 tamework.ui.shared.placeholder.groupName=Nom du groupe
 
 # ===== Tamework UI: Command Menu =====
-tamework.ui.commandMenu.current.none=Actuel : aucun
-tamework.ui.commandMenu.current.value=Actuel : {0}
 tamework.ui.commandMenu.subtitle=Sélectionner une commande
 tamework.ui.commandMenu.title=Menu des commandes
 

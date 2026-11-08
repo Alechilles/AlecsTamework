@@ -74,22 +74,6 @@ final class CommandSelectionPageEventBinder {
     private CommandSelectionPageEventBinder() {
     }
 
-    static void bindOptionEvents(
-            @Nonnull UIEventBuilder events,
-            @Nonnull CommandSelectionOptionSource.Option[] options,
-            int maximumOptions
-    ) {
-        int boundCount = Math.min(options.length, maximumOptions);
-        for (int index = 0; index < boundCount; index++) {
-            events.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    "#CommandButton" + index,
-                    EventData.of(EVENT_COMMAND_ID, options[index].id()),
-                    false
-            );
-        }
-    }
-
     static void bindPanelControls(
             @Nonnull UIEventBuilder events,
             @Nonnull LinkedNpcPanelFeatureController featureController
