@@ -650,8 +650,15 @@ final class TameworkInteractEffects {
                             Ref<EntityStore> npcRef,
                             Role role,
                             Store<EntityStore> store,
-                            Player player) {
-        return modeCycleEffects.applyToggleMode(cycle, showFloatingText, showUiMessage, npcRef, role, store, player);
+                            Player player,
+                            int requestedStepIndex) {
+        return modeCycleEffects.applyToggleMode(cycle, showFloatingText, showUiMessage, npcRef, role, store, player,
+                requestedStepIndex);
+    }
+
+    List<InteractionModeCycleEffects.CardModeStep> describeModes(ModeStep[] cycle, Ref<EntityStore> npcRef, Role role,
+                                                                 Store<EntityStore> store) {
+        return modeCycleEffects.describeModes(cycle, npcRef, role, store);
     }
 
     BreedingInteractionOutcome applyStartBreeding(

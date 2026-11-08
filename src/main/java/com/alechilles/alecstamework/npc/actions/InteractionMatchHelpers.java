@@ -206,6 +206,9 @@ final class InteractionMatchHelpers {
         if (requirement == null || requirement.getState() == null || requirement.getState().isBlank()) {
             return false;
         }
+        if (ctx != null && ctx.skipGestures) {
+            return true;
+        }
         MovementStates states = statesForPlayer(role, infoProvider, store, ctx);
         return matchesMovementState(states, requirement.getState());
     }
@@ -215,6 +218,9 @@ final class InteractionMatchHelpers {
                               InfoProvider infoProvider,
                               Store<EntityStore> store,
                               InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.skipGestures) {
+            return true;
+        }
         return matchesMovementState(statesForPlayer(role, infoProvider, store, ctx), "Crouching");
     }
 

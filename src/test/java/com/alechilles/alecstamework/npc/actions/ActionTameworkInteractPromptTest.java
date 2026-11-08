@@ -45,10 +45,11 @@ class ActionTameworkInteractPromptTest {
                                              ActionTameworkInteract.ResolvedInteraction resolved) throws Exception {
         Method method = ActionTameworkInteractPrompt.class.getDeclaredMethod(
                 "resolvePromptState",
-                ActionTameworkInteract.ResolvedInteraction.class
+                ActionTameworkInteract.ResolvedInteraction.class,
+                boolean.class
         );
         method.setAccessible(true);
-        return method.invoke(action, resolved);
+        return method.invoke(action, resolved, false);
     }
 
     private static Object readField(Object target, String fieldName) throws Exception {

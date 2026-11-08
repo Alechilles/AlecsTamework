@@ -77,6 +77,10 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsClaimLimitTotalLabel", "tamework.ui.settings.label.claimLimitTotal"},
             {"#TwSettingsBreedingRequiresClaimLabel", "tamework.ui.settings.label.breedingRequiresClaim"},
             {"#TwSettingsSimpleClaimsProtectLabel", "tamework.ui.settings.label.simpleClaimsProtect"},
+            {"#TwSettingsCompanionCardSectionLabel", "tamework.ui.settings.label.companionCardSection"},
+            {"#TwSettingsCardDefaultFBehaviourLabel", "tamework.ui.settings.label.companionCardDefaultFBehaviour"},
+            {"#TwSettingsCardAllowPlayerChoiceLabel", "tamework.ui.settings.label.companionCardAllowPlayerChoice"},
+            {"#TwSettingsCardRenameModeLabel", "tamework.ui.settings.label.companionCardRenameMode"},
             {"#TwSettingsTelemetrySectionLabel", "tamework.ui.settings.label.telemetrySection"},
             {"#TwSettingsTelemetryConsentInstructionLabel", "tamework.ui.settings.note.telemetryConsentCommand"}
     };
@@ -144,6 +148,10 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsDeploySectionTooltip", "tamework.ui.settings.tooltip.deploySection"},
             {"#TwSettingsDeployModeTooltip", "tamework.ui.settings.tooltip.deployMode"},
             {"#TwSettingsDeployPlacesTooltip", "tamework.ui.settings.tooltip.deployPlaces"},
+            {"#TwSettingsCompanionCardSectionTooltip", "tamework.ui.settings.tooltip.companionCardSection"},
+            {"#TwSettingsCardDefaultFBehaviourTooltip", "tamework.ui.settings.tooltip.companionCardDefaultFBehaviour"},
+            {"#TwSettingsCardAllowPlayerChoiceTooltip", "tamework.ui.settings.tooltip.companionCardAllowPlayerChoice"},
+            {"#TwSettingsCardRenameModeTooltip", "tamework.ui.settings.tooltip.companionCardRenameMode"},
             {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"}
     };
 
@@ -154,6 +162,8 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsAnimalAgingModeDropdown", "tamework.ui.settings.noItems.agingMode"},
             {"#TwSettingsCaptureItemOwnershipDropdown", "tamework.ui.settings.noItems.captureItemOwnership"},
             {"#TwSettingsDeployModeDropdown", "tamework.ui.settings.noItems.deployMode"},
+            {"#TwSettingsCardDefaultFBehaviourDropdown", "tamework.ui.settings.noItems.companionCardFBehaviour"},
+            {"#TwSettingsCardRenameModeDropdown", "tamework.ui.settings.noItems.companionCardRenameMode"},
             {"#TwSettingsNeedsDamageModelDropdown", "tamework.ui.settings.noItems.model"},
             {"#TwSettingsNeedsDamageDualNeedRuleDropdown", "tamework.ui.settings.noItems.rule"},
             {"#TwSettingsPopulationScopeDropdown", "tamework.ui.settings.noItems.scope"}

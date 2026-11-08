@@ -44,6 +44,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final String HINT_BREED = "server.interactionHints.breed";
     private static final String HINT_MODE_CYCLE = "server.interactionHints.modeCycle";
     private static final String HINT_CUSTOM = "server.interactionHints.custom";
+    private static final String HINT_COMPANION_CARD = "server.interactionHints.companionCard";
 
     private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
     private final Map<UUID, Long> lastDebugMs = new HashMap<>();
@@ -106,6 +107,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             prompt = cachedSelection.promptState();
         } else {
             ctx = buildContextSnapshot(player, interactionTarget, role, activeItem, playerId);
+            ctx.cardMode = ActionTameworkInteract.opensCompanionCard(interactionTarget, store);
             config = resolveConfig(role, ctx);
             if (config != null && config.isEnabled()) {
                 // Showing a prompt never claims an unowned tamed NPC: the interaction itself does.
@@ -124,7 +126,8 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 }
             }
 
-            prompt = resolvePromptState(resolved);
+            prompt = resolvePromptState(resolved, ctx != null && ctx.cardMode
+                    && resolved != null && resolved.entry instanceof ModeCycleInteraction);
             cachedPromptSelections.put(
                     playerId,
                     new CachedPromptSelection(
@@ -162,7 +165,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     }
 
     // Determines the prompt state (visibility + hint key) for the selected entry.
-    private PromptState resolvePromptState(ActionTameworkInteract.ResolvedInteraction resolved) {
+    private PromptState resolvePromptState(ActionTameworkInteract.ResolvedInteraction resolved, boolean companionCard) {
         if (resolved == null || resolved.blockedByCooldown || resolved.entry == null) {
             return PromptState.hidden(false);
         }
@@ -172,7 +175,8 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         if (!showPrompt) {
             return PromptState.hidden(true);
         }
-        String hint = entry.getPromptHint();
+        // In Card mode F opens the card instead of cycling, so an authored mode-cycle hint would be wrong.
+        String hint = companionCard ? HINT_COMPANION_CARD : entry.getPromptHint();
         if (hint == null || hint.isBlank()) {
             hint = resolveDefaultHint(entry);
         }

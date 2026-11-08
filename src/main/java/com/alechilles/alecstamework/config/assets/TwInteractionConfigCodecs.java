@@ -1321,6 +1321,55 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Optional UI message for this mode. May be raw text or a server.lang key.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("Label", Codec.STRING),
+            (step, value) -> step.label = value,
+            step -> step.label
+        )
+        .documentation("Optional companion card label for this mode. A server.lang key or raw text. "
+                + "Default: Tamework's label for Follow, Hold, Idle, Defend, Aggressive and Sleep, otherwise the state name.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Icon", Codec.STRING),
+            (step, value) -> step.icon = value,
+            step -> step.icon
+        )
+        .documentation("Optional companion card glyph for this mode, a texture path under Common/UI/Custom.")
+        .add()
+        .build();
+
+    public static final BuilderCodec<CardSettings> CARD_SETTINGS_CODEC = BuilderCodec.builder(
+            CardSettings.class,
+            CardSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Label", Codec.STRING),
+            (card, value) -> card.label = value,
+            card -> card.label
+        )
+        .documentation("Button label, a server.lang key or raw text. Default: Tamework's label for the entry type.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Icon", Codec.STRING),
+            (card, value) -> card.icon = value,
+            card -> card.icon
+        )
+        .documentation("Button glyph, a white 64x64 texture path under Common/UI/Custom. Default: Tamework's glyph for the entry type.")
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("Order", Codec.INTEGER),
+            (card, value) -> card.order = value == null ? 0 : value,
+            card -> card.order
+        )
+        .documentation("Sort order among the card's buttons, lowest first. Ties keep authored order. Default: 0.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("OnInteract", Codec.BOOLEAN),
+            (card, value) -> card.onInteract = value == null || value,
+            card -> card.onInteract
+        )
+        .documentation("Whether F can still select this entry. false makes the entry card-only. Default: true.")
+        .add()
         .build();
 
     public static final ArrayCodec<ModeStep> MODE_STEP_ARRAY_CODEC =
@@ -1356,6 +1405,14 @@ public final class TwInteractionConfigCodecs {
             entry -> entry.showPrompt
         )
         .documentation("Whether to show the interaction prompt when this entry matches. Default: true.")
+        .add()
+        .<CardSettings>append(
+            new KeyedCodec<>("Card", CARD_SETTINGS_CODEC),
+            (entry, value) -> entry.card = value,
+            entry -> entry.card
+        )
+        .documentation("Puts this entry on the companion card as a button. Clicking it runs the entry like F, "
+                + "without crouch or movement requirements. Default: not on the card.")
         .add()
         .build();
 

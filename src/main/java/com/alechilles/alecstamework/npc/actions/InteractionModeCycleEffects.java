@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.ArrayList;
+import java.util.List;
 
 /** Handles mode-cycle state transitions and related messaging. */
 final class InteractionModeCycleEffects {
@@ -31,14 +32,36 @@ final class InteractionModeCycleEffects {
         this.stateEffects = stateEffects;
     }
 
-    // Cycles the NPC's state to the next valid mode step and optionally emits messages.
+    /** A valid mode step for the companion card: its index in the authored cycle and whether it is active. */
+    record CardModeStep(int stepIndex, ModeStep step, boolean current) {
+    }
+
+    /** Lists the cycle's steps that are valid for this role, marking the active one. Read only. */
+    List<CardModeStep> describeModes(ModeStep[] cycle, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null) {
+            return List.of();
+        }
+        String defaultSub = stateEffects.resolveDefaultSubState(role);
+        ModeStep[] resolvedCycle = (cycle == null || cycle.length == 0) ? DEFAULT_MODE_CYCLE : cycle;
+        ResolvedModeStep[] resolved = resolveValidModeSteps(resolvedCycle, stateSupport, defaultSub);
+        int currentIndex = findCurrentModeIndex(resolved, stateSupport);
+        List<CardModeStep> modes = new ArrayList<>(resolved.length);
+        for (int i = 0; i < resolved.length; i++) {
+            modes.add(new CardModeStep(resolved[i].sourceIndex, resolved[i].source, i == currentIndex));
+        }
+        return modes;
+    }
+
+    // Cycles the NPC's state to the next valid mode step, or to the requested step, and optionally emits messages.
     boolean applyToggleMode(ModeStep[] cycle,
                             boolean showFloatingText,
                             boolean showUiMessage,
                             Ref<EntityStore> npcRef,
                             Role role,
                             Store<EntityStore> store,
-                            Player player) {
+                            Player player,
+                            int requestedStepIndex) {
         StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
         if (role == null || stateSupport == null) {
             return false;
@@ -50,12 +73,25 @@ final class InteractionModeCycleEffects {
             owner.logDebug("ModeToggle: no valid mode cycle states found for role " + role.getRoleName());
             return false;
         }
-        int currentIndex = findCurrentModeIndex(resolved, stateSupport);
-        int nextIndex = (currentIndex + 1) % resolved.length;
-        if (currentIndex < 0) {
-            nextIndex = 0;
+        ResolvedModeStep next;
+        if (requestedStepIndex >= 0) {
+            next = null;
+            for (ResolvedModeStep candidate : resolved) {
+                if (candidate.sourceIndex == requestedStepIndex) {
+                    next = candidate;
+                    break;
+                }
+            }
+            if (next == null) {
+                owner.logDebug("ModeToggle: requested step " + requestedStepIndex + " is not valid for role "
+                        + role.getRoleName());
+                return false;
+            }
+        } else {
+            int currentIndex = findCurrentModeIndex(resolved, stateSupport);
+            int nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % resolved.length;
+            next = resolved[nextIndex];
         }
-        ResolvedModeStep next = resolved[nextIndex];
         stateSupport.setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
         if (next.message != null && !next.message.isBlank()) {
             String message = resolveMessage(next.message, player);
@@ -84,7 +120,8 @@ final class InteractionModeCycleEffects {
             return new ResolvedModeStep[0];
         }
         ArrayList<ResolvedModeStep> resolved = new ArrayList<>();
-        for (ModeStep step : cycle) {
+        for (int stepIndex = 0; stepIndex < cycle.length; stepIndex++) {
+            ModeStep step = cycle[stepIndex];
             if (step == null || step.getState() == null || step.getState().isBlank()) {
                 continue;
             }
@@ -101,7 +138,7 @@ final class InteractionModeCycleEffects {
                     continue;
                 }
             }
-            resolved.add(new ResolvedModeStep(state, sub, step.getMessage()));
+            resolved.add(new ResolvedModeStep(state, sub, step.getMessage(), stepIndex, step));
         }
         return resolved.toArray(new ResolvedModeStep[0]);
     }
@@ -169,11 +206,15 @@ final class InteractionModeCycleEffects {
         private final String state;
         private final String subState;
         private final String message;
+        private final int sourceIndex;
+        private final ModeStep source;
 
-        private ResolvedModeStep(String state, String subState, String message) {
+        private ResolvedModeStep(String state, String subState, String message, int sourceIndex, ModeStep source) {
             this.state = state;
             this.subState = subState;
             this.message = message;
+            this.sourceIndex = sourceIndex;
+            this.source = source;
         }
     }
 }

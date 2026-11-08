@@ -457,6 +457,24 @@ final class CommandPanelActionService {
         groupActionService.applyDeleteGroup(player, toolId, groupId);
     }
 
+    /**
+     * Toggles a loaded companion's breeding from the companion card, which has no command item, so only the live
+     * component changes. The caller has checked the viewer owns the companion and that breeding is available.
+     */
+    void toggleLoadedNpcBreeding(Player player, Ref<EntityStore> npcRef, Store<EntityStore> store, UUID npcUuid,
+                                 String displayName) {
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkBreedingComponent breeding = breedingType == null ? null : store.getComponent(npcRef, breedingType);
+        if (breeding == null) {
+            return;
+        }
+        boolean enabled = !breeding.isEnabled();
+        applyLoadedNpcBreedingToggle(player, npcUuid, enabled);
+        feedbackService.showSuccessKey(player, enabled
+                ? "tamework.ui.notifications.command.toggleBreeding.enabled"
+                : "tamework.ui.notifications.command.toggleBreeding.disabled", displayName);
+    }
+
     private void applyLoadedNpcBreedingToggle(Player player,
                                               UUID npcUuid,
                                               boolean enabled) {

@@ -127,7 +127,7 @@ final class InteractionSelector {
                 continue;
             }
             InteractionEntry entry = entries[index];
-            if (entry == null || !entry.isEnabled()) {
+            if (entry == null || !entry.isEnabled() || !entry.isSelectableOnInteract(ctx.cardMode)) {
                 continue;
             }
             int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
@@ -256,7 +256,7 @@ final class InteractionSelector {
         ActionTameworkInteract.ResolvedInteraction blockedContext = null;
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
-            if (entry == null || !entry.isEnabled()) {
+            if (entry == null || !entry.isEnabled() || !entry.isSelectableOnInteract(ctx.cardMode)) {
                 continue;
             }
             if (contextualOnly && !isContextualEntry(entry)) {
@@ -314,6 +314,41 @@ final class InteractionSelector {
             }
         }
         return blockedContext;
+    }
+
+    /**
+     * Checks one entry for a companion card button: the same cooldown, harvest-alarm and requirement checks as F,
+     * for that entry only. Returns {@code null} when its requirements fail; a cooldown or harvest-alarm block returns
+     * an interaction marked {@code blockedByCooldown}. Gesture checks follow {@code ctx}.
+     */
+    ActionTameworkInteract.ResolvedInteraction checkCardEntry(TwInteractionConfig config,
+                                                              int index,
+                                                              Ref<EntityStore> npcRef,
+                                                              Role role,
+                                                              InfoProvider infoProvider,
+                                                              Store<EntityStore> store,
+                                                              Player player,
+                                                              InteractionContextSnapshot ctx) {
+        InteractionEntry[] entries = config != null ? config.getInteractions() : null;
+        if (entries == null || index < 0 || index >= entries.length) {
+            return null;
+        }
+        InteractionEntry entry = entries[index];
+        if (entry == null || !entry.isEnabled()) {
+            return null;
+        }
+        String interactionConfigId = config.getId();
+        int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
+        String cooldownAlarmName = cooldownSeconds > 0 ? cooldowns.buildCooldownAlarmName(config, index) : null;
+        boolean blocked = cooldownSeconds > 0
+                && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))
+                || isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, false);
+        if (!requirements.requirementsMet(interactionConfigId, index, entry, npcRef, role, infoProvider, store,
+                player, ctx)) {
+            return null;
+        }
+        return new ActionTameworkInteract.ResolvedInteraction(
+                interactionConfigId, entry, index, cooldownSeconds, cooldownAlarmName, blocked);
     }
 
     // Returns true when harvest alarm cooldown blocks a contextual harvest interaction.

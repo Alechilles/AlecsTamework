@@ -313,7 +313,8 @@ final class InteractionExecutor {
                     npcRef,
                     role,
                     store,
-                    player
+                    player,
+                    ctx.cardModeStep
             );
             return applied
                     | effects.applyCustomEffects(

@@ -29,6 +29,9 @@ class TameworkSettingsRenderingTest {
         Field deploy = TameworkSettingsPage.class.getDeclaredField("currentDeploy");
         deploy.setAccessible(true);
         deploy.set(page, com.alechilles.alecstamework.settings.DeployPlaces.DEFAULT);
+        Field companionCard = TameworkSettingsPage.class.getDeclaredField("currentCompanionCard");
+        companionCard.setAccessible(true);
+        companionCard.set(page, com.alechilles.alecstamework.settings.CompanionCardSettingsStore.Settings.DEFAULT);
         // No mod settings service: the Mod Settings tab renders its empty state.
         Field modTab = TameworkSettingsPage.class.getDeclaredField("modTab");
         modTab.setAccessible(true);

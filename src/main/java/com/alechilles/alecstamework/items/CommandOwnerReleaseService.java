@@ -83,7 +83,30 @@ final class CommandOwnerReleaseService {
             warn(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
-        CompanionRecord record = resolve(player, toolId, ownerUuid, npcUuid);
+        releaseRecord(player, ownerUuid, resolve(player, toolId, ownerUuid, npcUuid), forget);
+    }
+
+    /**
+     * Releases a loaded companion from the companion card, which has no command item: the row is the body's uuid
+     * and the record is found through the index. The caller has checked the viewer owns the live companion; the
+     * release flow checks ownership again.
+     */
+    void releaseLoaded(Player player, UUID npcUuid) {
+        if (player == null || npcUuid == null || player.getUuid() == null) {
+            return;
+        }
+        if (releaseFlow == null || companions == null) {
+            warn(player, "tamework.ui.notifications.command.release.unavailable");
+            return;
+        }
+        UUID ownerUuid = player.getUuid();
+        CompanionRecord record = new CommandOwnedPanelRecordSource(companions)
+                .profileForRow(ownerUuid, npcUuid, List.of()).map(ProfileId::value)
+                .map(companions::get).orElse(null);
+        releaseRecord(player, ownerUuid, record, false);
+    }
+
+    private void releaseRecord(Player player, UUID ownerUuid, @Nullable CompanionRecord record, boolean forget) {
         // Bonded companions are released through their own flow, never by a generic tool.
         if (record == null || record.bonded()) {
             warn(player, "tamework.ui.notifications.command.release.unavailable");

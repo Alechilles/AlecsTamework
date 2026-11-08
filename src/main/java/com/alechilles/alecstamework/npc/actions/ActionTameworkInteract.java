@@ -2,6 +2,11 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
+import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
+import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
+import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
+import com.alechilles.alecstamework.companioncard.CompanionCards;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
@@ -21,8 +26,10 @@ import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -32,6 +39,7 @@ import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
@@ -67,6 +75,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionCooldowns cooldowns;
     private final InteractionExecutor executor;
     private final InteractionLegacyAdoptionService legacyAdoptionService;
+    private final InteractionCardRuntime cardRuntime;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         this(builder, support, true);
@@ -190,8 +199,10 @@ public class ActionTameworkInteract extends TameworkActionBase {
             TameworkInteractEffects effects =
                     new TameworkInteractEffects(this, interactionExtensionRuntime);
             this.executor = new InteractionExecutor(effects, feedHelper);
+            this.cardRuntime = new InteractionCardRuntime(selector, effects);
         } else {
             this.executor = null;
+            this.cardRuntime = null;
         }
         this.legacyAdoptionService = new InteractionLegacyAdoptionService(diagnostics::logDebug);
     }
@@ -231,6 +242,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                       Player player,
                                       boolean allowLegacyAdoption) {
         InteractionContextSnapshot ctx = paramAccess.buildContextSnapshot(player, playerRef, role);
+        ctx.cardMode = opensCompanionCard(playerRef, store);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
         diagnostics.logDebug(String.format(
@@ -261,6 +273,16 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 return attempt.succeeded();
             }
         }
+        if (cardRuntime != null) {
+            CompanionCardRequests.Request request = CompanionCardRequests.take(npcUuid(npcRef, store), ctx.playerId);
+            if (request != null) {
+                InteractionCardRuntime.Outcome outcome = cardRuntime.handle(
+                        request, config, npcRef, role, infoProvider, store, player, ctx,
+                        resolved -> applyInteraction(resolved, npcRef, role, infoProvider, store, player, ctx));
+                deferCardEvent(false, playerRef, npcRef, store, outcome.interactions());
+                return outcome.applied();
+            }
+        }
         ResolvedInteraction interaction = selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
             ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
@@ -270,7 +292,56 @@ public class ActionTameworkInteract extends TameworkActionBase {
         if (interaction.blockedByCooldown) {
             return false;
         }
+        if (cardRuntime != null && ctx.cardMode
+                && interaction.entry instanceof TwInteractionConfig.ModeCycleInteraction) {
+            // F opens the card in place of cycling; nothing runs, so no entry cooldown starts.
+            deferCardEvent(true, playerRef, npcRef, store,
+                    cardRuntime.describe(config, npcRef, role, infoProvider, store, player, ctx));
+            return true;
+        }
         return applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+    }
+
+    /** Whether F opens the companion card for this player. Shared with {@code TameworkInteractPrompt}. */
+    static boolean opensCompanionCard(Ref<EntityStore> playerRef, Store<EntityStore> store) {
+        return CompanionCards.sink() != null
+                && CompanionCardPreferences.effective(playerRef, store) == CompanionCardFBehaviour.CARD;
+    }
+
+    @Nullable
+    private static UUID npcUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        UUIDComponent uuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
+        return uuid != null ? uuid.getUuid() : null;
+    }
+
+    /**
+     * Opens or updates the card after the role tick. Pages are opened outside the NPC system iteration; the deferred
+     * task carries only refs and the immutable snapshot, and resolves the player again on the world thread.
+     */
+    private void deferCardEvent(boolean open,
+                                Ref<EntityStore> playerRef,
+                                Ref<EntityStore> npcRef,
+                                Store<EntityStore> store,
+                                CompanionCardInteractions interactions) {
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null) {
+            return;
+        }
+        world.execute(() -> {
+            CompanionCards.Sink sink = CompanionCards.sink();
+            if (sink == null || !playerRef.isValid() || !npcRef.isValid()) {
+                return;
+            }
+            Player current = store.getComponent(playerRef, Player.getComponentType());
+            if (current == null) {
+                return;
+            }
+            if (open) {
+                sink.open(current, playerRef, npcRef, store, interactions);
+            } else {
+                sink.update(current, playerRef, npcRef, store, interactions);
+            }
+        });
     }
 
     private boolean applyInteraction(ResolvedInteraction interaction,

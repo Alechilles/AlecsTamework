@@ -333,9 +333,23 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         Boolean showPrompt;
         RequirementGroup requires;
         Effects effects;
+        CardSettings card;
 
         public boolean isEnabled() {
             return enabled;
+        }
+
+        /** The companion card button for this entry, or {@code null} when the entry is not on the card. */
+        public CardSettings getCard() {
+            return card;
+        }
+
+        /**
+         * Whether F can select this entry for a player. A card-only entry ({@code Card.OnInteract: false}) is skipped
+         * only for players whose F opens the companion card; with the mode cycle, F still selects it.
+         */
+        public boolean isSelectableOnInteract(boolean companionCardMode) {
+            return card == null || card.onInteract || !companionCardMode;
         }
 
         public Integer getCooldownSeconds() {
@@ -1263,10 +1277,46 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
+    /**
+     * Puts an interaction entry on the companion card as a button. Clicking it runs the entry through the same
+     * requirements and effects as F, without the crouch and movement gesture checks.
+     */
+    public static final class CardSettings {
+        String label;
+        String icon;
+        int order;
+        boolean onInteract = true;
+
+        public CardSettings() {
+        }
+
+        /** Button label: a language key or raw text. {@code null} uses the entry type's default. */
+        public String getLabel() {
+            return label;
+        }
+
+        /** Glyph texture path under {@code Common/UI/Custom}. {@code null} uses the entry type's default. */
+        public String getIcon() {
+            return icon;
+        }
+
+        /** Sort order on the card, lowest first; ties keep authored order. */
+        public int getOrder() {
+            return order;
+        }
+
+        /** Whether F can still select the entry when F opens the card. {@code false} makes it card-only then. */
+        public boolean isOnInteract() {
+            return onInteract;
+        }
+    }
+
     public static final class ModeStep {
         String state;
         String subState;
         String message;
+        String label;
+        String icon;
 
         public ModeStep() {
         }
@@ -1287,6 +1337,16 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getMessage() {
             return message;
+        }
+
+        /** Companion card button label: a language key or raw text. {@code null} uses the state's default. */
+        public String getLabel() {
+            return label;
+        }
+
+        /** Companion card glyph texture path under {@code Common/UI/Custom}. {@code null} uses the state's default. */
+        public String getIcon() {
+            return icon;
         }
     }
 

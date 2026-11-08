@@ -116,6 +116,7 @@ public final class CommandItemFeatureHandler {
     private final CommandTalentPageService talentPageService;
     private final BondedCompanionTalentPageService bondedTalentPageService;
     private final CommandSelectionPageService selectionPageService;
+    private final CompanionCardPageService companionCardPages;
     private final CommandItemUseOrchestrator itemUseOrchestrator;
     private final CommandWorldChangeTravelCoordinator worldChangeTravel;
 
@@ -344,6 +345,8 @@ public final class CommandItemFeatureHandler {
                 panelActionService,
                 this.groupService
         );
+        this.companionCardPages = new CompanionCardPageService(
+                talentPageService, ownerReleaseService, ownerCullService, panelActionService);
         this.groupActivationService = new CommandGroupActivationService(
                 linkedNpcRecordStore,
                 this.groupService
@@ -542,9 +545,15 @@ public final class CommandItemFeatureHandler {
     }
     /** Stops command panel snapshot caches before durable persistence closes. */
     public void close() {
+        companionCardPages.shutdown();
         locateService.close();
         capturedItemTracker.close();
         bondedPanelLifecycle.close();
+    }
+
+    /** The companion card's page service; Tamework installs it as the card sink. */
+    public CompanionCardPageService companionCardPages() {
+        return companionCardPages;
     }
 
     /** Internal event observers share the command feature's bounded location cache. */

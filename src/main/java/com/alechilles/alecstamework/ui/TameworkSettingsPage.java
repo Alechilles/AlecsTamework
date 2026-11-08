@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
+import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.DeployPlaces;
@@ -12,6 +14,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.settings.NameFilterSettings;
+import com.alechilles.alecstamework.settings.CompanionCardSettingsStore;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
@@ -117,6 +120,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
     private static final String KEY_FLIGHT_UNLIMITED_VIGOUR = "@AvatarFlightUnlimitedVigour";
+    private static final String KEY_CARD_DEFAULT_F_BEHAVIOUR = "@CompanionCardDefaultFBehaviour";
+    private static final String KEY_CARD_ALLOW_PLAYER_CHOICE = "@CompanionCardAllowPlayerChoice";
+    private static final String KEY_CARD_RENAME_MODE = "@CompanionCardRenameMode";
 
     private final Tamework plugin;
     private final World world;
@@ -132,6 +138,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     /** Where companions may come out, saved to its own file like the name filter. */
     private DeployPlaces currentDeploy;
     private DeployPlaces savedDeploy;
+    /** Companion card settings, saved to their own file like the name filter. */
+    private CompanionCardSettingsStore.Settings currentCompanionCard;
+    private CompanionCardSettingsStore.Settings savedCompanionCard;
     private EventPayload draftPayload;
     private boolean unsavedChanges;
     private String statusLine = "";
@@ -343,7 +352,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_NAME_FILTER_BLOCKED_WORDS, "#TwSettingsNameFilterBlockedWordsInput.Value")
                 .append(KEY_NAME_FILTER_ALLOWED_WORDS, "#TwSettingsNameFilterAllowedWordsInput.Value")
                 .append(KEY_DEPLOY_MODE, "#TwSettingsDeployModeDropdown.Value")
-                .append(KEY_DEPLOY_PLACES, "#TwSettingsDeployPlacesInput.Value");
+                .append(KEY_DEPLOY_PLACES, "#TwSettingsDeployPlacesInput.Value")
+                .append(KEY_CARD_DEFAULT_F_BEHAVIOUR, "#TwSettingsCardDefaultFBehaviourDropdown.Value")
+                .append(KEY_CARD_ALLOW_PLAYER_CHOICE, "#TwSettingsCardAllowPlayerChoiceCheck.Value")
+                .append(KEY_CARD_RENAME_MODE, "#TwSettingsCardRenameModeDropdown.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
@@ -417,6 +429,49 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsDeployModeDropdown.Entries", deployModeEntries());
         commandBuilder.set("#TwSettingsDeployModeDropdown.Value", currentDeploy.mode().configValue());
         commandBuilder.set("#TwSettingsDeployPlacesInput.Value", DeployPlaces.formatPlaces(currentDeploy.places()));
+        commandBuilder.set("#TwSettingsCardDefaultFBehaviourDropdown.Entries", companionCardFBehaviourEntries());
+        commandBuilder.set("#TwSettingsCardDefaultFBehaviourDropdown.Value",
+                currentCompanionCard.defaultFBehaviour().toConfigValue());
+        commandBuilder.set("#TwSettingsCardAllowPlayerChoiceCheck.Value", currentCompanionCard.allowPlayerChoice());
+        commandBuilder.set("#TwSettingsCardRenameModeDropdown.Entries", companionCardRenameModeEntries());
+        commandBuilder.set("#TwSettingsCardRenameModeDropdown.Value", currentCompanionCard.renameMode().toConfigValue());
+    }
+
+    /** The companion card settings the form holds; a control missing from the payload keeps its value. */
+    @Nonnull
+    private CompanionCardSettingsStore.Settings companionCardFrom(@Nonnull EventPayload payload) {
+        CompanionCardFBehaviour behaviour = CompanionCardFBehaviour.fromConfigValueOrNull(payload.cardDefaultFBehaviour);
+        return new CompanionCardSettingsStore.Settings(
+                behaviour != null ? behaviour : currentCompanionCard.defaultFBehaviour(),
+                payload.cardAllowPlayerChoice != null
+                        ? payload.cardAllowPlayerChoice
+                        : currentCompanionCard.allowPlayerChoice(),
+                payload.cardRenameMode != null
+                        ? CompanionCardRenameMode.fromConfigValue(payload.cardRenameMode)
+                        : currentCompanionCard.renameMode());
+    }
+
+    private List<DropdownEntryInfo> companionCardFBehaviourEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.companionCardFBehaviour.card")),
+                        CompanionCardFBehaviour.CARD.toConfigValue()),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.companionCardFBehaviour.cycle")),
+                        CompanionCardFBehaviour.CYCLE.toConfigValue()));
+    }
+
+    private List<DropdownEntryInfo> companionCardRenameModeEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.companionCardRenameMode.item")),
+                        CompanionCardRenameMode.ITEM.toConfigValue()),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.companionCardRenameMode.free")),
+                        CompanionCardRenameMode.FREE.toConfigValue()),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.companionCardRenameMode.off")),
+                        CompanionCardRenameMode.OFF.toConfigValue()));
     }
 
     /** Where companions may come out, as the form holds it; a control missing from the payload keeps its value. */
@@ -456,12 +511,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void updateUnsavedChanges() {
         if (draftPayload == null) {
             unsavedChanges = !currentValues.equals(savedValues) || !currentNameFilter.equals(savedNameFilter)
-                    || !currentDeploy.equals(savedDeploy) || modTab.hasPendingEdits();
+                    || !currentDeploy.equals(savedDeploy) || !currentCompanionCard.equals(savedCompanionCard)
+                    || modTab.hasPendingEdits();
             return;
         }
         unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues)
                 || !nameFilterFrom(draftPayload).equals(savedNameFilter)
                 || !deployFrom(draftPayload).equals(savedDeploy)
+                || !companionCardFrom(draftPayload).equals(savedCompanionCard)
                 || modTab.hasPendingEdits();
     }
 
@@ -585,9 +642,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         NameFilterSettings previousNameFilter = savedNameFilter;
         DeployPlaces requestedDeploy = deployFrom(payload);
         DeployPlaces previousDeploy = savedDeploy;
+        CompanionCardSettingsStore.Settings requestedCompanionCard = companionCardFrom(payload);
+        CompanionCardSettingsStore.Settings previousCompanionCard = savedCompanionCard;
         currentValues = requested;
         currentNameFilter = requestedNameFilter;
         currentDeploy = requestedDeploy;
+        currentCompanionCard = requestedCompanionCard;
         applyInProgress = true;
         statusLine = resolveText("tamework.ui.settings.status.applying");
         warningLine = "";
@@ -596,7 +656,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         // Both saves run off the world thread; the mod settings save waits for the main one to succeed.
         CompletableFuture
                 .supplyAsync(() -> applySettings(requested, requestedNameFilter, previousNameFilter,
-                        requestedDeploy, previousDeploy))
+                        requestedDeploy, previousDeploy, requestedCompanionCard, previousCompanionCard))
                 .thenCompose(outcome -> applyModSettings(outcome, modService, modChanges))
                 .whenComplete((result, throwable) -> world.execute(() -> {
                     applyInProgress = false;
@@ -615,6 +675,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         savedValues = loadSettingsValues();
                         savedNameFilter = NameFilterSettingsStore.current();
                         savedDeploy = DeployPlacesStore.cachedOrDefault();
+                        savedCompanionCard = CompanionCardSettingsStore.current();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -623,6 +684,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         savedValues = loadSettingsValues();
                         savedNameFilter = NameFilterSettingsStore.current();
                         savedDeploy = DeployPlacesStore.cachedOrDefault();
+                        savedCompanionCard = CompanionCardSettingsStore.current();
                         updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -700,9 +762,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 ? parseResult.values()
                 : currentValues;
         currentValues = preset.applyTo(baseValues);
-        // Presets do not cover the name filter or where companions may come out; keep what the form holds.
+        // Presets do not cover the name filter, where companions may come out or the companion card; keep
+        // what the form holds.
         currentNameFilter = nameFilterFrom(payload);
         currentDeploy = deployFrom(payload);
+        currentCompanionCard = companionCardFrom(payload);
         draftPayload = null;
         updateUnsavedChanges();
         statusLine = parseResult.success()
@@ -717,7 +781,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                                        @Nonnull NameFilterSettings nameFilter,
                                        @Nonnull NameFilterSettings savedFilter,
                                        @Nonnull DeployPlaces deploy,
-                                       @Nonnull DeployPlaces savedDeployPlaces) {
+                                       @Nonnull DeployPlaces savedDeployPlaces,
+                                       @Nonnull CompanionCardSettingsStore.Settings companionCard,
+                                       @Nonnull CompanionCardSettingsStore.Settings savedCard) {
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
@@ -733,6 +799,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         if (!deploy.equals(savedDeployPlaces) && !DeployPlacesStore.save(
                 DeployPlacesStore.resolveFile(plugin), deploy, plugin.getLogger())) {
             warnings.add(resolveText("tamework.ui.settings.warning.deploySaveFailed"));
+        }
+        if (!companionCard.equals(savedCard) && !CompanionCardSettingsStore.save(
+                CompanionCardSettingsStore.resolveFile(plugin), companionCard, plugin.getLogger())) {
+            warnings.add(resolveText("tamework.ui.settings.warning.companionCardSaveFailed"));
         }
         if (!TameworkSettingsAnnouncementStore.saveEnabled(
                 TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin),
@@ -792,6 +862,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         savedNameFilter = currentNameFilter;
         currentDeploy = DeployPlacesStore.cachedOrDefault();
         savedDeploy = currentDeploy;
+        currentCompanionCard = CompanionCardSettingsStore.current();
+        savedCompanionCard = currentCompanionCard;
         modTab.discardPendingEdits();
         draftPayload = null;
         unsavedChanges = false;
@@ -990,6 +1062,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_NAME_FILTER_ALLOWED_WORDS, Codec.STRING), (x, v) -> x.nameFilterAllowedWords = v, x -> x.nameFilterAllowedWords).add()
                 .<String>append(new KeyedCodec<>(KEY_DEPLOY_MODE, Codec.STRING), (x, v) -> x.deployMode = v, x -> x.deployMode).add()
                 .<String>append(new KeyedCodec<>(KEY_DEPLOY_PLACES, Codec.STRING), (x, v) -> x.deployPlaces = v, x -> x.deployPlaces).add()
+                .<String>append(new KeyedCodec<>(KEY_CARD_DEFAULT_F_BEHAVIOUR, Codec.STRING), (x, v) -> x.cardDefaultFBehaviour = v, x -> x.cardDefaultFBehaviour).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_CARD_ALLOW_PLAYER_CHOICE, Codec.BOOLEAN), (x, v) -> x.cardAllowPlayerChoice = v, x -> x.cardAllowPlayerChoice).add()
+                .<String>append(new KeyedCodec<>(KEY_CARD_RENAME_MODE, Codec.STRING), (x, v) -> x.cardRenameMode = v, x -> x.cardRenameMode).add()
                 .<String>append(new KeyedCodec<>(KEY_TAB, Codec.STRING), (x, v) -> x.tab = v, x -> x.tab).add()
                 .<String>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_ID, Codec.STRING), (x, v) -> x.modSettingId = v, x -> x.modSettingId).add()
                 .<Boolean>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_BOOL, Codec.BOOLEAN), (x, v) -> x.modSettingBool = v, x -> x.modSettingBool).add()
@@ -1045,6 +1120,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String nameFilterAllowedWords;
         String deployMode;
         String deployPlaces;
+        String cardDefaultFBehaviour;
+        Boolean cardAllowPlayerChoice;
+        String cardRenameMode;
         String tab;
         String modSettingId;
         Boolean modSettingBool;

@@ -33,6 +33,15 @@ final class InteractionContextSnapshot {
     Boolean cachedPlayerIsOwner;
     @Nullable
     MovementStates cachedPlayerMovementStates;
+    /**
+     * Set when a companion card button runs an entry: crouch, movement-state and empty-hand requirements count as
+     * met, because they choose which entry F triggers rather than whether the player may use it.
+     */
+    boolean skipGestures;
+    /** Whether F opens the companion card for this player; then F skips card-only entries. */
+    boolean cardMode;
+    /** Set when a card mode button runs the {@code ModeCycle} entry: the {@code Cycle} index to apply, else -1. */
+    int cardModeStep = -1;
     @Nullable
     private Inventory inventory;
     private boolean inventoryResolved;

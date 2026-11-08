@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
+import com.alechilles.alecstamework.settings.CompanionCardSettingsStore;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
@@ -68,6 +69,8 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                 TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
                 NameFilterSettingsStore.invalidateCache();
                 CompanionHudDefaultsStore.invalidateCache();
+                // Re-read here, off the world thread, because F reads these settings only from memory.
+                CompanionCardSettingsStore.load(CompanionCardSettingsStore.resolveFile(plugin), plugin.getLogger());
                 loaded = plugin.reloadItemFeatureConfigs();
             }
             int totalSpawners = plugin.getItemFeatureRegistry() != null

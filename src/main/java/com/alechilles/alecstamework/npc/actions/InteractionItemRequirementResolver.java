@@ -44,7 +44,8 @@ final class InteractionItemRequirementResolver {
 
     // Returns true if the player has no active held item.
     boolean isPlayerHandEmpty(InteractionContextSnapshot ctx) {
-        if (ctx == null) {
+        // An empty hand is how a player picks an entry on F; a card button has already picked it.
+        if (ctx == null || ctx.skipGestures) {
             return true;
         }
         if (ctx.activeItemId != null && !ctx.activeItemId.isBlank()) {

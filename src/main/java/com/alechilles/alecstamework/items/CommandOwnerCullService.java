@@ -66,6 +66,20 @@ final class CommandOwnerCullService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        cullLoaded(player, npcUuid, config != null && config.isRequireTamed());
+    }
+
+    /**
+     * Culls a loaded companion from the companion card, which has no command item. Ownership and the cull rules are
+     * checked by the cull service, exactly as for the command menu; the companion must be tamed.
+     */
+    void cullLoaded(@Nullable Player player, @Nullable UUID npcUuid) {
+        if (player != null && npcUuid != null) {
+            cullLoaded(player, npcUuid, true);
+        }
+    }
+
+    private void cullLoaded(Player player, UUID npcUuid, boolean requireTamed) {
         LiveCullTarget target = resolveTarget(player, npcUuid);
         if (target == null) {
             return;
@@ -75,7 +89,7 @@ final class CommandOwnerCullService {
                 target.reference(),
                 target.store(),
                 linkingRequiresOwner(),
-                config != null && config.isRequireTamed()
+                requireTamed
         );
         if (outcome == TameworkNpcCullService.Outcome.DENIED) {
             warn(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");

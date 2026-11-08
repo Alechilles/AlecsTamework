@@ -340,7 +340,9 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             "test:horn", "horn-tool"), () -> false,
                     ignored -> true, selected::set);
 
-            page.handleDataEvent(actor, store, event("Follow"));
+            var choice = new CommandSelectionEventData();
+            putObject(choice, CommandSelectionEventData.class, "primaryCommandValue", "Follow");
+            page.handleDataEvent(actor, store, choice);
 
             assertEquals("Follow", selected.get());
         }

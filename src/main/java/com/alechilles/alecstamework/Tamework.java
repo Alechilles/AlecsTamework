@@ -928,6 +928,8 @@ public class Tamework extends JavaPlugin {
                 admissionGate
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
+        com.alechilles.alecstamework.companioncard.CompanionCards.install(
+                commandItemFeatureHandler.companionCardPages());
         commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
         commandItemFeatureHandler.configureSavedTalents(companionQueries, storedTalentUpdates);
         if (captureItemFlows != null && spawnerFeatureHandler != null) {
@@ -1491,6 +1493,9 @@ public class Tamework extends JavaPlugin {
                 runtimeStartupPlan, runtimeStartupDiagnostics
         );
         getLogger().at(Level.INFO).log(runtimeActivationState.diagnostics().startupSummary());
+        // F reads the companion card settings from memory inside a role tick, so they are read from disk here.
+        com.alechilles.alecstamework.settings.CompanionCardSettingsStore.load(
+                com.alechilles.alecstamework.settings.CompanionCardSettingsStore.resolveFile(this), getLogger());
         registerCommandRoot();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
@@ -2275,6 +2280,8 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
+        com.alechilles.alecstamework.companioncard.CompanionCards.install(null);
+        com.alechilles.alecstamework.companioncard.CompanionCardRequests.clear();
         if (commandItemFeatureHandler != null) {
             commandItemFeatureHandler.close();
             commandItemFeatureHandler = null;
