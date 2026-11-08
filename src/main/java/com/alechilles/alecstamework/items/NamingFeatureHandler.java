@@ -1,7 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
+import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
 import com.alechilles.alecstamework.config.NameItemRegistry;
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
@@ -14,7 +15,6 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ui.TameworkNameInputPage;
-import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -32,12 +32,15 @@ import com.hypixel.hytale.server.npc.role.support.DisplayNameSupport;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Handles naming item interactions and name submission flow (UI first, chat fallback).
+ * Handles naming item interactions and name submission flow (UI first, chat fallback), plus renaming from the
+ * companion card, which needs no item in hand.
  */
 public final class NamingFeatureHandler {
     private static final long REQUEST_TIMEOUT_MS = 300000L;
@@ -45,6 +48,10 @@ public final class NamingFeatureHandler {
     private static final int DEFAULT_UI_NAME_MAX_LENGTH = 32;
     private static final int RANDOM_NAME_ATTEMPTS = 8;
     private static final String[] EMPTY_RANDOM_NAME_POOL = new String[0];
+    /** The {@code TwNameItemConfig} Naming defaults: card Free mode names with these, and nothing is consumed. */
+    private static final NamingRules DEFAULT_RULES = NamingRules.builder().build();
+    private static final Runnable NO_OP = () -> {
+    };
 
     private final NameItemRegistry registry;
     private final NamingEffectService effectService;
@@ -93,53 +100,29 @@ public final class NamingFeatureHandler {
         TwNameItemConfig config = resolveConfig(itemId, configIdOverride);
         NamingRules rules = resolveRules(config, overrides);
 
-        String roleId = npcInfoService.resolveRoleId(npc);
-        if (!isRoleAllowed(roleId, config)) {
-            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
-            return false;
-        }
-
-        if (rules.isRequireTamed() && !npcInfoService.isTamed(targetRef, store)) {
-            String npcName = npcInfoService.resolveDisplayName(npc);
-            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
-            return false;
-        }
-
-        UUID ownerUuid = npcInfoService.resolveOwnerUuid(targetRef, store);
+        TargetFacts facts = targetFacts(targetRef, store, npc);
         UUID playerUuid = player.getUuid();
-        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
-            if (ownerUuid == null) {
-                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
-                return false;
-            }
-            if (rules.isRequireOwner()) {
-                String npcName = npcInfoService.resolveDisplayName(npc);
-                String ownerName = npcInfoService.resolveOwnerName(targetRef, store);
-                OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
-                return false;
-            }
+        Denial denial = identityDenial(config, rules, facts, playerUuid);
+        if (denial != null) {
+            sendDenial(player, denial, targetRef, store, npc, facts.ownerUuid());
+            return false;
         }
 
-        if (isCooldownActive(itemStack, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
+        if (NamingItemSlots.isCooldownActive(itemStack, rules.getCooldownMs())) {
             sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
             return false;
         }
 
-        boolean hasTameworkName = npcInfoService.hasTameworkName(targetRef, store);
-        boolean hasAnyName = npcInfoService.hasAnyName(targetRef, store, npc);
-        if (!rules.isAllowRename() && hasTameworkName) {
-            sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyNamed");
-            return false;
-        }
-        if (!rules.isReplaceExisting() && hasAnyName) {
-            sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyHasName");
+        denial = existingNameDenial(rules, facts);
+        if (denial != null) {
+            sendDenial(player, denial, targetRef, store, npc, facts.ownerUuid());
             return false;
         }
 
         if (playerUuid == null) {
             return false;
         }
-        String gender = CompanionGenderService.resolveGender(targetRef, store, roleId, null);
+        String gender = CompanionGenderService.resolveGender(targetRef, store, facts.roleId(), null);
         String[] randomNamePool = resolveRandomNamePool(config, gender);
         PendingNameRequest uiRequest = new PendingNameRequest(
                 playerUuid,
@@ -150,10 +133,11 @@ public final class NamingFeatureHandler {
                 randomNamePool,
                 System.currentTimeMillis(),
                 InputMode.Ui,
-                UUID.randomUUID()
+                UUID.randomUUID(),
+                RequestSource.HELD
         );
         pendingByPlayer.put(playerUuid, uiRequest);
-        if (openNamingInputPage(player, store, npc, rules, uiRequest)) {
+        if (openNamingInputPage(player, store, npc, rules, uiRequest, NO_OP)) {
             return true;
         }
 
@@ -162,6 +146,212 @@ public final class NamingFeatureHandler {
         pendingByPlayer.put(playerUuid, chatFallbackRequest);
         sendMessageKey(player, "tamework.ui.notifications.name.uiUnavailableChatFallback", CANCEL_TOKEN);
         return true;
+    }
+
+    /**
+     * Whether the companion card's rename pencil can rename {@code npcRef} for this player. Read-only and cheap
+     * (one pass over the carried inventory in Item mode); call on the world thread that owns {@code store}.
+     * Free mode and the not-allowed check use the default naming rules; Item mode needs a carried stack whose
+     * naming config allows this target and whose cooldown has ended.
+     */
+    @Nonnull
+    public CardRenameAvailability cardRenameAvailability(@Nonnull Player player,
+                                                         @Nonnull Ref<EntityStore> playerRef,
+                                                         @Nonnull Ref<EntityStore> npcRef,
+                                                         @Nonnull Store<EntityStore> store,
+                                                         @Nonnull CompanionCardRenameMode mode) {
+        if (mode == CompanionCardRenameMode.OFF) {
+            return CardRenameAvailability.OFF;
+        }
+        UUID playerUuid = player.getUuid();
+        NPCEntity npc = loadedNpc(npcRef, store);
+        if (playerUuid == null || npc == null) {
+            return CardRenameAvailability.NOT_ALLOWED;
+        }
+        TargetFacts facts = targetFacts(npcRef, store, npc);
+        if (mode == CompanionCardRenameMode.ITEM && findCardItem(playerRef, store, facts, playerUuid) != null) {
+            return CardRenameAvailability.AVAILABLE;
+        }
+        if (cardDenial(null, DEFAULT_RULES, facts, playerUuid) != null) {
+            return CardRenameAvailability.NOT_ALLOWED;
+        }
+        return mode == CompanionCardRenameMode.ITEM
+                ? CardRenameAvailability.NEEDS_ITEM
+                : CardRenameAvailability.AVAILABLE;
+    }
+
+    /**
+     * Opens the name input page for {@code npcRef} from the companion card. Item mode uses the first carried
+     * naming item that can rename this target (hotbar first in slot order, then storage, then backpack) and that
+     * item's rules; at submit it re-finds a usable stack of the same item, then consumes and starts its cooldown.
+     * Free mode uses the default rules and changes no item. A refusal is told to the player.
+     *
+     * <p>{@code afterClose} runs exactly once, as a later task on the world thread, after the page closes for any
+     * reason (submit, clear, cancel, dismiss, or another page replacing it), or when no page opens (refused or
+     * failed to open). A dismiss can come from another page replacing this one, or from the player leaving, so the
+     * callback should check that the player is still valid and has no other page open before reopening the card.
+     * Call on the world thread that owns {@code store}.</p>
+     */
+    public void beginCardNaming(@Nonnull Player player,
+                                @Nonnull Ref<EntityStore> playerRef,
+                                @Nonnull Ref<EntityStore> npcRef,
+                                @Nonnull Store<EntityStore> store,
+                                @Nonnull CompanionCardRenameMode mode,
+                                @Nullable Runnable afterClose) {
+        Runnable closed = runOnceLater(store, afterClose);
+        if (!openCardNaming(player, playerRef, npcRef, store, mode, closed)) {
+            closed.run();
+        }
+    }
+
+    /** True when the name page opened; {@code closed} then runs when it closes. */
+    private boolean openCardNaming(Player player,
+                                   Ref<EntityStore> playerRef,
+                                   Ref<EntityStore> npcRef,
+                                   Store<EntityStore> store,
+                                   CompanionCardRenameMode mode,
+                                   Runnable closed) {
+        if (mode == CompanionCardRenameMode.OFF) {
+            return false;
+        }
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null) {
+            return false;
+        }
+        NPCEntity npc = loadedNpc(npcRef, store);
+        if (npc == null) {
+            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
+            return false;
+        }
+        TargetFacts facts = targetFacts(npcRef, store, npc);
+
+        TwNameItemConfig config = null;
+        NamingRules rules = DEFAULT_RULES;
+        String itemId = null;
+        RequestSource source = RequestSource.CARD_FREE;
+        if (mode == CompanionCardRenameMode.ITEM) {
+            CardItem item = findCardItem(playerRef, store, facts, playerUuid);
+            if (item == null) {
+                Denial denial = cardDenial(null, DEFAULT_RULES, facts, playerUuid);
+                if (denial != null) {
+                    sendDenial(player, denial, npcRef, store, npc, facts.ownerUuid());
+                } else {
+                    sendMissingItemMessage(player, playerRef, store,
+                            stack -> cardItemFor(stack, facts, playerUuid) != null);
+                }
+                return false;
+            }
+            config = item.config();
+            rules = item.rules();
+            itemId = item.slot().stack().getItemId();
+            source = RequestSource.CARD_ITEM;
+        }
+
+        Denial denial = cardDenial(config, rules, facts, playerUuid);
+        if (denial != null) {
+            sendDenial(player, denial, npcRef, store, npc, facts.ownerUuid());
+            return false;
+        }
+
+        String gender = CompanionGenderService.resolveGender(npcRef, store, facts.roleId(), null);
+        PendingNameRequest request = new PendingNameRequest(
+                playerUuid,
+                npcRef,
+                itemId,
+                null,
+                null,
+                resolveRandomNamePool(config, gender),
+                System.currentTimeMillis(),
+                InputMode.Ui,
+                UUID.randomUUID(),
+                source
+        );
+        pendingByPlayer.put(playerUuid, request);
+        if (openNamingInputPage(player, store, npc, rules, request, closed)) {
+            return true;
+        }
+        // No chat fallback here: the card reopens right away and would take the player's input.
+        pendingByPlayer.remove(playerUuid, request);
+        sendMessageKey(player, "tamework.ui.notifications.name.uiUnavailable");
+        return false;
+    }
+
+    /** The first carried naming item that can rename this target now, with its config and rules. */
+    @Nullable
+    private CardItem findCardItem(Ref<EntityStore> playerRef,
+                                  Store<EntityStore> store,
+                                  TargetFacts facts,
+                                  UUID playerUuid) {
+        NamingItemSlots.Slot slot = NamingItemSlots.findCarried(store, playerRef, stack -> {
+            CardItem candidate = cardItemFor(stack, facts, playerUuid);
+            return candidate != null && !NamingItemSlots.isCooldownActive(stack, candidate.rules().getCooldownMs());
+        });
+        if (slot == null) {
+            return null;
+        }
+        CardItem item = cardItemFor(slot.stack(), facts, playerUuid);
+        return item != null ? new CardItem(slot, item.config(), item.rules()) : null;
+    }
+
+    /** The stack's naming config and rules when its config allows renaming this target, ignoring cooldown. */
+    @Nullable
+    private CardItem cardItemFor(ItemStack stack, TargetFacts facts, UUID playerUuid) {
+        TwNameItemConfig config = resolveConfig(stack.getItemId(), null);
+        if (config == null) {
+            return null;
+        }
+        NamingRules rules = resolveRules(config, null);
+        if (cardDenial(config, rules, facts, playerUuid) != null) {
+            return null;
+        }
+        return new CardItem(null, config, rules);
+    }
+
+    /** Tells the player why no stack fits: cooldown when a matching stack is carried, otherwise none carried. */
+    private void sendMissingItemMessage(Player player,
+                                        Ref<EntityStore> playerRef,
+                                        Store<EntityStore> store,
+                                        Predicate<ItemStack> matching) {
+        boolean carried = NamingItemSlots.findCarried(store, playerRef, matching) != null;
+        sendMessageKey(player, carried
+                ? "tamework.ui.notifications.name.itemCooldown"
+                : "tamework.ui.notifications.name.needsItem");
+    }
+
+    @Nullable
+    private static NPCEntity loadedNpc(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || npcRef.getStore() != store) {
+            return null;
+        }
+        return store.getComponent(npcRef, NPCEntity.getComponentType());
+    }
+
+    /**
+     * Wraps {@code afterClose} so it runs at most once, as a later task on the store's world thread. Deferring
+     * lets a page that replaced the name page finish opening first. If the world takes no more tasks (it is
+     * stopping), it runs inline instead.
+     */
+    @Nonnull
+    private static Runnable runOnceLater(Store<EntityStore> store, @Nullable Runnable afterClose) {
+        if (afterClose == null) {
+            return NO_OP;
+        }
+        AtomicBoolean ran = new AtomicBoolean();
+        return () -> {
+            if (!ran.compareAndSet(false, true)) {
+                return;
+            }
+            World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+            if (world != null) {
+                try {
+                    world.execute(afterClose);
+                    return;
+                } catch (RuntimeException ignored) {
+                    // The world is stopping; run it here so it still runs once.
+                }
+            }
+            afterClose.run();
+        };
     }
 
     // Handles async chat events for the fallback chat naming path.
@@ -238,7 +428,8 @@ public final class NamingFeatureHandler {
                                         Store<EntityStore> store,
                                         NPCEntity npc,
                                         NamingRules rules,
-                                        PendingNameRequest request) {
+                                        PendingNameRequest request,
+                                        Runnable closed) {
         if (player == null || store == null || npc == null || rules == null || request == null) {
             return false;
         }
@@ -268,13 +459,15 @@ public final class NamingFeatureHandler {
                 LocalizedText.resolve(player, "tamework.ui.nameInput.placeholder"),
                 existingName,
                 maxLength,
-                () -> handleUiNameCancelled(player, request.playerUuid, request.requestId),
-                input -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input),
+                () -> runThenClose(() -> handleUiNameCancelled(player, request.playerUuid, request.requestId), closed),
+                input -> runThenClose(
+                        () -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input), closed),
                 request.randomNamePool != null && request.randomNamePool.length > 0
                         ? () -> handleUiRandomRequested(player, request.playerUuid, request.requestId)
                         : null,
                 existingName != null && canClearName(rules)
-                        ? () -> handleUiNameCleared(player, request.playerUuid, request.requestId)
+                        ? () -> runThenClose(
+                                () -> handleUiNameCleared(player, request.playerUuid, request.requestId), closed)
                         : null
         );
         try {
@@ -292,6 +485,14 @@ public final class NamingFeatureHandler {
                     ).build()
             );
             return false;
+        }
+    }
+
+    private static void runThenClose(Runnable action, Runnable closed) {
+        try {
+            action.run();
+        } finally {
+            closed.run();
         }
     }
 
@@ -431,7 +632,7 @@ public final class NamingFeatureHandler {
             );
         }
 
-        applyItemChanges(player, rules, rules.isConsumeItem());
+        applyItemChanges(target, rules.isConsumeItem());
         effectService.playSuccessEffects(
                 player.getWorld(),
                 request.npcRef,
@@ -470,12 +671,12 @@ public final class NamingFeatureHandler {
         if (listener != null) {
             listener.accept(request.npcRef, store);
         }
-        applyItemChanges(player, target.rules(), false);
+        applyItemChanges(target, false);
         sendMessageKey(player, "tamework.ui.notifications.name.cleared");
     }
 
     /**
-     * Re-checks everything a pending request depends on (target, held item, cooldown, role, tamed
+     * Re-checks everything a pending request depends on (target, naming item, cooldown, role, tamed
      * state and ownership) at submission time. Sends the player the reason and returns null on failure.
      */
     @Nullable
@@ -509,6 +710,51 @@ public final class NamingFeatureHandler {
             return null;
         }
 
+        NamingItem item = resolveSubmitItem(player, playerEntityRef, store, request);
+        if (item == null) {
+            return null;
+        }
+        NamingRules rules = item.rules();
+        TargetFacts facts = targetFacts(request.npcRef, store, npc);
+        Denial denial = identityDenial(item.config(), rules, facts, playerUuid);
+        if (denial != null) {
+            sendDenial(player, denial, request.npcRef, store, npc, facts.ownerUuid());
+            return null;
+        }
+        return new NamingTarget(store, npc, rules, facts.ownerUuid(), item.container(), item.slot());
+    }
+
+    /**
+     * The naming item a submission spends and the rules it names with. Held: the active hotbar item must still be
+     * the one used. Card Item: any carried stack of the same item off cooldown. Card Free: default rules, no item.
+     * Sends the player the reason and returns null when the item is gone or cooling down.
+     */
+    @Nullable
+    private NamingItem resolveSubmitItem(Player player,
+                                         Ref<EntityStore> playerRef,
+                                         Store<EntityStore> store,
+                                         PendingNameRequest request) {
+        if (request.source == RequestSource.CARD_FREE) {
+            return new NamingItem(null, DEFAULT_RULES, null, (short) -1);
+        }
+        if (request.source == RequestSource.CARD_ITEM) {
+            String itemId = request.itemId;
+            TwNameItemConfig config = itemId != null ? resolveConfig(itemId, null) : null;
+            if (config == null) {
+                // The naming config was removed by a reload since the page opened.
+                sendMessageKey(player, "tamework.ui.notifications.name.needsItem");
+                return null;
+            }
+            NamingRules rules = resolveRules(config, null);
+            NamingItemSlots.Slot slot = NamingItemSlots.findCarried(store, playerRef, stack ->
+                    itemId.equals(stack.getItemId()) && !NamingItemSlots.isCooldownActive(stack, rules.getCooldownMs()));
+            if (slot == null) {
+                sendMissingItemMessage(player, playerRef, store, stack -> itemId.equals(stack.getItemId()));
+                return null;
+            }
+            return new NamingItem(config, rules, slot.container(), slot.index());
+        }
+
         ItemStack activeItem = getActiveItem(player);
         if (activeItem == null || activeItem.isEmpty()) {
             sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
@@ -523,38 +769,91 @@ public final class NamingFeatureHandler {
         TwNameItemConfig config = resolveConfig(activeItemId, request.configIdOverride);
         NamingRules rules = resolveRules(config, request.overrides);
 
-        if (isCooldownActive(activeItem, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
+        if (NamingItemSlots.isCooldownActive(activeItem, rules.getCooldownMs())) {
             sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
             return null;
         }
+        return new NamingItem(
+                config,
+                rules,
+                PlayerInventoryAccess.getHotbar(player),
+                PlayerInventoryAccess.getActiveHotbarSlot(player)
+        );
+    }
 
-        String roleId = npcInfoService.resolveRoleId(npc);
-        if (!isRoleAllowed(roleId, config)) {
-            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
-            return null;
+    /** Reads what the naming checks need from the target. Read-only. */
+    private TargetFacts targetFacts(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
+        return new TargetFacts(
+                npcInfoService.resolveRoleId(npc),
+                npcInfoService.isTamed(npcRef, store),
+                npcInfoService.resolveOwnerUuid(npcRef, store),
+                npcInfoService.hasTameworkName(npcRef, store),
+                npcInfoService.hasAnyName(npcRef, store, npc)
+        );
+    }
+
+    /** Role filter, tamed state and ownership, in the order the held item checks them. */
+    @Nullable
+    private Denial identityDenial(@Nullable TwNameItemConfig config,
+                                  NamingRules rules,
+                                  TargetFacts facts,
+                                  @Nullable UUID playerUuid) {
+        if (!isRoleAllowed(facts.roleId(), config)) {
+            return Denial.ROLE_NOT_ALLOWED;
         }
-
-        if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
-            String npcName = npcInfoService.resolveDisplayName(npc);
-            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
-            return null;
+        if (rules.isRequireTamed() && !facts.tamed()) {
+            return Denial.NOT_TAMED;
         }
-
-        UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
-        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
-            if (ownerUuid == null) {
-                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
-                return null;
-            }
-            if (rules.isRequireOwner()) {
-                String npcName = npcInfoService.resolveDisplayName(npc);
-                String ownerName = npcInfoService.resolveOwnerName(request.npcRef, store);
-                OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
-                return null;
-            }
+        if (!NamingOwnershipPolicy.canName(playerUuid, facts.ownerUuid(), rules)) {
+            // With an owner, the policy refuses only when RequireOwner is set and the player is someone else.
+            return facts.ownerUuid() == null ? Denial.NO_OWNER : Denial.NOT_OWNER;
         }
+        return null;
+    }
 
-        return new NamingTarget(store, npc, rules, ownerUuid);
+    /** AllowRename for a Tamework-named target and ReplaceExisting for any named target. */
+    @Nullable
+    private static Denial existingNameDenial(NamingRules rules, TargetFacts facts) {
+        if (!rules.isAllowRename() && facts.hasTameworkName()) {
+            return Denial.ALREADY_NAMED;
+        }
+        if (!rules.isReplaceExisting() && facts.hasAnyName()) {
+            return Denial.ALREADY_HAS_NAME;
+        }
+        return null;
+    }
+
+    /** Every check a card rename makes before opening the page. */
+    @Nullable
+    private Denial cardDenial(@Nullable TwNameItemConfig config,
+                              NamingRules rules,
+                              TargetFacts facts,
+                              UUID playerUuid) {
+        Denial denial = identityDenial(config, rules, facts, playerUuid);
+        return denial != null ? denial : existingNameDenial(rules, facts);
+    }
+
+    private void sendDenial(Player player,
+                            Denial denial,
+                            Ref<EntityStore> npcRef,
+                            Store<EntityStore> store,
+                            NPCEntity npc,
+                            @Nullable UUID ownerUuid) {
+        switch (denial) {
+            case ROLE_NOT_ALLOWED -> sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
+            case NOT_TAMED -> sendMessageKey(player, "tamework.ui.notifications.name.requireTamed",
+                    npcInfoService.resolveDisplayName(npc));
+            case NO_OWNER -> sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
+            case NOT_OWNER -> OwnerMessageUtil.sendDenied(
+                    player,
+                    npcInfoService.resolveDisplayName(npc),
+                    npcInfoService.resolveOwnerName(npcRef, store),
+                    ownerUuid,
+                    "name"
+            );
+            case ALREADY_NAMED -> sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyNamed");
+            case ALREADY_HAS_NAME -> sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyHasName");
+        }
     }
 
     private boolean isRequestExpired(PendingNameRequest request) {
@@ -711,54 +1010,12 @@ public final class NamingFeatureHandler {
         return stack;
     }
 
-    private void applyItemChanges(Player player, NamingRules rules, boolean consumeItem) {
-        if (player == null || rules == null) {
+    /** Consumes from and starts the cooldown on the stack the target resolved, if it uses one. */
+    private static void applyItemChanges(NamingTarget target, boolean consumeItem) {
+        if (target.itemContainer() == null || target.itemSlot() < 0) {
             return;
         }
-        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
-        if (slot < 0) {
-            return;
-        }
-        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
-        if (hotbar == null) {
-            return;
-        }
-        ItemStack current = hotbar.getItemStack(slot);
-        if (current == null || current.isEmpty()) {
-            return;
-        }
-
-        if (consumeItem) {
-            hotbar.removeItemStackFromSlot((short) slot, 1);
-        }
-
-        ItemStack after = hotbar.getItemStack(slot);
-        if (after == null || after.isEmpty()) {
-            return;
-        }
-        if (rules.getCooldownMs() > 0) {
-            ItemStack updated = applyCooldown(after, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs());
-            hotbar.setItemStackForSlot((short) slot, updated);
-        }
-    }
-
-    private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
-        if (itemStack == null || key == null || cooldownMs <= 0) {
-            return false;
-        }
-        Long until = itemStack.getFromMetadataOrNull(key, Codec.LONG);
-        if (until == null) {
-            return false;
-        }
-        return until > System.currentTimeMillis();
-    }
-
-    private ItemStack applyCooldown(ItemStack itemStack, String key, int cooldownMs) {
-        if (itemStack == null || key == null || cooldownMs <= 0) {
-            return itemStack;
-        }
-        long until = System.currentTimeMillis() + cooldownMs;
-        return itemStack.withMetadata(key, Codec.LONG, until);
+        NamingItemSlots.use(target.itemContainer(), target.itemSlot(), consumeItem, target.rules().getCooldownMs());
     }
 
     private void sendMessage(Player player, String message) {
@@ -789,12 +1046,56 @@ public final class NamingFeatureHandler {
         playerRef.sendMessage(Message.raw(message));
     }
 
-    private record NamingTarget(Store<EntityStore> store, NPCEntity npc, NamingRules rules, @Nullable UUID ownerUuid) {
+    /** A checked target, plus the stack a successful naming spends ({@code itemContainer} null for none). */
+    private record NamingTarget(Store<EntityStore> store,
+                                NPCEntity npc,
+                                NamingRules rules,
+                                @Nullable UUID ownerUuid,
+                                @Nullable ItemContainer itemContainer,
+                                short itemSlot) {
+    }
+
+    /** The rules a submission names with and the stack it spends ({@code container} null for none). */
+    private record NamingItem(@Nullable TwNameItemConfig config,
+                              NamingRules rules,
+                              @Nullable ItemContainer container,
+                              short slot) {
+    }
+
+    /** A carried naming item usable from the card; {@code slot} is null until a stack is chosen. */
+    private record CardItem(@Nullable NamingItemSlots.Slot slot, TwNameItemConfig config, NamingRules rules) {
+    }
+
+    private record TargetFacts(@Nullable String roleId,
+                               boolean tamed,
+                               @Nullable UUID ownerUuid,
+                               boolean hasTameworkName,
+                               boolean hasAnyName) {
+    }
+
+    /** Why a target cannot be named; each maps to the player message the held item has always sent. */
+    private enum Denial {
+        ROLE_NOT_ALLOWED,
+        NOT_TAMED,
+        NO_OWNER,
+        NOT_OWNER,
+        ALREADY_NAMED,
+        ALREADY_HAS_NAME
     }
 
     private enum InputMode {
         Ui,
         ChatFallback
+    }
+
+    /** Where a naming request came from, which decides the item it needs at submit. */
+    private enum RequestSource {
+        /** A naming item held in hand; it must still be in hand at submit. */
+        HELD,
+        /** The companion card in Free mode: default rules, no item. */
+        CARD_FREE,
+        /** The companion card in Item mode: any carried stack of {@code itemId}. */
+        CARD_ITEM
     }
 
     private static final class PendingNameRequest {
@@ -807,16 +1108,18 @@ public final class NamingFeatureHandler {
         private final long createdMs;
         private final InputMode inputMode;
         private final UUID requestId;
+        private final RequestSource source;
 
         private PendingNameRequest(UUID playerUuid,
                                    Ref<EntityStore> npcRef,
-                                   String itemId,
+                                   @Nullable String itemId,
                                    String configIdOverride,
                                    NamingOverrides overrides,
                                    String[] randomNamePool,
                                    long createdMs,
                                    InputMode inputMode,
-                                   UUID requestId) {
+                                   UUID requestId,
+                                   RequestSource source) {
             this.playerUuid = playerUuid;
             this.npcRef = npcRef;
             this.itemId = itemId;
@@ -826,6 +1129,7 @@ public final class NamingFeatureHandler {
             this.createdMs = createdMs;
             this.inputMode = inputMode;
             this.requestId = requestId;
+            this.source = source;
         }
 
         private PendingNameRequest withInputMode(InputMode mode) {
@@ -838,7 +1142,8 @@ public final class NamingFeatureHandler {
                     randomNamePool,
                     createdMs,
                     mode,
-                    requestId
+                    requestId,
+                    source
             );
         }
     }

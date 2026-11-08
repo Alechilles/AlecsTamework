@@ -112,6 +112,9 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
         if (data == null) {
             handled = true;
             close();
+            if (cancelCallback != null) {
+                cancelCallback.run();
+            }
             return;
         }
         if (ACTION_CANCEL.equalsIgnoreCase(data.action)) {
