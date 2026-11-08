@@ -92,9 +92,12 @@ Reusable framework media, including the Nametag and Soul Lantern asset
 closures, remain in the main jar so dependent mods can reference them without
 installing the examples pack.
 
-Build the optional examples with `./gradlew exampleAssetPack`. Install the
-generated `Alec's Tamework! Examples v<version>.zip` beside the Tamework jar
-and explicitly enable it only when you need the sample graph. The pack is
+Download `Alecs-Tamework-Examples-v<version>.zip` from the
+[GitHub releases](https://github.com/Alechilles/AlecsTamework/releases), or
+build it with `./gradlew exampleAssetPack`. You can also browse the
+[example source](https://github.com/Alechilles/AlecsTamework/tree/main/examples/asset-pack)
+without installing it. Install the ZIP beside the Tamework jar and explicitly
+enable it only when you need the sample graph. The pack is
 disabled by default, declares Tamework as a dependency, and can be omitted
 from production servers.
 

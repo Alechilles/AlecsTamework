@@ -26,12 +26,22 @@ Add Tamework in your `manifest.json`:
 
 ## 3. Install or copy optional examples
 The main Tamework jar does not include sample NPCs, items, or progression
-configs. Build or install the separate `Alec's Tamework! Examples`
-asset pack when you need a starting point. It declares Tamework as a
-dependency and is disabled by default. Explicitly enable it before using the
-sample assets; production servers that do not use the samples can omit it.
+configs. Install the separate `Alec's Tamework! Examples` asset pack when you
+need a starting point:
 
-After installation, copy and adapt these files:
+- Download `Alecs-Tamework-Examples-v<version>.zip` from the
+  [GitHub releases](https://github.com/Alechilles/AlecsTamework/releases)
+  page, matching your Tamework version, and put it beside the Tamework jar.
+- Or browse the [example source](https://github.com/Alechilles/AlecsTamework/tree/main/examples/asset-pack)
+  on GitHub to read the files without installing anything.
+- Or build it from a clone of the repository with `./gradlew exampleAssetPack`.
+
+The pack declares Tamework as a dependency and is disabled by default.
+Explicitly enable it before using the sample assets; production servers that
+do not use the samples can omit it.
+
+Copy and adapt these files. The paths below are in the repository; inside the
+ZIP they start at `Server/`:
 - Template: `examples/asset-pack/Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json`
 - Simple template: `examples/asset-pack/Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Simple.json`
 - Matching role example: `examples/asset-pack/Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example.json`

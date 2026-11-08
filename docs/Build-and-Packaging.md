@@ -48,7 +48,9 @@ The example graph is packaged as a separate, opt-in asset pack. Build it with:
 ./gradlew exampleAssetPack
 ```
 
-Gradle writes `build/distributions/Alec's Tamework! Examples v<version>.zip`.
+Gradle writes `build/distributions/Alecs-Tamework-Examples-v<version>.zip`.
+`scripts/release/build-package.ps1` builds it with the release jar, and the
+release publisher attaches it to each GitHub release as an additional asset.
 The pack manifest declares `Alechilles:Alec's Tamework!` as a dependency. Put
 the ZIP beside the Tamework jar and explicitly enable it only when you need
 the sample livestock, items, configs, translations, and art. The pack is
@@ -88,8 +90,8 @@ Run the test suite before packaging:
 ```bash
 ./gradlew test packagingTest
 ./gradlew validateManifest assemble
-jar tf "build/libs/Alec's Tamework! v<version>.jar" | rg -i 'Mob_Tamework_Example|Spawner_Tamework_Example|Tamework_Nametag_Example|Tamework_Command_Whistle_Example|Tw[A-Za-z]*Example'
-unzip -l "build/distributions/Alec's Tamework! Examples v<version>.zip"
+jar tf "build/libs/Alecs-Tamework-v<version>.jar" | rg -i 'Mob_Tamework_Example|Spawner_Tamework_Example|Tamework_Nametag_Example|Tamework_Command_Whistle_Example|Tw[A-Za-z]*Example'
+unzip -l "build/distributions/Alecs-Tamework-Examples-v<version>.zip"
 ```
 
 `packagingTest` loads the built shaded jar in an isolated classloader and
