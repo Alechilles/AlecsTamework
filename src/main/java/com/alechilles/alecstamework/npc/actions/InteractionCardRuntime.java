@@ -59,7 +59,7 @@ final class InteractionCardRuntime {
                    Applier applier) {
         ctx.skipGestures = true;
         boolean applied = false;
-        if (request instanceof CompanionCardRequests.RunEntry run) {
+        if (request instanceof CompanionCardRequests.RunEntry run && sameConfig(run.configId(), config)) {
             InteractionEntry entry = entryAt(config, run.entryIndex());
             if (entry != null && entry.getCard() != null && !(entry instanceof ModeCycleInteraction)) {
                 ActionTameworkInteract.ResolvedInteraction resolved = selector.checkCardEntry(
@@ -68,7 +68,7 @@ final class InteractionCardRuntime {
                     applied = applier.apply(resolved);
                 }
             }
-        } else if (request instanceof CompanionCardRequests.SetMode mode) {
+        } else if (request instanceof CompanionCardRequests.SetMode mode && sameConfig(mode.configId(), config)) {
             int modeIndex = modeEntryIndex(config);
             if (modeIndex >= 0) {
                 ActionTameworkInteract.ResolvedInteraction resolved = selector.checkCardEntry(
@@ -142,6 +142,10 @@ final class InteractionCardRuntime {
             actions.add(button.action());
         }
         return new CompanionCardInteractions(config.getId(), modes, modeAllowed, actions);
+    }
+
+    private static boolean sameConfig(String requested, TwInteractionConfig config) {
+        return requested != null && config != null && requested.equals(config.getId());
     }
 
     /** Index of the first enabled {@code ModeCycle} entry, or -1. */

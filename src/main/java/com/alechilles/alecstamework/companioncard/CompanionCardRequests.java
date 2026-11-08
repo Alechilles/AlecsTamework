@@ -28,12 +28,15 @@ public final class CompanionCardRequests {
     public sealed interface Request permits RunEntry, SetMode, Refresh {
     }
 
-    /** Runs one interaction entry by its index in the config's {@code Interactions} list. */
-    public record RunEntry(int entryIndex) implements Request {
+    /**
+     * Runs one interaction entry by its index in the config's {@code Interactions} list. Dropped when the companion
+     * now resolves a different config (a role change or reload), so an index never lands on another entry.
+     */
+    public record RunEntry(@Nullable String configId, int entryIndex) implements Request {
     }
 
-    /** Applies one {@code ModeCycle} step by its index in the {@code Cycle} list. */
-    public record SetMode(int stepIndex) implements Request {
+    /** Applies one {@code ModeCycle} step by its index in the {@code Cycle} list of config {@code configId}. */
+    public record SetMode(@Nullable String configId, int stepIndex) implements Request {
     }
 
     /** Recomputes the card's interaction snapshot without running anything. */

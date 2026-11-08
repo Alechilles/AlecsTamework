@@ -365,11 +365,13 @@ final class TameworkInteractRequirements {
                 && !owner.isTamed(npcRef, store, ctx)) {
             return true;
         }
-        if (bucket.isPlayerHandEmpty()
+        // A card request skips gestures: they are neutral here, so they cannot stand in for another option.
+        boolean gestures = !ctx.skipGestures;
+        if (gestures && bucket.isPlayerHandEmpty()
                 && owner.isPlayerHandEmpty(ctx)) {
             return true;
         }
-        if (bucket.isPlayerCrouching()
+        if (gestures && bucket.isPlayerCrouching()
                 && owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return true;
         }
@@ -406,7 +408,7 @@ final class TameworkInteractRequirements {
         if (matchesAnyNpcState(bucket.getNpcState(), role)) {
             return true;
         }
-        if (matchesAnyPlayerMovementState(bucket.getPlayerMovementState(), role, infoProvider, store, ctx)) {
+        if (gestures && matchesAnyPlayerMovementState(bucket.getPlayerMovementState(), role, infoProvider, store, ctx)) {
             return true;
         }
         if (matchesAnyInteractionContext(bucket.getInteractionContext(), role, infoProvider, ctx, forPrompt)) {
@@ -426,7 +428,8 @@ final class TameworkInteractRequirements {
         )) {
             return true;
         }
-        return false;
+        // A bucket of only gestures has nothing left to check once the card has picked the entry.
+        return ctx.skipGestures && bucket.hasOnlyGestures();
     }
 
     private boolean matchesAnyItemsInHand(ItemsInHandRequirement[] requirements,

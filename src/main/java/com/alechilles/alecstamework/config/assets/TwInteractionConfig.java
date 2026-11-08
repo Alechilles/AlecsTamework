@@ -668,6 +668,28 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             return custom == null ? EMPTY_CUSTOM_REQUIREMENTS : custom;
         }
 
+        /** Whether the bucket holds gesture options (empty hand, crouching, movement state) and nothing else. */
+        public boolean hasOnlyGestures() {
+            return (playerHandEmpty || playerCrouching || getPlayerMovementState().length > 0)
+                    && !lovedItems
+                    && !isHarvestable
+                    && !isMountable
+                    && !isTamed
+                    && !isNotTamed
+                    && !playerIsOwner
+                    && !harvestAlarmReady
+                    && !harvestInteractionContext
+                    && getItemsInHand().length == 0
+                    && getItemsInInventory().length == 0
+                    && getItemsEquipped().length == 0
+                    && getNpcHealthPercent().length == 0
+                    && getParameter().length == 0
+                    && getAlarmState().length == 0
+                    && getNpcState().length == 0
+                    && getInteractionContext().length == 0
+                    && getCustom().length == 0;
+        }
+
         public boolean isEmpty() {
             return !lovedItems
                     && !isHarvestable

@@ -284,6 +284,13 @@ public class ActionTameworkInteract extends TameworkActionBase {
             }
         }
         ResolvedInteraction interaction = selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
+        if (cardRuntime != null && ctx.cardMode && opensCardInsteadOf(interaction, config, npcRef, role,
+                infoProvider, store, player, ctx)) {
+            // F opens the card in place of cycling; nothing runs, so no entry cooldown starts.
+            deferCardEvent(true, playerRef, npcRef, store,
+                    cardRuntime.describe(config, npcRef, role, infoProvider, store, player, ctx));
+            return true;
+        }
         if (interaction == null) {
             ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
             diagnostics.logDebug(diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
@@ -292,14 +299,29 @@ public class ActionTameworkInteract extends TameworkActionBase {
         if (interaction.blockedByCooldown) {
             return false;
         }
-        if (cardRuntime != null && ctx.cardMode
-                && interaction.entry instanceof TwInteractionConfig.ModeCycleInteraction) {
-            // F opens the card in place of cycling; nothing runs, so no entry cooldown starts.
-            deferCardEvent(true, playerRef, npcRef, store,
-                    cardRuntime.describe(config, npcRef, role, infoProvider, store, player, ctx));
+        return applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+    }
+
+    /**
+     * Whether F reaches the {@code ModeCycle} entry, which opens the card in Card mode. Entries above it keep winning
+     * F. The mode entry's own cooldown does not block opening the card: opening runs nothing.
+     */
+    private boolean opensCardInsteadOf(@Nullable ResolvedInteraction selected,
+                                       TwInteractionConfig config,
+                                       Ref<EntityStore> npcRef,
+                                       Role role,
+                                       InfoProvider infoProvider,
+                                       Store<EntityStore> store,
+                                       Player player,
+                                       InteractionContextSnapshot ctx) {
+        int modeIndex = InteractionCardRuntime.modeEntryIndex(config);
+        if (modeIndex < 0 || selected != null && selected.index < modeIndex) {
+            return false;
+        }
+        if (selected != null && selected.index == modeIndex) {
             return true;
         }
-        return applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+        return selector.checkCardEntry(config, modeIndex, npcRef, role, infoProvider, store, player, ctx) != null;
     }
 
     /** Whether F opens the companion card for this player. Shared with {@code TameworkInteractPrompt}. */
@@ -374,6 +396,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         NEUTRAL_CHAIN_ACTION.set(this);
         try {
             InteractionContextSnapshot ctx = neutralChainParamAccess.buildContextSnapshot(player, playerRef, role);
+            ctx.cardMode = opensCompanionCard(playerRef, store);
             TwInteractionConfig config = neutralChainConfigResolver.resolveConfig(role, ctx);
             if (config == null || !config.isEnabled()) {
                 return false;

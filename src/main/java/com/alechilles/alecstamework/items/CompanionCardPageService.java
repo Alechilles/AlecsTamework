@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.TameworkCompanionCardPage;
+import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -170,12 +171,13 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void mode(int stepIndex) {
-            request(new CompanionCardRequests.SetMode(stepIndex));
+            request(new CompanionCardRequests.SetMode(page.view().interactions().configId(), stepIndex));
         }
 
         @Override
         public void entry(int entryIndex, @Nonnull CompanionCardInteractions.Kind kind) {
-            if (request(new CompanionCardRequests.RunEntry(entryIndex)) && kind == CompanionCardInteractions.Kind.MOUNT) {
+            if (request(new CompanionCardRequests.RunEntry(page.view().interactions().configId(), entryIndex))
+                    && kind == CompanionCardInteractions.Kind.MOUNT) {
                 // The player is about to ride: get the card out of the way.
                 page.closeCard();
             }
@@ -223,7 +225,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                 return new CommandTalentPageService.TalentTarget(current.npcRef(), store,
                         displayName == null ? "" : displayName,
                         npc == null ? null : links.resolveRoleId(npc));
-            }, this::reopen);
+            }, () -> reopen(true));
         }
 
         @Override
@@ -234,7 +236,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                 return;
             }
             naming.beginCardNaming(live.player(), playerRef, live.npcRef(), store,
-                    CompanionCardPreferences.renameMode(), this::reopen);
+                    CompanionCardPreferences.renameMode(), () -> reopen(false));
         }
 
         @Override
@@ -308,14 +310,39 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                 return;
             }
             page.show(view);
+            if (waitingOnRoleTick(view)) {
+                // Cooldowns and mode availability come from the role tick; ask it again until they clear.
+                request(new CompanionCardRequests.Refresh());
+            }
         }
 
-        /** Opens a fresh card after a page that replaced it (talents, rename) closes, if nothing else is open. */
-        private void reopen() {
+        private boolean waitingOnRoleTick(TameworkCompanionCardPage.View view) {
+            CompanionCardInteractions interactions = view.interactions();
+            if (!view.canManage()) {
+                return false;
+            }
+            if (!interactions.modes().isEmpty() && !interactions.modeAllowed()) {
+                return true;
+            }
+            for (CompanionCardInteractions.Action action : interactions.actions()) {
+                if (action.status() == CompanionCardInteractions.Status.COOLDOWN) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Opens a fresh card after a page that replaced it closes, if nothing else is open. The talents page's Back
+         * leaves that page open, so {@code fromTalents} lets the card replace it.
+         */
+        private void reopen(boolean fromTalents) {
             Player player = player();
             Ref<EntityStore> npcRef = npcRef();
+            Object current = player == null || player.getPageManager() == null
+                    ? null : player.getPageManager().getCustomPage();
             if (stopped || player == null || npcRef == null || player.getPageManager() == null
-                    || player.getPageManager().getCustomPage() != null) {
+                    || current != null && !(fromTalents && current instanceof TameworkCompanionTalentsPage)) {
                 return;
             }
             open(player, playerRef, npcRef, store, page.view().interactions());

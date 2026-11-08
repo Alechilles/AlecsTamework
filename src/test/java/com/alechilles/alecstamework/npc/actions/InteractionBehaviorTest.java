@@ -226,6 +226,31 @@ class InteractionBehaviorTest {
         assertFalse(InteractionMatchHelpers.matchesNpcHealthPercentValue(60.0, requirement));
     }
 
+    /**
+     * A card button skips gesture requirements, but a skipped gesture must not satisfy an Any group that also offers a
+     * real option: the card would otherwise harvest without the tool. A group of gestures only still passes.
+     */
+    @Test
+    void cardRequestSkipsGesturesWithoutLettingThemSatisfyAnyGroup() throws Exception {
+        TwInteractionConfig config = TwInteractionConfig.CODEC.decode(BsonDocument.parse("{\"Interactions\":["
+                + "{\"Type\":\"Custom\",\"Requires\":{\"Any\":{\"PlayerHandEmpty\":true,"
+                + "\"ItemsInHand\":[{\"Items\":[\"Item_Shears\"]}]}}},"
+                + "{\"Type\":\"Custom\",\"Requires\":{\"Any\":{\"PlayerHandEmpty\":true}}}]}"),
+                new ExtraInfo());
+        TameworkInteractRequirements requirements = new TameworkInteractRequirements(newInteract(),
+                new InteractionFeedHelper(null), null, "Harvest_Ready", true, null);
+        InteractionContextSnapshot fPress = newContextSnapshotWithHeldItemId("Item_Carrot");
+        InteractionContextSnapshot card = newContextSnapshotWithHeldItemId("Item_Carrot");
+        card.skipGestures = true;
+
+        TwInteractionConfig.InteractionEntry withTool = config.getInteractions()[0];
+        TwInteractionConfig.InteractionEntry gestureOnly = config.getInteractions()[1];
+        assertFalse(requirements.requirementsMet(null, 0, withTool, null, null, null, null, null, fPress));
+        assertFalse(requirements.requirementsMet(null, 0, withTool, null, null, null, null, null, card));
+        assertFalse(requirements.requirementsMet(null, 1, gestureOnly, null, null, null, null, null, fPress));
+        assertTrue(requirements.requirementsMet(null, 1, gestureOnly, null, null, null, null, null, card));
+    }
+
     @Test
     void interactionRequireOwnerResolutionUsesGlobalToggle() {
         assertTrue(TameworkInteractRequirements.resolveInteractionRequireOwner(null, true));
