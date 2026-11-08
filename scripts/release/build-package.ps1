@@ -55,9 +55,10 @@ switch ($config.packaging) {
                 Copy-Item -Path $resolvedPrebuiltArtifact -Destination $resolvedArtifactDestination -Force
             }
         } else {
-            $gradleArgs = @("--no-daemon", "clean", "test", "packagingTest", "shadowJar")
+            # exampleAssetPack writes the examples ZIP that the publisher attaches to the GitHub release.
+            $gradleArgs = @("--no-daemon", "clean", "test", "packagingTest", "shadowJar", "exampleAssetPack")
             if ($SkipTests) {
-                $gradleArgs = @("--no-daemon", "clean", "shadowJar")
+                $gradleArgs = @("--no-daemon", "clean", "shadowJar", "exampleAssetPack")
             }
 
             & .\gradlew.bat @gradleArgs
