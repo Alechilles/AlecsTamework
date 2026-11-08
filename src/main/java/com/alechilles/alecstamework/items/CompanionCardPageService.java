@@ -452,7 +452,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
     private void scheduleRefresh(Session session) {
         CompletableFuture.delayedExecutor(REFRESH_MS, TimeUnit.MILLISECONDS).execute(() -> {
             World world = session.store.getExternalData() == null ? null : session.store.getExternalData().getWorld();
-            if (stopped || world == null || session.page == null || session.page.isClosed()) {
+            if (stopped || world == null || !world.isAlive() || session.page == null || session.page.isClosed()) {
                 return;
             }
             try {
