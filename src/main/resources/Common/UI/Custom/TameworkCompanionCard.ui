@@ -40,11 +40,15 @@ Group {
       Group { Anchor: (Top: 12, Right: 16, Width: 24, Height: 24); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #bfcdd5); HitTestVisible: false; }
 
       Group #Identity {
-        Anchor: (Top: 60, Left: 14, Width: 412, Height: 124);
+        Anchor: (Top: 60, Left: 14, Width: 412, Height: 130);
         Group #PortraitFrame { Anchor: (Top: 0, Left: 0, Width: 142, Height: 104); Background: "Tamework/Slate/Portrait_World.png"; HitTestVisible: false; }
         ItemGrid #Portrait { Anchor: (Top: 6, Left: 25, Width: 92, Height: 92); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
         Group #PortraitArt { Anchor: (Top: 6, Left: 25, Width: 92, Height: 92); HitTestVisible: false; Visible: false; }
         Label #OwnerLine { Anchor: (Top: 106, Left: 0, Width: 142, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+        // Same multi-select group picker as the companions window (TameworkLinkedNpcPanelCard.ui #GroupSelector).
+        DropdownBox #GroupSelector { Anchor: (Top: 106, Left: 0, Width: 142, Height: 24); Style: $A.@CompanionGroupDropdown; ShowLabel: false; MaxSelection: 0; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.noneGroups; Visible: false; }
+        Label #GroupSelectorLabel { Anchor: (Top: 106, Left: 26, Width: 94, Height: 24); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, VerticalAlignment: Center); HitTestVisible: false; Visible: false; }
+        Group #GroupSelectorMarker { Anchor: (Top: 112, Left: 8, Width: 12, Height: 12); Background: (TexturePath: "Tamework/PanelControls/GroupDiamondOutline.png", Color: #ffffff); HitTestVisible: false; Visible: false; }
 
         Group #XpProgressRing {
           Anchor: (Top: 0, Left: 156, Width: 48, Height: 24);

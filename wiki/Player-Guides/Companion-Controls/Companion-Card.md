@@ -15,11 +15,13 @@ Press **F** on a companion you own to open its companion card beside your crossh
 - **Header**: the companion's name, species and gender. The pencil renames it, and the X closes the card.
 - **Info**: portrait, level, health, happiness, hunger, thirst and traits, as in the companion panel. Click the
   level, or the talent point badge, to open its talents.
+- **Groups**: the picker under the portrait puts the companion in any of your groups. Create and edit groups in the
+  companions window.
 - **Mode**: one button per mode the companion supports, such as Follow, Hold and Idle. The current mode is
   highlighted; click another to switch.
 - **Timers**: age stage, breeding cooldown and harvest timer, when the companion has them.
-- **Actions**: shoulder, flight and breeding toggles, plus anything the companion's mod adds, such as **Ride** and
-  **Pet**. A greyed-out button is not available right now, for example Ride on a dragon without the Flightmaster's
+- **Actions**: shoulder, flight and breeding toggles, **Set Home** (here, where the companion stands) and
+  **Return Home**, plus anything the companion's mod adds, such as **Ride** and **Pet**. A greyed-out button is not available right now, for example Ride on a dragon without the Flightmaster's
   Talisman in hand. Riding from the card does not need crouching.
 - **Footer**: **Release** and **Cull**, each with a confirmation, and the **Open with F** switch.
 

@@ -33,7 +33,11 @@ final class CommandGroupService {
         if (stack == null || stack.isEmpty()) {
             return List.of();
         }
-        String raw = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_GROUPS, Codec.STRING);
+        return readGroups(stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_GROUPS, Codec.STRING));
+    }
+
+    /** Parses group definitions in the item metadata format, as the owner-wide groups component stores them. */
+    List<GroupRecord> readGroups(String raw) {
         if (raw == null || raw.isBlank()) {
             return List.of();
         }

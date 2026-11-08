@@ -12,6 +12,8 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.PatchStyle;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -35,6 +37,7 @@ import javax.annotation.Nullable;
 public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<TameworkCompanionCardPage.EventData> {
     public static final String UI_PATH = "TameworkCompanionCard.ui";
     private static final String KEY_ACTION = "Action";
+    private static final String KEY_GROUPS = "@CompanionGroups";
     private static final String CARD = "#CompanionCard";
     private static final int MODE_SLOTS = 6;
     private static final int ACTION_SLOTS = 12;
@@ -48,13 +51,21 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     @Nullable
     private Confirm pendingConfirm;
     private boolean closed;
+    // What the group picker was last given. Re-sending Entries or SelectedValues resets an open native popup, so a
+    // refresh sends them only when they changed.
+    @Nullable
+    private List<LinkedNpcEntry.GroupMembership> sentGroupOptions;
+    @Nullable
+    private List<String> sentGroupSelection;
 
     /**
      * What the page shows. Built by the page service on the world thread for one viewer.
      *
      * @param canManage      the viewer owns the companion: modes and {@code Card} entries are offered
      * @param genericActions the companion also accepts generic companion actions (it is not bonded): toggles,
-     *                       talents, rename, release and cull are offered
+     *                       homes, groups, talents, rename, release and cull are offered
+     * @param groupOptions   every group the viewer has defined; the entry's {@code groups()} are the selected ones.
+     *                       Empty hides the group picker
      */
     public record View(@Nonnull LinkedNpcEntry entry,
                        @Nonnull CompanionCardInteractions interactions,
@@ -63,7 +74,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        @Nullable String ownerName,
                        @Nonnull CardRenameAvailability rename,
                        boolean playerChoiceAllowed,
-                       boolean opensOnF) {
+                       boolean opensOnF,
+                       @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions) {
     }
 
     /** Clicks reported to the page service. Every callback runs on the world thread. */
@@ -77,6 +89,13 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         void toggleFlight();
 
         void toggleShoulder();
+
+        void setHome();
+
+        void returnHome();
+
+        /** Replaces the companion's group memberships with {@code groupIds} (possibly empty). */
+        void assignGroups(@Nonnull List<String> groupIds);
 
         void talents();
 
@@ -120,6 +139,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commands,
                       @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
         commands.append(UI_PATH);
+        sentGroupOptions = null;
+        sentGroupSelection = null;
         render(commands, events);
     }
 
@@ -169,6 +190,16 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             markClosed();
             return;
         }
+        if (action.equals("groups")) {
+            // Not a confirmable action, so it neither answers nor cancels an open confirmation.
+            if (generic() && !view.groupOptions().isEmpty()) {
+                List<String> selected = data.groups == null ? List.of() : List.of(data.groups);
+                // The client already shows this selection; do not send it back.
+                sentGroupSelection = selected;
+                actions.assignGroups(selected);
+            }
+            return;
+        }
         if (pendingConfirm != null) {
             handleConfirm(action);
             return;
@@ -189,6 +220,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             return;
         }
         switch (action) {
+            case "setHome" -> { if (generic()) actions.setHome(); }
+            case "returnHome" -> { if (generic()) actions.returnHome(); }
             case "breeding" -> { if (generic()) actions.toggleBreeding(); }
             case "flight" -> { if (generic()) actions.toggleFlight(); }
             case "shoulder" -> { if (generic()) actions.toggleShoulder(); }
@@ -278,7 +311,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         }
 
         bindIdentity(commands, events, entry, language, manage, generic);
-        int top = 194;
+        int top = 200;
         top = bindModes(commands, events, language, manage, top);
         boolean cooldowns = LinkedNpcPanelCardBinder.resolveLifecycleDisplay(entry, language).visible()
                 || entry.hasKnownCooldowns();
@@ -325,6 +358,46 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         commands.set(CARD + " #OwnerLine.Visible", showOwner);
         commands.set(CARD + " #OwnerLine.Text", showOwner
                 ? LocalizedText.format(language, "tamework.ui.companionCard.owner", view.ownerName()) : "");
+        bindGroups(commands, events, entry, language, generic);
+    }
+
+    /** The companions window's multi-select group picker, for the viewer's own groups. */
+    private void bindGroups(UICommandBuilder commands, UIEventBuilder events, LinkedNpcEntry entry,
+                            String language, boolean generic) {
+        String selector = CARD + " #GroupSelector";
+        List<LinkedNpcEntry.GroupMembership> options = view.groupOptions();
+        boolean visible = generic && !options.isEmpty();
+        commands.set(selector + ".Visible", visible);
+        commands.set(selector + "Label.Visible", visible);
+        commands.set(selector + "Marker.Visible", visible);
+        if (!visible) {
+            return;
+        }
+        if (!options.equals(sentGroupOptions)) {
+            commands.set(selector + ".Entries", options.stream()
+                    .map(group -> new DropdownEntryInfo(LocalizableString.fromString(group.name()), group.id()))
+                    .toList());
+            sentGroupOptions = options;
+            sentGroupSelection = null;
+        }
+        List<String> selected = entry.groupIds();
+        if (!selected.equals(sentGroupSelection)) {
+            // Literal wrappers send the IDs as plain strings without translating them.
+            commands.set(selector + ".SelectedValues", selected.stream().map(LocalizableString::fromString).toList());
+            sentGroupSelection = selected;
+        }
+        List<LinkedNpcEntry.GroupMembership> groups = entry.groups();
+        commands.set(selector + "Label.Text", groups.isEmpty()
+                ? LocalizedText.resolve(language, "tamework.ui.companions.noGroups")
+                : groups.size() == 1 ? groups.getFirst().name()
+                : LocalizedText.format(language, "tamework.ui.companions.groupSummary",
+                        groups.getFirst().name(), groups.size() - 1));
+        commands.set(selector + ".TooltipText", groups.isEmpty()
+                ? LocalizedText.resolve(language, "tamework.ui.companionCard.groups") : entry.groupName());
+        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
+        events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
+                com.hypixel.hytale.server.core.ui.builder.EventData.of(KEY_ACTION, "groups")
+                        .append(KEY_GROUPS, selector + ".SelectedValues"), false);
     }
 
     private int bindModes(UICommandBuilder commands, UIEventBuilder events, String language, boolean manage,
@@ -396,6 +469,18 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                         LocalizedText.resolve(language, on ? "tamework.ui.linkedPanel.card.tooltip.breedingEnabled"
                                 : "tamework.ui.linkedPanel.card.tooltip.breedingDisabled"),
                         on, true, "breeding"));
+            }
+            if (!entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost()) {
+                slots.add(new Slot("Tamework/PanelActions/SetHome_Glyph_Default.png",
+                        LocalizedText.resolve(language, "tamework.ui.linkedPanel.action.setHome"),
+                        LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.tooltip.setHome"),
+                        false, true, "setHome"));
+                if (entry.hasHome()) {
+                    slots.add(new Slot("Tamework/PanelActions/ReturnHome_Glyph_Default.png",
+                            LocalizedText.resolve(language, "tamework.ui.linkedPanel.action.returnHome"),
+                            LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.tooltip.returnHome"),
+                            false, true, "returnHome"));
+                }
             }
         }
         if (manage) {
@@ -536,15 +621,20 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     private record Slot(String icon, String caption, String tooltip, boolean on, boolean enabled, String event) {
     }
 
-    /** Event payload: one action string per click. */
+    /** Event payload: one action string per click, plus the picked group IDs for a group change. */
     public static final class EventData {
         public static final BuilderCodec<EventData> CODEC = BuilderCodec.builder(EventData.class, EventData::new)
                 .append(new KeyedCodec<>(KEY_ACTION, Codec.STRING),
                         (data, value) -> data.action = value,
                         data -> data.action)
                 .add()
+                .append(new KeyedCodec<>(KEY_GROUPS, Codec.STRING_ARRAY),
+                        (data, value) -> data.groups = value,
+                        data -> data.groups)
+                .add()
                 .build();
 
         private String action;
+        private String[] groups;
     }
 }

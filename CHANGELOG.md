@@ -5,8 +5,8 @@
 ### Added
 
 - Pressing F on a companion you own now opens its **companion card** beside your crosshair: its health, needs, traits,
-  level and timers, buttons for its modes, and its actions (shoulder, flight and breeding toggles, talents, release and
-  cull), all without a command item. Players who prefer the old behaviour can switch back to cycling modes with the
+  level and timers, buttons for its modes, and its actions (shoulder, flight and breeding toggles, Set Home and Return
+  Home, its groups, talents, release and cull), all without a command item. Players who prefer the old behaviour can switch back to cycling modes with the
   card's **Open with F** switch or `/tw card cycle`.
 - `/tw settings` has a **Companion Card** section: what F does by default, whether players may choose for themselves,
   and how renaming from the card works.

@@ -142,8 +142,13 @@ and a button for each entry with a `Card` block. See the `Card` section of the c
 Card buttons run through `TameworkInteract`: the page queues a short-lived request for that companion and player and
 registers an interaction, and the next role tick runs exactly that entry or mode step with the entry's requirements,
 effects and cooldown. Crouch, movement-state and empty-hand requirements are skipped for card requests only. Bonded
-companions get mode and `Card` buttons, but not the generic toggles, talents, rename, release or cull, which stay in
-their own panel.
+companions get mode and `Card` buttons, but not the generic toggles, homes, groups, talents, rename, release or cull,
+which stay in their own panel.
+
+Set Home, Return Home and groups need no command item. The home is stored on the companion, and Return Home runs the
+built-in Return Home command for that companion with its usual travel settings. Set Home also updates the cached home
+on hotbar command items that already link the companion. The group picker lists the viewer's own groups, the same
+owner-wide groups as the companions window; groups are created and edited there.
 
 ### Breed
 Common fields:

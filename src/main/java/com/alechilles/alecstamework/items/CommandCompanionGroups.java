@@ -125,6 +125,26 @@ final class CommandCompanionGroups {
         return state == null ? Set.of() : state.members(groupId);
     }
 
+    /** The viewer's own group definitions, with no command item involved. */
+    static List<CommandGroupService.GroupRecord> definedGroups(Player player) {
+        var state = read(player);
+        return state == null ? List.of() : CODEC.readGroups(state.definitions());
+    }
+
+    /**
+     * Replaces one companion's memberships without a command item, for the companion card. Only groups the viewer has
+     * defined are accepted; legacy item groups are imported by the item paths, not here.
+     */
+    static boolean assignDefined(Player player, String key, UUID alias, Collection<String> requested) {
+        var state = read(player);
+        if (state == null || requested == null || requested.size() > CommandGroupService.MAX_GROUPS) return false;
+        var valid = CODEC.readGroups(state.definitions()).stream().map(g -> g.groupId).toList();
+        if (!valid.containsAll(requested)) return false;
+        var next = state.clone();
+        next.groups(key, entityKey(alias), requested);
+        return save(player, next);
+    }
+
     static boolean assign(Player player, ItemStack stack, String key, UUID alias, Collection<String> requested) {
         importLegacy(player, stack);
         var state = read(player);

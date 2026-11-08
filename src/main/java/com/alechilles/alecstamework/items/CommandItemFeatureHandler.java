@@ -346,7 +346,9 @@ public final class CommandItemFeatureHandler {
                 this.groupService
         );
         this.companionCardPages = new CompanionCardPageService(
-                talentPageService, ownerReleaseService, ownerCullService, panelActionService);
+                talentPageService, ownerReleaseService, ownerCullService, panelActionService,
+                new CompanionCardHomeActions(menuMoveService, linkMutationService, feedbackService, npcNameResolver),
+                companions != null ? new CommandOwnedPanelRecordSource(companions) : null);
         this.groupActivationService = new CommandGroupActivationService(
                 linkedNpcRecordStore,
                 this.groupService

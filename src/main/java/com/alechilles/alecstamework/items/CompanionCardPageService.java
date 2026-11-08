@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,7 +40,9 @@ import javax.annotation.Nullable;
  * viewer and companion on the world thread and checks ownership again; the card's rendered state is never trusted.
  * Modes and {@code Card} entries go back through {@code TameworkInteract} as {@link CompanionCardRequests}. Built-in
  * actions call the companion window's services through their item-free entry points, and only for companions that
- * accept generic actions (bonded companions keep their own panel).
+ * accept generic actions (bonded companions keep their own panel). Homes and groups need no command item: the home
+ * lives on the companion and groups are the viewer's own (see {@link CompanionCardHomeActions} and
+ * {@link CommandCompanionGroups}).
  *
  * <p>Refresh: while a card is open, a delayed task re-renders it every {@link #REFRESH_MS} on the world thread so
  * health, needs and timers stay current. The chain stops when the card closes, its companion or viewer is gone, or the
@@ -55,22 +58,29 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
     private final CommandOwnerReleaseService releases;
     private final CommandOwnerCullService culls;
     private final CommandPanelActionService panelActions;
+    private final CompanionCardHomeActions homes;
+    @Nullable
+    private final CommandOwnedPanelRecordSource ownedRows;
     private final CommandLinkPolicyService links = new CommandLinkPolicyService();
     private final CommandNpcNameResolver names = new CommandNpcNameResolver();
     private final CommandLoadedNpcStatusSnapshotService snapshots;
     private final CommandLinkedFlightToggleActionService flight = new CommandLinkedFlightToggleActionService();
     private final CommandLinkedShoulderRideActionService shoulder = new CommandLinkedShoulderRideActionService();
-    private final Map<UUID, TameworkCompanionCardPage> openPages = new ConcurrentHashMap<>();
+    private final Map<UUID, Session> openPages = new ConcurrentHashMap<>();
     private volatile boolean stopped;
 
     CompanionCardPageService(CommandTalentPageService talents,
                              CommandOwnerReleaseService releases,
                              CommandOwnerCullService culls,
-                             CommandPanelActionService panelActions) {
+                             CommandPanelActionService panelActions,
+                             CompanionCardHomeActions homes,
+                             @Nullable CommandOwnedPanelRecordSource ownedRows) {
         this.talents = talents;
         this.releases = releases;
         this.culls = culls;
         this.panelActions = panelActions;
+        this.homes = homes;
+        this.ownedRows = ownedRows;
         this.snapshots = new CommandLoadedNpcStatusSnapshotService(names, links,
                 new CommandLinkedPanelProgressionPresentationService(),
                 new CommandLinkedPanelCooldownSnapshotService());
@@ -90,11 +100,15 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         PlayerRef uiPlayer = player.getPlayerRef();
         UUID npcUuid = npcUuid(npcRef, store);
-        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions);
-        if (uiPlayer == null || npcUuid == null || view == null) {
+        if (uiPlayer == null || npcUuid == null) {
             return;
         }
-        Session session = new Session(player.getUuid(), npcUuid, playerRef, store);
+        String groupKey = groupKey(player, npcUuid);
+        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions, groupKey);
+        if (view == null) {
+            return;
+        }
+        Session session = new Session(player.getUuid(), npcUuid, playerRef, store, groupKey);
         TameworkCompanionCardPage page = new TameworkCompanionCardPage(uiPlayer, npcUuid, view, session);
         session.page = page;
         try {
@@ -103,20 +117,22 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             LOGGER.log(Level.WARNING, "[tw-companion-card] could not open the card for npc=" + npcUuid, ex);
             return;
         }
-        openPages.put(player.getUuid(), page);
+        openPages.put(player.getUuid(), session);
         scheduleRefresh(session);
     }
 
     @Override
     public void update(@Nonnull Player player, @Nonnull Ref<EntityStore> playerRef, @Nonnull Ref<EntityStore> npcRef,
                        @Nonnull Store<EntityStore> store, @Nonnull CompanionCardInteractions interactions) {
-        TameworkCompanionCardPage page = openPages.get(player.getUuid());
+        Session session = openPages.get(player.getUuid());
+        TameworkCompanionCardPage page = session == null ? null : session.page;
         UUID npcUuid = npcUuid(npcRef, store);
         if (page == null || page.isClosed() || npcUuid == null || !npcUuid.equals(page.npcUuid())
                 || !showing(player, page)) {
             return;
         }
-        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions);
+        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions,
+                session.groupKey);
         if (view == null) {
             page.closeCard();
             return;
@@ -127,7 +143,8 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
     @Nullable
     private TameworkCompanionCardPage.View buildView(Player player, Ref<EntityStore> playerRef,
                                                      Ref<EntityStore> npcRef, Store<EntityStore> store,
-                                                     CompanionCardInteractions interactions) {
+                                                     CompanionCardInteractions interactions,
+                                                     String groupKey) {
         NPCEntity npc = npcRef.isValid() ? store.getComponent(npcRef, NPCEntity.getComponentType()) : null;
         if (npc == null) {
             return null;
@@ -140,8 +157,16 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         boolean owner = owns(player, npcRef, store);
         boolean generic = owner && CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store);
+        List<LinkedNpcEntry.GroupMembership> groupOptions = List.of();
         if (generic) {
             entry = entry.withOwnedActions();
+            groupOptions = CommandCompanionGroups.definedGroups(player).stream()
+                    .map(group -> new LinkedNpcEntry.GroupMembership(group.groupId, group.name, group.colorHex))
+                    .toList();
+            List<String> memberships = groupOptions.isEmpty() ? List.of()
+                    : CommandCompanionGroups.groups(player, groupKey, npc.getUuid());
+            entry = entry.withCompanionGroups(groupKey, groupOptions.stream()
+                    .filter(group -> memberships.contains(group.id())).toList(), true);
         }
         CardRenameAvailability rename = CardRenameAvailability.OFF;
         NamingFeatureHandler naming = naming();
@@ -151,7 +176,21 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         return new TameworkCompanionCardPage.View(entry, owner ? interactions : CompanionCardInteractions.EMPTY,
                 owner, generic, ownerName(npcRef, store), rename, CompanionCardPreferences.playerChoiceAllowed(),
-                CompanionCardPreferences.effective(playerRef, store) == CompanionCardFBehaviour.CARD);
+                CompanionCardPreferences.effective(playerRef, store) == CompanionCardFBehaviour.CARD, groupOptions);
+    }
+
+    /**
+     * The viewer's group key for this companion: its profile when the companion index knows one, as in the
+     * companions window, otherwise its NPC UUID. Resolved once per card, since it reads the owner's index.
+     */
+    private String groupKey(Player player, UUID npcUuid) {
+        String key = ownedRows == null ? null : ownedRows.profileForRow(player.getUuid(), npcUuid)
+                .map(profile -> CommandCompanionGroups.profileKey(profile.toString())).orElse(null);
+        if (key == null) {
+            return CommandCompanionGroups.entityKey(npcUuid);
+        }
+        CommandCompanionGroups.promoteProfile(player, key, npcUuid);
+        return key;
     }
 
     /** One open card: its viewer, companion and page. Page callbacks run on the world thread. */
@@ -160,13 +199,16 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private final UUID npcUuid;
         private final Ref<EntityStore> playerRef;
         private final Store<EntityStore> store;
+        private final String groupKey;
         private TameworkCompanionCardPage page;
 
-        private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store) {
+        private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store,
+                        String groupKey) {
             this.playerUuid = playerUuid;
             this.npcUuid = npcUuid;
             this.playerRef = playerRef;
             this.store = store;
+            this.groupKey = groupKey;
         }
 
         @Override
@@ -205,6 +247,33 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         public void toggleShoulder() {
             if (live(true) != null) {
                 shoulder.toggle(playerUuid, playerRef, store, CARD_SOURCE_ID, npcUuid);
+                refresh();
+            }
+        }
+
+        @Override
+        public void setHome() {
+            Live live = live(true);
+            if (live != null && live.entry() != null && live.entry().loaded()) {
+                homes.setHome(live.player(), live.npcRef(), store);
+                refresh();
+            }
+        }
+
+        @Override
+        public void returnHome() {
+            Live live = live(true);
+            if (live != null) {
+                homes.returnHome(live.player(), playerRef, live.npcRef(), store);
+                refresh();
+            }
+        }
+
+        @Override
+        public void assignGroups(@Nonnull List<String> groupIds) {
+            Live live = live(true);
+            if (live != null && !CommandCompanionGroups.assignDefined(live.player(), groupKey, npcUuid, groupIds)) {
+                // Rejected (a group was deleted meanwhile): show the saved memberships again.
                 refresh();
             }
         }
@@ -272,7 +341,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void closed() {
-            openPages.remove(playerUuid, page);
+            openPages.remove(playerUuid, this);
         }
 
         /** Queues a request for the role tick and registers the interaction that wakes it. */
@@ -299,12 +368,12 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             Player player = player();
             if (player != null && !showing(player, page)) {
                 // Another page replaced the card (talents, rename); it no longer receives updates.
-                openPages.remove(playerUuid, page);
+                openPages.remove(playerUuid, this);
                 return;
             }
             Ref<EntityStore> npcRef = npcRef();
             TameworkCompanionCardPage.View view = player == null || npcRef == null ? null
-                    : buildView(player, playerRef, npcRef, store, page.view().interactions());
+                    : buildView(player, playerRef, npcRef, store, page.view().interactions(), groupKey);
             if (view == null) {
                 page.closeCard();
                 return;
@@ -388,11 +457,11 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             }
             try {
                 world.execute(() -> {
-                    if (stopped || session.page.isClosed() || openPages.get(session.playerUuid) != session.page) {
+                    if (stopped || session.page.isClosed() || openPages.get(session.playerUuid) != session) {
                         return;
                     }
                     session.refresh();
-                    if (!session.page.isClosed() && openPages.get(session.playerUuid) == session.page) {
+                    if (!session.page.isClosed() && openPages.get(session.playerUuid) == session) {
                         scheduleRefresh(session);
                     }
                 });

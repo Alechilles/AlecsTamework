@@ -406,6 +406,49 @@ final class CommandMenuMoveService {
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
     }
 
+    /**
+     * Sends one loaded companion to its stored home without a command item, for the companion card. It runs the
+     * built-in Return Home command for that companion alone, with the same travel settings as the panel's Return
+     * Home; a home too far away still uses the timed teleport. The caller has already checked ownership and generic
+     * authority on the world thread.
+     *
+     * @param sourceId stands in for the command item ID in the move hook
+     */
+    void returnHomeLoaded(Player player, Ref<EntityStore> playerRef, Store<EntityStore> store,
+                          Ref<EntityStore> npcRef, NPCEntity npc, String sourceId) {
+        TameworkCommandLinksComponent links =
+                store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        if (links == null || !links.hasHome()) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.returnHome.noHome");
+            return;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId == null || roleId.isBlank()) {
+            roleId = npc.getRoleName();
+        }
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+        // No item backs this command: a plain generic-roster config stands in for one, and no item is updated.
+        TwCommandItemConfig itemFree = new TwCommandItemConfig() { };
+        Context context = new Context(
+                player, playerRef, store, itemFree, TwCommandItemConfig.createBuiltInReturnHomeCommand(),
+                sourceId, sourceId, npcRef, null, null,
+                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned()),
+                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned()),
+                resolvePositiveDouble(settings.getReturnHomeTeleportDistance(), defaultReturnHomeTeleportDistance),
+                resolvePositiveDouble(settings.getReturnHomePathDistanceBeforeTeleport(),
+                        defaultReturnHomePathDistanceBeforeTeleport),
+                resolvePositiveLong(settings.getReturnHomeTeleportDelayMs(), defaultReturnHomeTeleportDelayMs),
+                resolvePositiveDouble(settings.getRecallSafeSpawnDistance(), defaultRecallSafeSpawnDistance),
+                resolvePositiveDouble(settings.getRecallForceRelocateDistance(), defaultRecallForceRelocateDistance)
+        );
+        if (!executeCommand(context, new Candidate(npcRef, npc, 0.0)).applied) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.returnHome.noneMoved");
+            return;
+        }
+        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.move.returnHome.success",
+                new CommandNpcNameResolver().resolveNpcDisplayName(npcRef, store, npc));
+    }
+
     @Nullable
     private CommandNpcProfileActionResolver.ActionTarget resolveRelocationTarget(
             @Nullable LinkedNpcRecord record) {
