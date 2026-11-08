@@ -132,6 +132,19 @@ Default cycle when empty: `Hold -> Idle -> Defend`.
 
 Presentation strings such as mode-cycle `Message`, `ShowFloatingText.Message`, and `ShowUiMessage.Message` may be raw text or `server.lang` keys. Use language keys for player-facing copy whenever the text should be translatable.
 
+### Companion card
+
+When a player's F behaviour is Card (the server default, set in `/tw settings` and per player with `/tw card`), F on a
+companion that selects the `ModeCycle` entry opens the companion card instead of cycling. The card shows the
+companion's info, one button per `Cycle` step (optional step `Label` and `Icon`), the built-in toggles and actions,
+and a button for each entry with a `Card` block. See the `Card` section of the config reference for its fields.
+
+Card buttons run through `TameworkInteract`: the page queues a short-lived request for that companion and player and
+registers an interaction, and the next role tick runs exactly that entry or mode step with the entry's requirements,
+effects and cooldown. Crouch, movement-state and empty-hand requirements are skipped for card requests only. Bonded
+companions get mode and `Card` buttons, but not the generic toggles, talents, rename, release or cull, which stay in
+their own panel.
+
 ### Breed
 Common fields:
 - `RequireTamed`

@@ -142,6 +142,20 @@ cost no Vigour for any player, and the flight HUD hides the Vigour pips. Boost,
 flap and combat ability cooldowns still apply. Experience presets leave it
 unchanged.
 
+## Companion Card
+
+These settings are saved in `tamework-companion-card.json` next to the settings file and reloaded by
+`/tw config reload`.
+
+- **F on a Companion** is what F on an owned companion does for players who have not chosen for themselves: open the
+  companion card (default) or cycle modes as before.
+- **Players Can Choose** lets each player pick their own F behaviour with the card's **Open with F** switch or
+  `/tw card <card|cycle|default>`. When it is off, everyone uses the server default; a player's saved choice is kept
+  and applies again if the option is turned back on.
+- **Rename from the Card** controls the card's rename pencil. **Needs a naming item** (default) requires an item with
+  a naming config, such as a nametag, anywhere in the player's inventory, and uses that item's rules, consumption and
+  cooldown. **Free** renames with the default naming rules. **Off** hides the pencil.
+
 ## Companion HUD
 
 **Default HUD Position** sets where the companion HUD appears for players who

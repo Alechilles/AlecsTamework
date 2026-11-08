@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Pressing F on a companion you own now opens its **companion card** beside your crosshair: its health, needs, traits,
+  level and timers, buttons for its modes, and its actions (shoulder, flight and breeding toggles, talents, release and
+  cull), all without a command item. Players who prefer the old behaviour can switch back to cycling modes with the
+  card's **Open with F** switch or `/tw card cycle`.
+- `/tw settings` has a **Companion Card** section: what F does by default, whether players may choose for themselves,
+  and how renaming from the card works.
+- Rename a companion from its card with the pencil button. By default it needs a naming item such as a nametag
+  anywhere in your inventory and uses that item's rules; servers can make it free or turn it off.
+- Interaction configs can put any entry on the card with a `Card` block (`Label`, `Icon`, `Order`, `OnInteract`). A
+  card button runs the entry like F, but crouch, movement and empty-hand requirements do not apply. `OnInteract: false`
+  keeps an entry off F for players who use the card. `ModeCycle` steps take an optional `Label` and `Icon`.
+
+### Removed
+
+- The hidden legacy command wheel left in the command menu. `ShowInRadial` on command entries still loads but no
+  longer does anything.
+
+
 ## 5.9.0 - Owner-Only Damage - 2026-11-03
 
 ### Added

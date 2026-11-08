@@ -69,11 +69,36 @@ Every interaction entry supports:
 - `ShowPrompt`
 - `Requires`
 - `Effects`
+- `Card`
 
 Behavior notes:
 - `CooldownSeconds` overrides `Cooldowns.InteractionSeconds` for that entry.
 - `PromptHint` is the translation key used by `TameworkInteractPrompt`.
 - `ShowPrompt` only controls prompt display. It does not disable execution by itself.
+
+### `Card`
+Puts the entry on the companion card as a button. F on an owned companion opens the card when the player's F
+behaviour is Card (the server default); the card opens from the `ModeCycle` entry's position, so an entry above it that
+still runs on F wins first.
+
+Fields (all optional):
+- `Label`: button label, a `server.lang` key or raw text. Default: Tamework's label for the entry type (Ride, Feed,
+  Breed, Harvest, Tame, Interact). Tamework also provides `tamework.ui.companionCard.action.pet`.
+- `Icon`: button glyph, a white 64x64 texture path under `Common/UI/Custom`. Default: Tamework's glyph for the type.
+- `Order`: sort order among the card's buttons, lowest first. Ties keep authored order. Default `0`.
+- `OnInteract`: `false` keeps the entry off F for players whose F opens the card, so F reaches the card instead.
+  Players who chose the mode cycle still trigger it with F. Default `true`.
+
+A card button runs the entry through the same requirements, effects and cooldown as F, with one difference: crouch,
+movement-state and empty-hand requirements (`RequireCrouching`, `PlayerCrouching`, `PlayerMovementState`,
+`PlayerHandEmpty`) do not apply, because they only choose which entry F triggers. Every other requirement still
+applies; a button whose requirements fail is greyed out. `"Card": {}` is enough for a default button.
+
+```json
+{ "Type": "Mount", "RequireCrouching": true, "Card": { "Order": 10 } },
+{ "Type": "Custom", "PromptHint": "server.interactionHints.pet",
+  "Card": { "Label": "tamework.ui.companionCard.action.pet", "Order": 20, "OnInteract": false } }
+```
 
 ## Preset Interaction Types
 ### `Tame`
@@ -129,6 +154,12 @@ Each `Cycle` entry supports:
 - `State`
 - `SubState`
 - `Message`
+- `Label`: companion card label, a `server.lang` key or raw text. Default: Tamework's label for Follow, Hold, Idle,
+  Defend, Aggressive and Sleep, otherwise the state name.
+- `Icon`: companion card glyph texture path. Default: Tamework's mode glyph for those states.
+
+On the companion card, each valid step is a mode button and the current one is highlighted. A mode button applies
+that step directly, with the entry's requirements, message and effects.
 
 When `Cycle` is omitted, Tamework falls back to the default mode cycle.
 
