@@ -16,6 +16,11 @@
   card button runs the entry like F, but crouch, movement and empty-hand requirements do not apply. `OnInteract: false`
   keeps an entry off F for players who use the card. `ModeCycle` steps take an optional `Label` and `Icon`.
 
+### Changed
+
+- The Release tooltip and confirmation now say plainly that a released companion disappears for good, not just that
+  you give up ownership.
+
 ### Removed
 
 - The hidden legacy command wheel left in the command menu. `ShowInRadial` on command entries still loads but no

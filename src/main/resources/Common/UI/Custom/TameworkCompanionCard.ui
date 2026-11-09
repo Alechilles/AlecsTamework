@@ -17,7 +17,7 @@ $C = "Common.ui";
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @FooterNote = LabelStyle(FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
 @FooterLabel = LabelStyle(FontSize: 11, TextColor: #bfcdd5, VerticalAlignment: Center);
-@ConfirmLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #ffd3d3, VerticalAlignment: Center, Wrap: true);
+@ConfirmLabel = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffd3d3, VerticalAlignment: Center, Wrap: true);
 
 Group {
   LayoutMode: Middle;
@@ -261,7 +261,7 @@ Group {
         Label #ReadOnlyNote { Anchor: (Top: 6, Left: 0, Width: 412, Height: 36); Text: %server.tamework.ui.companionCard.readOnly; Style: @FooterNote; Visible: false; }
         TextButton #ReleaseButton { Anchor: (Top: 10, Right: 88, Width: 84, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.linkedPanel.card.button.release; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
         TextButton #CullButton { Anchor: (Top: 10, Right: 0, Width: 80, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.linkedPanel.action.cull; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.cull; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
-        Label #ConfirmText { Anchor: (Top: 6, Left: 0, Width: 236, Height: 36); Text: ""; Style: @ConfirmLabel; Visible: false; }
+        Label #ConfirmText { Anchor: (Top: 1, Left: 0, Width: 236, Height: 42); Text: ""; Style: @ConfirmLabel; Visible: false; }
         TextButton #ConfirmCancelButton { Anchor: (Top: 10, Right: 88, Width: 84, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.shared.button.cancel; Visible: false; }
         TextButton #ConfirmButton { Anchor: (Top: 10, Right: 0, Width: 80, Height: 28); Style: $A.@PanelButtonPrimary; Text: %server.tamework.ui.companionCard.confirm; Visible: false; }
       }
