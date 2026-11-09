@@ -74,6 +74,12 @@ public final class AdmissionCache {
     /** Drops the player's decisions and throttles; for a player leaving a world. */
     public void forgetPlayer(@Nonnull UUID player) {
         decisions.remove(player);
+        // Players also leave during world shutdown, when the plugin class loader may no longer
+        // load classes. The lambdas below are the first use of Key when no throttle was ever
+        // stamped, so skip them then: with every map empty there is nothing to drop.
+        if (notices.isEmpty() && resyncs.isEmpty() && followUps.isEmpty()) {
+            return;
+        }
         notices.keySet().removeIf(key -> key.player().equals(player));
         resyncs.keySet().removeIf(key -> key.player().equals(player));
         followUps.keySet().removeIf(key -> key.player().equals(player));
