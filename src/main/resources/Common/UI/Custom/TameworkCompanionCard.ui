@@ -11,7 +11,7 @@ $C = "Common.ui";
 @CaptionCurrent = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: Center, VerticalAlignment: Center);
 @CaptionMuted = LabelStyle(FontSize: 10, TextColor: #586d8a, HorizontalAlignment: Center, VerticalAlignment: Center);
 @SectionLabel = LabelStyle(FontSize: 9, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #8794a4, VerticalAlignment: Center);
-@SectionValue = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f2c66d, HorizontalAlignment: End, VerticalAlignment: Center);
+@SectionValue = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f2c66d, VerticalAlignment: Center);
 @TooltipLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TooltipButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel));
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
@@ -154,8 +154,11 @@ Group {
       Group #ModeSection {
         Anchor: (Top: 194, Left: 14, Width: 412, Height: 82);
         Visible: false;
-        Label { Anchor: (Top: 0, Left: 0, Width: 200, Height: 16); Text: %server.tamework.ui.companionCard.section.mode; Style: @SectionLabel; }
-        Label #ModeCurrent { Anchor: (Top: 0, Right: 0, Width: 200, Height: 16); Text: ""; Style: @SectionValue; }
+        // Header row: labels in a Left layout size to their text, so the current mode sits right after "Mode".
+        Group { Anchor: (Top: 0, Left: 0, Width: 412, Height: 16); LayoutMode: Left;
+          Label { Anchor: (Height: 16); Text: %server.tamework.ui.companionCard.section.mode; Style: @SectionLabel; }
+          Label #ModeCurrent { Anchor: (Height: 16); Padding: (Left: 8); Text: ""; Style: @SectionValue; }
+        }
       TextButton #Mode0Button { Anchor: (Top: 20, Left: 0, Width: 42, Height: 42); Style: $A.@Action; Text: ""; TooltipText: ""; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
       Group #Mode0Glyph { Anchor: (Top: 26, Left: 6, Width: 30, Height: 30); Background: (TexturePath: "Tamework/PanelActions/Pet_Glyph_Default.png", Color: #f9edd5); HitTestVisible: false; Visible: false; }
       Label #Mode0Caption { Anchor: (Top: 64, Left: -10, Width: 62, Height: 14); Text: ""; Style: @Caption; HitTestVisible: false; Visible: false; }

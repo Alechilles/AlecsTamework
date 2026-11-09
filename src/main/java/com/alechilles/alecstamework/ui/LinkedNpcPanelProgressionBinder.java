@@ -50,6 +50,16 @@ final class LinkedNpcPanelProgressionBinder {
                                    String levelTextSelector,
                                    String tooltipSelector,
                                    LinkedNpcEntry.FutureStat stat) {
+        bindXpProgressRing(commandBuilder, ringSelector, levelTextSelector, tooltipSelector, stat, LEVEL_TOP);
+    }
+
+    /** As above, with the button's top set by a layout whose portrait does not start at the linked card's top. */
+    static void bindXpProgressRing(UICommandBuilder commandBuilder,
+                                   String ringSelector,
+                                   String levelTextSelector,
+                                   String tooltipSelector,
+                                   LinkedNpcEntry.FutureStat stat,
+                                   int top) {
         commandBuilder.set(ringSelector + ".Visible", stat != null);
         if (stat == null) {
             return;
@@ -57,7 +67,7 @@ final class LinkedNpcPanelProgressionBinder {
         String levelText = resolveLevelText(stat.label());
         commandBuilder.set(levelTextSelector + ".Text", levelText);
         commandBuilder.set(tooltipSelector + ".TooltipText", resolveXpTooltip(stat));
-        bindCardLevelGeometry(commandBuilder, ringSelector, levelText);
+        bindCardLevelGeometry(commandBuilder, ringSelector, levelText, top);
     }
 
     /**
@@ -66,9 +76,10 @@ final class LinkedNpcPanelProgressionBinder {
      */
     private static void bindCardLevelGeometry(UICommandBuilder commandBuilder,
                                               String ringSelector,
-                                              String levelText) {
+                                              String levelText,
+                                              int top) {
         int width = resolveLevelControlWidth(levelText);
-        commandBuilder.setObject(ringSelector + ".Anchor", fixedAnchor(LEVEL_TOP, LEVEL_LEFT, width, 24));
+        commandBuilder.setObject(ringSelector + ".Anchor", fixedAnchor(top, LEVEL_LEFT, width, 24));
         commandBuilder.setObject(ringSelector + " #XpTooltip.Anchor", fixedAnchor(0, 0, width, 24));
         commandBuilder.setObject(ringSelector + " #XpLevelText.Anchor",
                 fixedAnchor(2, 30, Math.max(14, width - 34), 20));

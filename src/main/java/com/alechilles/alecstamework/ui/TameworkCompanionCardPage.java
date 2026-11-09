@@ -38,6 +38,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     public static final String UI_PATH = "TameworkCompanionCard.ui";
     private static final String KEY_ACTION = "Action";
     private static final String KEY_GROUPS = "@CompanionGroups";
+    /** The card's portrait starts at the identity block's top, 33 px higher than on the linked card. */
+    private static final int LEVEL_TOP = LinkedNpcPanelProgressionBinder.LEVEL_TOP - 33;
     private static final String CARD = "#CompanionCard";
     private static final int MODE_SLOTS = 6;
     private static final int ACTION_SLOTS = 12;
@@ -337,7 +339,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         LinkedNpcTraitIndicatorBinder.bind(commands, CARD, entry.traitIndicators());
         String ring = CARD + " #XpProgressRing";
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(commands, ring, ring + " #XpLevelText",
-                ring + " #XpTooltip", entry.futureStatA());
+                ring + " #XpTooltip", entry.futureStatA(), LEVEL_TOP);
         boolean talents = generic && entry.isTalentsActionVisible() && entry.isTalentsActionEnabled()
                 && entry.futureStatA() != null;
         commands.set(ring + " #XpTooltip.Disabled", !talents);
