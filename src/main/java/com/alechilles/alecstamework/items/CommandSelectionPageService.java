@@ -942,7 +942,7 @@ final class CommandSelectionPageService {
         }
         boolean revive = genericLinkedOrOwned && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
-                && (feature == null || !feature.managesPaidRevival());
+                && (feature == null || !feature.managesPaidRevival() || feature.ordinaryPaidRevival());
         if (revive) addGenericRow(catalog, rowId, "RESPAWN", actionLabel(context, "revive"),
                 npcId, null, npc.respawn(), context.genericAuthority(), false);
         if (genericLinkedOrOwned && !entry.dead() && !entry.lost()) {
@@ -1515,9 +1515,20 @@ final class CommandSelectionPageService {
 
     private LinkedNpcPanelFeatureAction featureCallback(
             PageContext context, FeatureAction action) {
-        return (uuid, eventRef, eventStore) -> applyFeatureAction(
-                context.ownerUuid(), eventRef, eventStore, context.config(), uuid,
-                action, context.snapshot(), context.bondedLifecycleAuthority());
+        Consumer<UUID> ordinaryRevive = guardedUuid(context.genericAuthority(), context.actions().respawn());
+        return (uuid, eventRef, eventStore) -> {
+            CommandPanelFeaturePresentation feature = context.snapshot() == null
+                    ? null : context.snapshot().presentation(uuid);
+            // A confirmed cost dialog of an ordinary companion uses the card's own revive, which
+            // checks and charges the same cost.
+            if (action == FeatureAction.REVIVE && feature != null && feature.ordinaryPaidRevival()
+                    && !context.config().usesBondedCompanionRoster()) {
+                ordinaryRevive.accept(uuid);
+                return;
+            }
+            applyFeatureAction(context.ownerUuid(), eventRef, eventStore, context.config(), uuid,
+                    action, context.snapshot(), context.bondedLifecycleAuthority());
+        };
     }
 
     private PanelCallbacks buildPanelCallbacks(PageContext context) {

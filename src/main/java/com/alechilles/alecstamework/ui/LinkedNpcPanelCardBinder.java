@@ -401,7 +401,8 @@ final class LinkedNpcPanelCardBinder {
         if (showStatusStrip) {
             commandBuilder.set(statusUnloadedSelector + ".Visible", false);
             LinkedNpcPanelStatusStrip.bind(commandBuilder, entrySelector, entry, emblem,
-                    respawnSelector, showRespawn, language);
+                    respawnSelector, showRespawn,
+                    paidRevivalManaged && entry.dead() ? feature.revival() : null, language);
         } else if (emblem != null && !showInlineLocation && !rosterLines) {
             boolean compact = !rosterLayout && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.

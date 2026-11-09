@@ -45,6 +45,30 @@ public final class CommandPanelFeaturePresentation {
         this.readOnly = false;
     }
 
+    private CommandPanelFeaturePresentation(
+            CommandReviveCostPresentation revival
+    ) {
+        this.roster = null;
+        this.bonded = null;
+        this.revival = java.util.Objects.requireNonNull(revival, "revival");
+        this.readOnly = false;
+    }
+
+    /**
+     * A dead ordinary companion whose revive costs items. The card keeps its normal actions; only
+     * Revive opens the cost dialog instead of charging at once.
+     */
+    public static CommandPanelFeaturePresentation paidRevival(
+            @Nonnull CommandReviveCostPresentation revival
+    ) {
+        return new CommandPanelFeaturePresentation(revival);
+    }
+
+    /** True for a {@link #paidRevival} row, which has no roster or bonded state. */
+    public boolean ordinaryPaidRevival() {
+        return !readOnly && roster == null && bonded == null && revival != null;
+    }
+
     public static CommandPanelFeaturePresentation bonded(
             @Nonnull BondedCompanionPanelPresentation bonded
     ) {
@@ -62,7 +86,7 @@ public final class CommandPanelFeaturePresentation {
                 ? bonded.status().state()
                         == com.alechilles.alecstamework.api
                         .BondedCompanionStateView.DEAD
-                : roster != null && roster.paidRevivalState();
+                : roster != null ? roster.paidRevivalState() : ordinaryPaidRevival();
     }
 
     private static CommandReviveCostPresentation bondedRevival(

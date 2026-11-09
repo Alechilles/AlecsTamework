@@ -20,6 +20,9 @@
 
 - The Release tooltip and confirmation now say plainly that a released companion disappears for good, not just that
   you give up ownership.
+- A dead companion whose revive costs items now shows the cost on its card, such as "Cost: 12/50 Life Essence", in
+  green when you have enough. Revive opens the cost dialog with each item you hold and need, and charges only when you
+  confirm. Before, ordinary companions showed only "Ready to revive" and Revive failed without saying what it cost.
 
 ### Removed
 

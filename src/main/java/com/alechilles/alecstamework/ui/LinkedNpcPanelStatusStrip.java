@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import javax.annotation.Nullable;
 
 /**
  * Presents the dead or lost status strip in the action section of a generic companion card.
@@ -43,10 +44,23 @@ final class LinkedNpcPanelStatusStrip {
         return restoreActionVisible ? State.READY : State.MISSING;
     }
 
-    /** Full render: shows the strip and moves a visible Revive/Recover button inside its right edge. */
+    /**
+     * Full render: shows the strip and moves a visible Revive/Recover button inside its right edge.
+     *
+     * @param revival the revive quote of a dead companion whose revive costs items, shown beside
+     *                the state caption; null hides the cost
+     */
     static void bind(UICommandBuilder commands, String card, LinkedNpcEntry entry, String emblem,
-                     String restoreSelector, boolean restoreActionVisible, String language) {
+                     String restoreSelector, boolean restoreActionVisible,
+                     @Nullable CommandReviveCostPresentation revival, String language) {
         commands.set(card + " #StatusStrip.Visible", true);
+        String cost = revival == null ? "" : costText(revival, language);
+        commands.set(card + " #StatusStrip #Text #Cost.Visible", !cost.isEmpty());
+        if (!cost.isEmpty()) {
+            commands.set(card + " #StatusStrip #Text #Cost.Text", cost);
+            commands.set(card + " #StatusStrip #Text #Cost.Style", Value.ref(CARD_UI,
+                    revival.affordable() ? "StatusStripCostMet" : "StatusStripCostMissing"));
+        }
         commands.setObject(card + " #StatusStrip #Icon.Background", UiIconStyle.forTexture(emblem));
         // The lost emblem has more transparent padding, so it renders larger to match visually.
         int iconSize = entry.dead() ? 36 : 44;
@@ -96,6 +110,22 @@ final class LinkedNpcPanelStatusStrip {
         long total = entry.deadRespawnTotalMs();
         if (state != State.COUNTDOWN || total <= 0L) return -1.0;
         return Math.clamp(1.0 - (double) Math.min(remainingMs, total) / total, 0.0, 1.0);
+    }
+
+    /**
+     * "Cost: 12/50 Life Essence" for a single cost line, or "Cost: 3 items" for several, which
+     * the cost dialog lists one by one. Empty when the quote has no cost lines.
+     */
+    static String costText(CommandReviveCostPresentation revival, String language) {
+        if (revival.costs().isEmpty()) return "";
+        if (revival.costs().size() > 1) {
+            return LocalizedText.format(language, "tamework.ui.linkedPanel.status.reviveCostMany",
+                    revival.costs().size());
+        }
+        CommandReviveCostPresentation.CostLine line = revival.costs().getFirst();
+        return LocalizedText.format(language, "tamework.ui.linkedPanel.status.reviveCost",
+                line.ownedQuantity(), line.requiredQuantity(),
+                ReviveCostItemText.resolve(line.itemId(), line.localizedName(), language));
     }
 
     private static String primaryText(LinkedNpcEntry entry, State state, long remainingMs, String language) {

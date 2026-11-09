@@ -194,6 +194,9 @@ final class CommandPanelEntrySourceService {
                     if (entry.captured() && !ownedIds.contains(entry.npcUuid()))
                         features.put(entry.npcUuid(), CommandPanelFeaturePresentation.readOnlyManaged());
                 }
+                List<LinkedNpcRecord> roleRecords = new ArrayList<>(inputs.linkedRecords());
+                roleRecords.addAll(inputs.owned().ownedRecords());
+                addPaidRevivals(features, entries, roleRecords, player, store);
             }
             return new CommandPanelSnapshot(entries, features, null, selectionEntries);
         }
@@ -282,7 +285,42 @@ final class CommandPanelEntrySourceService {
                 features.put(entry.npcUuid(), CommandPanelFeaturePresentation.readOnlyManaged());
             }
         }
+        addPaidRevivals(features, detailed, records, player, store);
         return new CommandPanelSnapshot(detailed, features, null, selectionEntries);
+    }
+
+    /**
+     * Gives each dead ordinary companion whose revive is ready and costs items a revive quote, so
+     * its Revive button opens the cost dialog and the card shows the cost. Rows that already have
+     * a feature row, and free revives, are left as they are.
+     *
+     * @param records the rows' records, read for their role ids
+     */
+    private static void addPaidRevivals(Map<UUID, CommandPanelFeaturePresentation> features,
+                                        List<LinkedNpcEntry> entries, List<LinkedNpcRecord> records,
+                                        @Nullable Player player, @Nullable Store<EntityStore> store) {
+        java.util.function.ToIntFunction<String> held = null;
+        Map<UUID, String> roles = null;
+        for (LinkedNpcEntry entry : entries) {
+            if (entry == null || entry.npcUuid() == null || !entry.dead()
+                    || entry.deadRespawnRemainingMs() != 0L
+                    || !(entry.linked() || entry.ownedActions())
+                    || features.containsKey(entry.npcUuid())) continue;
+            if (roles == null) {
+                roles = new java.util.HashMap<>();
+                for (LinkedNpcRecord record : records) {
+                    if (record != null && record.npcUuid != null && record.cachedRoleId != null) {
+                        roles.put(record.npcUuid, record.cachedRoleId);
+                    }
+                }
+                held = player == null ? null : heldItemCounter(player, store);
+            }
+            var revival = CommandPanelFeaturePresentationSource.ordinaryRevival(
+                    roles.get(entry.npcUuid()), held);
+            if (revival != null) {
+                features.put(entry.npcUuid(), CommandPanelFeaturePresentation.paidRevival(revival));
+            }
+        }
     }
 
     /** Keeps newly tamed indexed NPCs visible before their durable profile is published. */

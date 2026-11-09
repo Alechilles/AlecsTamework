@@ -29,6 +29,8 @@ $C = "Common.ui";
 @StatusStripLabelReady = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #e8aa35, VerticalAlignment: Center);
 @StatusStripLabelLost = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #f0b45a, VerticalAlignment: Center);
 @StatusStripLabelMuted = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #96a9be, VerticalAlignment: Center);
+@StatusStripCostMet = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #9fd58f, HorizontalAlignment: End, VerticalAlignment: Center);
+@StatusStripCostMissing = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f3aa9d, HorizontalAlignment: End, VerticalAlignment: Center);
 @StatusStripPrimary = LabelStyle(FontSize: 17, RenderBold: true, TextColor: #eef2f6, VerticalAlignment: Center);
 @StatusStripPrimaryMuted = LabelStyle(FontSize: 18, RenderBold: true, TextColor: #aab4bf, VerticalAlignment: Center);
 @RosterCaption = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #96a9be, VerticalAlignment: Center);
@@ -81,6 +83,8 @@ Group {
         Group #Text { Anchor: (Top: 9, Left: 62, Width: 280, Height: 36);
             Label #State { Anchor: (Top: 0, Left: 0, Right: 0, Height: 14); Text: ""; Style: @StatusStripLabelDead; }
             Label #Primary { Anchor: (Top: 14, Left: 0, Right: 0, Height: 22); Text: ""; Style: @StatusStripPrimary; }
+            // The revive cost, on the state caption's row; LinkedNpcPanelStatusStrip.bind sets it.
+            Label #Cost { Anchor: (Top: 0, Left: 40, Right: 0, Height: 14); Text: ""; Style: @StatusStripCostMet; Visible: false; }
         }
         Group #Bar { Anchor: (Top: 50, Left: 62, Width: 280, Height: 4); Background: #090e14;
             Group #BarFill { Anchor: (Top: 0, Left: 0, Width: 0, Height: 4); Background: #c97a6e; }

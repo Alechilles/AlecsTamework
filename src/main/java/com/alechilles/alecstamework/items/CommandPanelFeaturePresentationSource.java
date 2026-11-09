@@ -245,6 +245,35 @@ final class CommandPanelFeaturePresentationSource {
         if (terms == null) {
             return null;
         }
+        return quote(terms, heldItems, remaining(record.reviveAvailableAtMs(), nowMs));
+    }
+
+    /**
+     * The revive quote of a dead ordinary companion whose cooldown has ended, so its card can open
+     * the cost dialog. Null when the role's revive costs nothing, is turned off, or cannot be read;
+     * such a card keeps the direct Revive button.
+     *
+     * @param heldItems how many of an item id the viewing player holds; null shows none held
+     */
+    @Nullable
+    static CommandReviveCostPresentation ordinaryRevival(
+            @Nullable String roleId,
+            @Nullable ToIntFunction<String> heldItems
+    ) {
+        ReviveTerms terms;
+        try {
+            terms = ReviveTerms.forRole(roleId);
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+        return terms.enabled() && !terms.costs().isEmpty() ? quote(terms, heldItems, 0L) : null;
+    }
+
+    private static CommandReviveCostPresentation quote(
+            ReviveTerms terms,
+            @Nullable ToIntFunction<String> heldItems,
+            long cooldownMs
+    ) {
         List<CommandReviveCostPresentation.CostLine> costs = new ArrayList<>(terms.costs().size());
         boolean affordable = true;
         for (TwItemCostComponent cost : terms.costs()) {
@@ -253,7 +282,6 @@ final class CommandPanelFeaturePresentationSource {
             costs.add(new CommandReviveCostPresentation.CostLine(
                     cost.getItemId(), cost.getItemId(), null, held, cost.getQuantity()));
         }
-        long cooldownMs = remaining(record.reviveAvailableAtMs(), nowMs);
         PaidCommandRevivalQuote.Status status = !terms.enabled()
                 ? PaidCommandRevivalQuote.Status.DISABLED
                 : cooldownMs > 0L
