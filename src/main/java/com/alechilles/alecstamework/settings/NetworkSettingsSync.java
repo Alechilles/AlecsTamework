@@ -101,13 +101,29 @@ public final class NetworkSettingsSync implements AutoCloseable {
         }
         store = newStore;
         notifyChanged(NetworkSettingsStore.SERVER_KEY);
-        return () -> {
-            synchronized (NetworkSettingsSync.this) {
-                if (store == newStore) {
-                    store = null;
-                }
-            }
-        };
+        return new Registration(this, newStore);
+    }
+
+    private synchronized void unregister(@Nonnull NetworkSettingsStore registered) {
+        if (store == registered) {
+            store = null;
+        }
+    }
+
+    /** The handle {@link #register} returns. A public class, so a mod that closes it by reflection can. */
+    public static final class Registration implements AutoCloseable {
+        private final NetworkSettingsSync sync;
+        private final NetworkSettingsStore registered;
+
+        private Registration(@Nonnull NetworkSettingsSync sync, @Nonnull NetworkSettingsStore registered) {
+            this.sync = sync;
+            this.registered = registered;
+        }
+
+        @Override
+        public void close() {
+            sync.unregister(registered);
+        }
     }
 
     /** Reads {@code key} soon instead of at the next check. Safe from any thread. */
