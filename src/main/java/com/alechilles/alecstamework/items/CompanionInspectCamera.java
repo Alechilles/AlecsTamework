@@ -38,8 +38,18 @@ import org.joml.Vector3d;
 final class CompanionInspectCamera {
     /** How far the camera looks down at the companion, in radians (about 14 degrees). */
     private static final float PITCH = -0.25f;
-    /** Engine camera glide speed; the camera demo uses 0.2. */
+    /** Engine camera glide speed for opening; the camera demo uses 0.2. */
     private static final float LERP = 0.2f;
+    /**
+     * Glide speeds while a turn is animated in steps. The client derives the camera position from its eased angle and
+     * then eases the position again, so a slow position glide trails the aim; tracking position almost immediately
+     * keeps the orbit and the aim in step. The rotation glide smooths the gaps between steps.
+     */
+    private static final float TURN_POSITION_LERP = 0.6f;
+    private static final float TURN_ROTATION_LERP = 0.5f;
+    /** Steps per animated turn and the delay between them; together about a third of a second. */
+    static final int TURN_STEPS = 8;
+    static final long TURN_STEP_MS = 40L;
     /** A slightly narrower view than the default, for a zoomed-in look. */
     private static final float FOV = 60f;
     /** How far the companion sits from the screen centre, as a share of the camera distance. */
@@ -64,7 +74,8 @@ final class CompanionInspectCamera {
                        @Nonnull Ref<EntityStore> npcRef,
                        @Nonnull Store<EntityStore> store,
                        @Nonnull CompanionHudPlacement cardPlacement,
-                       @Nullable Float yaw) {
+                       @Nullable Float yaw,
+                       boolean turning) {
         PlayerRef uiPlayer = player.getPlayerRef();
         if (uiPlayer == null || uiPlayer.getPacketHandler() == null || cameraInUse(player, playerRef, store)) {
             return null;
@@ -82,8 +93,8 @@ final class CompanionInspectCamera {
         double shift = sideOfCard(cardPlacement) * SIDE_SHIFT * distance;
 
         ServerCameraSettings settings = new ServerCameraSettings();
-        settings.positionLerpSpeed = LERP;
-        settings.rotationLerpSpeed = LERP;
+        settings.positionLerpSpeed = turning ? TURN_POSITION_LERP : LERP;
+        settings.rotationLerpSpeed = turning ? TURN_ROTATION_LERP : LERP;
         settings.isFirstPerson = false;
         settings.displayReticle = false;
         settings.hideHeldItem = true;
@@ -107,6 +118,16 @@ final class CompanionInspectCamera {
     /** The yaw after one rotate click: -1 moves the camera left around the companion, +1 right. */
     static float turned(float yaw, int direction) {
         return yaw - Integer.signum(direction) * TURN;
+    }
+
+    /**
+     * The yaw at {@code step} of {@link #TURN_STEPS} on the way from {@code from} to {@code to}, eased in and out so the
+     * turn starts and stops gently. The sideways framing shift follows the same yaw, so it never jumps.
+     */
+    static float turnStep(float from, float to, int step) {
+        float t = Math.min(1f, Math.max(0f, step / (float) TURN_STEPS));
+        float eased = t * t * (3f - 2f * t);
+        return from + (to - from) * eased;
     }
 
     /** Engine yaw: forward is (-sin yaw, 0, -cos yaw). Looks from {@code from} towards {@code to}. */

@@ -144,7 +144,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         // A card replacing another card has already released the old camera in its close callback.
         session.cameraYaw = TameworkInspectPreferencesComponent.cameraEnabled(playerRef, store)
                 ? CompanionInspectCamera.apply(player, playerRef, npcRef, store,
-                        TameworkCompanionCardPlacementComponent.read(playerRef, store), null)
+                        TameworkCompanionCardPlacementComponent.read(playerRef, store), null, false)
                 : null;
         session.cameraLocked = session.cameraYaw != null;
         if (session.cameraLocked) {
@@ -238,9 +238,14 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private TameworkCompanionCardPage page;
         /** Whether this card took the player's camera; its close hands it back. */
         private boolean cameraLocked;
-        /** The camera's current look direction while it is locked; rotate clicks turn it. */
+        /** Where the camera is turning to while it is locked; rotate clicks turn it. */
         @Nullable
         private Float cameraYaw;
+        /** The last yaw sent during an animated turn, where a new click starts from. */
+        @Nullable
+        private Float cameraShownYaw;
+        /** Identifies the newest turn, so an older turn's remaining steps stop. */
+        private int cameraTurn;
         private int watches;
 
         private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store,
@@ -370,17 +375,48 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void rotateCamera(int direction) {
-            Player player = player();
-            Ref<EntityStore> npcRef = npcRef();
-            if (!cameraLocked || cameraYaw == null || player == null || npcRef == null) {
+            if (!cameraLocked || cameraYaw == null) {
                 return;
             }
-            Float turned = CompanionInspectCamera.apply(player, playerRef, npcRef, store,
-                    TameworkCompanionCardPlacementComponent.read(playerRef, store),
-                    CompanionInspectCamera.turned(cameraYaw, direction));
-            if (turned != null) {
-                cameraYaw = turned;
+            // A click during a turn continues from where that turn was heading, so clicks add up.
+            float from = cameraShownYaw != null ? cameraShownYaw : cameraYaw;
+            cameraYaw = CompanionInspectCamera.turned(cameraYaw, direction);
+            turnStep(++cameraTurn, from, cameraYaw, 1);
+        }
+
+        /**
+         * Sends one step of an animated turn and schedules the next. A newer turn, a closed card or a released
+         * camera stops the chain. Runs on the world thread.
+         */
+        private void turnStep(int turn, float from, float to, int step) {
+            Player player = player();
+            Ref<EntityStore> npcRef = npcRef();
+            if (turn != cameraTurn || !cameraLocked || page.isClosed() || player == null || npcRef == null) {
+                return;
             }
+            float yaw = CompanionInspectCamera.turnStep(from, to, step);
+            if (CompanionInspectCamera.apply(player, playerRef, npcRef, store,
+                    TameworkCompanionCardPlacementComponent.read(playerRef, store), yaw, true) == null) {
+                return;
+            }
+            cameraShownYaw = yaw;
+            if (step >= CompanionInspectCamera.TURN_STEPS) {
+                return;
+            }
+            World world = store.getExternalData() == null ? null : store.getExternalData().getWorld();
+            if (world == null) {
+                return;
+            }
+            CompletableFuture.delayedExecutor(CompanionInspectCamera.TURN_STEP_MS, TimeUnit.MILLISECONDS).execute(() -> {
+                if (stopped || !world.isAlive()) {
+                    return;
+                }
+                try {
+                    world.execute(() -> turnStep(turn, from, to, step + 1));
+                } catch (RuntimeException ignored) {
+                    // The world is shutting down; the camera goes with the card.
+                }
+            });
         }
 
         @Override
