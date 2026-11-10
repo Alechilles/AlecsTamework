@@ -7,8 +7,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * One player's position for the companion target HUD: a snap point on the screen plus an offset from it, in HUD
- * canvas units (+x right, +y down). The canvas is always 1080 units tall; its width depends on the client's aspect
+ * One player's position for the companion target HUD, or for the companion card: a snap point on the screen plus an
+ * offset from it, in HUD canvas units (+x right, +y down). The canvas is always 1080 units tall; its width depends on the client's aspect
  * ratio, which the server never learns.
  *
  * <p>The HUD is laid out as a full-height lane holding the plate. The lane's width is a {@code MaxWidth}, which the
@@ -25,6 +25,10 @@ public record CompanionHudPlacement(@Nonnull Point point, int x, int y) {
     public static final int HUD_WIDTH = 344;
     /** The placement used when a player has never moved the HUD. */
     public static final CompanionHudPlacement DEFAULT = new CompanionHudPlacement(Point.TOP_RIGHT, -26, 218);
+    /** The companion card width. */
+    public static final int CARD_WIDTH = 440;
+    /** The card's place when a player has never moved it: beside the crosshair, its left edge 40 units right of it. */
+    public static final CompanionHudPlacement CARD_DEFAULT = new CompanionHudPlacement(Point.CENTER, 40 + CARD_WIDTH / 2, 0);
 
     private static final int EDGE_MARGIN = 26;
 
@@ -86,18 +90,24 @@ public record CompanionHudPlacement(@Nonnull Point point, int x, int y) {
     /** The full-height lane that keeps the plate on screen. */
     @Nonnull
     public Anchor laneAnchor() {
+        return laneAnchor(HUD_WIDTH);
+    }
+
+    /** The lane for a plate {@code width} units wide, such as the companion card. */
+    @Nonnull
+    public Anchor laneAnchor(int width) {
         Anchor anchor = new Anchor();
         switch (point.column()) {
             case 0 -> {
                 anchor.setLeft(Value.of(0));
-                anchor.setMaxWidth(Value.of(Math.max(0, x) + HUD_WIDTH));
+                anchor.setMaxWidth(Value.of(Math.max(0, x) + width));
             }
             case 2 -> {
                 anchor.setRight(Value.of(0));
-                anchor.setMaxWidth(Value.of(Math.max(0, -x) + HUD_WIDTH));
+                anchor.setMaxWidth(Value.of(Math.max(0, -x) + width));
             }
             // A MaxWidth-only box centres itself.
-            default -> anchor.setMaxWidth(Value.of(2 * Math.abs(x) + HUD_WIDTH));
+            default -> anchor.setMaxWidth(Value.of(2 * Math.abs(x) + width));
         }
         anchor.setTop(Value.of(0));
         anchor.setBottom(Value.of(0));
@@ -110,6 +120,12 @@ public record CompanionHudPlacement(@Nonnull Point point, int x, int y) {
      */
     @Nonnull
     public Anchor plateAnchor(int height) {
+        return plateAnchor(height, HUD_WIDTH);
+    }
+
+    /** The plate inside {@link #laneAnchor(int)} for a plate {@code width} units wide. */
+    @Nonnull
+    public Anchor plateAnchor(int height, int width) {
         int plateHeight = Math.max(1, height);
         Anchor anchor = new Anchor();
         boolean againstRight = switch (point.column()) {
@@ -128,16 +144,21 @@ public record CompanionHudPlacement(@Nonnull Point point, int x, int y) {
             case 2 -> anchor.setBottom(Value.of(Math.min(-y, room)));
             default -> anchor.setTop(Value.of(clamp(room / 2 + y, 0, room)));
         }
-        anchor.setMaxWidth(Value.of(HUD_WIDTH));
+        anchor.setMaxWidth(Value.of(width));
         anchor.setHeight(Value.of(plateHeight));
         return anchor;
     }
 
     /** True when the plate's centre is right of the screen's centre line on a 16:9 screen. */
     public boolean rightOfCentre() {
+        return rightOfCentre(HUD_WIDTH);
+    }
+
+    /** As {@link #rightOfCentre()} for a plate {@code width} units wide. */
+    public boolean rightOfCentre(int width) {
         return switch (point.column()) {
-            case 0 -> x + HUD_WIDTH / 2 > DESIGN_WIDTH / 2;
-            case 2 -> DESIGN_WIDTH + x - HUD_WIDTH / 2 > DESIGN_WIDTH / 2;
+            case 0 -> x + width / 2 > DESIGN_WIDTH / 2;
+            case 2 -> DESIGN_WIDTH + x - width / 2 > DESIGN_WIDTH / 2;
             default -> x > 0;
         };
     }

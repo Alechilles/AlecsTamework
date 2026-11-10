@@ -19,11 +19,11 @@ $C = "Common.ui";
 @ConfirmLabel = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffd3d3, VerticalAlignment: Center, Wrap: true);
 
 Group {
-  LayoutMode: Middle;
-
-  // Twice the card's width plus a gap, centred: the card fills the right half, so it sits beside the crosshair.
+  Anchor: (Full: 0);
+  // A full-height lane holding the card, as the companion HUD uses (CompanionHudPlacement). TameworkCompanionCardPage
+  // sets both anchors from the player's card position; by default the card sits just right of the crosshair.
   Group #CompanionCardSlot {
-    Anchor: (Width: 960, Height: 560);
+    Anchor: (Top: 0, Bottom: 0, MaxWidth: 960);
 
     Group #CompanionCard {
       Anchor: (Top: 0, Right: 0, Width: 440, Height: 560);

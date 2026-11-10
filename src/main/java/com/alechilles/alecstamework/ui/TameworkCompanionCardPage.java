@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
 import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -53,6 +54,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     @Nullable
     private Confirm pendingConfirm;
     private boolean closed;
+    // Read once when the card opens; a change in Your settings applies the next time it opens.
+    private CompanionHudPlacement placement = CompanionHudPlacement.CARD_DEFAULT;
     // What the group picker was last given. Re-sending Entries or SelectedValues resets an open native popup, so a
     // refresh sends them only when they changed.
     @Nullable
@@ -137,6 +140,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commands,
                       @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
         commands.append(UI_PATH);
+        placement = TameworkCompanionCardPlacementComponent.read(ref, store);
         sentGroupOptions = null;
         sentGroupSelection = null;
         render(commands, events);
@@ -321,8 +325,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         top = bindActions(commands, events, entry, language, manage, generic, top);
         bindFooter(commands, events, entry, language, manage, generic, top);
         int height = top + 44 + 12;
-        commands.setObject("#CompanionCardSlot.Anchor", size(960, height));
-        commands.setObject(CARD + ".Anchor", rightAnchor(height));
+        commands.setObject("#CompanionCardSlot.Anchor", placement.laneAnchor(CompanionHudPlacement.CARD_WIDTH));
+        commands.setObject(CARD + ".Anchor", placement.plateAnchor(height, CompanionHudPlacement.CARD_WIDTH));
     }
 
     private void bindIdentity(UICommandBuilder commands, UIEventBuilder events, LinkedNpcEntry entry,
@@ -571,22 +575,6 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
 
     private static Anchor anchor(int top, int left, int width, int height) {
         return LinkedNpcPanelCardBinder.fixedAnchor(top, left, width, height);
-    }
-
-    private static Anchor size(int width, int height) {
-        Anchor anchor = new Anchor();
-        anchor.setWidth(Value.of(width));
-        anchor.setHeight(Value.of(height));
-        return anchor;
-    }
-
-    private static Anchor rightAnchor(int height) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(0));
-        anchor.setRight(Value.of(0));
-        anchor.setWidth(Value.of(440));
-        anchor.setHeight(Value.of(height));
-        return anchor;
     }
 
     private static String capitalize(String value) {

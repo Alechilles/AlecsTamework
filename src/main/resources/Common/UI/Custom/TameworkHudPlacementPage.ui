@@ -65,6 +65,18 @@ Group #TameworkHudPlacementLane {
    }
   }
  }
+ // The companion card sample, shown instead of the HUD sample while the card is being moved.
+ Group #TameworkHudPlacementCardSample {
+  Anchor: (Top: 280, Left: 0, MaxWidth: 440, Height: 520);
+  Background: (Color: #f2c66d);
+  Visible: false;
+  Group {
+   Anchor: (Full: 3);
+   Background: $A.@SlateWindowHeader48;
+   Label { Anchor: (Top: 0, Left: 20, Right: 20, Height: 48); Text: %server.tamework.ui.hudPlacement.sampleName; Style: (FontSize: 17, FontName: "Secondary", LetterSpacing: 1, TextColor: #eef2f6, VerticalAlignment: Center); }
+   Group { Anchor: (Top: 60, Left: 14, Width: 142, Height: 104); Background: "Tamework/Slate/Portrait_World.png"; }
+  }
+ }
 }
 
 // Declared last so it is on top for clicks. Java sets its side (Left or Right) so it never covers the sample.

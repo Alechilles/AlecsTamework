@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 /**
  * Your settings: what each player chooses for themselves, opened from the gear in the companions window. It holds
- * what F on a companion does, a way into the companion HUD position editor and, for players with settings access,
+ * what F on a companion does, the companion HUD and card positions and, for players with settings access,
  * the admin settings. Choices apply at once; Done returns to the page that opened it and Esc just closes.
  */
 public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<TameworkPlayerSettingsPage.EventPayload> {
@@ -36,6 +36,7 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
     private static final String ACTION_F_CYCLE = "f:cycle";
     private static final String ACTION_F_DEFAULT = "f:default";
     private static final String ACTION_HUD = "hud";
+    private static final String ACTION_CARD = "card";
     private static final String ACTION_SERVER = "server";
     private static final String ACTION_DONE = "done";
 
@@ -63,6 +64,7 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
             bind(eventBuilder, "#TameworkPlayerSettingsFDefault", ACTION_F_DEFAULT);
         }
         bind(eventBuilder, "#TameworkPlayerSettingsHudMove", ACTION_HUD);
+        bind(eventBuilder, "#TameworkPlayerSettingsCardMove", ACTION_CARD);
         if (admin) {
             bind(eventBuilder, "#TameworkPlayerSettingsServer", ACTION_SERVER);
         }
@@ -78,13 +80,8 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
             case ACTION_F_CARD -> choose(ref, store, CompanionCardFBehaviour.CARD);
             case ACTION_F_CYCLE -> choose(ref, store, CompanionCardFBehaviour.CYCLE);
             case ACTION_F_DEFAULT -> choose(ref, store, null);
-            case ACTION_HUD -> {
-                Player player = store.getComponent(ref, Player.getComponentType());
-                if (player != null) {
-                    player.getPageManager().openCustomPage(ref, store,
-                            new TameworkHudPlacementPage(playerRef, this::reopen));
-                }
-            }
+            case ACTION_HUD -> openPlacement(ref, store, TameworkHudPlacementPage.Mode.PLAYER);
+            case ACTION_CARD -> openPlacement(ref, store, TameworkHudPlacementPage.Mode.CARD);
             case ACTION_SERVER -> {
                 // The button is only shown with access; the service checks again, as a stale page may remain open.
                 String error = TameworkSettingsPageService.openSettingsPage(ref, store, "command_menu", "settings_button");
@@ -146,7 +143,15 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
         }
     }
 
-    /** Back from the HUD editor: a fresh page shows any change made meanwhile. */
+    private void openPlacement(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                               @Nonnull TameworkHudPlacementPage.Mode mode) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player != null) {
+            player.getPageManager().openCustomPage(ref, store, new TameworkHudPlacementPage(playerRef, mode, this::reopen));
+        }
+    }
+
+    /** Back from the position editor: a fresh page shows any change made meanwhile. */
     private void reopen() {
         Ref<EntityStore> ref = playerRef.getReference();
         if (ref == null || !ref.isValid()) {

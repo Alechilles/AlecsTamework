@@ -44,3 +44,9 @@ Pet button.
 
 Bonded companions, such as HyDragon's dragons, show their modes and their mod's buttons on the card. Their other
 actions stay in their own companion panel.
+
+## Moving the card
+
+The card opens just right of your crosshair. To put it somewhere else, open **Your settings** and click **Move** next
+to the companion card. Pick a snap point, nudge the sample into place and click Save. The card opens there next time.
+Reset puts it back beside the crosshair. Only your screen changes.

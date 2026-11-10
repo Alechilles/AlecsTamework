@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.CommandHudDirtySink;
+import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
 import com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
@@ -28,8 +29,8 @@ import javax.annotation.Nullable;
 
 /**
  * Moves the companion target HUD. In {@link Mode#PLAYER} it changes one player's own screen; in
- * {@link Mode#SERVER_DEFAULT} an admin sets the position used by every player who has not moved theirs. The page
- * shows a sample plate where the HUD will sit. Save stores the position, Cancel and Esc keep the old one. Save and
+ * {@link Mode#SERVER_DEFAULT} an admin sets the position used by every player who has not moved theirs; in
+ * {@link Mode#CARD} a player moves their own companion card instead. The page shows a sample where it will sit. Save stores the position, Cancel and Esc keep the old one. Save and
  * Cancel return to the page it was opened from; Esc just closes. The real HUD stays hidden while this is the open
  * page.
  */
@@ -38,6 +39,8 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
 
     /** The sample plate's height; real HUD heights vary with the companion's rows. */
     static final int SAMPLE_HEIGHT = 184;
+    /** A typical companion card's height; the real card grows and shrinks with the rows a companion supports. */
+    static final int CARD_SAMPLE_HEIGHT = 520;
     private static final int[] STEPS = {1, 10, 50};
     private static final int CARD_EDGE = 60;
     private static final int CARD_TOP = 160;
@@ -80,18 +83,21 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
         if (draft == null) {
-            draft = mode == Mode.SERVER_DEFAULT
-                    ? CompanionHudDefaultsStore.current()
-                    : TameworkHudPlacementComponent.read(ref, store);
+            draft = switch (mode) {
+                case SERVER_DEFAULT -> CompanionHudDefaultsStore.current();
+                case CARD -> TameworkCompanionCardPlacementComponent.read(ref, store);
+                case PLAYER -> TameworkHudPlacementComponent.read(ref, store);
+            };
             wakeTargetHud(store);
         }
         commandBuilder.append(UI_PATH);
-        if (mode == Mode.SERVER_DEFAULT) {
-            commandBuilder.set("#TameworkHudPlacementTitle.Text",
-                    LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.defaultTitle"));
-            commandBuilder.set("#TameworkHudPlacementHint.Text",
-                    LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.defaultHint"));
+        if (mode != Mode.PLAYER) {
+            String prefix = mode == Mode.CARD ? "tamework.ui.hudPlacement.card" : "tamework.ui.hudPlacement.default";
+            commandBuilder.set("#TameworkHudPlacementTitle.Text", LocalizedText.resolve(playerRef, prefix + "Title"));
+            commandBuilder.set("#TameworkHudPlacementHint.Text", LocalizedText.resolve(playerRef, prefix + "Hint"));
         }
+        commandBuilder.set("#TameworkHudPlacementSample.Visible", mode != Mode.CARD);
+        commandBuilder.set("#TameworkHudPlacementCardSample.Visible", mode == Mode.CARD);
         bindState(commandBuilder);
         bindEvents(eventBuilder);
     }
@@ -115,11 +121,13 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
                 return;
             }
             // A player resets to the server default; an admin resets the server default to the built-in one.
-            case ACTION_RESET -> draft = mode == Mode.SERVER_DEFAULT
-                    ? CompanionHudPlacement.DEFAULT
-                    : CompanionHudDefaultsStore.current();
-            case ACTION_UP -> draft = draft.moved(0, -step).fitted(SAMPLE_HEIGHT);
-            case ACTION_DOWN -> draft = draft.moved(0, step).fitted(SAMPLE_HEIGHT);
+            case ACTION_RESET -> draft = switch (mode) {
+                case SERVER_DEFAULT -> CompanionHudPlacement.DEFAULT;
+                case CARD -> CompanionHudPlacement.CARD_DEFAULT;
+                case PLAYER -> CompanionHudDefaultsStore.current();
+            };
+            case ACTION_UP -> draft = draft.moved(0, -step).fitted(sampleHeight());
+            case ACTION_DOWN -> draft = draft.moved(0, step).fitted(sampleHeight());
             case ACTION_LEFT -> draft = draft.moved(-step, 0);
             case ACTION_RIGHT -> draft = draft.moved(step, 0);
             default -> {
@@ -148,6 +156,10 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
 
     /** Saves the draft; returns false when the save was refused or failed and the player was told why. */
     private boolean save(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        if (mode == Mode.CARD) {
+            TameworkCompanionCardPlacementComponent.write(ref, store, draft);
+            return true;
+        }
         if (mode == Mode.PLAYER) {
             // A player at the server default keeps following it, including later changes to it.
             if (draft.equals(CompanionHudDefaultsStore.current())) {
@@ -189,7 +201,9 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
             if (point == null) {
                 return false;
             }
-            draft = CompanionHudPlacement.snap(point);
+            draft = mode == Mode.CARD && point == CompanionHudPlacement.CARD_DEFAULT.point()
+                    ? CompanionHudPlacement.CARD_DEFAULT
+                    : CompanionHudPlacement.snap(point);
             return true;
         }
         if (action.startsWith(ACTION_STEP)) {
@@ -209,11 +223,13 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
     }
 
     private void bindState(@Nonnull UICommandBuilder commands) {
-        commands.setObject("#TameworkHudPlacementLane.Anchor", draft.laneAnchor());
-        commands.setObject("#TameworkHudPlacementSample.Anchor", draft.plateAnchor(SAMPLE_HEIGHT));
+        int width = sampleWidth();
+        commands.setObject("#TameworkHudPlacementLane.Anchor", draft.laneAnchor(width));
+        commands.setObject(mode == Mode.CARD ? "#TameworkHudPlacementCardSample.Anchor" : "#TameworkHudPlacementSample.Anchor",
+                draft.plateAnchor(sampleHeight(), width));
 
         Anchor card = new Anchor();
-        if (draft.rightOfCentre()) {
+        if (draft.rightOfCentre(width)) {
             card.setLeft(Value.of(CARD_EDGE));
         } else {
             card.setRight(Value.of(CARD_EDGE));
@@ -241,6 +257,14 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
                 LocalizedText.resolve(playerRef, "tamework.ui.hudPlacement.point." + draft.point().key()));
         commands.set("#TameworkHudPlacementOffset.Text",
                 LocalizedText.format(playerRef, "tamework.ui.hudPlacement.offset", draft.x(), draft.y()));
+    }
+
+    private int sampleWidth() {
+        return mode == Mode.CARD ? CompanionHudPlacement.CARD_WIDTH : CompanionHudPlacement.HUD_WIDTH;
+    }
+
+    private int sampleHeight() {
+        return mode == Mode.CARD ? CARD_SAMPLE_HEIGHT : SAMPLE_HEIGHT;
     }
 
     private void bindEvents(@Nonnull UIEventBuilder events) {
@@ -282,7 +306,9 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
         /** The viewing player's own position. */
         PLAYER,
         /** The server default for players who have not moved theirs; requires settings access to save. */
-        SERVER_DEFAULT
+        SERVER_DEFAULT,
+        /** The viewing player's own companion card position. */
+        CARD
     }
 
     /** Event payload for placement editor buttons. */
