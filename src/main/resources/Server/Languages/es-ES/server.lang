@@ -2075,3 +2075,5 @@ tamework.ui.hudPlacement.cardTitle=Posición de la inspección del compañero
 tamework.ui.hudPlacement.cardHint=Elige un punto de anclaje y ajusta el panel. Se abrirá ahí la próxima vez.
 tamework.ui.playerSettings.camera.label=Cámara de inspección
 tamework.ui.playerSettings.camera.tooltip=Activada: la cámara se acerca al compañero mientras la inspección está abierta. Desactivada: la cámara se queda contigo.
+tamework.ui.companionCard.closeAfterCommand=Cerrar tras una orden
+tamework.ui.companionCard.closeAfterCommand.tooltip=Activado: elegir un modo o una acción, como Establecer hogar, cierra la inspección. Desactivado: sigue abierta.

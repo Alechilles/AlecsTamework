@@ -2119,3 +2119,5 @@ tamework.ui.hudPlacement.cardTitle=Position der Begleiter-Inspektion
 tamework.ui.hudPlacement.cardHint=Wähle einen Ankerpunkt und schiebe das Fenster zurecht. Es öffnet sich nächstes Mal dort.
 tamework.ui.playerSettings.camera.label=Inspektionskamera
 tamework.ui.playerSettings.camera.tooltip=An: Die Kamera zoomt auf den Begleiter, solange die Begleiter-Inspektion offen ist. Aus: Die Kamera bleibt bei dir.
+tamework.ui.companionCard.closeAfterCommand=Nach Befehl schließen
+tamework.ui.companionCard.closeAfterCommand.tooltip=An: Ein Modus oder eine Aktion, etwa Heim setzen, schließt die Begleiter-Inspektion. Aus: Sie bleibt offen.

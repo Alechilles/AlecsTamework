@@ -23,7 +23,9 @@ Press **F** on a companion you own to open **Companion Inspect** beside your cro
 - **Actions**: shoulder, flight and breeding toggles, **Set Home** (here, where the companion stands) and
   **Return Home**, plus anything the companion's mod adds, such as **Ride** and **Pet**. A greyed-out button is not available right now, for example Ride on a dragon without the Flightmaster's
   Talisman in hand. Riding from the panel does not need crouching.
-- **Footer**: **Release** and **Cull**, each with a confirmation.
+- **Footer**: the **Close after a command** switch, and **Release** and **Cull**, each with a confirmation. With the
+  switch on, choosing a mode or any button under **Actions** closes the panel. It is off by default, and
+  **Your settings** has the same switch.
 
 Someone else's companion shows its info and owner only.
 

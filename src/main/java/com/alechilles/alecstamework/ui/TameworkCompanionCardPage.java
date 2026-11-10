@@ -78,7 +78,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        boolean genericActions,
                        @Nullable String ownerName,
                        @Nonnull CardRenameAvailability rename,
-                       @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions) {
+                       @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions,
+                       boolean closeAfterCommand) {
     }
 
     /** Clicks reported to the page service. Every callback runs on the world thread. */
@@ -107,6 +108,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         void release();
 
         void cull();
+
+        /** Flips the viewer's choice of whether a command closes the panel. */
+        void toggleCloseAfterCommand();
 
         /** The card closed for any reason. */
         void closed();
@@ -202,6 +206,13 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             }
             return;
         }
+        if (action.equals("closeAfter")) {
+            // A preference, not a confirmable action: it neither answers nor cancels an open confirmation.
+            if (view.canManage()) {
+                actions.toggleCloseAfterCommand();
+            }
+            return;
+        }
         if (pendingConfirm != null) {
             handleConfirm(action);
             return;
@@ -210,6 +221,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             Integer index = parseIndex(action, "mode:");
             if (index != null && view.canManage() && view.interactions().modeAllowed()) {
                 actions.mode(index);
+                closeAfterCommand();
             }
             return;
         }
@@ -218,15 +230,16 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             CompanionCardInteractions.Action entry = index == null ? null : findEntry(index);
             if (entry != null && view.canManage() && entry.status() == CompanionCardInteractions.Status.READY) {
                 actions.entry(index, entry.kind());
+                closeAfterCommand();
             }
             return;
         }
         switch (action) {
-            case "setHome" -> { if (generic()) actions.setHome(); }
-            case "returnHome" -> { if (generic()) actions.returnHome(); }
-            case "breeding" -> { if (generic()) actions.toggleBreeding(); }
-            case "flight" -> { if (generic()) actions.toggleFlight(); }
-            case "shoulder" -> { if (generic()) actions.toggleShoulder(); }
+            case "setHome" -> { if (generic()) { actions.setHome(); closeAfterCommand(); } }
+            case "returnHome" -> { if (generic()) { actions.returnHome(); closeAfterCommand(); } }
+            case "breeding" -> { if (generic()) { actions.toggleBreeding(); closeAfterCommand(); } }
+            case "flight" -> { if (generic()) { actions.toggleFlight(); closeAfterCommand(); } }
+            case "shoulder" -> { if (generic()) { actions.toggleShoulder(); closeAfterCommand(); } }
             case "talents" -> { if (generic()) actions.talents(); }
             case "rename" -> {
                 if (generic() && view.rename() == CardRenameAvailability.AVAILABLE) actions.rename();
@@ -235,6 +248,17 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             case "cull" -> askConfirm(Confirm.CULL);
             default -> {
             }
+        }
+    }
+
+    /**
+     * Closes the panel after a command (a mode or any button in the Actions section) when the viewer chose so.
+     * Talents and rename open their own page; groups, the footer switch and removal keep the panel open.
+     */
+    private void closeAfterCommand() {
+        if (view.closeAfterCommand() && !closed) {
+            close();
+            markClosed();
         }
     }
 
@@ -534,6 +558,14 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         Confirm confirm = generic ? pendingConfirm : null;
         boolean confirming = confirm != null;
         commands.set(footer + " #ReadOnlyNote.Visible", !manage);
+        boolean closeSwitch = manage && !confirming;
+        commands.set(footer + " #CloseAfterCommandSwitch.Visible", closeSwitch);
+        commands.set(footer + " #CloseAfterCommandLabel.Visible", closeSwitch);
+        if (closeSwitch) {
+            commands.set(footer + " #CloseAfterCommandSwitch.Style", Value.ref("TameworkSlateStyles.ui",
+                    view.closeAfterCommand() ? "SwitchOn" : "SwitchOff"));
+            bind(events, footer + " #CloseAfterCommandSwitch", "closeAfter");
+        }
         boolean release = generic && !confirming && canRelease();
         boolean cull = generic && !confirming && canCull();
         commands.set(footer + " #ReleaseButton.Visible", release);

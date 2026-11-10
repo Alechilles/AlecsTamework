@@ -14,6 +14,8 @@
 - While Companion Inspect is open, your camera glides in and frames the companion beside the panel, then glides back
   when it closes. It is skipped while you ride or fly, and players can turn it off with **Inspect camera** in
   **Your settings**.
+- A **Close after a command** switch, on Companion Inspect and in **Your settings**, closes the panel after you pick a
+  mode or an action. It is off by default.
 - `/tw settings` has a **Companion Inspect** section: what F does by default, whether players may choose for themselves,
   and how renaming from Companion Inspect works.
 - Rename a companion from Companion Inspect with the pencil button. By default it needs a naming item such as a nametag

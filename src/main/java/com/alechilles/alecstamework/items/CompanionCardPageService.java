@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
 import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
 import com.alechilles.alecstamework.companioncard.CompanionCards;
 import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
-import com.alechilles.alecstamework.items.components.TameworkInspectCameraPreferenceComponent;
+import com.alechilles.alecstamework.items.components.TameworkInspectPreferencesComponent;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -120,7 +120,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         openPages.put(player.getUuid(), session);
         // A card replacing another card has already released the old camera in its close callback.
-        session.cameraLocked = TameworkInspectCameraPreferenceComponent.enabled(playerRef, store)
+        session.cameraLocked = TameworkInspectPreferencesComponent.cameraEnabled(playerRef, store)
                 && CompanionInspectCamera.apply(player, playerRef, npcRef, store,
                 TameworkCompanionCardPlacementComponent.read(playerRef, store));
         scheduleRefresh(session);
@@ -180,7 +180,8 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                     CompanionCardPreferences.renameMode());
         }
         return new TameworkCompanionCardPage.View(entry, owner ? interactions : CompanionCardInteractions.EMPTY,
-                owner, generic, ownerName(npcRef, store), rename, groupOptions);
+                owner, generic, ownerName(npcRef, store), rename, groupOptions,
+                TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store));
     }
 
     /**
@@ -331,6 +332,15 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             if (live != null) {
                 page.closeCard();
                 culls.cullLoaded(live.player(), npcUuid);
+            }
+        }
+
+        @Override
+        public void toggleCloseAfterCommand() {
+            if (playerRef.isValid()) {
+                TameworkInspectPreferencesComponent.setCloseAfterCommand(playerRef, store,
+                        !TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store));
+                refresh();
             }
         }
 

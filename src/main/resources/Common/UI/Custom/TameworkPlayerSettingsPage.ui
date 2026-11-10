@@ -9,7 +9,7 @@ $C = "Common.ui";
 @RowLabel = LabelStyle(FontSize: 13, TextColor: #dfe6ee, VerticalAlignment: Center);
 
 Group #TameworkPlayerSettingsCard {
- Anchor: (Width: 420, Height: 400);
+ Anchor: (Width: 420, Height: 436);
  Background: $A.@SlateModal;
  Label #TameworkPlayerSettingsTitle { Anchor: (Top: 16, Left: 22, Right: 22, Height: 28); Text: %server.tamework.ui.playerSettings.title; Style: $A.@SlateTitle; }
  Label { Anchor: (Top: 46, Left: 22, Right: 22, Height: 20); Text: %server.tamework.ui.playerSettings.hint; Style: @Note; }
@@ -20,16 +20,18 @@ Group #TameworkPlayerSettingsCard {
  TextButton #TameworkPlayerSettingsFDefault { Anchor: (Top: 104, Left: 278, Width: 120, Height: 30); Text: %server.tamework.ui.playerSettings.f.default; TooltipText: %server.tamework.ui.playerSettings.f.default.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
  Label #TameworkPlayerSettingsFNote { Anchor: (Top: 140, Left: 22, Right: 22, Height: 32); Text: ""; Style: @Note; }
  Label { Anchor: (Top: 180, Left: 22, Right: 80, Height: 30); Text: %server.tamework.ui.playerSettings.camera.label; Style: @RowLabel; }
+ Label { Anchor: (Top: 216, Left: 22, Right: 80, Height: 30); Text: %server.tamework.ui.companionCard.closeAfterCommand; Style: @RowLabel; }
+ TextButton #TameworkPlayerSettingsCloseAfter { Anchor: (Top: 220, Right: 22, Width: 42, Height: 22); Text: ""; Style: $A.@SwitchOff; TooltipText: %server.tamework.ui.companionCard.closeAfterCommand.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
  TextButton #TameworkPlayerSettingsCamera { Anchor: (Top: 184, Right: 22, Width: 42, Height: 22); Text: ""; Style: $A.@SwitchOn; TooltipText: %server.tamework.ui.playerSettings.camera.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
 
- Group { Anchor: (Top: 222, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
- Label { Anchor: (Top: 236, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.playerSettings.position.section; Style: @Caps; }
- Label { Anchor: (Top: 258, Left: 22, Right: 140, Height: 30); Text: %server.tamework.ui.playerSettings.hud.label; Style: @RowLabel; }
- TextButton #TameworkPlayerSettingsHudMove { Anchor: (Top: 258, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.playerSettings.hud.move; Style: $A.@PanelButton; }
- Label { Anchor: (Top: 294, Left: 22, Right: 140, Height: 30); Text: %server.tamework.ui.playerSettings.card.label; Style: @RowLabel; }
- TextButton #TameworkPlayerSettingsCardMove { Anchor: (Top: 294, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.playerSettings.hud.move; Style: $A.@PanelButton; }
+ Group { Anchor: (Top: 258, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
+ Label { Anchor: (Top: 272, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.playerSettings.position.section; Style: @Caps; }
+ Label { Anchor: (Top: 294, Left: 22, Right: 140, Height: 30); Text: %server.tamework.ui.playerSettings.hud.label; Style: @RowLabel; }
+ TextButton #TameworkPlayerSettingsHudMove { Anchor: (Top: 294, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.playerSettings.hud.move; Style: $A.@PanelButton; }
+ Label { Anchor: (Top: 330, Left: 22, Right: 140, Height: 30); Text: %server.tamework.ui.playerSettings.card.label; Style: @RowLabel; }
+ TextButton #TameworkPlayerSettingsCardMove { Anchor: (Top: 330, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.playerSettings.hud.move; Style: $A.@PanelButton; }
 
- Group { Anchor: (Top: 338, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
- TextButton #TameworkPlayerSettingsServer { Anchor: (Top: 354, Left: 22, Width: 150, Height: 30); Text: %server.tamework.ui.playerSettings.serverSettings; Style: $A.@PanelButtonQuiet; Visible: false; }
- TextButton #TameworkPlayerSettingsDone { Anchor: (Top: 354, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
+ Group { Anchor: (Top: 374, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
+ TextButton #TameworkPlayerSettingsServer { Anchor: (Top: 390, Left: 22, Width: 150, Height: 30); Text: %server.tamework.ui.playerSettings.serverSettings; Style: $A.@PanelButtonQuiet; Visible: false; }
+ TextButton #TameworkPlayerSettingsDone { Anchor: (Top: 390, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
 }
