@@ -31,9 +31,11 @@ public record CompanionHudPlacement(@Nonnull Point point, int x, int y) {
     public static final CompanionHudPlacement CARD_DEFAULT = new CompanionHudPlacement(Point.CENTER, 40 + CARD_WIDTH / 2, 0);
     /**
      * Where the card opens instead of {@link #CARD_DEFAULT} while the inspect camera frames the companion in the screen
-     * centre: against the right edge, clear of the companion. A player's own card position is kept as it is.
+     * centre: its left edge 290 units right of the centre, clear of the companion. Measured from the centre, so it sits
+     * the same on every screen width. A player's own card position is kept as it is.
      */
-    public static final CompanionHudPlacement CARD_CAMERA_DEFAULT = new CompanionHudPlacement(Point.RIGHT, -40, 0);
+    public static final CompanionHudPlacement CARD_CAMERA_DEFAULT =
+            new CompanionHudPlacement(Point.CENTER, 290 + CARD_WIDTH / 2, 0);
 
     private static final int EDGE_MARGIN = 26;
 

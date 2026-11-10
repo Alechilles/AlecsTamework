@@ -56,7 +56,7 @@ While Companion Inspect is open, the camera zooms in on the companion and keeps 
 you stay where you stood. The arrows on each side of the portrait turn the view around the companion. To keep your
 normal camera instead, turn **Inspect camera** off in **Your settings**.
 
-Companion Inspect opens just right of your crosshair, or at the right edge of the screen while the inspect camera is
-on, so the companion stays in view. To put it somewhere else, open **Your settings** and click **Move** next
+Companion Inspect opens just right of your crosshair, or further right while the inspect camera is on, so the
+companion in the middle of the screen stays in view. To put it somewhere else, open **Your settings** and click **Move** next
 to **Companion Inspect**. Pick a snap point, nudge the sample into place and click Save. It opens there next time.
 Reset puts it back beside the crosshair. Only your screen changes.

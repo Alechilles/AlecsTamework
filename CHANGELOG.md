@@ -11,7 +11,7 @@
 - The gear in the companions window now opens **Your settings** for every player: what F on a companion does, and
   where the companion HUD and Companion Inspect sit on your screen. Admins reach the server settings from there, and its
   **Back** button returns to Your settings. The separate HUD position button is gone.
-- While Companion Inspect is open, your camera glides in and frames the companion, with the panel at the screen edge, then glides back
+- While Companion Inspect is open, your camera glides in and frames the companion, with the panel off to its right, then glides back
   when it closes. Arrows on the portrait turn the view around the companion. It is skipped while you ride or fly, and players can turn it off with **Inspect camera** in
   **Your settings**.
 - Companion Inspect lists the companion's food preferences, with how much each food changes happiness, and its
