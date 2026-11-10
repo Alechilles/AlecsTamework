@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
 import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
 import com.alechilles.alecstamework.companioncard.CompanionCards;
+import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -107,7 +108,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         if (view == null) {
             return;
         }
-        Session session = new Session(player.getUuid(), npcUuid, playerRef, store, groupKey);
+        Session session = new Session(player.getUuid(), npcUuid, playerRef, store, groupKey, uiPlayer);
         TameworkCompanionCardPage page = new TameworkCompanionCardPage(uiPlayer, npcUuid, view, session);
         session.page = page;
         try {
@@ -117,6 +118,9 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             return;
         }
         openPages.put(player.getUuid(), session);
+        // A card replacing another card has already released the old camera in its close callback.
+        session.cameraLocked = CompanionInspectCamera.apply(player, playerRef, npcRef, store,
+                TameworkCompanionCardPlacementComponent.read(playerRef, store));
         scheduleRefresh(session);
     }
 
@@ -198,15 +202,19 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private final Ref<EntityStore> playerRef;
         private final Store<EntityStore> store;
         private final String groupKey;
+        private final PlayerRef uiPlayer;
         private TameworkCompanionCardPage page;
+        /** Whether this card took the player's camera; its close hands it back. */
+        private boolean cameraLocked;
 
         private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store,
-                        String groupKey) {
+                        String groupKey, PlayerRef uiPlayer) {
             this.playerUuid = playerUuid;
             this.npcUuid = npcUuid;
             this.playerRef = playerRef;
             this.store = store;
             this.groupKey = groupKey;
+            this.uiPlayer = uiPlayer;
         }
 
         @Override
@@ -326,7 +334,13 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void closed() {
+            Session current = openPages.get(playerUuid);
             openPages.remove(playerUuid, this);
+            // Skip when a newer card already holds the camera (its open ran before this close arrived).
+            if (cameraLocked && (current == null || current == this)) {
+                CompanionInspectCamera.release(uiPlayer);
+            }
+            cameraLocked = false;
         }
 
         /** Queues a request for the role tick and registers the interaction that wakes it. */
