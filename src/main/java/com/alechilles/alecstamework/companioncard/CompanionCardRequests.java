@@ -43,7 +43,11 @@ public final class CompanionCardRequests {
     public record Refresh() implements Request {
     }
 
-    /** Queues a request, replacing an older one for the same companion and viewer. */
+    /**
+     * Queues a request, replacing an older one for the same companion and viewer. A {@link Refresh} never replaces a
+     * live button request: the card's background refresh would otherwise drop a click still waiting for the role
+     * tick, and the button request recomputes the snapshot anyway.
+     */
     public static void queue(@Nonnull UUID npcUuid, @Nonnull UUID playerUuid, @Nonnull Request request) {
         long nowMs = System.currentTimeMillis();
         if (PENDING.size() >= MAX_PENDING) {
@@ -52,7 +56,10 @@ public final class CompanionCardRequests {
                 return;
             }
         }
-        PENDING.put(new Key(npcUuid, playerUuid), new Pending(request, nowMs + TTL_MS));
+        Pending next = new Pending(request, nowMs + TTL_MS);
+        PENDING.compute(new Key(npcUuid, playerUuid), (key, current) ->
+                request instanceof Refresh && current != null && current.expiresAtMs > nowMs
+                        && !(current.request instanceof Refresh) ? current : next);
     }
 
     /** Removes and returns the pending request for this companion and viewer, or {@code null} if none is live. */
