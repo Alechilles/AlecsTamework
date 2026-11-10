@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.10.0 - Companion Inspect - 2026-11-10
 
 ### Added
 
