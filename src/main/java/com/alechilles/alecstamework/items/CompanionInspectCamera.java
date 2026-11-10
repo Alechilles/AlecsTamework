@@ -29,7 +29,8 @@ import org.joml.Vector3d;
  * Prototype: while Companion Inspect is open, the player's camera locks onto the companion from the side the player
  * stood on, a little above it and looking down, and glides there and back. The companion sits off centre, away from
  * the panel, so the panel does not cover it. The engine's server camera ({@code SetServerCamera}) does the work: it
- * follows the companion if it moves, and while the camera is attached to another entity the player cannot walk.
+ * eases after the companion if it moves, and while the camera is attached to another entity the player cannot walk
+ * and stays where they stood.
  *
  * <p>Call on the player's world thread from a page event or deferred world task, never inside an ECS system
  * iteration. Every path that closes the panel must call {@link #release(PlayerRef)}.
@@ -87,7 +88,9 @@ final class CompanionInspectCamera {
         settings.hideHeldItem = true;
         settings.attachedToType = AttachedToType.EntityId;
         settings.attachedToEntityId = npcNetworkId.getId();
-        settings.followAttachedEntity = true;
+        // Never true here: the client then moves the local player onto the followed entity every tick (spectator
+        // behaviour). Without it the camera still tracks the companion, eased by the lerp speeds above.
+        settings.followAttachedEntity = false;
         settings.eyeOffset = true;
         settings.positionDistanceOffsetType = PositionDistanceOffsetType.DistanceOffsetRaycast;
         settings.distance = distance;
