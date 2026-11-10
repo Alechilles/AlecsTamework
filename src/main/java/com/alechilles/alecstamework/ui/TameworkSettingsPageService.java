@@ -58,7 +58,7 @@ public final class TameworkSettingsPageService {
         if (!hasAccess(playerRef, playerRef)) {
             return LocalizedText.resolve(playerRef, "tamework.ui.settings.permissionDenied");
         }
-        return openSettingsPage(player, ref, store, world, "api", "settings_api");
+        return openSettingsPage(player, ref, store, world, "api", "settings_api", null);
     }
 
     @Nullable
@@ -72,6 +72,19 @@ public final class TameworkSettingsPageService {
                                           @Nonnull Store<EntityStore> store,
                                           @Nonnull String telemetrySource,
                                           @Nonnull String entryPoint) {
+        return openSettingsPage(ref, store, telemetrySource, entryPoint, null);
+    }
+
+    /**
+     * Opens the settings page with a Back button that runs {@code returnTo}, such as reopening Your settings; a null
+     * {@code returnTo} shows no Back button.
+     */
+    @Nullable
+    public static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull Store<EntityStore> store,
+                                          @Nonnull String telemetrySource,
+                                          @Nonnull String entryPoint,
+                                          @Nullable Runnable returnTo) {
         if (store.getExternalData() == null) {
             return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
@@ -79,7 +92,7 @@ public final class TameworkSettingsPageService {
         if (world == null) {
             return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
-        return openSettingsPage(ref, store, world, telemetrySource, entryPoint);
+        return openSettingsPage(ref, store, world, telemetrySource, entryPoint, returnTo);
     }
 
     @Nullable
@@ -95,11 +108,21 @@ public final class TameworkSettingsPageService {
                                           @Nonnull World world,
                                           @Nonnull String telemetrySource,
                                           @Nonnull String entryPoint) {
+        return openSettingsPage(ref, store, world, telemetrySource, entryPoint, null);
+    }
+
+    @Nullable
+    private static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
+                                           @Nonnull Store<EntityStore> store,
+                                           @Nonnull World world,
+                                           @Nonnull String telemetrySource,
+                                           @Nonnull String entryPoint,
+                                           @Nullable Runnable returnTo) {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
             return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
-        return openSettingsPage(player, ref, store, world, telemetrySource, entryPoint);
+        return openSettingsPage(player, ref, store, world, telemetrySource, entryPoint, returnTo);
     }
 
     @Nullable
@@ -108,7 +131,8 @@ public final class TameworkSettingsPageService {
                                            @Nonnull Store<EntityStore> store,
                                            @Nonnull World world,
                                            @Nonnull String telemetrySource,
-                                           @Nonnull String entryPoint) {
+                                           @Nonnull String entryPoint,
+                                           @Nullable Runnable returnTo) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             return LocalizedText.resolve(player, "tamework.ui.settings.notAvailable");
@@ -124,7 +148,7 @@ public final class TameworkSettingsPageService {
             return LocalizedText.resolve(player, "tamework.ui.settings.permissionDenied");
         }
         try {
-            TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
+            TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world, returnTo);
             player.getPageManager().openCustomPage(ref, store, page);
         } catch (Throwable failure) {
             plugin.getLogger().at(java.util.logging.Level.WARNING).withCause(failure)

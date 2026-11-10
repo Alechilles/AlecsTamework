@@ -64,6 +64,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_APPLY = "Apply";
     private static final String ACTION_LOAD_PRESET = "LoadPreset";
     private static final String ACTION_CLOSE = "Close";
+    private static final String ACTION_BACK = "Back";
     private static final String ACTION_EDIT = "Edit";
     private static final String ACTION_EDIT_HUD_DEFAULT = "EditHudDefault";
     private static final String ACTION_SELECT_TAB = "SelectTab";
@@ -148,12 +149,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private boolean applyInProgress;
     /** Set when this page hands over to the HUD default editor, which returns here; skips the leaving reminder. */
     private boolean openingHudDefaultEditor;
+    /** Reopens the page this was opened from, such as Your settings; null hides the Back button. */
+    @Nullable
+    private final Runnable returnTo;
     private boolean modSettingsTabSelected;
 
     public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
                                 @Nonnull Tamework plugin,
                                 @Nonnull World world) {
+        this(playerRef, plugin, world, null);
+    }
+
+    public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
+                                @Nonnull Tamework plugin,
+                                @Nonnull World world,
+                                @Nullable Runnable returnTo) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
+        this.returnTo = returnTo;
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
         this.formParser = new TameworkSettingsFormParser(playerRef, plugin.getLogger());
@@ -193,6 +205,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String action = trim(data.action);
         switch (action) {
             case ACTION_CLOSE -> close();
+            case ACTION_BACK -> {
+                if (returnTo != null) {
+                    // Going back is not leaving settings for good, so skip the reopen reminder.
+                    openingHudDefaultEditor = true;
+                    returnTo.run();
+                }
+            }
             case ACTION_REFRESH -> {
                 loadCurrentValues();
                 statusLine = resolveText("tamework.ui.settings.status.refreshed");
@@ -282,6 +301,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 EventData.of(ACTION, ACTION_CLOSE),
                 false
         );
+        if (returnTo != null) {
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwSettingsBackButton",
+                    EventData.of(ACTION, ACTION_BACK), false);
+        }
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.ValueChanged,
                 "#TwSettingsPresetDropdown",
@@ -360,6 +383,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
+        commandBuilder.set("#TwSettingsBackButton.Visible", returnTo != null);
         renderTabs(commandBuilder);
         CompanionHudPlacement hudDefault = CompanionHudDefaultsStore.current();
         commandBuilder.set("#TwSettingsHudDefaultValue.Text", LocalizedText.format(playerRef,
@@ -604,7 +628,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             return;
         }
         String error = TameworkSettingsPageService.openSettingsPage(
-                currentRef, currentRef.getStore(), "hud_placement", "settings_hud_default");
+                currentRef, currentRef.getStore(), "hud_placement", "settings_hud_default", returnTo);
         if (error != null) {
             playerRef.sendMessage(Message.raw(error));
         }

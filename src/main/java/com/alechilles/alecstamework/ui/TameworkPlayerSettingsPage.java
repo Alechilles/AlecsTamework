@@ -84,7 +84,8 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
             case ACTION_CARD -> openPlacement(ref, store, TameworkHudPlacementPage.Mode.CARD);
             case ACTION_SERVER -> {
                 // The button is only shown with access; the service checks again, as a stale page may remain open.
-                String error = TameworkSettingsPageService.openSettingsPage(ref, store, "command_menu", "settings_button");
+                String error = TameworkSettingsPageService.openSettingsPage(ref, store, "command_menu", "settings_button",
+                        this::reopen);
                 if (error != null) {
                     playerRef.sendMessage(Message.raw(error));
                 }

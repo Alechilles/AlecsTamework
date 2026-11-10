@@ -26,9 +26,16 @@ $C.@PageOverlay {
       Anchor: (Top: 0, Left: 0, Right: 0, Height: 48);
       Group { Anchor: (Top: 7, Left: 18, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; HitTestVisible: false; }
       Label #TwSettingsTitle {
-        Anchor: (Left: 64, Right: 280, Height: 48);
+        Anchor: (Left: 64, Right: 360, Height: 48);
         Text: %server.tamework.ui.settings.title;
         Style: $A.@SlateTitle;
+      }
+      // Shown when opened from Your settings; goes back there.
+      TextButton #TwSettingsBackButton {
+        Anchor: (Top: 9, Right: 270, Width: 84, Height: 30);
+        Text: %server.tamework.ui.shared.button.back;
+        Style: $A.@PanelButtonQuiet;
+        Visible: false;
       }
       TextButton #TwSettingsRefreshButton {
         Anchor: (Top: 9, Right: 164, Width: 96, Height: 30);

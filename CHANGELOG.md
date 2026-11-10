@@ -4,13 +4,13 @@
 
 ### Added
 
-- Pressing F on a companion you own now opens its **companion card** beside your crosshair: its health, needs, traits,
+- Pressing F on a companion you own (the prompt reads "Press [F] to inspect") now opens its **companion card** beside your crosshair: its health, needs, traits,
   level and timers, buttons for its modes, and its actions (shoulder, flight and breeding toggles, Set Home and Return
   Home, its groups, talents, release and cull), all without a command item. Players who prefer the old behaviour can
   switch back to cycling modes in **Your settings** or with `/tw card cycle`.
 - The gear in the companions window now opens **Your settings** for every player: what F on a companion does, and
-  where the companion HUD and the companion card sit on your screen. Admins reach the server settings from there. The
-  separate HUD position button is gone.
+  where the companion HUD and the companion card sit on your screen. Admins reach the server settings from there, and its
+  **Back** button returns to Your settings. The separate HUD position button is gone.
 - `/tw settings` has a **Companion Card** section: what F does by default, whether players may choose for themselves,
   and how renaming from the card works.
 - Rename a companion from its card with the pencil button. By default it needs a naming item such as a nametag

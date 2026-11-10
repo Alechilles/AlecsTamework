@@ -8,7 +8,7 @@ draft: false
 
 Parent: [Companion Controls](/mod/alecs-tamework/companion-controls) | [Player Guides](/mod/alecs-tamework/player-guides)
 
-Press **F** on a companion you own to open its companion card beside your crosshair. You do not need a command item.
+Press **F** on a companion you own to open its companion card beside your crosshair. The prompt reads "Press [F] to inspect". You do not need a command item.
 
 ## What the card shows
 
@@ -48,5 +48,5 @@ actions stay in their own companion panel.
 ## Moving the card
 
 The card opens just right of your crosshair. To put it somewhere else, open **Your settings** and click **Move** next
-to the companion card. Pick a snap point, nudge the sample into place and click Save. The card opens there next time.
+to **Companion Inspect**. Pick a snap point, nudge the sample into place and click Save. The card opens there next time.
 Reset puts it back beside the crosshair. Only your screen changes.
