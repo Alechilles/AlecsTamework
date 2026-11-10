@@ -49,7 +49,8 @@ actions stay in their own companion panel.
 
 ## Moving the panel
 
-While Companion Inspect is open, the camera zooms in on the companion, and you stay where you stood. To keep your
+While Companion Inspect is open, the camera zooms in on the companion, and you stay where you stood. The arrows on
+the portrait's top corners turn the view around the companion. To keep your
 normal camera instead, turn **Inspect camera** off in **Your settings**.
 
 Companion Inspect opens just right of your crosshair. To put it somewhere else, open **Your settings** and click **Move** next

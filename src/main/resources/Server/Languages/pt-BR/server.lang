@@ -2121,3 +2121,5 @@ tamework.ui.playerSettings.camera.label=Câmera de inspeção
 tamework.ui.playerSettings.camera.tooltip=Ativada: a câmera se aproxima do companheiro enquanto a inspeção está aberta. Desativada: a câmera fica com você.
 tamework.ui.companionCard.closeAfterCommand=Fechar após um comando
 tamework.ui.companionCard.closeAfterCommand.tooltip=Ativado: escolher um modo ou uma ação, como Definir lar, fecha a inspeção. Desativado: ela continua aberta.
+tamework.ui.companionCard.rotateLeft=Girar a visão para a esquerda
+tamework.ui.companionCard.rotateRight=Girar a visão para a direita

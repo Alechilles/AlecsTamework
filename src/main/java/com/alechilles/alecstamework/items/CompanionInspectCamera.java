@@ -46,35 +46,36 @@ final class CompanionInspectCamera {
     private static final double SIDE_SHIFT = 0.35;
     /** Card centres closer than this to the screen centre (canvas units) leave the companion centred. */
     private static final int CENTRED_CARD = 200;
+    /** How far one rotate click turns the camera around the companion, in radians (30 degrees). */
+    private static final float TURN = (float) (Math.PI / 6.0);
 
     private CompanionInspectCamera() {
     }
 
     /**
-     * Locks the camera onto the companion. Returns false, sending nothing, when the player is riding or flying (their
-     * camera is already in use) or either entity is missing what the camera needs.
+     * Locks the camera onto the companion, looking along {@code yaw}, or from the player towards the companion when
+     * {@code yaw} is null. Returns the yaw used, or null, sending nothing, when the player is riding or flying (their
+     * camera is already in use) or either entity is missing what the camera needs. Sending again with another yaw
+     * glides the camera there.
      */
-    static boolean apply(@Nonnull Player player,
-                         @Nonnull Ref<EntityStore> playerRef,
-                         @Nonnull Ref<EntityStore> npcRef,
-                         @Nonnull Store<EntityStore> store,
-                         @Nonnull CompanionHudPlacement cardPlacement) {
+    @Nullable
+    static Float apply(@Nonnull Player player,
+                       @Nonnull Ref<EntityStore> playerRef,
+                       @Nonnull Ref<EntityStore> npcRef,
+                       @Nonnull Store<EntityStore> store,
+                       @Nonnull CompanionHudPlacement cardPlacement,
+                       @Nullable Float yaw) {
         PlayerRef uiPlayer = player.getPlayerRef();
         if (uiPlayer == null || uiPlayer.getPacketHandler() == null || cameraInUse(player, playerRef, store)) {
-            return false;
+            return null;
         }
         NetworkId npcNetworkId = store.getComponent(npcRef, NetworkId.getComponentType());
         TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (npcNetworkId == null || npcTransform == null || playerTransform == null) {
-            return false;
+            return null;
         }
-        Vector3d npc = npcTransform.getPosition();
-        Vector3d viewer = playerTransform.getPosition();
-        double dx = npc.x - viewer.x;
-        double dz = npc.z - viewer.z;
-        // Engine yaw: forward is (-sin yaw, 0, -cos yaw). Look from the player towards the companion.
-        float yaw = dx * dx + dz * dz < 1.0e-4 ? 0f : (float) Math.atan2(-dx, -dz);
+        float look = yaw != null ? yaw : towards(playerTransform.getPosition(), npcTransform.getPosition());
 
         float eyeHeight = ModelComponent.getEyeHeight(npcRef, store);
         float distance = (float) Math.max(2.2, Math.min(8.0, 1.6 + eyeHeight * 2.0));
@@ -95,12 +96,24 @@ final class CompanionInspectCamera {
         settings.positionDistanceOffsetType = PositionDistanceOffsetType.DistanceOffsetRaycast;
         settings.distance = distance;
         // Moving the pivot to the camera's right moves the companion left on screen, and the reverse.
-        settings.positionOffset = new Position(Math.cos(yaw) * shift, 0.0, -Math.sin(yaw) * shift);
+        settings.positionOffset = new Position(Math.cos(look) * shift, 0.0, -Math.sin(look) * shift);
         settings.rotationType = RotationType.Custom;
-        settings.rotation = new Direction(yaw, PITCH, 0f);
+        settings.rotation = new Direction(look, PITCH, 0f);
         settings.baseFov = FOV;
         uiPlayer.getPacketHandler().writeNoCache(new SetServerCamera(ClientCameraView.Custom, true, settings));
-        return true;
+        return look;
+    }
+
+    /** The yaw after one rotate click: -1 moves the camera left around the companion, +1 right. */
+    static float turned(float yaw, int direction) {
+        return yaw - Integer.signum(direction) * TURN;
+    }
+
+    /** Engine yaw: forward is (-sin yaw, 0, -cos yaw). Looks from {@code from} towards {@code to}. */
+    private static float towards(@Nonnull Vector3d from, @Nonnull Vector3d to) {
+        double dx = to.x - from.x;
+        double dz = to.z - from.z;
+        return dx * dx + dz * dz < 1.0e-4 ? 0f : (float) Math.atan2(-dx, -dz);
     }
 
     /** Hands the normal camera back, as the engine's {@code /camera reset} does. */

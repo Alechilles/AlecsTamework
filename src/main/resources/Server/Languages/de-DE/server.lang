@@ -2121,3 +2121,5 @@ tamework.ui.playerSettings.camera.label=Inspektionskamera
 tamework.ui.playerSettings.camera.tooltip=An: Die Kamera zoomt auf den Begleiter, solange die Begleiter-Inspektion offen ist. Aus: Die Kamera bleibt bei dir.
 tamework.ui.companionCard.closeAfterCommand=Nach Befehl schließen
 tamework.ui.companionCard.closeAfterCommand.tooltip=An: Ein Modus oder eine Aktion, etwa Heim setzen, schließt die Begleiter-Inspektion. Aus: Sie bleibt offen.
+tamework.ui.companionCard.rotateLeft=Ansicht nach links drehen
+tamework.ui.companionCard.rotateRight=Ansicht nach rechts drehen

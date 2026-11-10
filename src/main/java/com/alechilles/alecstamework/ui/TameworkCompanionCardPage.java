@@ -54,6 +54,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     @Nullable
     private Confirm pendingConfirm;
     private boolean closed;
+    /** Whether the inspect camera is locked on, which shows the rotate buttons. */
+    private boolean cameraControls;
     // Read once when the card opens; a change in Your settings applies the next time it opens.
     private CompanionHudPlacement placement = CompanionHudPlacement.CARD_DEFAULT;
     // What the group picker was last given. Re-sending Entries or SelectedValues resets an open native popup, so a
@@ -112,6 +114,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         /** Flips the viewer's choice of whether a command closes the panel. */
         void toggleCloseAfterCommand();
 
+        /** Turns the inspect camera one step around the companion: -1 left, +1 right. */
+        void rotateCamera(int direction);
+
         /** The card closed for any reason. */
         void closed();
     }
@@ -165,6 +170,29 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         sendUpdate(commands, events, false);
     }
 
+    /** Shows the rotate buttons once the inspect camera has locked onto the companion. */
+    public void showCameraControls() {
+        cameraControls = true;
+        if (closed) {
+            return;
+        }
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        bindCameraControls(commands, events);
+        sendUpdate(commands, events, false);
+    }
+
+    private void bindCameraControls(UICommandBuilder commands, UIEventBuilder events) {
+        for (String side : new String[]{"Left", "Right"}) {
+            commands.set(CARD + " #Rotate" + side + "Button.Visible", cameraControls);
+            commands.set(CARD + " #Rotate" + side + "Glyph.Visible", cameraControls);
+        }
+        if (cameraControls) {
+            bind(events, CARD + " #RotateLeftButton", "rotate:-1");
+            bind(events, CARD + " #RotateRightButton", "rotate:1");
+        }
+    }
+
     /** Closes the card from the server, for example after the player mounted the companion. */
     public void closeCard() {
         if (!closed) {
@@ -203,6 +231,13 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                 // The client already shows this selection; do not send it back.
                 sentGroupSelection = selected;
                 actions.assignGroups(selected);
+            }
+            return;
+        }
+        if (action.equals("rotate:-1") || action.equals("rotate:1")) {
+            // Moves only the camera: no confirmation is answered or cancelled, and the panel stays open.
+            if (cameraControls) {
+                actions.rotateCamera(action.equals("rotate:1") ? 1 : -1);
             }
             return;
         }
@@ -316,6 +351,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         boolean manage = view.canManage();
         boolean generic = generic();
         bind(events, "#CloseButton", "close");
+        bindCameraControls(commands, events);
 
         commands.set(CARD + " #Name.Text", entry.displayName());
         commands.set(CARD + " #RoleSubtitle.Text", entry.roleSubtitle());

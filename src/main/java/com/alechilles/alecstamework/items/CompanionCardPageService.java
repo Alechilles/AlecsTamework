@@ -129,9 +129,14 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         openPages.put(player.getUuid(), session);
         // A card replacing another card has already released the old camera in its close callback.
-        session.cameraLocked = TameworkInspectPreferencesComponent.cameraEnabled(playerRef, store)
-                && CompanionInspectCamera.apply(player, playerRef, npcRef, store,
-                TameworkCompanionCardPlacementComponent.read(playerRef, store));
+        session.cameraYaw = TameworkInspectPreferencesComponent.cameraEnabled(playerRef, store)
+                ? CompanionInspectCamera.apply(player, playerRef, npcRef, store,
+                        TameworkCompanionCardPlacementComponent.read(playerRef, store), null)
+                : null;
+        session.cameraLocked = session.cameraYaw != null;
+        if (session.cameraLocked) {
+            page.showCameraControls();
+        }
         scheduleRefresh(session);
     }
 
@@ -218,6 +223,9 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private TameworkCompanionCardPage page;
         /** Whether this card took the player's camera; its close hands it back. */
         private boolean cameraLocked;
+        /** The camera's current look direction while it is locked; rotate clicks turn it. */
+        @Nullable
+        private Float cameraYaw;
         private int watches;
 
         private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store,
@@ -342,6 +350,21 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             if (live != null) {
                 page.closeCard();
                 culls.cullLoaded(live.player(), npcUuid);
+            }
+        }
+
+        @Override
+        public void rotateCamera(int direction) {
+            Player player = player();
+            Ref<EntityStore> npcRef = npcRef();
+            if (!cameraLocked || cameraYaw == null || player == null || npcRef == null) {
+                return;
+            }
+            Float turned = CompanionInspectCamera.apply(player, playerRef, npcRef, store,
+                    TameworkCompanionCardPlacementComponent.read(playerRef, store),
+                    CompanionInspectCamera.turned(cameraYaw, direction));
+            if (turned != null) {
+                cameraYaw = turned;
             }
         }
 

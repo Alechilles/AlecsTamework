@@ -43,6 +43,11 @@ Group {
         Anchor: (Top: 60, Left: 14, Width: 412, Height: 130);
         Group #PortraitFrame { Anchor: (Top: 0, Left: 0, Width: 142, Height: 104); Background: "Tamework/Slate/Portrait_World.png"; HitTestVisible: false; }
         ItemGrid #Portrait { Anchor: (Top: 6, Left: 25, Width: 92, Height: 92); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
+        // Turn the inspect camera around the companion; shown only while the camera is locked on.
+        TextButton #RotateLeftButton { Anchor: (Top: 4, Left: 4, Width: 22, Height: 22); Style: $A.@ActionQuiet; Text: ""; TooltipText: %server.tamework.ui.companionCard.rotateLeft; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
+        Group #RotateLeftGlyph { Anchor: (Top: 8, Left: 8, Width: 14, Height: 14); Background: (TexturePath: "Tamework/PanelControls/Nudge_Left.png", Color: #eef2f6); HitTestVisible: false; Visible: false; }
+        TextButton #RotateRightButton { Anchor: (Top: 4, Left: 116, Width: 22, Height: 22); Style: $A.@ActionQuiet; Text: ""; TooltipText: %server.tamework.ui.companionCard.rotateRight; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
+        Group #RotateRightGlyph { Anchor: (Top: 8, Left: 120, Width: 14, Height: 14); Background: (TexturePath: "Tamework/PanelControls/Nudge_Right.png", Color: #eef2f6); HitTestVisible: false; Visible: false; }
         Group #PortraitArt { Anchor: (Top: 6, Left: 25, Width: 92, Height: 92); HitTestVisible: false; Visible: false; }
         Label #OwnerLine { Anchor: (Top: 106, Left: 0, Width: 142, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
         // Same multi-select group picker as the companions window (TameworkLinkedNpcPanelCard.ui #GroupSelector).

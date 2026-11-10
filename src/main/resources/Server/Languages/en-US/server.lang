@@ -2133,3 +2133,5 @@ tamework.ui.playerSettings.camera.label=Inspect camera
 tamework.ui.playerSettings.camera.tooltip=On: the camera zooms in on the companion while Companion Inspect is open. Off: the camera stays with you.
 tamework.ui.companionCard.closeAfterCommand=Close after a command
 tamework.ui.companionCard.closeAfterCommand.tooltip=On: choosing a mode or any action, such as Set Home or Ride, closes Companion Inspect. Off: it stays open.
+tamework.ui.companionCard.rotateLeft=Turn the view left
+tamework.ui.companionCard.rotateRight=Turn the view right
