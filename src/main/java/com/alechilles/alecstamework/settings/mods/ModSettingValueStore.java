@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.settings.mods;
 
+import com.alechilles.alecstamework.settings.NetworkSettingsLayer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -46,11 +47,15 @@ final class ModSettingValueStore {
     /** Reads saved values. A missing file is empty; an unreadable file is moved aside and treated as empty. */
     @Nonnull
     Map<String, JsonPrimitive> load() {
-        if (!Files.isRegularFile(file)) {
+        boolean hasFile = Files.isRegularFile(file);
+        if (!hasFile && !NetworkSettingsLayer.active()) {
             return Map.of();
         }
         try {
-            JsonElement root = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8));
+            // The network's values with this server's on top; a local null hides a network value.
+            JsonElement root = JsonParser.parseString(NetworkSettingsLayer.effective(
+                    NetworkSettingsLayer.SECTION_MOD_SETTINGS,
+                    hasFile ? Files.readString(file, StandardCharsets.UTF_8) : null));
             JsonElement values = root.isJsonObject() ? root.getAsJsonObject().get("Values") : null;
             if (values == null || !values.isJsonObject()) {
                 throw new JsonParseException("Missing Values object");
@@ -63,6 +68,10 @@ final class ModSettingValueStore {
             }
             return result;
         } catch (IOException | RuntimeException failure) {
+            if (!hasFile) {
+                logger.at(Level.WARNING).withCause(failure).log("The network's mod settings could not be read; using defaults.");
+                return Map.of();
+            }
             Path backup = file.resolveSibling(FILE_NAME + ".broken-" + System.currentTimeMillis());
             logger.at(Level.WARNING).withCause(failure).log(
                     "Mod settings file '%s' could not be read; moving it to '%s' and using defaults.", file, backup);
@@ -75,16 +84,23 @@ final class ModSettingValueStore {
         }
     }
 
-    /** Writes all saved values atomically. */
-    void save(@Nonnull Map<String, JsonPrimitive> values) throws IOException {
+    /** The full document for these values. */
+    @Nonnull
+    static String toJson(@Nonnull Map<String, JsonPrimitive> values) {
         JsonObject valuesJson = new JsonObject();
         values.forEach(valuesJson::add);
         JsonObject root = new JsonObject();
         root.addProperty("Version", VERSION);
         root.add("Values", valuesJson);
+        return GSON.toJson(root);
+    }
+
+    /** Writes all saved values atomically. With network settings, only those that differ from the network's. */
+    void save(@Nonnull Map<String, JsonPrimitive> values) throws IOException {
         Files.createDirectories(file.getParent());
         Path temp = file.resolveSibling(FILE_NAME + ".tmp");
-        Files.writeString(temp, GSON.toJson(root), StandardCharsets.UTF_8);
+        Files.writeString(temp, NetworkSettingsLayer.localForm(NetworkSettingsLayer.SECTION_MOD_SETTINGS, toJson(values)),
+                StandardCharsets.UTF_8);
         try {
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ignored) {

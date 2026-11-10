@@ -381,7 +381,8 @@ public final class TameworkSettingsStore {
     }
 
     private static void ensureGlobalTemplateExists(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
-        if (Files.isRegularFile(globalSettingsFile)) {
+        // With network settings a missing file means "no overrides"; a template of defaults would override them all.
+        if (Files.isRegularFile(globalSettingsFile) || NetworkSettingsLayer.active()) {
             return;
         }
         writeDocument(globalSettingsFile, createDefaultGlobalSettingsDocument(), logger);
@@ -477,13 +478,36 @@ public final class TameworkSettingsStore {
         return toOverrides(createDefaultGlobalSettingsDocument());
     }
 
+    /**
+     * The full document this store would save for {@code raw}: every setting with its resolved value,
+     * legacy fields moved to their current place. A null or blank {@code raw} gives the built-in defaults.
+     *
+     * @throws JsonSyntaxException when {@code raw} is not a settings document
+     */
+    @Nonnull
+    public static String normalize(@Nullable String raw) {
+        GlobalSettingsDocument parsed = raw == null || raw.isBlank() ? null : GSON.fromJson(raw, GlobalSettingsDocument.class);
+        if (parsed == null) {
+            return GSON.toJson(createDefaultGlobalSettingsDocument());
+        }
+        migrateToCurrentVersion(parsed);
+        moveLegacyOwnedLimitToDeployed(parsed);
+        return GSON.toJson(createDocument(TameworkSettingsResolver.resolve(toOverrides(parsed)).toSnapshot()));
+    }
+
+    /** The settings {@code raw} resolves to; a null or blank {@code raw} gives the built-in defaults. */
+    @Nonnull
+    public static ResolvedTameworkSettings parse(@Nullable String raw) {
+        GlobalSettingsDocument parsed = raw == null || raw.isBlank() ? null : GSON.fromJson(raw, GlobalSettingsDocument.class);
+        return parsed == null ? defaultGlobalSettings() : TameworkSettingsResolver.resolve(toOverrides(parsed));
+    }
+
     @Nullable
     private static GlobalSettingsDocument readDocument(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
-        if (!Files.isRegularFile(globalSettingsFile)) {
-            return null;
-        }
         try {
-            String raw = Files.readString(globalSettingsFile, StandardCharsets.UTF_8);
+            String raw = NetworkSettingsLayer.effective(NetworkSettingsLayer.SECTION_MAIN,
+                    Files.isRegularFile(globalSettingsFile)
+                            ? Files.readString(globalSettingsFile, StandardCharsets.UTF_8) : null);
             if (raw == null || raw.isBlank()) {
                 return null;
             }
@@ -531,7 +555,8 @@ public final class TameworkSettingsStore {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            String serialized = GSON.toJson(document) + System.lineSeparator();
+            String serialized = NetworkSettingsLayer.localForm(NetworkSettingsLayer.SECTION_MAIN, GSON.toJson(document))
+                    + System.lineSeparator();
             Path tmp = globalSettingsFile.resolveSibling(globalSettingsFile.getFileName() + ".tmp");
             Files.writeString(tmp, serialized, StandardCharsets.UTF_8);
             try {

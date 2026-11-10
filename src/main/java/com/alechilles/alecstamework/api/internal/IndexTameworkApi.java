@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
+import com.alechilles.alecstamework.api.NetworkSettingsApi;
 import com.alechilles.alecstamework.api.PortableCompanionsApi;
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProgressionApi;
@@ -50,6 +51,7 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
     @Nullable private volatile BondedCompanionApi bondedCompanions;
     @Nullable private volatile PortableCompanionsApi portableCompanions;
+    @Nullable private volatile NetworkSettingsApi networkSettings;
 
     public IndexTameworkApi(
             @Nonnull IndexNpcProfilesApi profiles,
@@ -111,6 +113,14 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         this.portableCompanions = portableCompanions;
     }
 
+    /**
+     * Sets the server network settings facade this API hands out; with one that is available,
+     * {@code NETWORK_SETTINGS_STORE} is advertised. The caller owns the sync behind it.
+     */
+    public void useNetworkSettings(@Nullable NetworkSettingsApi networkSettings) {
+        this.networkSettings = networkSettings;
+    }
+
     /** Drops reflected optional-claim contracts after a settings change. */
     public void onRuntimeSettingsChanged() {
         base.onRuntimeSettingsChanged();
@@ -136,6 +146,9 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         }
         if (portableCompanions().available()) {
             result.add(TameworkApiCapability.PORTABLE_COMPANION_STORE);
+        }
+        if (networkSettings().available()) {
+            result.add(TameworkApiCapability.NETWORK_SETTINGS_STORE);
         }
         if (activities.isOpen()) {
             result.add(TameworkApiCapability.ACTIVITY_FEED_V2);
@@ -244,6 +257,12 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     public PortableCompanionsApi portableCompanions() {
         PortableCompanionsApi current = portableCompanions;
         return current == null || closed.get() ? PortableCompanionsApi.unavailable() : current;
+    }
+
+    @Override
+    public NetworkSettingsApi networkSettings() {
+        NetworkSettingsApi current = networkSettings;
+        return current == null || closed.get() ? NetworkSettingsApi.unavailable() : current;
     }
 
     /** Closes the feed and the registries. Clear {@code ActivityRuntime} before calling this. */

@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.api.internal.IndexNpcProfilesApi;
 import com.alechilles.alecstamework.api.internal.IndexPopulationGroupApi;
 import com.alechilles.alecstamework.api.internal.IndexProfileDataApi;
 import com.alechilles.alecstamework.api.internal.IndexTameworkApi;
+import com.alechilles.alecstamework.api.internal.NetworkSettingsFacade;
 import com.alechilles.alecstamework.api.internal.PortableCompanionsFacade;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
@@ -189,6 +190,8 @@ import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.settings.NetworkSettingsRuntime;
+import com.alechilles.alecstamework.settings.NetworkSettingsSync;
 import com.alechilles.alecstamework.settings.TameworkDataPathService;
 import com.alechilles.alecstamework.settings.mods.ModSettingsService;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
@@ -325,6 +328,9 @@ public class Tamework extends JavaPlugin {
     /** Server network sync; inert until a network mod installs a store. Null unless the companion module is ready. */
     @Nullable
     private volatile PortableSync portableSync;
+    /** Server network settings; serves the saved network layer and is otherwise inert until a network mod installs a store. */
+    @Nullable
+    private volatile NetworkSettingsSync networkSettingsSync;
     /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
     private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
     /** Drops a cleared name from the companion record; a no-op until the companion index is registered. */
@@ -845,6 +851,9 @@ public class Tamework extends JavaPlugin {
             if (network != null) {
                 indexApi.usePortableCompanions(new PortableCompanionsFacade(network));
             }
+            NetworkSettingsSync settingsSync = NetworkSettingsRuntime.start(this, modSettingsService);
+            networkSettingsSync = settingsSync;
+            indexApi.useNetworkSettings(new NetworkSettingsFacade(settingsSync));
             api = indexApi;
             // Companion events go out after the index lock is released, on the changing thread (spec 9).
             apiModule.addAfterUnlockListener(new CompanionEventPublisher(
@@ -1645,6 +1654,12 @@ public class Tamework extends JavaPlugin {
         return sync;
     }
 
+    /** The server network settings sync, or null when the API is not ready. */
+    @Nullable
+    public NetworkSettingsSync getNetworkSettingsSync() {
+        return networkSettingsSync;
+    }
+
     /** The server network sync, or null when the companion module is not ready. */
     @Nullable
     public PortableSync getPortableSync() {
@@ -2242,6 +2257,11 @@ public class Tamework extends JavaPlugin {
         if (network != null) {
             // Does nothing when the -28 ShutdownEvent handler already sent and stopped it.
             network.shutdown(1_000L);
+        }
+        NetworkSettingsSync settingsSync = networkSettingsSync;
+        networkSettingsSync = null;
+        if (settingsSync != null) {
+            settingsSync.close();
         }
     }
 

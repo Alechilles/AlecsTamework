@@ -58,17 +58,14 @@ public final class DeployPlacesStore {
 
     @Nonnull
     private static DeployPlaces read(@Nonnull Path file, @Nullable HytaleLogger logger) {
-        if (!Files.isRegularFile(file)) {
+        // With network settings a missing file means "no override"; a template of defaults would be one.
+        if (!Files.isRegularFile(file) && !NetworkSettingsLayer.active()) {
             write(file, DeployPlaces.DEFAULT, logger);
             return DeployPlaces.DEFAULT;
         }
         try {
-            Document document = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), Document.class);
-            if (document == null) {
-                return DeployPlaces.DEFAULT;
-            }
-            return new DeployPlaces(DeployPlaces.Mode.fromConfigValue(document.mode),
-                    document.places == null ? List.of() : document.places);
+            return parse(NetworkSettingsLayer.effective(NetworkSettingsLayer.SECTION_DEPLOY_PLACES,
+                    Files.isRegularFile(file) ? Files.readString(file, StandardCharsets.UTF_8) : null));
         } catch (IOException | JsonParseException ex) {
             if (logger != null) {
                 logger.at(Level.WARNING).withCause(ex)
@@ -88,17 +85,37 @@ public final class DeployPlacesStore {
         return true;
     }
 
-    private static boolean write(@Nonnull Path file, @Nonnull DeployPlaces places, @Nullable HytaleLogger logger) {
+    /**
+     * The places a document holds; a null or blank document gives the defaults.
+     *
+     * @throws JsonParseException when {@code raw} is not a places document
+     */
+    @Nonnull
+    public static DeployPlaces parse(@Nullable String raw) {
+        Document document = raw == null || raw.isBlank() ? null : GSON.fromJson(raw, Document.class);
+        return document == null ? DeployPlaces.DEFAULT
+                : new DeployPlaces(DeployPlaces.Mode.fromConfigValue(document.mode),
+                        document.places == null ? List.of() : document.places);
+    }
+
+    /** The full document for these places. */
+    @Nonnull
+    public static String toJson(@Nonnull DeployPlaces places) {
         Document document = new Document();
         document.mode = places.mode().configValue();
         document.places = places.places();
+        return GSON.toJson(document);
+    }
+
+    private static boolean write(@Nonnull Path file, @Nonnull DeployPlaces places, @Nullable HytaleLogger logger) {
         try {
             Path parent = file.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(tmp, GSON.toJson(document), StandardCharsets.UTF_8);
+            Files.writeString(tmp, NetworkSettingsLayer.localForm(NetworkSettingsLayer.SECTION_DEPLOY_PLACES,
+                    toJson(places)), StandardCharsets.UTF_8);
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
             return true;
         } catch (IOException ex) {
