@@ -821,6 +821,28 @@ public final class CompanionLifeStageService {
         return adultFinal;
     }
 
+    /**
+     * Replaces a stored adult role left over from another role family with the NPC's current role.
+     *
+     * <p>A role change outside the lifecycle, such as taming a wild {@code Deer_Doe} into
+     * {@code Tamed_Deer_Doe}, keeps the life-stage component. Its stored adult role then names the old
+     * family, and the next refresh would switch the NPC back to it. The stored role is stale when the
+     * current role is itself an adult role of {@code family} and the stored one is not.
+     *
+     * @return true when the stored adult role changed
+     */
+    static boolean adoptCurrentAdultRole(@Nonnull TameworkLifeStageComponent component,
+                                         @Nullable String roleId,
+                                         @Nonnull TwBreedingConfig.RoleFamily family) {
+        String stored = component.getAdultRoleId();
+        if (stored == null || stored.isBlank()
+                || !family.matchesAdultRole(roleId) || family.matchesAdultRole(stored)) {
+            return false;
+        }
+        component.setAdultRoleId(roleId);
+        return true;
+    }
+
     private static boolean normalizeComponentDefaults(TameworkLifeStageComponent component,
                                                       Ref<EntityStore> npcRef,
                                                       Store<EntityStore> store) {
@@ -864,6 +886,7 @@ public final class CompanionLifeStageService {
             TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
             TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForProgression(config, roleId);
             if (family != null) {
+                changed |= adoptCurrentAdultRole(component, roleId, family);
                 if ((component.getAdultRoleId() == null || component.getAdultRoleId().isBlank())
                         && family.getAdultRoleId() != null
                         && !family.getAdultRoleId().isBlank()) {

@@ -28,6 +28,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsConsumeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
@@ -401,6 +403,48 @@ final class TameworkInteractEffects {
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store, roleId);
         }
         return changed;
+    }
+
+    /**
+     * Moves a tamed NPC back onto its tame role when it still runs a role that names a different one.
+     *
+     * <p>Releases before the life-stage fix could switch a tamed animal back to its wild role. Only a
+     * {@code RoleParam} is trusted here, because it is the current role's own statement of what it
+     * becomes when tamed; a literal {@code Role} can sit in a config shared with later tamed roles.
+     *
+     * @return true when a role change was requested
+     */
+    boolean repairTamedRole(@Nullable TwInteractionConfig config,
+                            Ref<EntityStore> npcRef,
+                            @Nullable Role role,
+                            Store<EntityStore> store,
+                            @Nullable InteractionContextSnapshot ctx) {
+        if (config == null || role == null || !TamedStateResolver.isTamed(npcRef, store)) {
+            return false;
+        }
+        for (InteractionEntry entry : config.getInteractions()) {
+            if (!(entry instanceof TameInteraction tame) || !entry.isEnabled()) {
+                continue;
+            }
+            String roleParam = tame.getRoleParam();
+            if (roleParam == null || roleParam.isBlank()) {
+                continue;
+            }
+            String tameRoleId = owner.getRoleStringParam(role, ctx, roleParam);
+            if (tameRoleId == null || tameRoleId.isBlank() || tameRoleId.equalsIgnoreCase(role.getRoleName())) {
+                continue;
+            }
+            if (roleChangeEffects.applySetRole(tameRoleId, false, npcRef, role, store)) {
+                Tamework plugin = Tamework.getInstance();
+                if (plugin != null && plugin.getLogger() != null) {
+                    plugin.getLogger().at(Level.INFO).log(
+                            "Tamed NPC was still in role %s; moved it to its tame role %s.",
+                            role.getRoleName(), tameRoleId);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     @Nullable

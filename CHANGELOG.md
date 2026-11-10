@@ -36,6 +36,12 @@
   green when you have enough. Revive opens the cost dialog with each item you hold and need, and charges only when you
   confirm. Before, ordinary companions showed only "Ready to revive" and Revive failed without saying what it cost.
 
+### Fixed
+
+- Tamed animals whose wild roles have their own adult-role family, such as Animal Husbandry deer and moose, no
+  longer switch back to their wild role and stop answering commands. Animals already affected return to their tamed
+  role the next time a player interacts with them.
+
 ### Removed
 
 - The hidden legacy command wheel left in the command menu. `ShowInRadial` on command entries still loads but no

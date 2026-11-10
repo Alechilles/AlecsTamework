@@ -261,6 +261,10 @@ public class ActionTameworkInteract extends TameworkActionBase {
             ));
             return false;
         }
+        if (executor != null && executor.repairTamedRole(config, npcRef, role, store, ctx)) {
+            // The role is being replaced, so nothing else runs on it; the next interaction uses the tame role.
+            return true;
+        }
         if (allowLegacyAdoption) {
             InteractionLegacyAdoptionService.Attempt attempt = legacyAdoptionService.attempt(
                     npcRef, store, player, role,
