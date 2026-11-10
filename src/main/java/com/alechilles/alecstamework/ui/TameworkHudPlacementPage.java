@@ -3,7 +3,8 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.CommandHudDirtySink;
 import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
-import com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent;
+import com.alechilles.alecstamework.items.components.TameworkHudPlacementComponent;
+import com.alechilles.alecstamework.items.components.TameworkInspectPreferencesComponent;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.hypixel.hytale.server.core.Message;
@@ -65,6 +66,8 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
     private final Runnable returnToPanel;
     private CompanionHudPlacement draft;
     private int step = 10;
+    /** The card's default position for this viewer: further right while the inspect camera is on. */
+    private CompanionHudPlacement cardDefault = CompanionHudPlacement.CARD_DEFAULT;
     private boolean finished;
 
     public TameworkHudPlacementPage(@Nonnull PlayerRef playerRef, @Nullable Runnable returnToPanel) {
@@ -83,9 +86,15 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
         if (draft == null) {
+            // The card's default depends on the inspect camera, as on the real card (TameworkCompanionCardPage).
+            cardDefault = TameworkInspectPreferencesComponent.cameraEnabled(ref, store)
+                    ? CompanionHudPlacement.CARD_CAMERA_DEFAULT : CompanionHudPlacement.CARD_DEFAULT;
             draft = switch (mode) {
                 case SERVER_DEFAULT -> CompanionHudDefaultsStore.current();
-                case CARD -> TameworkCompanionCardPlacementComponent.read(ref, store);
+                case CARD -> {
+                    CompanionHudPlacement saved = TameworkCompanionCardPlacementComponent.read(ref, store);
+                    yield saved.equals(CompanionHudPlacement.CARD_DEFAULT) ? cardDefault : saved;
+                }
                 case PLAYER -> TameworkHudPlacementComponent.read(ref, store);
             };
             wakeTargetHud(store);
@@ -123,7 +132,7 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
             // A player resets to the server default; an admin resets the server default to the built-in one.
             case ACTION_RESET -> draft = switch (mode) {
                 case SERVER_DEFAULT -> CompanionHudPlacement.DEFAULT;
-                case CARD -> CompanionHudPlacement.CARD_DEFAULT;
+                case CARD -> cardDefault;
                 case PLAYER -> CompanionHudDefaultsStore.current();
             };
             case ACTION_UP -> draft = draft.moved(0, -step).fitted(sampleHeight());
@@ -157,7 +166,9 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
     /** Saves the draft; returns false when the save was refused or failed and the player was told why. */
     private boolean save(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         if (mode == Mode.CARD) {
-            TameworkCompanionCardPlacementComponent.write(ref, store, draft);
+            // Saving the default stores nothing, so the card keeps following the camera setting.
+            TameworkCompanionCardPlacementComponent.write(ref, store,
+                    draft.equals(cardDefault) ? CompanionHudPlacement.CARD_DEFAULT : draft);
             return true;
         }
         if (mode == Mode.PLAYER) {
@@ -201,8 +212,8 @@ public final class TameworkHudPlacementPage extends InteractiveCustomUIPage<Tame
             if (point == null) {
                 return false;
             }
-            draft = mode == Mode.CARD && point == CompanionHudPlacement.CARD_DEFAULT.point()
-                    ? CompanionHudPlacement.CARD_DEFAULT
+            draft = mode == Mode.CARD && point == cardDefault.point()
+                    ? cardDefault
                     : CompanionHudPlacement.snap(point);
             return true;
         }
