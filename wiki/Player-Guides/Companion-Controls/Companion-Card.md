@@ -47,6 +47,9 @@ actions stay in their own companion panel.
 
 ## Moving the panel
 
+While Companion Inspect is open, the camera zooms in on the companion, and you stay where you stood. To keep your
+normal camera instead, turn **Inspect camera** off in **Your settings**.
+
 Companion Inspect opens just right of your crosshair. To put it somewhere else, open **Your settings** and click **Move** next
 to **Companion Inspect**. Pick a snap point, nudge the sample into place and click Save. It opens there next time.
 Reset puts it back beside the crosshair. Only your screen changes.

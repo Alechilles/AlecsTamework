@@ -2117,3 +2117,5 @@ tamework.ui.playerSettings.position.section=Positionen
 tamework.ui.playerSettings.card.label=Begleiter-Inspektion
 tamework.ui.hudPlacement.cardTitle=Position der Begleiter-Inspektion
 tamework.ui.hudPlacement.cardHint=Wähle einen Ankerpunkt und schiebe das Fenster zurecht. Es öffnet sich nächstes Mal dort.
+tamework.ui.playerSettings.camera.label=Inspektionskamera
+tamework.ui.playerSettings.camera.tooltip=An: Die Kamera zoomt auf den Begleiter, solange die Begleiter-Inspektion offen ist. Aus: Die Kamera bleibt bei dir.

@@ -2117,3 +2117,5 @@ tamework.ui.playerSettings.position.section=Positions
 tamework.ui.playerSettings.card.label=Inspection du compagnon
 tamework.ui.hudPlacement.cardTitle=Position de l'inspection du compagnon
 tamework.ui.hudPlacement.cardHint=Choisissez un point d'ancrage, puis ajustez le panneau. Il s'ouvrira là la prochaine fois.
+tamework.ui.playerSettings.camera.label=Caméra d'inspection
+tamework.ui.playerSettings.camera.tooltip=Activée : la caméra se rapproche du compagnon tant que l'inspection est ouverte. Désactivée : la caméra reste avec vous.

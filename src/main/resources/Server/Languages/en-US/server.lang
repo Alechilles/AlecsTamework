@@ -2129,3 +2129,5 @@ tamework.ui.playerSettings.position.section=Positions
 tamework.ui.playerSettings.card.label=Companion Inspect
 tamework.ui.hudPlacement.cardTitle=Companion Inspect position
 tamework.ui.hudPlacement.cardHint=Pick a snap point, then nudge the panel into place. It opens there next time.
+tamework.ui.playerSettings.camera.label=Inspect camera
+tamework.ui.playerSettings.camera.tooltip=On: the camera zooms in on the companion while Companion Inspect is open. Off: the camera stays with you.

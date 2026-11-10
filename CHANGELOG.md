@@ -12,7 +12,8 @@
   where the companion HUD and Companion Inspect sit on your screen. Admins reach the server settings from there, and its
   **Back** button returns to Your settings. The separate HUD position button is gone.
 - While Companion Inspect is open, your camera glides in and frames the companion beside the panel, then glides back
-  when it closes. It is skipped while you ride or fly.
+  when it closes. It is skipped while you ride or fly, and players can turn it off with **Inspect camera** in
+  **Your settings**.
 - `/tw settings` has a **Companion Inspect** section: what F does by default, whether players may choose for themselves,
   and how renaming from Companion Inspect works.
 - Rename a companion from Companion Inspect with the pencil button. By default it needs a naming item such as a nametag

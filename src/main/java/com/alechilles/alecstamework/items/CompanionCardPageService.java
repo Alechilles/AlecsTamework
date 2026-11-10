@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
 import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
 import com.alechilles.alecstamework.companioncard.CompanionCards;
 import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
+import com.alechilles.alecstamework.items.components.TameworkInspectCameraPreferenceComponent;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -119,7 +120,8 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         openPages.put(player.getUuid(), session);
         // A card replacing another card has already released the old camera in its close callback.
-        session.cameraLocked = CompanionInspectCamera.apply(player, playerRef, npcRef, store,
+        session.cameraLocked = TameworkInspectCameraPreferenceComponent.enabled(playerRef, store)
+                && CompanionInspectCamera.apply(player, playerRef, npcRef, store,
                 TameworkCompanionCardPlacementComponent.read(playerRef, store));
         scheduleRefresh(session);
     }

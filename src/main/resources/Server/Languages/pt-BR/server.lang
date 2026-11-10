@@ -2117,3 +2117,5 @@ tamework.ui.playerSettings.position.section=Posições
 tamework.ui.playerSettings.card.label=Inspeção do companheiro
 tamework.ui.hudPlacement.cardTitle=Posição da inspeção do companheiro
 tamework.ui.hudPlacement.cardHint=Escolha um ponto de encaixe e ajuste o painel. Ele abrirá ali na próxima vez.
+tamework.ui.playerSettings.camera.label=Câmera de inspeção
+tamework.ui.playerSettings.camera.tooltip=Ativada: a câmera se aproxima do companheiro enquanto a inspeção está aberta. Desativada: a câmera fica com você.

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
 import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
+import com.alechilles.alecstamework.items.components.TameworkInspectCameraPreferenceComponent;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -24,7 +25,8 @@ import javax.annotation.Nullable;
 
 /**
  * Your settings: what each player chooses for themselves, opened from the gear in the companions window. It holds
- * what F on a companion does, the companion HUD and card positions and, for players with settings access,
+ * what F on a companion does, whether Companion Inspect moves the camera, the companion HUD and card positions and,
+ * for players with settings access,
  * the admin settings. Choices apply at once; Done returns to the page that opened it and Esc just closes.
  */
 public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<TameworkPlayerSettingsPage.EventPayload> {
@@ -37,6 +39,7 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
     private static final String ACTION_F_DEFAULT = "f:default";
     private static final String ACTION_HUD = "hud";
     private static final String ACTION_CARD = "card";
+    private static final String ACTION_CAMERA = "camera";
     private static final String ACTION_SERVER = "server";
     private static final String ACTION_DONE = "done";
 
@@ -63,6 +66,7 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
             bind(eventBuilder, "#TameworkPlayerSettingsFCycle", ACTION_F_CYCLE);
             bind(eventBuilder, "#TameworkPlayerSettingsFDefault", ACTION_F_DEFAULT);
         }
+        bind(eventBuilder, "#TameworkPlayerSettingsCamera", ACTION_CAMERA);
         bind(eventBuilder, "#TameworkPlayerSettingsHudMove", ACTION_HUD);
         bind(eventBuilder, "#TameworkPlayerSettingsCardMove", ACTION_CARD);
         if (admin) {
@@ -80,6 +84,13 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
             case ACTION_F_CARD -> choose(ref, store, CompanionCardFBehaviour.CARD);
             case ACTION_F_CYCLE -> choose(ref, store, CompanionCardFBehaviour.CYCLE);
             case ACTION_F_DEFAULT -> choose(ref, store, null);
+            case ACTION_CAMERA -> {
+                TameworkInspectCameraPreferenceComponent.setEnabled(ref, store,
+                        !TameworkInspectCameraPreferenceComponent.enabled(ref, store));
+                UICommandBuilder commands = new UICommandBuilder();
+                bindChoice(commands, ref, store);
+                sendUpdate(commands, new UIEventBuilder(), false);
+            }
             case ACTION_HUD -> openPlacement(ref, store, TameworkHudPlacementPage.Mode.PLAYER);
             case ACTION_CARD -> openPlacement(ref, store, TameworkHudPlacementPage.Mode.CARD);
             case ACTION_SERVER -> {
@@ -125,6 +136,8 @@ public final class TameworkPlayerSettingsPage extends InteractiveCustomUIPage<Ta
         choiceButton(commands, "#TameworkPlayerSettingsFDefault", allowed, allowed && saved == null);
         String behaviour = LocalizedText.resolve(playerRef, CompanionCardPreferences.serverDefault() == CompanionCardFBehaviour.CARD
                 ? "tamework.commands.card.behaviour.card" : "tamework.commands.card.behaviour.cycle");
+        commands.set("#TameworkPlayerSettingsCamera.Style", Value.ref(STYLES,
+                TameworkInspectCameraPreferenceComponent.enabled(ref, store) ? "SwitchOn" : "SwitchOff"));
         commands.set("#TameworkPlayerSettingsFNote.Text", LocalizedText.format(playerRef, allowed
                 ? "tamework.ui.playerSettings.f.note.default" : "tamework.ui.playerSettings.f.note.locked", behaviour));
     }
