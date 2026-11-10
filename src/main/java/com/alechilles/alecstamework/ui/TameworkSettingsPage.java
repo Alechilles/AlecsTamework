@@ -422,7 +422,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
         boolean rejoin = ACTION_NETWORK_LEAVE.equals(action) && NetworkSettingsLayer.state().left();
         if (ACTION_NETWORK_PUBLISH.equals(action)
-                && !TameworkConfigPermission.hasNetworkAccess((Object) store.getComponent(ref, Player.getComponentType()))) {
+                && !TameworkConfigPermission.hasNetworkAccess((Object) playerRef)) {
             warningLine = formatText("tamework.ui.settings.network.warning.noPermission",
                     TameworkConfigPermission.NETWORK_NODE);
             refreshFeedback();
