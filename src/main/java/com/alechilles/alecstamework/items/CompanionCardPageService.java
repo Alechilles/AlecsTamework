@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
-import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
 import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
 import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
@@ -175,8 +174,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                     CompanionCardPreferences.renameMode());
         }
         return new TameworkCompanionCardPage.View(entry, owner ? interactions : CompanionCardInteractions.EMPTY,
-                owner, generic, ownerName(npcRef, store), rename, CompanionCardPreferences.playerChoiceAllowed(),
-                CompanionCardPreferences.effective(playerRef, store) == CompanionCardFBehaviour.CARD, groupOptions);
+                owner, generic, ownerName(npcRef, store), rename, groupOptions);
     }
 
     /**
@@ -324,19 +322,6 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                 page.closeCard();
                 culls.cullLoaded(live.player(), npcUuid);
             }
-        }
-
-        @Override
-        public void toggleOpenOnF() {
-            if (!CompanionCardPreferences.playerChoiceAllowed() || !playerRef.isValid()) {
-                return;
-            }
-            boolean card = CompanionCardPreferences.effective(playerRef, store) == CompanionCardFBehaviour.CARD;
-            CompanionCardFBehaviour next = card ? CompanionCardFBehaviour.CYCLE : CompanionCardFBehaviour.CARD;
-            // Picking the server default clears the override, so a later default change applies again.
-            CompanionCardPreferences.setOverride(playerRef, store,
-                    next == CompanionCardPreferences.serverDefault() ? null : next);
-            refresh();
         }
 
         @Override

@@ -16,7 +16,6 @@ $C = "Common.ui";
 @TooltipButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TooltipLabel));
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @FooterNote = LabelStyle(FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
-@FooterLabel = LabelStyle(FontSize: 11, TextColor: #bfcdd5, VerticalAlignment: Center);
 @ConfirmLabel = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffd3d3, VerticalAlignment: Center, Wrap: true);
 
 Group {
@@ -255,9 +254,6 @@ Group {
       Group #Footer {
         Anchor: (Top: 500, Left: 14, Width: 412, Height: 44);
         Group { Anchor: (Top: 0, Left: 0, Width: 412, Height: 1); Background: #ffffff(0.08); }
-        TextButton #FBehaviourOnButton { Anchor: (Top: 13, Left: 0, Width: 42, Height: 22); Style: $A.@SwitchOn; Text: ""; TooltipText: %server.tamework.ui.companionCard.openOnF.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
-        TextButton #FBehaviourOffButton { Anchor: (Top: 13, Left: 0, Width: 42, Height: 22); Style: $A.@SwitchOff; Text: ""; TooltipText: %server.tamework.ui.companionCard.openOnF.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
-        Label #FBehaviourLabel { Anchor: (Top: 10, Left: 50, Width: 170, Height: 28); Text: %server.tamework.ui.companionCard.openOnF; Style: @FooterLabel; Visible: false; }
         Label #ReadOnlyNote { Anchor: (Top: 6, Left: 0, Width: 412, Height: 36); Text: %server.tamework.ui.companionCard.readOnly; Style: @FooterNote; Visible: false; }
         TextButton #ReleaseButton { Anchor: (Top: 10, Right: 88, Width: 84, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.linkedPanel.card.button.release; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }
         TextButton #CullButton { Anchor: (Top: 10, Right: 0, Width: 80, Height: 28); Style: $A.@PanelButtonQuiet; Text: %server.tamework.ui.linkedPanel.action.cull; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.cull; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Visible: false; }

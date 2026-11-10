@@ -482,7 +482,6 @@ public final class TameworkCommandSelectionPage
                     ? "unknown" : plugin.getManifest().getVersion().toString();
             commandBuilder.set("#TameworkCommandMenuLogo.TooltipText",
                     LocalizedText.format(resolveLanguage(), "tamework.ui.shared.brandTooltip", runningVersion));
-            commandBuilder.set("#CommandMenuSettings.Visible", canOpenSettings(ref, store));
             commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
             if (viewBinding != null) commandBuilder.append("#TameworkLinkedPanelContainer", "TameworkCompanionViews.ui");
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
@@ -626,7 +625,8 @@ public final class TameworkCommandSelectionPage
             });
             return;
         }
-        if (CommandSelectionPageEventBinder.HUD_PLACEMENT_COMMAND_ID.equals(commandId)) {
+        // The gear opens Your settings for everyone; it links to the admin settings for players with access.
+        if (CommandSelectionPageEventBinder.SETTINGS_COMMAND_ID.equals(commandId)) {
             if (!beginPageNavigation()) return;
             navigateAfterUiDrain(() -> {
                 try {
@@ -636,25 +636,7 @@ public final class TameworkCommandSelectionPage
                     Player currentPlayer = currentStore.getComponent(currentRef, Player.getComponentType());
                     if (currentPlayer == null) return;
                     currentPlayer.getPageManager().openCustomPage(currentRef, currentStore,
-                            new TameworkHudPlacementPage(playerRef, reopenPanel));
-                } finally {
-                    navigationPending = false;
-                }
-            });
-            return;
-        }
-        if (CommandSelectionPageEventBinder.SETTINGS_COMMAND_ID.equals(commandId)) {
-            if (!canOpenSettings(ref, store) || !beginPageNavigation()) return;
-            navigateAfterUiDrain(() -> {
-                try {
-                    Ref<EntityStore> currentRef = playerRef.getReference();
-                    if (currentRef == null || !currentRef.isValid()) return;
-                    String error = TameworkSettingsPageService.openSettingsPage(
-                            currentRef, currentRef.getStore(), "command_menu", "settings_button");
-                    if (error != null) {
-                        playerRef.sendMessage(com.hypixel.hytale.server.core.Message.raw(error));
-                        close();
-                    }
+                            new TameworkPlayerSettingsPage(playerRef, reopenPanel));
                 } finally {
                     navigationPending = false;
                 }
@@ -1355,16 +1337,6 @@ public final class TameworkCommandSelectionPage
         refreshLifecycle.close();
         close();
     }
-    private boolean canOpenSettings(Ref<EntityStore> ref, Store<EntityStore> store) {
-        if (ref == null || !ref.isValid() || store == null) return false;
-        try {
-            return TameworkSettingsPageService.hasAccess(playerRef, playerRef);
-        } catch (RuntimeException unavailable) {
-            // Permission infrastructure may be unavailable during page teardown; fail closed.
-            return false;
-        }
-    }
-
     private boolean beginPageNavigation() {
         if (navigationPending) {
             return false;

@@ -1,0 +1,30 @@
+$A = "TameworkSlateStyles.ui";
+$C = "Common.ui";
+
+// Your settings: the choices each player makes for themselves, opened from the gear in the companions window.
+// TameworkPlayerSettingsPage highlights the current F choice, greys it out when the server locks it, and shows
+// the Server settings button only to players allowed to open the admin settings.
+@Caps = LabelStyle(FontSize: 10, RenderBold: true, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, VerticalAlignment: Center);
+@Note = LabelStyle(FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
+
+Group #TameworkPlayerSettingsCard {
+ Anchor: (Width: 420, Height: 330);
+ Background: $A.@SlateModal;
+ Label #TameworkPlayerSettingsTitle { Anchor: (Top: 16, Left: 22, Right: 22, Height: 28); Text: %server.tamework.ui.playerSettings.title; Style: $A.@SlateTitle; }
+ Label { Anchor: (Top: 46, Left: 22, Right: 22, Height: 20); Text: %server.tamework.ui.playerSettings.hint; Style: @Note; }
+
+ Label { Anchor: (Top: 82, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.playerSettings.f.section; Style: @Caps; }
+ TextButton #TameworkPlayerSettingsFCard { Anchor: (Top: 104, Left: 22, Width: 120, Height: 30); Text: %server.tamework.ui.playerSettings.f.card; TooltipText: %server.tamework.ui.playerSettings.f.card.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+ TextButton #TameworkPlayerSettingsFCycle { Anchor: (Top: 104, Left: 150, Width: 120, Height: 30); Text: %server.tamework.ui.playerSettings.f.cycle; TooltipText: %server.tamework.ui.playerSettings.f.cycle.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+ TextButton #TameworkPlayerSettingsFDefault { Anchor: (Top: 104, Left: 278, Width: 120, Height: 30); Text: %server.tamework.ui.playerSettings.f.default; TooltipText: %server.tamework.ui.playerSettings.f.default.tooltip; TextTooltipStyle: $C.@DefaultTextTooltipStyle; Style: $A.@PanelButton; }
+ Label #TameworkPlayerSettingsFNote { Anchor: (Top: 140, Left: 22, Right: 22, Height: 32); Text: ""; Style: @Note; }
+
+ Group { Anchor: (Top: 184, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
+ Label { Anchor: (Top: 198, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.playerSettings.hud.section; Style: @Caps; }
+ Label { Anchor: (Top: 220, Left: 22, Right: 140, Height: 30); Text: %server.tamework.ui.playerSettings.hud.hint; Style: @Note; }
+ TextButton #TameworkPlayerSettingsHudMove { Anchor: (Top: 220, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.playerSettings.hud.move; Style: $A.@PanelButton; }
+
+ Group { Anchor: (Top: 266, Left: 22, Right: 22, Height: 1); Background: #ffffff(0.08); }
+ TextButton #TameworkPlayerSettingsServer { Anchor: (Top: 282, Left: 22, Width: 150, Height: 30); Text: %server.tamework.ui.playerSettings.serverSettings; Style: $A.@PanelButtonQuiet; Visible: false; }
+ TextButton #TameworkPlayerSettingsDone { Anchor: (Top: 282, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
+}

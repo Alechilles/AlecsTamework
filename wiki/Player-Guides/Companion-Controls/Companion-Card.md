@@ -23,7 +23,7 @@ Press **F** on a companion you own to open its companion card beside your crossh
 - **Actions**: shoulder, flight and breeding toggles, **Set Home** (here, where the companion stands) and
   **Return Home**, plus anything the companion's mod adds, such as **Ride** and **Pet**. A greyed-out button is not available right now, for example Ride on a dragon without the Flightmaster's
   Talisman in hand. Riding from the card does not need crouching.
-- **Footer**: **Release** and **Cull**, each with a confirmation, and the **Open with F** switch.
+- **Footer**: **Release** and **Cull**, each with a confirmation.
 
 Someone else's companion shows its info and owner only.
 
@@ -35,8 +35,10 @@ when you need a naming item and have none.
 
 ## Choosing what F does
 
-Turn **Open with F** off on the card, or use `/tw card cycle`, to have F cycle your companions' modes as before.
-`/tw card card` turns the card back on, and `/tw card default` follows the server's choice. Crouch + F still does what
+Open the companions window from your command item and click the gear to reach **Your settings**. Under **F on a
+companion**, pick **Cycle modes** to have F cycle your companions' modes as before, **Companion card** to open the
+card, or **Server default** to follow the server's choice. Without a command item, use `/tw card cycle`,
+`/tw card card` or `/tw card default`. If the server has locked this choice, the buttons are greyed out. Crouch + F still does what
 it did, such as mounting. With the card on, F with an empty hand opens the card instead of petting; use the card's
 Pet button.
 

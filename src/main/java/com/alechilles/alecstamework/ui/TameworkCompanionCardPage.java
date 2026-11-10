@@ -75,8 +75,6 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        boolean genericActions,
                        @Nullable String ownerName,
                        @Nonnull CardRenameAvailability rename,
-                       boolean playerChoiceAllowed,
-                       boolean opensOnF,
                        @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions) {
     }
 
@@ -106,8 +104,6 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         void release();
 
         void cull();
-
-        void toggleOpenOnF();
 
         /** The card closed for any reason. */
         void closed();
@@ -231,7 +227,6 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             case "rename" -> {
                 if (generic() && view.rename() == CardRenameAvailability.AVAILABLE) actions.rename();
             }
-            case "openOnF" -> { if (view.playerChoiceAllowed()) actions.toggleOpenOnF(); }
             case "release" -> askConfirm(Confirm.RELEASE);
             case "cull" -> askConfirm(Confirm.CULL);
             default -> {
@@ -534,19 +529,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         commands.setObject(footer + ".Anchor", anchor(top, 14, 412, 44));
         Confirm confirm = generic ? pendingConfirm : null;
         boolean confirming = confirm != null;
-        boolean choice = view.playerChoiceAllowed() && !confirming;
-        commands.set(footer + " #FBehaviourOnButton.Visible", choice && view.opensOnF());
-        commands.set(footer + " #FBehaviourOffButton.Visible", choice && !view.opensOnF());
-        commands.set(footer + " #FBehaviourLabel.Visible", choice);
-        if (choice) {
-            bind(events, footer + (view.opensOnF() ? " #FBehaviourOnButton" : " #FBehaviourOffButton"), "openOnF");
-        }
         commands.set(footer + " #ReadOnlyNote.Visible", !manage);
-        if (!manage) {
-            commands.set(footer + " #FBehaviourOnButton.Visible", false);
-            commands.set(footer + " #FBehaviourOffButton.Visible", false);
-            commands.set(footer + " #FBehaviourLabel.Visible", false);
-        }
         boolean release = generic && !confirming && canRelease();
         boolean cull = generic && !confirming && canCull();
         commands.set(footer + " #ReleaseButton.Visible", release);

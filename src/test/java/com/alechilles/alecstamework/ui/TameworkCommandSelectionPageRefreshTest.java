@@ -28,6 +28,7 @@ import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Observable page refresh coverage through the package-scoped packet boundary. */
@@ -1050,17 +1051,15 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void settingsWithoutAuthorizedPlayerKeepsCommandMenuOpen() throws Exception {
+    void settingsGearOpensYourSettingsForPlayerWithoutAdminAccess() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         NavigationFixture fixture = new NavigationFixture();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)), fixture);
         build(page);
         event(page, "__settings__");
-        assertEquals(0, fixture.source.closes);
-        assertNull(fixture.deferred);
-        event(page, "__talents__:" + CARD);
-        fixture.run();
-        assertEquals(1, fixture.talents);
+        // Your settings is for every player, so the gear leaves the menu without settings access.
+        assertEquals(1, fixture.source.closes);
+        assertNotNull(fixture.deferred);
     }
 
     @Test
