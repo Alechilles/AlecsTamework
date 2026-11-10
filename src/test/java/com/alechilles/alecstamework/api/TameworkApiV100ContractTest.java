@@ -54,6 +54,8 @@ class TameworkApiV100ContractTest {
             assertTrue(api.getCapabilities().contains(
                     TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT));
             assertTrue(api.getCapabilities().contains(
+                    TameworkApiCapability.HUSBANDRY_OUTCOME_ANIMAL_STATE));
+            assertTrue(api.getCapabilities().contains(
                     TameworkApiCapability.HUSBANDRY_TOOL_BONUSES));
             assertTrue(api.husbandryOutcomes().available());
             api.husbandryOutcomes().register(ignored -> new HusbandryOutcomeModifiers(
@@ -80,6 +82,8 @@ class TameworkApiV100ContractTest {
                     TameworkApiCapability.HUSBANDRY_OUTCOMES));
             assertFalse(api.getCapabilities().contains(
                     TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT));
+            assertFalse(api.getCapabilities().contains(
+                    TameworkApiCapability.HUSBANDRY_OUTCOME_ANIMAL_STATE));
             assertFalse(api.getCapabilities().contains(
                     TameworkApiCapability.HUSBANDRY_TOOL_BONUSES));
             assertFalse(api.husbandryOutcomes().available());

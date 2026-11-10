@@ -58,6 +58,16 @@ The provider receives an immutable `HusbandryOutcomeContext` with:
   It supplies the original item ID, quantity, durability, maximum durability,
   and copied BSON metadata. Providers can decode their own metadata without
   receiving a mutable live `ItemStack`.
+- `happiness` and `ageStage`, the animal's state at the moment of the outcome
+  (development addition, capability `HUSBANDRY_OUTCOME_ANIMAL_STATE`).
+  `happiness` is the animal's current stored happiness, the value the
+  happiness inspector shows. `ageStage` is the age cull rewards read:
+  `JUVENILE` before the animal is grown, else `ADULT`, `PRIME` or `SENIOR`.
+  For `BREEDING_GENETICS` they describe the parent that supplies the child's
+  owner. Each is `null` when the action has no live animal, when happiness is
+  disabled for the role, or when the role has aging disabled. Contexts built
+  with the older constructors leave both `null`. Coop egg production does not
+  resolve husbandry outcomes, so it never sees this state.
 
 The provider returns `HusbandryOutcomeModifiers`:
 

@@ -75,6 +75,8 @@ public enum TameworkApiCapability {
     /** A server network can install a shared store that companions follow their owner through. */
     PORTABLE_COMPANION_STORE,
     /** A server network can install a shared store for settings that every server inherits. */
-    NETWORK_SETTINGS_STORE
+    NETWORK_SETTINGS_STORE,
+    /** Husbandry outcome contexts include the animal's current happiness and age stage. */
+    HUSBANDRY_OUTCOME_ANIMAL_STATE
 }
 

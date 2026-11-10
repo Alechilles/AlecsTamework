@@ -86,7 +86,9 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 context.profileId(),
                 groups,
                 context.productId(),
-                context.tool()
+                context.tool(),
+                context.happiness(),
+                context.ageStage()
         );
     }
 
