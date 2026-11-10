@@ -14,6 +14,8 @@
 - While Companion Inspect is open, your camera glides in and frames the companion beside the panel, then glides back
   when it closes. Arrows on the portrait turn the view around the companion. It is skipped while you ride or fly, and players can turn it off with **Inspect camera** in
   **Your settings**.
+- Companion Inspect lists the companion's food preferences, with how much each food changes happiness, and its
+  appearance traits.
 - A **Close after a command** switch, on Companion Inspect and in **Your settings**, closes the panel after you pick a
   mode or an action. It is off by default.
 - `/tw settings` has a **Companion Inspect** section: what F does by default, whether players may choose for themselves,

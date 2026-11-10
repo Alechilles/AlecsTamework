@@ -381,7 +381,7 @@ final class CommandTargetHudBinder {
         bindFoodGrid(commandBuilder, selector + " #FoodGrid", food);
     }
 
-    private static void bindFoodValue(@Nonnull UICommandBuilder commandBuilder,
+    static void bindFoodValue(@Nonnull UICommandBuilder commandBuilder,
                                       @Nonnull String selector,
                                       @Nullable Double value) {
         String text = formatHappinessDelta(value);
@@ -402,7 +402,7 @@ final class CommandTargetHudBinder {
         commandBuilder.set(selector + " " + labelSelector + ".Text", visible ? text : "");
     }
 
-    private static void bindFoodGrid(@Nonnull UICommandBuilder commandBuilder,
+    static void bindFoodGrid(@Nonnull UICommandBuilder commandBuilder,
                                      @Nonnull String selector,
                                      @Nullable CommandTargetHudViewModel.FoodRow food) {
         if (food == null || food.itemId() == null || food.itemId().isBlank()) {
@@ -434,7 +434,7 @@ final class CommandTargetHudBinder {
     }
 
     @Nonnull
-    private static String foodTooltip(@Nonnull CommandTargetHudViewModel.FoodRow food,
+    static String foodTooltip(@Nonnull CommandTargetHudViewModel.FoodRow food,
                                       @Nullable String language) {
         String delta = formatHappinessDelta(food.happinessDelta());
         if (delta.isBlank()) {

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
 import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
 import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -38,6 +39,11 @@ import javax.annotation.Nullable;
 public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<TameworkCompanionCardPage.EventData> {
     public static final String UI_PATH = "TameworkCompanionCard.ui";
     private static final String KEY_ACTION = "Action";
+    /** Appearance traits the card lists, in two columns. */
+    public static final int APPEARANCE_SLOTS = 8;
+    private static final int FOOD_SLOTS = 9;
+    /** Horizontal distance between food slots. */
+    private static final int FOOD_SLOT_STEP = 45;
     private static final String KEY_GROUPS = "@CompanionGroups";
     /** The card's portrait starts at the identity block's top, 33 px higher than on the linked card. */
     private static final int LEVEL_TOP = LinkedNpcPanelProgressionBinder.LEVEL_TOP - 33;
@@ -81,7 +87,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        @Nullable String ownerName,
                        @Nonnull CardRenameAvailability rename,
                        @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions,
-                       boolean closeAfterCommand) {
+                       boolean closeAfterCommand,
+                       @Nonnull List<CommandTargetHudViewModel.FoodRow> foods,
+                       @Nonnull List<CommandTargetHudViewModel.AttachmentRow> appearance) {
     }
 
     /** Clicks reported to the page service. Every callback runs on the world thread. */
@@ -383,10 +391,72 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             top += 47;
         }
         top = bindActions(commands, events, entry, language, manage, generic, top);
+        top = bindFood(commands, language, top);
+        top = bindAppearance(commands, language, top);
         bindFooter(commands, events, entry, language, manage, generic, top);
         int height = top + 44 + 12;
         commands.setObject("#CompanionCardSlot.Anchor", placement.laneAnchor(CompanionHudPlacement.CARD_WIDTH));
         commands.setObject(CARD + ".Anchor", placement.plateAnchor(height, CompanionHudPlacement.CARD_WIDTH));
+    }
+
+    /** Food the companion eats, with its happiness value; "+N" stands for foods past the last slot. */
+    private int bindFood(UICommandBuilder commands, String language, int top) {
+        List<CommandTargetHudViewModel.FoodRow> foods = view.foods().stream()
+                .filter(food -> food.itemId() != null && !food.itemId().isBlank())
+                .toList();
+        boolean visible = !foods.isEmpty();
+        commands.set(CARD + " #FoodSection.Visible", visible);
+        if (!visible) {
+            return top;
+        }
+        commands.setObject(CARD + " #FoodSection.Anchor", anchor(top, 14, 412, 66));
+        int shown = foods.size() > FOOD_SLOTS ? FOOD_SLOTS - 1 : foods.size();
+        for (int slot = 0; slot < FOOD_SLOTS; slot++) {
+            String selector = CARD + " #Food" + slot;
+            boolean slotVisible = slot < shown;
+            commands.set(selector + ".Visible", slotVisible);
+            if (!slotVisible) {
+                continue;
+            }
+            CommandTargetHudViewModel.FoodRow food = foods.get(slot);
+            CommandTargetHudBinder.bindFoodValue(commands, selector, food.happinessDelta());
+            CommandTargetHudBinder.bindFoodGrid(commands, selector + " #FoodGrid", food);
+            commands.set(selector + " #FoodTooltip.TooltipText", CommandTargetHudBinder.foodTooltip(food, language));
+        }
+        int more = foods.size() - shown;
+        commands.set(CARD + " #FoodMore.Visible", more > 0);
+        if (more > 0) {
+            commands.set(CARD + " #FoodMore.Text", "+" + more);
+            commands.setObject(CARD + " #FoodMore.Anchor", anchor(30, shown * FOOD_SLOT_STEP, 40, 24));
+        }
+        return top + 74;
+    }
+
+    /** Appearance traits in two columns: the trait set's name, then the companion's value. */
+    private int bindAppearance(UICommandBuilder commands, String language, int top) {
+        List<CommandTargetHudViewModel.AttachmentRow> rows = view.appearance();
+        boolean visible = !rows.isEmpty();
+        commands.set(CARD + " #AppearanceSection.Visible", visible);
+        if (!visible) {
+            return top;
+        }
+        int lines = (Math.min(rows.size(), APPEARANCE_SLOTS) + 1) / 2;
+        int height = 20 + lines * 20;
+        commands.setObject(CARD + " #AppearanceSection.Anchor", anchor(top, 14, 412, height));
+        for (int slot = 0; slot < APPEARANCE_SLOTS; slot++) {
+            String selector = CARD + " #Appearance" + slot;
+            boolean slotVisible = slot < rows.size();
+            commands.set(selector + ".Visible", slotVisible);
+            if (!slotVisible) {
+                continue;
+            }
+            CommandTargetHudViewModel.AttachmentRow row = rows.get(slot);
+            commands.set(selector + " #Name.Text",
+                    LocalizedText.resolveConfigValue(language, row.setLabel(), row.setLabel()));
+            commands.set(selector + " #Value.Text",
+                    LocalizedText.resolveConfigValue(language, row.valueLabel(), row.valueLabel()));
+        }
+        return top + height + 8;
     }
 
     private void bindIdentity(UICommandBuilder commands, UIEventBuilder events, LinkedNpcEntry entry,

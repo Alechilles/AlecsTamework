@@ -2135,3 +2135,5 @@ tamework.ui.companionCard.closeAfterCommand=Close after a command
 tamework.ui.companionCard.closeAfterCommand.tooltip=On: choosing a mode or any action, such as Set Home or Ride, closes Companion Inspect. Off: it stays open.
 tamework.ui.companionCard.rotateLeft=Turn the view left
 tamework.ui.companionCard.rotateRight=Turn the view right
+tamework.ui.companionCard.section.food=Food preferences
+tamework.ui.companionCard.section.appearance=Appearance

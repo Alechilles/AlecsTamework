@@ -2123,3 +2123,5 @@ tamework.ui.companionCard.closeAfterCommand=Fechar após um comando
 tamework.ui.companionCard.closeAfterCommand.tooltip=Ativado: escolher um modo ou uma ação, como Definir lar, fecha a inspeção. Desativado: ela continua aberta.
 tamework.ui.companionCard.rotateLeft=Girar a visão para a esquerda
 tamework.ui.companionCard.rotateRight=Girar a visão para a direita
+tamework.ui.companionCard.section.food=Preferências alimentares
+tamework.ui.companionCard.section.appearance=Aparência

@@ -17,6 +17,16 @@ $C = "Common.ui";
 @PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
 @FooterLabel = LabelStyle(FontSize: 11, TextColor: #bfcdd5, VerticalAlignment: Center);
 @FooterNote = LabelStyle(FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
+// Food value chips, as on the companion HUD: the pill outline is tinted per sign.
+@FoodGridStyle = ItemGridStyle(SlotSize: 32, SlotSpacing: 0, SlotIconSize: 32);
+@FoodChipTextPositive = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #7fe08f, Alignment: Center);
+@FoodChipTextNegative = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #e5786d, Alignment: Center);
+@FoodChipTextNeutral = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #bfcdd5, Alignment: Center);
+@FoodChipPositive = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #7fe08f);
+@FoodChipNegative = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #e5786d);
+@FoodChipNeutral = PatchStyle(TexturePath: "Tamework/Slate/PillDark.png", Border: 7, Color: #96a9be);
+@TraitName = LabelStyle(FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center);
+@TraitValue = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, VerticalAlignment: Center);
 @ConfirmLabel = LabelStyle(FontSize: 10, RenderBold: true, TextColor: #ffd3d3, VerticalAlignment: Center, Wrap: true);
 
 Group {
@@ -257,6 +267,123 @@ Group {
       Label #Action11Caption { Anchor: (Top: 132, Left: 320, Width: 62, Height: 14); Text: ""; Style: @Caption; HitTestVisible: false; Visible: false; }
       }
 
+      // Food the companion eats; TameworkCompanionCardPage places this section and fills the slots.
+      Group #FoodSection {
+        Anchor: (Top: 0, Left: 14, Width: 412, Height: 66);
+        Visible: false;
+        Label { Anchor: (Top: 0, Left: 0, Width: 200, Height: 16); Text: %server.tamework.ui.companionCard.section.food; Style: @SectionLabel; }
+        Group #Food0 { Anchor: (Top: 20, Left: 0, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food1 { Anchor: (Top: 20, Left: 45, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food2 { Anchor: (Top: 20, Left: 90, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food3 { Anchor: (Top: 20, Left: 135, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food4 { Anchor: (Top: 20, Left: 180, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food5 { Anchor: (Top: 20, Left: 225, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food6 { Anchor: (Top: 20, Left: 270, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food7 { Anchor: (Top: 20, Left: 315, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Group #Food8 { Anchor: (Top: 20, Left: 360, Width: 40, Height: 46); Visible: false;
+          Group { Anchor: (Top: 12, Left: 1, Width: 38, Height: 34); Background: $A.@SlateQuiet; HitTestVisible: false; }
+          ItemGrid #FoodGrid { Anchor: (Top: 13, Left: 4, Width: 32, Height: 32); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @FoodGridStyle; HitTestVisible: false; Visible: false; }
+          Label #FoodValuePositive { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipPositive; Style: @FoodChipTextPositive; HitTestVisible: false; }
+          Label #FoodValueNegative { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNegative; Style: @FoodChipTextNegative; HitTestVisible: false; }
+          Label #FoodValueNeutral { Anchor: (Top: 0, Left: 8, Width: 26, Height: 14); Text: ""; Visible: false; Background: @FoodChipNeutral; Style: @FoodChipTextNeutral; HitTestVisible: false; }
+          TextButton #FoodTooltip { Anchor: (Top: 12, Left: 0, Width: 40, Height: 34); Text: ""; TooltipText: ""; Style: @TooltipButton; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        }
+        Label #FoodMore { Anchor: (Top: 30, Left: 360, Width: 40, Height: 24); Text: ""; Style: @SectionValue; Visible: false; }
+      }
+      // Appearance traits in two columns; TameworkCompanionCardPage places this section and fills the cells.
+      Group #AppearanceSection {
+        Anchor: (Top: 0, Left: 14, Width: 412, Height: 100);
+        Visible: false;
+        Label { Anchor: (Top: 0, Left: 0, Width: 200, Height: 16); Text: %server.tamework.ui.companionCard.section.appearance; Style: @SectionLabel; }
+        Group #Appearance0 { Anchor: (Top: 20, Left: 0, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance1 { Anchor: (Top: 20, Left: 206, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance2 { Anchor: (Top: 40, Left: 0, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance3 { Anchor: (Top: 40, Left: 206, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance4 { Anchor: (Top: 60, Left: 0, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance5 { Anchor: (Top: 60, Left: 206, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance6 { Anchor: (Top: 80, Left: 0, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+        Group #Appearance7 { Anchor: (Top: 80, Left: 206, Width: 200, Height: 18); Visible: false;
+          Label #Name { Anchor: (Top: 0, Left: 0, Width: 92, Height: 18); Text: ""; Style: @TraitName; }
+          Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
+        }
+      }
       Group #Footer {
         Anchor: (Top: 500, Left: 14, Width: 412, Height: 44);
         Group { Anchor: (Top: 0, Left: 0, Width: 412, Height: 1); Background: #ffffff(0.08); }

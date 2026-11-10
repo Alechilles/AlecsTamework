@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companioncard.CompanionCardRequests;
 import com.alechilles.alecstamework.companioncard.CompanionCards;
 import com.alechilles.alecstamework.items.components.TameworkCompanionCardPlacementComponent;
 import com.alechilles.alecstamework.items.components.TameworkInspectPreferencesComponent;
+import com.alechilles.alecstamework.npc.actions.TameworkTameFoodDisplayResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -73,6 +74,9 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
     private final CommandOwnedPanelRecordSource ownedRows;
     private final CommandLinkPolicyService links = new CommandLinkPolicyService();
     private final CommandNpcNameResolver names = new CommandNpcNameResolver();
+    private final CommandTargetHudFoodResolver foodResolver = new CommandTargetHudFoodResolver();
+    private final TameworkTameFoodDisplayResolver foodDisplay = new TameworkTameFoodDisplayResolver();
+    private final CommandTargetHudAttachmentResolver attachments = new CommandTargetHudAttachmentResolver();
     private final CommandLoadedNpcStatusSnapshotService snapshots;
     private final CommandLinkedFlightToggleActionService flight = new CommandLinkedFlightToggleActionService();
     private final CommandLinkedShoulderRideActionService shoulder = new CommandLinkedShoulderRideActionService();
@@ -114,7 +118,16 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             return;
         }
         String groupKey = groupKey(player, npcUuid);
-        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions, groupKey);
+        // Food and appearance rarely change, so they are worked out once per open and carried in the view.
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        String roleId = npc == null ? null : names.resolveNpcRoleId(npc);
+        List<CommandTargetHudViewModel.FoodRow> foods = npc == null ? List.of() : foodResolver.resolveFoodEntries(
+                player, foodDisplay.resolveFoodDisplayItemIds(roleId, npc.getRole(), npcRef, store, true).entries());
+        List<CommandTargetHudViewModel.AttachmentRow> appearance = attachments.resolveRows(roleId,
+                CommandTargetHudService.resolveModelAssetId(npcRef, store),
+                CommandTargetHudService.resolveAttachmentIds(npcRef, store), TameworkCompanionCardPage.APPEARANCE_SLOTS);
+        TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions, groupKey,
+                foods, appearance);
         if (view == null) {
             return;
         }
@@ -151,7 +164,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             return;
         }
         TameworkCompanionCardPage.View view = buildView(player, playerRef, npcRef, store, interactions,
-                session.groupKey);
+                session.groupKey, page.view().foods(), page.view().appearance());
         if (view == null) {
             page.closeCard();
             return;
@@ -163,7 +176,9 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
     private TameworkCompanionCardPage.View buildView(Player player, Ref<EntityStore> playerRef,
                                                      Ref<EntityStore> npcRef, Store<EntityStore> store,
                                                      CompanionCardInteractions interactions,
-                                                     String groupKey) {
+                                                     String groupKey,
+                                                     List<CommandTargetHudViewModel.FoodRow> foods,
+                                                     List<CommandTargetHudViewModel.AttachmentRow> appearance) {
         NPCEntity npc = npcRef.isValid() ? store.getComponent(npcRef, NPCEntity.getComponentType()) : null;
         if (npc == null || dying(npcRef, store)) {
             return null;
@@ -195,7 +210,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         return new TameworkCompanionCardPage.View(entry, owner ? interactions : CompanionCardInteractions.EMPTY,
                 owner, generic, ownerName(npcRef, store), rename, groupOptions,
-                TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store));
+                TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store), foods, appearance);
     }
 
     /**
@@ -417,7 +432,8 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
             }
             Ref<EntityStore> npcRef = npcRef();
             TameworkCompanionCardPage.View view = player == null || npcRef == null ? null
-                    : buildView(player, playerRef, npcRef, store, page.view().interactions(), groupKey);
+                    : buildView(player, playerRef, npcRef, store, page.view().interactions(), groupKey,
+                            page.view().foods(), page.view().appearance());
             if (view == null) {
                 page.closeCard();
                 return;

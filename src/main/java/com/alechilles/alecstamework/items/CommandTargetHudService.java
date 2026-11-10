@@ -422,7 +422,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     @Nullable
-    private Map<String, String> resolveAttachmentIds(@Nonnull Ref<EntityStore> npcRef,
+    static Map<String, String> resolveAttachmentIds(@Nonnull Ref<EntityStore> npcRef,
                                                      @Nonnull Store<EntityStore> store) {
         TameworkAttachmentsComponent attachments = store.getComponent(npcRef, TameworkAttachmentsComponent.getComponentType());
         return resolveDisplayAttachmentIds(
@@ -441,7 +441,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     @Nullable
-    private String resolveModelAssetId(@Nonnull Ref<EntityStore> npcRef,
+    static String resolveModelAssetId(@Nonnull Ref<EntityStore> npcRef,
                                        @Nonnull Store<EntityStore> store) {
         ModelComponent modelComponent = store.getComponent(npcRef, ModelComponent.getComponentType());
         Model model = modelComponent != null ? modelComponent.getModel() : null;

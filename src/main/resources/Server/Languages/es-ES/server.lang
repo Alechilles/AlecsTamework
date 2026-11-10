@@ -2079,3 +2079,5 @@ tamework.ui.companionCard.closeAfterCommand=Cerrar tras una orden
 tamework.ui.companionCard.closeAfterCommand.tooltip=Activado: elegir un modo o una acción, como Establecer hogar, cierra la inspección. Desactivado: sigue abierta.
 tamework.ui.companionCard.rotateLeft=Girar la vista a la izquierda
 tamework.ui.companionCard.rotateRight=Girar la vista a la derecha
+tamework.ui.companionCard.section.food=Preferencias alimentarias
+tamework.ui.companionCard.section.appearance=Apariencia

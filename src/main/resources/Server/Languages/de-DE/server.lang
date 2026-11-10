@@ -2123,3 +2123,5 @@ tamework.ui.companionCard.closeAfterCommand=Nach Befehl schließen
 tamework.ui.companionCard.closeAfterCommand.tooltip=An: Ein Modus oder eine Aktion, etwa Heim setzen, schließt die Begleiter-Inspektion. Aus: Sie bleibt offen.
 tamework.ui.companionCard.rotateLeft=Ansicht nach links drehen
 tamework.ui.companionCard.rotateRight=Ansicht nach rechts drehen
+tamework.ui.companionCard.section.food=Futtervorlieben
+tamework.ui.companionCard.section.appearance=Aussehen
