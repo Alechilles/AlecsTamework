@@ -78,7 +78,9 @@ public final class HusbandryRewardTableRegistry implements HusbandryRewardTableA
                 context.profileId(),
                 groups,
                 context.productId(),
-                context.tool()
+                context.tool(),
+                context.happiness(),
+                context.ageStage()
         );
     }
 

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.AnimalAgeStage;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
@@ -10,6 +11,8 @@ import com.alechilles.alecstamework.api.HusbandryRewardTable;
 import com.alechilles.alecstamework.api.HusbandryRewardTableApi;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -179,8 +182,44 @@ public final class HusbandryOutcomeRuntime {
                 profileId,
                 groupIds,
                 productId,
-                tool != null && tool.present() ? tool : null
+                tool != null && tool.present() ? tool : null,
+                resolveHappiness(npcRef, store),
+                resolveAgeStage(npcRef, store, roleId)
         );
+    }
+
+    /**
+     * The animal's current stored happiness, read from the store this world-thread action already reads.
+     * It never recomputes care modifiers, so a {@code HAPPINESS_CARE} resolution cannot recurse.
+     */
+    @Nullable
+    static Double resolveHappiness(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        try {
+            double value = CompanionHappinessService.resolveCurrentValue(npcRef, store, Double.NaN);
+            return Double.isFinite(value) ? value : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** The animal's age as cull rewards read it, or null without a live animal or with aging disabled. */
+    @Nullable
+    static AnimalAgeStage resolveAgeStage(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable String roleId
+    ) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        try {
+            return AnimalProgressionService.ageStage(npcRef, store, roleId);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     @Nullable

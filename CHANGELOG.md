@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased development changes
+
+### Added
+
+- API: `HusbandryOutcomeContext` carries the animal's current `happiness()` (the value the happiness inspector
+  shows) and `ageStage()` (`JUVENILE`, `ADULT`, `PRIME` or `SENIOR`) at the moment of the outcome, with capability
+  `HUSBANDRY_OUTCOME_ANIMAL_STATE`. Either is null when the action has no live animal, happiness is disabled for the
+  role, or the role has aging disabled. Existing constructors keep working and leave both unknown.
+
 ## 5.10.0 - Companion Inspect - 2026-11-10
 
 ### Added
