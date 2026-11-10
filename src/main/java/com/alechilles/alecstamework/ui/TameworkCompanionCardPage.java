@@ -62,6 +62,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     private boolean closed;
     /** Whether the inspect camera is locked on, which shows the rotate buttons. */
     private boolean cameraControls;
+    /** Whether the card opens in its camera layout (see {@link #useCameraLayout}). */
+    private boolean cameraLayout;
     // Read once when the card opens; a change in Your settings applies the next time it opens.
     private CompanionHudPlacement placement = CompanionHudPlacement.CARD_DEFAULT;
     // What the group picker was last given. Re-sending Entries or SelectedValues resets an open native popup, so a
@@ -158,6 +160,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                       @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
         commands.append(UI_PATH);
         placement = TameworkCompanionCardPlacementComponent.read(ref, store);
+        if (cameraLayout && placement.equals(CompanionHudPlacement.CARD_DEFAULT)) {
+            placement = CompanionHudPlacement.CARD_CAMERA_DEFAULT;
+        }
         sentGroupOptions = null;
         sentGroupSelection = null;
         render(commands, events);
@@ -176,6 +181,14 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         UIEventBuilder events = new UIEventBuilder();
         render(commands, events);
         sendUpdate(commands, events, false);
+    }
+
+    /**
+     * Opens the card at the screen edge when the inspect camera will frame the companion in the centre, unless the
+     * viewer has placed the card themselves. Call before the page opens.
+     */
+    public void useCameraLayout(boolean camera) {
+        cameraLayout = camera;
     }
 
     /** Shows the rotate buttons once the inspect camera has locked onto the companion. */
