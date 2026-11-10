@@ -92,25 +92,31 @@ $C.@PageOverlay {
         Visible: false;
 
         Label #TwSettingsNetworkStatus {
-          Anchor: (Width: 250, Height: 32);
+          Anchor: (Width: 240, Height: 32);
           Text: "";
           Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
         }
 
+        Group { Anchor: (Width: 8); }
+
         TextButton #TwSettingsNetworkPublishButton {
-          Anchor: (Width: 150, Height: 30);
+          Anchor: (Width: 144, Height: 30);
           Text: %server.tamework.ui.settings.network.button.publish;
           Style: $A.@PanelButtonQuiet;
         }
 
+        Group { Anchor: (Width: 8); }
+
         TextButton #TwSettingsNetworkUseButton {
-          Anchor: (Width: 150, Height: 30);
+          Anchor: (Width: 144, Height: 30);
           Text: %server.tamework.ui.settings.network.button.use;
           Style: $A.@PanelButtonQuiet;
         }
 
+        Group { Anchor: (Width: 8); }
+
         TextButton #TwSettingsNetworkLeaveButton {
-          Anchor: (Width: 150, Height: 30);
+          Anchor: (Width: 144, Height: 30);
           Text: %server.tamework.ui.settings.network.button.leave;
           Style: $A.@PanelButtonQuiet;
         }
