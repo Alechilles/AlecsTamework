@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.List;
@@ -45,15 +46,23 @@ import javax.annotation.Nullable;
  * lives on the companion and groups are the viewer's own (see {@link CompanionCardHomeActions} and
  * {@link CommandCompanionGroups}).
  *
- * <p>Refresh: while a card is open, a delayed task re-renders it every {@link #REFRESH_MS} on the world thread so
- * health, needs and timers stay current. The chain stops when the card closes, its companion or viewer is gone, or the
- * plugin shuts down. One chain per open card; nothing else is scheduled.
+ * <p>Refresh: while a card is open, a delayed task checks every {@link #WATCH_MS} on the world thread that its
+ * companion is still there and alive, closing the card when it is not, and re-renders the card every
+ * {@link #REFRESH_MS} so health, needs and timers stay current. The chain stops when the card closes, its companion or
+ * viewer is gone, or the plugin shuts down. One chain per open card; nothing else is scheduled.
  */
 public final class CompanionCardPageService implements CompanionCards.Sink {
     private static final Logger LOGGER = Logger.getLogger(CompanionCardPageService.class.getName());
     /** Passed to services that key hook dispatches by item; the card has no command item. */
     static final String CARD_SOURCE_ID = "tamework:companion_card";
     private static final long REFRESH_MS = 2_000L;
+    /**
+     * How often an open panel checks that its companion is still there. One cheap lookup per open panel (an entity
+     * ref by uuid and a death check), so a companion that dies or vanishes closes the panel, and hands the camera
+     * back, within a quarter second rather than at the next full refresh.
+     */
+    private static final long WATCH_MS = 250L;
+    private static final int WATCHES_PER_REFRESH = (int) (REFRESH_MS / WATCH_MS);
 
     private final CommandTalentPageService talents;
     private final CommandOwnerReleaseService releases;
@@ -151,7 +160,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                                                      CompanionCardInteractions interactions,
                                                      String groupKey) {
         NPCEntity npc = npcRef.isValid() ? store.getComponent(npcRef, NPCEntity.getComponentType()) : null;
-        if (npc == null) {
+        if (npc == null || dying(npcRef, store)) {
             return null;
         }
         LinkedNpcEntry entry = snapshots.buildLoadedEntry(player, npcRef, store,
@@ -209,6 +218,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private TameworkCompanionCardPage page;
         /** Whether this card took the player's camera; its close hands it back. */
         private boolean cameraLocked;
+        private int watches;
 
         private Session(UUID playerUuid, UUID npcUuid, Ref<EntityStore> playerRef, Store<EntityStore> store,
                         String groupKey, PlayerRef uiPlayer) {
@@ -453,15 +463,34 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         private Ref<EntityStore> npcRef() {
             World world = store.getExternalData() == null ? null : store.getExternalData().getWorld();
             Ref<EntityStore> ref = world == null ? null : world.getEntityRef(npcUuid);
-            return ref != null && ref.isValid() && ref.getStore() == store ? ref : null;
+            // A dying companion counts as gone: no command reaches it and the panel closes.
+            return ref != null && ref.isValid() && ref.getStore() == store && !dying(ref, store) ? ref : null;
         }
+
+        /**
+         * Closes the panel because its companion died, unloaded, was captured or otherwise left this world. Closing
+         * runs the page's dismiss callback, which hands the camera back. A panel already replaced by another page
+         * (talents, rename) is only forgotten, so that page stays open.
+         */
+        private void companionGone() {
+            Player player = player();
+            if (player != null && !showing(player, page)) {
+                openPages.remove(playerUuid, this);
+                return;
+            }
+            page.closeCard();
+        }
+    }
+
+    private static boolean dying(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return store.getComponent(npcRef, DeathComponent.getComponentType()) != null;
     }
 
     private record Live(Player player, Ref<EntityStore> npcRef, @Nullable LinkedNpcEntry entry) {
     }
 
     private void scheduleRefresh(Session session) {
-        CompletableFuture.delayedExecutor(REFRESH_MS, TimeUnit.MILLISECONDS).execute(() -> {
+        CompletableFuture.delayedExecutor(WATCH_MS, TimeUnit.MILLISECONDS).execute(() -> {
             World world = session.store.getExternalData() == null ? null : session.store.getExternalData().getWorld();
             if (stopped || world == null || !world.isAlive() || session.page == null || session.page.isClosed()) {
                 return;
@@ -471,7 +500,11 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                     if (stopped || session.page.isClosed() || openPages.get(session.playerUuid) != session) {
                         return;
                     }
-                    session.refresh();
+                    if (session.npcRef() == null) {
+                        session.companionGone();
+                    } else if (++session.watches % WATCHES_PER_REFRESH == 0) {
+                        session.refresh();
+                    }
                     if (!session.page.isClosed() && openPages.get(session.playerUuid) == session) {
                         scheduleRefresh(session);
                     }
