@@ -195,6 +195,28 @@ class CompanionLifeStageServiceTest {
     }
 
     @Test
+    void storedAdultRoleFollowsRoleChangeToAnotherFamily() throws Exception {
+        TwBreedingConfig.RoleFamily tamedFamily = new TwBreedingConfig.RoleFamily();
+        setPrivateField(tamedFamily, "adultRoles", new TwBreedingConfig.AdultRoleChoice[] {
+                adultRole("Tamed_Deer_Doe", 1.0),
+                adultRole("Tamed_Deer_Stag", 1.0)
+        });
+        setPrivateField(tamedFamily, "babyRoleId", "Tamed_Deer_Fawn");
+
+        // Tamed from the wild: the stored wild role would otherwise switch the deer back.
+        TameworkLifeStageComponent tamedFromWild = new TameworkLifeStageComponent();
+        tamedFromWild.setAdultRoleId("Deer_Doe");
+        assertTrue(CompanionLifeStageService.adoptCurrentAdultRole(tamedFromWild, "Tamed_Deer_Doe", tamedFamily));
+        assertEquals("Tamed_Deer_Doe", tamedFromWild.getAdultRoleId());
+
+        // A juvenile in its baby role keeps the adult role chosen at birth.
+        TameworkLifeStageComponent fawn = new TameworkLifeStageComponent();
+        fawn.setAdultRoleId("Tamed_Deer_Stag");
+        assertFalse(CompanionLifeStageService.adoptCurrentAdultRole(fawn, "Tamed_Deer_Fawn", tamedFamily));
+        assertEquals("Tamed_Deer_Stag", fawn.getAdultRoleId());
+    }
+
+    @Test
     void isUninitializedAdultComponentDetectsDefaultAdultShell() throws Exception {
         TameworkLifeStageComponent uninitialized = new TameworkLifeStageComponent(
                 CompanionLifeStageService.STAGE_ADULT,

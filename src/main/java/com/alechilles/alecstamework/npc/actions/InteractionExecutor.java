@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
@@ -55,6 +56,15 @@ final class InteractionExecutor {
     InteractionExecutor(TameworkInteractEffects effects, InteractionFeedHelper feedHelper) {
         this.effects = effects;
         this.feedHelper = feedHelper;
+    }
+
+    /** See {@link TameworkInteractEffects#repairTamedRole}. */
+    boolean repairTamedRole(TwInteractionConfig config,
+                            Ref<EntityStore> npcRef,
+                            Role role,
+                            Store<EntityStore> store,
+                            InteractionContextSnapshot ctx) {
+        return effects.repairTamedRole(config, npcRef, role, store, ctx);
     }
 
     // Applies a single interaction entry and any configured custom effects.
