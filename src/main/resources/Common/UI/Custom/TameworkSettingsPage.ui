@@ -85,6 +85,37 @@ $C.@PageOverlay {
         }
       }
 
+      // Server network settings. Java shows the bar when a network store or saved network settings exist.
+      Group #TwSettingsNetworkBar {
+        Anchor: (Left: 8, Right: 8, Top: 4, Height: 32);
+        LayoutMode: Left;
+        Visible: false;
+
+        Label #TwSettingsNetworkStatus {
+          Anchor: (Width: 250, Height: 32);
+          Text: "";
+          Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        }
+
+        TextButton #TwSettingsNetworkPublishButton {
+          Anchor: (Width: 150, Height: 30);
+          Text: %server.tamework.ui.settings.network.button.publish;
+          Style: $A.@PanelButtonQuiet;
+        }
+
+        TextButton #TwSettingsNetworkUseButton {
+          Anchor: (Width: 150, Height: 30);
+          Text: %server.tamework.ui.settings.network.button.use;
+          Style: $A.@PanelButtonQuiet;
+        }
+
+        TextButton #TwSettingsNetworkLeaveButton {
+          Anchor: (Width: 150, Height: 30);
+          Text: %server.tamework.ui.settings.network.button.leave;
+          Style: $A.@PanelButtonQuiet;
+        }
+      }
+
       Group #TwSettingsUnsavedWarning {
         Anchor: (Left: 8, Right: 8, Height: 20);
         Visible: false;

@@ -16,7 +16,10 @@ import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefresh
 import com.alechilles.alecstamework.settings.NameFilterSettings;
 import com.alechilles.alecstamework.settings.CompanionCardSettingsStore;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
+import com.alechilles.alecstamework.commands.TameworkConfigPermission;
 import com.alechilles.alecstamework.settings.NameFilterSettingsStore;
+import com.alechilles.alecstamework.settings.NetworkSettingsLayer;
+import com.alechilles.alecstamework.settings.NetworkSettingsSync;
 import com.alechilles.alecstamework.settings.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
@@ -68,6 +71,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_EDIT = "Edit";
     private static final String ACTION_EDIT_HUD_DEFAULT = "EditHudDefault";
     private static final String ACTION_SELECT_TAB = "SelectTab";
+    private static final String ACTION_NETWORK_PUBLISH = "NetworkPublish";
+    private static final String ACTION_NETWORK_USE = "NetworkUse";
+    private static final String ACTION_NETWORK_LEAVE = "NetworkLeave";
     private static final String KEY_TAB = "Tab";
     private static final String TAB_GENERAL = "General";
     private static final String TAB_MOD_SETTINGS = "ModSettings";
@@ -153,6 +159,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     @Nullable
     private final Runnable returnTo;
     private boolean modSettingsTabSelected;
+    /** The network action waiting for its confirming second press, or null. */
+    @Nullable
+    private String pendingNetworkAction;
+    /** How many settings this server overrides; -1 until counted. */
+    private int networkOverrideCount = -1;
 
     public TameworkSettingsPage(@Nonnull PlayerRef playerRef,
                                 @Nonnull Tamework plugin,
@@ -183,6 +194,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             bindStaticEvents(eventBuilder);
             render(commandBuilder);
             modTab.render(commandBuilder, eventBuilder);
+            countNetworkOverrides();
         } catch (Throwable throwable) {
             plugin.getLogger().at(Level.WARNING).withCause(throwable)
                     .log("Failed to build Tamework settings page.");
@@ -203,6 +215,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull EventPayload data) {
         String action = trim(data.action);
+        if (!action.equals(pendingNetworkAction)) {
+            // Anything but the confirming second press cancels a pending network action.
+            pendingNetworkAction = null;
+        }
         switch (action) {
             case ACTION_CLOSE -> close();
             case ACTION_BACK -> {
@@ -227,6 +243,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             case ACTION_APPLY -> onApply(data, store);
             case ACTION_EDIT_HUD_DEFAULT -> onEditHudDefault(data, ref, store);
             case ACTION_SELECT_TAB -> onSelectTab(data);
+            case ACTION_NETWORK_PUBLISH, ACTION_NETWORK_USE, ACTION_NETWORK_LEAVE ->
+                    onNetworkAction(action, data, ref, store);
             case TameworkSettingsModTab.ACTION_BOOL, TameworkSettingsModTab.ACTION_CHOICE,
                  TameworkSettingsModTab.ACTION_TEXT, TameworkSettingsModTab.ACTION_RESET -> onModSettingEdit(action, data);
             default -> {
@@ -323,6 +341,141 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 appendFormEventData(EventData.of(ACTION, ACTION_APPLY)),
                 false
         );
+        eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwSettingsNetworkPublishButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_NETWORK_PUBLISH)), false);
+        eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwSettingsNetworkUseButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_NETWORK_USE)), false);
+        eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwSettingsNetworkLeaveButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_NETWORK_LEAVE)), false);
+    }
+
+    /**
+     * The network bar: whether this server follows network settings, and the actions that move
+     * settings between this server and the network. Hidden on a server with no network store and
+     * no saved network settings.
+     */
+    private void renderNetworkBar(@Nonnull UICommandBuilder commandBuilder) {
+        NetworkSettingsSync sync = plugin.getNetworkSettingsSync();
+        NetworkSettingsLayer.State state = NetworkSettingsLayer.state();
+        boolean storeActive = sync != null && sync.active();
+        boolean visible = sync != null && (storeActive || state.active() || state.left());
+        commandBuilder.set("#TwSettingsNetworkBar.Visible", visible);
+        if (!visible) {
+            return;
+        }
+        String status;
+        if (state.left()) {
+            status = resolveText("tamework.ui.settings.network.status.left");
+        } else if (!state.active()) {
+            status = resolveText("tamework.ui.settings.network.status.notPublished");
+        } else if (networkOverrideCount < 0) {
+            status = resolveText("tamework.ui.settings.network.status.following");
+        } else {
+            status = formatText("tamework.ui.settings.network.status.followingWithOverrides", networkOverrideCount);
+        }
+        commandBuilder.set("#TwSettingsNetworkStatus.Text", status);
+        commandBuilder.set("#TwSettingsNetworkPublishButton.Visible", storeActive && !state.left());
+        commandBuilder.set("#TwSettingsNetworkUseButton.Visible", state.active());
+        commandBuilder.set("#TwSettingsNetworkLeaveButton.Visible", state.active() || state.left());
+        commandBuilder.set("#TwSettingsNetworkPublishButton.Text",
+                resolveText("tamework.ui.settings.network.button.publish"));
+        commandBuilder.set("#TwSettingsNetworkUseButton.Text", resolveText("tamework.ui.settings.network.button.use"));
+        commandBuilder.set("#TwSettingsNetworkLeaveButton.Text", resolveText(state.left()
+                ? "tamework.ui.settings.network.button.rejoin" : "tamework.ui.settings.network.button.leave"));
+    }
+
+    /** Counts this server's overrides off the world thread, then shows the number. */
+    private void countNetworkOverrides() {
+        NetworkSettingsSync sync = plugin.getNetworkSettingsSync();
+        if (sync == null || !NetworkSettingsLayer.state().active()) {
+            return;
+        }
+        sync.localSettingCount().whenComplete((count, failure) -> world.execute(() -> {
+            if (count == null || count == networkOverrideCount) {
+                return;
+            }
+            networkOverrideCount = count;
+            UICommandBuilder commandBuilder = new UICommandBuilder();
+            renderNetworkBar(commandBuilder);
+            sendUpdate(commandBuilder, null, false);
+        }));
+    }
+
+    /**
+     * Publish, use the network's values, or leave or rejoin the network. Each needs a second press,
+     * because it changes many settings at once, and applied form values, because it reloads them.
+     */
+    private void onNetworkAction(@Nonnull String action, @Nonnull EventPayload payload,
+                                 @Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        NetworkSettingsSync sync = plugin.getNetworkSettingsSync();
+        if (sync == null) {
+            return;
+        }
+        statusLine = "";
+        draftPayload = payload;
+        updateUnsavedChanges();
+        if (unsavedChanges || applyInProgress) {
+            pendingNetworkAction = null;
+            warningLine = resolveText("tamework.ui.settings.network.warning.applyFirst");
+            refreshFeedback();
+            return;
+        }
+        boolean rejoin = ACTION_NETWORK_LEAVE.equals(action) && NetworkSettingsLayer.state().left();
+        if (ACTION_NETWORK_PUBLISH.equals(action)
+                && !TameworkConfigPermission.hasNetworkAccess((Object) store.getComponent(ref, Player.getComponentType()))) {
+            warningLine = formatText("tamework.ui.settings.network.warning.noPermission",
+                    TameworkConfigPermission.NETWORK_NODE);
+            refreshFeedback();
+            return;
+        }
+        if (!action.equals(pendingNetworkAction)) {
+            pendingNetworkAction = action;
+            warningLine = resolveText(switch (action) {
+                case ACTION_NETWORK_PUBLISH -> "tamework.ui.settings.network.confirm.publish";
+                case ACTION_NETWORK_USE -> "tamework.ui.settings.network.confirm.use";
+                default -> rejoin ? "tamework.ui.settings.network.confirm.rejoin"
+                        : "tamework.ui.settings.network.confirm.leave";
+            });
+            refreshFeedback();
+            return;
+        }
+        pendingNetworkAction = null;
+        CompletableFuture<String> resultKey = switch (action) {
+            case ACTION_NETWORK_PUBLISH -> sync.publish().thenApply(result -> switch (result) {
+                case SAVED -> "tamework.ui.settings.network.result.published";
+                case CONFLICT -> "tamework.ui.settings.network.result.conflict";
+                case FAILED -> "tamework.ui.settings.network.result.publishFailed";
+                case UNAVAILABLE -> "tamework.ui.settings.network.result.unavailable";
+            });
+            case ACTION_NETWORK_USE -> sync.useNetworkSettings().thenApply(done -> done
+                    ? "tamework.ui.settings.network.result.usingNetwork"
+                    : "tamework.ui.settings.network.result.unavailable");
+            default -> rejoin
+                    ? sync.rejoin().thenApply(done -> done ? "tamework.ui.settings.network.result.rejoined"
+                            : "tamework.ui.settings.network.result.unavailable")
+                    : sync.leave().thenApply(done -> done ? "tamework.ui.settings.network.result.left"
+                            : "tamework.ui.settings.network.result.unavailable");
+        };
+        applyInProgress = true;
+        warningLine = "";
+        statusLine = resolveText("tamework.ui.settings.status.applying");
+        refreshFeedback();
+        resultKey.whenComplete((key, failure) -> world.execute(() -> {
+            applyInProgress = false;
+            // The settings in effect may all have changed, so the form starts from them again.
+            loadCurrentValues();
+            networkOverrideCount = -1;
+            boolean succeeded = failure == null && key != null && (key.endsWith(".published")
+                    || key.endsWith(".usingNetwork") || key.endsWith(".left") || key.endsWith(".rejoined"));
+            statusLine = succeeded ? resolveText(key) : "";
+            warningLine = succeeded ? "" : resolveText(failure != null || key == null
+                    ? "tamework.ui.settings.network.result.publishFailed" : key);
+            if (failure != null) {
+                plugin.getLogger().at(Level.WARNING).withCause(failure).log("Tamework network settings action failed.");
+            }
+            refreshUi();
+            countNetworkOverrides();
+        }));
     }
 
     @Nonnull
@@ -385,6 +538,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
         commandBuilder.set("#TwSettingsBackButton.Visible", returnTo != null);
         renderTabs(commandBuilder);
+        renderNetworkBar(commandBuilder);
         CompanionHudPlacement hudDefault = CompanionHudDefaultsStore.current();
         commandBuilder.set("#TwSettingsHudDefaultValue.Text", LocalizedText.format(playerRef,
                 "tamework.ui.hudPlacement.summary",
@@ -684,6 +838,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .thenCompose(outcome -> applyModSettings(outcome, modService, modChanges))
                 .whenComplete((result, throwable) -> world.execute(() -> {
                     applyInProgress = false;
+                    countNetworkOverrides();
                     if (throwable != null || result == null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Tamework settings apply failed.");
                         statusLine = "";

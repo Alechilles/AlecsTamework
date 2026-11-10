@@ -38,6 +38,10 @@ class TameworkSettingsRenderingTest {
         modTab.set(page, new TameworkSettingsModTab(
                 (com.hypixel.hytale.server.core.universe.PlayerRef) unsafe.allocateInstance(com.hypixel.hytale.server.core.universe.PlayerRef.class),
                 (com.alechilles.alecstamework.Tamework) unsafe.allocateInstance(com.alechilles.alecstamework.Tamework.class)));
+        // A plugin with no network settings sync: the network bar stays hidden.
+        Field plugin = TameworkSettingsPage.class.getDeclaredField("plugin");
+        plugin.setAccessible(true);
+        plugin.set(page, unsafe.allocateInstance(com.alechilles.alecstamework.Tamework.class));
         UICommandBuilder commands = new UICommandBuilder();
         var events = new com.hypixel.hytale.server.core.ui.builder.UIEventBuilder();
         page.build(null, commands, events, null);
