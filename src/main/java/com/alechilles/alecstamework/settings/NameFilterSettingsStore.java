@@ -76,21 +76,14 @@ public final class NameFilterSettingsStore {
     /** Reads the file, writing the default template first when it does not exist yet. */
     @Nonnull
     public static NameFilterSettings load(@Nonnull Path file, @Nullable HytaleLogger logger) {
-        if (!Files.isRegularFile(file)) {
+        // With network settings a missing file means "no override"; a template of defaults would be one.
+        if (!Files.isRegularFile(file) && !NetworkSettingsLayer.active()) {
             write(file, NameFilterSettings.DEFAULT, logger);
             return NameFilterSettings.DEFAULT;
         }
         try {
-            Document document = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), Document.class);
-            if (document == null) {
-                return NameFilterSettings.DEFAULT;
-            }
-            return new NameFilterSettings(
-                    document.enabled == null || document.enabled,
-                    document.useStockList == null || document.useStockList,
-                    document.blockedWords == null ? List.of() : document.blockedWords,
-                    document.allowedWords == null ? List.of() : document.allowedWords
-            );
+            return parse(NetworkSettingsLayer.effective(NetworkSettingsLayer.SECTION_NAME_FILTER,
+                    Files.isRegularFile(file) ? Files.readString(file, StandardCharsets.UTF_8) : null));
         } catch (IOException | JsonParseException ex) {
             if (logger != null) {
                 logger.at(Level.WARNING).withCause(ex)
@@ -109,19 +102,42 @@ public final class NameFilterSettingsStore {
         return true;
     }
 
-    private static boolean write(@Nonnull Path file, @Nonnull NameFilterSettings settings, @Nullable HytaleLogger logger) {
+    /**
+     * The settings a document holds; a null or blank document gives the defaults.
+     *
+     * @throws JsonParseException when {@code raw} is not a name filter document
+     */
+    @Nonnull
+    public static NameFilterSettings parse(@Nullable String raw) {
+        Document document = raw == null || raw.isBlank() ? null : GSON.fromJson(raw, Document.class);
+        return document == null ? NameFilterSettings.DEFAULT : new NameFilterSettings(
+                document.enabled == null || document.enabled,
+                document.useStockList == null || document.useStockList,
+                document.blockedWords == null ? List.of() : document.blockedWords,
+                document.allowedWords == null ? List.of() : document.allowedWords
+        );
+    }
+
+    /** The full document for these settings. */
+    @Nonnull
+    public static String toJson(@Nonnull NameFilterSettings settings) {
         Document document = new Document();
         document.enabled = settings.enabled();
         document.useStockList = settings.useStockList();
         document.blockedWords = settings.blockedWords();
         document.allowedWords = settings.allowedWords();
+        return GSON.toJson(document);
+    }
+
+    private static boolean write(@Nonnull Path file, @Nonnull NameFilterSettings settings, @Nullable HytaleLogger logger) {
         try {
             Path parent = file.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(tmp, GSON.toJson(document), StandardCharsets.UTF_8);
+            Files.writeString(tmp, NetworkSettingsLayer.localForm(NetworkSettingsLayer.SECTION_NAME_FILTER,
+                    toJson(settings)), StandardCharsets.UTF_8);
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
             return true;
         } catch (IOException ex) {

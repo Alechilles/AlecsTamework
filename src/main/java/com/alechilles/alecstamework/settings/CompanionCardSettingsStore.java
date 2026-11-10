@@ -60,24 +60,9 @@ public final class CompanionCardSettingsStore {
     /** Parses the file without touching the cache. A missing or unknown value falls back to its default. */
     @Nonnull
     static Settings read(@Nonnull Path file, @Nullable HytaleLogger logger) {
-        if (!Files.isRegularFile(file)) {
-            return Settings.DEFAULT;
-        }
         try {
-            Document document = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), Document.class);
-            if (document == null) {
-                return Settings.DEFAULT;
-            }
-            CompanionCardFBehaviour behaviour = CompanionCardFBehaviour.fromConfigValueOrNull(document.defaultFBehaviour);
-            if (behaviour == null && document.defaultFBehaviour != null && logger != null) {
-                logger.at(Level.WARNING).log(
-                        "Tamework companion card settings in %s have an unknown defaultFBehaviour '%s'; using %s.",
-                        file, document.defaultFBehaviour, Settings.DEFAULT.defaultFBehaviour().toConfigValue());
-            }
-            return new Settings(
-                    behaviour == null ? Settings.DEFAULT.defaultFBehaviour() : behaviour,
-                    document.allowPlayerChoice == null ? Settings.DEFAULT.allowPlayerChoice() : document.allowPlayerChoice,
-                    CompanionCardRenameMode.fromConfigValue(document.renameMode));
+            return parse(NetworkSettingsLayer.effective(NetworkSettingsLayer.SECTION_COMPANION_CARD,
+                    Files.isRegularFile(file) ? Files.readString(file, StandardCharsets.UTF_8) : null), file, logger);
         } catch (IOException | JsonParseException ex) {
             if (logger != null) {
                 logger.at(Level.WARNING).withCause(ex)
@@ -87,20 +72,55 @@ public final class CompanionCardSettingsStore {
         }
     }
 
-    /** Writes the settings and, once written, makes them current. Blocks on file I/O. */
-    public static synchronized boolean save(@Nonnull Path file, @Nonnull Settings settings,
-                                            @Nullable HytaleLogger logger) {
+    /**
+     * The settings a document holds; a null or blank document gives the defaults.
+     *
+     * @throws JsonParseException when {@code raw} is not a settings document
+     */
+    @Nonnull
+    public static Settings parse(@Nullable String raw) {
+        return parse(raw, null, null);
+    }
+
+    @Nonnull
+    private static Settings parse(@Nullable String raw, @Nullable Path file, @Nullable HytaleLogger logger) {
+        Document document = raw == null || raw.isBlank() ? null : GSON.fromJson(raw, Document.class);
+        if (document == null) {
+            return Settings.DEFAULT;
+        }
+        CompanionCardFBehaviour behaviour = CompanionCardFBehaviour.fromConfigValueOrNull(document.defaultFBehaviour);
+        if (behaviour == null && document.defaultFBehaviour != null && logger != null) {
+            logger.at(Level.WARNING).log(
+                    "Tamework companion card settings in %s have an unknown defaultFBehaviour '%s'; using %s.",
+                    file, document.defaultFBehaviour, Settings.DEFAULT.defaultFBehaviour().toConfigValue());
+        }
+        return new Settings(
+                behaviour == null ? Settings.DEFAULT.defaultFBehaviour() : behaviour,
+                document.allowPlayerChoice == null ? Settings.DEFAULT.allowPlayerChoice() : document.allowPlayerChoice,
+                CompanionCardRenameMode.fromConfigValue(document.renameMode));
+    }
+
+    /** The full document for these settings. */
+    @Nonnull
+    public static String toJson(@Nonnull Settings settings) {
         Document document = new Document();
         document.defaultFBehaviour = settings.defaultFBehaviour().toConfigValue();
         document.allowPlayerChoice = settings.allowPlayerChoice();
         document.renameMode = settings.renameMode().toConfigValue();
+        return GSON.toJson(document);
+    }
+
+    /** Writes the settings and, once written, makes them current. Blocks on file I/O. */
+    public static synchronized boolean save(@Nonnull Path file, @Nonnull Settings settings,
+                                            @Nullable HytaleLogger logger) {
         try {
             Path parent = file.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(tmp, GSON.toJson(document), StandardCharsets.UTF_8);
+            Files.writeString(tmp, NetworkSettingsLayer.localForm(NetworkSettingsLayer.SECTION_COMPANION_CARD,
+                    toJson(settings)), StandardCharsets.UTF_8);
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
             if (logger != null) {

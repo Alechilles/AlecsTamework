@@ -326,6 +326,42 @@ class ApiSurfaceCompatibilityTest {
     }
 
     @Test
+    void runeteriaRegistersANetworkSettingsStoreThroughAProxyAndBuildsDocumentsByReflection() throws Exception {
+        com.alechilles.alecstamework.settings.NetworkSettingsSync sync =
+                new com.alechilles.alecstamework.settings.NetworkSettingsSync(
+                        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(),
+                        () -> java.nio.file.Path.of("unused"),
+                        new com.alechilles.alecstamework.settings.NetworkSettingsFiles(List.of(), null),
+                        () -> { }, null);
+        try {
+            ((IndexTameworkApi) api).useNetworkSettings(
+                    new com.alechilles.alecstamework.api.internal.NetworkSettingsFacade(sync));
+            Collection<?> capabilities = (Collection<?>) runeteria("TameworkApi", api, "getCapabilities");
+            assertTrue(capabilities.stream().anyMatch(c -> "NETWORK_SETTINGS_STORE".equals(((Enum<?>) c).name())));
+            Class<?> storeType = Class.forName(API_PACKAGE + "NetworkSettingsStore");
+            Class<?> documentType = Class.forName(API_PACKAGE + "NetworkSettingsDocument");
+            assertEquals("server", storeType.getField("SERVER_KEY").get(null));
+            Object document = documentType.getConstructor(String.class, long.class).newInstance("{}", 1L);
+            assertEquals("{}", documentType.getMethod("json").invoke(document));
+            assertEquals(1L, documentType.getMethod("revision").invoke(document));
+            // No document stored, so the registration's background read changes nothing on this machine.
+            Object store = Proxy.newProxyInstance(storeType.getClassLoader(), new Class<?>[] {storeType},
+                    (proxy, method, args) -> "save".equals(method.getName()) ? Boolean.FALSE : null);
+            Object facade = runeteria("TameworkApi", api, "networkSettings");
+            assertEquals(Boolean.TRUE, runeteria("NetworkSettingsApi", facade, "available"));
+
+            Object handle = runeteria("NetworkSettingsApi", facade, "register", types(storeType), store);
+
+            assertEquals(Boolean.TRUE, runeteria("NetworkSettingsApi", facade, "active"));
+            runeteria("NetworkSettingsApi", facade, "notifyChanged", types(String.class), "server");
+            inspector(handle, "close");
+            assertEquals(Boolean.FALSE, runeteria("NetworkSettingsApi", facade, "active"));
+        } finally {
+            sync.close();
+        }
+    }
+
+    @Test
     void runeteriaReadsRequiredContentProfileReadiness() {
         Object profiles = runeteria("TameworkApi", api, "requiredContentProfiles");
 

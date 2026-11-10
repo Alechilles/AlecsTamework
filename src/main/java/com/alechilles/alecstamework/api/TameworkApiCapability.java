@@ -73,6 +73,8 @@ public enum TameworkApiCapability {
     /** External husbandry providers can supply the base reward table rolled for a managed cull. */
     HUSBANDRY_REWARD_TABLES,
     /** A server network can install a shared store that companions follow their owner through. */
-    PORTABLE_COMPANION_STORE
+    PORTABLE_COMPANION_STORE,
+    /** A server network can install a shared store for settings that every server inherits. */
+    NETWORK_SETTINGS_STORE
 }
 

@@ -88,5 +88,10 @@ public interface TameworkApi {
     default PortableCompanionsApi portableCompanions() {
         return PortableCompanionsApi.unavailable();
     }
+
+    /** Returns the optional server network settings facade. */
+    default NetworkSettingsApi networkSettings() {
+        return NetworkSettingsApi.unavailable();
+    }
 }
 

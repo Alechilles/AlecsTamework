@@ -146,6 +146,36 @@ public final class ModSettingsService {
                 String.join(", ", changes.keySet()), failure != null ? "failed: " + failure : outcome));
     }
 
+    /** The full saved-values document, as the settings file would hold it without a network layer. */
+    @Nonnull
+    public String savedValuesJson() {
+        return ModSettingValueStore.toJson(saved);
+    }
+
+    /** The full document for a saved-values file's text; null or blank text gives a document with no values. */
+    @Nonnull
+    public static String normalizeSavedValues(@Nullable String raw) {
+        return raw == null || raw.isBlank() ? ModSettingValueStore.toJson(Map.of()) : raw;
+    }
+
+    /** The saved values file, which may not exist. */
+    @Nonnull
+    public Path savedValuesFile() {
+        return store.file();
+    }
+
+    /**
+     * Reads the saved values again after the file or the network's values changed outside this
+     * service, and regenerates patches when the values Patchwork last used no longer match. Blocks
+     * on file I/O.
+     */
+    public void reloadSavedValues() {
+        synchronized (this) {
+            saved = Collections.unmodifiableMap(new LinkedHashMap<>(store.load()));
+        }
+        onDeclarationsChanged();
+    }
+
     /**
      * Values Patchwork uses for one generation pass: every declared setting's effective value, plus
      * saved values whose declarations are not loaded (yet), so admin choices apply during the

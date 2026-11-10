@@ -8,6 +8,8 @@ import javax.annotation.Nullable;
  */
 public final class TameworkConfigPermission {
     public static final String NODE = "tamework.config";
+    /** Publishing settings to a server network changes every server, so it has its own node. */
+    public static final String NETWORK_NODE = "tamework.config.network";
     private static final String[] ADMIN_PERMISSION_GROUPS = {
             "hytale:Admin",
             "OP",
@@ -39,6 +41,22 @@ public final class TameworkConfigPermission {
         }
         for (String fallbackNode : FALLBACK_NODES) {
             if (holder.hasPermission(fallbackNode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the holder may publish settings to a server network: {@link #NETWORK_NODE} or an admin fallback. */
+    public static boolean hasNetworkAccess(@Nullable Object holder) {
+        if (!(holder instanceof PermissionHolder permissionHolder)) {
+            return false;
+        }
+        if (permissionHolder.hasPermission(NETWORK_NODE)) {
+            return true;
+        }
+        for (String fallbackNode : FALLBACK_NODES) {
+            if (permissionHolder.hasPermission(fallbackNode)) {
                 return true;
             }
         }

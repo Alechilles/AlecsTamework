@@ -27,6 +27,12 @@
   keeps an entry off F for players who use Companion Inspect. `ModeCycle` steps take an optional `Label` and `Icon`.
 - `/tw debug get role` prints the role, tamed status and owner of the NPC you are looking at, to spot a tamed
   companion that is still in its wild role.
+- Server networks can share `/tw settings` across servers. With a network mod that installs a settings store, an admin
+  publishes one server's settings to the network; every server follows them and can still override single settings.
+  `/tw settings` gains a network bar with **Publish settings**, **Use network values** and **Leave network**.
+  Publishing needs the `tamework.config.network` permission. Servers without such a mod are unchanged.
+- API: `TameworkApi.networkSettings()` with `NetworkSettingsStore`, `NetworkSettingsDocument` and the
+  `NETWORK_SETTINGS_STORE` capability, for network mods that supply the store.
 
 ### Changed
 
