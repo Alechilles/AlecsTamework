@@ -284,7 +284,7 @@ released.
 The companion HUD is the card that appears when you hold your command item and
 look at a companion. To move it, click the gear at the top of the panel to open
 **Your settings**, then click **Move** next to **Companion HUD**. The **Move**
-button next to **Companion Inspect** moves the companion card that F opens in the same way; the card
+button next to **Companion Inspect** moves the Companion Inspect panel that F opens in the same way; it
 opens in its new place the next time you open it.
 
 - Pick one of the nine snap points to send the HUD to a corner, an edge or the
