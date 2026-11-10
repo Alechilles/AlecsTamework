@@ -18,6 +18,8 @@
 - Interaction configs can put any entry on Companion Inspect with a `Card` block (`Label`, `Icon`, `Order`, `OnInteract`). A
   button there runs the entry like F, but crouch, movement and empty-hand requirements do not apply. `OnInteract: false`
   keeps an entry off F for players who use Companion Inspect. `ModeCycle` steps take an optional `Label` and `Icon`.
+- `/tw debug get role` prints the role, tamed status and owner of the NPC you are looking at, to spot a tamed
+  companion that is still in its wild role.
 
 ### Changed
 

@@ -19,6 +19,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 
 - `/tw debug get owner`, `/tw debug set owner`
 - `/tw debug get tamed`, `/tw debug set tamed`
+- `/tw debug get role`
 - `/tw debug get alarm [AlarmName] [NpcUuid]`
 - `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]`
 - `/tw config open`, `/tw settings`
@@ -47,6 +48,11 @@ The grant does not need the family's `Provision` feature, which only controls
 integrations. Each use creates a new companion. It has no body until its first
 summon, which spawns it from the role. Without a name the companion shows its
 role's name. The command works from the console and needs the `/tw` permission.
+
+`/tw debug get role` prints the role ID, tamed status and owner of the NPC you
+are looking at in one line. Use it when a tamed companion ignores commands: a
+tamed animal that still shows its wild role ID has not switched to its tamed
+role.
 
 The life-stage setter updates juvenile growth timing, role, and scale together.
 `baby` and `adolescent` require an enabled offspring lifecycle. `prime` requires
