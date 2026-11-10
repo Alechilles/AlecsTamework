@@ -247,6 +247,44 @@ companions recovered. Role-scoped `TwCompanionConfig.Command.Revive` supplies
 the gameplay cooldown, the exact AND item-cost recipe, and the optional
 insufficient-cost message for a revive. Recover is free.
 
+## Network settings
+
+On a server network whose network mod installs a settings store (see the
+[Network Settings API Reference](/mod/alecs-tamework/network-settings-api-reference)),
+`/tw settings` shows a network bar under the tabs. Servers without a store, and
+without saved network settings, do not show it.
+
+Each setting resolves on its own: this server's override, then the network's
+value, then the built-in default. Lists override as a whole. The welcome
+announcement switch and player settings stay per server.
+
+- **Publish settings** makes the settings in effect on this server the
+  settings of the whole network. Use it once on the server that is set up
+  correctly, and again there after a change every server should get. It needs
+  the `tamework.config.network` permission or an admin group. If another server
+  published first, nothing is written and the newer settings load instead.
+- **Apply** always saves to this server. While it follows the network, a value
+  that differs from the network's becomes an override, and setting it back to
+  the network's value removes the override. The bar shows how many overrides
+  the server has.
+- **Use network values** drops every override on this server.
+- **Leave network** writes the settings in effect into this server's own files
+  and stops following the network, so nothing changes at that moment.
+  **Rejoin network** follows it again.
+
+Each button asks for a second press. Apply or refresh unsaved form changes
+first.
+
+A server that first sees network settings keeps its own values only where they
+differ from both the network's value and the built-in default; a value left at
+the default follows the network. Each value that changes is logged at `INFO`.
+From then on its settings files hold only its overrides, a missing file means
+no overrides, and a JSON `null` in one unsets a network value so the default
+applies. The network's settings as last read are saved in
+`universe/Tamework/Settings/tamework-network-settings.json` and still apply
+while the store is unreachable. Other servers pick up a change within a
+minute, or at once when the network mod sends a notice.
+
 ## Troubleshooting
 
 - If a limit appears wrong, remember what each one counts. The owned limit
