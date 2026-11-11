@@ -47,9 +47,7 @@ public final class HusbandryHarvestUseContext {
      * player who harvested: the drop can run after the interaction has moved on.
      */
     static CapturedUse toolless(@Nullable Player player) {
-        CapturedUse empty = CapturedUse.empty();
-        return player == null ? empty : new CapturedUse(player.getUuid(), empty.hotbarSlot(), empty.tool(),
-                empty.fingerprint(), empty.wearMultiplier(), empty.genericModifiers(), null, null, 0L, 0);
+        return player == null ? CapturedUse.empty() : CapturedUse.empty().withActor(player.getUuid());
     }
 
     static void begin(@Nullable Ref<EntityStore> npcRef,
@@ -82,9 +80,17 @@ public final class HusbandryHarvestUseContext {
         return use == null ? CapturedUse.empty() : use;
     }
 
-    static CapturedUse finish(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+    /**
+     * Ends a use once its drops are paid. Only the player's id stays, until the use expires or the
+     * next harvest begins: one press can run the harvest state twice, and the second drop must name
+     * the same player without reusing the tool, roll or prepared output.
+     */
+    static void finish(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
         UUID npcId = npcId(npcRef, store);
-        return npcId == null ? CapturedUse.empty() : USES.remove(npcId);
+        if (npcId != null) {
+            USES.computeIfPresent(npcId, (id, use) -> use.actorId() == null ? null
+                    : CapturedUse.empty().withActor(use.actorId()).startedAtNanos(use.startedAtNanos()));
+        }
     }
 
     static void applyWear(@Nullable Player player, CapturedUse use, double multiplier) {
@@ -195,6 +201,11 @@ public final class HusbandryHarvestUseContext {
         CapturedUse withBatchCopies(int copies) {
             return new CapturedUse(actorId, hotbarSlot, tool, fingerprint, wearMultiplier,
                     genericModifiers, preparedDropList, preparedOutput, startedAtNanos, copies);
+        }
+
+        CapturedUse withActor(UUID playerId) {
+            return new CapturedUse(playerId, hotbarSlot, tool, fingerprint, wearMultiplier,
+                    genericModifiers, preparedDropList, preparedOutput, startedAtNanos, batchCopies);
         }
 
         CapturedUse startedAtNanos(long value) {
