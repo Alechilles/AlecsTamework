@@ -42,6 +42,16 @@ public final class HusbandryHarvestUseContext {
         );
     }
 
+    /**
+     * A harvest that captured no tool (a milking), kept only so the drop that follows names the
+     * player who harvested: the drop can run after the interaction has moved on.
+     */
+    static CapturedUse toolless(@Nullable Player player) {
+        CapturedUse empty = CapturedUse.empty();
+        return player == null ? empty : new CapturedUse(player.getUuid(), empty.hotbarSlot(), empty.tool(),
+                empty.fingerprint(), empty.wearMultiplier(), empty.genericModifiers(), null, null, 0L, 0);
+    }
+
     static void begin(@Nullable Ref<EntityStore> npcRef,
                       @Nullable Store<EntityStore> store,
                       CapturedUse use) {
@@ -51,8 +61,8 @@ public final class HusbandryHarvestUseContext {
             return;
         }
         CapturedUse captured = use == null ? CapturedUse.empty() : use;
-        // A toolless harvest (a milking) is kept too once it has rolled, so its drops share that roll.
-        if (!captured.tool().present() && captured.batchCopies() <= 0) {
+        // A toolless harvest (a milking) is kept too, so its drops share its roll and name its player.
+        if (!captured.tool().present() && captured.batchCopies() <= 0 && captured.actorId() == null) {
             USES.remove(npcId);
             return;
         }

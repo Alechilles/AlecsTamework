@@ -207,7 +207,7 @@ final class InteractionExecutor {
             boolean shearContext = harvestContext != null && harvestContext.equalsIgnoreCase("Shear");
             HusbandryHarvestUseContext.CapturedUse toolUse = shearContext
                     ? HusbandryHarvestUseContext.capture(player, ctx == null ? null : ctx.activeItem)
-                    : HusbandryHarvestUseContext.CapturedUse.empty();
+                    : HusbandryHarvestUseContext.toolless(player);
             HusbandryOutcomeModifiers authorization = HusbandryYieldResolver.resolveHarvest(
                     npcRef, store, role == null ? null : role.getRoleName(), null, toolUse.tool(),
                     player == null ? null : player.getUuid());

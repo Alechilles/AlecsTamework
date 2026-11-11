@@ -138,7 +138,8 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     output.itemQuantities(),
                     result,
                     usesCapturedTool ? toolUse.tool() : null,
-                    usesCapturedTool ? toolUse.actorId() : harvestingPlayerId(ref, role, store)
+                    // The interaction has usually moved on by now, so the captured use names the player.
+                    toolUse.actorId() != null ? toolUse.actorId() : harvestingPlayerId(ref, role, store)
             );
         } else if (dropped) {
             ActivityRuntime.publishHarvest(
