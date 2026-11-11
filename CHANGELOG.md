@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.10.1 - Trough and Aging Fixes - 2026-11-11
 
 ### Fixed
 
