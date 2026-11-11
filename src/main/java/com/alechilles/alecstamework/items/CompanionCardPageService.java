@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.access.SharedAccessService;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
@@ -221,7 +223,35 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         return new TameworkCompanionCardPage.View(entry, manage ? interactions : CompanionCardInteractions.EMPTY,
                 manage, generic, access, ownerName(npcRef, store), rename, groupOptions,
-                TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store), foods, appearance);
+                TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store), foods, appearance,
+                generic && access == AccessLevel.OWNER ? privateState(player.getUuid(), npcRef, store) : null);
+    }
+
+    /**
+     * Whether the owner marked this companion private, or {@code null} when the card should not offer the switch:
+     * a companion that is never shared (bonded), one without a profile, or an owner who shares with nobody and has
+     * not marked it private. Reads memory only.
+     */
+    @Nullable
+    private static Boolean privateState(UUID owner, Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        UUID profileId = profileId(npcRef, store);
+        if (profileId == null) {
+            return null;
+        }
+        SharedAccessService service = SharedAccessService.get();
+        boolean marked = service.grants(owner).privateCompanions().contains(profileId);
+        if (!marked && service.isPrivate(owner, profileId)) {
+            // Never shared whatever the flag says, so a switch would mislead.
+            return null;
+        }
+        return marked || service.sharesAnything(owner) ? marked : null;
+    }
+
+    @Nullable
+    private static UUID profileId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkCompanionComponent> type = TameworkCompanionComponent.getComponentType();
+        TameworkCompanionComponent companion = type == null || !npcRef.isValid() ? null : store.getComponent(npcRef, type);
+        return companion == null ? null : companion.getProfileId();
     }
 
     /**
@@ -402,6 +432,21 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
                         !TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store));
                 refresh();
             }
+        }
+
+        @Override
+        public void togglePrivate() {
+            Live live = live(AccessAction.OWNER_ONLY);
+            // The private flag is the owner's own choice, so this compares identity, not access.
+            if (live == null || !playerUuid.equals(links.resolveOwnerId(live.npcRef(), store))) {
+                return;
+            }
+            UUID profileId = profileId(live.npcRef(), store);
+            Boolean current = privateState(playerUuid, live.npcRef(), store);
+            if (profileId != null && current != null) {
+                SharedAccessService.get().setPrivate(playerUuid, profileId, !current);
+            }
+            refresh();
         }
 
         @Override

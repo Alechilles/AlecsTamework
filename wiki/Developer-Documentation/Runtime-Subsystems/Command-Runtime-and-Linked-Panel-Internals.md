@@ -64,6 +64,24 @@ panel refresh reads the index, so stale item records cannot restore a card after
 a transfer or a later recapture. Bonded companions never appear in ordinary
 panels, and command-family roster members are read-only there.
 
+The owned panel also lists companions other owners share with the viewer at
+`VIEW_IN_PANELS` (Handler) or higher. `CommandOwnedPanelRecordSource` reads them
+from the same index, one in-memory pass over each owner in
+`SharedAccessService.ownersSharingWith(viewer)`, and leaves out bonded, private,
+command-family and stored companions. A shared row carries the owner's name and
+the viewer's level (`LinkedNpcEntry.sharedAccess()`), and
+`LinkedNpcPanelCardBinder` shows each action only when
+`LinkedNpcEntry.viewerMay(action)` allows it; every callback checks access again
+through `CompanionAccess` when it runs. Shared rows are an authorization view
+only: caps, counts and record writes keep using the record's owner. When any
+owner's sharing changes, `Tamework` forwards the `SharedAccessService` change
+listener to `CommandItemFeatureHandler.sharedAccessChanged()`, which signals every
+open generic panel to refresh on its own world thread.
+
+The **Sharing** button in the window header opens `TameworkSharingPage`, where the
+viewer manages their own grants and leaves named shares. It shares its decisions
+with `/tw share` through `TameworkShareRules`.
+
 - `TameworkCommandSelectionPage`
 - `TameworkCommandGroupManagerPage`
 - `LinkedNpcPanelCardBinder`
@@ -92,7 +110,7 @@ document contains no literal guide text.
 ## Persistence model
 Ordinary `ItemMetadata` command tools persist their per-item selection records and
 panel preferences on the physical item. The owned panel discovers all owned
-companions from the companion index, then uses the flute's records only to
+companions, and those shared with the viewer, from the companion index, then uses the flute's records only to
 decide which rows are selected for that flute. A selected row is eligible for
 dispatch only after the held item's owner, tame, role, command, and capacity checks.
 Named view definitions live in the player's saved `TameworkCompanionViewsComponent`,

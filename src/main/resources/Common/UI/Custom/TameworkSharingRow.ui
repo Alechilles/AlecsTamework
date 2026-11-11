@@ -1,0 +1,46 @@
+$A = "TameworkSlateStyles.ui";
+$C = "Common.ui";
+
+// One row of the Sharing page: a name, then either a level picker or a fixed level, then an
+// optional Remove or Leave button. TameworkSharingPage shows the parts each list needs.
+@RowLabelLit = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #eef2f6, Alignment: Center);
+@RowLabelDelete = LabelStyle(FontSize: 11, RenderBold: true, TextColor: #f3aa9d, Alignment: Center);
+@RowDelete = TextButtonStyle(
+  Default: (Background: $A.@SlateQuiet, LabelStyle: @RowLabelDelete),
+  Hovered: (Background: $A.@SlateDanger, LabelStyle: @RowLabelLit),
+  Pressed: (Background: $A.@SlateDanger, LabelStyle: @RowLabelLit),
+  Sounds: $C.@ButtonSounds
+);
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 34);
+
+  Group { Anchor: (Top: 0, Left: 0, Right: 0, Height: 30); Background: $A.@SlateQuiet; }
+
+  Label #Name {
+    Anchor: (Top: 0, Left: 10, Right: 270, Height: 30);
+    Text: "";
+    Style: (FontSize: 13, RenderBold: true, TextColor: #eef2f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+  }
+
+  DropdownBox #Level {
+    Anchor: (Top: 3, Right: 96, Width: 160, Height: 24);
+    Style: $A.@GroupDropdown;
+    MaxSelection: 1;
+    Visible: false;
+  }
+
+  Label #LevelText {
+    Anchor: (Top: 0, Right: 96, Width: 160, Height: 30);
+    Text: "";
+    Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Visible: false;
+  }
+
+  TextButton #Action {
+    Anchor: (Top: 3, Right: 6, Width: 82, Height: 24);
+    Text: "";
+    Style: @RowDelete;
+    Visible: false;
+  }
+}

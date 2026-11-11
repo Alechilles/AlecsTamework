@@ -557,6 +557,15 @@ public final class CommandItemFeatureHandler {
         bondedPanelLifecycle.close();
     }
 
+    /**
+     * Refreshes every open companions window after an owner's sharing changed, so shared animals
+     * appear or leave and their buttons follow the new level. Safe from any thread: it only signals
+     * the pages, which rebuild on their own world thread.
+     */
+    public void sharedAccessChanged() {
+        selectionPageService.signalAllPanels();
+    }
+
     /** The companion card's page service; Tamework installs it as the card sink. */
     public CompanionCardPageService companionCardPages() {
         return companionCardPages;

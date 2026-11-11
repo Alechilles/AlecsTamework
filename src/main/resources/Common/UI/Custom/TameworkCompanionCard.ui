@@ -385,6 +385,13 @@ Group {
           Label #Value { Anchor: (Top: 0, Left: 96, Width: 104, Height: 18); Text: ""; Style: @TraitValue; }
         }
       }
+      // The owner's private switch, shown only to an owner who shares or already marked this companion private.
+      Group #PrivacyRow {
+        Anchor: (Top: 460, Left: 14, Width: 412, Height: 32);
+        Visible: false;
+        TextButton #PrivateSwitch { Anchor: (Top: 5, Left: 0, Width: 42, Height: 22); Style: $A.@SwitchOff; Text: ""; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+        Label #PrivateLabel { Anchor: (Top: 2, Left: 50, Width: 362, Height: 28); Text: %server.tamework.ui.companionCard.private; Style: @FooterLabel; }
+      }
       Group #Footer {
         Anchor: (Top: 500, Left: 14, Width: 412, Height: 44);
         Group { Anchor: (Top: 0, Left: 0, Width: 412, Height: 1); Background: #ffffff(0.08); }

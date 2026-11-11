@@ -86,6 +86,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
      * @param access         the viewer's access level on the companion; {@link AccessLevel#OWNER} for its owner
      * @param groupOptions   every group the viewer has defined; the entry's {@code groups()} are the selected ones.
      *                       Empty hides the group picker
+     * @param privateCompanion whether the owner marked this companion private; {@code null} hides the private
+     *                       switch (not the owner, a bonded companion, or an owner who shares with nobody)
      */
     public record View(@Nonnull LinkedNpcEntry entry,
                        @Nonnull CompanionCardInteractions interactions,
@@ -97,7 +99,8 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions,
                        boolean closeAfterCommand,
                        @Nonnull List<CommandTargetHudViewModel.FoodRow> foods,
-                       @Nonnull List<CommandTargetHudViewModel.AttachmentRow> appearance) {
+                       @Nonnull List<CommandTargetHudViewModel.AttachmentRow> appearance,
+                       @Nullable Boolean privateCompanion) {
     }
 
     /** Clicks reported to the page service. Every callback runs on the world thread. */
@@ -129,6 +132,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
 
         /** Flips the viewer's choice of whether a command closes the panel. */
         void toggleCloseAfterCommand();
+
+        /** Marks the companion private, or shares it again. Only its owner may. */
+        void togglePrivate();
 
         /** Turns the inspect camera one step around the companion: -1 left, +1 right. */
         void rotateCamera(int direction);
@@ -272,6 +278,13 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             // A preference, not a confirmable action: it neither answers nor cancels an open confirmation.
             if (view.canManage()) {
                 actions.toggleCloseAfterCommand();
+            }
+            return;
+        }
+        if (action.equals("private")) {
+            // The owner's sharing choice, not a confirmable action.
+            if (showsPrivateSwitch()) {
+                actions.togglePrivate();
             }
             return;
         }
@@ -422,6 +435,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         top = bindActions(commands, events, entry, language, manage, generic, top);
         top = bindFood(commands, language, top);
         top = bindAppearance(commands, language, top);
+        top = bindPrivacy(commands, events, language, top);
         bindFooter(commands, events, entry, language, manage, generic, top);
         int height = top + 44 + 12;
         commands.setObject("#CompanionCardSlot.Anchor", placement.laneAnchor(CompanionHudPlacement.CARD_WIDTH));
@@ -486,6 +500,27 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                     LocalizedText.resolveConfigValue(language, row.valueLabel(), row.valueLabel()));
         }
         return top + height + 8;
+    }
+
+    private boolean showsPrivateSwitch() {
+        return view.privateCompanion() != null && view.access() == AccessLevel.OWNER && generic();
+    }
+
+    /** The owner's private switch: on keeps the players and groups they share with away from this companion. */
+    private int bindPrivacy(UICommandBuilder commands, UIEventBuilder events, String language, int top) {
+        String row = CARD + " #PrivacyRow";
+        boolean visible = showsPrivateSwitch();
+        commands.set(row + ".Visible", visible);
+        if (!visible) {
+            return top;
+        }
+        boolean on = Boolean.TRUE.equals(view.privateCompanion());
+        commands.setObject(row + ".Anchor", anchor(top, 14, 412, 32));
+        commands.set(row + " #PrivateSwitch.Style", Value.ref("TameworkSlateStyles.ui", on ? "SwitchOn" : "SwitchOff"));
+        commands.set(row + " #PrivateSwitch.TooltipText", LocalizedText.resolve(language,
+                on ? "tamework.ui.companionCard.private.tooltip.on" : "tamework.ui.companionCard.private.tooltip.off"));
+        bind(events, row + " #PrivateSwitch", "private");
+        return top + 36;
     }
 
     private void bindIdentity(UICommandBuilder commands, UIEventBuilder events, LinkedNpcEntry entry,

@@ -1,14 +1,11 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.access.OwnerGrants;
 import com.alechilles.alecstamework.access.SharedAccessService;
 import com.alechilles.alecstamework.access.SharedAccessService.ChangeResult;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
-import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
-import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -21,7 +18,6 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -100,11 +96,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             boolean isNew = !service.grants(owner).players().containsKey(targetId);
             if (isNew && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
-                ChangeResult refused = !service.isEnabled() ? ChangeResult.SHARING_DISABLED
-                        : owner.equals(targetId) ? ChangeResult.SELF
-                        : level.compareTo(service.maxLevel()) > 0 ? ChangeResult.LEVEL_NOT_ALLOWED
-                        : service.grants(owner).players().size() >= SharedAccessService.MAX_PLAYER_GRANTS_PER_OWNER
-                        ? ChangeResult.TOO_MANY_PLAYERS : null;
+                ChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, level);
                 context.sendMessage(refused != null ? refusal(refused, null)
                         : Message.translation(KEY + "add.confirm").param("0", targetName)
                         .param("1", levelName(level)).param("2", levelToken(level)));
@@ -115,8 +107,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
                 case CHANGED -> {
                     context.sendMessage(Message.translation(KEY + (isNew ? "add.done" : "add.changed"))
                             .param("0", targetName).param("1", levelName(level)));
-                    target.sendMessage(Message.translation(KEY + (isNew ? "add.notify" : "add.notifyChanged"))
-                            .param("0", playerRef.getUsername()).param("1", levelName(level)));
+                    TameworkShareRules.notifyGranted(target, playerRef.getUsername(), level, isNew);
                 }
                 case UNCHANGED -> context.sendMessage(Message.translation(KEY + "add.unchanged")
                         .param("0", targetName).param("1", levelName(level)));
@@ -199,9 +190,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             }
             if (!grants.groups().containsKey(groupId) && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
-                ChangeResult refused = !service.isEnabled() ? ChangeResult.SHARING_DISABLED
-                        : service.groupProvider(groupId) == null ? ChangeResult.UNKNOWN_GROUP
-                        : level.compareTo(service.maxLevel()) > 0 ? ChangeResult.LEVEL_NOT_ALLOWED : null;
+                ChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
                 context.sendMessage(refused != null ? refusal(refused, groupId)
                         : Message.translation(KEY + "group.confirm").param("0", name)
                         .param("1", levelName(level)).param("2", groupId).param("3", levelToken(level)));
@@ -263,13 +252,8 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
                     continue;
                 }
                 // Only a named grant can be given up; group membership belongs to the group.
-                if (service.revokePlayer(owner, sender) != ChangeResult.CHANGED) {
-                    context.sendMessage(Message.translation(KEY + "leave.groupOnly").param("0", name));
-                    return;
-                }
-                boolean stillShared = service.level(owner, sender, null) != AccessLevel.NONE;
-                context.sendMessage(Message.translation(KEY + (stillShared ? "leave.doneStillGroup" : "leave.done"))
-                        .param("0", name));
+                TameworkShareRules.LeaveResult left = TameworkShareRules.leave(service, owner, sender);
+                context.sendMessage(Message.translation("server." + left.messageKey()).param("0", name));
                 return;
             }
             context.sendMessage(Message.translation(KEY + "leave.notFound").param("0", args[0]));
@@ -330,39 +314,30 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
     /** The grantable level typed as {@code caretaker}, {@code handler} or {@code manager}; else null. */
     @Nullable
     static AccessLevel parseLevel(@Nonnull String raw) {
-        for (AccessLevel level : AccessLevel.values()) {
-            if (level.isGrantable() && level.name().equalsIgnoreCase(raw)) {
-                return level;
-            }
-        }
-        return null;
+        return TameworkShareRules.parseLevel(raw);
     }
 
     /** The level as typed in a command. */
     @Nonnull
     static String levelToken(@Nonnull AccessLevel level) {
-        return level.name().toLowerCase(Locale.ROOT);
+        return TameworkShareRules.levelToken(level);
     }
 
     /** The translated name of a grantable level. */
     @Nonnull
     static Message levelName(@Nonnull AccessLevel level) {
-        return Message.translation(KEY + "level." + levelToken(level));
+        return TameworkShareRules.levelName(level);
     }
 
     /** The reply for a change the service refused. {@code groupId} is only read for an unknown group. */
     @Nonnull
     static Message refusal(@Nonnull ChangeResult result, @Nullable String groupId) {
+        Message message = Message.translation("server." + TameworkShareRules.refusalKey(result));
         return switch (result) {
-            case SHARING_DISABLED -> Message.translation(KEY + "error.disabled");
-            case SELF -> Message.translation(KEY + "error.self");
-            case LEVEL_NOT_ALLOWED -> Message.translation(KEY + "error.levelNotAllowed")
-                    .param("0", levelName(SharedAccessService.get().maxLevel()));
-            case TOO_MANY_PLAYERS -> Message.translation(KEY + "error.tooManyPlayers")
-                    .param("0", SharedAccessService.MAX_PLAYER_GRANTS_PER_OWNER);
-            case UNKNOWN_GROUP -> Message.translation(KEY + "error.unknownGroup")
-                    .param("0", groupId == null ? "" : groupId);
-            case CHANGED, UNCHANGED -> Message.translation(KEY + "error.unchanged");
+            case LEVEL_NOT_ALLOWED -> message.param("0", levelName(SharedAccessService.get().maxLevel()));
+            case TOO_MANY_PLAYERS -> message.param("0", SharedAccessService.MAX_PLAYER_GRANTS_PER_OWNER);
+            case UNKNOWN_GROUP -> message.param("0", groupId == null ? "" : groupId);
+            default -> message;
         };
     }
 
@@ -376,32 +351,13 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
     /** The name saved with a grant, or the player's UUID so the grant can still be removed. */
     @Nonnull
     static String grantName(@Nonnull OwnerGrants.PlayerGrant grant) {
-        String name = grant.playerName();
-        return name == null || name.isBlank() ? grant.playerId().toString() : name;
+        return TameworkShareRules.grantName(grant);
     }
 
-    /**
-     * A name for an owner: the online player's, else the one saved on one of the owner's companion
-     * records, else the start of the UUID. Reads memory only.
-     */
+    /** A name for an owner; see {@link TameworkShareRules#ownerName}. Reads memory only. */
     @Nonnull
     static String ownerName(@Nonnull UUID ownerId) {
-        Universe universe = Universe.get();
-        PlayerRef online = universe == null ? null : universe.getPlayer(ownerId);
-        if (online != null && online.getUsername() != null) {
-            return online.getUsername();
-        }
-        Tamework plugin = Tamework.getInstance();
-        CompanionQueries companions = plugin == null ? null : plugin.getCompanionQueries();
-        if (companions != null) {
-            for (CompanionRecord record : companions.owned(ownerId)) {
-                String name = record.ownerName();
-                if (name != null && !name.isBlank()) {
-                    return name;
-                }
-            }
-        }
-        return ownerId.toString().substring(0, 8);
+        return TameworkShareRules.ownerName(ownerId);
     }
 
     /** The online player with this name, ignoring case; null when not online. */

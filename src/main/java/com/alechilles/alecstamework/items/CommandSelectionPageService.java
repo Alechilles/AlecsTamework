@@ -1313,6 +1313,14 @@ final class CommandSelectionPageService {
         ownerSignals.changed(ownerUuid);
     }
 
+    /**
+     * Refreshes every open generic and command-family panel, for a change whose viewers are not
+     * known by id. Safe from any thread; bonded panels never list shared companions.
+     */
+    void signalAllPanels() {
+        ownerSignals.changedAll();
+    }
+
     private TameworkCommandSelectionPage createSelectionPage(
             PageContext context, NpcCallbacks npcCallbacks,
             FeatureCallbacks featureCallbacks, PanelCallbacks panelCallbacks) {

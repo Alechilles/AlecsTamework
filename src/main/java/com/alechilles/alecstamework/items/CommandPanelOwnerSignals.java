@@ -47,5 +47,20 @@ final class CommandPanelOwnerSignals {
         }
     }
 
+    /**
+     * Asks every open generic panel to rebuild its card list now. For changes whose viewers are not
+     * known by id, such as a share with a group or a share that was just taken back.
+     */
+    void changedAll() {
+        for (Subscription subscription : subscriptions) {
+            try {
+                subscription.listener().accept(
+                        new LinkedPanelRefreshSignal(LinkedPanelRefreshSignal.Kind.IMMEDIATE));
+            } catch (RuntimeException ignored) {
+                // A page that is closing must not stop the other pages from refreshing.
+            }
+        }
+    }
+
     private record Subscription(UUID owner, Consumer<LinkedPanelRefreshSignal> listener) { }
 }

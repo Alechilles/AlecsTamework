@@ -644,6 +644,24 @@ public final class TameworkCommandSelectionPage
             });
             return;
         }
+        // Sharing is about the viewer's own grants, so it opens the same way from every panel.
+        if (CommandSelectionPageEventBinder.SHARING_COMMAND_ID.equals(commandId)) {
+            if (!beginPageNavigation()) return;
+            navigateAfterUiDrain(() -> {
+                try {
+                    Ref<EntityStore> currentRef = playerRef.getReference();
+                    if (currentRef == null || !currentRef.isValid()) return;
+                    Store<EntityStore> currentStore = currentRef.getStore();
+                    Player currentPlayer = currentStore.getComponent(currentRef, Player.getComponentType());
+                    if (currentPlayer == null) return;
+                    currentPlayer.getPageManager().openCustomPage(currentRef, currentStore,
+                            new TameworkSharingPage(playerRef, reopenPanel));
+                } finally {
+                    navigationPending = false;
+                }
+            });
+            return;
+        }
         if (handleShoulderRide(commandId, ref, store)) {
             return;
         }

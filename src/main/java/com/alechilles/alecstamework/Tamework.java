@@ -312,6 +312,13 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
+    /**
+     * The handler whose open companions windows refresh when sharing changes. The shared access
+     * listener reads it from the changing thread, so it is volatile; shutdown clears it, which turns
+     * the listener into a no-op because the service has no way to remove a listener.
+     */
+    private volatile CommandItemFeatureHandler sharedAccessPanels;
+    private boolean sharedAccessPanelListenerAdded;
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
@@ -951,6 +958,17 @@ public class Tamework extends JavaPlugin {
                 admissionGate
         );
         commandItemFeatureHandler.configureRecallRestore(recallRestore);
+        // Companions windows list animals others share with the viewer, so any sharing change refreshes them.
+        sharedAccessPanels = commandItemFeatureHandler;
+        if (!sharedAccessPanelListenerAdded) {
+            sharedAccessPanelListenerAdded = true;
+            com.alechilles.alecstamework.access.SharedAccessService.get().addChangeListener(ownerId -> {
+                CommandItemFeatureHandler panels = sharedAccessPanels;
+                if (panels != null) {
+                    panels.sharedAccessChanged();
+                }
+            });
+        }
         com.alechilles.alecstamework.companioncard.CompanionCards.install(
                 commandItemFeatureHandler.companionCardPages());
         commandItemFeatureHandler.configureCaptureItemFlows(captureItemFlows);
@@ -2318,6 +2336,7 @@ public class Tamework extends JavaPlugin {
         overrideInitializedScopeKeys.clear();
         com.alechilles.alecstamework.companioncard.CompanionCards.install(null);
         com.alechilles.alecstamework.companioncard.CompanionCardRequests.clear();
+        sharedAccessPanels = null;
         if (commandItemFeatureHandler != null) {
             commandItemFeatureHandler.close();
             commandItemFeatureHandler = null;

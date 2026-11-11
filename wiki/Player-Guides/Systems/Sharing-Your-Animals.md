@@ -71,13 +71,46 @@ If a player is both named and in a group you share with, they get the higher of 
 - how many of your animals are private; and
 - the players who share their animals with you, and your level on them.
 
-TODO(main agent): panels and sharing page
+## The Sharing page
+
+You can do all of the above without commands. Open your companions window with your command item and press
+**Sharing** in the header, next to Help. The page shows:
+
+- whether sharing is on and the highest level this server allows;
+- the players you share with, how many of the 20 you use, a level picker for each and a **Remove** button;
+- a row to add a player: pick an online player and a level, then press **Share**. Sharing with a new player
+  shows the same warning as the command first, and you press **Share** again to confirm;
+- each group with a picker: choose a level to turn it on (it asks you to confirm first) or **Off** to turn it off;
+  and
+- the players who share with you and your level on each, with a **Leave** button for named shares.
+
+The page shows what happened after each change. While sharing is off on the server, the page says so and has no
+add row, but you can still remove players and turn groups off. **Done** takes you back to the companions window.
+
+## Shared animals in your companions window
+
+Animals that others share with you at Handler or Manager appear in the **Owned** view of your own companions window,
+next to your own animals. Each one shows its owner's name where the species name usually is, so you can tell them
+apart. The buttons on its card follow your level: a Handler can command, ride, breed and set homes, and a Manager can
+also cull. Release stays with the owner, so its button is greyed out and says why. Caretakers do not see the
+owner's animals in the window. Animals in a command-family roster or stored in an item are left out, because only
+their owner's item can act on them.
+
+The window updates by itself when someone shares with you, changes your level or stops sharing.
+
+## Companion Inspect on a shared animal
+
+Press **F** on an animal someone shares with you to open **Companion Inspect**, as you would on your own. It shows
+the owner's name under the portrait and offers only the buttons your level allows. Talents stay with the owner.
 
 ## Private animals
 
 Look at one of your animals and run `/tw share private on`. No player or group you share with can use it then.
 Run `/tw share private off` to share it again. Only the owner can do this. Bonded companions are always private
 and cannot be changed.
+
+You can also use the **Keep this animal private** switch in Companion Inspect. It appears on your own animals once
+you share with someone, or on an animal you already marked private.
 
 ## Hunger, aging and production
 
