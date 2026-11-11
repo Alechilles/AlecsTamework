@@ -146,6 +146,27 @@ public final class AnimalProgressionClock implements AutoCloseable {
         }
     }
 
+    /**
+     * Returns the session-clock instant at which an offline owner's grace began, or null when the
+     * clock is stopped or the owner is online. An untracked owner starts being tracked as offline
+     * from now. The value may be negative: offline time saved by an earlier server session
+     * predates this session's runtime zero.
+     */
+    @Nullable
+    Long offlineStartedAtMs(@Nonnull UUID ownerId) {
+        synchronized (lock) {
+            if (!started) {
+                return null;
+            }
+            long nowMs = CompanionRuntimeClock.nowMs();
+            OwnerClock ownerClock = ownerClocks.computeIfAbsent(
+                    ownerId, ignored -> OwnerClock.offlineAt(0L, nowMs, 0L)
+            );
+            scheduleCheckpoint(nowMs, false);
+            return ownerClock.online ? null : ownerClock.offlineStartedAtMs;
+        }
+    }
+
     @Override
     public void close() {
         ExecutorService executor;

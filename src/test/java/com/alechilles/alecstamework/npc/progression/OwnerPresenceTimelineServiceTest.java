@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import java.lang.reflect.Field;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Verifies owner timeline windows used by owner-gated needs progression. */
 class OwnerPresenceTimelineServiceTest {
@@ -81,6 +83,31 @@ class OwnerPresenceTimelineServiceTest {
         );
 
         assertEquals(30_000L, effective);
+    }
+
+    @Test
+    void offlineGraceUsedBeforeARestartIsNotGrantedAgain(@TempDir Path dataDirectory) {
+        AnimalProgressionClock clock = AnimalProgressionClock.get();
+        clock.clearForTests();
+        try {
+            clock.start(dataDirectory);
+            UUID ownerId = UUID.randomUUID();
+            service.markOnlineForTests(ownerId, 0L);
+            service.markOfflineForTests(ownerId, 0L);
+            CompanionRuntimeClock.advanceByDeltaSeconds(80.0f * 3_600.0f);
+            clock.close();
+
+            // A new server session: presence is forgotten and the runtime clock starts at zero.
+            service.clearForTests();
+            clock.start(dataDirectory);
+            CompanionRuntimeClock.advanceByDeltaSeconds(3_600.0f);
+
+            long effective = service.resolveEffectiveElapsedMs(ownerId, 0L, HOUR_MS, policy(72.0, 1.0));
+
+            assertEquals(HOUR_MS, effective);
+        } finally {
+            clock.clearForTests();
+        }
     }
 
     private TwNeedsConfig.TickPolicySettings policy(double graceHours, double multiplier) {

@@ -19,6 +19,8 @@ public final class OwnerPresenceTimelineService {
     private static final double HOURS_TO_MILLIS = 3_600_000.0;
     private static final double DEFAULT_GRACE_HOURS = 72.0;
     private static final double DEFAULT_OFFLINE_MULTIPLIER = 1.0;
+    /** Marks a transition that has not happened. Zero and negative session instants are real values. */
+    private static final long UNSET_MS = Long.MIN_VALUE;
     private final Map<UUID, PresenceState> presenceByOwner = new ConcurrentHashMap<>();
 
     private OwnerPresenceTimelineService() {
@@ -94,7 +96,7 @@ public final class OwnerPresenceTimelineService {
         long graceMs = resolveGraceDurationMs(graceHours);
 
         if (state.online) {
-            long connectedAtMs = state.lastConnectedAtMs > 0L ? state.lastConnectedAtMs : state.lastStatusChangeMs;
+            long connectedAtMs = state.lastConnectedAtMs != UNSET_MS ? state.lastConnectedAtMs : state.lastStatusChangeMs;
             if (connectedAtMs <= windowStartMs) {
                 return totalWindowMs;
             }
@@ -110,7 +112,7 @@ public final class OwnerPresenceTimelineService {
             return clampToWindow(onlineWindowMs + offlineEffectiveMs, totalWindowMs);
         }
 
-        long disconnectedAtMs = state.lastDisconnectedAtMs > 0L ? state.lastDisconnectedAtMs : state.lastStatusChangeMs;
+        long disconnectedAtMs = state.lastDisconnectedAtMs != UNSET_MS ? state.lastDisconnectedAtMs : state.lastStatusChangeMs;
         if (disconnectedAtMs <= windowStartMs) {
             return resolveOfflineEffectiveElapsedMs(
                     state,
@@ -186,7 +188,7 @@ public final class OwnerPresenceTimelineService {
         if (graceMs <= 0L) {
             return scaleDurationMs(segmentEndMs - segmentStartMs, offlineMultiplier);
         }
-        long offlineStartMs = state.lastDisconnectedAtMs > 0L ? state.lastDisconnectedAtMs : state.lastStatusChangeMs;
+        long offlineStartMs = state.lastDisconnectedAtMs != UNSET_MS ? state.lastDisconnectedAtMs : state.lastStatusChangeMs;
         long graceEndMs = saturatingAdd(offlineStartMs, graceMs);
         if (segmentEndMs <= graceEndMs) {
             return 0L;
@@ -200,7 +202,17 @@ public final class OwnerPresenceTimelineService {
         if (existing != null) {
             return existing;
         }
-        PresenceState seeded = PresenceState.initial(isOwnerOnlineInUniverse(ownerId), atMs);
+        boolean online = isOwnerOnlineInUniverse(ownerId);
+        long sinceMs = atMs;
+        if (!online) {
+            // Presence is memory-only, so a new server session would otherwise restart the offline
+            // grace. The progression clock saves the offline time each owner has already used.
+            Long savedOfflineStartMs = AnimalProgressionClock.get().offlineStartedAtMs(ownerId);
+            if (savedOfflineStartMs != null) {
+                sinceMs = Math.min(atMs, savedOfflineStartMs);
+            }
+        }
+        PresenceState seeded = PresenceState.initial(online, sinceMs);
         PresenceState prior = presenceByOwner.putIfAbsent(ownerId, seeded);
         return prior == null ? seeded : prior;
     }
@@ -289,8 +301,8 @@ public final class OwnerPresenceTimelineService {
         }
 
         private static PresenceState initial(boolean online, long atMs) {
-            long connectedAtMs = online ? atMs : 0L;
-            long disconnectedAtMs = online ? 0L : atMs;
+            long connectedAtMs = online ? atMs : UNSET_MS;
+            long disconnectedAtMs = online ? UNSET_MS : atMs;
             return new PresenceState(online, atMs, connectedAtMs, disconnectedAtMs);
         }
 

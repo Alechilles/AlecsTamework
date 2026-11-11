@@ -7,6 +7,11 @@
 - Baby animals can no longer be harvested (milked, sheared and so on), and their companion card no longer shows a
   harvest meter. Species that grow up in their adult role, with no separate baby role, such as Mosshorns, used to
   inherit the adult's harvest.
+- The owner-offline grace for hunger and thirst (72 hours by default) no longer starts again every time the server
+  restarts. Before, on a server that restarts daily the grace never ran out, so animals of players who had stopped
+  playing never got hungry. Their animals now start getting hungry and thirsty once the grace is used up, the same
+  way aging and production already worked. The grace still counts server uptime only, and its length is still set
+  with `/tw settings`.
 
 ## 5.10.1 - Trough and Aging Fixes - 2026-11-11
 
