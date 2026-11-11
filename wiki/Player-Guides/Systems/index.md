@@ -14,5 +14,6 @@ This subsection covers progression and shared-system behavior players will see w
 - [Happiness, Needs, Breeding, and Traits](/mod/alecs-tamework/happiness-needs-breeding-and-traits)
 - [Coops, Feed Troughs, and Shared Systems](/mod/alecs-tamework/coops-feed-troughs-and-shared-systems)
 - [Scarecrow Spawn Suppression](/mod/alecs-tamework/scarecrow-spawn-suppression)
+- [Sharing Your Animals](/mod/alecs-tamework/sharing-your-animals)
 
 

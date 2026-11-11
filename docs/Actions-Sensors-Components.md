@@ -298,7 +298,8 @@ instructions cannot read. Two role flags expose what an outside instruction need
   flags and restarts from its default state the next time it runs, so it does not resume the old settle.
 
 ## NPC Sensor Builder IDs
-- `TameworkIsOwner`
+- `TameworkIsOwner` (the interacting player is the NPC's owner)
+- `TameworkHasAccess` (the interacting player is the owner or holds shared access at `MinLevel` or higher; see below)
 - `TameworkHasOwner`
 - `TameworkIsTamed`
 - `TameworkLifeStage`
@@ -332,6 +333,39 @@ specific to each NPC.
 ## NPC Entity Filter Builder IDs
 - `TameworkAttitudeFromTargetSlot` (checks a candidate NPC's attitude toward a marked target slot)
 - `TameworkAttackedTargetSlotRecently`
+- `TameworkIsOwner` (the candidate entity is the NPC's owner)
+- `TameworkHasAccess` (the candidate entity is the owner or a player with shared access at `MinLevel` or higher)
+
+## Owner and shared access checks
+
+An owner can share their animals with other players at one of three levels: `Caretaker`, `Handler`, or
+`Manager`. `TameworkIsOwner` and `TameworkHasAccess` exist as both a sensor and an entity filter. The sensor
+tests the current interaction player. The filter tests the candidate entity of a `Player` or `Target` sensor.
+
+- `TameworkIsOwner` matches the owner only. It ignores shared access. Use it for anything that must stay
+  with the owner.
+- `TameworkHasAccess` matches the owner and any player whose shared access is at least `MinLevel`. Use it
+  when the NPC should treat trusted players like its owner, for example to never attack them.
+
+`TameworkHasAccess` has one optional parameter:
+
+- `MinLevel`: `Caretaker` (default), `Handler`, `Manager`, or `Owner`. A level also matches every higher
+  level, and the owner always matches. `Owner` behaves like `TameworkIsOwner`.
+
+```json
+{
+  "Type": "Target",
+  "TargetSlot": "LockedTarget",
+  "Filters": [
+    { "Type": "TameworkHasAccess", "MinLevel": "Handler" }
+  ]
+}
+```
+
+Neither type matches on an unowned NPC. Bonded companions and animals the owner marked private are never
+shared, so on them only the owner matches. The framework `Component_Tamework_Instruction_Aggressive` and
+`Component_Tamework_Instruction_Defend` components use the `TameworkHasAccess` filter to drop a locked
+combat target that is the owner or a player with access.
 
 ## Runtime ECS Components
 - `TameworkOwnerComponent`

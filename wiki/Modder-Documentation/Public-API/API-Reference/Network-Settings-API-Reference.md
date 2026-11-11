@@ -43,9 +43,10 @@ in the background.
 ## The store
 
 The store holds opaque JSON documents by key. Tamework writes and reads the
-JSON; keep it as text. Tamework uses the key `NetworkSettingsStore.SERVER_KEY`
-(`"server"`) today. Keys that start with `player/` are reserved, so accept any
-key.
+JSON; keep it as text. Tamework uses two keys today:
+`NetworkSettingsStore.SERVER_KEY` (`"server"`) for the settings and
+`"shared-access"` for shared access grants (see below). Keys that start with
+`player/` are reserved, so accept any key.
 
 Tamework calls both methods on its own `tamework-network-settings` thread, one
 call at a time, never on a world thread. Calls may block on I/O. A call that
@@ -72,6 +73,35 @@ safe from any thread and returns immediately.
 A server that reads a network document for the first time keeps its own values
 only where they differ from both the network's value and the built-in default.
 Each value that changes is logged at `INFO`.
+
+## Shared access grants
+
+A registered store also carries the grants owners make when they share their
+tamed animals with other players. All owners' grants are one document under
+the key `shared-access`. There is nothing more to register: a store that
+accepts any key already carries it. Without a store, each server keeps its
+grants in its own `shared-access.json`.
+
+Tamework reads this document when the store is registered and then once a
+minute, and saves it when an owner changes a grant on this server. Call
+`notifyChanged("shared-access")` when you learn that another server saved it,
+and the grant applies on this server at once. Without the call it applies
+within a minute.
+
+- Servers merge by owner. When two servers save at the same moment, the second
+  save is refused, reads the first one's document and saves again on top of
+  it, so both owners' changes are kept. If both changed the same owner, the
+  later save wins for that owner.
+- A server that joins with grants of its own adds them to the network's. After
+  that it takes the network's grants, so an owner who stopped sharing while
+  the server was down stays that way.
+- Each server keeps a copy in its own file, and the grants in it still apply
+  when the store is down. A grant changed while the store is down is saved to
+  the network at the next check that succeeds. If the server restarts before
+  that, the change is lost: the server takes the network's grants for that
+  owner when it reads the store again.
+- **Leave network** on the settings page concerns settings only. Grants keep
+  following the store while one is registered.
 
 ## Limits
 

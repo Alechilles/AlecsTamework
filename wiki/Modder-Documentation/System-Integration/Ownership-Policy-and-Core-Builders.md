@@ -29,7 +29,8 @@ Use this page when you need the shared building blocks rather than one specific 
 `TameworkHarvestAlarm` sets the `Harvest_Ready` alarm from the role's `HarvestTimeout` builder parameter and applies the companion's `HarvestCooldownMultiplier` passive effect before scheduling the alarm.
 
 ## Core sensors and filters
-- `TameworkIsOwner`
+- `TameworkIsOwner` (sensor and entity filter; matches the owner only)
+- `TameworkHasAccess` (sensor and entity filter; matches the owner and players with shared access, see below)
 - `TameworkHasOwner`
 - `TameworkIsTamed`
 - `TameworkLifeStage`
@@ -40,6 +41,43 @@ Use this page when you need the shared building blocks rather than one specific 
 - `TameworkAttitudeFromTargetSlot` (checks a candidate NPC's attitude toward a marked target slot)
 - `TameworkAttackedTargetSlotRecently`
 - `TameworkInteractionActive` (entity filter; see held interactions below)
+
+## Owner and shared access checks
+
+An owner can share their animals with other players at one of three levels:
+`Caretaker`, `Handler`, or `Manager`. `TameworkIsOwner` and `TameworkHasAccess`
+exist as both a sensor and an entity filter. The sensor tests the current
+interaction player. The filter tests the candidate entity of a `Player` or
+`Target` sensor.
+
+- `TameworkIsOwner` matches the owner only. It ignores shared access. Use it
+  for anything that must stay with the owner.
+- `TameworkHasAccess` matches the owner and any player whose shared access is
+  at least `MinLevel`. Use it when the NPC should treat trusted players like
+  its owner, for example to never attack them.
+
+`TameworkHasAccess` has one optional parameter:
+
+- `MinLevel`: `Caretaker` (default), `Handler`, `Manager`, or `Owner`. A level
+  also matches every higher level, and the owner always matches. `Owner`
+  behaves like `TameworkIsOwner`.
+
+```json
+{
+  "Type": "Target",
+  "TargetSlot": "LockedTarget",
+  "Filters": [
+    { "Type": "TameworkHasAccess", "MinLevel": "Handler" }
+  ]
+}
+```
+
+Neither type matches on an unowned NPC. Bonded companions and animals the owner
+marked private are never shared, so on them only the owner matches. The
+framework `Component_Tamework_Instruction_Aggressive` and
+`Component_Tamework_Instruction_Defend` components use the `TameworkHasAccess`
+filter to drop a locked combat target that is the owner or a player with
+access.
 
 ## Peaceful positioning and held interactions (development)
 

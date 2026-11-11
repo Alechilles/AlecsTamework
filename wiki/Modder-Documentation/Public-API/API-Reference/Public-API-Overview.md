@@ -45,6 +45,8 @@ behavior.
 - `bondedCompanions()` for roster companions that are summoned, stored,
   revived, captured, and provisioned;
 - `capturedItemDisplay()` for captured-item tooltip and quality providers;
+- `sharedAccess()` for what players other than the owner may do with a
+  companion, and for the group providers owners can share with;
 - `commandUi()` for registered Java command-menu renderers and namespaced
   contributors; and
 - `commandHud()` for registered Java target and equipped-tool HUD renderers
@@ -67,8 +69,8 @@ Advertised while their runtime is available: `CAPTURE_POLICY`,
 `COMMAND_HUD_RENDERERS`, `COMMAND_HUD_CONTRIBUTORS`, `HUSBANDRY_OUTCOMES`,
 `HUSBANDRY_TOOL_CONTEXT`, `HUSBANDRY_TOOL_BONUSES`, `HUSBANDRY_CARE_BONUSES`,
 `HUSBANDRY_FLAT_CARE_BONUS`, `HUSBANDRY_BREEDING_GENETICS`,
-`CAPTURED_ITEM_DISPLAY`, `HUSBANDRY_REWARD_TABLES`, `PORTABLE_COMPANION_STORE`, and
-`NETWORK_SETTINGS_STORE`.
+`CAPTURED_ITEM_DISPLAY`, `HUSBANDRY_REWARD_TABLES`, `PORTABLE_COMPANION_STORE`,
+`NETWORK_SETTINGS_STORE`, and `SHARED_ACCESS`.
 
 In the enum but not advertised in 3.0.0: `LOADED_POPULATION_GROUP_COUNTS` and
 `DURABLE_OUTPUT_OPERATIONS`.

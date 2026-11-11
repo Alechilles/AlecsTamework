@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Added
+
+- Owners can share their tamed animals with other players and stay the only owner. Each player gets a level:
+  **Caretaker** (feed, water, pet, heal and see status; Tamework's attack and defend behaviours never target them,
+  and they cannot hurt the animal), **Handler** (also harvest, mount, shoulder ride, toggle flight, command it with
+  their own command item, lead, recall, set and return home, breed, and use custom interactions such as fitting
+  equipment) or **Manager** (also rename, cull, and put it in or take it out of a coop). Capture, release, revive,
+  talents, transfer and sharing itself stay with the owner. Population limits still count the owner alone.
+- Sharing covers all of an owner's animals. Look at one and run `/tw share private on` to keep it to yourself, or
+  `/tw share private off` to share it again. Bonded companions are never shared.
+- **Sharing makes your animals depend on the players you share with.** While you or anyone you share with is
+  online, your shared animals get hungry and thirsty, age and produce, even when you are offline. If nobody feeds
+  them, they can starve. Private animals and bonded companions still follow you alone. When none of you is online,
+  the usual owner-offline grace applies. For this reason, a first share with a player or a group asks you to confirm.
+- `/tw share` commands for every player, with no admin permission: `add <player> <caretaker|handler|manager>
+  [confirm]`, `remove <player>`, `list`, `group <groupId> <caretaker|handler|manager|off> [confirm]`,
+  `leave <player>` and `private <on|off>`. You can share with up to 20 players by name. Other mods can offer groups,
+  such as a guild; a group gives nothing until its owner turns it on with `/tw share group`.
+- A Manager counts as the owner for the damage settings, and their killing blow counts as a cull where the owner's
+  would. Caretakers and Handlers can never hurt a shared animal.
+- `/tw settings` has **Sharing Enabled** (on by default) and **Highest Sharing Level** (Manager by default) in the
+  Ownership section. Turning sharing off keeps every saved share for later. A share above the highest level counts
+  as that level.
+- For modders: `TameworkApi.sharedAccess()` (`SharedAccessApi`) with the `SHARED_ACCESS` capability reads levels,
+  changes grants and registers groups through `AccessGroupProvider`. The `TameworkHasAccess` NPC sensor and entity
+  filter (optional `MinLevel`) match the owner and players with access; the framework Aggressive and Defend
+  components use it. `TameworkIsOwner` and `PolicyApi.isOwner` stay owner-only, and `PolicyApi.evaluateDamage`
+  follows the damage rule above. `ManagedActivityView.actorId` now names the player who fed, harvested or culled;
+  the owner stays the owner. On a server network with a settings store, grants follow the network under the key
+  `shared-access`. The API version stays `3.0.0`.
+
 ### Fixed
 
 - Baby animals can no longer be harvested (milked, sheared and so on), and their companion card no longer shows a

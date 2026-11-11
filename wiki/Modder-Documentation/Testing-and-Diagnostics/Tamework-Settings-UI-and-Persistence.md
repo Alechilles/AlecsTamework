@@ -112,6 +112,35 @@ decided by **Block Owner Damage**, so turn that off too when owners should keep
 that ability. **Block All Player Damage If Owned** still blocks every player,
 the owner included.
 
+## Sharing
+
+Owners can share their animals with other players (`/tw share`). Two settings in
+the Ownership section decide how far that goes on this server.
+
+| Setting | Key in `tamework-settings.json` | Values | Default |
+| --- | --- | --- | --- |
+| Sharing Enabled | `ownership.sharing.enabled` | `true`, `false` | `true` |
+| Highest Sharing Level | `ownership.sharing.highestLevel` | `CARETAKER`, `HANDLER`, `MANAGER` | `MANAGER` |
+
+- With **Sharing Enabled** on, an owner can let other players care for, handle
+  or manage their animals. The animals of an owner who shares keep getting
+  hungry and thirsty while any of those players is online, even when the owner
+  is not.
+- With it off, only the owner has access to an animal. Saved shares are kept in
+  their file and apply again when sharing is turned back on.
+- **Highest Sharing Level** is the most an owner can give: Caretaker (feed,
+  water, pet and heal), Handler (also harvest, mount, command and breed) or
+  Manager (also rename, cull and use coops). An owner cannot share above it, and
+  a share saved at a higher level counts as this level until the setting is
+  raised again.
+
+A settings file written before these settings existed has no
+`ownership.sharing` section and loads with the defaults. The level name is read
+in any letter case; a missing or unknown name counts as `MANAGER`. Both settings
+take effect as soon as they are applied, reloaded with `/tw config reload`, or
+changed through network settings, where they layer like every other value in
+`tamework-settings.json`. Experience presets leave them unchanged.
+
 ## Other settings
 
 The same UI continues to own the established taming, ownership, damage,
