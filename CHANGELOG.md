@@ -7,6 +7,10 @@
 - Companions with needs now walk to feed troughs holding any food their food config lists (premium, preferred,
   compatible or disliked), not only the needs config's `ContainerFoodItemIds`. Before, a trough stocked only with,
   say, premium feed was never sought out, even though the companion would eat that food once next to it.
+- Grown tamed animals keep aging after a server restart or after their area reloads. Before, their age stopped
+  saving while the companion panel kept counting, so an animal the panel called Prime could be culled as an Adult:
+  half the drops, and no cull credit for mods that pay only for raised animals. A cull now reads the same age the
+  panel shows.
 
 ## 5.10.0 - Companion Inspect - 2026-11-10
 
