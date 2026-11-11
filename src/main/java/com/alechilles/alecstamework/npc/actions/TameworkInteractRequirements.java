@@ -26,6 +26,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequ
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementBucket;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementGroup;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -243,7 +245,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestable()
-                && !owner.resolveIsHarvestable(role, ctx)) {
+                && !isHarvestable(npcRef, store, role, ctx)) {
             return false;
         }
         if (bucket.isMountable()
@@ -350,7 +352,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestable()
-                && owner.resolveIsHarvestable(role, ctx)) {
+                && isHarvestable(npcRef, store, role, ctx)) {
             return true;
         }
         if (bucket.isMountable()
@@ -636,6 +638,15 @@ final class TameworkInteractRequirements {
         return owner.isHeldItemInList(resolved.getItems(), ctx);
     }
 
+    /**
+     * A juvenile is never harvestable: species that grow up in their adult role (no baby role) share its
+     * IsHarvestable parameter, so the life stage decides.
+     */
+    private boolean isHarvestable(Ref<EntityStore> npcRef, Store<EntityStore> store, Role role, InteractionContextSnapshot ctx) {
+        return owner.resolveIsHarvestable(role, ctx)
+                && CompanionLifeStageService.isAdult(npcRef, store, CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+    }
+
     private boolean meetsHarvestRequirements(HarvestInteraction interaction,
                                              Ref<EntityStore> npcRef,
                                              Role role,
@@ -651,7 +662,7 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
+        if (requireHarvestable && !isHarvestable(npcRef, store, role, ctx)) {
             return false;
         }
         if (requireAlarm

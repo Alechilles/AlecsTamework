@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -76,7 +77,8 @@ public final class CommandLinkedPanelCooldownSnapshotService {
     /**
      * An absent alarm means a supported animal is ready; it must not make every companion
      * advertise harvest readiness. This matches the interaction route's role config and
-     * harvestability parameter before consulting the shared alarm.
+     * harvestability parameter before consulting the shared alarm. A juvenile shows no harvest
+     * meter, matching the interaction route's adult gate.
      */
     private boolean hasEnabledHarvestCapability(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
@@ -89,6 +91,9 @@ public final class CommandLinkedPanelCooldownSnapshotService {
         }
         StdScope roleScope = NpcSupportAccess.sensorScope(npc.getRole(), npcRef, store);
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (!CompanionLifeStageService.isAdult(npcRef, store, roleId)) {
+            return false;
+        }
         // Root role parameters are not necessarily exported to the live sensor scope.
         StdScope parameters = resolveRoleParameterScope(roleId);
         return hasEnabledHarvestCapability(

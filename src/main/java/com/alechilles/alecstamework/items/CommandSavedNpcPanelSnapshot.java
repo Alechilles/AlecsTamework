@@ -186,7 +186,8 @@ final class CommandSavedNpcPanelSnapshot {
                 : facts.breeding == null
                 ? Cooldown.from(base.breedingCooldownKnown(), base.breedingCooldownActive(), base.breedingCooldownRemainingMs(), base.breedingCooldownRatio())
                 : facts.breeding.cooldown(facts.lifeStage, base.captured(), gameRate);
-        Cooldown harvest = resolveHarvest(facts.harvest, facts.lifeStage, base.captured(), effectiveRole, base, gameRate);
+        Cooldown harvest = juvenile ? new Cooldown(false, false, 0L, 0.0)
+                : resolveHarvest(facts.harvest, facts.lifeStage, base.captured(), effectiveRole, base, gameRate);
         boolean breedingEnabled = !juvenile && (facts.breeding == null ? base.breedingEnabled() : facts.breeding.enabled);
         boolean breedingAvailable = !juvenile && (facts.breeding == null ? base.breedingAvailable() : true);
         LinkedNpcEntry applied = new LinkedNpcEntry(

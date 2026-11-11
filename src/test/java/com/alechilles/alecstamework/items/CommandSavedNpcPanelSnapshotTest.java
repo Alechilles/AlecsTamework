@@ -55,11 +55,15 @@ class CommandSavedNpcPanelSnapshotTest {
     }
 
     @Test
-    void hidesBreedingPresentationForJuvenileSavedCompanions() {
+    void hidesBreedingAndHarvestPresentationForJuvenileSavedCompanions() {
         TameworkLifeStageComponent juvenile = new TameworkLifeStageComponent();
         juvenile.setStage("Baby");
         Inputs inputs = new Inputs();
         inputs.breeding = new TameworkBreedingComponent("breed-test", 0.0, 0L, true, true, 60_000L, null);
+        TameworkAlarmComponent alarms = new TameworkAlarmComponent();
+        String harvestAlarm = CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName();
+        alarms.setAlarm(harvestAlarm, 0L, 60_000L, 60_000L);
+        inputs.harvest = alarms.getAlarm(harvestAlarm);
         inputs.lifeStage = juvenile;
 
         LinkedNpcEntry applied = saved(inputs).apply(baseCard(), null);
@@ -67,6 +71,8 @@ class CommandSavedNpcPanelSnapshotTest {
         assertFalse(applied.breedingAvailable());
         assertFalse(applied.breedingCooldownKnown());
         assertEquals(-1.0, applied.breedingHappinessRatio());
+        // Species that grow up in their adult role share its IsHarvestable; a baby still has no harvest meter.
+        assertFalse(applied.harvestCooldownKnown());
     }
 
     @Test

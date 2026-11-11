@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Baby animals can no longer be harvested (milked, sheared and so on), and their companion card no longer shows a
+  harvest meter. Species that grow up in their adult role, with no separate baby role, such as Mosshorns, used to
+  inherit the adult's harvest.
+
 ## 5.10.1 - Trough and Aging Fixes - 2026-11-11
 
 ### Fixed
