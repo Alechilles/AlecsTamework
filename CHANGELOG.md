@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Companions with needs now walk to feed troughs holding any food their food config lists (premium, preferred,
+  compatible or disliked), not only the needs config's `ContainerFoodItemIds`. Before, a trough stocked only with,
+  say, premium feed was never sought out, even though the companion would eat that food once next to it.
+
 ## 5.10.0 - Companion Inspect - 2026-11-10
 
 ### Added

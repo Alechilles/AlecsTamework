@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -141,6 +142,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                 eligibility.needsConfig() == null
                                         ? resolveNeedsConfig(ref, store)
                                         : eligibility.needsConfig(),
+                                CompanionRoleIdResolver.resolveRoleId(ref, store),
                                 worldName,
                                 originX,
                                 originY,
@@ -186,6 +188,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         NeedsResourceSearchCoordinator.Request request = createRequest(
                 needsConfig,
+                CompanionRoleIdResolver.resolveRoleId(ref, store),
                 worldName,
                 originX,
                 originY,
@@ -301,6 +304,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     @Nullable
     private NeedsResourceSearchCoordinator.Request createRequest(@Nullable TwNeedsConfig config,
+                                                                 @Nullable String roleId,
                                                                  @Nonnull String worldName,
                                                                  double originX,
                                                                  double originY,
@@ -329,7 +333,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     searchRadius = Math.max(searchRadius, configuredSearchRadius);
                     verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
                     consumeRadius = configuredConsumeRadius;
-                    passiveItemIds = passive.getContainerFoodItemIds();
+                    // Seek the same container foods the consume step accepts: the needs config's
+                    // container list plus every food the role's TwFoodConfig lists.
+                    passiveItemIds = mergeItemIds(
+                            passive.getContainerFoodItemIds(),
+                            TwFoodConfig.resolveNeedsConsumeItemIdsForRole(roleId)
+                    );
                 }
             }
 
@@ -438,18 +447,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return itemIds;
         }
         return mergeItemIds(itemIds, passiveItemIds);
-    }
-
-    @Nullable
-    String[] resolveFoodItemIds(@Nullable TwNeedsConfig needsConfig) {
-        if (needsConfig == null) {
-            return itemIds;
-        }
-        String[] passiveItemIds = sanitizeItemIds(needsConfig.getPassiveRefill().getContainerFoodItemIds());
-        if (hasConfiguredItemIds && passiveItemIds.length == 0) {
-            return itemIds;
-        }
-        return hasConfiguredItemIds ? mergeItemIds(itemIds, passiveItemIds) : passiveItemIds;
     }
 
     private SearchEligibility resolveSearchEligibility(@Nonnull Ref<EntityStore> ref,
