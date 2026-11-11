@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
 import com.alechilles.alecstamework.items.TameworkNpcCullService;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -87,7 +89,11 @@ public final class TameworkCullNpcInteraction extends SimpleInteraction {
         Player player = commandBuffer.getComponent(playerRef, Player.getComponentType());
         HusbandryToolContext tool = HusbandryToolContext.from(heldItem);
         byte hotbarSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
-        if (player == null || !TameworkNpcCullService.canCullFromItemInteraction(
+        // The service's owner check admits command access; a cull needs the owner or CULL access.
+        if (player == null
+                || (requireOwner && !CompanionAccess.allows(
+                        target, commandBuffer, player.getUuid(), AccessAction.CULL))
+                || !TameworkNpcCullService.canCullFromItemInteraction(
                 player, target, commandBuffer, requireOwner, requireTamed, tool)) {
             fail(context, time, type, cooldownHandler);
             return;

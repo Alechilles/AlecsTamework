@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -234,9 +236,10 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 store, npcRef, TameworkCommandLinksComponent.getComponentType()
         );
         ModelComponent model = component(store, npcRef, ModelComponent.getComponentType());
+        // The links owner is the companion's owner; a holder with COMMAND access sees the marker too.
         if (npc == null || links == null
-                || !playerUuid.equals(links.getOwnerId())
-                || !links.containsToolId(toolId)) {
+                || !links.containsToolId(toolId)
+                || !CompanionAccess.allows(links.getOwnerId(), playerUuid, npcRef, store, AccessAction.COMMAND)) {
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
@@ -372,8 +375,8 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 && component(store, npcRef, NPCEntity.getComponentType()) != null
                 && !isNpcInMountLifecycle(store, npcRef)
                 && links != null
-                && playerUuid.equals(links.getOwnerId())
-                && links.containsToolId(toolId);
+                && links.containsToolId(toolId)
+                && CompanionAccess.allows(links.getOwnerId(), playerUuid, npcRef, store, AccessAction.COMMAND);
     }
 
     private boolean isNpcInMountLifecycle(@Nonnull Store<EntityStore> store,

@@ -1,6 +1,11 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.access.SharedAccessService;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -15,10 +20,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
-/** Reads owned companions across worlds from the companion index. */
+/**
+ * Reads the companions a viewer's generic panel lists, across worlds, from the companion index:
+ * the viewer's own, and those other owners share with the viewer.
+ */
 final class CommandOwnedPanelRecordSource {
     /** Candidate profiles for one owner; a null owner asks for the unowned captured profiles. */
     private final Function<UUID, Collection<ProfileSnapshot>> profiles;
+    /** Other owners' companions the viewer may see in panels, each with the viewer's level on it. */
+    private final Function<UUID, Map<ProfileId, SharedProfile>> sharedProfiles;
     /** Profiles an owner's generic items show read-only, because another authority manages them. */
     private final Function<UUID, java.util.Set<ProfileId>> managedProfiles;
     /** One profile id to its record when that is an unowned capture item, else null. */
@@ -30,11 +40,33 @@ final class CommandOwnedPanelRecordSource {
      * item's linked records are looked up one by one. Command-family roster members (a roster id,
      * not bonded) are read-only here: their family item's panel owns their actions. Bonded
      * companions are never listed: they belong to their bonded roster's own panel.
+     *
+     * <p>Shared rows come from the same index: one in-memory pass over each sharing owner's
+     * records per snapshot, with no file read. They are an authorization view only. Caps, counts
+     * and everything written to a record keep using the record's owner.</p>
      */
     CommandOwnedPanelRecordSource(CompanionQueries companions) {
         this.profiles = owner -> owner == null ? List.of()
                 : companions.owned(owner).stream().filter(record -> !record.bonded())
                         .map(CommandPersistenceView::from).toList();
+        this.sharedProfiles = viewer -> {
+            var owners = viewer == null ? java.util.Set.<UUID>of() : SharedAccessService.get().ownersSharingWith(viewer);
+            if (owners.isEmpty()) return Map.of();
+            var shared = new java.util.LinkedHashMap<ProfileId, SharedProfile>();
+            for (UUID owner : owners) {
+                for (CompanionRecord record : companions.owned(owner)) {
+                    // The access check already gives nothing for bonded and private companions.
+                    // Another owner's command-family member or stored body is left out: only its
+                    // family item acts on it, so a row here could offer nothing.
+                    if (record.rosterId() != null || record.location().kind() == LocationKind.STORED) continue;
+                    AccessLevel level = CompanionAccess.level(record, viewer);
+                    if (!AccessAction.VIEW_IN_PANELS.allowedAt(level)) continue;
+                    var profile = CommandPersistenceView.from(record);
+                    shared.put(profile.profileId(), new SharedProfile(profile, new SharedRow(record.ownerName(), level)));
+                }
+            }
+            return shared;
+        };
         this.managedProfiles = owner -> owner == null ? java.util.Set.of()
                 : companions.owned(owner).stream()
                         .filter(record -> record.rosterId() != null && !record.bonded())
@@ -65,14 +97,26 @@ final class CommandOwnedPanelRecordSource {
         return found;
     }
 
-    /** One refresh owns this immutable display snapshot; action handlers still read current authority. */
+    /** The owner's name and the viewer's level on a companion another owner shares with the viewer. */
+    record SharedRow(String ownerName, AccessLevel level) { }
+
+    private record SharedProfile(ProfileSnapshot profile, SharedRow row) { }
+
+    /**
+     * One refresh owns this immutable display snapshot; action handlers still read current authority.
+     * {@code ownedRecords} lists the viewer's own companions and the shared ones; {@code sharedRows}
+     * names the shared ones by every row id they answer to.
+     */
     record Snapshot(List<LinkedNpcRecord> ownedRecords, List<LinkedNpcRecord> capturedRecords,
                     Map<UUID, ProfileId> profilesByRow,
-                    Map<UUID, CommandPanelFeaturePresentation> managedFeatures) { }
+                    Map<UUID, CommandPanelFeaturePresentation> managedFeatures,
+                    Map<UUID, SharedRow> sharedRows) { }
 
+    /** {@code ownerUuid} is the viewer: the owner of the listed rows, except for the shared ones. */
     Snapshot snapshot(UUID ownerUuid, List<LinkedNpcRecord> linkedRecords,
                       java.util.Set<String> carriedProfiles) {
         var managed = managedProfiles.apply(ownerUuid);
+        var shared = sharedProfiles.apply(ownerUuid);
         var linkedByProfile = new HashMap<String, LinkedNpcRecord>();
         var linkedByAlias = new HashMap<UUID, LinkedNpcRecord>();
         var firstByProfile = new HashMap<String, IndexedRecord>();
@@ -92,12 +136,15 @@ final class CommandOwnedPanelRecordSource {
         var captures = new ArrayList<LinkedNpcRecord>();
         var rows = new HashMap<UUID, ProfileId>();
         var features = new HashMap<UUID, CommandPanelFeaturePresentation>();
+        var sharedRows = new HashMap<UUID, SharedRow>();
         var candidates = new ArrayList<ProfileSnapshot>(profiles.apply(ownerUuid));
+        for (var sharedProfile : shared.values()) candidates.add(sharedProfile.profile());
         candidates.addAll(knownUnownedCaptures(linkedRecords, carriedProfiles));
         for (var profile : candidates) {
             String id = profile.profileId().toString();
             UUID currentAlias = profile.currentNpcUuid();
-            if (profile.ownerUuid() != null && profile.ownerUuid().equals(ownerUuid)) {
+            SharedProfile sharedProfile = shared.get(profile.profileId());
+            if (profile.ownerUuid() != null && (profile.ownerUuid().equals(ownerUuid) || sharedProfile != null)) {
                 UUID presentation = CommandRosterPanelRecordSource.presentationUuid(profile.profileId());
                 if (managed.contains(profile.profileId()) || profile.lifecycleState() == LifecycleState.ROSTER_STORED
                         || profile.lifecycleState() == LifecycleState.PROVISIONED_DORMANT) {
@@ -122,8 +169,18 @@ final class CommandOwnedPanelRecordSource {
                             linked.cachedDisplayName, linked.cachedNameKey, linked.cachedRoleId,
                             linked.cachedCommandState, linked.active, linked.breedingEnabled, linked.groupId);
                 }
-                records.add(linked != null ? linked : displayRecord(profile,
-                        currentAlias == null ? presentation : currentAlias, false));
+                LinkedNpcRecord row = linked != null ? linked : displayRecord(profile,
+                        currentAlias == null ? presentation : currentAlias, false);
+                records.add(row);
+                if (sharedProfile != null) {
+                    // Every id the row can be shown or clicked under, as profilesByRow maps them.
+                    sharedRows.put(presentation, sharedProfile.row());
+                    sharedRows.put(row.npcUuid, sharedProfile.row());
+                    if (currentAlias != null) sharedRows.put(currentAlias, sharedProfile.row());
+                    for (UUID alias : aliasesByProfile.getOrDefault(id, List.of())) {
+                        sharedRows.put(alias, sharedProfile.row());
+                    }
+                }
             } else if (profile.ownerUuid() == null && profile.lifecycleState() == LifecycleState.CAPTURED) {
                 // Preserve the first matching legacy record when profile and alias matches differ.
                 var match = firstByProfile.get(id);
@@ -137,7 +194,8 @@ final class CommandOwnedPanelRecordSource {
         }
         records.sort(Comparator.comparing(record -> record.profileId == null
                 ? record.npcUuid.toString() : record.profileId));
-        return new Snapshot(List.copyOf(records), List.copyOf(captures), Map.copyOf(rows), Map.copyOf(features));
+        return new Snapshot(List.copyOf(records), List.copyOf(captures), Map.copyOf(rows), Map.copyOf(features),
+                Map.copyOf(sharedRows));
     }
 
     private record IndexedRecord(int index, LinkedNpcRecord record) { }

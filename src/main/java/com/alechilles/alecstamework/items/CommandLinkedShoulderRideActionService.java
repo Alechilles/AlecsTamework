@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -23,7 +25,8 @@ final class CommandLinkedShoulderRideActionService {
         Ref<EntityStore> npcRef = player.getWorld().getEntityRef(npcUuid);
         if (npcRef == null || !npcRef.isValid() || npcRef.getStore() != store
                 || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
-                || !ownerUuid.equals(links.resolveOwnerId(npcRef, store))) return false;
+                || !CompanionAccess.allows(links.resolveOwnerId(npcRef, store), ownerUuid,
+                        npcRef, store, AccessAction.MOUNT)) return false;
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwCompanionShoulderRideSettings settings = roleId == null ? null
                 : TwCompanionConfig.resolveEffectiveForRole(roleId).getShoulderRide();

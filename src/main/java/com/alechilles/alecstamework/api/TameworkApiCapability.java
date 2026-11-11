@@ -75,6 +75,8 @@ public enum TameworkApiCapability {
     /** A server network can install a shared store that companions follow their owner through. */
     PORTABLE_COMPANION_STORE,
     /** A server network can install a shared store for settings that every server inherits. */
-    NETWORK_SETTINGS_STORE
+    NETWORK_SETTINGS_STORE,
+    /** Owners can share companions with players and registered groups at an access level. */
+    SHARED_ACCESS
 }
 

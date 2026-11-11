@@ -177,13 +177,13 @@
         ]
       },
       {
-        "$Comment": "Never retaliate against the owner if damage or other sensors locked them as the combat target.",
+        "$Comment": "Never retaliate against the owner or a player with shared access if damage or other sensors locked them as the combat target.",
         "Sensor": {
           "Type": "Target",
           "TargetSlot": "LockedTarget",
           "Filters": [
             {
-              "Type": "TameworkIsOwner"
+              "Type": "TameworkHasAccess"
             }
           ]
         },

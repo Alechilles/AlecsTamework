@@ -89,6 +89,19 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     }
 
     /**
+     * Decides the owner damage settings for one hit given the attacker's access to the target, or
+     * returns null when they do not block it. Callers that know the access level use this first
+     * and then {@link #evaluate} with an unowned policy for the claim rules.
+     */
+    @Nullable
+    public TamedDamageDecision evaluateOwnerProtection(
+            @Nullable TamedDamageOwnerPolicy ownerPolicy,
+            @Nullable UUID attackerPlayerUuid,
+            @Nonnull com.alechilles.alecstamework.api.access.AccessLevel attackerAccess) {
+        return decisionAdapter.evaluateOwnerProtection(ownerPolicy, attackerPlayerUuid, attackerAccess);
+    }
+
+    /**
      * Evaluates owner protection and, when active and eligible, native SimpleClaims damage access.
      */
     @Nonnull

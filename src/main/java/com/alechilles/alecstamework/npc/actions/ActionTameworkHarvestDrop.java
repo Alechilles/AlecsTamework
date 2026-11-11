@@ -138,7 +138,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     output.itemQuantities(),
                     result,
                     usesCapturedTool ? toolUse.tool() : null,
-                    usesCapturedTool ? toolUse.actorId() : null
+                    usesCapturedTool ? toolUse.actorId() : harvestingPlayerId(ref, role, store)
             );
         } else if (dropped) {
             ActivityRuntime.publishHarvest(
@@ -150,7 +150,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     output.itemQuantities(),
                     null,
                     usesCapturedTool ? toolUse.tool() : null,
-                    usesCapturedTool ? toolUse.actorId() : null
+                    usesCapturedTool ? toolUse.actorId() : harvestingPlayerId(ref, role, store)
             );
         } else if (!dropped) {
             logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()
@@ -219,6 +219,13 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             drops.add(randomItem);
         }
         return drops;
+    }
+
+    /** The player who took a toolless harvest, so the activity names who did it. */
+    @Nullable
+    private static java.util.UUID harvestingPlayerId(Ref<EntityStore> ref, Role role, Store<EntityStore> store) {
+        com.hypixel.hytale.server.core.entity.entities.Player player = resolveInteractionPlayer(ref, role, store);
+        return player == null ? null : player.getUuid();
     }
 
     @Nullable

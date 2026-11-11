@@ -62,6 +62,8 @@ final class CommandRelocationPostMoveEffects {
             return;
         }
         try {
+            // pending.ownerUuid is the player who asked for the move: the owner, or a player with
+            // COMMAND access. The companion targets whoever recalled it.
             Ref<EntityStore> ownerRef = world.getEntityRef(pending.ownerUuid);
             MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(role, npcRef, store);
             if (ownerRef != null && ownerRef.isValid() && markedEntity != null) {

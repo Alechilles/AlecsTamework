@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.settings;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -79,8 +80,27 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.avatarFlightUnlimitedVigour(),
                         Boolean.TRUE.equals(defaults.avatarFlightUnlimitedVigour())),
                 resolveBoolean(values.blockNonOwnerPlayerDamage(),
-                        Boolean.TRUE.equals(defaults.blockNonOwnerPlayerDamage()))
+                        Boolean.TRUE.equals(defaults.blockNonOwnerPlayerDamage())),
+                resolveBoolean(values.sharingEnabled(), !Boolean.FALSE.equals(defaults.sharingEnabled())),
+                resolveSharingHighestLevel(values.sharingHighestLevel()).name()
         );
+    }
+
+    /**
+     * The highest level an owner may grant, from its saved name in any letter case. A missing or
+     * unknown name, and a level an owner cannot grant, give {@link AccessLevel#MANAGER}.
+     */
+    @Nonnull
+    public static AccessLevel resolveSharingHighestLevel(@Nullable String value) {
+        String name = trimToNull(value);
+        if (name != null) {
+            for (AccessLevel level : AccessLevel.values()) {
+                if (level.isGrantable() && level.name().equalsIgnoreCase(name)) {
+                    return level;
+                }
+            }
+        }
+        return AccessLevel.MANAGER;
     }
 
     @Nonnull

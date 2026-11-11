@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
@@ -47,6 +48,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -104,6 +106,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_CAPTURE_REQUIRES_OWNER = "@CaptureRequiresOwner";
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
     private static final String KEY_LINKING_REQUIRES_OWNER = "@LinkingRequiresOwner";
+    private static final String KEY_SHARING_ENABLED = "@SharingEnabled";
+    private static final String KEY_SHARING_HIGHEST_LEVEL = "@SharingHighestLevel";
     private static final String KEY_NEEDS_ENABLED = "@NeedsEnabled";
     private static final String KEY_NEEDS_RESOURCE_MODE = "@NeedsResourceMode";
     private static final String KEY_NEEDS_DAMAGE_ENABLED = "@NeedsDamageEnabled";
@@ -499,6 +503,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
                 .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
                 .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
+                .append(KEY_SHARING_ENABLED, "#TwSettingsSharingEnabledCheck.Value")
+                .append(KEY_SHARING_HIGHEST_LEVEL, "#TwSettingsSharingHighestLevelDropdown.Value")
                 .append(KEY_NEEDS_ENABLED, "#TwSettingsNeedsEnabledCheck.Value")
                 .append(KEY_NEEDS_RESOURCE_MODE, "#TwSettingsNeedsResourceModeDropdown.Value")
                 .append(KEY_NEEDS_DAMAGE_ENABLED, "#TwSettingsNeedsDamageEnabledCheck.Value")
@@ -569,6 +575,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner());
         commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
         commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner());
+        commandBuilder.set("#TwSettingsSharingEnabledCheck.Value", currentValues.sharingEnabled());
+        commandBuilder.set("#TwSettingsSharingHighestLevelDropdown.Entries", sharingHighestLevelEntries());
+        commandBuilder.set("#TwSettingsSharingHighestLevelDropdown.Value", currentValues.sharingHighestLevel().name());
         commandBuilder.set("#TwSettingsNeedsEnabledCheck.Value", currentValues.needsEnabled());
         commandBuilder.set("#TwSettingsNeedsResourceModeDropdown.Entries", needsResourceModeEntries());
         commandBuilder.set("#TwSettingsNeedsResourceModeDropdown.Value", currentValues.needsResourceMode());
@@ -1089,6 +1098,21 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         };
     }
 
+    /** The levels an owner can grant, lowest first, named as the share commands name them. */
+    private List<DropdownEntryInfo> sharingHighestLevelEntries() {
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        for (AccessLevel level : AccessLevel.values()) {
+            if (level.isGrantable()) {
+                entries.add(new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText(
+                                "tamework.share.level." + level.name().toLowerCase(Locale.ROOT))),
+                        level.name()
+                ));
+            }
+        }
+        return entries;
+    }
+
     private List<DropdownEntryInfo> animalAgingModeEntries() {
         return List.of(
                 new DropdownEntryInfo(
@@ -1211,6 +1235,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_CAPTURE_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.captureRequiresOwner = v, x -> x.captureRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_LINKING_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.linkingRequiresOwner = v, x -> x.linkingRequiresOwner).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_SHARING_ENABLED, Codec.BOOLEAN), (x, v) -> x.sharingEnabled = v, x -> x.sharingEnabled).add()
+                .<String>append(new KeyedCodec<>(KEY_SHARING_HIGHEST_LEVEL, Codec.STRING), (x, v) -> x.sharingHighestLevel = v, x -> x.sharingHighestLevel).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsEnabled = v, x -> x.needsEnabled).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_RESOURCE_MODE, Codec.STRING), (x, v) -> x.needsResourceMode = v, x -> x.needsResourceMode).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_DAMAGE_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsDamageEnabled = v, x -> x.needsDamageEnabled).add()
@@ -1269,6 +1295,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Boolean captureRequiresOwner;
         Boolean interactionRequiresOwner;
         Boolean linkingRequiresOwner;
+        Boolean sharingEnabled;
+        String sharingHighestLevel;
         Boolean needsEnabled;
         String needsResourceMode;
         Boolean needsDamageEnabled;

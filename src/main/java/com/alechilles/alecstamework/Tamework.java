@@ -863,6 +863,11 @@ public class Tamework extends JavaPlugin {
             NetworkSettingsSync settingsSync = NetworkSettingsRuntime.start(this, modSettingsService);
             networkSettingsSync = settingsSync;
             indexApi.useNetworkSettings(new NetworkSettingsFacade(settingsSync));
+            indexApi.useSharedAccess(new com.alechilles.alecstamework.api.internal.SharedAccessFacade(
+                    com.alechilles.alecstamework.access.SharedAccessService.get(), apiModule.queries()::get));
+            // With a network store registered, grants are the same on every server of the network.
+            new com.alechilles.alecstamework.access.SharedAccessNetworkSync(
+                    com.alechilles.alecstamework.access.SharedAccessService.get(), settingsSync).start();
             api = indexApi;
             // Companion events go out after the index lock is released, on the changing thread (spec 9).
             apiModule.addAfterUnlockListener(new CompanionEventPublisher(

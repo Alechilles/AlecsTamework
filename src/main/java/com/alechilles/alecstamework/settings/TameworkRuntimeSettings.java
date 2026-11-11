@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.settings;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import javax.annotation.Nonnull;
@@ -19,6 +20,7 @@ public final class TameworkRuntimeSettings {
     private final TwNeedsConfig.DamageSettings resolvedNeedsDamage;
     private final AnimalAgingMode resolvedAnimalAgingMode;
     private final CaptureItemOwnershipMode resolvedCaptureItemOwnership;
+    private final AccessLevel resolvedSharingHighestLevel;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
         this.values = values;
@@ -38,6 +40,7 @@ public final class TameworkRuntimeSettings {
         );
         this.resolvedAnimalAgingMode = AnimalAgingMode.fromConfigValue(values.animalAgingMode());
         this.resolvedCaptureItemOwnership = values.captureItemOwnershipMode();
+        this.resolvedSharingHighestLevel = values.sharingHighestAccessLevel();
     }
 
     @Nonnull
@@ -176,6 +179,17 @@ public final class TameworkRuntimeSettings {
 
     public boolean linkingRequiresOwner() {
         return values.linkingRequiresOwner();
+    }
+
+    /** True when owners may share their animals with other players. Off keeps saved grants but gives no access. */
+    public boolean sharingEnabled() {
+        return values.sharingEnabled();
+    }
+
+    /** The highest level an owner may grant; grants above it count as this level. */
+    @Nonnull
+    public AccessLevel sharingHighestLevel() {
+        return resolvedSharingHighestLevel;
     }
 
     public boolean needsEnabled() {

@@ -27,6 +27,8 @@ final class LinkedNpcPanelCardDynamicState {
                 && previous.ownedActions() == current.ownedActions()
                 && previous.active() == current.active()
                 && previous.selectionSupported() == current.selectionSupported()
+                // A changed access level changes which buttons a shared row offers.
+                && Objects.equals(previous.sharedAccess(), current.sharedAccess())
                 && Objects.equals(previous.groups(), current.groups())
                 && previous.dead() == current.dead()
                 && previous.captured() == current.captured()

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -1254,8 +1255,11 @@ public final class TameworkCommandSelectionPage
         sendCardRefreshUpdate();
     }
 
+    // On a row another owner shares with the viewer, Release and Forget stay with the owner and
+    // Cull needs CULL access; the handlers check the same again.
     private boolean genericRemovalMenuAvailable(@Nullable UUID npcUuid) {
-        return genericRemovalEntry(npcUuid) != null;
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && LinkedNpcPanelCardBinder.removalMenuOffered(entry);
     }
 
     private boolean genericUnlinkAvailable(@Nullable UUID npcUuid) {
@@ -1265,12 +1269,14 @@ public final class TameworkCommandSelectionPage
 
     private boolean genericReleaseAvailable(@Nullable UUID npcUuid) {
         LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
-        return entry != null && !entry.captured() && !entry.inCoop();
+        return entry != null && !entry.captured() && !entry.inCoop()
+                && entry.viewerMay(AccessAction.OWNER_ONLY);
     }
 
     private boolean genericForgetAvailable(@Nullable UUID npcUuid) {
         LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
-        return entry != null && entry.captured() && (entry.linked() || entry.ownedActions());
+        return entry != null && entry.captured() && (entry.linked() || entry.ownedActions())
+                && entry.viewerMay(AccessAction.OWNER_ONLY);
     }
 
     private boolean capturedEntry(@Nullable UUID npcUuid) {
@@ -1281,7 +1287,8 @@ public final class TameworkCommandSelectionPage
     private boolean genericCullAvailable(@Nullable UUID npcUuid) {
         LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
         return entry != null && entry.loaded() && !entry.dead() && !entry.lost()
-                && !entry.captured() && !entry.inCoop();
+                && !entry.captured() && !entry.inCoop()
+                && entry.viewerMay(AccessAction.CULL);
     }
 
     @Nullable

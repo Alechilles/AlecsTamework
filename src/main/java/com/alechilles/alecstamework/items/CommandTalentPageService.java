@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.access.CompanionAccess;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
@@ -576,7 +578,8 @@ final class CommandTalentPageService {
         }
         // Talent access follows ownership, independently of this flute's selection.
         if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
-                || !linkPolicyService.passesOwnerAndTamed(true, true, npcRef, player.getUuid(), store)) {
+                || !linkPolicyService.passesOwnerAndTamed(true, true, npcRef, player.getUuid(), store)
+                || !CompanionAccess.allows(npcRef, store, player.getUuid(), AccessAction.OWNER_ONLY)) {
             return null;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());

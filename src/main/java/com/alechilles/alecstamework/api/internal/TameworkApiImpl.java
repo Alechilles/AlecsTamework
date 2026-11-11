@@ -1086,21 +1086,32 @@ public final class TameworkApiImpl
                 ? new Vector3d(liveNpc.transform().getPosition())
                 : null;
         String worldName = liveNpc != null ? liveNpc.world().getName() : null;
-        TamedDamageDecision decision = damagePolicy.evaluate(
-                new TamedDamageOwnerPolicy(
-                        effectivePolicy.ownerUuid(),
-                        effectivePolicy.blockOwnerDamage(),
-                        effectivePolicy.blockAllPlayerDamageIfOwned(),
-                        effectivePolicy.invulnerableIfOwned(),
-                        effectivePolicy.blockNonOwnerPlayerDamage()
-                ),
-                liveNpc != null ? liveNpc.reference() : null,
-                liveNpc != null ? liveNpc.store() : null,
-                worldName,
-                targetPosition,
-                attackerPlayerUuid,
-                resolveSimpleClaimsConfig()
+        TamedDamageOwnerPolicy ownerPolicy = new TamedDamageOwnerPolicy(
+                effectivePolicy.ownerUuid(),
+                effectivePolicy.blockOwnerDamage(),
+                effectivePolicy.blockAllPlayerDamageIfOwned(),
+                effectivePolicy.invulnerableIfOwned(),
+                effectivePolicy.blockNonOwnerPlayerDamage()
         );
+        // Same order as the runtime damage filter: the owner settings by the attacker's shared
+        // access first, then the claim rules alone.
+        TamedDamageDecision decision = damagePolicy.evaluateOwnerProtection(
+                ownerPolicy,
+                attackerPlayerUuid,
+                com.alechilles.alecstamework.access.CompanionAccess.level(
+                        effectivePolicy.ownerUuid(), attackerPlayerUuid, parseUuidOrNull(profileId))
+        );
+        if (decision == null) {
+            decision = damagePolicy.evaluate(
+                    TamedDamageOwnerPolicy.unowned(),
+                    liveNpc != null ? liveNpc.reference() : null,
+                    liveNpc != null ? liveNpc.store() : null,
+                    worldName,
+                    targetPosition,
+                    attackerPlayerUuid,
+                    resolveSimpleClaimsConfig()
+            );
+        }
         return ApiDamagePolicyMapper.map(
                 effectivePolicy,
                 attackerPlayerUuid,
@@ -1108,6 +1119,18 @@ public final class TameworkApiImpl
                 worldName,
                 ApiMapper.mapVector(targetPosition)
         );
+    }
+
+    @Nullable
+    private static UUID parseUuidOrNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
     }
 
     @Nonnull

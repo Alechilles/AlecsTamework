@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -41,7 +43,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -183,7 +184,7 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            if (applied && isInteractingOwner(npcRef, store, player)) {
+            if (applied && isInteractingPlayerAllowed(npcRef, store, player, AccessAction.CARE)) {
                 boolean careCredit = ActivityRuntime.tryAcquireCareCredit(npcRef, store);
                 AwardResult award = careCredit
                         ? CompanionLevelingService.awardFeedXp(npcRef, store)
@@ -194,7 +195,8 @@ final class InteractionExecutor {
                         resolveOwnerId(npcRef, store),
                         resolveCompanionId(npcRef, store),
                         award,
-                        careCredit
+                        careCredit,
+                        player.getUuid()
                 );
             }
             return applied | customApplied;
@@ -274,7 +276,7 @@ final class InteractionExecutor {
                 applyChainShear(npcRef, role, infoProvider, store, player, resolvedToolUse);
             }
             boolean dropActionExpected = hasHarvestDropAction(role, ctx);
-            if (isInteractingOwner(npcRef, store, player)
+            if (isInteractingPlayerAllowed(npcRef, store, player, AccessAction.HARVEST)
                     && !dropActionExpected
                     && (containerOutcome.result
                     == TameworkInteractEffects.HarvestContainerResult.APPLIED
@@ -290,7 +292,8 @@ final class InteractionExecutor {
                         () -> CompanionLevelingService.awardHarvestXp(npcRef, store),
                         customOutcome.itemQuantities(),
                         resolvedToolUse.tool(),
-                        resolvedToolUse.actorId()
+                        // The acting player, also for a toolless harvest that captured no tool use.
+                        player.getUuid()
                 );
             }
             return true | customOutcome.applied();
@@ -585,7 +588,8 @@ final class InteractionExecutor {
                     continue;
                 }
                 TameworkOwnerComponent owner = chunk.getComponent(index, ownerType);
-                if (owner == null || !playerId.equals(owner.getOwnerId())
+                if (owner == null
+                        || !CompanionAccess.allows(owner.getOwnerId(), playerId, candidate, store, AccessAction.HARVEST)
                         || !TamedStateResolver.isTamed(candidate, store)) {
                     continue;
                 }
@@ -635,15 +639,15 @@ final class InteractionExecutor {
     ) {
     }
 
-    private boolean isInteractingOwner(
+    /** Whether the interacting player is the owner or a sharer whose level covers the action. */
+    private boolean isInteractingPlayerAllowed(
             Ref<EntityStore> npcRef,
             Store<EntityStore> store,
-            Player player
+            Player player,
+            AccessAction action
     ) {
-        UUID ownerId = resolveOwnerId(npcRef, store);
-        return ownerId != null
-                && player != null
-                && Objects.equals(ownerId, player.getUuid());
+        return player != null
+                && CompanionAccess.allows(resolveOwnerId(npcRef, store), player.getUuid(), npcRef, store, action);
     }
 
     private UUID resolveOwnerId(

@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -73,10 +76,12 @@ public final class OwnerInteractionListener {
             }
             UUID ownerUuid = null;
             String ownerName = null;
+            Store<EntityStore> store = null;
+            Ref<EntityStore> ref = null;
             World world = player.getWorld();
             if (world != null) {
-                Store<EntityStore> store = world.getEntityStore().getStore();
-                Ref<EntityStore> ref = ((NPCEntity) target).getReference();
+                store = world.getEntityStore().getStore();
+                ref = ((NPCEntity) target).getReference();
                 if (ref != null && ref.isValid()) {
                     TameworkOwnerComponent component = store.getComponent(ref, TameworkOwnerComponent.getComponentType());
                     if (component != null) {
@@ -92,6 +97,10 @@ public final class OwnerInteractionListener {
 
             InteractionOwnershipPolicy ownershipPolicy = resolveOwnershipPolicyForHeldItem(player);
             if (!isOwnerRequiredForPolicy(ownershipPolicy, resolveGlobalConfig())) {
+                return;
+            }
+            if (sharedAccessAllows(ownershipPolicy,
+                    CompanionAccess.level(ownerUuid, player.getUuid(), ref, store))) {
                 return;
             }
 
@@ -245,6 +254,19 @@ public final class OwnerInteractionListener {
             case CAPTURE -> TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
             case LINKING -> TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
             case INTERACTION -> TameworkRuntimeSettings.interactionRequiresOwner(resolved.isOwnershipInteractionRequiresOwner());
+        };
+    }
+
+    /**
+     * Whether a sharer at {@code level} passes the owner restriction for what the held item does.
+     * Capture stays with the owner. Interaction entries check their own action afterwards, so any
+     * access level gets through here.
+     */
+    private static boolean sharedAccessAllows(InteractionOwnershipPolicy policy, AccessLevel level) {
+        return switch (policy) {
+            case CAPTURE -> false;
+            case LINKING -> AccessAction.COMMAND.allowedAt(level);
+            case INTERACTION -> level.atLeast(AccessLevel.CARETAKER);
         };
     }
 

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.access.CompanionAccess;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -25,6 +27,8 @@ final class TameworkCullEligibility {
                         target, components)
                 && linkPolicyService.passesOwnerAndTamed(
                         requireOwner, requireTamed, target, playerUuid,
-                        components);
+                        components)
+                // Commanding a shared companion does not include culling it.
+                && (!requireOwner || CompanionAccess.allows(target, components, playerUuid, AccessAction.CULL));
     }
 }

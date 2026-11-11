@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -214,7 +216,7 @@ final class CommandWorldChangeTravelCoordinator {
         // A bonded companion never follows: the same event stores it (RosterSummons.storeBondedOutside,
         // plan 6 R18), and a follow would race that store.
         if (companion == null || companion.bonded()
-                || !player.getUuid().equals(companion.ownerUuid())
+                || !CompanionAccess.allows(companion, player.getUuid(), AccessAction.COMMAND)
                 || queuedProfileIds.contains(companion.profileId())) return false;
         UUID profileId = companion.profileId();
         Ref<EntityStore> body = queries.loadedBody(profileId);

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
 import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -788,7 +790,9 @@ public final class NamingFeatureHandler {
                 npcInfoService.isTamed(npcRef, store),
                 npcInfoService.resolveOwnerUuid(npcRef, store),
                 npcInfoService.hasTameworkName(npcRef, store),
-                npcInfoService.hasAnyName(npcRef, store, npc)
+                npcInfoService.hasAnyName(npcRef, store, npc),
+                npcRef,
+                store
         );
     }
 
@@ -804,8 +808,10 @@ public final class NamingFeatureHandler {
         if (rules.isRequireTamed() && !facts.tamed()) {
             return Denial.NOT_TAMED;
         }
-        if (!NamingOwnershipPolicy.canName(playerUuid, facts.ownerUuid(), rules)) {
-            // With an owner, the policy refuses only when RequireOwner is set and the player is someone else.
+        boolean mayRename = CompanionAccess.allows(
+                facts.ownerUuid(), playerUuid, facts.npcRef(), facts.store(), AccessAction.RENAME);
+        if (!NamingOwnershipPolicy.canName(facts.ownerUuid(), rules, mayRename)) {
+            // With an owner, the policy refuses only when RequireOwner is set and the player may not rename it.
             return facts.ownerUuid() == null ? Denial.NO_OWNER : Denial.NOT_OWNER;
         }
         return null;
@@ -1066,11 +1072,14 @@ public final class NamingFeatureHandler {
     private record CardItem(@Nullable NamingItemSlots.Slot slot, TwNameItemConfig config, NamingRules rules) {
     }
 
+    /** {@code npcRef} and {@code store} are kept for the shared-access check; the record does not outlive the call. */
     private record TargetFacts(@Nullable String roleId,
                                boolean tamed,
                                @Nullable UUID ownerUuid,
                                boolean hasTameworkName,
-                               boolean hasAnyName) {
+                               boolean hasAnyName,
+                               Ref<EntityStore> npcRef,
+                               Store<EntityStore> store) {
     }
 
     /** Why a target cannot be named; each maps to the player message the held item has always sent. */

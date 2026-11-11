@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.access.AccessGroupMembership;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +32,10 @@ import javax.annotation.Nullable;
  *
  * <p>Reads are map lookups on immutable values and are safe from any thread. Changes take one
  * lock and are saved by a single background thread, so no caller waits on a file.</p>
+ *
+ * <p>On a server network, {@link SharedAccessNetworkSync} keeps these grants the same on every
+ * server through {@link #setLocalChangeHook} and {@link #applyNetwork}. This class does no
+ * network I/O.</p>
  */
 public final class SharedAccessService implements AutoCloseable {
     /** Most named players one owner can share with. Bounds the file and every access check. */
@@ -68,6 +73,9 @@ public final class SharedAccessService implements AutoCloseable {
     @Nullable private Path dataDirectory;
     @Nullable private ExecutorService saveExecutor;
     private boolean writable;
+    /** The last network revision applied here; 0 until this server first follows a network's grants. */
+    private long networkRevision;
+    @Nullable private volatile Consumer<UUID> localChangeHook;
 
     private SharedAccessService() {
     }
@@ -97,6 +105,7 @@ public final class SharedAccessService implements AutoCloseable {
             });
             dataDirectory = targetDataDirectory.toAbsolutePath().normalize();
             writable = loaded.writable();
+            networkRevision = loaded.networkRevision();
             saveExecutor = Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "tamework-shared-access-save");
                 thread.setDaemon(true);
@@ -362,15 +371,84 @@ public final class SharedAccessService implements AutoCloseable {
         changeListeners.add(Objects.requireNonNull(listener, "listener"));
     }
 
-    void clearForTests() {
+    /**
+     * Every owner with anything stored, including owners who only marked companions private. A
+     * snapshot.
+     */
+    @Nonnull
+    public Set<UUID> storedOwners() {
+        return new LinkedHashSet<>(grantsByOwner.keySet());
+    }
+
+    /** The last network revision applied on this server; 0 when it never followed a network's grants. */
+    public long networkRevision() {
+        synchronized (mutationLock) {
+            return networkRevision;
+        }
+    }
+
+    /**
+     * Sets the one hook that hears about changes made on this server, for the network sync. It is
+     * called with the owner id while the change lock is held, in the same step as the change, so
+     * {@link #applyNetwork} never sees a changed owner that the hook has not heard about yet. It
+     * is not called for {@link #applyNetwork}. The hook must return at once and must not call
+     * back into this service.
+     */
+    public void setLocalChangeHook(@Nullable Consumer<UUID> hook) {
+        localChangeHook = hook;
+    }
+
+    /**
+     * Makes this server's grants the network's: every owner not in {@code keepLocal} takes the
+     * network's value, and loses their grants when the network has none for them. Change
+     * listeners hear about each owner whose grants changed; the local change hook does not.
+     *
+     * @param keepLocal owners whose grants changed here and are not saved to the network yet. It
+     *                  is read while the change lock is held, so pass the live set that the local
+     *                  change hook fills.
+     * @param revision  the network document's revision, saved with the grants
+     */
+    public void applyNetwork(@Nonnull Map<UUID, OwnerGrants> network, @Nonnull Set<UUID> keepLocal, long revision) {
+        List<UUID> changed = new ArrayList<>();
+        synchronized (mutationLock) {
+            Set<UUID> owners = new LinkedHashSet<>(grantsByOwner.keySet());
+            owners.addAll(network.keySet());
+            for (UUID ownerId : owners) {
+                if (keepLocal.contains(ownerId)) {
+                    continue;
+                }
+                OwnerGrants current = grants(ownerId);
+                OwnerGrants next = network.getOrDefault(ownerId, OwnerGrants.EMPTY);
+                if (next.equals(current)) {
+                    continue;
+                }
+                if (next.isEmpty()) {
+                    grantsByOwner.remove(ownerId);
+                } else {
+                    grantsByOwner.put(ownerId, next);
+                }
+                index(ownerId, current, next);
+                changed.add(ownerId);
+            }
+            if (!changed.isEmpty() || networkRevision != revision) {
+                networkRevision = revision;
+                queueSave();
+            }
+        }
+        changed.forEach(this::notifyChanged);
+    }
+
+    /** Test hook: forgets every grant, provider, setting and the local change hook. Listeners stay registered. */
+    public void clearForTests() {
         close();
         synchronized (mutationLock) {
             grantsByOwner.clear();
             ownersByPlayer.clear();
             ownersByGroup.clear();
+            networkRevision = 0L;
         }
+        localChangeHook = null;
         providers.clear();
-        changeListeners.clear();
         enabled = true;
         maxLevel = AccessLevel.MANAGER;
         neverShared = profileId -> false;
@@ -396,6 +474,14 @@ public final class SharedAccessService implements AutoCloseable {
             }
             index(ownerId, current, next);
             queueSave();
+            Consumer<UUID> hook = localChangeHook;
+            if (hook != null) {
+                try {
+                    hook.accept(ownerId);
+                } catch (RuntimeException failed) {
+                    LOGGER.log(System.Logger.Level.WARNING, "The shared access network hook failed.", failed);
+                }
+            }
         }
         notifyChanged(ownerId);
         return ChangeResult.CHANGED;
@@ -439,9 +525,10 @@ public final class SharedAccessService implements AutoCloseable {
             return;
         }
         Map<UUID, OwnerGrants> snapshot = new LinkedHashMap<>(grantsByOwner);
+        long revision = networkRevision;
         try {
             executor.execute(() -> {
-                if (!SharedAccessFileStore.save(target, snapshot)) {
+                if (!SharedAccessFileStore.save(target, snapshot, revision)) {
                     LOGGER.log(System.Logger.Level.WARNING,
                             "Cannot save shared access grants at {0}; the next change will retry.",
                             SharedAccessFileStore.resolveFile(target));

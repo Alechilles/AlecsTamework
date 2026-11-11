@@ -47,10 +47,15 @@ final class CompanionCardHomeActions {
         }
         TameworkCommandLinksComponent current =
                 store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        // The links owner is the companion's owner, also when a player with shared access sets the home.
+        com.alechilles.alecstamework.npc.components.TameworkOwnerComponent owner = store.getComponent(
+                npcRef, com.alechilles.alecstamework.npc.components.TameworkOwnerComponent.getComponentType());
+        java.util.UUID linksOwner = owner != null && owner.getOwnerId() != null
+                ? owner.getOwnerId() : player.getUuid();
         TameworkCommandLinksComponent next = current == null
-                ? new TameworkCommandLinksComponent(player.getUuid(), new String[0]) : current.clone();
+                ? new TameworkCommandLinksComponent(linksOwner, new String[0]) : current.clone();
         if (next.getOwnerId() == null) {
-            next.setOwnerId(player.getUuid());
+            next.setOwnerId(linksOwner);
         }
         Vector3d home = new Vector3d(transform.getPosition());
         next.setHomePosition(home);

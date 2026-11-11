@@ -296,7 +296,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
             return true;
         }
         if (interaction == null) {
-            ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
+            ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player, ctx);
             diagnostics.logDebug(diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
         }

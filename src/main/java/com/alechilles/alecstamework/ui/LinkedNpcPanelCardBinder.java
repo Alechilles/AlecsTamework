@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
@@ -111,14 +112,37 @@ final class LinkedNpcPanelCardBinder {
                 config, language, null);
     }
 
+    /**
+     * Whether a generic row has a removal menu for its viewer. The viewer's own rows always do. A
+     * row someone else shares with the viewer has one only while it can offer Cull: Release and
+     * Forget stay with the owner.
+     */
+    static boolean removalMenuOffered(LinkedNpcEntry entry) {
+        return entry.viewerMay(AccessAction.OWNER_ONLY)
+                || entry.viewerMay(AccessAction.CULL) && cullable(entry);
+    }
+
+    private static boolean cullable(LinkedNpcEntry entry) {
+        return !entry.captured() && !entry.inCoop() && entry.loaded() && !entry.dead() && !entry.lost();
+    }
+
     private static void bind(UICommandBuilder commandBuilder,
                      UIEventBuilder eventBuilder,
                      String entrySelector,
                      LinkedNpcEntry entry,
-                     boolean pendingUnlink,
+                     boolean pendingUnlinkRequested,
                      CardBindingConfig config,
                      String language,
                      CommandPanelFeaturePresentation feature) {
+        // A shared row that can no longer offer its removal menu shows as a normal card again.
+        boolean pendingUnlink = pendingUnlinkRequested && removalMenuOffered(entry);
+        // On a row another owner shares with the viewer each action needs its own access level.
+        // The viewer's own rows pass every check, so they bind as before.
+        boolean mayCommand = entry.viewerMay(AccessAction.COMMAND);
+        boolean mayMount = entry.viewerMay(AccessAction.MOUNT);
+        boolean mayBreed = entry.viewerMay(AccessAction.BREED);
+        boolean ownerOnly = entry.viewerMay(AccessAction.OWNER_ONLY);
+        LinkedNpcEntry.SharedAccess sharedAccess = entry.sharedAccess();
         String nameSelector = entrySelector + " #Name";
         String maleIconSelector = entrySelector + " #GenderMaleIcon";
         String femaleIconSelector = entrySelector + " #GenderFemaleIcon";
@@ -160,16 +184,23 @@ final class LinkedNpcPanelCardBinder {
         String cullSelector = entrySelector + " #CullButton";
         LifecycleDisplay lifecycleDisplay = resolveLifecycleDisplay(entry, language);
         LinkedNpcEntry.AnimalLifecycle lifecycle = entry.animalLifecycle();
+        // A shared row names its owner where the species subtitle goes, so it is told apart at a
+        // glance; the name's tooltip keeps the species.
+        String ownerLabel = sharedAccess == null || sharedAccess.ownerName().isBlank() ? ""
+                : LocalizedText.format(language, "tamework.ui.commandTargetHud.owner", sharedAccess.ownerName());
+        String subtitle = ownerLabel.isEmpty() ? entry.roleSubtitle() : ownerLabel;
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
-        commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
+        commandBuilder.set(nameSelector + ".TooltipText", ownerLabel.isEmpty() ? entry.displayName()
+                : entry.displayName() + (entry.roleSubtitle().isBlank() ? "" : "\n" + entry.roleSubtitle())
+                        + "\n" + ownerLabel);
         String slateState = slateState(entry);
         String slateArt = Character.toUpperCase(slateState.charAt(0)) + slateState.substring(1);
         commandBuilder.setObject(entrySelector + " #SlatePlate.Background",
                 new PatchStyle(Value.of("Tamework/Slate/Card_" + slateArt + ".png"), Value.of(38)));
         commandBuilder.setObject(entrySelector + " #PortraitFrame.Background",
                 UiIconStyle.forTexture("Tamework/Slate/Portrait_" + slateArt + ".png"));
-        commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
-        commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
+        commandBuilder.set(entrySelector + " #RoleSubtitle.Text", subtitle);
+        commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !subtitle.isBlank());
         bindLifecycleProgress(commandBuilder, entrySelector, lifecycle, lifecycleDisplay, language, entry.captured() || entry.dead());
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
@@ -198,21 +229,23 @@ final class LinkedNpcPanelCardBinder {
                 && (!location.status().isBlank()
                         || !location.world().isBlank()
                         || !location.coordinates().isBlank());
-        boolean showReviveAction = !paidRevivalManaged && genericLinkedOrOwned
+        // Revive and Recover restore the companion for its owner, at the owner's cost.
+        boolean showReviveAction = !paidRevivalManaged && genericLinkedOrOwned && ownerOnly
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showLocate = !showInlineLocation && genericLinkedOrOwned
+        boolean showLocate = !showInlineLocation && genericLinkedOrOwned && mayCommand
                 && !entry.dead() && !entry.lost() && !pendingUnlink;
         // A captured companion's Recall restores it from its snapshot (spec 8.14), so it does not
-        // depend on the recall-teleport setting.
+        // depend on the recall-teleport setting. That restore is the owner's, like Recover.
         boolean showRecall = genericLinkedOrOwned
                 && !pendingUnlink
-                && (entry.captured() || config.recallActionEnabled()
+                && (entry.captured() ? ownerOnly : mayCommand && config.recallActionEnabled()
                         && !entry.dead()
                         && !entry.inCoop()
                         && !entry.lost());
         boolean showSetHome = genericLinkedOrOwned
+                && mayCommand
                 && entry.loaded()
                 && !entry.dead()
                 && !entry.captured()
@@ -221,17 +254,18 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         boolean showReturnHome =
                 genericLinkedOrOwned
+                        && mayCommand
                         && !entry.dead()
                         && !entry.captured()
                         && !entry.inCoop()
                         && !entry.lost()
                         && entry.hasHome()
                         && !pendingUnlink;
-        boolean removalMenuAvailable = !managedRoster;
-        boolean canRelease = removalMenuAvailable && !entry.captured() && !entry.inCoop();
-        boolean canCull = canRelease && entry.loaded() && !entry.dead() && !entry.lost();
+        boolean removalMenuAvailable = !managedRoster && removalMenuOffered(entry);
+        boolean canRelease = removalMenuAvailable && ownerOnly && !entry.captured() && !entry.inCoop();
+        boolean canCull = removalMenuAvailable && cullable(entry) && entry.viewerMay(AccessAction.CULL);
         // The release slot becomes Forget for a companion in a capture item; the page picks the action.
-        boolean canForget = removalMenuAvailable && genericLinkedOrOwned && entry.captured();
+        boolean canForget = removalMenuAvailable && ownerOnly && genericLinkedOrOwned && entry.captured();
         boolean showLink = !entry.ownedActions() && !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
         boolean showRemovalMenu = removalMenuAvailable && pendingUnlink;
@@ -240,15 +274,16 @@ final class LinkedNpcPanelCardBinder {
         boolean showRelease = showRemovalMenu && (canRelease || canForget);
         boolean showReleaseDisabled = showRemovalMenu && !canRelease && !canForget;
         boolean showCull = showRemovalMenu && canCull;
+        // Deselecting is always open; selecting a companion for this item is commanding it.
         boolean showActiveToggleActive = genericLinkedOrOwned && entry.active();
-        boolean showActiveToggleInactive = genericLinkedOrOwned && !entry.active();
-        boolean showBreedingToggleEnabled =
-                genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
-        boolean showBreedingToggleDisabled =
-                genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        boolean showFlightToggle = genericLinkedOrOwned && entry.loaded()
+        boolean showActiveToggleInactive = genericLinkedOrOwned && mayCommand && !entry.active();
+        boolean showBreedingToggleEnabled = genericLinkedOrOwned && mayBreed
+                && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
+        boolean showBreedingToggleDisabled = genericLinkedOrOwned && mayBreed
+                && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
+        boolean showFlightToggle = genericLinkedOrOwned && mayMount && entry.loaded()
                 && entry.flightToggleAvailable() && !pendingUnlink;
-        boolean showShoulderRide = genericLinkedOrOwned && entry.loaded()
+        boolean showShoulderRide = genericLinkedOrOwned && mayMount && entry.loaded()
                 && entry.shoulderRideAvailable() && !pendingUnlink;
         boolean showRespawn = paidRevivalManaged
                 ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
@@ -336,8 +371,10 @@ final class LinkedNpcPanelCardBinder {
                 xpTooltipSelector,
                 entry.futureStatA()
         );
+        // Talent points are the owner's to spend, so only the owner opens the talent page.
         boolean canOpenTalentsFromLevelIndicator =
-                entry.isTalentsActionVisible()
+                ownerOnly
+                        && entry.isTalentsActionVisible()
                         && entry.isTalentsActionEnabled()
                         && entry.futureStatA() != null;
         commandBuilder.set(xpTooltipSelector + ".Disabled", !canOpenTalentsFromLevelIndicator);
@@ -345,7 +382,7 @@ final class LinkedNpcPanelCardBinder {
         boolean showTalentPointAction =
                 entry.isTalentsActionVisible()
                         && LinkedNpcPanelProgressionBinder.availableTalentPoints(entry.futureStatB()) > 0;
-        boolean canOpenTalentPoints = showTalentPointAction && entry.isTalentsActionEnabled();
+        boolean canOpenTalentPoints = ownerOnly && showTalentPointAction && entry.isTalentsActionEnabled();
         commandBuilder.set(talentPointButtonSelector + ".Disabled", !canOpenTalentPoints);
         LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(
                 commandBuilder,
@@ -510,6 +547,10 @@ final class LinkedNpcPanelCardBinder {
         }
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseSelector, showRelease);
         LinkedNpcPanelIconStyles.visible(commandBuilder, releaseDisabledSelector, showReleaseDisabled);
+        // Cards are reused, so the disabled Release says why for a shared row and is reset otherwise.
+        commandBuilder.set(releaseDisabledSelector + ".TooltipText", LocalizedText.resolve(language, ownerOnly
+                ? "tamework.ui.linkedPanel.card.tooltip.release"
+                : "tamework.ui.linkedPanel.action.unavailable.notOwner"));
         commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language, canForget
                 ? "tamework.ui.linkedPanel.card.button.forget" : "tamework.ui.linkedPanel.card.button.release"));
         commandBuilder.set(releaseSelector + ".TooltipText", LocalizedText.resolve(language, canForget

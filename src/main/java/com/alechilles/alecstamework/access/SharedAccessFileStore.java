@@ -22,6 +22,9 @@ import javax.annotation.Nullable;
  * Reads and writes every owner's grants as one small JSON file in the Tamework data folder.
  * Callers keep file access off world threads. An entry that cannot be read is skipped; a file
  * that cannot be read at all is reported so the caller leaves it untouched.
+ *
+ * <p>The same JSON form, through {@link #toJson} and {@link #fromJson}, is the document a server
+ * network shares.</p>
  */
 public final class SharedAccessFileStore {
     public static final String FILE_NAME = "shared-access.json";
@@ -42,47 +45,34 @@ public final class SharedAccessFileStore {
     public static LoadResult load(@Nonnull Path dataDirectory) {
         Path file = resolveFile(dataDirectory);
         if (!Files.isRegularFile(file)) {
-            return new LoadResult(Map.of(), true);
+            return new LoadResult(Map.of(), true, 0L);
         }
         try {
-            Document document = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), Document.class);
-            if (document == null) {
-                return new LoadResult(Map.of(), false);
-            }
-            Map<UUID, OwnerGrants> owners = new LinkedHashMap<>();
-            if (document.owners != null) {
-                for (Map.Entry<String, OwnerDocument> entry : document.owners.entrySet()) {
-                    UUID ownerId = parseUuid(entry.getKey());
-                    OwnerGrants grants = ownerId == null ? null : toGrants(entry.getValue());
-                    if (grants != null && !grants.isEmpty()) {
-                        owners.put(ownerId, grants);
-                    }
-                }
-            }
-            return new LoadResult(owners, true);
+            Document document = parse(Files.readString(file, StandardCharsets.UTF_8));
+            long networkRevision = document.networkRevision == null ? 0L : Math.max(0L, document.networkRevision);
+            return new LoadResult(owners(document), true, networkRevision);
         } catch (Exception unreadable) {
-            return new LoadResult(Map.of(), false);
+            return new LoadResult(Map.of(), false, 0L);
         }
     }
 
-    /** Writes one complete snapshot, replacing the file atomically where the filesystem allows. */
-    public static boolean save(@Nonnull Path dataDirectory, @Nonnull Map<UUID, OwnerGrants> owners) {
+    /**
+     * Writes one complete snapshot, replacing the file atomically where the filesystem allows.
+     *
+     * @param networkRevision the last network revision this server applied, or 0 when it never
+     *                        followed a network's grants
+     */
+    public static boolean save(@Nonnull Path dataDirectory, @Nonnull Map<UUID, OwnerGrants> owners,
+                               long networkRevision) {
         Path file = resolveFile(dataDirectory);
         try {
             Path parent = file.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Document document = new Document();
-            document.version = CURRENT_VERSION;
-            document.owners = new LinkedHashMap<>();
-            for (Map.Entry<UUID, OwnerGrants> entry : owners.entrySet()) {
-                if (!entry.getValue().isEmpty()) {
-                    document.owners.put(entry.getKey().toString(), toDocument(entry.getValue()));
-                }
-            }
             Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(temporary, GSON.toJson(document) + System.lineSeparator(), StandardCharsets.UTF_8);
+            Files.writeString(temporary, toJson(owners, networkRevision) + System.lineSeparator(),
+                    StandardCharsets.UTF_8);
             try {
                 Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (Exception atomicMoveUnsupported) {
@@ -92,6 +82,60 @@ public final class SharedAccessFileStore {
         } catch (Exception failed) {
             return false;
         }
+    }
+
+    /** Every owner's grants as one JSON document: the form a server network shares. */
+    @Nonnull
+    public static String toJson(@Nonnull Map<UUID, OwnerGrants> owners) {
+        return toJson(owners, 0L);
+    }
+
+    /**
+     * Reads a document written by {@link #toJson}. An entry that cannot be read is skipped.
+     *
+     * @throws RuntimeException when {@code json} is not a grants document at all
+     */
+    @Nonnull
+    public static Map<UUID, OwnerGrants> fromJson(@Nonnull String json) {
+        return owners(parse(json));
+    }
+
+    @Nonnull
+    private static String toJson(@Nonnull Map<UUID, OwnerGrants> owners, long networkRevision) {
+        Document document = new Document();
+        document.version = CURRENT_VERSION;
+        document.networkRevision = networkRevision > 0L ? networkRevision : null;
+        document.owners = new LinkedHashMap<>();
+        for (Map.Entry<UUID, OwnerGrants> entry : owners.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                document.owners.put(entry.getKey().toString(), toDocument(entry.getValue()));
+            }
+        }
+        return GSON.toJson(document);
+    }
+
+    @Nonnull
+    private static Document parse(@Nonnull String json) {
+        Document document = GSON.fromJson(json, Document.class);
+        if (document == null) {
+            throw new IllegalArgumentException("The shared access document is empty.");
+        }
+        return document;
+    }
+
+    @Nonnull
+    private static Map<UUID, OwnerGrants> owners(@Nonnull Document document) {
+        Map<UUID, OwnerGrants> owners = new LinkedHashMap<>();
+        if (document.owners != null) {
+            for (Map.Entry<String, OwnerDocument> entry : document.owners.entrySet()) {
+                UUID ownerId = parseUuid(entry.getKey());
+                OwnerGrants grants = ownerId == null ? null : toGrants(entry.getValue());
+                if (grants != null && !grants.isEmpty()) {
+                    owners.put(ownerId, grants);
+                }
+            }
+        }
+        return owners;
     }
 
     @Nullable
@@ -172,8 +216,13 @@ public final class SharedAccessFileStore {
         }
     }
 
-    /** The saved grants, and whether the file may be replaced. */
-    public record LoadResult(@Nonnull Map<UUID, OwnerGrants> owners, boolean writable) {
+    /**
+     * The saved grants, and whether the file may be replaced.
+     *
+     * @param networkRevision the last network revision this server applied; 0 when the file has
+     *                        none, which means this server never followed a network's grants
+     */
+    public record LoadResult(@Nonnull Map<UUID, OwnerGrants> owners, boolean writable, long networkRevision) {
         public LoadResult {
             owners = Map.copyOf(owners);
         }
@@ -181,6 +230,8 @@ public final class SharedAccessFileStore {
 
     private static final class Document {
         private Integer version;
+        /** Only in this server's own file, never in the network's document. */
+        private Long networkRevision;
         private LinkedHashMap<String, OwnerDocument> owners;
     }
 

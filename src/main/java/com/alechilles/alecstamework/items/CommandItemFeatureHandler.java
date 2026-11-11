@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
@@ -525,7 +527,9 @@ public final class CommandItemFeatureHandler {
         for (LinkedNpcRecord record : records) {
             if (record == null || !record.active) continue;
             CommandPersistenceView.ProfileSnapshot profile = persistenceView.find(record).orElse(null);
-            if (profile == null || !ownerUuid.equals(profile.ownerUuid())
+            if (profile == null
+                    || !CompanionAccess.allows(profile.ownerUuid(), ownerUuid,
+                            profile.profileId().value(), AccessAction.COMMAND)
                     || !linkPolicyService.isRoleAllowed(profile.roleId(), config, true)) {
                 return groupStatusResolver.customStatus(language);
             }
@@ -947,7 +951,7 @@ public final class CommandItemFeatureHandler {
             TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
             UUID ownerId = linkPolicyService.resolveOwnerId(npcRef, store);
             if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
-                    || !player.getUuid().equals(ownerId)) {
+                    || !CompanionAccess.allows(ownerId, player.getUuid(), npcRef, store, AccessAction.COMMAND)) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.notAllowed");
                 return;
             }
@@ -965,8 +969,9 @@ public final class CommandItemFeatureHandler {
                 stack = linkedNpcRecordStore.write(stack, records);
             }
             Vector3d home = new Vector3d(transform.getPosition());
-            if (links.getOwnerId() == null && player.getUuid() != null) {
-                links.setOwnerId(player.getUuid());
+            // The links owner is the companion's owner, not a player with shared access setting its home.
+            if (links.getOwnerId() == null) {
+                links.setOwnerId(ownerId);
             }
             links.setHomePosition(home);
             store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links);

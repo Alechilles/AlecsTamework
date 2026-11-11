@@ -17,7 +17,11 @@ public interface AccessGroupProvider {
     @Nonnull
     String id();
 
-    /** Translation key for the group's name as shown to players, for example "My guild". */
+    /**
+     * Translation key for the group's name as shown to players, for example "My guild". Give the
+     * full key as the game resolves it: an entry in a {@code server.lang} file needs the
+     * {@code server.} prefix.
+     */
     @Nonnull
     String displayNameKey();
 

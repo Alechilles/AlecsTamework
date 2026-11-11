@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -175,13 +177,15 @@ final class CommandRelocationDispatchService {
     }
 
     /**
-     * Starts a restore of the owner's companion at a placement frozen now, on the player's world
-     * thread. Returns whether the restore started; its result arrives later and is logged. A role
-     * with {@code Travel.CrossWorldRecallEnabled} off is not recalled across worlds.
+     * Starts a restore of a companion the recalling player may command at a placement frozen now,
+     * on the player's world thread. {@code ownerUuid} is the recalling player; the restore itself
+     * is admitted against the record's owner. Returns whether the restore started; its result
+     * arrives later and is logged. A role with {@code Travel.CrossWorldRecallEnabled} off is not
+     * recalled across worlds.
      */
     private boolean restoreNearPlayer(Context context, @Nullable UUID ownerUuid, CompanionRecord indexed) {
         CompanionRestoreRecallSink restore = recallRestore;
-        if (restore == null || ownerUuid == null || !ownerUuid.equals(indexed.ownerUuid())) {
+        if (restore == null || !CompanionAccess.allows(indexed, ownerUuid, AccessAction.COMMAND)) {
             return false;
         }
         TwCompanionConfig.EffectiveSettings settings =

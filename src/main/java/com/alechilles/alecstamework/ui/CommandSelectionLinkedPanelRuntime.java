@@ -523,7 +523,9 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
+        // Groups are the viewer's own, but grouping a shared companion is for commanding it.
         return entry != null && !page.cardBindingConfig.ownerCommandFamilyRoster()
+                && entry.viewerMay(com.alechilles.alecstamework.api.access.AccessAction.COMMAND)
                 && (presentation == null || presentation.bonded() == null
                 && (!presentation.managesRosterRow()
                 || page.companionBinding != null && entry.captured() && entry.ownedActions()));

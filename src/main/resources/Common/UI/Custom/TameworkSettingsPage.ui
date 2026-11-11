@@ -1259,6 +1259,74 @@ $C.@PageOverlay {
               }
             }
 
+            Group {
+              Anchor: (Top: 4, Height: 18);
+
+              Label #TwSettingsSharingSectionLabel {
+                Anchor: (Left: 0, Right: 0, Height: 18);
+                Text: %server.tamework.ui.settings.label.sharing;
+                Style: @SettingsSubsectionLabel;
+              }
+
+              TextButton #TwSettingsSharingSectionTooltip {
+                Anchor: (Left: 0, Right: 0, Height: 18);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.sharing;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsSharingEnabledLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.sharingEnabled;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsSharingEnabledTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.sharingEnabled;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsSharingEnabledCheck {
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: $A.@SlateQuiet;
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsSharingHighestLevelLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.sharingHighestLevel;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsSharingHighestLevelTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.sharingHighestLevel;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsSharingHighestLevelDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: %server.tamework.ui.settings.noItems.sharingHighestLevel;
+              }
+            }
+
             Group { Anchor: (Height: 8); }
 
             Group {

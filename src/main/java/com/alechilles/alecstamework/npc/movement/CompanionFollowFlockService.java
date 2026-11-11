@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.movement;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -246,7 +248,8 @@ public final class CompanionFollowFlockService {
         var leaderId = store.getComponent(leader, UUIDComponent.getComponentType());
         var player = store.getComponent(leader, Player.getComponentType());
         if (owner != null && tamed != null && leaderId != null && player != null
-                && hasFollowAuthority(tamed.isTamed(), owner.getOwnerId(), leaderId.getUuid(),
+                && hasFollowAuthority(tamed.isTamed(), owner.getOwnerId(),
+                        leadingAs(owner.getOwnerId(), leaderId.getUuid(), self, store),
                         player.getGameMode(), state.getStateName(), true)) {
             return true;
         }
@@ -280,8 +283,19 @@ public final class CompanionFollowFlockService {
         var state = NpcSupportAccess.state(role, self, store);
         var targets = NpcSupportAccess.markedEntity(role, self, store);
         return state != null && targets != null && hasFollowAuthority(tame.isTamed(), ownership.getOwnerId(),
-                identity.getUuid(), player.getGameMode(), state.getStateName(),
+                leadingAs(ownership.getOwnerId(), identity.getUuid(), self, store),
+                player.getGameMode(), state.getStateName(),
                 owner.equals(targets.getMarkedEntityRef(targetSlot)));
+    }
+
+    /**
+     * The id follow authority is judged for: the owner's when {@code leaderId} is the owner or
+     * holds COMMAND access to this companion, so that leader keeps the flock exactly as the owner
+     * would; otherwise the leader's own, which has no authority. For the owner this is one id
+     * comparison; nothing is scanned.
+     */
+    private static UUID leadingAs(UUID ownerId, UUID leaderId, Ref<EntityStore> self, Store<EntityStore> store) {
+        return CompanionAccess.allows(ownerId, leaderId, self, store, AccessAction.COMMAND) ? ownerId : leaderId;
     }
 
     static boolean hasFollowAuthority(boolean tamed, UUID ownerId, UUID playerId,

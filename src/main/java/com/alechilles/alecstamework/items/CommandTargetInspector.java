@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.hypixel.hytale.component.Ref;
@@ -100,7 +102,8 @@ public final class CommandTargetInspector {
         }
         UUID playerUuid = player.getUuid();
         UUID ownerUuid = linkPolicyService.resolveOwnerId(target.reference(), store);
-        return playerUuid != null && (ownerUuid == null || ownerUuid.equals(playerUuid));
+        return playerUuid != null && (ownerUuid == null || CompanionAccess.allows(
+                ownerUuid, playerUuid, target.reference(), store, AccessAction.COMMAND));
     }
 
     record Target(Ref<EntityStore> reference, NPCEntity npc) {

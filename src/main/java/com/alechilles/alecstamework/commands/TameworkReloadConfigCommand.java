@@ -67,6 +67,8 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
             int loaded = 0;
             if (!topologyReport.restartRequired()) {
                 TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+                // Read the settings now so sharing settings apply on this thread, not on the next reader.
+                TameworkSettingsStore.loadRuntimeGlobalSettings();
                 NameFilterSettingsStore.invalidateCache();
                 CompanionHudDefaultsStore.invalidateCache();
                 // Re-read here, off the world thread, because F reads these settings only from memory.

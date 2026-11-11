@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.flow.ReleaseFlow;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -53,6 +55,9 @@ final class CommandOwnerCullService {
     boolean cullFromItemInteraction(Player player, Ref<EntityStore> target,
                                    Store<EntityStore> store,
                                    boolean requireOwner, boolean requireTamed) {
+        if (requireOwner && !mayCull(player, target, store)) {
+            return false;
+        }
         TameworkNpcCullService.Outcome outcome = cullService.cullWithManagedRewards(
                 player, target, store, requireOwner, requireTamed);
         return outcome == TameworkNpcCullService.Outcome.CULLED
@@ -84,13 +89,16 @@ final class CommandOwnerCullService {
         if (target == null) {
             return;
         }
-        TameworkNpcCullService.Outcome outcome = cullService.cullFromCommandMenu(
-                player,
-                target.reference(),
-                target.store(),
-                linkingRequiresOwner(),
-                requireTamed
-        );
+        boolean requireOwner = linkingRequiresOwner();
+        TameworkNpcCullService.Outcome outcome = requireOwner && !mayCull(player, target.reference(), target.store())
+                ? TameworkNpcCullService.Outcome.DENIED
+                : cullService.cullFromCommandMenu(
+                        player,
+                        target.reference(),
+                        target.store(),
+                        requireOwner,
+                        requireTamed
+                );
         if (outcome == TameworkNpcCullService.Outcome.DENIED) {
             warn(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");
             return;
@@ -131,6 +139,16 @@ final class CommandOwnerCullService {
             return null;
         }
         return new LiveCullTarget(npcRef, store, npc);
+    }
+
+    /**
+     * The cull service's own owner check admits COMMAND access, which is enough to select a
+     * companion but not to cull it. A cull needs the owner or a player with CULL access.
+     */
+    private static boolean mayCull(@Nullable Player player, @Nullable Ref<EntityStore> target,
+                                   @Nullable Store<EntityStore> store) {
+        return player != null
+                && CompanionAccess.allows(target, store, player.getUuid(), AccessAction.CULL);
     }
 
     private boolean linkingRequiresOwner() {

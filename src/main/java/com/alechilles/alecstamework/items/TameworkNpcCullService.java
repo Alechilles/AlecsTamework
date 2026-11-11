@@ -260,7 +260,7 @@ public final class TameworkNpcCullService {
             );
         }
         return applyCull(
-                player, player.getUuid(), target, store, managedRewards, false
+                player, player.getUuid(), player.getUuid(), target, store, managedRewards, false
         );
     }
 
@@ -284,7 +284,7 @@ public final class TameworkNpcCullService {
                     && (outcome == CullTerminalOwnerReleaseService.Outcome.RELEASED
                     || outcome == CullTerminalOwnerReleaseService.Outcome.NOT_TRACKED)) {
                 LeaseBoundWorldDispatcher.execute(world, () -> applyDeferredCull(
-                        world, actorUuid, targetUuid, managedRewards, true
+                        world, actorUuid, targetOwnerUuid, targetUuid, managedRewards, true
                 ));
             } else {
                 CommandUiCurrentWorldDispatcher.production().dispatch(actorUuid, (playerRef, store) -> {
@@ -300,7 +300,8 @@ public final class TameworkNpcCullService {
 
     private void applyDeferredCull(
             World world,
-            UUID ownerUuid,
+            UUID actorUuid,
+            UUID targetOwnerUuid,
             UUID targetUuid,
             boolean managedRewards,
             boolean companionReleased
@@ -318,9 +319,9 @@ public final class TameworkNpcCullService {
             return;
         }
         WorldPlayerResolver.ResolvedPlayer resolved =
-                WorldPlayerResolver.resolve(world, ownerUuid);
+                WorldPlayerResolver.resolve(world, actorUuid);
         Player player = resolved == null ? null : resolved.player();
-        applyCull(player, ownerUuid, target, store, managedRewards, companionReleased);
+        applyCull(player, actorUuid, targetOwnerUuid, target, store, managedRewards, companionReleased);
     }
 
     @Nullable
@@ -335,8 +336,13 @@ public final class TameworkNpcCullService {
         return owner == null ? null : owner.getOwnerId();
     }
 
+    /**
+     * @param actorUuid the player doing the cull; a manager with shared access may not be the owner
+     * @param ownerUuid the companion's owner before the cull released it, for the activity
+     */
     private Outcome applyCull(
             @Nullable Player player,
+            @Nullable UUID actorUuid,
             @Nullable UUID ownerUuid,
             Ref<EntityStore> target,
             Store<EntityStore> store,
@@ -357,7 +363,7 @@ public final class TameworkNpcCullService {
         NPCEntity npc = store.getComponent(target, NPCEntity.getComponentType());
         String roleId = managedRewards
                 ? CompanionRoleIdResolver.resolveRoleId(target, store) : null;
-        CapturedItemUse itemUse = consumeItemUse(ownerUuid, target, store);
+        CapturedItemUse itemUse = consumeItemUse(actorUuid, target, store);
         CullRewardService.Outcome rewards = managedRewards
                 ? CullRewardService.apply(itemUse.preparedRewards(), target, store)
                 : CullRewardService.Outcome.unavailable();
@@ -387,7 +393,7 @@ public final class TameworkNpcCullService {
                     npc == null ? null : npc.getUuid(),
                     rewards.itemQuantities(),
                     itemUse.tool().present() ? itemUse.tool() : null,
-                    itemUse.tool().present() ? itemUse.actorId() : null,
+                    itemUse.tool().present() ? itemUse.actorId() : actorUuid,
                     rewards.ageStage()
             );
         }

@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountPreflight;
 
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
@@ -44,6 +46,7 @@ import javax.annotation.Nullable;
 final class TameworkInteractRequirements {
     private final AvatarFlightMountPreflight avatarFlightMountPreflight = new AvatarFlightMountPreflight();
     private final ActionTameworkInteract owner;
+    private final InteractionOwnershipHelper ownershipHelper;
     private final InteractionFeedHelper feedHelper;
     private final InteractionAlarmHelper alarmHelper;
     private final String harvestAlarmName;
@@ -59,6 +62,7 @@ final class TameworkInteractRequirements {
                                  boolean interactionRequireOwnerDefault,
                                  @Nullable InteractionExtensionRuntime extensionRuntime) {
         this.owner = owner;
+        this.ownershipHelper = new InteractionOwnershipHelper(owner);
         this.feedHelper = feedHelper;
         this.alarmHelper = alarmHelper;
         this.harvestAlarmName = harvestAlarmName;
@@ -86,7 +90,7 @@ final class TameworkInteractRequirements {
                 player,
                 ctx,
                 false
-        );
+        ) && sharedAccessMet(entry, npcRef, store, player, ctx);
     }
 
     boolean requirementsMetForPrompt(@Nullable String interactionConfigId,
@@ -109,7 +113,55 @@ final class TameworkInteractRequirements {
                 player,
                 ctx,
                 true
-        );
+        ) && sharedAccessMet(entry, npcRef, store, player, ctx);
+    }
+
+    /**
+     * The coarse owner gates let a sharer through at the lowest level, so when interactions need the
+     * owner each entry also needs the level for its own action. Owners pass; strangers are left to the
+     * existing gates.
+     */
+    private boolean sharedAccessMet(InteractionEntry entry,
+                                    Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store,
+                                    Player player,
+                                    InteractionContextSnapshot ctx) {
+        if (!resolveInteractionRequireOwner(null, interactionRequireOwnerDefault)) {
+            return true;
+        }
+        AccessLevel level = ownershipHelper.accessLevel(npcRef, store, player, ctx);
+        if (level == AccessLevel.NONE || level == AccessLevel.OWNER) {
+            return true;
+        }
+        return ownershipHelper.allows(npcRef, store, player, ctx, accessActionFor(entry, ctx));
+    }
+
+    // For a player whose F opens the companion card, the mode entry only decides whether the card
+    // opens, which reading status allows. The card runtime checks command access before a mode changes.
+    private static AccessAction modeCycleAction(@Nullable InteractionContextSnapshot ctx) {
+        return ctx != null && ctx.cardMode ? AccessAction.CARE : AccessAction.COMMAND;
+    }
+
+    // The access action an entry stands for.
+    private static AccessAction accessActionFor(InteractionEntry entry, @Nullable InteractionContextSnapshot ctx) {
+        if (entry instanceof HarvestInteraction) {
+            return AccessAction.HARVEST;
+        }
+        if (entry instanceof MountInteraction) {
+            return AccessAction.MOUNT;
+        }
+        if (entry instanceof ModeCycleInteraction) {
+            return modeCycleAction(ctx);
+        }
+        if (entry instanceof BreedInteraction) {
+            return AccessAction.BREED;
+        }
+        if (entry instanceof FeedInteraction) {
+            return AccessAction.CARE;
+        }
+        // Custom entries can do anything a config author wires up, such as removing equipment,
+        // so they need more than caretaker access. Taming only ever applies to unowned animals.
+        return AccessAction.CUSTOM_INTERACTION;
     }
 
     private boolean requirementsMetInternal(@Nullable String interactionConfigId,
@@ -123,6 +175,7 @@ final class TameworkInteractRequirements {
                                             InteractionContextSnapshot ctx,
                                             boolean forPrompt) {
         RequirementGroup requires = entry.getRequires();
+        AccessAction accessAction = accessActionFor(entry, ctx);
         if (entry instanceof CustomInteraction customInteraction) {
             if (requires != null && !evaluateRequirementGroup(
                     interactionConfigId,
@@ -134,7 +187,8 @@ final class TameworkInteractRequirements {
                     store,
                     player,
                     ctx,
-                    forPrompt
+                    forPrompt,
+                    accessAction
             )) {
                 return false;
             }
@@ -178,7 +232,8 @@ final class TameworkInteractRequirements {
                 store,
                 player,
                 ctx,
-                forPrompt
+                forPrompt,
+                accessAction
         );
     }
 
@@ -191,7 +246,8 @@ final class TameworkInteractRequirements {
                                              Store<EntityStore> store,
                                              Player player,
                                              InteractionContextSnapshot ctx,
-                                             boolean forPrompt) {
+                                             boolean forPrompt,
+                                             AccessAction accessAction) {
         if (group == null) {
             return false;
         }
@@ -205,7 +261,8 @@ final class TameworkInteractRequirements {
                 store,
                 player,
                 ctx,
-                forPrompt
+                forPrompt,
+                accessAction
         )) {
             return false;
         }
@@ -223,7 +280,8 @@ final class TameworkInteractRequirements {
                 store,
                 player,
                 ctx,
-                forPrompt
+                forPrompt,
+                accessAction
         );
     }
 
@@ -236,7 +294,8 @@ final class TameworkInteractRequirements {
                                       Store<EntityStore> store,
                                       Player player,
                                       InteractionContextSnapshot ctx,
-                                      boolean forPrompt) {
+                                      boolean forPrompt,
+                                      AccessAction accessAction) {
         if (bucket == null) {
             return true;
         }
@@ -268,8 +327,9 @@ final class TameworkInteractRequirements {
                 && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
         }
+        // PlayerIsOwner is met by the owner and by a sharer whose level covers this entry's action.
         if (bucket.isPlayerIsOwner()
-                && !owner.isOwner(npcRef, store, player, ctx)) {
+                && !ownershipHelper.allows(npcRef, store, player, ctx, accessAction)) {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
@@ -343,7 +403,8 @@ final class TameworkInteractRequirements {
                                       Store<EntityStore> store,
                                       Player player,
                                       InteractionContextSnapshot ctx,
-                                      boolean forPrompt) {
+                                      boolean forPrompt,
+                                      AccessAction accessAction) {
         if (bucket == null) {
             return false;
         }
@@ -378,7 +439,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isPlayerIsOwner()
-                && owner.isOwner(npcRef, store, player, ctx)) {
+                && ownershipHelper.allows(npcRef, store, player, ctx, accessAction)) {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
@@ -689,7 +750,7 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
+        if (requireOwner && !ownershipHelper.allows(npcRef, store, player, ctx, AccessAction.MOUNT)) {
             return false;
         }
         if (requireMountable && !owner.resolveIsMountable(role, ctx)) {
@@ -721,7 +782,7 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
+        if (requireOwner && !ownershipHelper.allows(npcRef, store, player, ctx, modeCycleAction(ctx))) {
             return false;
         }
         return true;

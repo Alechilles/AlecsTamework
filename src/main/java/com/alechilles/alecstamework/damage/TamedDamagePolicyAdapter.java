@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,7 +19,14 @@ final class TamedDamagePolicyAdapter {
             boolean integrationEnabled,
             boolean protectionEnabled,
             @Nonnull TamedDamageTargetEligibilityResolver.Status eligibility) {
-        TamedDamageDecision ownerDecision = evaluateOwnerProtection(ownerPolicy, attackerPlayerUuid);
+        // This entry point knows only the two ids, so the attacker is the owner or a stranger.
+        // A caller that knows the attacker's shared access uses evaluateOwnerProtection directly.
+        AccessLevel attackerAccess = ownerPolicy != null
+                && ownerPolicy.ownerUuid() != null
+                && ownerPolicy.ownerUuid().equals(attackerPlayerUuid)
+                ? AccessLevel.OWNER
+                : AccessLevel.NONE;
+        TamedDamageDecision ownerDecision = evaluateOwnerProtection(ownerPolicy, attackerPlayerUuid, attackerAccess);
         if (ownerDecision != null) {
             return Optional.of(ownerDecision);
         }
@@ -76,10 +85,19 @@ final class TamedDamagePolicyAdapter {
         };
     }
 
+    /**
+     * Decides the owner damage settings for one hit, or returns null when they do not block it.
+     *
+     * <p>{@code attackerAccess} is the attacking player's access to the target, resolved by the
+     * caller. A player who may cull (a manager) is treated exactly like the owner. A player with
+     * lower access (a caretaker or handler) can never damage the animal. A player with no access
+     * follows the non-owner settings.</p>
+     */
     @Nullable
-    private TamedDamageDecision evaluateOwnerProtection(
+    TamedDamageDecision evaluateOwnerProtection(
             @Nullable TamedDamageOwnerPolicy ownerPolicy,
-            @Nullable UUID attackerPlayerUuid) {
+            @Nullable UUID attackerPlayerUuid,
+            @Nonnull AccessLevel attackerAccess) {
         if (ownerPolicy == null || ownerPolicy.ownerUuid() == null) {
             return null;
         }
@@ -92,10 +110,14 @@ final class TamedDamagePolicyAdapter {
         if (ownerPolicy.blockAllPlayerDamageIfOwned()) {
             return TamedDamageDecision.denyOwner("block-all-player-damage-if-owned");
         }
-        if (ownerPolicy.blockNonOwnerPlayerDamage() && !ownerPolicy.ownerUuid().equals(attackerPlayerUuid)) {
+        boolean actsAsOwner = AccessAction.CULL.allowedAt(attackerAccess);
+        if (!actsAsOwner && attackerAccess.atLeast(AccessLevel.CARETAKER)) {
+            return TamedDamageDecision.denyOwner("block-shared-access-damage");
+        }
+        if (ownerPolicy.blockNonOwnerPlayerDamage() && !actsAsOwner) {
             return TamedDamageDecision.denyOwner("block-non-owner-player-damage");
         }
-        if (ownerPolicy.blockOwnerDamage() && ownerPolicy.ownerUuid().equals(attackerPlayerUuid)) {
+        if (ownerPolicy.blockOwnerDamage() && actsAsOwner) {
             return TamedDamageDecision.denyOwner("block-owner-damage");
         }
         return null;

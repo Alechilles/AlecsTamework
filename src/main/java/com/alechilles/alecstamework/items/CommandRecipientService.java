@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -379,7 +381,8 @@ final class CommandRecipientService {
 
     /**
      * Offline records are advisory item metadata; the canonical profile still
-     * decides whether this player owns the companion and this item supports it.
+     * decides whether this player may command the companion (its owner, or a
+     * player with COMMAND access) and this item supports it.
      */
     private boolean hasUnloadedSelectionAuthority(UUID playerUuid,
                                                    LinkedNpcRecord record,
@@ -388,7 +391,8 @@ final class CommandRecipientService {
             return false;
         }
         return persistenceView.find(record)
-                .filter(profile -> playerUuid.equals(profile.ownerUuid()))
+                .filter(profile -> CompanionAccess.allows(profile.ownerUuid(), playerUuid,
+                        profile.profileId().value(), AccessAction.COMMAND))
                 .filter(profile -> linkPolicyService.isRoleAllowed(profile.roleId(), config, true))
                 .isPresent();
     }

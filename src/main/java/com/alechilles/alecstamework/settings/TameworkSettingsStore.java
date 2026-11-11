@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.settings;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.SharedAccessService;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
 import com.google.gson.Gson;
@@ -78,18 +80,7 @@ public final class TameworkSettingsStore {
         if (cached != null && cached.path().equals(globalSettingsFile)) {
             return cached.settings();
         }
-        synchronized (SETTINGS_CACHE_LOCK) {
-            cached = cachedRuntimeSettings;
-            if (cached != null && cached.path().equals(globalSettingsFile)) {
-                return cached.settings();
-            }
-            ensureGlobalTemplateExists(globalSettingsFile, plugin.getLogger());
-            CachedSettings loaded = loadGlobalSettingsCache(
-                    globalSettingsFile, plugin.getLogger()
-            );
-            cachedRuntimeSettings = loaded;
-            return loaded.settings();
-        }
+        return loadRuntimeSettingsCache(plugin, globalSettingsFile).settings();
     }
 
     @Nullable
@@ -108,18 +99,35 @@ public final class TameworkSettingsStore {
         if (cached != null && cached.path().equals(globalSettingsFile)) {
             return cached.overrides();
         }
+        return loadRuntimeSettingsCache(plugin, globalSettingsFile).overrides();
+    }
+
+    /** Reads the runtime settings after a start or an invalidation, and puts them into effect. */
+    @Nonnull
+    private static CachedSettings loadRuntimeSettingsCache(@Nonnull Tamework plugin, @Nonnull Path globalSettingsFile) {
+        CachedSettings loaded;
         synchronized (SETTINGS_CACHE_LOCK) {
-            cached = cachedRuntimeSettings;
+            CachedSettings cached = cachedRuntimeSettings;
             if (cached != null && cached.path().equals(globalSettingsFile)) {
-                return cached.overrides();
+                return cached;
             }
             ensureGlobalTemplateExists(globalSettingsFile, plugin.getLogger());
-            CachedSettings loaded = loadGlobalSettingsCache(
-                    globalSettingsFile, plugin.getLogger()
-            );
+            loaded = loadGlobalSettingsCache(globalSettingsFile, plugin.getLogger());
             cachedRuntimeSettings = loaded;
-            return loaded.overrides();
         }
+        applySharingSettings(loaded.settings());
+        return loaded;
+    }
+
+    /**
+     * Gives the sharing settings to the access service, which keeps its own copy for access
+     * checks. This is the one place that does so: it runs each time the runtime settings are
+     * replaced, which covers the first read after a start, a save, a reload and a change of the
+     * network settings. It runs outside the cache lock because the service tells its listeners on
+     * the calling thread when a value changed.
+     */
+    private static void applySharingSettings(@Nonnull ResolvedTameworkSettings settings) {
+        SharedAccessService.get().configure(settings.sharingEnabled(), settings.sharingHighestAccessLevel());
     }
 
     public static void invalidateRuntimeGlobalOverridesCache() {
@@ -197,6 +205,10 @@ public final class TameworkSettingsStore {
                 CaptureItemOwnershipMode.fromConfigValue(snapshot.captureItemOwnership()).toConfigValue();
         document.ownership.interactionRequiresOwner = snapshot.interactionRequiresOwner();
         document.ownership.linkingRequiresOwner = snapshot.linkingRequiresOwner();
+        document.ownership.sharing = new OwnershipSharingSection();
+        document.ownership.sharing.enabled = snapshot.sharingEnabled();
+        document.ownership.sharing.highestLevel =
+                TameworkSettingsResolver.resolveSharingHighestLevel(snapshot.sharingHighestLevel()).name();
 
         document.needs = new NeedsSection();
         document.needs.enabled = snapshot.needsEnabled();
@@ -354,8 +366,9 @@ public final class TameworkSettingsStore {
 
     private static void publishSettingsCache(@Nonnull Path globalSettingsFile,
                                              @Nonnull GlobalSettingsDocument document) {
+        CachedSettings cached;
         synchronized (SETTINGS_CACHE_LOCK) {
-            CachedSettings cached = cachedSettings(
+            cached = cachedSettings(
                     globalSettingsFile,
                     lastModifiedMillis(globalSettingsFile),
                     document
@@ -363,6 +376,7 @@ public final class TameworkSettingsStore {
             cachedDiskSettings = cached;
             cachedRuntimeSettings = cached;
         }
+        applySharingSettings(cached.settings());
     }
 
     @Nonnull
@@ -417,6 +431,9 @@ public final class TameworkSettingsStore {
         document.ownership.capture.captureItemOwnership = CaptureItemOwnershipMode.FOLLOWS_ITEM.toConfigValue();
         document.ownership.interactionRequiresOwner = true;
         document.ownership.linkingRequiresOwner = true;
+        document.ownership.sharing = new OwnershipSharingSection();
+        document.ownership.sharing.enabled = true;
+        document.ownership.sharing.highestLevel = AccessLevel.MANAGER.name();
 
         document.needs = new NeedsSection();
         document.needs.enabled = true;
@@ -615,6 +632,7 @@ public final class TameworkSettingsStore {
         OwnershipDamageProtectionSection ownershipDamageProtection =
                 ownership != null ? ownership.damageProtection : null;
         OwnershipCaptureSection ownershipCapture = ownership != null ? ownership.capture : null;
+        OwnershipSharingSection ownershipSharing = ownership != null ? ownership.sharing : null;
         NeedsSection needs = document.needs;
         NeedsTickPolicySection needsTickPolicy = needs != null ? needs.tickPolicy : null;
         NeedsDamageSection needsDamage = needs != null ? needs.damage : null;
@@ -697,7 +715,9 @@ public final class TameworkSettingsStore {
                 avatarFlight != null ? avatarFlight.unlimitedVigour : null,
                 ownershipDamageProtection != null
                         ? ownershipDamageProtection.blockNonOwnerPlayerDamage
-                        : null
+                        : null,
+                ownershipSharing != null ? ownershipSharing.enabled : null,
+                ownershipSharing != null ? trimToNull(ownershipSharing.highestLevel) : null
         );
     }
 
@@ -855,7 +875,72 @@ public final class TameworkSettingsStore {
                                           int commandPanelCardsPerPage,
                                          int populationLimitPerPlayerDeployedTotal,
                                          boolean avatarFlightUnlimitedVigour,
-                                         boolean blockNonOwnerPlayerDamage) {
+                                         boolean blockNonOwnerPlayerDamage,
+                                         boolean sharingEnabled,
+                                         @Nonnull String sharingHighestLevel) {
+
+        /** Compatibility constructor for callers compiled before the sharing settings: sharing is on, up to Manager. */
+        public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                      @Nonnull String populationPerPlayerLimitScope,
+                                      boolean simpleClaimsEnabled,
+                                      int simpleClaimsLimitPerClaimChunk,
+                                      int simpleClaimsLimitPerClaimTotal,
+                                      boolean simpleClaimsBreedingRequiresClaim,
+                                      boolean simpleClaimsProtectTamedFromNonMembers,
+                                      boolean blockOwnerDamage,
+                                      boolean blockAllPlayerDamageIfOwned,
+                                      boolean invulnerableIfOwned,
+                                      @Nonnull String captureItemOwnership,
+                                      boolean captureRequiresOwner,
+                                      boolean spawnRequiresOwner,
+                                      boolean interactionRequiresOwner,
+                                      boolean linkingRequiresOwner,
+                                      boolean needsEnabled,
+                                      @Nonnull String needsResourceMode,
+                                      @Nonnull String needsTickPolicyMode,
+                                      double needsOwnerOfflineGraceHours,
+                                      double needsOwnerOfflineDecayMultiplier,
+                                      boolean needsDamageEnabled,
+                                      @Nonnull String needsDamageModel,
+                                      @Nonnull String needsDamageDualNeedRule,
+                                      double needsStarvationDamagePerMinute,
+                                      double needsDehydrationDamagePerMinute,
+                                      boolean needsDamageLethal,
+                                      boolean happinessEnabled,
+                                      boolean passiveBreedingEnabled,
+                                      boolean breedingRequiresHappiness,
+                                      boolean breedingGenderEnabled,
+                                      boolean traitsEnabled,
+                                      boolean levelingEnabled,
+                                      boolean talentsEnabled,
+                                      boolean reviveSystemEnabled,
+                                      boolean recallTeleportingEnabled,
+                                      boolean telemetryEnabled,
+                                      boolean telemetryBreadcrumbsEnabled,
+                                      @Nonnull String animalAgingMode,
+                                      boolean animalOldAgeDeathEnabled,
+                                      int commandPanelCardsPerPage,
+                                      int populationLimitPerPlayerDeployedTotal,
+                                      boolean avatarFlightUnlimitedVigour,
+                                      boolean blockNonOwnerPlayerDamage) {
+            this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                    simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                    simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                    simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                    blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership,
+                    captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner,
+                    linkingRequiresOwner, needsEnabled, needsResourceMode, needsTickPolicyMode,
+                    needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
+                    needsDamageEnabled, needsDamageModel, needsDamageDualNeedRule,
+                    needsStarvationDamagePerMinute, needsDehydrationDamagePerMinute,
+                    needsDamageLethal, happinessEnabled, passiveBreedingEnabled,
+                    breedingRequiresHappiness, breedingGenderEnabled, traitsEnabled,
+                    levelingEnabled, talentsEnabled, reviveSystemEnabled, recallTeleportingEnabled,
+                    telemetryEnabled, telemetryBreadcrumbsEnabled, animalAgingMode,
+                    animalOldAgeDeathEnabled, commandPanelCardsPerPage,
+                    populationLimitPerPlayerDeployedTotal, avatarFlightUnlimitedVigour,
+                    blockNonOwnerPlayerDamage, true, AccessLevel.MANAGER.name());
+        }
 
         /** Compatibility constructor for callers compiled before the non-owner player damage setting: non-owners can still deal damage. */
         public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
@@ -1301,7 +1386,74 @@ public final class TameworkSettingsStore {
                                    @Nullable String captureItemOwnership,
                                   @Nullable Integer populationLimitPerPlayerDeployedTotal,
                                   @Nullable Boolean avatarFlightUnlimitedVigour,
-                                  @Nullable Boolean blockNonOwnerPlayerDamage) {
+                                  @Nullable Boolean blockNonOwnerPlayerDamage,
+                                  @Nullable Boolean sharingEnabled,
+                                  @Nullable String sharingHighestLevel) {
+
+        /** Compatibility constructor for callers compiled before the sharing settings. */
+        public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
+                               @Nullable String populationPerPlayerLimitScope,
+                               @Nullable Boolean simpleClaimsEnabled,
+                               @Nullable Integer simpleClaimsLimitPerClaimChunk,
+                               @Nullable Integer simpleClaimsLimitPerClaimTotal,
+                               @Nullable Boolean simpleClaimsBreedingRequiresClaim,
+                               @Nullable Boolean simpleClaimsProtectTamedFromNonMembers,
+                               @Nullable Boolean blockOwnerDamage,
+                               @Nullable Boolean blockAllPlayerDamageIfOwned,
+                               @Nullable Boolean invulnerableIfOwned,
+                               @Nullable Boolean captureClearsOwner,
+                               @Nullable Boolean spawnSetsOwner,
+                               @Nullable Boolean captureRequiresOwner,
+                               @Nullable Boolean spawnRequiresOwner,
+                               @Nullable Boolean interactionRequiresOwner,
+                               @Nullable Boolean linkingRequiresOwner,
+                               @Nullable Boolean needsEnabled,
+                               @Nullable String needsResourceMode,
+                               @Nullable String needsTickPolicyMode,
+                               @Nullable Double needsOwnerOfflineGraceHours,
+                               @Nullable Double needsOwnerOfflineDecayMultiplier,
+                               @Nullable Boolean needsDamageEnabled,
+                               @Nullable String needsDamageModel,
+                               @Nullable String needsDamageDualNeedRule,
+                               @Nullable Double needsStarvationDamagePerMinute,
+                               @Nullable Double needsDehydrationDamagePerMinute,
+                               @Nullable Boolean needsDamageLethal,
+                               @Nullable Boolean happinessEnabled,
+                               @Nullable Boolean passiveBreedingEnabled,
+                               @Nullable Boolean breedingRequiresHappiness,
+                               @Nullable Boolean breedingGenderEnabled,
+                               @Nullable Boolean traitsEnabled,
+                               @Nullable Boolean levelingEnabled,
+                               @Nullable Boolean talentsEnabled,
+                               @Nullable Boolean reviveSystemEnabled,
+                               @Nullable Boolean recallTeleportingEnabled,
+                               @Nullable Boolean telemetryEnabled,
+                               @Nullable Boolean telemetryBreadcrumbsEnabled,
+                               @Nullable String animalAgingMode,
+                               @Nullable Boolean animalOldAgeDeathEnabled,
+                               @Nullable Integer commandPanelCardsPerPage,
+                               @Nullable String captureItemOwnership,
+                               @Nullable Integer populationLimitPerPlayerDeployedTotal,
+                               @Nullable Boolean avatarFlightUnlimitedVigour,
+                               @Nullable Boolean blockNonOwnerPlayerDamage) {
+            this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                    simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                    simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                    simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                    blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureClearsOwner,
+                    spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner,
+                    interactionRequiresOwner, linkingRequiresOwner, needsEnabled,
+                    needsResourceMode, needsTickPolicyMode, needsOwnerOfflineGraceHours,
+                    needsOwnerOfflineDecayMultiplier, needsDamageEnabled, needsDamageModel,
+                    needsDamageDualNeedRule, needsStarvationDamagePerMinute,
+                    needsDehydrationDamagePerMinute, needsDamageLethal, happinessEnabled,
+                    passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
+                    traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                    recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
+                    animalAgingMode, animalOldAgeDeathEnabled, commandPanelCardsPerPage,
+                    captureItemOwnership, populationLimitPerPlayerDeployedTotal,
+                    avatarFlightUnlimitedVigour, blockNonOwnerPlayerDamage, null, null);
+        }
 
         /** Compatibility constructor for callers compiled before the non-owner player damage setting. */
         public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
@@ -1735,6 +1887,15 @@ public final class TameworkSettingsStore {
         private OwnershipCaptureSection capture;
         private Boolean interactionRequiresOwner;
         private Boolean linkingRequiresOwner;
+        /** Absent in a file written before sharing: sharing is on, up to Manager. */
+        private OwnershipSharingSection sharing;
+    }
+
+    private static final class OwnershipSharingSection {
+        /** False gives only the owner access; saved grants are kept. Absent = true. */
+        private Boolean enabled;
+        /** The highest level an owner may grant: CARETAKER, HANDLER or MANAGER. Absent = MANAGER. */
+        private String highestLevel;
     }
 
     private static final class OwnershipDamageProtectionSection {

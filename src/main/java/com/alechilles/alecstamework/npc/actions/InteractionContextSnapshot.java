@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.MovementStates;
@@ -29,8 +30,14 @@ final class InteractionContextSnapshot {
     Boolean cachedNpcTamed;
     @Nullable
     UUID cachedNpcOwnerId;
+    /**
+     * The player's access level on the NPC, shared by every entry; each entry compares it with its
+     * own action. The prompt presets OWNER for an unowned tamed NPC the interaction would claim.
+     */
     @Nullable
-    Boolean cachedPlayerIsOwner;
+    AccessLevel cachedPlayerAccessLevel;
+    /** Set when an entry was refused because the player's shared access level is too low for it. */
+    boolean accessDenied;
     @Nullable
     MovementStates cachedPlayerMovementStates;
     /**

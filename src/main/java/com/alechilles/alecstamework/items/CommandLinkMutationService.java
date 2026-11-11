@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -118,7 +120,9 @@ final class CommandLinkMutationService {
             return LinkToggleResult.pending();
         }
         UUID ownerId = ownerBridgeResult.getOwnerId();
-        if (requireOwner && (ownerId == null || !ownerId.equals(playerId))) {
+        // The link is a record on the player's own item; the companion's links component and
+        // its owner are not written here, so a player with COMMAND access changes nothing of the owner's.
+        if (requireOwner && !CompanionAccess.allows(ownerId, playerId, targetRef, store, AccessAction.COMMAND)) {
             return LinkToggleResult.notToggled();
         }
         if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
@@ -193,7 +197,8 @@ final class CommandLinkMutationService {
             return false;
         }
         UUID owner = links.getOwnerId();
-        if (resolveLinkingRequireOwner() && owner != null && !owner.equals(player.getUuid())) {
+        if (resolveLinkingRequireOwner() && owner != null
+                && !CompanionAccess.allows(owner, player.getUuid(), npcRef, store, AccessAction.COMMAND)) {
             return false;
         }
         store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));

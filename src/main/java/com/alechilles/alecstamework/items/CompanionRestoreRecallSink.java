@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.flow.RestoreFlow;
 import com.alechilles.alecstamework.companion.flow.RestoreRules;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -20,8 +22,10 @@ import javax.annotation.Nullable;
  * Turns a recall that cannot move a body into a restore from the snapshot (spec 8.5): a LIVE
  * companion in another world, or one whose body never appeared before the relocation wait ran out.
  *
- * <p>Only the recalling owner's companion is restored: {@link #recover} checks the owner itself,
- * and {@link #restoreNear}'s caller checks it first. {@link RestoreFlow} rechecks the record and
+ * <p>Only a companion the recalling player may command (its owner, or a player with COMMAND
+ * access) is restored: {@link #recover} checks that itself, and {@link #restoreNear}'s caller
+ * checks it first. The restore is admitted against the record's owner, never the recalling
+ * player. {@link RestoreFlow} rechecks the record and
  * hands its entity work to the world threads itself, so both entry points may be called from any
  * thread. Results complete on whichever thread finishes the restore.
  */
@@ -38,8 +42,8 @@ public final class CompanionRestoreRecallSink implements ImportedRecallRecoveryS
     }
 
     /**
-     * Restores {@code profileId} at a placement already computed near its owner on the owner's
-     * world thread. The caller has checked that the recalling player owns it.
+     * Restores {@code profileId} at a placement already computed near the recalling player on
+     * that player's world thread. The caller has checked that the recalling player may command it.
      */
     @Nonnull
     CompletableFuture<RestoreFlow.Result> restoreNear(@Nonnull UUID profileId,
@@ -49,14 +53,16 @@ public final class CompanionRestoreRecallSink implements ImportedRecallRecoveryS
 
     /**
      * Called once when an explicit recall's relocation ran out of time without touching the body.
-     * The destination is the safe spot frozen near the owner when the recall was queued.
+     * The destination is the safe spot frozen near the recalling player when the recall was queued;
+     * {@code failure.ownerUuid()} is that player.
      */
     @Nonnull
     @Override
     public CompletionStage<RecoveryOutcome> recover(@Nonnull RecallFailure failure) {
         CompanionRecord record = resolve(failure.npcUuid());
         RecallDestination destination = failure.destination();
-        if (record == null || destination == null || !failure.ownerUuid().equals(record.ownerUuid())) {
+        if (record == null || destination == null
+                || !CompanionAccess.allows(record, failure.ownerUuid(), AccessAction.COMMAND)) {
             return CompletableFuture.completedFuture(RecoveryOutcome.NONE);
         }
         return restore(record.profileId(), new RestoreFlow.Destination(destination.worldName(),

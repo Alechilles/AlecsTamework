@@ -113,7 +113,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 // Showing a prompt never claims an unowned tamed NPC: the interaction itself does.
                 // The prompt is the one the player would get once that interaction claimed it.
                 if (LegacyTamedOwnershipBridge.isClaimableByInteraction(npcRef, store)) {
-                    ctx.cachedPlayerIsOwner = true;
+                    ctx.cachedPlayerAccessLevel = com.alechilles.alecstamework.api.access.AccessLevel.OWNER;
                 }
                 resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
             }

@@ -127,6 +127,22 @@ public final class ActivityRuntime {
             @Nullable AwardResult award,
             boolean careCredit
     ) {
+        publishFeed(operationId, roleId, ownerId, companionId, award, careCredit, null);
+    }
+
+    /**
+     * Publishes a feed with the player who fed. {@code ownerId} stays the companion's owner;
+     * {@code actorId} is the feeder, who may be a player the owner shares the companion with.
+     */
+    public static void publishFeed(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable AwardResult award,
+            boolean careCredit,
+            @Nullable UUID actorId
+    ) {
         RuntimeState state = CURRENT.get();
         if (state.publisher == null) {
             return;
@@ -140,7 +156,8 @@ public final class ActivityRuntime {
                 transition(award),
                 careCredit && companionId != null && ownerId != null
                         ? new CareCreditOutcomeView(companionId, ownerId)
-                        : null
+                        : null,
+                actorId
         );
     }
 

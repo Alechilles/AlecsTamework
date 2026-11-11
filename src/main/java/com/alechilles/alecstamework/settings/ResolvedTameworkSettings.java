@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.settings;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import javax.annotation.Nonnull;
 
 /**
@@ -47,7 +48,72 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                                        int commandPanelCardsPerPage,
                                        int populationLimitPerPlayerDeployedTotal,
                                        boolean avatarFlightUnlimitedVigour,
-                                       boolean blockNonOwnerPlayerDamage) {
+                                       boolean blockNonOwnerPlayerDamage,
+                                       boolean sharingEnabled,
+                                       @Nonnull String sharingHighestLevel) {
+
+    /** Compatibility constructor for callers compiled before the sharing settings: sharing is on, up to Manager. */
+    public ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
+                                    @Nonnull String populationPerPlayerLimitScope,
+                                    boolean simpleClaimsEnabled,
+                                    int simpleClaimsLimitPerClaimChunk,
+                                    int simpleClaimsLimitPerClaimTotal,
+                                    boolean simpleClaimsBreedingRequiresClaim,
+                                    boolean simpleClaimsProtectTamedFromNonMembers,
+                                    boolean blockOwnerDamage,
+                                    boolean blockAllPlayerDamageIfOwned,
+                                    boolean invulnerableIfOwned,
+                                    @Nonnull String captureItemOwnership,
+                                    boolean captureRequiresOwner,
+                                    boolean spawnRequiresOwner,
+                                    boolean interactionRequiresOwner,
+                                    boolean linkingRequiresOwner,
+                                    boolean needsEnabled,
+                                    @Nonnull String needsResourceMode,
+                                    @Nonnull String needsTickPolicyMode,
+                                    double needsOwnerOfflineGraceHours,
+                                    double needsOwnerOfflineDecayMultiplier,
+                                    boolean needsDamageEnabled,
+                                    @Nonnull String needsDamageModel,
+                                    @Nonnull String needsDamageDualNeedRule,
+                                    double needsStarvationDamagePerMinute,
+                                    double needsDehydrationDamagePerMinute,
+                                    boolean needsDamageLethal,
+                                    boolean happinessEnabled,
+                                    boolean passiveBreedingEnabled,
+                                    boolean breedingRequiresHappiness,
+                                    boolean breedingGenderEnabled,
+                                    boolean traitsEnabled,
+                                    boolean levelingEnabled,
+                                    boolean talentsEnabled,
+                                    boolean reviveSystemEnabled,
+                                    boolean recallTeleportingEnabled,
+                                    boolean telemetryEnabled,
+                                    boolean telemetryBreadcrumbsEnabled,
+                                    @Nonnull String animalAgingMode,
+                                    boolean animalOldAgeDeathEnabled,
+                                    int commandPanelCardsPerPage,
+                                    int populationLimitPerPlayerDeployedTotal,
+                                    boolean avatarFlightUnlimitedVigour,
+                                    boolean blockNonOwnerPlayerDamage) {
+        this(populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership,
+                captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner,
+                linkingRequiresOwner, needsEnabled, needsResourceMode, needsTickPolicyMode,
+                needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier,
+                needsDamageEnabled, needsDamageModel, needsDamageDualNeedRule,
+                needsStarvationDamagePerMinute, needsDehydrationDamagePerMinute,
+                needsDamageLethal, happinessEnabled, passiveBreedingEnabled,
+                breedingRequiresHappiness, breedingGenderEnabled, traitsEnabled,
+                levelingEnabled, talentsEnabled, reviveSystemEnabled, recallTeleportingEnabled,
+                telemetryEnabled, telemetryBreadcrumbsEnabled, animalAgingMode,
+                animalOldAgeDeathEnabled, commandPanelCardsPerPage,
+                populationLimitPerPlayerDeployedTotal, avatarFlightUnlimitedVigour,
+                blockNonOwnerPlayerDamage, true, AccessLevel.MANAGER.name());
+    }
 
     /** Compatibility constructor for callers compiled before the non-owner player damage setting: non-owners can still deal damage. */
     public ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
@@ -225,6 +291,7 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
 
     public ResolvedTameworkSettings {
         captureItemOwnership = CaptureItemOwnershipMode.fromConfigValue(captureItemOwnership).toConfigValue();
+        sharingHighestLevel = TameworkSettingsResolver.resolveSharingHighestLevel(sharingHighestLevel).name();
     }
 
     /** Compatibility constructor for integrations compiled before the capture item ownership mode. */
@@ -429,6 +496,12 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
         return CaptureItemOwnershipMode.fromConfigValue(captureItemOwnership);
     }
 
+    /** The highest {@link AccessLevel} an owner may grant: Caretaker, Handler or Manager. */
+    @Nonnull
+    public AccessLevel sharingHighestAccessLevel() {
+        return TameworkSettingsResolver.resolveSharingHighestLevel(sharingHighestLevel);
+    }
+
     /**
      * Retired with the capture item ownership mode: a capture never clears the owner.
      *
@@ -495,7 +568,9 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                 commandPanelCardsPerPage,
                 populationLimitPerPlayerDeployedTotal,
                 avatarFlightUnlimitedVigour,
-                blockNonOwnerPlayerDamage
+                blockNonOwnerPlayerDamage,
+                sharingEnabled,
+                sharingHighestLevel
         );
     }
 

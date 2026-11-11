@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
+import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.logging.Level;
@@ -138,6 +140,10 @@ final class TameworkSettingsFormParser {
                 CaptureItemOwnershipMode.fromConfigValue(fallback(
                         payload.captureItemOwnership,
                         currentValues.captureItemOwnership().toConfigValue()
+                )),
+                TameworkSettingsResolver.resolveSharingHighestLevel(fallback(
+                        payload.sharingHighestLevel,
+                        currentValues.sharingHighestLevel().name()
                 ))
         ));
     }
@@ -190,7 +196,9 @@ final class TameworkSettingsFormParser {
                 numbers.commandPanelCardsPerPage(),
                 numbers.deployedLimit(),
                 boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour()),
-                boolOrDefault(payload.blockNonOwnerPlayerDamage, current.blockNonOwnerPlayerDamage())
+                boolOrDefault(payload.blockNonOwnerPlayerDamage, current.blockNonOwnerPlayerDamage()),
+                boolOrDefault(payload.sharingEnabled, current.sharingEnabled()),
+                choices.sharingHighestLevel()
         );
     }
 
@@ -314,7 +322,8 @@ final class TameworkSettingsFormParser {
                                 @Nonnull TwNeedsConfig.DamageModel damageModel,
                                 @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule,
                                 @Nonnull AnimalAgingMode animalAgingMode,
-                                @Nonnull CaptureItemOwnershipMode captureItemOwnership) {
+                                @Nonnull CaptureItemOwnershipMode captureItemOwnership,
+                                @Nonnull AccessLevel sharingHighestLevel) {
     }
 
     private record ChoiceResult(boolean success, @Nonnull String message, @Nullable ChoiceValues values) {

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.access.CompanionAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Component;
@@ -47,9 +49,10 @@ final class CommandRelocationWorldAccess {
         TameworkOwnerComponent owner = safeGetComponent(
                 store, ref, TameworkOwnerComponent.getComponentType()
         );
-        return owner != null && Objects.equals(
-                owner.getOwnerId(), pending.ownerUuid
-        );
+        // pending.ownerUuid is the player who asked for the move: the owner, or a player the
+        // owner lets command this companion.
+        return owner != null && (Objects.equals(owner.getOwnerId(), pending.ownerUuid)
+                || CompanionAccess.allows(owner.getOwnerId(), pending.ownerUuid, ref, store, AccessAction.COMMAND));
     }
 
     @Nullable

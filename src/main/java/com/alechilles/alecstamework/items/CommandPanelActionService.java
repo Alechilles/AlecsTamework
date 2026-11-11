@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -208,6 +210,15 @@ final class CommandPanelActionService {
         var entry = toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config).stream()
                 .filter(row -> npcUuid.equals(row.npcUuid()) && row.loaded() && row.breedingAvailable()).findFirst().orElse(null);
         if (entry == null) return;
+        // The record on the item is the player's own, but the toggle changes the companion: that
+        // is for its owner, or a player the owner lets breed it.
+        World world = player.getWorld();
+        Ref<EntityStore> npcRef = world == null ? null : world.getEntityRef(npcUuid);
+        Store<EntityStore> npcStore = world == null ? null : world.getEntityStore().getStore();
+        if (npcRef != null && npcRef.isValid() && npcStore != null
+                && !CompanionAccess.allows(npcRef, npcStore, player.getUuid(), AccessAction.BREED)) {
+            return;
+        }
         CommandLinkMutationService.BreedingToggleResult[] resultHolder =
                 new CommandLinkMutationService.BreedingToggleResult[1];
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
@@ -459,7 +470,8 @@ final class CommandPanelActionService {
 
     /**
      * Toggles a loaded companion's breeding from the companion card, which has no command item, so only the live
-     * component changes. The caller has checked the viewer owns the companion and that breeding is available.
+     * component changes. The caller has checked the viewer may breed the companion (its owner, or a player with
+     * BREED access) and that breeding is available.
      */
     void toggleLoadedNpcBreeding(Player player, Ref<EntityStore> npcRef, Store<EntityStore> store, UUID npcUuid,
                                  String displayName) {

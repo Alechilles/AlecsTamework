@@ -200,7 +200,9 @@ final class CommandGroupAssignPageService {
                 .filter(e -> npcUuid.equals(e.npcUuid()) && e.ownedActions()).findFirst().orElse(null);
         // Group tags belong to the viewer. A freshly resolved captured card may be
         // organized even when capture cleared ownership and command selection is unavailable.
-        if (entry == null || !entry.captured()
+        // A companion someone else shares with the viewer is grouped only with COMMAND access.
+        if (entry == null || !entry.viewerMay(com.alechilles.alecstamework.api.access.AccessAction.COMMAND)
+                || !entry.captured()
                 && toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, npcUuid) == null) return;
         CommandCompanionGroups.assign(player, toolInventoryService.findToolStack(player, toolId),
                 entry.companionKey(), npcUuid, groupIds);

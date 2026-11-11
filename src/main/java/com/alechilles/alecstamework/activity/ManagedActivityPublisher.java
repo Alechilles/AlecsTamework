@@ -52,6 +52,21 @@ public final class ManagedActivityPublisher {
             @Nullable CompanionXpTransition xpTransition,
             @Nullable CareCreditOutcomeView careCredit
     ) {
+        publishFeed(operationId, roleId, ownerId, companionId, itemQuantities,
+                xpTransition, careCredit, null);
+    }
+
+    /** Publishes one committed feed activity with the player who fed as its actor. */
+    public void publishFeed(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable CompanionXpTransition xpTransition,
+            @Nullable CareCreditOutcomeView careCredit,
+            @Nullable UUID actorId
+    ) {
         if (ownerId == null || companionId == null) {
             return;
         }
@@ -70,7 +85,10 @@ public final class ManagedActivityPublisher {
                 itemQuantities,
                 List.of(),
                 xpTransition,
-                careCredit
+                careCredit,
+                null,
+                actorId,
+                null
         );
     }
 

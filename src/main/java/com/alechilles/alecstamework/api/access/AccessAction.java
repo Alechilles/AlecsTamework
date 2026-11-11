@@ -14,6 +14,8 @@ public enum AccessAction {
     COMMAND(AccessLevel.HANDLER),
     /** Start breeding. */
     BREED(AccessLevel.HANDLER),
+    /** Use a config-defined custom interaction, such as fitting or removing equipment. */
+    CUSTOM_INTERACTION(AccessLevel.HANDLER),
     /** See the companion in companion panels. */
     VIEW_IN_PANELS(AccessLevel.HANDLER),
     /** Rename. */

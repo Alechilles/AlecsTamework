@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.*;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
@@ -919,61 +920,68 @@ final class CommandSelectionPageService {
         boolean releasable = !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
+        // On a row another owner shares with the viewer each action needs its own access level,
+        // as on the card. The viewer's own rows pass every check. The handlers check again.
+        boolean mayCommand = entry.viewerMay(AccessAction.COMMAND);
+        boolean mayMount = entry.viewerMay(AccessAction.MOUNT);
+        boolean ownerOnly = entry.viewerMay(AccessAction.OWNER_ONLY);
         if (!entry.ownedActions() && !linked && releasable) addGenericRow(catalog, rowId, "LINK", actionLabel(context, "link"),
                 npcId, null, npc.link(), context.genericAuthority(), false);
         if (linked && !entry.ownedActions()) addGenericRow(catalog, rowId, "UNLINK", actionLabel(context, "unlink"),
                 npcId, null, npc.unlink(), context.genericAuthority(),
                 false);
-        if (!managed && !entry.captured() && !entry.inCoop()) {
+        if (!managed && ownerOnly && !entry.captured() && !entry.inCoop()) {
             addGenericRow(catalog, rowId, "RELEASE", actionLabel(context, "release"), npcId, null,
                     npc.release(), context.genericAuthority(), true);
         }
-        if (releasable) {
+        if (releasable && entry.viewerMay(AccessAction.CULL)) {
             addGenericRow(catalog, rowId, "CULL", actionLabel(context, "cull"), npcId, null,
                     npc.cull(), context.genericAuthority(), true);
         }
-        if (genericLinkedOrOwned) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
+        if (genericLinkedOrOwned && (mayCommand || entry.active())) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
                 actionLabel(context, entry.active() ? "setInactive" : "setActive"), npcId, null,
                 npc.toggleActive(), context.genericAuthority(), false);
-        if (genericLinkedOrOwned && entry.loaded() && entry.breedingAvailable()) {
+        if (genericLinkedOrOwned && entry.viewerMay(AccessAction.BREED)
+                && entry.loaded() && entry.breedingAvailable()) {
             addGenericRow(catalog, rowId, "TOGGLE_BREEDING",
                     actionLabel(context, entry.breedingEnabled() ? "disableBreeding" : "enableBreeding"),
                     npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
         }
-        boolean revive = genericLinkedOrOwned && (entry.dead() || entry.lost())
+        boolean revive = genericLinkedOrOwned && ownerOnly && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && (feature == null || !feature.managesPaidRevival() || feature.ordinaryPaidRevival());
         if (revive) addGenericRow(catalog, rowId, "RESPAWN", actionLabel(context, "revive"),
                 npcId, null, npc.respawn(), context.genericAuthority(), false);
-        if (genericLinkedOrOwned && !entry.dead() && !entry.lost()) {
+        if (genericLinkedOrOwned && mayCommand && !entry.dead() && !entry.lost()) {
             addGenericRow(catalog, rowId, "LOCATE", actionLabel(context, "locate"), npcId, null,
                     npc.locate(), context.genericAuthority(), false);
         }
-        if (genericLinkedOrOwned && context.recallTeleportingEnabled() && !entry.dead()
+        if (genericLinkedOrOwned && mayCommand && context.recallTeleportingEnabled() && !entry.dead()
                 && !entry.captured() && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "RECALL", actionLabel(context, "recall"), npcId, null,
                     npc.recall(), context.genericAuthority(), false);
         }
-        if (genericLinkedOrOwned && entry.loaded() && !entry.dead() && !entry.captured()
+        if (genericLinkedOrOwned && mayCommand && entry.loaded() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "SET_HOME", actionLabel(context, "setHome"), npcId, null,
                     npc.setHome(), context.genericAuthority(), false);
         }
-        if (genericLinkedOrOwned && entry.hasHome() && !entry.dead() && !entry.captured()
+        if (genericLinkedOrOwned && mayCommand && entry.hasHome() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "RETURN_HOME", actionLabel(context, "returnHome"),
                     npcId, null, npc.returnHome(), context.genericAuthority(), false);
         }
-        if (genericLinkedOrOwned && entry.loaded() && entry.flightToggleAvailable()) {
+        if (genericLinkedOrOwned && mayMount && entry.loaded() && entry.flightToggleAvailable()) {
             addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", actionLabel(context, "toggleFlight"),
                     npcId, features.flightToggle(), context, false);
         }
-        if (genericLinkedOrOwned && entry.loaded() && entry.shoulderRideAvailable()) {
+        if (genericLinkedOrOwned && mayMount && entry.loaded() && entry.shoulderRideAvailable()) {
             addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
                     actionLabel(context, "toggleShoulderRide"), npcId, shoulderRideCallback(context),
                     context, false);
         }
-        managedTalentActions.addGenericAction(catalog, rowId, entry,
+        // Talent points are the owner's to spend.
+        if (ownerOnly) managedTalentActions.addGenericAction(catalog, rowId, entry,
                 context.toolId(), context.genericAuthority(),
                 () -> resolveCurrentPlayer(context.ownerUuid()));
         if (feature != null && feature.roster() != null) {
@@ -988,7 +996,7 @@ final class CommandSelectionPageService {
                         features.revive(), context, true);
             }
         }
-        if (linked && context.genericRosterActions()) {
+        if (linked && mayCommand && context.genericRosterActions()) {
             PanelCallbacks panel = buildPanelCallbacks(context);
             addGroupAssignment(catalog, context, rowId, npcId, "", actionLabel(context, "noGroup"),
                     panel.assignGroup());

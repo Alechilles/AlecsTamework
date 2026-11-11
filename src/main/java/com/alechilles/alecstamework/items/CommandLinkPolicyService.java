@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -72,7 +74,8 @@ final class CommandLinkPolicyService {
                                 UUID playerUuid,
                                 ComponentAccessor<EntityStore> components) {
         UUID ownerId = resolveOwnerId(npcRef, components);
-        if (requireOwner && ownerId != null && !ownerId.equals(playerUuid)) {
+        if (requireOwner && ownerId != null
+                && !CompanionAccess.allows(ownerId, playerUuid, npcRef, components, AccessAction.COMMAND)) {
             return false;
         }
         if (requireOwner && ownerId == null) {
@@ -172,7 +175,12 @@ final class CommandLinkPolicyService {
                            String toolId,
                            Store<EntityStore> store) {
         TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        return isLinkedToTool(resolveOwnerId(npcRef, store), links, playerUuid, toolId);
+        UUID ownerId = resolveOwnerId(npcRef, store);
+        // A holder with COMMAND access uses a linked tool with the owner's authority. This is
+        // read at use time, so revoking access stops the link working with nothing to clean up.
+        UUID actingAs = CompanionAccess.allows(ownerId, playerUuid, npcRef, store, AccessAction.COMMAND)
+                ? ownerId : playerUuid;
+        return isLinkedToTool(ownerId, links, actingAs, toolId);
     }
 
     static boolean isLinkedToTool(UUID canonicalOwnerId,
@@ -202,7 +210,7 @@ final class CommandLinkPolicyService {
 
     private boolean isOwnedByPlayer(Ref<EntityStore> npcRef, UUID playerUuid, Store<EntityStore> store) {
         UUID ownerId = resolveOwnerId(npcRef, store);
-        return ownerId != null && ownerId.equals(playerUuid);
+        return CompanionAccess.allows(ownerId, playerUuid, npcRef, store, AccessAction.COMMAND);
     }
 
     private boolean contains(String[] values, String expected) {

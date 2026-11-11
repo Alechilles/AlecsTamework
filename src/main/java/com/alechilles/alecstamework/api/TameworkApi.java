@@ -93,5 +93,10 @@ public interface TameworkApi {
     default NetworkSettingsApi networkSettings() {
         return NetworkSettingsApi.unavailable();
     }
+
+    /** Returns the shared access facade: who may do what with another player's companions. */
+    default com.alechilles.alecstamework.api.access.SharedAccessApi sharedAccess() {
+        return com.alechilles.alecstamework.api.access.SharedAccessApi.unavailable();
+    }
 }
 

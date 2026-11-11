@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.coop.CoopCapturedItemInventoryPosition;
 import com.alechilles.alecstamework.companion.coop.CoopIntakeFlow;
@@ -211,7 +213,8 @@ public final class HytaleCapturedItemCoopInteractionService {
     /**
      * The coop's capture policy against the companion's record. A record without an owner counts
      * as untamed for {@code RequireTamed}: the tamed state lives in the stored snapshot, which is
-     * not read here.
+     * not read here. An owner-restricted coop takes the companion from its owner or from a player
+     * the owner lets use coops.
      */
     private static boolean policyAllows(CapturedItemCoopTarget target, CompanionRecord record, UUID actor) {
         UUID owner = record.ownerUuid();
@@ -219,7 +222,7 @@ public final class HytaleCapturedItemCoopInteractionService {
                 || (target.requireTamed() || target.requireOwner()) && owner == null) {
             return false;
         }
-        return !target.ownerRestricted() || actor.equals(owner);
+        return !target.ownerRestricted() || CompanionAccess.allows(record, actor, AccessAction.COOP);
     }
 
     /**

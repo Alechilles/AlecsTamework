@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -29,8 +32,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Treats an owner's killing blow on an owned managed-cull animal as a cull when its managed
- * activity profile sets {@code Activities.OwnerKillCountsAsCull}.
+ * Treats a killing blow on an owned managed-cull animal as a cull when its managed activity
+ * profile sets {@code Activities.OwnerKillCountsAsCull} and the killer is the owner or a player
+ * the owner lets cull it.
  *
  * <p>It runs when the death component is added, before the engine's NPC drop system ticks:
  * {@code NPCDamageSystems.DropDeathItems} drops the role's drop list only while the death's
@@ -76,7 +80,8 @@ public final class OwnerKillCullSystem extends DeathSystems.OnDeathSystem {
         Player killer = killerRef == null ? null : store.getComponent(killerRef, Player.getComponentType());
         UUID ownerId = owner == null ? null : owner.getOwnerId();
         UUID killerId = killer == null ? null : killer.getUuid();
-        if (!countsAsOwnerKill(ownerId, killerId, component.getItemsLossMode())
+        AccessLevel killerAccess = CompanionAccess.level(ownerId, killerId, ref, store);
+        if (!countsAsOwnerKill(killerAccess, component.getItemsLossMode())
                 || !CommandGenericTargetAuthority.allowsGenericTargetMutation(ref, store)) {
             return;
         }
@@ -101,20 +106,19 @@ public final class OwnerKillCullSystem extends DeathSystems.OnDeathSystem {
                 npc == null ? null : npc.getUuid(),
                 rewards.itemQuantities(),
                 tool,
-                tool == null ? null : killerId,
+                killerId,
                 rewards.ageStage()
         );
     }
 
     /**
-     * Returns whether this death is an owner's kill that may count as a cull: the killer is the
-     * owner and the death still drops items (a revivable companion's death is already
-     * {@code NONE}).
+     * Returns whether this death is a kill that may count as a cull: the killer may cull the
+     * animal (the owner, or a player the owner gave that access) and the death still drops items
+     * (a revivable companion's death is already {@code NONE}).
      */
-    static boolean countsAsOwnerKill(@Nullable UUID ownerId,
-                                     @Nullable UUID killerId,
+    static boolean countsAsOwnerKill(@Nonnull AccessLevel killerAccess,
                                      @Nullable DeathConfig.ItemsLossMode itemsLossMode) {
-        return ownerId != null && ownerId.equals(killerId)
+        return AccessAction.CULL.allowedAt(killerAccess)
                 && itemsLossMode == DeathConfig.ItemsLossMode.ALL;
     }
 
@@ -129,7 +133,7 @@ public final class OwnerKillCullSystem extends DeathSystems.OnDeathSystem {
     }
 
     /**
-     * The owner's held item becomes the cull's tool only when the husbandry outcome provider
+     * The killer's held item becomes the cull's tool only when the husbandry outcome provider
      * authorizes it. Otherwise the cull has no tool, so a weapon the provider does not know
      * cannot zero the rewards.
      */

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearTargetStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
@@ -273,11 +275,23 @@ final class CommandStepExecutionService {
         UUID commanderId = context.player != null ? context.player.getUuid() : null;
         TameworkOwnerComponent targetOwner = context.store.getComponent(target, TameworkOwnerComponent.getComponentType());
         UUID targetOwnerId = targetOwner != null ? targetOwner.getOwnerId() : null;
-        boolean targetOwnedByCommander = commanderId != null && targetOwnerId != null && commanderId.equals(targetOwnerId);
+        // Also true for an animal someone shares with the commander at any level: it is not a target.
+        boolean targetOwnedByCommander = CompanionAccess.level(targetOwnerId, commanderId, target, context.store)
+                .atLeast(AccessLevel.CARETAKER);
         Player targetPlayer = context.store.getComponent(target, Player.getComponentType());
         boolean targetIsPlayer = targetPlayer != null;
         boolean playerTargetingAllowed = !targetIsPlayer || isPlayerTargetAllowed(context.player.getWorld());
         boolean targetPlayerSpawnProtected = targetIsPlayer && targetPlayer.hasSpawnProtection();
+        // A player commanding someone else's companion cannot turn it on its owner or on the
+        // owner's other animals.
+        TameworkOwnerComponent commandedOwner = context.store.getComponent(
+                candidate.ref, TameworkOwnerComponent.getComponentType());
+        UUID commandedOwnerId = commandedOwner != null ? commandedOwner.getOwnerId() : null;
+        if (commandedOwnerId != null && !commandedOwnerId.equals(commanderId)
+                && (commandedOwnerId.equals(targetOwnerId)
+                || (targetIsPlayer && commandedOwnerId.equals(targetPlayer.getUuid())))) {
+            return false;
+        }
         return CommandTargetPermission.isAllowed(
                 target.equals(context.playerRef),
                 target.equals(candidate.ref),
@@ -414,8 +428,17 @@ final class CommandStepExecutionService {
         if (links == null) {
             links = new TameworkCommandLinksComponent();
         }
-        if (links.getOwnerId() == null && context.player != null && context.player.getUuid() != null) {
-            links.setOwnerId(context.player.getUuid());
+        if (links.getOwnerId() == null) {
+            // The links owner is the companion's owner, never a player commanding it through
+            // shared access. An unowned NPC keeps the commanding player, as before.
+            TameworkOwnerComponent owner = context.store.getComponent(
+                    candidate.ref, TameworkOwnerComponent.getComponentType());
+            UUID linkOwnerId = owner != null && owner.getOwnerId() != null
+                    ? owner.getOwnerId()
+                    : context.player != null ? context.player.getUuid() : null;
+            if (linkOwnerId != null) {
+                links.setOwnerId(linkOwnerId);
+            }
         }
         links.setHomePosition(home);
         context.store.putComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType(), links);

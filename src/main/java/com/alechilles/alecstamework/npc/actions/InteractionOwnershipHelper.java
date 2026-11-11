@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -37,28 +40,62 @@ final class InteractionOwnershipHelper {
                     Store<EntityStore> store,
                     Player player,
                     @Nullable InteractionContextSnapshot ctx) {
-        if (ctx != null && ctx.cachedPlayerIsOwner != null) {
-            return ctx.cachedPlayerIsOwner;
+        return accessLevel(npcRef, store, player, ctx) == AccessLevel.OWNER;
+    }
+
+    /**
+     * Returns whether the player's access to the NPC allows the action: the owner always, a sharer when
+     * their level covers it. False for an unowned NPC.
+     */
+    boolean allows(Ref<EntityStore> npcRef,
+                   Store<EntityStore> store,
+                   Player player,
+                   @Nullable InteractionContextSnapshot ctx,
+                   AccessAction action) {
+        AccessLevel level = accessLevel(npcRef, store, player, ctx);
+        boolean allowed = action.allowedAt(level);
+        if (!allowed && ctx != null && level != AccessLevel.NONE) {
+            // Lets the no-match path tell a sharer that their level was the reason.
+            ctx.accessDenied = true;
+        }
+        return allowed;
+    }
+
+    // Returns the player's access level on the NPC; NONE for an unowned NPC.
+    AccessLevel accessLevel(Ref<EntityStore> npcRef,
+                            Store<EntityStore> store,
+                            Player player,
+                            @Nullable InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.cachedPlayerAccessLevel != null) {
+            return ctx.cachedPlayerAccessLevel;
         }
         if (player == null && (ctx == null || ctx.playerId == null)) {
-            return false;
+            return AccessLevel.NONE;
         }
         UUID playerId = ctx != null && ctx.playerId != null ? ctx.playerId : owner.getPlayerUuid(player);
         if (playerId == null) {
-            return false;
+            return AccessLevel.NONE;
         }
         UUID ownerId = resolveOwnerId(npcRef, store, ctx);
-        boolean isOwner = ownerId != null && ownerId.equals(playerId);
+        AccessLevel level = CompanionAccess.level(ownerId, playerId, npcRef, store);
         if (ctx != null) {
-            ctx.cachedPlayerIsOwner = isOwner;
+            ctx.cachedPlayerAccessLevel = level;
         }
-        return isOwner;
+        return level;
     }
 
     // Sends a denial message to non-owners when applicable.
     void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
                                 Store<EntityStore> store,
                                 Player player) {
+        maybeNotifyOwnerDenied(npcRef, store, player, null);
+    }
+
+    // As above; ctx carries whether an entry was refused for the player's shared access level.
+    void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
+                                Store<EntityStore> store,
+                                Player player,
+                                @Nullable InteractionContextSnapshot ctx) {
         if (player == null) {
             return;
         }
@@ -66,6 +103,12 @@ final class InteractionOwnershipHelper {
         UUID ownerUuid = ownerInfo.getOwnerId();
         UUID playerUuid = owner.getPlayerUuid(player);
         if (ownerUuid == null || playerUuid == null || ownerUuid.equals(playerUuid)) {
+            return;
+        }
+        // A sharer who matched nothing is like an owner who matched nothing, unless an entry was
+        // refused for their level.
+        if ((ctx == null || !ctx.accessDenied)
+                && CompanionAccess.level(ownerUuid, playerUuid, npcRef, store) != AccessLevel.NONE) {
             return;
         }
         String npcName = owner.resolveNpcName(owner.resolveNpcEntity(npcRef, store));

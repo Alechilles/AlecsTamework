@@ -73,7 +73,7 @@ final class InteractionCardRuntime {
             if (modeIndex >= 0) {
                 ActionTameworkInteract.ResolvedInteraction resolved = selector.checkCardEntry(
                         config, modeIndex, npcRef, role, infoProvider, store, player, ctx);
-                if (resolved != null && !resolved.blockedByCooldown) {
+                if (resolved != null && !resolved.blockedByCooldown && mayChangeMode(npcRef, store, player)) {
                     ctx.cardModeStep = mode.stepIndex();
                     try {
                         applied = applier.apply(resolved);
@@ -84,6 +84,17 @@ final class InteractionCardRuntime {
             }
         }
         return new Outcome(applied, describe(config, npcRef, role, infoProvider, store, player, ctx));
+    }
+
+    /**
+     * A player with shared access below command level may open the card but not change modes.
+     * Owners pass, and players with no access are left to the entry's own requirements.
+     */
+    private static boolean mayChangeMode(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
+        com.alechilles.alecstamework.api.access.AccessLevel level =
+                com.alechilles.alecstamework.access.CompanionAccess.level(npcRef, store, player.getUuid());
+        return level == com.alechilles.alecstamework.api.access.AccessLevel.NONE
+                || com.alechilles.alecstamework.api.access.AccessAction.COMMAND.allowedAt(level);
     }
 
     /** Builds the card's interaction snapshot for this viewer. Read only. */
@@ -112,7 +123,7 @@ final class InteractionCardRuntime {
             }
             ActionTameworkInteract.ResolvedInteraction resolved = selector.checkCardEntry(
                     config, modeIndex, npcRef, role, infoProvider, store, player, ctx);
-            modeAllowed = resolved != null && !resolved.blockedByCooldown;
+            modeAllowed = resolved != null && !resolved.blockedByCooldown && mayChangeMode(npcRef, store, player);
         }
         List<Indexed> buttons = new ArrayList<>();
         for (int index = 0; index < entries.length; index++) {

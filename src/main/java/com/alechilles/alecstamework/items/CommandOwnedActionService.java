@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -105,27 +107,35 @@ final class CommandOwnedActionService {
         return player != null && inventory.findToolStack(player, toolId) != null;
     }
 
-    /** Recall and respawn gate for an index record: the viewer owns it and it is live, dead or lost. */
+    /**
+     * Recall and respawn gate for an index record: the viewer owns it or holds COMMAND access,
+     * and it is live, dead or lost.
+     */
     static boolean allows(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.ACTION);
+        return mayAct(owner, companion, AccessAction.COMMAND) && stateAllows(state(companion), Gate.ACTION);
     }
 
-    /** Revive and Recover gate for an index record: also open for a captured or cooped companion. */
+    /**
+     * Revive and Recover gate for an index record: also open for a captured or cooped companion.
+     * Owner only: a revive spends the owner's resources.
+     */
     static boolean allowsRecover(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.RECOVER);
+        return mayAct(owner, companion, AccessAction.OWNER_ONLY) && stateAllows(state(companion), Gate.RECOVER);
     }
 
     /** Locate gate for an index record: also open for captured and cooped companions. */
     static boolean allowsLocate(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return ownedBy(owner, companion) && stateAllows(state(companion), Gate.LOCATE);
+        return mayAct(owner, companion, AccessAction.COMMAND) && stateAllows(state(companion), Gate.LOCATE);
     }
 
     /**
-     * The viewer owns the record and a generic item may act on it. A command-family roster member
-     * (a roster id, not bonded) is read-only here: only its family item's panel acts on it.
+     * The viewer may do {@code action} with the record and a generic item may act on it. A
+     * command-family roster member (a roster id, not bonded) is read-only here: only its family
+     * item's panel acts on it.
      */
-    private static boolean ownedBy(@Nullable UUID owner, @Nullable CompanionRecord companion) {
-        return owner != null && companion != null && owner.equals(companion.ownerUuid())
+    private static boolean mayAct(@Nullable UUID viewer, @Nullable CompanionRecord companion,
+            AccessAction action) {
+        return companion != null && CompanionAccess.allows(companion, viewer, action)
                 && !(companion.rosterId() != null && !companion.bonded());
     }
 

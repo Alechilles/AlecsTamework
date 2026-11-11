@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -46,6 +48,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
     private final HytaleLogger logger;
     private final SimpleClaimsTamedDamagePolicy damagePolicy;
     private final DamageAttackerAttributionResolver attackerAttributionResolver;
+    private final TamedDamagePolicyAdapter ownerProtection = new TamedDamagePolicyAdapter();
 
     public OwnerDamageFilterSystem(HytaleLogger logger) {
         this(logger, new SimpleClaimsTamedDamagePolicy());
@@ -86,6 +89,15 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             }
 
             UUID attackerPlayerUuid = attackerAttributionResolver.resolve(damage.getSource(), store);
+            // The owner settings are decided here, where the attacker's shared access to this
+            // body can be read. The shared policy below then adds only the claim rules.
+            TamedDamageOwnerPolicy ownerPolicy = resolveOwnerPolicy(index, chunk, store, targetRef);
+            AccessLevel attackerAccess = CompanionAccess.level(
+                    ownerPolicy.ownerUuid(), attackerPlayerUuid, targetRef, store);
+            if (ownerProtection.evaluateOwnerProtection(ownerPolicy, attackerPlayerUuid, attackerAccess) != null) {
+                cancelDamage(damage);
+                return;
+            }
             TwGlobalConfig globalConfig = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
             if (globalConfig == null) {
                 globalConfig = TwGlobalConfig.resolveActive();
@@ -94,7 +106,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
                 globalConfig = TwGlobalConfig.defaultConfig();
             }
             TamedDamageDecision decision = damagePolicy.evaluate(
-                    resolveOwnerPolicy(index, chunk, store, targetRef),
+                    TamedDamageOwnerPolicy.unowned(),
                     targetRef,
                     store,
                     resolveWorldName(store),

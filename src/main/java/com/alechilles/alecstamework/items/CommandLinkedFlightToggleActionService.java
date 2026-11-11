@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -95,7 +97,8 @@ final class CommandLinkedFlightToggleActionService {
         @Override public boolean linked(Ref<EntityStore> npcRef, UUID ownerUuid,
                                         String itemId, Store<EntityStore> store) {
             return CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
-                    && ownerUuid.equals(links.resolveOwnerId(npcRef, store));
+                    && CompanionAccess.allows(links.resolveOwnerId(npcRef, store), ownerUuid,
+                            npcRef, store, AccessAction.MOUNT);
         }
 
         @Override public NPCEntity npc(Ref<EntityStore> npcRef, Store<EntityStore> store) {

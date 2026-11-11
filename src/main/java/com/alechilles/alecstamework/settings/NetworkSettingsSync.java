@@ -6,8 +6,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -28,10 +30,21 @@ import javax.annotation.Nullable;
  * seconds, plus one right after {@link #register} and each {@link #notifyChanged}. The timer is
  * needed because other servers change the document and a network mod may never send a notice. A
  * failed check keeps the saved layer and is tried again at the next one; nothing is queued.</p>
+ *
+ * <p><b>Other documents.</b> {@link #follow} adds a document of the same store, under its own key,
+ * that another part of Tamework owns. Its task runs right after the settings check, on the same
+ * thread, and again on {@link #notifyChanged} with its key. Leaving the network's settings
+ * ({@link #leave}) does not stop these: it only concerns settings.</p>
  */
 public final class NetworkSettingsSync implements AutoCloseable {
     static final long CHECK_INTERVAL_SECONDS = 60L;
     private static final long WARN_INTERVAL_MS = 300_000L;
+
+    /** Work on the registered store for one followed document. Runs on this object's thread. */
+    @FunctionalInterface
+    public interface StoreTask {
+        void run(@Nonnull NetworkSettingsStore store) throws Exception;
+    }
 
     /** How a {@link #publish} ended. */
     public enum PublishResult {
@@ -51,6 +64,8 @@ public final class NetworkSettingsSync implements AutoCloseable {
     private final Runnable settingsChanged;
     @Nullable
     private final HytaleLogger logger;
+    /** Followed documents by key. Read on the executor thread, added to from any thread. */
+    private final Map<String, StoreTask> followed = new ConcurrentHashMap<>();
 
     @Nullable
     private volatile NetworkSettingsStore store;
@@ -76,8 +91,27 @@ public final class NetworkSettingsSync implements AutoCloseable {
 
     /** Starts the periodic check. */
     public void start() {
-        executor.scheduleWithFixedDelay(this::checkSafely, CHECK_INTERVAL_SECONDS, CHECK_INTERVAL_SECONDS,
+        executor.scheduleWithFixedDelay(this::checkAll, CHECK_INTERVAL_SECONDS, CHECK_INTERVAL_SECONDS,
                 TimeUnit.SECONDS);
+    }
+
+    /**
+     * Follows one more document of the store. {@code task} runs on this object's thread when a
+     * store is registered, at every periodic check, and on {@link #notifyChanged} with
+     * {@code key}; the owner calls that too when it has something to save. It never runs without
+     * a store. A task that throws is logged and runs again at the next check. Following a key
+     * again replaces its task.
+     *
+     * @throws IllegalArgumentException for the settings key, which this object reads itself
+     */
+    public void follow(@Nonnull String key, @Nonnull StoreTask task) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(task, "task");
+        if (NetworkSettingsStore.SERVER_KEY.equals(key)) {
+            throw new IllegalArgumentException("the settings document cannot be followed");
+        }
+        followed.put(key, task);
+        notifyChanged(key);
     }
 
     /** Whether a store is installed. */
@@ -129,12 +163,23 @@ public final class NetworkSettingsSync implements AutoCloseable {
     /** Reads {@code key} soon instead of at the next check. Safe from any thread. */
     public void notifyChanged(@Nonnull String key) {
         Objects.requireNonNull(key, "key");
-        if (NetworkSettingsStore.SERVER_KEY.equals(key) && active()) {
-            try {
-                executor.execute(this::checkSafely);
-            } catch (RejectedExecutionException shuttingDown) {
-                // Closed between the check and the submit.
+        if (!active()) {
+            return;
+        }
+        Runnable work;
+        if (NetworkSettingsStore.SERVER_KEY.equals(key)) {
+            work = this::checkAll;
+        } else {
+            StoreTask task = followed.get(key);
+            if (task == null) {
+                return;
             }
+            work = () -> runFollowed(key, task);
+        }
+        try {
+            executor.execute(work);
+        } catch (RejectedExecutionException shuttingDown) {
+            // Closed between the check and the submit.
         }
     }
 
@@ -229,6 +274,25 @@ public final class NetworkSettingsSync implements AutoCloseable {
         closed = true;
         store = null;
         executor.shutdownNow();
+    }
+
+    /** The settings check, then every followed document. One that fails does not stop the others. */
+    private void checkAll() {
+        checkSafely();
+        followed.forEach(this::runFollowed);
+    }
+
+    private void runFollowed(@Nonnull String key, @Nonnull StoreTask task) {
+        NetworkSettingsStore current = store;
+        if (current == null || closed) {
+            return;
+        }
+        try {
+            task.run(current);
+        } catch (Exception failure) {
+            warn(failure, "Could not sync the network document '" + key
+                    + "'; this server keeps what it has and tries again at the next check.");
+        }
     }
 
     private void checkSafely() {

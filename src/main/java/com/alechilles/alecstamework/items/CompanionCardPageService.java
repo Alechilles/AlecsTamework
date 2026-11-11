@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
 import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.companioncard.CompanionCardPreferences;
@@ -40,7 +43,8 @@ import javax.annotation.Nullable;
  *
  * <p>Ownership: the interaction runtime opens the card through {@link CompanionCards.Sink}; this service owns the
  * open pages (at most one per viewer), their refresh chains, and the built-in actions. Every action re-resolves the
- * viewer and companion on the world thread and checks ownership again; the card's rendered state is never trusted.
+ * viewer and companion on the world thread and checks the viewer's access again (the owner, or a player the owner
+ * shares the companion with at a level that covers the action); the card's rendered state is never trusted.
  * Modes and {@code Card} entries go back through {@code TameworkInteract} as {@link CompanionCardRequests}. Built-in
  * actions call the companion window's services through their item-free entry points, and only for companions that
  * accept generic actions (bonded companions keep their own panel). Homes and groups need no command item: the home
@@ -190,14 +194,20 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         if (entry == null) {
             return null;
         }
-        boolean owner = owns(player, npcRef, store);
-        boolean generic = owner && CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store);
+        // The owner, or a player the owner shares the companion with, uses the card; anyone else only
+        // reads it. Each button then needs the access level for its own action.
+        AccessLevel access = access(player, npcRef, store);
+        boolean manage = AccessAction.CARE.allowedAt(access);
+        boolean generic = manage && CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store);
         List<LinkedNpcEntry.GroupMembership> groupOptions = List.of();
         if (generic) {
             entry = entry.withOwnedActions();
-            groupOptions = CommandCompanionGroups.definedGroups(player).stream()
-                    .map(group -> new LinkedNpcEntry.GroupMembership(group.groupId, group.name, group.colorHex))
-                    .toList();
+            // Groups are the viewer's own, but grouping a shared companion is for commanding it.
+            if (AccessAction.COMMAND.allowedAt(access)) {
+                groupOptions = CommandCompanionGroups.definedGroups(player).stream()
+                        .map(group -> new LinkedNpcEntry.GroupMembership(group.groupId, group.name, group.colorHex))
+                        .toList();
+            }
             List<String> memberships = groupOptions.isEmpty() ? List.of()
                     : CommandCompanionGroups.groups(player, groupKey, npc.getUuid());
             entry = entry.withCompanionGroups(groupKey, groupOptions.stream()
@@ -205,12 +215,12 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
         CardRenameAvailability rename = CardRenameAvailability.OFF;
         NamingFeatureHandler naming = naming();
-        if (generic && naming != null) {
+        if (generic && naming != null && AccessAction.RENAME.allowedAt(access)) {
             rename = naming.cardRenameAvailability(player, playerRef, npcRef, store,
                     CompanionCardPreferences.renameMode());
         }
-        return new TameworkCompanionCardPage.View(entry, owner ? interactions : CompanionCardInteractions.EMPTY,
-                owner, generic, ownerName(npcRef, store), rename, groupOptions,
+        return new TameworkCompanionCardPage.View(entry, manage ? interactions : CompanionCardInteractions.EMPTY,
+                manage, generic, access, ownerName(npcRef, store), rename, groupOptions,
                 TameworkInspectPreferencesComponent.closeAfterCommand(playerRef, store), foods, appearance);
     }
 
@@ -270,7 +280,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void toggleBreeding() {
-            Live live = live(true);
+            Live live = live(AccessAction.BREED);
             if (live != null && live.entry() != null && live.entry().breedingAvailable()) {
                 panelActions.toggleLoadedNpcBreeding(live.player(), live.npcRef(), store, npcUuid,
                         live.entry().displayName());
@@ -280,7 +290,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void toggleFlight() {
-            if (live(true) != null) {
+            if (live(AccessAction.MOUNT) != null) {
                 flight.toggle(playerUuid, playerRef, store, CARD_SOURCE_ID, npcUuid);
                 refresh();
             }
@@ -288,7 +298,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void toggleShoulder() {
-            if (live(true) != null) {
+            if (live(AccessAction.MOUNT) != null) {
                 shoulder.toggle(playerUuid, playerRef, store, CARD_SOURCE_ID, npcUuid);
                 refresh();
             }
@@ -296,7 +306,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void setHome() {
-            Live live = live(true);
+            Live live = live(AccessAction.COMMAND);
             if (live != null && live.entry() != null && live.entry().loaded()) {
                 homes.setHome(live.player(), live.npcRef(), store);
                 refresh();
@@ -305,7 +315,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void returnHome() {
-            Live live = live(true);
+            Live live = live(AccessAction.COMMAND);
             if (live != null) {
                 homes.returnHome(live.player(), playerRef, live.npcRef(), store);
                 refresh();
@@ -314,7 +324,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void assignGroups(@Nonnull List<String> groupIds) {
-            Live live = live(true);
+            Live live = live(AccessAction.COMMAND);
             if (live != null && !CommandCompanionGroups.assignDefined(live.player(), groupKey, npcUuid, groupIds)) {
                 // Rejected (a group was deleted meanwhile): show the saved memberships again.
                 refresh();
@@ -323,12 +333,13 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void talents() {
-            Live live = live(true);
+            // Talent points are the owner's to spend.
+            Live live = live(AccessAction.OWNER_ONLY);
             if (live == null) {
                 return;
             }
             talents.openTalentPage(live.player(), () -> {
-                Live current = live(true);
+                Live current = live(AccessAction.OWNER_ONLY);
                 if (current == null) {
                     return null;
                 }
@@ -342,7 +353,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void rename() {
-            Live live = live(true);
+            Live live = live(AccessAction.RENAME);
             NamingFeatureHandler naming = naming();
             if (live == null || naming == null) {
                 return;
@@ -353,7 +364,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void release() {
-            Live live = live(true);
+            Live live = live(AccessAction.OWNER_ONLY);
             if (live != null) {
                 page.closeCard();
                 releases.releaseLoaded(live.player(), npcUuid);
@@ -362,7 +373,7 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         @Override
         public void cull() {
-            Live live = live(true);
+            Live live = live(AccessAction.CULL);
             if (live != null) {
                 page.closeCard();
                 culls.cullLoaded(live.player(), npcUuid);
@@ -406,7 +417,8 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
 
         /** Queues a request for the role tick and registers the interaction that wakes it. */
         private boolean request(CompanionCardRequests.Request request) {
-            Live live = live(false);
+            // Any access level may ask; the role tick checks each entry and mode for this viewer.
+            Live live = live(null);
             if (live == null) {
                 return false;
             }
@@ -480,15 +492,21 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         }
 
         /**
-         * The current viewer and companion, or {@code null} when either is gone. With {@code generic}, also requires
-         * that the viewer owns a companion that accepts generic actions.
+         * The current viewer and companion, or {@code null} when either is gone or the viewer is neither the
+         * companion's owner nor a player the owner shares it with. With {@code action}, a built-in action, also
+         * requires that the viewer's access covers it and that the companion accepts generic actions. Read now, so
+         * access the owner took back since the card was drawn no longer counts.
          */
         @Nullable
-        private Live live(boolean generic) {
+        private Live live(@Nullable AccessAction action) {
             Player player = player();
             Ref<EntityStore> npcRef = npcRef();
-            if (player == null || npcRef == null || !owns(player, npcRef, store)
-                    || generic && !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)) {
+            if (player == null || npcRef == null) {
+                return null;
+            }
+            AccessLevel access = access(player, npcRef, store);
+            if (!AccessAction.CARE.allowedAt(access) || action != null && (!action.allowedAt(access)
+                    || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store))) {
                 return null;
             }
             return new Live(player, npcRef, page == null ? null : page.view().entry());
@@ -559,9 +577,12 @@ public final class CompanionCardPageService implements CompanionCards.Sink {
         return player.getPageManager() != null && player.getPageManager().getCustomPage() == page;
     }
 
-    private boolean owns(Player player, Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        UUID owner = links.resolveOwnerId(npcRef, store);
-        return owner != null && owner.equals(player.getUuid());
+    /**
+     * The viewer's access level on the loaded companion: OWNER for its owner, NONE for a stranger and for an
+     * unowned companion. World thread.
+     */
+    private AccessLevel access(Player player, Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return CompanionAccess.level(links.resolveOwnerId(npcRef, store), player.getUuid(), npcRef, store);
     }
 
     @Nullable

@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkProgression
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
+import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkHasAccess;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkInteractionActive;
 import com.alechilles.alecstamework.npc.movement.builders.BuilderBodyMotionTameworkMaintainDistance;
@@ -47,6 +48,7 @@ import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTamework
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkAlarm;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasAccess;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasTalent;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -180,6 +182,7 @@ public final class TameworkNpcBuilderRegistrar {
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Sensor factory ready.");
             sensorFactory.add(BuilderSensorTameworkIsOwner.BUILDER_ID, BuilderSensorTameworkIsOwner::new);
+            sensorFactory.add(BuilderSensorTameworkHasAccess.BUILDER_ID, BuilderSensorTameworkHasAccess::new);
             sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
             sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
             sensorFactory.add(BuilderSensorTameworkFollowFormation.BUILDER_ID,
@@ -226,6 +229,8 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
             );
             filterFactory.add(BuilderEntityFilterTameworkIsOwner.BUILDER_ID, BuilderEntityFilterTameworkIsOwner::new);
+            filterFactory.add(BuilderEntityFilterTameworkHasAccess.BUILDER_ID,
+                    BuilderEntityFilterTameworkHasAccess::new);
             filterFactory.add(BuilderEntityFilterTameworkInteractionActive.BUILDER_ID,
                     BuilderEntityFilterTameworkInteractionActive::new);
         }

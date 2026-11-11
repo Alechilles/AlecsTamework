@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.ProgressionView;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.npc.progression.AnimalProgressionService;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +47,35 @@ public final class LinkedNpcEntry {
     private boolean selectionSupported = true;
     private boolean nearby;
     private long deadRespawnTotalMs;
+    /** Set on the row of a companion another player owns and shares with the viewer; null on every other row. */
+    private SharedAccess sharedAccess;
     public boolean nearby() { return nearby; }
+
+    /** The owner's name and the viewer's level on a companion that someone else shares with the viewer. */
+    public record SharedAccess(String ownerName, AccessLevel level) {
+        public SharedAccess {
+            ownerName = ownerName == null ? "" : ownerName.trim();
+            level = level == null ? AccessLevel.NONE : level;
+        }
+    }
+
+    public SharedAccess sharedAccess() { return sharedAccess; }
+
+    /**
+     * False only on a shared row whose level does not cover {@code action}. Every other row keeps
+     * its existing rules, so this never widens what a row offers. Handlers check access again.
+     */
+    public boolean viewerMay(AccessAction action) {
+        return sharedAccess == null || action.allowedAt(sharedAccess.level());
+    }
+
+    /** Returns a copy marked as shared with the viewer, or as the viewer's own row for {@code null}. */
+    public LinkedNpcEntry withSharedAccess(SharedAccess access) {
+        if (Objects.equals(sharedAccess, access)) return this;
+        LinkedNpcEntry copy = new LinkedNpcEntry(this, ownedActions);
+        copy.sharedAccess = access;
+        return copy;
+    }
 
     /** Full revive cooldown of the current death, or 0 when unknown (the progress bar then hides). */
     public long deadRespawnTotalMs() { return deadRespawnTotalMs; }
@@ -1133,6 +1163,7 @@ public final class LinkedNpcEntry {
         this.groups = source.groups;
         this.companionKey = source.companionKey;
         this.selectionSupported = source.selectionSupported;
+        this.sharedAccess = source.sharedAccess;
         this.groupId = source.groupId;
         this.groupName = source.groupName;
         this.groupColorHex = source.groupColorHex;
@@ -1268,6 +1299,7 @@ public final class LinkedNpcEntry {
                 && Objects.equals(companionKey, other.companionKey)
                 && selectionSupported == other.selectionSupported
                 && nearby == other.nearby
+                && Objects.equals(sharedAccess, other.sharedAccess)
                 && Objects.equals(groupId, other.groupId)
                 && Objects.equals(groupName, other.groupName)
                 && Objects.equals(groupColorHex, other.groupColorHex)
@@ -1338,7 +1370,7 @@ public final class LinkedNpcEntry {
                 animalLifecycle
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
-        result = 31 * result + Objects.hash(groups, companionKey, selectionSupported, nearby);
+        result = 31 * result + Objects.hash(groups, companionKey, selectionSupported, nearby, sharedAccess);
         return result;
     }
 

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
@@ -291,7 +293,8 @@ final class CommandPanelEntrySourceService {
      * Gives each dead ordinary companion whose revive is ready and costs items a revive quote, so
      * its Revive button opens the cost dialog and the card shows the cost. Rows that already have
      * a feature row, and free revives, are left as they are. The role is the entry's species,
-     * which comes from the saved profile; a link record's cached role can be blank.
+     * which comes from the saved profile; a link record's cached role can be blank. A companion
+     * someone else shares with the viewer gets no quote: a revive is the owner's alone.
      */
     private static void addPaidRevivals(Map<UUID, CommandPanelFeaturePresentation> features,
                                         List<LinkedNpcEntry> entries,
@@ -302,6 +305,7 @@ final class CommandPanelEntrySourceService {
             if (entry == null || entry.npcUuid() == null || !entry.dead()
                     || entry.deadRespawnRemainingMs() != 0L
                     || !(entry.linked() || entry.ownedActions())
+                    || !entry.viewerMay(AccessAction.OWNER_ONLY)
                     || features.containsKey(entry.npcUuid())) continue;
             if (!heldRead) {
                 held = player == null ? null : heldItemCounter(player, store);
@@ -638,15 +642,24 @@ final class CommandPanelEntrySourceService {
         }
     }
 
+    /**
+     * The record a generic item may select, command or organize for the panel row {@code rowId}:
+     * the viewer's own companion, or one another owner shares with the viewer at a level that
+     * allows commanding it. Null for every other row.
+     */
     @Nullable
     LinkedNpcRecord ownedSelectionRecord(Player player, ItemStack stack, UUID rowId) {
         if (player == null || rowId == null || player.getWorld() == null) return null;
         List<LinkedNpcRecord> records = linkedRecordStore.read(stack);
         LinkedNpcRecord owned = null;
         if (ownedRecordSource != null) {
-            if (ownedRecordSource.managedFeatures(player.getUuid(), records).containsKey(rowId)) return null;
+            var listed = ownedRecordSource.snapshot(player.getUuid(), records, Set.of());
+            if (listed.managedFeatures().containsKey(rowId)) return null;
+            var shared = listed.sharedRows().get(rowId);
+            // A shared row is listed from VIEW_IN_PANELS up; acting on it needs COMMAND.
+            if (shared != null && !AccessAction.COMMAND.allowedAt(shared.level())) return null;
             String profile = ownedRecordSource.profileForRow(player.getUuid(), rowId).map(Object::toString).orElse(null);
-            owned = ownedRecordSource.recordsFor(player.getUuid(), records).stream()
+            owned = listed.ownedRecords().stream()
                     .filter(record -> rowId.equals(record.npcUuid) || profile != null && profile.equals(record.profileId))
                     .findFirst().orElse(null);
             if (owned != null && !rowId.equals(owned.npcUuid)) {
@@ -659,8 +672,10 @@ final class CommandPanelEntrySourceService {
         var ref = world.getEntityRef(rowId);
         if (ref == null || !ref.isValid()) return owned;
         var store = world.getEntityStore().getStore();
+        // The loaded body answers for itself: its owner, or a player the owner lets command it.
         if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(ref, store)
-                || !player.getUuid().equals(linkPolicyService.resolveOwnerId(ref, store))) return null;
+                || !CompanionAccess.allows(linkPolicyService.resolveOwnerId(ref, store), player.getUuid(),
+                        ref, store, AccessAction.COMMAND)) return null;
         var npc = store.getComponent(ref, NPCEntity.getComponentType());
         if (npc == null) return null;
         var position = store.getComponent(ref, TransformComponent.getComponentType());
@@ -721,6 +736,10 @@ final class CommandPanelEntrySourceService {
         List<LinkedNpcEntry> decorated = new ArrayList<>(entries.size());
         var profilesByRow = inputs.owned() == null ? Map.<UUID, com.alechilles.alecstamework.companion.identity.ProfileId>of()
                 : inputs.owned().profilesByRow();
+        // Rows of companions other owners share with this viewer carry the owner's name and the
+        // viewer's level, so the card names the owner and offers only what that level allows.
+        var sharedRows = inputs.owned() == null ? Map.<UUID, CommandOwnedPanelRecordSource.SharedRow>of()
+                : inputs.owned().sharedRows();
         for (var entry : entries) {
             var profileId = profilesByRow.get(entry.npcUuid());
             String key = ownedRecordSource == null ? CommandCompanionGroups.entityKey(entry.npcUuid())
@@ -736,8 +755,11 @@ final class CommandPanelEntrySourceService {
             boolean nearby = origin != null && position != null && origin.getPosition().distanceSquared(position.getPosition()) <= radius * radius;
             var npc = ref == null || !ref.isValid() ? null : store.getComponent(ref, NPCEntity.getComponentType());
             String roleId = npc == null ? savedRoles.get(entry.npcUuid()) : linkPolicyService.resolveRoleId(npc);
+            var shared = sharedRows.get(entry.npcUuid());
             decorated.add(entry.withCompanionGroups(key, tags, (!entry.captured() || savedRoles.containsKey(entry.npcUuid()))
-                    && linkPolicyService.isRoleAllowed(roleId, config, true)).withNearby(nearby));
+                    && linkPolicyService.isRoleAllowed(roleId, config, true)).withNearby(nearby)
+                    .withSharedAccess(shared == null ? null
+                            : new LinkedNpcEntry.SharedAccess(shared.ownerName(), shared.level())));
         }
         return decorated;
     }

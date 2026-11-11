@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.access.CompanionAccess;
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -40,10 +43,24 @@ public final class ActionTameworkDenyInteract extends TameworkActionBase {
         if (!resolveRequiresOwner(policy)) {
             return false;
         }
-        // Block interactions when an owner exists and the player is not the owner.
+        // Block interactions when an owner exists and the player is neither the owner nor a sharer
+        // whose access covers what the held item does.
         UUID ownerUuid = resolveOwnerUuid(npcRef, store);
         UUID playerUuid = getPlayerUuid(player);
-        return ownerUuid != null && playerUuid != null && !ownerUuid.equals(playerUuid);
+        return ownerUuid != null && playerUuid != null && !ownerUuid.equals(playerUuid)
+                && !sharedAccessAllows(policy, CompanionAccess.level(ownerUuid, playerUuid, npcRef, store));
+    }
+
+    /**
+     * Capture stays with the owner. Interaction entries check their own action afterwards, so any
+     * access level gets through here.
+     */
+    private static boolean sharedAccessAllows(OwnershipPolicy policy, AccessLevel level) {
+        return switch (policy) {
+            case CAPTURE -> false;
+            case LINKING -> AccessAction.COMMAND.allowedAt(level);
+            case INTERACTION -> level.atLeast(AccessLevel.CARETAKER);
+        };
     }
 
     @Override

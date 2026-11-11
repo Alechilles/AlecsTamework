@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companioncard.CardRenameAvailability;
 import com.alechilles.alecstamework.companioncard.CompanionCardInteractions;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -76,9 +78,12 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
     /**
      * What the page shows. Built by the page service on the world thread for one viewer.
      *
-     * @param canManage      the viewer owns the companion: modes and {@code Card} entries are offered
+     * @param canManage      the viewer owns the companion or the owner shares it with them: modes and {@code Card}
+     *                       entries are offered, each as the role tick allows it for this viewer
      * @param genericActions the companion also accepts generic companion actions (it is not bonded): toggles,
-     *                       homes, groups, talents, rename, release and cull are offered
+     *                       homes, groups, talents, rename, release and cull are offered, each when {@code access}
+     *                       covers it
+     * @param access         the viewer's access level on the companion; {@link AccessLevel#OWNER} for its owner
      * @param groupOptions   every group the viewer has defined; the entry's {@code groups()} are the selected ones.
      *                       Empty hides the group picker
      */
@@ -86,6 +91,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                        @Nonnull CompanionCardInteractions interactions,
                        boolean canManage,
                        boolean genericActions,
+                       @Nonnull AccessLevel access,
                        @Nullable String ownerName,
                        @Nonnull CardRenameAvailability rename,
                        @Nonnull List<LinkedNpcEntry.GroupMembership> groupOptions,
@@ -247,7 +253,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         }
         if (action.equals("groups")) {
             // Not a confirmable action, so it neither answers nor cancels an open confirmation.
-            if (generic() && !view.groupOptions().isEmpty()) {
+            if (may(AccessAction.COMMAND) && !view.groupOptions().isEmpty()) {
                 List<String> selected = data.groups == null ? List.of() : List.of(data.groups);
                 // The client already shows this selection; do not send it back.
                 sentGroupSelection = selected;
@@ -291,14 +297,14 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
             return;
         }
         switch (action) {
-            case "setHome" -> { if (generic()) { actions.setHome(); closeAfterCommand(); } }
-            case "returnHome" -> { if (generic()) { actions.returnHome(); closeAfterCommand(); } }
-            case "breeding" -> { if (generic()) { actions.toggleBreeding(); closeAfterCommand(); } }
-            case "flight" -> { if (generic()) { actions.toggleFlight(); closeAfterCommand(); } }
-            case "shoulder" -> { if (generic()) { actions.toggleShoulder(); closeAfterCommand(); } }
-            case "talents" -> { if (generic()) actions.talents(); }
+            case "setHome" -> { if (may(AccessAction.COMMAND)) { actions.setHome(); closeAfterCommand(); } }
+            case "returnHome" -> { if (may(AccessAction.COMMAND)) { actions.returnHome(); closeAfterCommand(); } }
+            case "breeding" -> { if (may(AccessAction.BREED)) { actions.toggleBreeding(); closeAfterCommand(); } }
+            case "flight" -> { if (may(AccessAction.MOUNT)) { actions.toggleFlight(); closeAfterCommand(); } }
+            case "shoulder" -> { if (may(AccessAction.MOUNT)) { actions.toggleShoulder(); closeAfterCommand(); } }
+            case "talents" -> { if (may(AccessAction.OWNER_ONLY)) actions.talents(); }
             case "rename" -> {
-                if (generic() && view.rename() == CardRenameAvailability.AVAILABLE) actions.rename();
+                if (may(AccessAction.RENAME) && view.rename() == CardRenameAvailability.AVAILABLE) actions.rename();
             }
             case "release" -> askConfirm(Confirm.RELEASE);
             case "cull" -> askConfirm(Confirm.CULL);
@@ -320,6 +326,14 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
 
     private boolean generic() {
         return view.canManage() && view.genericActions();
+    }
+
+    /**
+     * Whether the card offers a generic action to this viewer. The owner passes every action; a player the owner
+     * shares the companion with needs the level for that action. The page service checks again when it runs.
+     */
+    private boolean may(AccessAction action) {
+        return generic() && action.allowedAt(view.access());
     }
 
     private void askConfirm(Confirm confirm) {
@@ -356,14 +370,16 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         return null;
     }
 
+    /** Release changes who owns the companion, so it stays with the owner. */
     private boolean canRelease() {
         LinkedNpcEntry entry = view.entry();
-        return !entry.captured() && !entry.inCoop();
+        return may(AccessAction.OWNER_ONLY) && !entry.captured() && !entry.inCoop();
     }
 
     private boolean canCull() {
         LinkedNpcEntry entry = view.entry();
-        return canRelease() && entry.loaded() && !entry.dead() && !entry.lost();
+        return may(AccessAction.CULL) && !entry.captured() && !entry.inCoop()
+                && entry.loaded() && !entry.dead() && !entry.lost();
     }
 
     private void render(UICommandBuilder commands, UIEventBuilder events) {
@@ -378,7 +394,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         commands.set(CARD + " #RoleSubtitle.Text", entry.roleSubtitle());
         commands.set(CARD + " #GenderMaleIcon.Visible", entry.isMale());
         commands.set(CARD + " #GenderFemaleIcon.Visible", entry.isFemale());
-        boolean renameVisible = generic && view.rename() != CardRenameAvailability.OFF
+        boolean renameVisible = may(AccessAction.RENAME) && view.rename() != CardRenameAvailability.OFF
                 && view.rename() != CardRenameAvailability.NOT_ALLOWED;
         boolean renameReady = view.rename() == CardRenameAvailability.AVAILABLE;
         commands.set(CARD + " #RenameButton.Visible", renameVisible);
@@ -482,27 +498,32 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
         String ring = CARD + " #XpProgressRing";
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(commands, ring, ring + " #XpLevelText",
                 ring + " #XpTooltip", entry.futureStatA(), LEVEL_TOP);
-        boolean talents = generic && entry.isTalentsActionVisible() && entry.isTalentsActionEnabled()
+        // Talent points are the owner's to spend, so only the owner opens the talent page.
+        boolean ownerTalents = may(AccessAction.OWNER_ONLY);
+        boolean talents = ownerTalents && entry.isTalentsActionVisible() && entry.isTalentsActionEnabled()
                 && entry.futureStatA() != null;
         commands.set(ring + " #XpTooltip.Disabled", !talents);
         commands.set(ring + " #TalentsArrow.Visible", talents);
         String points = CARD + " #TalentPointAction";
         boolean showPoints = generic && entry.isTalentsActionVisible()
                 && LinkedNpcPanelProgressionBinder.availableTalentPoints(entry.futureStatB()) > 0;
-        commands.set(points + " #TalentPointButton.Disabled", !(showPoints && entry.isTalentsActionEnabled()));
+        boolean openPoints = ownerTalents && showPoints && entry.isTalentsActionEnabled();
+        commands.set(points + " #TalentPointButton.Disabled", !openPoints);
         LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(commands, points, points + " #TalentPointCount",
                 points + " #TalentPointCountShadow", entry.futureStatB(), showPoints);
         if (talents) {
             bind(events, ring + " #XpTooltip", "talents");
         }
-        if (showPoints && entry.isTalentsActionEnabled()) {
+        if (openPoints) {
             bind(events, points + " #TalentPointButton", "talents");
         }
-        boolean showOwner = !manage && view.ownerName() != null && !view.ownerName().isBlank();
+        // Everyone but the owner sees whose companion this is, also a player the owner shares it with.
+        boolean showOwner = view.access() != AccessLevel.OWNER
+                && view.ownerName() != null && !view.ownerName().isBlank();
         commands.set(CARD + " #OwnerLine.Visible", showOwner);
         commands.set(CARD + " #OwnerLine.Text", showOwner
                 ? LocalizedText.format(language, "tamework.ui.companionCard.owner", view.ownerName()) : "");
-        bindGroups(commands, events, entry, language, generic);
+        bindGroups(commands, events, entry, language, may(AccessAction.COMMAND));
     }
 
     /** The companions window's multi-select group picker, for the viewer's own groups. */
@@ -587,7 +608,9 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                             String language, boolean manage, boolean generic, int top) {
         List<Slot> slots = new ArrayList<>();
         if (generic && entry.loaded()) {
-            if (entry.shoulderRideAvailable()) {
+            boolean mayMount = may(AccessAction.MOUNT);
+            boolean mayCommand = may(AccessAction.COMMAND);
+            if (mayMount && entry.shoulderRideAvailable()) {
                 boolean on = entry.shoulderRideMounted();
                 slots.add(new Slot(on ? "Tamework/PanelActions/ShoulderOn_Glyph_Default.png"
                         : "Tamework/PanelActions/ShoulderOff_Glyph_Default.png",
@@ -596,7 +619,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                                 : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip"),
                         on, true, "shoulder"));
             }
-            if (entry.flightToggleAvailable()) {
+            if (mayMount && entry.flightToggleAvailable()) {
                 boolean airborne = entry.flightToggleAirborne();
                 slots.add(new Slot(airborne ? "Tamework/PanelActions/FlightAirborne_Glyph_Default.png"
                         : "Tamework/PanelActions/FlightGrounded_Glyph_Default.png",
@@ -605,7 +628,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                                 : "tamework.ui.linkedPanel.bonded.flight.switchToFlight"),
                         airborne, true, "flight"));
             }
-            if (entry.breedingAvailable()) {
+            if (may(AccessAction.BREED) && entry.breedingAvailable()) {
                 boolean on = entry.breedingEnabled();
                 slots.add(new Slot(on ? "Tamework/PanelActions/BreedingOn_Glyph_Default.png"
                         : "Tamework/PanelActions/BreedingOff_Glyph_Default.png",
@@ -614,7 +637,7 @@ public final class TameworkCompanionCardPage extends InteractiveCustomUIPage<Tam
                                 : "tamework.ui.linkedPanel.card.tooltip.breedingDisabled"),
                         on, true, "breeding"));
             }
-            if (!entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost()) {
+            if (mayCommand && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost()) {
                 slots.add(new Slot("Tamework/PanelActions/SetHome_Glyph_Default.png",
                         LocalizedText.resolve(language, "tamework.ui.linkedPanel.action.setHome"),
                         LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.tooltip.setHome"),

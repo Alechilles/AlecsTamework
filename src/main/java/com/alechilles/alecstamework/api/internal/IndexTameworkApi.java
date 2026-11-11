@@ -52,6 +52,7 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     @Nullable private volatile BondedCompanionApi bondedCompanions;
     @Nullable private volatile PortableCompanionsApi portableCompanions;
     @Nullable private volatile NetworkSettingsApi networkSettings;
+    @Nullable private volatile com.alechilles.alecstamework.api.access.SharedAccessApi sharedAccess;
 
     public IndexTameworkApi(
             @Nonnull IndexNpcProfilesApi profiles,
@@ -121,6 +122,11 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         this.networkSettings = networkSettings;
     }
 
+    /** Sets the shared access facade this API hands out; with one, {@code SHARED_ACCESS} is advertised. */
+    public void useSharedAccess(@Nullable com.alechilles.alecstamework.api.access.SharedAccessApi sharedAccess) {
+        this.sharedAccess = sharedAccess;
+    }
+
     /** Drops reflected optional-claim contracts after a settings change. */
     public void onRuntimeSettingsChanged() {
         base.onRuntimeSettingsChanged();
@@ -149,6 +155,9 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
         }
         if (networkSettings().available()) {
             result.add(TameworkApiCapability.NETWORK_SETTINGS_STORE);
+        }
+        if (sharedAccess().available()) {
+            result.add(TameworkApiCapability.SHARED_ACCESS);
         }
         if (activities.isOpen()) {
             result.add(TameworkApiCapability.ACTIVITY_FEED_V2);
@@ -263,6 +272,13 @@ public final class IndexTameworkApi implements TameworkApi, AutoCloseable {
     public NetworkSettingsApi networkSettings() {
         NetworkSettingsApi current = networkSettings;
         return current == null || closed.get() ? NetworkSettingsApi.unavailable() : current;
+    }
+
+    @Override
+    public com.alechilles.alecstamework.api.access.SharedAccessApi sharedAccess() {
+        com.alechilles.alecstamework.api.access.SharedAccessApi current = sharedAccess;
+        return current == null || closed.get()
+                ? com.alechilles.alecstamework.api.access.SharedAccessApi.unavailable() : current;
     }
 
     /** Closes the feed and the registries. Clear {@code ActivityRuntime} before calling this. */
