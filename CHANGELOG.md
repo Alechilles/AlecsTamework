@@ -20,6 +20,12 @@
   [confirm]`, `remove <player>`, `list`, `group <groupId> <caretaker|handler|manager|off> [confirm]`,
   `leave <player>` and `private <on|off>`. You can share with up to 20 players by name. Other mods can offer groups,
   such as a guild; a group gives nothing until its owner turns it on with `/tw share group`.
+- The companions window has a **Sharing** button. Its page lists who you share with, changes or removes their
+  level, adds a player who is online, turns groups on or off, and lets you leave a share someone gave you.
+- Animals shared with you at Handler or higher appear in your own companions window with their owner's name. You
+  can select them for your command item, command, recall and locate them, and use the buttons your level allows;
+  the rest are hidden or disabled. Companion Inspect (F) opens on a shared animal from Caretaker up.
+- Companion Inspect shows a **Private** switch to an owner who shares, to keep that one animal out of every share.
 - A Manager counts as the owner for the damage settings, and their killing blow counts as a cull where the owner's
   would. Caretakers and Handlers can never hurt a shared animal.
 - `/tw settings` has **Sharing Enabled** (on by default) and **Highest Sharing Level** (Manager by default) in the
