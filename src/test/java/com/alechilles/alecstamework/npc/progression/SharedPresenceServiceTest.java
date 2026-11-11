@@ -43,9 +43,11 @@ class SharedPresenceServiceTest {
 
     @Test
     void sharedCompanionNeedsRunWhileOnlyASharerIsOnline() {
+        UUID sharedId = presence.presenceIdFor(owner, sharedCompanion);
+        // Known offline first, so the window only counts if the sharer's arrival marks it online.
+        timeline.markOfflineForTests(sharedId, 0L);
         presence.onPlayerOnline(sharer);
         presence.sweep();
-        UUID sharedId = presence.presenceIdFor(owner, sharedCompanion);
         CompanionRuntimeClock.advanceByDeltaSeconds(3_600.0f);
 
         assertNotEquals(owner, sharedId);

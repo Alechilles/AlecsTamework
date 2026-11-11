@@ -11,7 +11,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
@@ -50,9 +49,9 @@ final class CommandRelocationWorldAccess {
                 store, ref, TameworkOwnerComponent.getComponentType()
         );
         // pending.ownerUuid is the player who asked for the move: the owner, or a player the
-        // owner lets command this companion.
-        return owner != null && (Objects.equals(owner.getOwnerId(), pending.ownerUuid)
-                || CompanionAccess.allows(owner.getOwnerId(), pending.ownerUuid, ref, store, AccessAction.COMMAND));
+        // owner lets command this companion. The owner always passes the COMMAND check.
+        return owner != null
+                && CompanionAccess.allows(owner.getOwnerId(), pending.ownerUuid, ref, store, AccessAction.COMMAND);
     }
 
     @Nullable

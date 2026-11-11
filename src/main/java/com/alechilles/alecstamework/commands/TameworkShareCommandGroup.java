@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.access.OwnerGrants;
 import com.alechilles.alecstamework.access.SharedAccessService;
-import com.alechilles.alecstamework.access.SharedAccessService.ChangeResult;
+import com.alechilles.alecstamework.api.access.AccessChangeResult;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
@@ -96,13 +96,13 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             boolean isNew = !service.grants(owner).players().containsKey(targetId);
             if (isNew && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
-                ChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, level);
+                AccessChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, level);
                 context.sendMessage(refused != null ? refusal(refused, null)
                         : Message.translation(KEY + "add.confirm").param("0", targetName)
                         .param("1", levelName(level)).param("2", levelToken(level)));
                 return;
             }
-            ChangeResult result = service.grantPlayer(owner, targetId, targetName, level);
+            AccessChangeResult result = service.grantPlayer(owner, targetId, targetName, level);
             switch (result) {
                 case CHANGED -> {
                     context.sendMessage(Message.translation(KEY + (isNew ? "add.done" : "add.changed"))
@@ -135,7 +135,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             SharedAccessService service = SharedAccessService.get();
             UUID owner = playerRef.getUuid();
             OwnerGrants.PlayerGrant grant = namedGrant(service.grants(owner), args[0]);
-            if (grant == null || service.revokePlayer(owner, grant.playerId()) != ChangeResult.CHANGED) {
+            if (grant == null || service.revokePlayer(owner, grant.playerId()) != AccessChangeResult.CHANGED) {
                 context.sendMessage(Message.translation(KEY + "remove.notShared").param("0", args[0]));
                 return;
             }
@@ -183,20 +183,20 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             String groupId = canonicalGroupId(service, grants, args[0]);
             Message name = groupName(service, groupId);
             if (off) {
-                boolean changed = service.setGroup(owner, groupId, null) == ChangeResult.CHANGED;
+                boolean changed = service.setGroup(owner, groupId, null) == AccessChangeResult.CHANGED;
                 context.sendMessage(Message.translation(KEY + (changed ? "group.off" : "group.notOn"))
                         .param("0", name));
                 return;
             }
             if (!grants.groups().containsKey(groupId) && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
-                ChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
+                AccessChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
                 context.sendMessage(refused != null ? refusal(refused, groupId)
                         : Message.translation(KEY + "group.confirm").param("0", name)
                         .param("1", levelName(level)).param("2", groupId).param("3", levelToken(level)));
                 return;
             }
-            ChangeResult result = service.setGroup(owner, groupId, level);
+            AccessChangeResult result = service.setGroup(owner, groupId, level);
             context.sendMessage(switch (result) {
                 case CHANGED -> Message.translation(KEY + "group.on").param("0", name).param("1", levelName(level));
                 case UNCHANGED -> Message.translation(KEY + "group.unchanged")
@@ -242,7 +242,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             }
             SharedAccessService service = SharedAccessService.get();
             if (!service.isEnabled()) {
-                context.sendMessage(refusal(ChangeResult.SHARING_DISABLED, null));
+                context.sendMessage(refusal(AccessChangeResult.SHARING_DISABLED, null));
                 return;
             }
             UUID sender = playerRef.getUuid();
@@ -305,7 +305,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
                 context.sendMessage(Message.translation(KEY + "private.neverShared"));
                 return;
             }
-            boolean changed = service.setPrivate(owner, profileId, on) == ChangeResult.CHANGED;
+            boolean changed = service.setPrivate(owner, profileId, on) == AccessChangeResult.CHANGED;
             context.sendMessage(Message.translation(KEY + "private."
                     + (changed ? (on ? "on" : "off") : (on ? "alreadyOn" : "alreadyOff"))));
         }
@@ -331,7 +331,7 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
 
     /** The reply for a change the service refused. {@code groupId} is only read for an unknown group. */
     @Nonnull
-    static Message refusal(@Nonnull ChangeResult result, @Nullable String groupId) {
+    static Message refusal(@Nonnull AccessChangeResult result, @Nullable String groupId) {
         Message message = Message.translation("server." + TameworkShareRules.refusalKey(result));
         return switch (result) {
             case LEVEL_NOT_ALLOWED -> message.param("0", levelName(SharedAccessService.get().maxLevel()));

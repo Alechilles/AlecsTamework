@@ -84,14 +84,8 @@ final class InteractionOwnershipHelper {
         return level;
     }
 
-    // Sends a denial message to non-owners when applicable.
-    void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
-                                Store<EntityStore> store,
-                                Player player) {
-        maybeNotifyOwnerDenied(npcRef, store, player, null);
-    }
-
-    // As above; ctx carries whether an entry was refused for the player's shared access level.
+    // Sends a denial message to non-owners when applicable; ctx carries whether an entry was
+    // refused for the player's shared access level.
     void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
                                 Store<EntityStore> store,
                                 Player player,

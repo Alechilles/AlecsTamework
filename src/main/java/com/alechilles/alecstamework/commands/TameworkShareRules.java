@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.commands;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.access.OwnerGrants;
 import com.alechilles.alecstamework.access.SharedAccessService;
-import com.alechilles.alecstamework.access.SharedAccessService.ChangeResult;
+import com.alechilles.alecstamework.api.access.AccessChangeResult;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.runtime.CompanionQueries;
@@ -32,13 +32,13 @@ public final class TameworkShareRules {
      * confirms in vain; {@code null} when the share would go ahead.
      */
     @Nullable
-    public static ChangeResult addRefusal(@Nonnull SharedAccessService service, @Nonnull UUID owner,
-                                          @Nonnull UUID target, @Nonnull AccessLevel level) {
-        return !service.isEnabled() ? ChangeResult.SHARING_DISABLED
-                : owner.equals(target) ? ChangeResult.SELF
-                : !level.isGrantable() || level.compareTo(service.maxLevel()) > 0 ? ChangeResult.LEVEL_NOT_ALLOWED
+    public static AccessChangeResult addRefusal(@Nonnull SharedAccessService service, @Nonnull UUID owner,
+                                                @Nonnull UUID target, @Nonnull AccessLevel level) {
+        return !service.isEnabled() ? AccessChangeResult.SHARING_DISABLED
+                : owner.equals(target) ? AccessChangeResult.SELF
+                : !level.isGrantable() || level.compareTo(service.maxLevel()) > 0 ? AccessChangeResult.LEVEL_NOT_ALLOWED
                 : service.grants(owner).players().size() >= SharedAccessService.MAX_PLAYER_GRANTS_PER_OWNER
-                ? ChangeResult.TOO_MANY_PLAYERS : null;
+                ? AccessChangeResult.TOO_MANY_PLAYERS : null;
     }
 
     /**
@@ -46,11 +46,11 @@ public final class TameworkShareRules {
      * would go ahead.
      */
     @Nullable
-    public static ChangeResult groupRefusal(@Nonnull SharedAccessService service, @Nonnull String groupId,
-                                            @Nonnull AccessLevel level) {
-        return !service.isEnabled() ? ChangeResult.SHARING_DISABLED
-                : service.groupProvider(groupId) == null ? ChangeResult.UNKNOWN_GROUP
-                : !level.isGrantable() || level.compareTo(service.maxLevel()) > 0 ? ChangeResult.LEVEL_NOT_ALLOWED
+    public static AccessChangeResult groupRefusal(@Nonnull SharedAccessService service, @Nonnull String groupId,
+                                                  @Nonnull AccessLevel level) {
+        return !service.isEnabled() ? AccessChangeResult.SHARING_DISABLED
+                : service.groupProvider(groupId) == null ? AccessChangeResult.UNKNOWN_GROUP
+                : !level.isGrantable() || level.compareTo(service.maxLevel()) > 0 ? AccessChangeResult.LEVEL_NOT_ALLOWED
                 : null;
     }
 
@@ -60,14 +60,14 @@ public final class TameworkShareRules {
      * player limit for {@code TOO_MANY_PLAYERS} and the group id for {@code UNKNOWN_GROUP}.
      */
     @Nonnull
-    public static String refusalKey(@Nonnull ChangeResult result) {
+    public static String refusalKey(@Nonnull AccessChangeResult result) {
         return "tamework.share.error." + switch (result) {
             case SHARING_DISABLED -> "disabled";
             case SELF -> "self";
             case LEVEL_NOT_ALLOWED -> "levelNotAllowed";
             case TOO_MANY_PLAYERS -> "tooManyPlayers";
             case UNKNOWN_GROUP -> "unknownGroup";
-            case CHANGED, UNCHANGED -> "unchanged";
+            case CHANGED, UNCHANGED, UNAVAILABLE -> "unchanged";
         };
     }
 
@@ -94,7 +94,7 @@ public final class TameworkShareRules {
     /** Gives up {@code player}'s named grant on {@code owner}'s animals. Group membership belongs to the group. */
     @Nonnull
     public static LeaveResult leave(@Nonnull SharedAccessService service, @Nonnull UUID owner, @Nonnull UUID player) {
-        if (service.revokePlayer(owner, player) != ChangeResult.CHANGED) {
+        if (service.revokePlayer(owner, player) != AccessChangeResult.CHANGED) {
             return LeaveResult.GROUP_ONLY;
         }
         return service.level(owner, player, null) != AccessLevel.NONE ? LeaveResult.LEFT_STILL_GROUP : LeaveResult.LEFT;

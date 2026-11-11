@@ -948,7 +948,13 @@ public final class CompanionNeedsService {
      */
     @Nullable
     static UUID resolvePresenceId(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
-        UUID ownerId = resolveOwnerId(npcRef, store);
+        return presenceIdFor(resolveOwnerId(npcRef, store), npcRef, store);
+    }
+
+    /** As {@link #resolvePresenceId} for a caller that already read the owner. */
+    @Nullable
+    static UUID presenceIdFor(@Nullable UUID ownerId, @Nullable Ref<EntityStore> npcRef,
+                              @Nullable Store<EntityStore> store) {
         if (ownerId == null || !SharedAccessService.get().sharesAnything(ownerId)) {
             return ownerId;
         }

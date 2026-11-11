@@ -45,25 +45,35 @@ public final class SharedAccessFileStore {
     public static LoadResult load(@Nonnull Path dataDirectory) {
         Path file = resolveFile(dataDirectory);
         if (!Files.isRegularFile(file)) {
-            return new LoadResult(Map.of(), true, 0L);
+            return new LoadResult(Map.of(), true, 0L, Set.of());
         }
         try {
             Document document = parse(Files.readString(file, StandardCharsets.UTF_8));
             long networkRevision = document.networkRevision == null ? 0L : Math.max(0L, document.networkRevision);
-            return new LoadResult(owners(document), true, networkRevision);
+            Set<UUID> pending = new LinkedHashSet<>();
+            if (document.pendingNetworkOwners != null) {
+                for (String raw : document.pendingNetworkOwners) {
+                    UUID ownerId = parseUuid(raw);
+                    if (ownerId != null) {
+                        pending.add(ownerId);
+                    }
+                }
+            }
+            return new LoadResult(owners(document), true, networkRevision, pending);
         } catch (Exception unreadable) {
-            return new LoadResult(Map.of(), false, 0L);
+            return new LoadResult(Map.of(), false, 0L, Set.of());
         }
     }
 
     /**
      * Writes one complete snapshot, replacing the file atomically where the filesystem allows.
      *
-     * @param networkRevision the last network revision this server applied, or 0 when it never
-     *                        followed a network's grants
+     * @param networkRevision      the last network revision this server applied, or 0 when it
+     *                             never followed a network's grants
+     * @param pendingNetworkOwners owners changed here and not yet saved to the network
      */
     public static boolean save(@Nonnull Path dataDirectory, @Nonnull Map<UUID, OwnerGrants> owners,
-                               long networkRevision) {
+                               long networkRevision, @Nonnull Set<UUID> pendingNetworkOwners) {
         Path file = resolveFile(dataDirectory);
         try {
             Path parent = file.getParent();
@@ -71,7 +81,7 @@ public final class SharedAccessFileStore {
                 Files.createDirectories(parent);
             }
             Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(temporary, toJson(owners, networkRevision) + System.lineSeparator(),
+            Files.writeString(temporary, toJson(owners, networkRevision, pendingNetworkOwners) + System.lineSeparator(),
                     StandardCharsets.UTF_8);
             try {
                 Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -87,13 +97,14 @@ public final class SharedAccessFileStore {
     /** Every owner's grants as one JSON document: the form a server network shares. */
     @Nonnull
     public static String toJson(@Nonnull Map<UUID, OwnerGrants> owners) {
-        return toJson(owners, 0L);
+        return toJson(owners, 0L, Set.of());
     }
 
     /**
      * Reads a document written by {@link #toJson}. An entry that cannot be read is skipped.
      *
-     * @throws RuntimeException when {@code json} is not a grants document at all
+     * @throws RuntimeException when {@code json} is not a grants document at all, or a newer
+     *                          build wrote it
      */
     @Nonnull
     public static Map<UUID, OwnerGrants> fromJson(@Nonnull String json) {
@@ -101,10 +112,15 @@ public final class SharedAccessFileStore {
     }
 
     @Nonnull
-    private static String toJson(@Nonnull Map<UUID, OwnerGrants> owners, long networkRevision) {
+    private static String toJson(@Nonnull Map<UUID, OwnerGrants> owners, long networkRevision,
+                                 @Nonnull Set<UUID> pendingNetworkOwners) {
         Document document = new Document();
         document.version = CURRENT_VERSION;
         document.networkRevision = networkRevision > 0L ? networkRevision : null;
+        if (!pendingNetworkOwners.isEmpty()) {
+            document.pendingNetworkOwners = new ArrayList<>();
+            pendingNetworkOwners.forEach(ownerId -> document.pendingNetworkOwners.add(ownerId.toString()));
+        }
         document.owners = new LinkedHashMap<>();
         for (Map.Entry<UUID, OwnerGrants> entry : owners.entrySet()) {
             if (!entry.getValue().isEmpty()) {
@@ -119,6 +135,12 @@ public final class SharedAccessFileStore {
         Document document = GSON.fromJson(json, Document.class);
         if (document == null) {
             throw new IllegalArgumentException("The shared access document is empty.");
+        }
+        // A newer build may store levels or fields this one would drop, and the next save would
+        // then delete them everywhere.
+        if (document.version != null && document.version > CURRENT_VERSION) {
+            throw new IllegalArgumentException("The shared access document has version " + document.version
+                    + "; this build reads up to " + CURRENT_VERSION + ".");
         }
         return document;
     }
@@ -219,12 +241,16 @@ public final class SharedAccessFileStore {
     /**
      * The saved grants, and whether the file may be replaced.
      *
-     * @param networkRevision the last network revision this server applied; 0 when the file has
-     *                        none, which means this server never followed a network's grants
+     * @param networkRevision      the last network revision this server applied; 0 when the file
+     *                             has none, which means this server never followed a network's grants
+     * @param pendingNetworkOwners owners changed here and not yet saved to the network; empty when
+     *                             the file has none
      */
-    public record LoadResult(@Nonnull Map<UUID, OwnerGrants> owners, boolean writable, long networkRevision) {
+    public record LoadResult(@Nonnull Map<UUID, OwnerGrants> owners, boolean writable, long networkRevision,
+                             @Nonnull Set<UUID> pendingNetworkOwners) {
         public LoadResult {
             owners = Map.copyOf(owners);
+            pendingNetworkOwners = Set.copyOf(pendingNetworkOwners);
         }
     }
 
@@ -232,6 +258,8 @@ public final class SharedAccessFileStore {
         private Integer version;
         /** Only in this server's own file, never in the network's document. */
         private Long networkRevision;
+        /** Only in this server's own file: owners changed here and not yet saved to the network. */
+        private List<String> pendingNetworkOwners;
         private LinkedHashMap<String, OwnerDocument> owners;
     }
 

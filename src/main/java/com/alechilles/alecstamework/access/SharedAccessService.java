@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.access;
 
 import com.alechilles.alecstamework.api.access.AccessAction;
+import com.alechilles.alecstamework.api.access.AccessChangeResult;
 import com.alechilles.alecstamework.api.access.AccessGroupMembership;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
@@ -44,20 +45,6 @@ public final class SharedAccessService implements AutoCloseable {
     private static final System.Logger LOGGER = System.getLogger(SharedAccessService.class.getName());
     private static final SharedAccessService INSTANCE = new SharedAccessService();
 
-    /** The outcome of a request to change an owner's grants. */
-    public enum ChangeResult {
-        CHANGED,
-        UNCHANGED,
-        SHARING_DISABLED,
-        /** An owner cannot share with themselves. */
-        SELF,
-        /** The level is not grantable, or is above the server's highest allowed level. */
-        LEVEL_NOT_ALLOWED,
-        TOO_MANY_PLAYERS,
-        /** No provider is registered for the group. */
-        UNKNOWN_GROUP
-    }
-
     private final Map<UUID, OwnerGrants> grantsByOwner = new ConcurrentHashMap<>();
     /** Owners who named a player, by that player. Finds "shared with me" without scanning owners. */
     private final Map<UUID, Set<UUID>> ownersByPlayer = new ConcurrentHashMap<>();
@@ -75,6 +62,10 @@ public final class SharedAccessService implements AutoCloseable {
     private boolean writable;
     /** The last network revision applied here; 0 until this server first follows a network's grants. */
     private long networkRevision;
+    /** The network sync's pending owners as last loaded or queued for saving. */
+    private Set<UUID> savedNetworkPending = Set.of();
+    /** The network sync's live pending set, copied into each save; null until it registers one. */
+    @Nullable private Set<UUID> networkPending;
     @Nullable private volatile Consumer<UUID> localChangeHook;
 
     private SharedAccessService() {
@@ -106,6 +97,8 @@ public final class SharedAccessService implements AutoCloseable {
             dataDirectory = targetDataDirectory.toAbsolutePath().normalize();
             writable = loaded.writable();
             networkRevision = loaded.networkRevision();
+            savedNetworkPending = loaded.pendingNetworkOwners();
+            networkPending = null;
             saveExecutor = Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "tamework-shared-access-save");
                 thread.setDaemon(true);
@@ -268,16 +261,16 @@ public final class SharedAccessService implements AutoCloseable {
 
     /** Shares {@code ownerId}'s companions with a named player, or changes that player's level. */
     @Nonnull
-    public ChangeResult grantPlayer(@Nonnull UUID ownerId, @Nonnull UUID playerId, @Nullable String playerName,
-                                    @Nonnull AccessLevel level) {
+    public AccessChangeResult grantPlayer(@Nonnull UUID ownerId, @Nonnull UUID playerId, @Nullable String playerName,
+                                          @Nonnull AccessLevel level) {
         if (!enabled) {
-            return ChangeResult.SHARING_DISABLED;
+            return AccessChangeResult.SHARING_DISABLED;
         }
         if (ownerId.equals(playerId)) {
-            return ChangeResult.SELF;
+            return AccessChangeResult.SELF;
         }
         if (!level.isGrantable() || level.compareTo(maxLevel) > 0) {
-            return ChangeResult.LEVEL_NOT_ALLOWED;
+            return AccessChangeResult.LEVEL_NOT_ALLOWED;
         }
         return change(ownerId, current -> {
             OwnerGrants.PlayerGrant existing = current.players().get(playerId);
@@ -286,36 +279,36 @@ public final class SharedAccessService implements AutoCloseable {
             }
             String name = playerName != null ? playerName : existing == null ? null : existing.playerName();
             return current.withPlayer(new OwnerGrants.PlayerGrant(playerId, name, level));
-        }, ChangeResult.TOO_MANY_PLAYERS);
+        }, AccessChangeResult.TOO_MANY_PLAYERS);
     }
 
     /** Removes a named player's grant. Also how a player leaves someone's share. */
     @Nonnull
-    public ChangeResult revokePlayer(@Nonnull UUID ownerId, @Nonnull UUID playerId) {
-        return change(ownerId, current -> current.withoutPlayer(playerId), ChangeResult.UNCHANGED);
+    public AccessChangeResult revokePlayer(@Nonnull UUID ownerId, @Nonnull UUID playerId) {
+        return change(ownerId, current -> current.withoutPlayer(playerId), AccessChangeResult.UNCHANGED);
     }
 
     /** Turns a group share on at {@code level}, or off when {@code level} is null. */
     @Nonnull
-    public ChangeResult setGroup(@Nonnull UUID ownerId, @Nonnull String groupId, @Nullable AccessLevel level) {
+    public AccessChangeResult setGroup(@Nonnull UUID ownerId, @Nonnull String groupId, @Nullable AccessLevel level) {
         if (level != null) {
             if (!enabled) {
-                return ChangeResult.SHARING_DISABLED;
+                return AccessChangeResult.SHARING_DISABLED;
             }
             if (!providers.containsKey(groupId)) {
-                return ChangeResult.UNKNOWN_GROUP;
+                return AccessChangeResult.UNKNOWN_GROUP;
             }
             if (!level.isGrantable() || level.compareTo(maxLevel) > 0) {
-                return ChangeResult.LEVEL_NOT_ALLOWED;
+                return AccessChangeResult.LEVEL_NOT_ALLOWED;
             }
         }
-        return change(ownerId, current -> current.withGroup(groupId, level), ChangeResult.UNCHANGED);
+        return change(ownerId, current -> current.withGroup(groupId, level), AccessChangeResult.UNCHANGED);
     }
 
     /** Marks one companion private, so no grant applies to it, or shares it again. */
     @Nonnull
-    public ChangeResult setPrivate(@Nonnull UUID ownerId, @Nonnull UUID profileId, boolean isPrivate) {
-        return change(ownerId, current -> current.withPrivate(profileId, isPrivate), ChangeResult.UNCHANGED);
+    public AccessChangeResult setPrivate(@Nonnull UUID ownerId, @Nonnull UUID profileId, boolean isPrivate) {
+        return change(ownerId, current -> current.withPrivate(profileId, isPrivate), AccessChangeResult.UNCHANGED);
     }
 
     /**
@@ -357,8 +350,9 @@ public final class SharedAccessService implements AutoCloseable {
         }
         try {
             return provider.membership(ownerId, actorId) == AccessGroupMembership.MEMBER;
-        } catch (RuntimeException failed) {
-            // A broken provider must not break gameplay checks; it simply grants nothing.
+        } catch (RuntimeException | LinkageError failed) {
+            // A broken provider, or one whose mod was unloaded, must not break gameplay checks;
+            // it simply grants nothing.
             return false;
         }
     }
@@ -384,6 +378,32 @@ public final class SharedAccessService implements AutoCloseable {
     public long networkRevision() {
         synchronized (mutationLock) {
             return networkRevision;
+        }
+    }
+
+    /** The network sync's pending owners saved in the file, or last queued for saving. A snapshot. */
+    @Nonnull
+    public Set<UUID> savedNetworkPending() {
+        synchronized (mutationLock) {
+            return savedNetworkPending;
+        }
+    }
+
+    /**
+     * Keeps the network sync's pending owners in the file, so a change not yet saved to the network
+     * survives a restart. From now on every save copies {@code livePending}, under the change lock;
+     * this call also queues a save when it differs from what was last saved. The save runs on the
+     * save thread.
+     *
+     * @param livePending the live set the local change hook fills
+     */
+    public void saveNetworkPending(@Nonnull Set<UUID> livePending) {
+        Objects.requireNonNull(livePending, "livePending");
+        synchronized (mutationLock) {
+            networkPending = livePending;
+            if (!savedNetworkPending.equals(livePending)) {
+                queueSave();
+            }
         }
     }
 
@@ -446,6 +466,8 @@ public final class SharedAccessService implements AutoCloseable {
             ownersByPlayer.clear();
             ownersByGroup.clear();
             networkRevision = 0L;
+            savedNetworkPending = Set.of();
+            networkPending = null;
         }
         localChangeHook = null;
         providers.clear();
@@ -455,9 +477,9 @@ public final class SharedAccessService implements AutoCloseable {
     }
 
     @Nonnull
-    private ChangeResult change(@Nonnull UUID ownerId,
-                                @Nonnull java.util.function.UnaryOperator<OwnerGrants> edit,
-                                @Nonnull ChangeResult whenRefused) {
+    private AccessChangeResult change(@Nonnull UUID ownerId,
+                                      @Nonnull java.util.function.UnaryOperator<OwnerGrants> edit,
+                                      @Nonnull AccessChangeResult whenRefused) {
         synchronized (mutationLock) {
             OwnerGrants current = grants(ownerId);
             OwnerGrants next = edit.apply(current);
@@ -465,7 +487,7 @@ public final class SharedAccessService implements AutoCloseable {
                 return whenRefused;
             }
             if (next.equals(current)) {
-                return ChangeResult.UNCHANGED;
+                return AccessChangeResult.UNCHANGED;
             }
             if (next.isEmpty()) {
                 grantsByOwner.remove(ownerId);
@@ -473,7 +495,7 @@ public final class SharedAccessService implements AutoCloseable {
                 grantsByOwner.put(ownerId, next);
             }
             index(ownerId, current, next);
-            queueSave();
+            // The hook first, so the save below already holds this owner as pending.
             Consumer<UUID> hook = localChangeHook;
             if (hook != null) {
                 try {
@@ -482,9 +504,10 @@ public final class SharedAccessService implements AutoCloseable {
                     LOGGER.log(System.Logger.Level.WARNING, "The shared access network hook failed.", failed);
                 }
             }
+            queueSave();
         }
         notifyChanged(ownerId);
-        return ChangeResult.CHANGED;
+        return AccessChangeResult.CHANGED;
     }
 
     /** Keeps the reverse lookups in step with one owner's change. Caller holds the lock. */
@@ -526,9 +549,11 @@ public final class SharedAccessService implements AutoCloseable {
         }
         Map<UUID, OwnerGrants> snapshot = new LinkedHashMap<>(grantsByOwner);
         long revision = networkRevision;
+        Set<UUID> pendingOwners = networkPending == null ? savedNetworkPending : Set.copyOf(networkPending);
+        savedNetworkPending = pendingOwners;
         try {
             executor.execute(() -> {
-                if (!SharedAccessFileStore.save(target, snapshot, revision)) {
+                if (!SharedAccessFileStore.save(target, snapshot, revision, pendingOwners)) {
                     LOGGER.log(System.Logger.Level.WARNING,
                             "Cannot save shared access grants at {0}; the next change will retry.",
                             SharedAccessFileStore.resolveFile(target));

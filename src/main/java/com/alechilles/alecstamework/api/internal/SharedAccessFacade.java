@@ -85,45 +85,32 @@ public final class SharedAccessFacade implements SharedAccessApi {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(level, "level");
-        return map(service.grantPlayer(ownerUuid, playerUuid, playerName, level));
+        return service.grantPlayer(ownerUuid, playerUuid, playerName, level);
     }
 
     @Override
     public AccessChangeResult revokePlayer(UUID ownerUuid, UUID playerUuid) {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return map(service.revokePlayer(ownerUuid, playerUuid));
+        return service.revokePlayer(ownerUuid, playerUuid);
     }
 
     @Override
     public AccessChangeResult setGroup(UUID ownerUuid, String groupId, @Nullable AccessLevel level) {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(groupId, "groupId");
-        return map(service.setGroup(ownerUuid, groupId, level));
+        return service.setGroup(ownerUuid, groupId, level);
     }
 
     @Override
     public AccessChangeResult setPrivate(UUID ownerUuid, UUID profileId, boolean isPrivate) {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(profileId, "profileId");
-        return map(service.setPrivate(ownerUuid, profileId, isPrivate));
+        return service.setPrivate(ownerUuid, profileId, isPrivate);
     }
 
     @Override
     public AutoCloseable registerGroup(AccessGroupProvider provider) {
         return service.registerGroup(Objects.requireNonNull(provider, "provider"));
-    }
-
-    @Nonnull
-    private static AccessChangeResult map(@Nonnull SharedAccessService.ChangeResult result) {
-        return switch (result) {
-            case CHANGED -> AccessChangeResult.CHANGED;
-            case UNCHANGED -> AccessChangeResult.UNCHANGED;
-            case SHARING_DISABLED -> AccessChangeResult.SHARING_DISABLED;
-            case SELF -> AccessChangeResult.SELF;
-            case LEVEL_NOT_ALLOWED -> AccessChangeResult.LEVEL_NOT_ALLOWED;
-            case TOO_MANY_PLAYERS -> AccessChangeResult.TOO_MANY_PLAYERS;
-            case UNKNOWN_GROUP -> AccessChangeResult.UNKNOWN_GROUP;
-        };
     }
 }

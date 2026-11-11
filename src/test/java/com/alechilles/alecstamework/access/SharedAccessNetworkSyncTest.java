@@ -8,9 +8,11 @@ import com.alechilles.alecstamework.api.NetworkSettingsStore;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.settings.NetworkSettingsFiles;
 import com.alechilles.alecstamework.settings.NetworkSettingsSync;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -40,12 +42,7 @@ class SharedAccessNetworkSyncTest {
     void setUp() {
         service.clearForTests();
         store = new FakeStore();
-        settingsSync = new NetworkSettingsSync(
-                Executors.newSingleThreadScheduledExecutor(),
-                () -> tempDir.resolve("tamework-network-settings.json"),
-                new NetworkSettingsFiles(List.of(), null),
-                () -> { },
-                null);
+        settingsSync = newSettingsSync();
     }
 
     @AfterEach
@@ -89,7 +86,7 @@ class SharedAccessNetworkSyncTest {
         Map<UUID, OwnerGrants> both = Map.of(owner, kept, otherOwner, sharedWith(friend, AccessLevel.CARETAKER));
         // This server applied revision 1, then was down while the other owner stopped sharing.
         store.saveAsAnotherServer(both);
-        assertTrue(SharedAccessFileStore.save(tempDir, both, 1L));
+        assertTrue(SharedAccessFileStore.save(tempDir, both, 1L, Set.of()));
         service.start(tempDir);
         store.saveAsAnotherServer(Map.of(owner, kept));
 
@@ -98,6 +95,37 @@ class SharedAccessNetworkSyncTest {
         assertEquals(OwnerGrants.EMPTY, service.grants(otherOwner));
         assertEquals(kept, service.grants(owner));
         assertEquals(Map.of(owner, kept), store.owners());
+    }
+
+    @Test
+    void aRevocationMadeWhileTheStoreIsDownIsPushedAfterARestart() throws Exception {
+        OwnerGrants shared = sharedWith(friend, AccessLevel.HANDLER);
+        store.saveAsAnotherServer(Map.of(owner, shared));
+        service.start(tempDir);
+        join();
+        store.down = true;
+        service.revokePlayer(owner, friend);
+        waitForSync();
+
+        // The server stops before the store comes back, then starts again.
+        settingsSync.close();
+        service.close();
+        settingsSync = newSettingsSync();
+        service.start(tempDir);
+        store.down = false;
+        join();
+
+        assertEquals(OwnerGrants.EMPTY, service.grants(owner));
+        assertEquals(Map.of(), store.owners());
+    }
+
+    private NetworkSettingsSync newSettingsSync() {
+        return new NetworkSettingsSync(
+                Executors.newSingleThreadScheduledExecutor(),
+                () -> tempDir.resolve("tamework-network-settings.json"),
+                new NetworkSettingsFiles(List.of(), null),
+                () -> { },
+                null);
     }
 
     /** Follows the network's grants, registers the store and waits for the first read. */
@@ -120,6 +148,8 @@ class SharedAccessNetworkSyncTest {
     private static final class FakeStore implements NetworkSettingsStore {
         private NetworkSettingsDocument document;
         volatile Runnable beforeNextSave;
+        /** While true, this server cannot reach the store. */
+        volatile boolean down;
 
         synchronized void saveAsAnotherServer(Map<UUID, OwnerGrants> owners) {
             document = new NetworkSettingsDocument(SharedAccessFileStore.toJson(owners),
@@ -131,12 +161,18 @@ class SharedAccessNetworkSyncTest {
         }
 
         @Override
-        public synchronized NetworkSettingsDocument load(String key) {
+        public synchronized NetworkSettingsDocument load(String key) throws IOException {
+            if (down) {
+                throw new IOException("store unreachable");
+            }
             return SharedAccessNetworkSync.DOCUMENT_KEY.equals(key) ? document : null;
         }
 
         @Override
-        public synchronized boolean save(String key, String json, long expectedRevision) {
+        public synchronized boolean save(String key, String json, long expectedRevision) throws IOException {
+            if (down) {
+                throw new IOException("store unreachable");
+            }
             Runnable other = beforeNextSave;
             beforeNextSave = null;
             if (other != null) {

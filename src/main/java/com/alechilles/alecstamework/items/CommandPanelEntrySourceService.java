@@ -319,7 +319,11 @@ final class CommandPanelEntrySourceService {
         }
     }
 
-    /** Keeps newly tamed indexed NPCs visible before their durable profile is published. */
+    /**
+     * Keeps newly tamed indexed NPCs visible before their durable profile is published. Only the
+     * viewer's own bodies: these rows carry no shared level, and the record source already lists
+     * the companions others share with the viewer.
+     */
     private void appendFreshOwnedRecords(Player player, Store<EntityStore> store,
                                          List<LinkedNpcRecord> records,
                                          List<LinkedNpcRecord> selectionRecords) {
@@ -329,7 +333,7 @@ final class CommandPanelEntrySourceService {
             NPCEntity npc = ref == null || !ref.isValid() ? null : store.getComponent(ref, NPCEntity.getComponentType());
             if (npc == null || npc.getUuid() == null || !known.add(npc.getUuid())
                     || !CommandGenericTargetAuthority.allowsNearbyPresentation(ref, store)
-                    || !linkPolicyService.passesOwnerAndTamed(true, false, ref, player.getUuid(), store)) continue;
+                    || !player.getUuid().equals(linkPolicyService.resolveOwnerId(ref, store))) continue;
             LinkedNpcRecord selection = linkedRecordStore.find(selectionRecords, npc.getUuid());
             records.add(new LinkedNpcRecord(npc.getUuid(), null, null, null, null,
                     npcNameResolver.resolveNpcDisplayName(ref, store, npc),
@@ -483,6 +487,10 @@ final class CommandPanelEntrySourceService {
                     playerUuid,
                     store
             )) {
+                continue;
+            }
+            // As in appendFreshOwnedRecords: an owned-mode live row is the viewer's own body.
+            if (ownedMode && !playerUuid.equals(linkPolicyService.resolveOwnerId(npcRef, store))) {
                 continue;
             }
             if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
@@ -650,15 +658,32 @@ final class CommandPanelEntrySourceService {
     @Nullable
     LinkedNpcRecord ownedSelectionRecord(Player player, ItemStack stack, UUID rowId) {
         if (player == null || rowId == null || player.getWorld() == null) return null;
-        List<LinkedNpcRecord> records = linkedRecordStore.read(stack);
+        return ownedSelectionRecord(player, rowId, selectionSnapshot(player, stack));
+    }
+
+    /**
+     * The viewer's listed rows read once, so an action that resolves many rows (select group,
+     * select matching) builds one snapshot instead of one per row. Null without an owned source.
+     */
+    @Nullable
+    CommandOwnedPanelRecordSource.Snapshot selectionSnapshot(Player player, ItemStack stack) {
+        if (player == null || ownedRecordSource == null) return null;
+        return ownedRecordSource.snapshot(player.getUuid(), linkedRecordStore.read(stack), Set.of());
+    }
+
+    /** As {@link #ownedSelectionRecord(Player, ItemStack, UUID)}, against a snapshot from {@link #selectionSnapshot}. */
+    @Nullable
+    LinkedNpcRecord ownedSelectionRecord(Player player, UUID rowId,
+                                         @Nullable CommandOwnedPanelRecordSource.Snapshot listed) {
+        if (player == null || rowId == null || player.getWorld() == null) return null;
         LinkedNpcRecord owned = null;
-        if (ownedRecordSource != null) {
-            var listed = ownedRecordSource.snapshot(player.getUuid(), records, Set.of());
+        if (listed != null) {
             if (listed.managedFeatures().containsKey(rowId)) return null;
             var shared = listed.sharedRows().get(rowId);
             // A shared row is listed from VIEW_IN_PANELS up; acting on it needs COMMAND.
             if (shared != null && !AccessAction.COMMAND.allowedAt(shared.level())) return null;
-            String profile = ownedRecordSource.profileForRow(player.getUuid(), rowId).map(Object::toString).orElse(null);
+            var profileId = listed.profilesByRow().get(rowId);
+            String profile = profileId == null ? null : profileId.toString();
             owned = listed.ownedRecords().stream()
                     .filter(record -> rowId.equals(record.npcUuid) || profile != null && profile.equals(record.profileId))
                     .findFirst().orElse(null);

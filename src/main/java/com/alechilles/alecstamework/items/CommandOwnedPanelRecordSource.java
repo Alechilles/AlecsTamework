@@ -25,6 +25,13 @@ import java.util.function.Function;
  * the viewer's own, and those other owners share with the viewer.
  */
 final class CommandOwnedPanelRecordSource {
+    /**
+     * Most shared rows one viewer's snapshot lists. Own rows are bounded by the population cap;
+     * shared rows are not, and every listed row costs world-thread work on panel builds and
+     * multi-row actions.
+     */
+    static final int MAX_SHARED_ROWS = 200;
+
     /** Candidate profiles for one owner; a null owner asks for the unowned captured profiles. */
     private final Function<UUID, Collection<ProfileSnapshot>> profiles;
     /** Other owners' companions the viewer may see in panels, each with the viewer's level on it. */
@@ -52,7 +59,7 @@ final class CommandOwnedPanelRecordSource {
         this.sharedProfiles = viewer -> {
             var owners = viewer == null ? java.util.Set.<UUID>of() : SharedAccessService.get().ownersSharingWith(viewer);
             if (owners.isEmpty()) return Map.of();
-            var shared = new java.util.LinkedHashMap<ProfileId, SharedProfile>();
+            List<Map.Entry<CompanionRecord, AccessLevel>> visible = new ArrayList<>();
             for (UUID owner : owners) {
                 for (CompanionRecord record : companions.owned(owner)) {
                     // The access check already gives nothing for bonded and private companions.
@@ -60,10 +67,19 @@ final class CommandOwnedPanelRecordSource {
                     // family item acts on it, so a row here could offer nothing.
                     if (record.rosterId() != null || record.location().kind() == LocationKind.STORED) continue;
                     AccessLevel level = CompanionAccess.level(record, viewer);
-                    if (!AccessAction.VIEW_IN_PANELS.allowedAt(level)) continue;
-                    var profile = CommandPersistenceView.from(record);
-                    shared.put(profile.profileId(), new SharedProfile(profile, new SharedRow(record.ownerName(), level)));
+                    if (AccessAction.VIEW_IN_PANELS.allowedAt(level)) visible.add(Map.entry(record, level));
                 }
+            }
+            if (visible.size() > MAX_SHARED_ROWS) {
+                // Owners come from a set, so order by profile id to keep the same rows each refresh.
+                visible.sort(Comparator.comparing(entry -> entry.getKey().profileId()));
+                visible = visible.subList(0, MAX_SHARED_ROWS);
+            }
+            var shared = new java.util.LinkedHashMap<ProfileId, SharedProfile>();
+            for (var entry : visible) {
+                var profile = CommandPersistenceView.from(entry.getKey());
+                shared.put(profile.profileId(),
+                        new SharedProfile(profile, new SharedRow(entry.getKey().ownerName(), entry.getValue())));
             }
             return shared;
         };

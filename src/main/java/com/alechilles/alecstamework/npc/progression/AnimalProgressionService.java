@@ -46,11 +46,16 @@ public final class AnimalProgressionService {
     static void advance(TameworkLifeStageComponent state, Ref<EntityStore> ref,
                         Store<EntityStore> store, boolean loaded) {
         // The clock id: the owner, or the owner's shared presence id for a shared companion.
-        UUID owner = CompanionNeedsService.resolvePresenceId(ref, store);
+        UUID realOwner = CompanionNeedsService.resolveOwnerId(ref, store);
+        UUID owner = CompanionNeedsService.presenceIdFor(realOwner, ref, store);
         String ownerText = owner == null ? null : owner.toString();
         long current = AnimalProgressionClock.get().current(owner);
+        // Sharing or unsharing moves a companion between its owner's two clocks. Time it earned on
+        // the old one still counts; only a change of owner drops it.
+        boolean sameOwnerClock = Objects.equals(state.getProgressionOwnerId(), ownerText)
+                || SharedPresenceService.get().isPresenceIdOf(realOwner, state.getProgressionOwnerId());
         long elapsed = state.isProgressionInitialized() && !state.isStoredProgressionPaused()
-                && Objects.equals(state.getProgressionOwnerId(), ownerText) ? pendingElapsed(state) : 0L;
+                && sameOwnerClock ? pendingElapsed(state) : 0L;
         state.setActiveProgressMs(BreedingTimeService.saturatingAdd(state.getActiveProgressMs(), elapsed));
         long worldNow = BreedingTimeService.resolveCurrentTimeMs(store);
         if (!state.isProgressionInitialized()) {

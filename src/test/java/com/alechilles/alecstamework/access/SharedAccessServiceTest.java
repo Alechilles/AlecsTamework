@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.access;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.alechilles.alecstamework.access.SharedAccessService.ChangeResult;
+import com.alechilles.alecstamework.api.access.AccessChangeResult;
 import com.alechilles.alecstamework.api.access.AccessGroupMembership;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
@@ -79,7 +79,7 @@ class SharedAccessServiceTest {
 
         service.configure(true, AccessLevel.CARETAKER);
         assertEquals(AccessLevel.CARETAKER, service.level(owner, friend, companion));
-        assertEquals(ChangeResult.LEVEL_NOT_ALLOWED,
+        assertEquals(AccessChangeResult.LEVEL_NOT_ALLOWED,
                 service.grantPlayer(owner, stranger, "Stranger", AccessLevel.HANDLER));
 
         service.configure(false, AccessLevel.MANAGER);
@@ -93,9 +93,9 @@ class SharedAccessServiceTest {
             service.grantPlayer(owner, UUID.randomUUID(), "Player" + i, AccessLevel.CARETAKER);
         }
 
-        assertEquals(ChangeResult.TOO_MANY_PLAYERS,
+        assertEquals(AccessChangeResult.TOO_MANY_PLAYERS,
                 service.grantPlayer(owner, friend, "Friend", AccessLevel.CARETAKER));
-        assertEquals(ChangeResult.SELF, service.grantPlayer(owner, owner, "Owner", AccessLevel.CARETAKER));
+        assertEquals(AccessChangeResult.SELF, service.grantPlayer(owner, owner, "Owner", AccessLevel.CARETAKER));
     }
 
     @Test

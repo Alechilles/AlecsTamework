@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.access.OwnerGrants;
 import com.alechilles.alecstamework.access.SharedAccessService;
-import com.alechilles.alecstamework.access.SharedAccessService.ChangeResult;
+import com.alechilles.alecstamework.api.access.AccessChangeResult;
 import com.alechilles.alecstamework.api.access.AccessGroupProvider;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.commands.TameworkShareRules;
@@ -200,7 +200,7 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
             grant(target, addLevel, false);
             return;
         }
-        ChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, addLevel);
+        AccessChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, addLevel);
         if (refused != null) {
             feedback = refusal(refused, null);
             return;
@@ -215,14 +215,14 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
         if (grant == null || level == null) {
             return;
         }
-        ChangeResult result = service.grantPlayer(owner(), playerId, null, level);
+        AccessChangeResult result = service.grantPlayer(owner(), playerId, null, level);
         String name = TameworkShareRules.grantName(grant);
         feedback = switch (result) {
             case CHANGED -> text("tamework.share.add.changed", name, levelName(level));
             case UNCHANGED -> text("tamework.share.add.unchanged", name, levelName(level));
             default -> refusal(result, null);
         };
-        if (result == ChangeResult.CHANGED) {
+        if (result == AccessChangeResult.CHANGED) {
             PlayerRef target = onlinePlayer(playerId);
             if (target != null) {
                 TameworkShareRules.notifyGranted(target, viewerName(), level, false);
@@ -237,7 +237,7 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
             return;
         }
         String name = TameworkShareRules.grantName(grant);
-        feedback = service.revokePlayer(owner(), playerId) == ChangeResult.CHANGED
+        feedback = service.revokePlayer(owner(), playerId) == AccessChangeResult.CHANGED
                 ? text("tamework.share.remove.done", name)
                 : text("tamework.share.remove.notShared", name);
     }
@@ -249,7 +249,7 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
         SharedAccessService service = SharedAccessService.get();
         String name = groupName(service, groupId);
         if (OFF.equals(value)) {
-            boolean changed = service.setGroup(owner(), groupId, null) == ChangeResult.CHANGED;
+            boolean changed = service.setGroup(owner(), groupId, null) == AccessChangeResult.CHANGED;
             feedback = text(changed ? "tamework.share.group.off" : "tamework.share.group.notOn", name);
             return;
         }
@@ -258,7 +258,7 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
             return;
         }
         if (!service.grants(owner()).groups().containsKey(groupId)) {
-            ChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
+            AccessChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
             if (refused != null) {
                 feedback = refusal(refused, groupId);
                 return;
@@ -295,20 +295,20 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
 
     private void grant(@Nonnull PlayerRef target, @Nonnull AccessLevel level, boolean isNew) {
         String name = target.getUsername();
-        ChangeResult result = SharedAccessService.get().grantPlayer(owner(), target.getUuid(), name, level);
+        AccessChangeResult result = SharedAccessService.get().grantPlayer(owner(), target.getUuid(), name, level);
         feedback = switch (result) {
             case CHANGED -> text(isNew ? "tamework.share.add.done" : "tamework.share.add.changed", name,
                     levelName(level));
             case UNCHANGED -> text("tamework.share.add.unchanged", name, levelName(level));
             default -> refusal(result, null);
         };
-        if (result == ChangeResult.CHANGED) {
+        if (result == AccessChangeResult.CHANGED) {
             TameworkShareRules.notifyGranted(target, viewerName(), level, isNew);
         }
     }
 
     private void applyGroup(@Nonnull String groupId, @Nonnull String name, @Nonnull AccessLevel level) {
-        ChangeResult result = SharedAccessService.get().setGroup(owner(), groupId, level);
+        AccessChangeResult result = SharedAccessService.get().setGroup(owner(), groupId, level);
         feedback = switch (result) {
             case CHANGED -> text("tamework.share.group.on", name, levelName(level));
             case UNCHANGED -> text("tamework.share.group.unchanged", name, levelName(level));
@@ -561,7 +561,7 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
         return LocalizedText.resolve(playerRef, TameworkShareRules.levelKey(level));
     }
 
-    private String refusal(ChangeResult result, @Nullable String groupId) {
+    private String refusal(AccessChangeResult result, @Nullable String groupId) {
         Object arg = switch (result) {
             case LEVEL_NOT_ALLOWED -> levelName(SharedAccessService.get().maxLevel());
             case TOO_MANY_PLAYERS -> SharedAccessService.MAX_PLAYER_GRANTS_PER_OWNER;

@@ -53,10 +53,20 @@ final class CommandToolInventoryService {
     @javax.annotation.Nullable
     LinkedNpcRecord resolveOwnedSelectionRecord(Player player, String toolId,
             com.alechilles.alecstamework.config.assets.TwCommandItemConfig config, UUID rowId) {
+        return ownedSelectionResolver(player, toolId, config).apply(rowId);
+    }
+
+    /**
+     * Resolves rows as {@link #resolveOwnedSelectionRecord} does, all against one read of the
+     * viewer's rows taken now. Use it when one action resolves many rows.
+     */
+    java.util.function.Function<UUID, LinkedNpcRecord> ownedSelectionResolver(Player player, String toolId,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
         ItemStack stack = findToolStack(player, toolId);
         if (stack == null || panelEntrySourceService == null || config == null
-                || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return null;
-        return panelEntrySourceService.ownedSelectionRecord(player, stack, rowId);
+                || config.usesOwnerCommandFamilyRoster() || config.usesBondedCompanionRoster()) return rowId -> null;
+        var snapshot = panelEntrySourceService.selectionSnapshot(player, stack);
+        return rowId -> panelEntrySourceService.ownedSelectionRecord(player, rowId, snapshot);
     }
 
     ToolResolution ensureToolId(ItemStack itemStack) {

@@ -57,7 +57,10 @@ public final class CompanionAccess {
         if (!service.sharesAnything(ownerId)) {
             return AccessLevel.NONE;
         }
-        return service.level(ownerId, actorId, profileId(npcRef, accessor));
+        // Without a profile id the private and bonded exclusions cannot be checked, so a body
+        // that cannot name its profile is not shared.
+        UUID profileId = profileId(npcRef, accessor);
+        return profileId == null ? AccessLevel.NONE : service.level(ownerId, actorId, profileId);
     }
 
     public static boolean allows(@Nullable Ref<EntityStore> npcRef,

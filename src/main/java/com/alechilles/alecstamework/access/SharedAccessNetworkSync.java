@@ -31,10 +31,10 @@ import javax.annotation.Nullable;
  * <p><b>Thread.</b> All store calls run on the {@link NetworkSettingsSync} thread, through the
  * task it runs for this document. Pending owners are marked while the service's change lock is
  * held, in the same step as the change, so a document applied at that moment cannot overwrite
- * it. Best effort: pending owners are kept in memory only. A change that was not saved to the
- * network before this server stopped (a crash right after it, a store that stayed down, or a
- * session with no store registered) is lost on a server that followed the network before: at
- * the next contact the network's value replaces it.</p>
+ * it. Pending owners are also saved in this server's grants file, by the service's save thread,
+ * so a change not yet saved to the network survives a restart. Best effort: a crash before that
+ * file save loses the change on a server that followed the network before, because at the next
+ * contact the network's value replaces it.</p>
  *
  * <p><b>Lifecycle.</b> No thread and nothing to close. The task stops with the
  * {@link NetworkSettingsSync} it was given to; a later instance replaces this one's hook.</p>
@@ -70,18 +70,36 @@ public final class SharedAccessNetworkSync {
 
     /** Starts following the network's grants. Call once, after the service loaded its file. */
     public void start() {
+        for (UUID ownerId : service.savedNetworkPending()) {
+            pending.merge(ownerId, 1L, Long::sum);
+        }
+        service.saveNetworkPending(pending.keySet());
         service.setLocalChangeHook(this::onLocalChange);
         sync.follow(DOCUMENT_KEY, this::syncWithNetwork);
     }
 
     /** Called by the service under its change lock, on the changing thread. Does no I/O. */
     private void onLocalChange(@Nonnull UUID ownerId) {
+        // A server that never followed a network has nothing to push: at first contact it offers
+        // every owner it stores. Tracking changes before then would only replay old removals.
+        if (!sync.active() && service.networkRevision() == 0L) {
+            return;
+        }
         pending.merge(ownerId, 1L, Long::sum);
         sync.notifyChanged(DOCUMENT_KEY);
     }
 
     /** Reads the network's grants, then saves this server's pending owners on top of them. */
     private void syncWithNetwork(@Nonnull NetworkSettingsStore store) throws Exception {
+        try {
+            saveToNetwork(store);
+        } finally {
+            // Keeps the file's pending owners in step with what this run added or cleared.
+            service.saveNetworkPending(pending.keySet());
+        }
+    }
+
+    private void saveToNetwork(@Nonnull NetworkSettingsStore store) throws Exception {
         apply(store.load(DOCUMENT_KEY));
         for (int attempt = 0; attempt < MAX_SAVE_ATTEMPTS && !pending.isEmpty(); attempt++) {
             Map<UUID, Long> included = Map.copyOf(pending);
@@ -109,6 +127,11 @@ public final class SharedAccessNetworkSync {
 
     private void apply(@Nullable NetworkSettingsDocument document) {
         if (document == null) {
+            if (applied) {
+                // A store that briefly returns nothing for a document it had. Offering every
+                // owner now would let this server's possibly stale copy win the next save.
+                return;
+            }
             // Nothing saved yet, or the store was emptied. Deleting every grant here would be the
             // wrong reading of that, so this server offers all it has instead.
             network = Map.of();

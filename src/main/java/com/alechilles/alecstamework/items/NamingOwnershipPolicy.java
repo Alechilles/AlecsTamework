@@ -9,10 +9,6 @@ final class NamingOwnershipPolicy {
     private NamingOwnershipPolicy() {
     }
 
-    static boolean canName(UUID playerUuid, UUID ownerUuid, NamingRules rules) {
-        return canName(ownerUuid, rules, playerUuid != null && playerUuid.equals(ownerUuid));
-    }
-
     /**
      * {@code mayRename} is the caller's answer to "may this player rename this owned NPC": the owner,
      * or a player the owner shares it with at a level that allows renaming. Ignored for an unowned NPC.

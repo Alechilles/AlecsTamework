@@ -106,7 +106,7 @@ final class CommandGroupAssignPageService {
         if (!all && !none && resolveGroupDropdownEntries(player, toolId).stream().noneMatch(g -> g.value().equals(selectorValue))) return;
         // Existing selections get capacity priority when adding a group. Every candidate is revalidated.
         var candidates = selectionCandidates(entries, selectorValue, additive,
-                id -> toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, id));
+                toolInventoryService.ownedSelectionResolver(player, toolId, config));
         var records = new CommandLinkedNpcRecordStore();
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
             var next = new java.util.LinkedHashMap<UUID, LinkedNpcRecord>();
@@ -131,7 +131,7 @@ final class CommandGroupAssignPageService {
         var records = new CommandLinkedNpcRecordStore();
         toolInventoryService.mutateToolStack(player, toolId, stack -> records.write(stack,
                 matchingSelection(records.read(stack), entries, CommandCompanionViewStore.read(stack).current(),
-                        config.getMaxActive(), id -> toolInventoryService.resolveOwnedSelectionRecord(player, toolId, config, id))));
+                        config.getMaxActive(), toolInventoryService.ownedSelectionResolver(player, toolId, config))));
     }
 
     static List<LinkedNpcRecord> matchingSelection(List<LinkedNpcRecord> previous, List<LinkedNpcEntry> entries,

@@ -39,6 +39,9 @@ public final class SharedPresenceService implements AutoCloseable {
     private final Map<UUID, Boolean> sharedOnlineByOwner = new ConcurrentHashMap<>();
     private final Map<UUID, UUID> sharedIdByOwner = new ConcurrentHashMap<>();
     private final Object lifecycleLock = new Object();
+    /** True while a requested sweep waits to run, so a burst of logins queues one sweep, not one each. */
+    private final java.util.concurrent.atomic.AtomicBoolean sweepQueued =
+            new java.util.concurrent.atomic.AtomicBoolean();
     @Nullable private ScheduledExecutorService sweeper;
     private boolean listening;
 
@@ -109,6 +112,12 @@ public final class SharedPresenceService implements AutoCloseable {
             return ownerId;
         }
         return sharedIdFor(ownerId);
+    }
+
+    /** True when {@code presenceId} is {@code ownerId} itself or that owner's shared presence id. */
+    boolean isPresenceIdOf(@Nullable UUID ownerId, @Nullable String presenceId) {
+        return ownerId != null && presenceId != null
+                && (presenceId.equals(ownerId.toString()) || presenceId.equals(sharedIdFor(ownerId).toString()));
     }
 
     /** Recomputes every sharing owner, and stops following owners who no longer share. */
@@ -190,10 +199,17 @@ public final class SharedPresenceService implements AutoCloseable {
             sweep();
             return;
         }
+        if (!sweepQueued.compareAndSet(false, true)) {
+            return;
+        }
         try {
-            executor.execute(this::sweepQuietly);
+            executor.execute(() -> {
+                sweepQueued.set(false);
+                sweepQuietly();
+            });
         } catch (RuntimeException rejected) {
             // Shutting down.
+            sweepQueued.set(false);
         }
     }
 
