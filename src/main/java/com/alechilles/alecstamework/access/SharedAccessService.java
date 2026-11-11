@@ -64,6 +64,7 @@ public final class SharedAccessService implements AutoCloseable {
 
     private volatile boolean enabled = true;
     private volatile AccessLevel maxLevel = AccessLevel.MANAGER;
+    private volatile java.util.function.Predicate<UUID> neverShared = profileId -> false;
     @Nullable private Path dataDirectory;
     @Nullable private ExecutorService saveExecutor;
     private boolean writable;
@@ -135,6 +136,14 @@ public final class SharedAccessService implements AutoCloseable {
         }
     }
 
+    /**
+     * Names the companions that no grant ever applies to, by profile id. Tamework uses it for
+     * bonded companions, which stay with their one player. The test must be an in-memory lookup.
+     */
+    public void setNeverShared(@Nonnull java.util.function.Predicate<UUID> profileTest) {
+        neverShared = Objects.requireNonNull(profileTest, "profileTest");
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -164,7 +173,8 @@ public final class SharedAccessService implements AutoCloseable {
         }
         OwnerGrants grants = grantsByOwner.get(ownerId);
         if (grants == null || !grants.sharesAnything()
-                || (profileId != null && grants.privateCompanions().contains(profileId))) {
+                || (profileId != null && (grants.privateCompanions().contains(profileId)
+                || neverShared.test(profileId)))) {
             return AccessLevel.NONE;
         }
         AccessLevel best = AccessLevel.NONE;
@@ -195,12 +205,13 @@ public final class SharedAccessService implements AutoCloseable {
         return grants != null && grants.sharesAnything();
     }
 
+    /** True when no grant applies to this companion: the owner marked it private, or it is never shared. */
     public boolean isPrivate(@Nullable UUID ownerId, @Nullable UUID profileId) {
         if (ownerId == null || profileId == null) {
             return false;
         }
         OwnerGrants grants = grantsByOwner.get(ownerId);
-        return grants != null && grants.privateCompanions().contains(profileId);
+        return (grants != null && grants.privateCompanions().contains(profileId)) || neverShared.test(profileId);
     }
 
     @Nonnull
@@ -362,6 +373,7 @@ public final class SharedAccessService implements AutoCloseable {
         changeListeners.clear();
         enabled = true;
         maxLevel = AccessLevel.MANAGER;
+        neverShared = profileId -> false;
     }
 
     @Nonnull

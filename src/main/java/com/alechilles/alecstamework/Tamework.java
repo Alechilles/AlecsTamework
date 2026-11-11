@@ -747,6 +747,13 @@ public class Tamework extends JavaPlugin {
             releaseFlow = new ReleaseFlow(companionModule.index(), companionModule.loaded(),
                     companionModule.writer()::queueSnapshotDelete);
             companionQueries = companionModule.queries();
+            // Bonded companions stay with their one player: no grant applies to them.
+            CompanionQueries sharedAccessQueries = companionQueries;
+            com.alechilles.alecstamework.access.SharedAccessService.get().setNeverShared(profileId -> {
+                com.alechilles.alecstamework.companion.index.CompanionRecord record =
+                        sharedAccessQueries.get(profileId);
+                return record != null && record.bonded();
+            });
             admissionProviderRegistry = new AdmissionProviderRegistry();
             providerAdmission = ProviderAdmission.of(managedActivityConfigRegistry, admissionProviderRegistry);
             ProviderDecisionCache providerDecisions = startProviderDecisionCache(providerAdmission);
