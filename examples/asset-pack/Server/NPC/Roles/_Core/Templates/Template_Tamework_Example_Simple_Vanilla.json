@@ -409,7 +409,8 @@
                 {
                   "Type": "Not",
                   "Sensor": {
-                    "Type": "TameworkIsOwner"
+                    "Type": "TameworkHasAccess",
+                    "MinLevel": "Caretaker"
                   }
                 },
                 {
@@ -655,7 +656,8 @@
               "Type": "And",
               "Sensors": [
                 {
-                  "Type": "TameworkIsOwner"
+                  "Type": "TameworkHasAccess",
+                  "MinLevel": "Caretaker"
                 },
                 {
                   "Type": "Target",
@@ -703,7 +705,8 @@
               "Type": "And",
               "Sensors": [
                 {
-                  "Type": "TameworkIsOwner"
+                  "Type": "TameworkHasAccess",
+                  "MinLevel": "Handler"
                 },
                 {
                   "Type": "State",
@@ -739,7 +742,8 @@
               "Type": "And",
               "Sensors": [
                 {
-                  "Type": "TameworkIsOwner"
+                  "Type": "TameworkHasAccess",
+                  "MinLevel": "Handler"
                 },
                 {
                   "Type": "Or",
@@ -786,7 +790,8 @@
                   "Type": "And",
                   "Sensors": [
                     {
-                      "Type": "TameworkIsOwner"
+                      "Type": "TameworkHasAccess",
+                      "MinLevel": "Handler"
                     },
                     {
                       "Type": "State",
