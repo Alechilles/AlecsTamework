@@ -54,6 +54,7 @@ class SharedPresenceServiceTest {
 
     @Test
     void privateCompanionFollowsItsOwnerEvenWhileASharerIsOnline() {
+        timeline.markOfflineForTests(owner, 0L);
         presence.onPlayerOnline(sharer);
         presence.sweep();
         UUID privateId = presence.presenceIdFor(owner, privateCompanion);
