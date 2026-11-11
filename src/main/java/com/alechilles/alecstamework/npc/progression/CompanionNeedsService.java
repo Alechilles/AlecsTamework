@@ -8,7 +8,9 @@ import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.access.SharedAccessService;
 import com.alechilles.alecstamework.companion.flow.DeathCauseKind;
+import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -630,9 +632,9 @@ public final class CompanionNeedsService {
         double hungerBeforeTick = hunger;
         double thirstBeforeTick = thirst;
         long lastUpdateMs = component.getLastUpdateMs();
-        UUID ownerId = resolveOwnerId(npcRef, store);
+        UUID presenceId = resolvePresenceId(npcRef, store);
         long effectiveElapsedMs = capLoadedTickElapsedMs(
-                resolveEffectiveElapsedMs(config, ownerId, lastUpdateMs, nowMs)
+                resolveEffectiveElapsedMs(config, presenceId, lastUpdateMs, nowMs)
         );
         boolean diagnosticsEnabled = isNeedsDamageDiagnosticsEnabled();
         String npcId = diagnosticsEnabled ? resolveNpcId(npcRef, store) : "<disabled>";
@@ -938,6 +940,24 @@ public final class CompanionNeedsService {
         }
         TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
         return links != null ? links.getOwnerId() : null;
+    }
+
+    /**
+     * The id whose presence drives this companion's needs and progression: its owner, or the
+     * owner's shared presence id when the owner shares it with other players.
+     */
+    @Nullable
+    static UUID resolvePresenceId(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        UUID ownerId = resolveOwnerId(npcRef, store);
+        if (ownerId == null || !SharedAccessService.get().sharesAnything(ownerId)) {
+            return ownerId;
+        }
+        ComponentType<EntityStore, TameworkCompanionComponent> companionType =
+                TameworkCompanionComponent.getComponentType();
+        TameworkCompanionComponent companion = companionType == null ? null
+                : store.getComponent(npcRef, companionType);
+        return SharedPresenceService.get().presenceIdFor(
+                ownerId, companion == null ? null : companion.getProfileId());
     }
 
     static boolean shouldSuppressNaturalRegen(@Nonnull TwNeedsConfig config,

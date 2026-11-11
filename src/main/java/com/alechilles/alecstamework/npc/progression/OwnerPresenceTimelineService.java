@@ -45,7 +45,18 @@ public final class OwnerPresenceTimelineService {
                 continue;
             }
             markOnline(playerRef.getUuid(), nowMs);
+            SharedPresenceService.get().onPlayerOnline(playerRef.getUuid());
         }
+    }
+
+    /** Marks a derived presence id online. Player ids arrive through the connect events instead. */
+    void markPresenceOnline(UUID presenceId) {
+        markOnline(presenceId, CompanionRuntimeClock.nowMs());
+    }
+
+    /** Marks a derived presence id offline. */
+    void markPresenceOffline(UUID presenceId) {
+        markOffline(presenceId, CompanionRuntimeClock.nowMs());
     }
 
     public void onPlayerConnect(@Nullable PlayerConnectEvent event) {
@@ -57,6 +68,7 @@ public final class OwnerPresenceTimelineService {
             return;
         }
         markOnline(ownerId, CompanionRuntimeClock.nowMs());
+        SharedPresenceService.get().onPlayerOnline(ownerId);
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
@@ -68,6 +80,7 @@ public final class OwnerPresenceTimelineService {
             return;
         }
         markOffline(ownerId, CompanionRuntimeClock.nowMs());
+        SharedPresenceService.get().onPlayerOffline(ownerId);
     }
 
     public long resolveEffectiveElapsedMs(@Nullable UUID ownerId,

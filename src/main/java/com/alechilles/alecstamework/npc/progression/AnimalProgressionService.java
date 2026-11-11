@@ -45,7 +45,8 @@ public final class AnimalProgressionService {
     /** Advances a component only; caller owns its ECS write. Unloaded intervals never inherit poor care. */
     static void advance(TameworkLifeStageComponent state, Ref<EntityStore> ref,
                         Store<EntityStore> store, boolean loaded) {
-        UUID owner = CompanionNeedsService.resolveOwnerId(ref, store);
+        // The clock id: the owner, or the owner's shared presence id for a shared companion.
+        UUID owner = CompanionNeedsService.resolvePresenceId(ref, store);
         String ownerText = owner == null ? null : owner.toString();
         long current = AnimalProgressionClock.get().current(owner);
         long elapsed = state.isProgressionInitialized() && !state.isStoredProgressionPaused()

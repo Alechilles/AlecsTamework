@@ -1,0 +1,197 @@
+package com.alechilles.alecstamework.access;
+
+import com.alechilles.alecstamework.api.access.AccessLevel;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Reads and writes every owner's grants as one small JSON file in the Tamework data folder.
+ * Callers keep file access off world threads. An entry that cannot be read is skipped; a file
+ * that cannot be read at all is reported so the caller leaves it untouched.
+ */
+public final class SharedAccessFileStore {
+    public static final String FILE_NAME = "shared-access.json";
+
+    private static final int CURRENT_VERSION = 1;
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+
+    private SharedAccessFileStore() {
+    }
+
+    @Nonnull
+    public static Path resolveFile(@Nonnull Path dataDirectory) {
+        return dataDirectory.resolve(FILE_NAME).toAbsolutePath().normalize();
+    }
+
+    /** Reads the saved grants. A missing file is an empty, writable result. */
+    @Nonnull
+    public static LoadResult load(@Nonnull Path dataDirectory) {
+        Path file = resolveFile(dataDirectory);
+        if (!Files.isRegularFile(file)) {
+            return new LoadResult(Map.of(), true);
+        }
+        try {
+            Document document = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), Document.class);
+            if (document == null) {
+                return new LoadResult(Map.of(), false);
+            }
+            Map<UUID, OwnerGrants> owners = new LinkedHashMap<>();
+            if (document.owners != null) {
+                for (Map.Entry<String, OwnerDocument> entry : document.owners.entrySet()) {
+                    UUID ownerId = parseUuid(entry.getKey());
+                    OwnerGrants grants = ownerId == null ? null : toGrants(entry.getValue());
+                    if (grants != null && !grants.isEmpty()) {
+                        owners.put(ownerId, grants);
+                    }
+                }
+            }
+            return new LoadResult(owners, true);
+        } catch (Exception unreadable) {
+            return new LoadResult(Map.of(), false);
+        }
+    }
+
+    /** Writes one complete snapshot, replacing the file atomically where the filesystem allows. */
+    public static boolean save(@Nonnull Path dataDirectory, @Nonnull Map<UUID, OwnerGrants> owners) {
+        Path file = resolveFile(dataDirectory);
+        try {
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Document document = new Document();
+            document.version = CURRENT_VERSION;
+            document.owners = new LinkedHashMap<>();
+            for (Map.Entry<UUID, OwnerGrants> entry : owners.entrySet()) {
+                if (!entry.getValue().isEmpty()) {
+                    document.owners.put(entry.getKey().toString(), toDocument(entry.getValue()));
+                }
+            }
+            Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
+            Files.writeString(temporary, GSON.toJson(document) + System.lineSeparator(), StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception atomicMoveUnsupported) {
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (Exception failed) {
+            return false;
+        }
+    }
+
+    @Nullable
+    private static OwnerGrants toGrants(@Nullable OwnerDocument owner) {
+        if (owner == null) {
+            return null;
+        }
+        Map<UUID, OwnerGrants.PlayerGrant> players = new LinkedHashMap<>();
+        if (owner.players != null) {
+            for (Map.Entry<String, PlayerDocument> entry : owner.players.entrySet()) {
+                UUID playerId = parseUuid(entry.getKey());
+                AccessLevel level = entry.getValue() == null ? null : parseLevel(entry.getValue().level);
+                if (playerId != null && level != null) {
+                    players.put(playerId, new OwnerGrants.PlayerGrant(playerId, entry.getValue().name, level));
+                }
+            }
+        }
+        Map<String, AccessLevel> groups = new LinkedHashMap<>();
+        if (owner.groups != null) {
+            for (Map.Entry<String, String> entry : owner.groups.entrySet()) {
+                AccessLevel level = parseLevel(entry.getValue());
+                if (entry.getKey() != null && !entry.getKey().isBlank() && level != null) {
+                    groups.put(entry.getKey(), level);
+                }
+            }
+        }
+        Set<UUID> privateCompanions = new LinkedHashSet<>();
+        if (owner.privateCompanions != null) {
+            for (String raw : owner.privateCompanions) {
+                UUID profileId = parseUuid(raw);
+                if (profileId != null) {
+                    privateCompanions.add(profileId);
+                }
+            }
+        }
+        return new OwnerGrants(players, groups, privateCompanions);
+    }
+
+    @Nonnull
+    private static OwnerDocument toDocument(@Nonnull OwnerGrants grants) {
+        OwnerDocument owner = new OwnerDocument();
+        owner.players = new LinkedHashMap<>();
+        for (OwnerGrants.PlayerGrant grant : grants.players().values()) {
+            PlayerDocument player = new PlayerDocument();
+            player.name = grant.playerName();
+            player.level = grant.level().name();
+            owner.players.put(grant.playerId().toString(), player);
+        }
+        owner.groups = new LinkedHashMap<>();
+        grants.groups().forEach((groupId, level) -> owner.groups.put(groupId, level.name()));
+        owner.privateCompanions = new ArrayList<>();
+        grants.privateCompanions().forEach(profileId -> owner.privateCompanions.add(profileId.toString()));
+        return owner;
+    }
+
+    @Nullable
+    private static AccessLevel parseLevel(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            AccessLevel level = AccessLevel.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+            return level.isGrantable() ? level : null;
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static UUID parseUuid(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw.trim());
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
+    }
+
+    /** The saved grants, and whether the file may be replaced. */
+    public record LoadResult(@Nonnull Map<UUID, OwnerGrants> owners, boolean writable) {
+        public LoadResult {
+            owners = Map.copyOf(owners);
+        }
+    }
+
+    private static final class Document {
+        private Integer version;
+        private LinkedHashMap<String, OwnerDocument> owners;
+    }
+
+    private static final class OwnerDocument {
+        private LinkedHashMap<String, PlayerDocument> players;
+        private LinkedHashMap<String, String> groups;
+        private List<String> privateCompanions;
+    }
+
+    private static final class PlayerDocument {
+        private String name;
+        private String level;
+    }
+}

@@ -731,6 +731,8 @@ public class Tamework extends JavaPlugin {
                 .resolveAndInitializeDataPathLayout(getDataDirectory());
         runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
+        com.alechilles.alecstamework.access.SharedAccessService.get().start(runtimeDataDirectory);
+        com.alechilles.alecstamework.npc.progression.SharedPresenceService.get().start();
         openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
         CompanionQueries companionQueries = null;
@@ -2234,6 +2236,8 @@ public class Tamework extends JavaPlugin {
         ownerPopulationLiveIndex.clear();
         LinkedNpcPanelPortraitItemIndex.clear();
         AvatarFlightStaleOwnerRecoveryRegistry.clear();
+        com.alechilles.alecstamework.npc.progression.SharedPresenceService.get().close();
+        com.alechilles.alecstamework.access.SharedAccessService.get().close();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().close();
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
