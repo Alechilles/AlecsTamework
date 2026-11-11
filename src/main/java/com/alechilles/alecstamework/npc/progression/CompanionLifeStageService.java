@@ -649,7 +649,7 @@ public final class CompanionLifeStageService {
             return;
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        if (stage == null || (!stage.isGrowthScalingEnabled() && !agingEnabled(npcRef, store))) {
+        if (stage == null || (!stage.isGrowthScalingEnabled() && !isAgingEnabled(npcRef, store))) {
             return;
         }
         UUID npcUuid = npc != null ? npc.getUuid() : null;
@@ -1363,10 +1363,11 @@ public final class CompanionLifeStageService {
             return false;
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        return stage != null && (stage.isGrowthScalingEnabled() || agingEnabled(npcRef, store));
+        return stage != null && (stage.isGrowthScalingEnabled() || isAgingEnabled(npcRef, store));
     }
 
-    private static boolean agingEnabled(Ref<EntityStore> ref, Store<EntityStore> store) {
+    /** Whether this NPC's current role has adult aging turned on. */
+    public static boolean isAgingEnabled(Ref<EntityStore> ref, Store<EntityStore> store) {
         TwBreedingConfig config = TwBreedingConfig.resolveForRole(CompanionRoleIdResolver.resolveRoleId(ref, store));
         return config != null && config.resolveAging(CompanionRoleIdResolver.resolveRoleId(ref, store)).isEnabled();
     }

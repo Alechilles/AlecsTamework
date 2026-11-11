@@ -131,7 +131,22 @@ public final class AnimalProgressionService {
     public static AnimalAgingPolicy.Progress aging(@Nullable Ref<EntityStore> ref,
                                                    @Nullable Store<EntityStore> store,
                                                    @Nullable String role) {
-        TameworkLifeStageComponent state = state(ref, store);
+        return aging(state(ref, store), role);
+    }
+
+    /**
+     * Age as of now: the time since the last checkpoint is settled on a detached copy, as the companion panel
+     * shows it. A cull reads this, so an animal the panel calls Prime is culled as Prime even when its
+     * checkpoint is behind.
+     */
+    @Nullable
+    private static AnimalAgingPolicy.Progress settledAging(Ref<EntityStore> ref, Store<EntityStore> store,
+                                                           String role) {
+        return aging(snapshot(ref, store), role);
+    }
+
+    @Nullable
+    private static AnimalAgingPolicy.Progress aging(@Nullable TameworkLifeStageComponent state, @Nullable String role) {
         TwBreedingConfig config = TwBreedingConfig.resolveForRole(role);
         if (state == null || config == null || !config.resolveAging(role).isEnabled()) return null;
         return AnimalAgingPolicy.advance(resolveAgingSettings(config, role), state.getAgeProgressMs(), 0, false, 100, 100);
@@ -140,7 +155,7 @@ public final class AnimalProgressionService {
     /** Lifecycle yield modifies expected output, preserving unbiased fractional item rounding. */
     public static double slaughterMultiplier(Ref<EntityStore> ref, Store<EntityStore> store, String role) {
         if (!CompanionLifeStageService.isAdult(ref, store, role)) return 0;
-        AnimalAgingPolicy.Progress value = aging(ref, store, role);
+        AnimalAgingPolicy.Progress value = settledAging(ref, store, role);
         return value == null ? 1 : value.dead() ? 0 : value.yieldMultiplier();
     }
 
@@ -151,7 +166,7 @@ public final class AnimalProgressionService {
     @Nullable
     public static AnimalAgeStage ageStage(Ref<EntityStore> ref, Store<EntityStore> store, String role) {
         if (!CompanionLifeStageService.isAdult(ref, store, role)) return AnimalAgeStage.JUVENILE;
-        AnimalAgingPolicy.Progress value = aging(ref, store, role);
+        AnimalAgingPolicy.Progress value = settledAging(ref, store, role);
         if (value == null) return null;
         return switch (value.stage()) {
             case ADULT -> AnimalAgeStage.ADULT;
