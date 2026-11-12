@@ -908,7 +908,7 @@ tamework.ui.settings.tooltip.claimMod=Which claim mod to use. Automatic uses Sim
 tamework.ui.settings.tooltip.claimLimitChunk=Owned companions allowed in a claim for each chunk it covers: a 4-chunk claim with a limit of 3 allows 12. Taming and breeding stop at the limit; companions that walk in are not blocked. 0 = no limit.
 tamework.ui.settings.tooltip.claimLimitTotal=Most owned companions allowed in one claim, whatever its size. When both limits are set, the lower one applies. 0 = no limit.
 tamework.ui.settings.tooltip.breedingRequiresClaim=Breeding only works inside a claim of the selected claim mod, even when no claim limit is set.
-tamework.ui.settings.tooltip.simpleClaimsProtect=Inside a claim, players can hurt a tamed animal only when the claim mod allows it: SimpleClaims' member, ally and outsider rules, or QuestLines Claims' rule for hurting creatures. Players with the damage bypass permission (tamework.damage_tamed_claim_npc by default) always can. If the claim mod cannot be checked, damage is allowed.
+tamework.ui.settings.tooltip.simpleClaimsProtect=Players can hurt a tamed animal only when the claim mod allows it. With SimpleClaims this applies inside claims and follows its member, ally and outsider rules. With QuestLines Claims it follows QuestLines' rule for hurting creatures wherever QuestLines sets one: claims, regions and the wilderness. Players with the damage bypass permission (tamework.damage_tamed_claim_npc by default) always can. If the claim mod cannot be checked, damage is allowed.
 tamework.ui.settings.tooltip.telemetrySection=Telemetry consent is managed by the shared Beacon command.
 
 tamework.ui.commandTargetHud.name.unknown=Companion

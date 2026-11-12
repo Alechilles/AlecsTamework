@@ -36,6 +36,12 @@ public enum ClaimModChoice {
         if (value == null) {
             return AUTOMATIC;
         }
+        // Resolved settings hold the saved form, read on every damage and claim check.
+        for (ClaimModChoice choice : values()) {
+            if (choice.configValue.equals(value)) {
+                return choice;
+            }
+        }
         String normalized = value.trim()
                 .replace("-", "")
                 .replace("_", "")

@@ -347,14 +347,10 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     /** The claim mod whose damage rules apply, from the settings in {@code globalConfig}. */
     @Nonnull
     private ClaimModChoice selectClaimMod(@Nullable TwGlobalConfig globalConfig) {
-        try {
-            return ClaimModSelector.select(
-                    TameworkRuntimeSettings.claimMod(globalConfig != null ? globalConfig.getSimpleClaimsProvider() : null),
-                    installedClaimMods
-            );
-        } catch (RuntimeException failed) {
-            return ClaimModChoice.SIMPLE_CLAIMS;
-        }
+        return ClaimModSelector.select(
+                TameworkRuntimeSettings.claimMod(globalConfig != null ? globalConfig.getSimpleClaimsProvider() : null),
+                installedClaimMods
+        );
     }
 
     private boolean hasServerPermission(@Nonnull UUID attackerPlayerUuid,

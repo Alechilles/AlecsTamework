@@ -27,9 +27,9 @@ public final class SimpleClaimsClaimModProvider implements ClaimModProvider {
                 yield info == null || info.partyId() == null
                         ? ClaimLookupResult.error("claim-info-missing")
                         : ClaimLookupResult.found("simpleclaims:" + info.partyId(),
-                                info.claimChunkCount(), info.partyId());
+                                info.claimChunkCount());
             }
-            case NO_CLAIM -> new ClaimLookupResult(ClaimLookupResult.Status.NO_CLAIM, null, 0, null, lookup.message());
+            case NO_CLAIM -> new ClaimLookupResult(ClaimLookupResult.Status.NO_CLAIM, null, 0, lookup.message());
             case UNAVAILABLE -> ClaimLookupResult.unavailable(lookup.message());
             case ERROR -> ClaimLookupResult.error(lookup.message());
         };

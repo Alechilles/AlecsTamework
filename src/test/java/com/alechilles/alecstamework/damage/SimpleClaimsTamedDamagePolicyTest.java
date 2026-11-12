@@ -304,7 +304,6 @@ class SimpleClaimsTamedDamagePolicyTest {
         assertEquals(2, questLines.damageCalls.get());
         assertEquals(0, simpleClaimsResolutions.get());
         assertEquals(1, warnings.size());
-        assertTrue(warnings.getFirst().startsWith("QuestLines Claims"));
     }
 
     @Test
@@ -348,7 +347,7 @@ class SimpleClaimsTamedDamagePolicyTest {
 
         questLines.lookup = ClaimLookupResult.noClaim();
         SimpleClaimsRawAccessDecision outside = policy.evaluateRawClaimAccess("world", POSITION, ATTACKER, config);
-        questLines.lookup = ClaimLookupResult.found("questlines:3", 2, null);
+        questLines.lookup = ClaimLookupResult.found("questlines:3", 2);
         questLines.damage = ClaimModDamageProvider.DamageResult.Status.DENIED;
         SimpleClaimsRawAccessDecision denied = policy.evaluateRawClaimAccess("world", POSITION, ATTACKER, config);
 

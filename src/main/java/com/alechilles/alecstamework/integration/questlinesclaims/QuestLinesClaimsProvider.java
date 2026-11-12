@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.plugin.PluginManager;
 import com.hypixel.hytale.server.core.plugin.PluginState;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -30,8 +31,10 @@ import org.joml.Vector3d;
  * {@code QuestLinesClaimsAPI.canPlayerAct(PlayerRef, String, Vector3i, RegionFlags)}. The damage
  * rule is the {@code PVE} flag, which QuestLines describes as hurting creatures.</p>
  *
- * <p>Call on the world thread. Nothing here reads entity components: the attacker's
- * {@link PlayerRef} comes from the universe's player list by UUID.</p>
+ * <p>Call on the world thread. The attacker's {@link PlayerRef} comes from the universe's player
+ * list by UUID. QuestLines may read the attacker's components inside {@code canPlayerAct} (for its
+ * permission groups), so the damage check runs only on the thread of the world the attacker is in
+ * and reports an error, which lets the damage through, anywhere else.</p>
  */
 public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
     private static final System.Logger LOGGER = System.getLogger(QuestLinesClaimsProvider.class.getName());
@@ -44,20 +47,16 @@ public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
     @Nullable
     @Override
     public String unavailableReason() {
-        PluginBase plugin = enabledPlugin();
-        if (plugin == null) {
-            return NOT_ENABLED;
-        }
-        Bound current = bind(plugin);
-        return current.binding() != null ? null : current.failure();
+        return unavailableReason(current());
     }
 
     @Nonnull
     @Override
     public ClaimLookupResult lookupClaim(@Nonnull String worldName, @Nonnull Vector3d position) {
-        Binding binding = binding();
+        Bound current = current();
+        Binding binding = current == null ? null : current.binding();
         if (binding == null) {
-            return ClaimLookupResult.unavailable(firstNonNull(unavailableReason(), NOT_ENABLED));
+            return ClaimLookupResult.unavailable(unavailableReason(current));
         }
         try {
             Object api = binding.api();
@@ -72,7 +71,7 @@ public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
             Object claimId = binding.getClaimId().invoke(claim);
             Object chunks = binding.getChunks().invoke(claim);
             int chunkCount = chunks instanceof Collection<?> collection ? collection.size() : 0;
-            return ClaimLookupResult.found("questlines:" + claimId, chunkCount, null);
+            return ClaimLookupResult.found("questlines:" + claimId, chunkCount);
         } catch (InvocationTargetException thrown) {
             return ClaimLookupResult.error("QuestLines Claims claim lookup failed: " + message(thrown.getCause()));
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failed) {
@@ -85,13 +84,18 @@ public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
     public DamageResult evaluateTamedDamage(@Nonnull String worldName,
                                             @Nonnull Vector3d position,
                                             @Nonnull UUID attackerPlayerUuid) {
-        Binding binding = binding();
+        Bound current = current();
+        Binding binding = current == null ? null : current.binding();
         if (binding == null) {
-            return new DamageResult(DamageResult.Status.UNAVAILABLE, firstNonNull(unavailableReason(), NOT_ENABLED));
+            return new DamageResult(DamageResult.Status.UNAVAILABLE, unavailableReason(current));
         }
         PlayerRef attacker = onlinePlayer(attackerPlayerUuid);
         if (attacker == null) {
             return new DamageResult(DamageResult.Status.ERROR, "The attacking player is not online.");
+        }
+        if (!onAttackerWorldThread(attacker, worldName)) {
+            return new DamageResult(DamageResult.Status.ERROR,
+                    "The attacking player is not in world " + worldName + " on its thread.");
         }
         try {
             Object api = binding.api();
@@ -118,10 +122,20 @@ public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
         bound = null;
     }
 
+    /** The binding for the enabled plugin instance, or null when QuestLines is not enabled. */
     @Nullable
-    private Binding binding() {
+    private Bound current() {
         PluginBase plugin = enabledPlugin();
-        return plugin == null ? null : bind(plugin).binding();
+        return plugin == null ? null : bind(plugin);
+    }
+
+    /** Why {@code current} cannot answer, or null when it can. */
+    @Nullable
+    private static String unavailableReason(@Nullable Bound current) {
+        if (current == null) {
+            return NOT_ENABLED;
+        }
+        return current.binding() != null ? null : current.failure();
     }
 
     @Nonnull
@@ -164,13 +178,16 @@ public final class QuestLinesClaimsProvider implements ClaimModDamageProvider {
         return universe == null ? null : universe.getPlayer(playerUuid);
     }
 
-    private static int floor(double value) {
-        return (int) Math.floor(value);
+    /** True when the attacker is in {@code worldName} and this is that world's thread. */
+    private static boolean onAttackerWorldThread(@Nonnull PlayerRef attacker, @Nonnull String worldName) {
+        UUID worldUuid = attacker.getWorldUuid();
+        Universe universe = Universe.get();
+        World world = worldUuid == null || universe == null ? null : universe.getWorld(worldUuid);
+        return world != null && worldName.equals(world.getName()) && world.isInThread();
     }
 
-    @Nonnull
-    private static String firstNonNull(@Nullable String preferred, @Nonnull String fallback) {
-        return preferred == null ? fallback : preferred;
+    private static int floor(double value) {
+        return (int) Math.floor(value);
     }
 
     @Nonnull

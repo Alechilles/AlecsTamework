@@ -177,7 +177,7 @@ class BreedingClaimLimitPolicyServiceTest {
     /** A claim from any claim mod is keyed by its world and claim key and capped by its own size. */
     @Test
     void claimModLookupIsKeyedByClaimKeyAndCappedByItsChunkCount() throws Exception {
-        ClaimModProvider questLines = (world, position) -> ClaimLookupResult.found("questlines:7", 4, null);
+        ClaimModProvider questLines = (world, position) -> ClaimLookupResult.found("questlines:7", 4);
         BreedingClaimLimitPolicyService.ResolvedClaim resolved =
                 BreedingClaimLimitPolicyService.resolveClaim(questLines, "world", new Vector3d(1.5, 64.0, 1.5));
 
