@@ -110,6 +110,14 @@ public final class DirectLiveCoopProduceService {
     }
 
     /**
+     * When the next roam window opens: the earliest game time after {@code nowMs} whose hour of
+     * day is {@code roamStartHour}. Outside the roam hours this is the next morning sweep.
+     */
+    public static long nextRoamStartMs(long nowMs, int roamStartHour) {
+        return roamWindowStartMs(nowMs, roamStartHour) + GAME_MILLIS_PER_DAY;
+    }
+
+    /**
      * The next watermark. A watermark inside the current roam window (from {@code windowStartMs}
      * up to now) is kept and nothing is produced: this window already ran for the resident. No
      * watermark (0) starts at {@code nowMs} without producing. Otherwise the due units, when

@@ -95,6 +95,25 @@ class DirectLiveCoopProduceServiceTest {
         assertEquals(midday + DAY, nextDay);
     }
 
+    @Test
+    void passPulledForwardToTheNextRoamStartIsNotRepeatedByTheRealMorningSweep() {
+        // The coop debug fast-forward runs the next window's pass early, at that window's start.
+        List<Integer> produced = new ArrayList<>();
+        long evening = MORNING - DAY + 14L * HOUR; // 20:00
+        long enteredAtDusk = evening - 2L * HOUR;
+        long nextStart = DirectLiveCoopProduceService.nextRoamStartMs(evening, ROAM_START_HOUR);
+
+        long afterHook = advance(enteredAtDusk, nextStart, produced);
+        long afterRealMorning = advance(afterHook, MORNING + 1_000L, produced);
+
+        assertEquals(MORNING, nextStart);
+        assertEquals(List.of(1), produced);
+        assertEquals(MORNING, afterRealMorning);
+        // From inside a roam window it is the next day's start, on a negative clock as well.
+        assertEquals(NEGATIVE_MORNING + DAY,
+                DirectLiveCoopProduceService.nextRoamStartMs(NEGATIVE_MORNING, ROAM_START_HOUR));
+    }
+
     private static int units(long elapsedMs, long intervalHours) {
         return DirectLiveCoopProduceService.unitsDue(MORNING - elapsedMs, MORNING, intervalHours);
     }

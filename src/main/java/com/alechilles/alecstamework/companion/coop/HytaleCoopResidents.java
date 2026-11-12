@@ -20,6 +20,9 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.reference.PersistentRef;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -35,6 +38,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -54,6 +58,8 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     /** Sweeps (one per second) a loaded chunk must show no coop before its imported residents are moved out. */
     private static final int SWEEPS_WITHOUT_COOP = 5;
+    /** The instance the coop systems run, for the debug commands; null while the coop systems are not running. */
+    private static final AtomicReference<HytaleCoopResidents> CURRENT = new AtomicReference<>();
 
     private final RestoreFlow<Ref<EntityStore>> restoreFlow;
     private final HytaleCompanionSpawner spawner;
@@ -74,6 +80,21 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         Objects.requireNonNull(index, "index");
         this.release = new CoopRelease(index::get, this, System::currentTimeMillis);
         this.imports = new CoopImportedResidents(index);
+    }
+
+    /** Makes {@code residents} the one the debug commands use. */
+    public static void install(@Nonnull HytaleCoopResidents residents) {
+        CURRENT.set(Objects.requireNonNull(residents, "residents"));
+    }
+
+    /** The installed instance, or null while the coop systems are not running. */
+    @Nullable
+    public static HytaleCoopResidents current() {
+        return CURRENT.get();
+    }
+
+    public static void uninstall() {
+        CURRENT.set(null);
     }
 
     /** True while {@code world} has residents imported from 3.x or 4.x that are not in a coop block yet (plan 7 R20). */
@@ -209,19 +230,12 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         if (block == null || block.slots() == null) {
             return;
         }
-        List<DirectLiveCoopProduceService.Resident> residents = new ArrayList<>();
-        for (TameworkCoopSlotsComponent.Slot entry : block.slots().slots()) {
-            if (release.resident(at, entry)) {
-                residents.add(resident(entry));
-            }
-        }
+        List<DirectLiveCoopProduceService.Resident> residents = residents(at, block.slots());
         if (residents.isEmpty()) {
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
-        List<TameworkCoopSlotsComponent.Slot> changed = produce.produce(coop, residents,
-                CompanionWorldTime.gameTimeMs(store));
-        writeEntries(block, changed);
+        writeEntries(block, produce.produce(coop, residents, CompanionWorldTime.gameTimeMs(store)));
         for (DirectLiveCoopProduceService.Resident resident : residents) {
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
             if (release.releasableNow(at, entry)) {
@@ -230,6 +244,98 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
                 return;
             }
         }
+    }
+
+    /** The current residents of a coop (not stale entries, no release running), in slot order. */
+    private List<DirectLiveCoopProduceService.Resident> residents(CoopRelease.At at, TameworkCoopSlotsComponent slots) {
+        List<DirectLiveCoopProduceService.Resident> residents = new ArrayList<>();
+        for (TameworkCoopSlotsComponent.Slot entry : slots.slots()) {
+            if (release.resident(at, entry)) {
+                residents.add(resident(entry));
+            }
+        }
+        return residents;
+    }
+
+    /** How a {@link #advanceProduce} call ended. */
+    public enum AdvanceStatus {
+        /** The produce pass of the next roam window ran now. */
+        PRODUCED,
+        /** The advance ends before the next roam window opens; nothing changed. */
+        NOT_REACHED,
+        /** The coop is in its roam hours: the schedule's own sweep produces and releases within a second. */
+        ROAMING_NOW,
+        /** The world has no game time. */
+        NO_GAME_TIME,
+        /** The coop block could not be read. */
+        UNREADABLE
+    }
+
+    /**
+     * {@code produceAtMs} is the game time the pass ran at (the next roam start), 0 when it did not run.
+     * {@code items} counts item units in the coop container.
+     */
+    public record ProduceAdvance(@Nonnull AdvanceStatus status, long nowMs, long untilRoamMs, long produceAtMs,
+                                 int residents, int itemsBefore, int itemsAfter) {
+    }
+
+    /**
+     * Test hook: moves this one coop's produce clock forward by {@code advanceMs} of game time,
+     * never the world's time of day. When that reaches the next roam window, runs now the produce
+     * pass the schedule would run at that window's start, through the same rules
+     * ({@link DirectLiveCoopProduceService#produce}: units from the hours since each resident's
+     * intake, the catch-up cap, drops by role, items per unit, a full container). The watermarks
+     * are left at that window's start, so the real morning sweep finds them inside its window and
+     * does not produce again; it still releases the residents at the real morning. Only the first
+     * window counts, because the residents leave at it. Call on the coop's world thread.
+     */
+    @Nonnull
+    public ProduceAdvance advanceProduce(@Nonnull World world, @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop,
+                                         @Nonnull WorldTimeResource worldTime, long advanceMs) {
+        long nowMs = CompanionWorldTime.gameTimeMs(world.getEntityStore().getStore());
+        TwCoopConfig config = coop.config();
+        if (nowMs == 0L || config == null) {
+            return new ProduceAdvance(config == null ? AdvanceStatus.UNREADABLE : AdvanceStatus.NO_GAME_TIME,
+                    nowMs, 0L, 0L, 0, 0, 0);
+        }
+        if (CoopScheduleSystem.roaming(worldTime, config)) {
+            return new ProduceAdvance(AdvanceStatus.ROAMING_NOW, nowMs, 0L, 0L, 0, 0, 0);
+        }
+        Vector3i b = coop.block();
+        HytaleCoopIntake.Block block = HytaleCoopIntake.block(world, b.x, b.y, b.z);
+        if (block == null) {
+            return new ProduceAdvance(AdvanceStatus.UNREADABLE, nowMs, 0L, 0L, 0, 0, 0);
+        }
+        long roamStartMs = DirectLiveCoopProduceService.nextRoamStartMs(nowMs,
+                config.getLifecycleRules().getResidentRoamStartHour());
+        List<DirectLiveCoopProduceService.Resident> residents = block.slots() == null ? List.of()
+                : residents(new CoopRelease.At(world.getName(), b.x, b.y, b.z), block.slots());
+        int itemsBefore = itemUnits(coop.container());
+        long untilRoamMs = roamStartMs - nowMs;
+        if (advanceMs < untilRoamMs) {
+            return new ProduceAdvance(AdvanceStatus.NOT_REACHED, nowMs, untilRoamMs, 0L, residents.size(),
+                    itemsBefore, itemsBefore);
+        }
+        if (!residents.isEmpty()) {
+            writeEntries(block, produce.produce(coop, residents, roamStartMs));
+            produce.syncInteractionState(world, coop);
+        }
+        return new ProduceAdvance(AdvanceStatus.PRODUCED, nowMs, untilRoamMs, roamStartMs, residents.size(),
+                itemsBefore, itemUnits(coop.container()));
+    }
+
+    private static int itemUnits(@Nullable ItemContainer container) {
+        if (container == null) {
+            return 0;
+        }
+        int units = 0;
+        for (short slot = 0; slot < container.getCapacity(); slot++) {
+            ItemStack stack = container.getItemStack(slot);
+            if (stack != null && !stack.isEmpty()) {
+                units += stack.getQuantity();
+            }
+        }
+        return units;
     }
 
     /**

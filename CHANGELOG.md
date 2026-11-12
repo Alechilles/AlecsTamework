@@ -24,6 +24,12 @@
 - For admins and test scripts: `/tw debug share add|remove|list ... --owner <uuid|name>` shares an owner's animals
   for them from the server console, without the owner's confirmation. Each change is written to the server log
   with the admin who made it.
+- For admins and test scripts: `/tw debug coop advance <seconds> --at <x> <y> <z> [--world <name>]` moves one coop's
+  produce clock forward by game seconds, without changing the world's time of day. When that reaches the coop's
+  next roam window, its residents produce now what that window's first sweep would give, through the same rules
+  (hours since intake, the catch-up cap, drops by role, a full coop). The real morning then releases them without
+  producing again. It works from the server console; the reply is one `ok ...` line with the game seconds to the
+  next roam window and the item count in the coop before and after.
 
 ### Changed
 

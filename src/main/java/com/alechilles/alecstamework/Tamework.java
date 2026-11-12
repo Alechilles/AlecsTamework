@@ -2008,6 +2008,9 @@ public class Tamework extends JavaPlugin {
                 new com.alechilles.alecstamework.companion.coop.HytaleCoopResidents(module.index(), restoreFlow,
                         new HytaleCompanionSpawner(TameworkCompanionComponent.getComponentType(), module.index()::get,
                                 module.writer()::queueSnapshot, module.writer()::queueSnapshotDelete));
+        if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+            com.alechilles.alecstamework.companion.coop.HytaleCoopResidents.install(coopResidents);
+        }
         deferChunkSystem(TameworkRuntimeModule.GENERIC_PERSISTENCE, "coopschedulesystem",
                 () -> new com.alechilles.alecstamework.companion.coop.CoopScheduleSystem(coopIntake, coopResidents,
                         coopCaptureReceiptsComponentType));
@@ -2048,6 +2051,7 @@ public class Tamework extends JavaPlugin {
         // Coop intake stops first so no intake commits after the flush.
         getEventRegistry().register((short) -28, ShutdownEvent.class, event -> {
             com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+            com.alechilles.alecstamework.companion.coop.HytaleCoopResidents.uninstall();
             module.shutdown(System.currentTimeMillis() + 10_000L);
             // After the files are written: what they hold goes to the network store, best effort.
             PortableSync network = portableSync;
@@ -2226,6 +2230,7 @@ public class Tamework extends JavaPlugin {
                 commandNpcRelocationService = null;
             }
             com.alechilles.alecstamework.companion.coop.HytaleCoopIntake.uninstall();
+            com.alechilles.alecstamework.companion.coop.HytaleCoopResidents.uninstall();
             com.alechilles.alecstamework.companion.migrate.LegacyItemAdoption.install(
                     com.alechilles.alecstamework.companion.migrate.LegacyAliases.EMPTY);
         } finally {

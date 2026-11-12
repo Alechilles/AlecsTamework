@@ -252,7 +252,7 @@ public final class CoopScheduleSystem extends TickingSystem<ChunkStore> {
     }
 
     /** True inside the coop's roam hours (residents are out); start == end means always. */
-    private static boolean roaming(WorldTimeResource worldTime, TwCoopConfig config) {
+    static boolean roaming(WorldTimeResource worldTime, TwCoopConfig config) {
         Instant gameTime = worldTime.getGameTime();
         int hour = (gameTime == null ? Instant.now() : gameTime).atZone(ZoneOffset.UTC).getHour();
         int start = config.getLifecycleRules().getResidentRoamStartHour();

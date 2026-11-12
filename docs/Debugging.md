@@ -393,11 +393,23 @@ but `tw npc find` then says it is not valid in-world and every `--entity` comman
 the local rig, 2026-11-12). With no content pack that turns on needs, growth or leveling for a role, the matching
 commands refuse in words, and `growth advance` counts 0 seconds while the progression clock is stopped.
 
+Coop produce runs on the coop world's game time (30 times faster than real time by default): residents taken in
+outside the coop's roam hours produce once, at the first sweep of the next roam window, and leave then.
+`coop advance` takes game seconds and moves only that coop's produce clock, never the world's time of day. Once the
+advance reaches the next roam window it runs that window's produce pass now (units from the hours since each
+resident's intake, the catch-up cap, drops by role, `ItemsPerTick`, a full coop) and leaves each watermark at the
+window's start, so the real morning releases the residents without producing again; a second call before then
+produces nothing. `86400` always reaches the next window. It refuses with `reason=roaming-now` inside the roam hours
+(the schedule then produces and releases within a second) and with `reason=no-coop` when the block is not a managed
+coop or its land is not loaded. Its release is not fast-forwarded: residents stay in the coop until the real
+morning.
+
 | What | Command | Example reply |
 |---|---|---|
 | Fast-forward growth and aging, through the owner clock's offline rule (also moves harvest and breeding deadlines) | `tw debug growth advance <seconds> --entity <uuid>` | `ok entity=<uuid> requestedSeconds=3600.000 countedSeconds=3600.000 stage=Baby->Adult role=Cow_Calf roleChange=requested oldAgeDeath=false` |
 | Fast-forward needs, through the owner-presence gate | `tw debug needs advance <seconds> --entity <uuid>` | `Advanced needs for NPC <uuid>: requestedSeconds=600.000 countedSeconds=600.000 hunger=80.000->72.000 thirst=90.000->84.000` |
 | Move an offline owner's offline start back (shared by all that owner's animals, saved) | `tw debug owner offline-age <ownerUuid> <seconds>` | `ok owner=<uuid> movedSeconds=259200.000 presenceOfflineSeconds=259260.000 progressionOfflineSeconds=259260.000` |
+| Fast-forward one coop's produce clock by game seconds, through the coop's produce rules (see above) | `tw debug coop advance <seconds> --at <x> <y> <z> [--world <name>]` | `ok coop=coop_chicken world=default x=10 y=64 z=-4 requestedGameSeconds=86400.000 untilRoamGameSeconds=28800.000 produced=true producedAtGameMs=... residents=1 items=0->1` |
 | Read harvest readiness without changing it | `tw debug get alarm <uuid> [AlarmName]` | `ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=... nowMs=... remainingMs=34567` |
 | Read a companion: owner, sharers, stage, level, XP, happiness, needs, harvest and breeding readiness, traits | `tw debug get companion --entity <uuid>` | `ok entity=<uuid> role=Cow tamed=true owner=<uuid> sharers=none stage=Adult level=3 xp=12.00 totalXp=112.00 happiness=72.50 hunger=80.00 thirst=64.00 harvestReady=true harvestRemainingMs=0 breedingReady=false breedingCooldownRemainingMs=420000 traits=none` |
 | Read happiness, life stage, owner, role, tamed, traits (human-readable lines) | `tw debug get happiness\|lifestage\|owner\|role\|tamed\|traits --entity <uuid>` | `Owner for NPC <uuid> is <uuid>` |

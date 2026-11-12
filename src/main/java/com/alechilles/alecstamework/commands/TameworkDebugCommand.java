@@ -19,6 +19,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugGetCommand());
         addSubCommand(new TameworkDebugNeedsCommand());
         addSubCommand(new TameworkDebugGrowthCommand());
+        addSubCommand(new TameworkDebugCoopGroupCommand());
         addSubCommand(new TameworkDebugOwnerCommand());
         addSubCommand(new TameworkDebugShareCommand());
         addSubCommand(new TameworkDebugLogCommand());
