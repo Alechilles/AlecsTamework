@@ -17,7 +17,7 @@
 - For admins and test scripts: `/tw debug get companion [--entity <uuid>]` prints one `ok ...` line with a
   companion's role, tamed state, owner, the players it is shared with, life stage, level and XP, happiness, needs,
   harvest and breeding readiness and traits, and changes nothing. Level and XP had no read before.
-- For admins and test scripts: `/tw npc spawn tamed <Role> [count] --owner <uuid|name> --at <x> <y> <z>` spawns
+- For admins and test scripts: `/tw npc spawn tamed <Role> [--count=<n>] --owner <uuid|name> --at <x> <y> <z>` spawns
   owned, tamed animals for an owner from the server console, through the same limits and ownership steps as a
   player's spawn. The owner may be offline when given by UUID.
 - For admins and test scripts: `/tw debug share add|remove|list ... --owner <uuid|name>` shares an owner's animals

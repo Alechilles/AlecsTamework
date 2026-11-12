@@ -193,11 +193,11 @@ Additional runtime diagnostics include:
   owner, the players it is shared with, life stage, level and XP, happiness, needs, harvest and breeding readiness
   and traits, read from memory. Keys the animal has no state for are left out.
 - The NPC getters and setters `get companion|happiness|lifestage|owner|role|tamed|traits` and
-  `set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>` (and `--world <name>` outside the default
-  world), so they work from the server console; put `--entity` after the command's own arguments. In game, without
+  `set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>` (and `--world <name>` whenever more than one
+  world is loaded), so they work from the server console; put `--entity` after the command's own arguments. In game, without
   `--entity`, they still act on the NPC you look at. `set owner` takes an owner UUID (the owner may be offline), an
   online player's name, or `clear`.
-- `/tw npc spawn tamed <Role> [count] --owner <uuid|name> --at <x> <y> <z> [--world <name>]` spawns owned, tamed
+- `/tw npc spawn tamed <Role> [--count=<n>] --owner <uuid|name> --at <x> <y> <z> [--world <name>]` spawns owned, tamed
   animals for that owner without a player, through the same limits and ownership steps as a player's spawn. The
   reply is one `ok ... entity=<uuid>[,<uuid>...]` line.
 - `/tw debug share add <player> <caretaker|handler|manager> --owner <uuid|name>`,

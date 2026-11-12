@@ -280,8 +280,9 @@ refused reason=invalid-seconds max=31536000.000
 
 `/tw debug owner offline-age <ownerUuid> <seconds>` moves an offline owner's offline start `<seconds>` earlier in
 both owner clocks: the needs presence timeline and the progression clock that drives growth, aging and production.
-A test can then reach the offline grace (72 hours by default) without waiting. Time already counted stays as it
-was, and the moved-back span is never credited. Both clocks are shared by all of that owner's animals, and the
+A test can then reach the offline grace (72 hours by default) without waiting. Growth, aging and production are not retroactive: the progression clock settles first, so time already
+past is not credited. Needs are different: an animal's unsettled needs window is judged later against the
+moved offline start, so needs decay can count real offline time that was inside the grace before the move. Both clocks are shared by all of that owner's animals, and the
 progression clock is saved to disk, so the change survives a restart. When the owner shares animals, the owner's
 shared presence id, which drives the shared ones, moves too while no player it covers is online. Works from the
 console:
@@ -298,8 +299,8 @@ refused reason=owner-online owner=<uuid>
 configured harvest alarm (`TwGlobalConfig` `HarvestAlarmName`, `Harvest_Ready` by default). Tamework's own alarm
 is read first and judged on the animal's progression time, as harvest readiness is (`source=tamework`;
 `exists=false` means no alarm was set, so it is ready). Alarms Tamework does not keep come from the engine's NPC
-alarm store on world game time (`source=engine`). From the console give the NPC UUID (and `--world` when it is not
-in the default world).
+alarm store on world game time (`source=engine`). From the console give the NPC UUID (and `--world <name>` whenever
+more than one world is loaded).
 
 ```
 ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=1234567 nowMs=1200000 remainingMs=34567
@@ -320,8 +321,8 @@ refused reason=entity-required option=--entity
 ```
 
 The NPC debug getters and setters `get companion|happiness|lifestage|owner|role|tamed|traits` and
-`set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>` (and `--world <name>` when the NPC is not in
-the default world), so they work from the console; a player who gives no `--entity` still targets the NPC in view.
+`set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>` (and `--world <name>` whenever more than
+one world is loaded), so they work from the console; a player who gives no `--entity` still targets the NPC in view.
 Put `--entity` after the command's own arguments: `tw debug set level 5 --entity <uuid>`. From the console the
 setters reply with one line:
 
@@ -341,7 +342,7 @@ population admission see it.
 
 ## Console setup of owned and shared animals
 
-`/tw npc spawn tamed <Role> [count] --owner <uuid|name> --at <x> <y> <z> [--world <name>]` spawns owned, tamed
+`/tw npc spawn tamed <Role> [--count=<n>] --owner <uuid|name> --at <x> <y> <z> [--world <name>]` spawns owned, tamed
 animals for that owner without a player. The owner may be offline when given by UUID. It runs the player spawn's
 steps: the owner's population limits, then the owner component write and tamed state that the ownership systems
 register and admit, as for a player. Nothing is linked to a command item, and the animals face and follow the owner
@@ -381,7 +382,7 @@ refused reason=not-shared owner=<uuid> value=<value>
 | Read harvest readiness without changing it | `tw debug get alarm <uuid> [AlarmName]` | `ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=... nowMs=... remainingMs=34567` |
 | Read a companion: owner, sharers, stage, level, XP, happiness, needs, harvest and breeding readiness, traits | `tw debug get companion --entity <uuid>` | `ok entity=<uuid> role=Cow tamed=true owner=<uuid> sharers=none stage=Adult level=3 xp=12.00 totalXp=112.00 happiness=72.50 hunger=80.00 thirst=64.00 harvestReady=true harvestRemainingMs=0 breedingReady=false breedingCooldownRemainingMs=420000 traits=none` |
 | Read happiness, life stage, owner, role, tamed, traits (human-readable lines) | `tw debug get happiness\|lifestage\|owner\|role\|tamed\|traits --entity <uuid>` | `Owner for NPC <uuid> is <uuid>` |
-| Own an animal without a player (setup; offline owner allowed by UUID) | `tw npc spawn tamed <Role> [count] --owner <uuid\|name> --at <x> <y> <z> [--world <name>]` | `ok role=Cow owner=<uuid> entity=<uuid> world=default x=10.00 y=64.00 z=-4.00` |
+| Own an animal without a player (setup; offline owner allowed by UUID) | `tw npc spawn tamed <Role> [--count=<n>] --owner <uuid\|name> --at <x> <y> <z> [--world <name>]` | `ok role=Cow owner=<uuid> entity=<uuid> world=default x=10.00 y=64.00 z=-4.00` |
 | Set or clear an owner (setup) | `tw debug set owner <ownerUuid\|name\|clear> --entity <uuid>` | `ok entity=<uuid> owner=<uuid>` |
 | Force happiness, level, tamed, traits (setup) | `tw debug set happiness <value>\|level <level>\|tamed [true\|false]\|traits <Id> <Value> ...\|trait <Id> <Value> --entity <uuid>` | `ok entity=<uuid> requested=5 level=1->5 maxLevel=25 totalXp=400` |
 | Share an owner's animals with a player (setup, no confirm step; logged with the admin) | `tw debug share add <player> <caretaker\|handler\|manager> --owner <uuid\|name>`, `tw debug share remove <player> --owner ...` | `ok owner=<uuid> player=<uuid> level=handler result=changed new=true` |

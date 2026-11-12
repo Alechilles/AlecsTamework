@@ -195,7 +195,7 @@ public final class AnimalProgressionClock implements AutoCloseable {
 
     /**
      * Debug hook: moves an offline owner's offline start {@code ms} earlier, so the offline grace runs
-     * out sooner. Time already settled stays as it was and the moved-back span is never credited.
+     * out sooner. Time already settled stays as it was, so growth is not retroactive.
      * The owner clock is shared by all of the owner's animals and the change is checkpointed to disk.
      * Use {@link OwnerPresenceTimelineService#ageOfflineStartForDebug}, which moves both owner clocks.
      *
@@ -216,9 +216,16 @@ public final class AnimalProgressionClock implements AutoCloseable {
                 return null;
             }
             settle(ownerClock, nowMs);
-            ownerClock.offlineStartedAtMs = saturatingSubtract(ownerClock.offlineStartedAtMs, ms);
+            ownerClock.offlineStartedAtMs = BreedingTimeService.saturatingSubtract(ownerClock.offlineStartedAtMs, ms);
             scheduleCheckpoint(nowMs, true);
             return nowMs - ownerClock.offlineStartedAtMs;
+        }
+    }
+
+    /** Whether the clock is running; a stopped clock refuses the debug offline-age. */
+    public boolean isStarted() {
+        synchronized (lock) {
+            return started;
         }
     }
 
@@ -441,13 +448,6 @@ public final class AnimalProgressionClock implements AutoCloseable {
             return left;
         }
         return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
-    }
-
-    private static long saturatingSubtract(long left, long right) {
-        if (right <= 0L) {
-            return left;
-        }
-        return left < Long.MIN_VALUE + right ? Long.MIN_VALUE : left - right;
     }
 
     private static final class OwnerClock {

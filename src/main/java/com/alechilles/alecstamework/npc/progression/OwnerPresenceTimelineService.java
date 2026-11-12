@@ -175,7 +175,9 @@ public final class OwnerPresenceTimelineService {
      * Debug hook: moves an offline presence id's offline start {@code ms} earlier in both owner clocks,
      * this timeline (needs, memory only) and {@link AnimalProgressionClock} (growth, aging, production;
      * checkpointed to disk), so the offline grace runs out sooner. Each clock changes under its own
-     * lock; time either clock already counted stays as it was. An id not seen yet is seeded first, as
+     * lock. Growth is not retroactive (the progression clock settles first, so time already past is not
+     * credited); needs are: an animal's unsettled needs window is judged later against the moved start,
+     * so needs decay can count real offline time that was inside the grace before the move. An id not seen yet is seeded first, as
      * a normal read does.
      *
      * @return the offline time afterwards, or null when the id is online in either clock or the

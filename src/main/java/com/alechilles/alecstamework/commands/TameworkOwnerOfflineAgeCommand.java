@@ -3,12 +3,12 @@ package com.alechilles.alecstamework.commands;
 import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.DOUBLE;
 import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.STRING;
 
+import com.alechilles.alecstamework.npc.progression.AnimalProgressionClock;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.npc.progression.SharedPresenceService;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
-import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -42,20 +42,22 @@ public final class TameworkOwnerOfflineAgeCommand extends AbstractTameworkServer
         }
         double seconds = secondsArg.get(context);
         if (!Double.isFinite(seconds) || seconds <= 0.0 || seconds > MAX_SECONDS) {
-            context.sendMessage(Message.raw("refused reason=invalid-seconds max=" + format(MAX_SECONDS)));
+            context.sendMessage(Message.raw("refused reason=invalid-seconds max=" + TameworkTraitCommandSupport.formatDouble(MAX_SECONDS)));
             return;
         }
         long ms = Math.round(seconds * 1000.0);
         OwnerPresenceTimelineService.OfflineAge aged =
                 OwnerPresenceTimelineService.get().ageOfflineStartForDebug(owner, ms);
         if (aged == null) {
-            context.sendMessage(Message.raw("refused reason=owner-online owner=" + owner));
+            context.sendMessage(Message.raw(AnimalProgressionClock.get().isStarted()
+                    ? "refused reason=owner-online owner=" + owner
+                    : "refused reason=clock-stopped owner=" + owner));
             return;
         }
         StringBuilder reply = new StringBuilder("ok owner=").append(owner)
-                .append(" movedSeconds=").append(format(ms / 1000.0))
-                .append(" presenceOfflineSeconds=").append(format(aged.presenceOfflineMs() / 1000.0))
-                .append(" progressionOfflineSeconds=").append(format(aged.progressionOfflineMs() / 1000.0));
+                .append(" movedSeconds=").append(TameworkTraitCommandSupport.formatDouble(ms / 1000.0))
+                .append(" presenceOfflineSeconds=").append(TameworkTraitCommandSupport.formatDouble(aged.presenceOfflineMs() / 1000.0))
+                .append(" progressionOfflineSeconds=").append(TameworkTraitCommandSupport.formatDouble(aged.progressionOfflineMs() / 1000.0));
         UUID sharedId = SharedPresenceService.get().presenceIdFor(owner, null);
         if (sharedId != null && !sharedId.equals(owner)) {
             OwnerPresenceTimelineService.OfflineAge shared =
@@ -65,9 +67,9 @@ public final class TameworkOwnerOfflineAgeCommand extends AbstractTameworkServer
                 // A player the owner shares with is online, so the shared animals count time anyway.
                 reply.append(" shared=online");
             } else {
-                reply.append(" sharedPresenceOfflineSeconds=").append(format(shared.presenceOfflineMs() / 1000.0))
+                reply.append(" sharedPresenceOfflineSeconds=").append(TameworkTraitCommandSupport.formatDouble(shared.presenceOfflineMs() / 1000.0))
                         .append(" sharedProgressionOfflineSeconds=")
-                        .append(format(shared.progressionOfflineMs() / 1000.0));
+                        .append(TameworkTraitCommandSupport.formatDouble(shared.progressionOfflineMs() / 1000.0));
             }
         }
         context.sendMessage(Message.raw(reply.toString()));
@@ -83,9 +85,5 @@ public final class TameworkOwnerOfflineAgeCommand extends AbstractTameworkServer
         } catch (IllegalArgumentException ignored) {
             return null;
         }
-    }
-
-    private static String format(double value) {
-        return String.format(Locale.ROOT, "%.3f", Double.isFinite(value) ? value : 0.0);
     }
 }

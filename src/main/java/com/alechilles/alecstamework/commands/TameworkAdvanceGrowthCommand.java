@@ -12,7 +12,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.commands.NPCMultiSelectCommandBase;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.Locale;
 import javax.annotation.Nonnull;
 
 /**
@@ -36,25 +35,26 @@ public final class TameworkAdvanceGrowthCommand extends NPCMultiSelectCommandBas
                            @Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> npcRef) {
         double seconds = secondsArg.get(context);
         if (!Double.isFinite(seconds) || seconds <= 0.0 || seconds > MAX_SECONDS) {
-            context.sendMessage(Message.raw("refused reason=invalid-seconds max=" + format(MAX_SECONDS)));
+            context.sendMessage(Message.raw("refused reason=invalid-seconds max=" + TameworkTraitCommandSupport.formatDouble(MAX_SECONDS)));
+            return;
+        }
+        long ms = Math.round(seconds * 1000.0);
+        if (ms <= 0L) {
+            context.sendMessage(Message.raw("refused reason=invalid-seconds max=" + TameworkTraitCommandSupport.formatDouble(MAX_SECONDS)));
             return;
         }
         CompanionLifeStageService.GrowthAdvanceResult result = CompanionLifeStageService.advanceGrowthForDebug(
-                npcRef, npc, store, Math.round(seconds * 1000.0));
+                npcRef, npc, store, ms);
         if (result == null) {
             context.sendMessage(Message.raw("refused reason=no-life-stage entity=" + npc.getUuid()));
             return;
         }
         context.sendMessage(Message.raw("ok entity=" + npc.getUuid()
-                + " requestedSeconds=" + format(result.requestedMs() / 1000.0)
-                + " countedSeconds=" + format(result.countedMs() / 1000.0)
+                + " requestedSeconds=" + TameworkTraitCommandSupport.formatDouble(result.requestedMs() / 1000.0)
+                + " countedSeconds=" + TameworkTraitCommandSupport.formatDouble(result.countedMs() / 1000.0)
                 + " stage=" + result.stageBefore() + "->" + result.stageAfter()
                 + " role=" + npc.getRoleName()
                 + " roleChange=" + (result.roleChangeRequested() ? "requested" : "none")
                 + " oldAgeDeath=" + result.oldAgeDeath()));
-    }
-
-    private static String format(double value) {
-        return String.format(Locale.ROOT, "%.3f", Double.isFinite(value) ? value : 0.0);
     }
 }

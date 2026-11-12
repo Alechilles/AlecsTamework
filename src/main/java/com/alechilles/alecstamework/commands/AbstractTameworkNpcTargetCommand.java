@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
 
 /**
  * Base for debug commands that act on one NPC, on the thread of that NPC's world. {@code --entity <uuid>}
- * names the NPC and works from the console (add {@code --world} when it is not in the default world).
+ * names the NPC and works from the console (from the console add {@code --world <name>} whenever more than one world is loaded).
  * Without it a player picks the NPC by looking at it, with Tamework's own view targeting, as these
  * commands always have; the console is refused with one line.
  */

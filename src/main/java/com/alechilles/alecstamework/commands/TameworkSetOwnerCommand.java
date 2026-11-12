@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -36,14 +38,14 @@ public final class TameworkSetOwnerCommand extends AbstractTameworkNpcTargetComm
         UUID newOwner;
         String ownerName = null;
         if (raw == null || raw.isBlank()) {
-            if (console) {
+            // --entity also stops the raw parser, so a player who gave it but lost the owner is refused too.
+            if (console || entityArg.provided(commandContext)) {
                 commandContext.sendMessage(Message.raw("refused reason=owner-required usage=<ownerUuid|name|clear>"));
                 return;
             }
             // Default: the executing player owns it.
-            TameworkCommandPlayers.Named self = TameworkCommandPlayers.resolve(commandContext.sender().getUuid().toString());
             newOwner = commandContext.sender().getUuid();
-            ownerName = self != null ? self.name() : null;
+            ownerName = OwnerNameUtil.resolve((PlayerRef) commandContext.sender());
         } else if (isClear(raw)) {
             newOwner = null;
         } else {
