@@ -435,7 +435,16 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.simpleClaimsEnabled = value,
                     section -> section.simpleClaimsEnabled
             )
-            .documentation("Enables Simple Claims integration for tame protection and limits.")
+            .documentation("Enables claim integration for claim limits, the breeding claim rule and tamed damage rules.")
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("Provider", Codec.STRING),
+                    (section, value) -> section.provider = value,
+                    section -> section.provider
+            )
+            .documentation("Claim mod to use: Automatic (default; SimpleClaims when installed, otherwise "
+                    + "QuestLines Claims when installed), SimpleClaims or QuestLinesClaims. Missing or unknown "
+                    + "values mean Automatic. Used only when no /tw settings file is loaded.")
             .add()
             .<SimpleClaimsBreedingSection>append(
                     new KeyedCodec<>("Breeding", SIMPLE_CLAIMS_BREEDING_SECTION_CODEC),
@@ -449,7 +458,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.damage = value,
                     section -> section.damage
             )
-            .documentation("Simple Claims damage-protection settings for tamed NPCs.")
+            .documentation("Tamed damage settings: use the selected claim mod's damage rules for tamed NPCs.")
             .add()
             .build();
 
@@ -527,8 +536,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     TwGlobalConfig::applySimpleClaimsSection,
                     TwGlobalConfig::toSimpleClaimsSection
             )
-            .documentation("Server-level SimpleClaims integration settings for Tamework systems. Inheritance: omitted "
-                    + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
+            .documentation("Server-level claim integration settings (SimpleClaims or QuestLines Claims) for Tamework "
+                    + "systems. Inheritance: omitted section inherits from parent; when present, only explicitly "
+                    + "defined nested fields override parent.")
             .add()
             .build();
 
@@ -586,6 +596,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int populationLimitPerPlayerDeployedTotal;
     private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private boolean simpleClaimsEnabled;
+    @Nullable
+    private String simpleClaimsProvider;
     private int simpleClaimsBreedingLimitPerClaimChunk;
     private int simpleClaimsBreedingLimitPerClaimTotal;
     private boolean simpleClaimsBreedingRequiresClaim;
@@ -1015,6 +1027,15 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return simpleClaimsEnabled;
     }
 
+    /**
+     * The claim mod named by {@code SimpleClaims.Provider}, as written, or null when it is not set.
+     * Read it with {@code ClaimModChoice.fromConfigValue}: null and unknown values mean Automatic.
+     */
+    @Nullable
+    public String getSimpleClaimsProvider() {
+        return simpleClaimsProvider;
+    }
+
     public int getSimpleClaimsBreedingLimitPerClaimChunk() {
         return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
     }
@@ -1327,6 +1348,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.simpleClaimsEnabled != null) {
             simpleClaimsEnabled = section.simpleClaimsEnabled;
         }
+        if (section.provider != null) {
+            simpleClaimsProvider = section.provider.trim();
+        }
         if (section.breeding != null) {
             SimpleClaimsBreedingSection breeding = section.breeding;
             if (breeding.limitPerClaimChunk != null) {
@@ -1353,6 +1377,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private SimpleClaimsSection toSimpleClaimsSection() {
         SimpleClaimsSection section = new SimpleClaimsSection();
         section.simpleClaimsEnabled = simpleClaimsEnabled;
+        section.provider = simpleClaimsProvider;
         section.breeding = new SimpleClaimsBreedingSection();
         section.breeding.limitPerClaimChunk = simpleClaimsBreedingLimitPerClaimChunk;
         section.breeding.limitPerClaimTotal = simpleClaimsBreedingLimitPerClaimTotal;
@@ -1666,6 +1691,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                                             @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("SimpleClaims")) {
             simpleClaimsEnabled = parent.simpleClaimsEnabled;
+            simpleClaimsProvider = parent.simpleClaimsProvider;
             simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
             simpleClaimsBreedingLimitPerClaimTotal = parent.simpleClaimsBreedingLimitPerClaimTotal;
             simpleClaimsBreedingRequiresClaim = parent.simpleClaimsBreedingRequiresClaim;
@@ -1682,6 +1708,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("SimpleClaimsEnabled")) {
             simpleClaimsEnabled = parent.simpleClaimsEnabled;
+        }
+        if (!nestedExplicit.contains("Provider")) {
+            simpleClaimsProvider = parent.simpleClaimsProvider;
         }
         if (!nestedExplicit.contains("Breeding")) {
             simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
@@ -1815,6 +1844,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     private static final class SimpleClaimsSection {
         private Boolean simpleClaimsEnabled;
+        private String provider;
         private SimpleClaimsBreedingSection breeding;
         private SimpleClaimsDamageSection damage;
     }

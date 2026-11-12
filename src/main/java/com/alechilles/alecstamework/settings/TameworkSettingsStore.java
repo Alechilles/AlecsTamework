@@ -190,6 +190,7 @@ public final class TameworkSettingsStore {
         document.simpleClaims.limitPerClaimTotal = Math.max(0, snapshot.simpleClaimsLimitPerClaimTotal());
         document.simpleClaims.breedingRequiresClaim = snapshot.simpleClaimsBreedingRequiresClaim();
         document.simpleClaims.protectTamedFromNonMembers = snapshot.simpleClaimsProtectTamedFromNonMembers();
+        document.simpleClaims.provider = ClaimModChoice.fromConfigValue(snapshot.claimMod()).toConfigValue();
 
         document.ownership = new OwnershipSection();
         document.ownership.damageProtection = new OwnershipDamageProtectionSection();
@@ -418,6 +419,7 @@ public final class TameworkSettingsStore {
         document.simpleClaims.limitPerClaimTotal = 0;
         document.simpleClaims.breedingRequiresClaim = false;
         document.simpleClaims.protectTamedFromNonMembers = false;
+        document.simpleClaims.provider = ClaimModChoice.AUTOMATIC.toConfigValue();
 
         document.ownership = new OwnershipSection();
         document.ownership.damageProtection = new OwnershipDamageProtectionSection();
@@ -717,7 +719,8 @@ public final class TameworkSettingsStore {
                         ? ownershipDamageProtection.blockNonOwnerPlayerDamage
                         : null,
                 ownershipSharing != null ? ownershipSharing.enabled : null,
-                ownershipSharing != null ? trimToNull(ownershipSharing.highestLevel) : null
+                ownershipSharing != null ? trimToNull(ownershipSharing.highestLevel) : null,
+                simpleClaims != null ? trimToNull(simpleClaims.provider) : null
         );
     }
 
@@ -877,7 +880,74 @@ public final class TameworkSettingsStore {
                                          boolean avatarFlightUnlimitedVigour,
                                          boolean blockNonOwnerPlayerDamage,
                                          boolean sharingEnabled,
-                                         @Nonnull String sharingHighestLevel) {
+                                         @Nonnull String sharingHighestLevel,
+                                         @Nonnull String claimMod) {
+
+        /** Compatibility constructor for callers compiled before the claim mod choice: the claim mod is chosen automatically. */
+        public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                      @Nonnull String populationPerPlayerLimitScope,
+                                      boolean simpleClaimsEnabled,
+                                      int simpleClaimsLimitPerClaimChunk,
+                                      int simpleClaimsLimitPerClaimTotal,
+                                      boolean simpleClaimsBreedingRequiresClaim,
+                                      boolean simpleClaimsProtectTamedFromNonMembers,
+                                      boolean blockOwnerDamage,
+                                      boolean blockAllPlayerDamageIfOwned,
+                                      boolean invulnerableIfOwned,
+                                      @Nonnull String captureItemOwnership,
+                                      boolean captureRequiresOwner,
+                                      boolean spawnRequiresOwner,
+                                      boolean interactionRequiresOwner,
+                                      boolean linkingRequiresOwner,
+                                      boolean needsEnabled,
+                                      @Nonnull String needsResourceMode,
+                                      @Nonnull String needsTickPolicyMode,
+                                      double needsOwnerOfflineGraceHours,
+                                      double needsOwnerOfflineDecayMultiplier,
+                                      boolean needsDamageEnabled,
+                                      @Nonnull String needsDamageModel,
+                                      @Nonnull String needsDamageDualNeedRule,
+                                      double needsStarvationDamagePerMinute,
+                                      double needsDehydrationDamagePerMinute,
+                                      boolean needsDamageLethal,
+                                      boolean happinessEnabled,
+                                      boolean passiveBreedingEnabled,
+                                      boolean breedingRequiresHappiness,
+                                      boolean breedingGenderEnabled,
+                                      boolean traitsEnabled,
+                                      boolean levelingEnabled,
+                                      boolean talentsEnabled,
+                                      boolean reviveSystemEnabled,
+                                      boolean recallTeleportingEnabled,
+                                      boolean telemetryEnabled,
+                                      boolean telemetryBreadcrumbsEnabled,
+                                      @Nonnull String animalAgingMode,
+                                      boolean animalOldAgeDeathEnabled,
+                                      int commandPanelCardsPerPage,
+                                      int populationLimitPerPlayerDeployedTotal,
+                                      boolean avatarFlightUnlimitedVigour,
+                                      boolean blockNonOwnerPlayerDamage,
+                                      boolean sharingEnabled,
+                                      @Nonnull String sharingHighestLevel) {
+            this(
+                populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureItemOwnership,
+                captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner,
+                linkingRequiresOwner, needsEnabled, needsResourceMode, needsTickPolicyMode,
+                needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier, needsDamageEnabled,
+                needsDamageModel, needsDamageDualNeedRule, needsStarvationDamagePerMinute,
+                needsDehydrationDamagePerMinute, needsDamageLethal, happinessEnabled,
+                passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
+                traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
+                animalAgingMode, animalOldAgeDeathEnabled, commandPanelCardsPerPage,
+                populationLimitPerPlayerDeployedTotal, avatarFlightUnlimitedVigour,
+                blockNonOwnerPlayerDamage, sharingEnabled, sharingHighestLevel,
+                ClaimModChoice.AUTOMATIC.toConfigValue());
+        }
 
         /** Compatibility constructor for callers compiled before the sharing settings: sharing is on, up to Manager. */
         public GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
@@ -1388,7 +1458,76 @@ public final class TameworkSettingsStore {
                                   @Nullable Boolean avatarFlightUnlimitedVigour,
                                   @Nullable Boolean blockNonOwnerPlayerDamage,
                                   @Nullable Boolean sharingEnabled,
-                                  @Nullable String sharingHighestLevel) {
+                                  @Nullable String sharingHighestLevel,
+                                  @Nullable String claimMod) {
+
+        /** Compatibility constructor for callers compiled before the claim mod choice. */
+        public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
+                               @Nullable String populationPerPlayerLimitScope,
+                               @Nullable Boolean simpleClaimsEnabled,
+                               @Nullable Integer simpleClaimsLimitPerClaimChunk,
+                               @Nullable Integer simpleClaimsLimitPerClaimTotal,
+                               @Nullable Boolean simpleClaimsBreedingRequiresClaim,
+                               @Nullable Boolean simpleClaimsProtectTamedFromNonMembers,
+                               @Nullable Boolean blockOwnerDamage,
+                               @Nullable Boolean blockAllPlayerDamageIfOwned,
+                               @Nullable Boolean invulnerableIfOwned,
+                               @Nullable Boolean captureClearsOwner,
+                               @Nullable Boolean spawnSetsOwner,
+                               @Nullable Boolean captureRequiresOwner,
+                               @Nullable Boolean spawnRequiresOwner,
+                               @Nullable Boolean interactionRequiresOwner,
+                               @Nullable Boolean linkingRequiresOwner,
+                               @Nullable Boolean needsEnabled,
+                               @Nullable String needsResourceMode,
+                               @Nullable String needsTickPolicyMode,
+                               @Nullable Double needsOwnerOfflineGraceHours,
+                               @Nullable Double needsOwnerOfflineDecayMultiplier,
+                               @Nullable Boolean needsDamageEnabled,
+                               @Nullable String needsDamageModel,
+                               @Nullable String needsDamageDualNeedRule,
+                               @Nullable Double needsStarvationDamagePerMinute,
+                               @Nullable Double needsDehydrationDamagePerMinute,
+                               @Nullable Boolean needsDamageLethal,
+                               @Nullable Boolean happinessEnabled,
+                               @Nullable Boolean passiveBreedingEnabled,
+                               @Nullable Boolean breedingRequiresHappiness,
+                               @Nullable Boolean breedingGenderEnabled,
+                               @Nullable Boolean traitsEnabled,
+                               @Nullable Boolean levelingEnabled,
+                               @Nullable Boolean talentsEnabled,
+                               @Nullable Boolean reviveSystemEnabled,
+                               @Nullable Boolean recallTeleportingEnabled,
+                               @Nullable Boolean telemetryEnabled,
+                               @Nullable Boolean telemetryBreadcrumbsEnabled,
+                               @Nullable String animalAgingMode,
+                               @Nullable Boolean animalOldAgeDeathEnabled,
+                               @Nullable Integer commandPanelCardsPerPage,
+                               @Nullable String captureItemOwnership,
+                               @Nullable Integer populationLimitPerPlayerDeployedTotal,
+                               @Nullable Boolean avatarFlightUnlimitedVigour,
+                               @Nullable Boolean blockNonOwnerPlayerDamage,
+                               @Nullable Boolean sharingEnabled,
+                               @Nullable String sharingHighestLevel) {
+            this(
+                populationLimitPerPlayerOwnedTotal, populationPerPlayerLimitScope,
+                simpleClaimsEnabled, simpleClaimsLimitPerClaimChunk,
+                simpleClaimsLimitPerClaimTotal, simpleClaimsBreedingRequiresClaim,
+                simpleClaimsProtectTamedFromNonMembers, blockOwnerDamage,
+                blockAllPlayerDamageIfOwned, invulnerableIfOwned, captureClearsOwner,
+                spawnSetsOwner, captureRequiresOwner, spawnRequiresOwner, interactionRequiresOwner,
+                linkingRequiresOwner, needsEnabled, needsResourceMode, needsTickPolicyMode,
+                needsOwnerOfflineGraceHours, needsOwnerOfflineDecayMultiplier, needsDamageEnabled,
+                needsDamageModel, needsDamageDualNeedRule, needsStarvationDamagePerMinute,
+                needsDehydrationDamagePerMinute, needsDamageLethal, happinessEnabled,
+                passiveBreedingEnabled, breedingRequiresHappiness, breedingGenderEnabled,
+                traitsEnabled, levelingEnabled, talentsEnabled, reviveSystemEnabled,
+                recallTeleportingEnabled, telemetryEnabled, telemetryBreadcrumbsEnabled,
+                animalAgingMode, animalOldAgeDeathEnabled, commandPanelCardsPerPage,
+                captureItemOwnership, populationLimitPerPlayerDeployedTotal,
+                avatarFlightUnlimitedVigour, blockNonOwnerPlayerDamage, sharingEnabled,
+                sharingHighestLevel, null);
+        }
 
         /** Compatibility constructor for callers compiled before the sharing settings. */
         public GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
@@ -1880,6 +2019,8 @@ public final class TameworkSettingsStore {
         private Integer limitPerClaimTotal;
         private Boolean breedingRequiresClaim;
         private Boolean protectTamedFromNonMembers;
+        /** Automatic, SimpleClaims or QuestLinesClaims. Absent in a file written before the choice = Automatic. */
+        private String provider;
     }
 
     private static final class OwnershipSection {

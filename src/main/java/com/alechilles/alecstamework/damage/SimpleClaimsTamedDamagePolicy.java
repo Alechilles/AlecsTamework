@@ -1,7 +1,11 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimModDamageProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimModSelector;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsProvider;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.settings.ClaimModChoice;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -9,22 +13,29 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Shared owner-first and SimpleClaims-native tamed-target damage policy.
+ * Shared owner-first and claim-mod tamed-target damage policy.
  *
  * <p>Both the runtime damage filter and public API call this class. It resolves eligibility from
- * the live target, treats the configurable bypass as a server permission, retains the historical
- * raw-party grant for one compatibility release, and fails open only when optional integration
- * access cannot be evaluated.</p>
+ * the live target, treats the configurable bypass as a server permission, and then applies the
+ * damage rules of the selected claim mod: SimpleClaims' native policy (with its version gate and
+ * the historical raw-party grant kept for one compatibility release) or QuestLines Claims' rule
+ * for hurting creatures. It fails open only when optional integration access cannot be
+ * evaluated.</p>
  */
 public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     private static final String WARN_FAIL_OPEN = "simpleclaims-damage-fail-open";
     private static final String WARN_LEGACY_BYPASS = "simpleclaims-legacy-damage-bypass";
     private static final String WARN_PERMISSION = "simpleclaims-damage-server-permission";
+    private static final String SIMPLE_CLAIMS_NAME = "SimpleClaims";
+    private static final String QUESTLINES_CLAIMS_NAME = "QuestLines Claims";
+    /** Fixed claim-mod presence for the SimpleClaims-only fixtures: Automatic picks SimpleClaims. */
+    private static final Predicate<ClaimModChoice> SIMPLE_CLAIMS_ONLY = mod -> mod == ClaimModChoice.SIMPLE_CLAIMS;
 
     private final TamedDamageTargetEligibilityResolver eligibilityResolver;
     private final TamedDamagePolicyAdapter decisionAdapter;
@@ -32,6 +43,9 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     private final SimpleClaimsRawAccessEvaluator rawAccessEvaluator;
     private final DamageServerPermissionBypass serverPermissionBypass;
     private final DamagePolicyWarningSink warningSink;
+    private final ClaimModDamageProvider questLines;
+    private final ClaimModRawAccessEvaluator questLinesRawAccess;
+    private final Predicate<ClaimModChoice> installedClaimMods;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     /** Creates a production policy that resolves the live SimpleClaims generation per decision. */
@@ -41,11 +55,19 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
 
     /** Creates a policy that uses the shared SimpleClaims capability runtime. */
     public SimpleClaimsTamedDamagePolicy(@Nonnull SimpleClaimsCapabilityRuntime runtime) {
+        this(runtime, new QuestLinesClaimsProvider());
+    }
+
+    /** Creates a policy that uses the shared SimpleClaims runtime and QuestLines Claims reader. */
+    public SimpleClaimsTamedDamagePolicy(@Nonnull SimpleClaimsCapabilityRuntime runtime,
+                                         @Nonnull ClaimModDamageProvider questLines) {
         this(
                 new TamedDamageTargetEligibilityResolver(),
                 runtime.damageResolver(),
                 new HytaleDamageServerPermissionBypass(),
-                new ThrottledDamagePolicyWarningSink()
+                new ThrottledDamagePolicyWarningSink(),
+                questLines,
+                ClaimModSelector.SERVER_PLUGINS
         );
     }
 
@@ -80,12 +102,32 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
             @Nonnull SimpleClaimsDamageCapabilityResolver capabilityResolver,
             @Nonnull DamageServerPermissionBypass serverPermissionBypass,
             @Nonnull DamagePolicyWarningSink warningSink) {
+        this(
+                eligibilityResolver,
+                capabilityResolver,
+                serverPermissionBypass,
+                warningSink,
+                new QuestLinesClaimsProvider(),
+                SIMPLE_CLAIMS_ONLY
+        );
+    }
+
+    SimpleClaimsTamedDamagePolicy(
+            @Nonnull TamedDamageTargetEligibilityResolver eligibilityResolver,
+            @Nonnull SimpleClaimsDamageCapabilityResolver capabilityResolver,
+            @Nonnull DamageServerPermissionBypass serverPermissionBypass,
+            @Nonnull DamagePolicyWarningSink warningSink,
+            @Nonnull ClaimModDamageProvider questLines,
+            @Nonnull Predicate<ClaimModChoice> installedClaimMods) {
         this.eligibilityResolver = eligibilityResolver;
         this.decisionAdapter = new TamedDamagePolicyAdapter();
         this.capabilityResolver = capabilityResolver;
         this.rawAccessEvaluator = new SimpleClaimsRawAccessEvaluator(capabilityResolver);
         this.serverPermissionBypass = serverPermissionBypass;
         this.warningSink = warningSink;
+        this.questLines = questLines;
+        this.questLinesRawAccess = new ClaimModRawAccessEvaluator(questLines);
+        this.installedClaimMods = installedClaimMods;
     }
 
     /**
@@ -102,7 +144,7 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     }
 
     /**
-     * Evaluates owner protection and, when active and eligible, native SimpleClaims damage access.
+     * Evaluates owner protection and, when active and eligible, the selected claim mod's damage rules.
      */
     @Nonnull
     public TamedDamageDecision evaluate(
@@ -177,13 +219,15 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
                 worldName,
                 targetPosition,
                 attackerPlayerUuid,
-                permissionKey
+                permissionKey,
+                globalConfig
         );
     }
 
     /**
-     * Evaluates the legacy claim-only public API without invoking population topology.
-     * Damage protection's enable toggle intentionally remains outside this legacy contract.
+     * Evaluates the legacy claim-only public API through the selected claim mod, without invoking
+     * population topology. Damage protection's enable toggle intentionally remains outside this
+     * legacy contract.
      */
     @Nonnull
     public SimpleClaimsRawAccessDecision evaluateRawClaimAccess(
@@ -191,6 +235,11 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
             @Nullable Vector3d targetPosition,
             @Nullable UUID attackerPlayerUuid,
             @Nullable TwGlobalConfig globalConfig) {
+        if (globalConfig != null
+                && TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())
+                && selectClaimMod(globalConfig) == ClaimModChoice.QUESTLINES_CLAIMS) {
+            return questLinesRawAccess.evaluate(worldName, targetPosition, attackerPlayerUuid);
+        }
         return rawAccessEvaluator.evaluate(worldName, targetPosition, attackerPlayerUuid, globalConfig);
     }
 
@@ -199,9 +248,13 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
             @Nonnull String worldName,
             @Nonnull Vector3d targetPosition,
             @Nonnull UUID attackerPlayerUuid,
-            @Nullable String permissionKey) {
+            @Nullable String permissionKey,
+            @Nullable TwGlobalConfig globalConfig) {
         if (permissionKey != null && hasServerPermission(attackerPlayerUuid, permissionKey)) {
             return TamedDamageDecision.allowEnforced("server-permission-bypass", null, null);
+        }
+        if (selectClaimMod(globalConfig) == ClaimModChoice.QUESTLINES_CLAIMS) {
+            return evaluateQuestLinesPolicy(worldName, targetPosition, attackerPlayerUuid);
         }
 
         SimpleClaimsDamageCapabilityResolver.Resolution resolution = resolveCapability();
@@ -262,6 +315,48 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
         }
     }
 
+    /**
+     * QuestLines Claims' rule for hurting creatures. It has no legacy party grant; errors and a
+     * missing or unsupported QuestLines fail open like SimpleClaims.
+     */
+    @Nonnull
+    private TamedDamageDecision evaluateQuestLinesPolicy(@Nonnull String worldName,
+                                                         @Nonnull Vector3d targetPosition,
+                                                         @Nonnull UUID attackerPlayerUuid) {
+        if (closed.get()) {
+            return failOpen(QUESTLINES_CLAIMS_NAME, false, "bridge-unavailable", "Claim damage policy is shut down.");
+        }
+        ClaimModDamageProvider.DamageResult result;
+        try {
+            result = questLines.evaluateTamedDamage(worldName, targetPosition, attackerPlayerUuid);
+        } catch (Throwable throwable) {
+            return failOpen(QUESTLINES_CLAIMS_NAME, false, "lookup-error", message(throwable));
+        }
+        if (result == null) {
+            return failOpen(QUESTLINES_CLAIMS_NAME, false, "missing-access-result",
+                    "QuestLines Claims damage result was missing.");
+        }
+        return switch (result.status()) {
+            case ALLOWED -> TamedDamageDecision.allowEnforced("native-policy-allowed", null, result.message());
+            case DENIED -> TamedDamageDecision.denyClaim("claim-protection-denied", null, result.message());
+            case ERROR -> failOpen(QUESTLINES_CLAIMS_NAME, true, "lookup-error", result.message());
+            case UNAVAILABLE -> failOpen(QUESTLINES_CLAIMS_NAME, false, "bridge-unavailable", result.message());
+        };
+    }
+
+    /** The claim mod whose damage rules apply, from the settings in {@code globalConfig}. */
+    @Nonnull
+    private ClaimModChoice selectClaimMod(@Nullable TwGlobalConfig globalConfig) {
+        try {
+            return ClaimModSelector.select(
+                    TameworkRuntimeSettings.claimMod(globalConfig != null ? globalConfig.getSimpleClaimsProvider() : null),
+                    installedClaimMods
+            );
+        } catch (RuntimeException failed) {
+            return ClaimModChoice.SIMPLE_CLAIMS;
+        }
+    }
+
     private boolean hasServerPermission(@Nonnull UUID attackerPlayerUuid,
                                         @Nonnull String permissionKey) {
         try {
@@ -271,7 +366,7 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
                     WARN_PERMISSION,
                     "Tamework could not evaluate the configured server damage permission '"
                             + permissionKey
-                            + "'; native SimpleClaims policy will still run: "
+                            + "'; the claim mod's damage rules will still run: "
                             + message(throwable)
                             + "."
             );
@@ -361,9 +456,26 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
                                          @Nullable UUID claimPartyId,
                                          @Nonnull String reason,
                                          @Nullable String detail) {
+        return failOpen(SIMPLE_CLAIMS_NAME, claimAccessAvailable, claimPartyId, reason, detail);
+    }
+
+    @Nonnull
+    private TamedDamageDecision failOpen(@Nonnull String claimModName,
+                                         boolean claimAccessAvailable,
+                                         @Nonnull String reason,
+                                         @Nullable String detail) {
+        return failOpen(claimModName, claimAccessAvailable, null, reason, detail);
+    }
+
+    @Nonnull
+    private TamedDamageDecision failOpen(@Nonnull String claimModName,
+                                         boolean claimAccessAvailable,
+                                         @Nullable UUID claimPartyId,
+                                         @Nonnull String reason,
+                                         @Nullable String detail) {
         warningSink.warn(
                 WARN_FAIL_OPEN,
-                "SimpleClaims tamed damage evaluation failed open: reason="
+                claimModName + " tamed damage evaluation failed open: reason="
                         + reason
                         + ", detail="
                         + safeDetail(detail)

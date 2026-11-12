@@ -40,7 +40,7 @@ class TameClaimLimitPolicyServiceTest {
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {
         return new BreedingClaimLimitPolicyService.ResolvedClaim(
                 BreedingClaimLimitPolicyService.ClaimResolutionStatus.CLAIM_FOUND,
-                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", UUID.randomUUID()),
+                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", "simpleclaims:" + UUID.randomUUID()),
                 chunkCount,
                 null
         );

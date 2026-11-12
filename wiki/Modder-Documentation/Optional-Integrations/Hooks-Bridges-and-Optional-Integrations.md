@@ -46,13 +46,20 @@ Stay in the config layer when:
 Use a hook only when the behavior would otherwise force you back into a large bespoke instruction tree.
 
 ## Optional Integrations
-### SimpleClaims
+### Claim mods: SimpleClaims and QuestLines Claims
 Relevant family:
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 
+The Claim Mod setting in `/tw settings` (`SimpleClaims.Provider` in
+`TwGlobalConfig`) picks the claim mod: Automatic (SimpleClaims when installed,
+otherwise QuestLines Claims when installed), SimpleClaims, or QuestLines Claims.
+Both are optional and read by reflection, so Tamework runs without either.
+
 What it enables:
 - Direct breeding-per-claim limits and optional claim-required breeding.
-- SimpleClaims-native tamed-target damage policy.
+- The claim mod's tamed-target damage rules: SimpleClaims' native policy, or
+  QuestLines Claims' `PVE` rule (whether the attacking player may hurt
+  creatures at that spot).
 
 These checks do not create a general claim-population or placement-admission
 system. Tamework's own per-player limits are separate and come from the
@@ -64,7 +71,20 @@ not. Both are checked in the same locked step that changes the companion.
 
 Tamework shares reflected SimpleClaims capabilities for the current live
 plugin generation. A stopped or replaced SimpleClaims instance is detected
-before a policy check and is not reused.
+before a policy check and is not reused. QuestLines Claims is bound the same
+way, once per plugin instance with its own class loader. Claim limits compare
+claims by a key unique to the claim mod and claim, and scale the per-chunk
+limit by the claim's chunk count in either mod.
+
+### QuestLines Claims damage policy
+
+With QuestLines Claims selected, `ProtectTamedFromNonMembers` asks QuestLines
+whether the attacking player may act with its `PVE` flag (hurting creatures)
+at the target's block. QuestLines answers from its own claim, admin-region,
+member and group rules. The server permission bypass below applies; the legacy
+raw-party bypass is SimpleClaims-only. Errors, an attacker who is no longer
+online, and a missing or unsupported QuestLines version fail open. Public
+`evaluateClaimAccess` reports a null `claimPartyId` for QuestLines claims.
 
 ### SimpleClaims damage policy
 

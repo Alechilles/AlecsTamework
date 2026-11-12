@@ -82,7 +82,8 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.blockNonOwnerPlayerDamage(),
                         Boolean.TRUE.equals(defaults.blockNonOwnerPlayerDamage())),
                 resolveBoolean(values.sharingEnabled(), !Boolean.FALSE.equals(defaults.sharingEnabled())),
-                resolveSharingHighestLevel(values.sharingHighestLevel()).name()
+                resolveSharingHighestLevel(values.sharingHighestLevel()).name(),
+                ClaimModChoice.fromConfigValue(values.claimMod()).toConfigValue()
         );
     }
 

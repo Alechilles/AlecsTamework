@@ -121,6 +121,12 @@ public final class TameworkRuntimeSettings {
         return values.simpleClaimsBreedingRequiresClaim();
     }
 
+    /** The claim mod chosen in settings; {@link ClaimModChoice#AUTOMATIC} picks one at each check. */
+    @Nonnull
+    public ClaimModChoice claimMod() {
+        return values.claimModChoice();
+    }
+
     public boolean simpleClaimsProtectTamedFromNonMembers() {
         return values.simpleClaimsProtectTamedFromNonMembers();
     }
@@ -378,6 +384,16 @@ public final class TameworkRuntimeSettings {
     public static int simpleClaimsLimitPerClaimTotal(int configLimit) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.simpleClaimsLimitPerClaimTotal() : configLimit;
+    }
+
+    /**
+     * The claim mod chosen in settings, or the asset's {@code SimpleClaims.Provider} value when no
+     * settings are loaded. Missing and unknown values give {@link ClaimModChoice#AUTOMATIC}.
+     */
+    @Nonnull
+    public static ClaimModChoice claimMod(@Nullable String configValue) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.claimMod() : ClaimModChoice.fromConfigValue(configValue);
     }
 
     public static boolean simpleClaimsBreedingRequiresClaim(boolean configEnabled) {

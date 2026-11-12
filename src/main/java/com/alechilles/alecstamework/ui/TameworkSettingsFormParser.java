@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
+import com.alechilles.alecstamework.settings.ClaimModChoice;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -144,6 +145,10 @@ final class TameworkSettingsFormParser {
                 TameworkSettingsResolver.resolveSharingHighestLevel(fallback(
                         payload.sharingHighestLevel,
                         currentValues.sharingHighestLevel().name()
+                )),
+                ClaimModChoice.fromConfigValue(fallback(
+                        payload.claimMod,
+                        currentValues.claimMod().toConfigValue()
                 ))
         ));
     }
@@ -198,7 +203,8 @@ final class TameworkSettingsFormParser {
                 boolOrDefault(payload.avatarFlightUnlimitedVigour, current.avatarFlightUnlimitedVigour()),
                 boolOrDefault(payload.blockNonOwnerPlayerDamage, current.blockNonOwnerPlayerDamage()),
                 boolOrDefault(payload.sharingEnabled, current.sharingEnabled()),
-                choices.sharingHighestLevel()
+                choices.sharingHighestLevel(),
+                choices.claimMod()
         );
     }
 
@@ -323,7 +329,8 @@ final class TameworkSettingsFormParser {
                                 @Nonnull TwNeedsConfig.DualNeedRule damageDualNeedRule,
                                 @Nonnull AnimalAgingMode animalAgingMode,
                                 @Nonnull CaptureItemOwnershipMode captureItemOwnership,
-                                @Nonnull AccessLevel sharingHighestLevel) {
+                                @Nonnull AccessLevel sharingHighestLevel,
+                                @Nonnull ClaimModChoice claimMod) {
     }
 
     private record ChoiceResult(boolean success, @Nonnull String message, @Nullable ChoiceValues values) {

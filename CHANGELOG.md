@@ -8,6 +8,11 @@
   animals with **My party (SimpleClaims)**, **My party (PartyPro)**, **My claim members (QuestLines Claims)** or
   **My region members (OrbisGuard)** from the Sharing page or with `/tw share group`. Membership follows the other
   mod, and allies do not count. Like every group, each one grants nothing until an owner turns it on.
+- QuestLines Claims now works with Claim Integration: claim limits for taming and breeding, Breeding Requires
+  Claim, and tamed damage rules, where players may hurt a tamed animal in a claim only when QuestLines lets them
+  hurt creatures there. A new **Claim Mod** setting in `/tw settings` > Claim Integration picks SimpleClaims,
+  QuestLines Claims or Automatic (the default: SimpleClaims when installed, otherwise QuestLines Claims). Servers
+  that already use SimpleClaims need no change. The damage toggle is now called **Use the Claim Mod's Damage Rules**.
 
 ### Changed
 

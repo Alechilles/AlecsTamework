@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwConfigSchemaAdapterTest {
@@ -25,7 +24,6 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "General.Enabled"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "OwnershipProtection.BlockOwnerDamage"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SimpleClaims.Breeding.LimitPerClaimChunk"));
-        assertNull(TwConfigEditorFieldPolicy.findField(fields, "SimpleClaims.Provider"));
 
         TwConfigEditorFieldPolicy.EditorFieldSpec parent = TwConfigEditorFieldPolicy.findField(fields, "Parent");
         assertNotNull(parent);

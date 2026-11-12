@@ -74,18 +74,26 @@ A companion imported from a 3.x or 4.x world that has not been seen since the
 import does not count toward the deployed limit until its animal is found. It
 counts as owned.
 
-## SimpleClaims
+## Claim Integration
 
-The supported claims integration is direct SimpleClaims behavior:
+The Claim Integration section works with SimpleClaims or QuestLines Claims:
 
-- `SimpleClaimsEnabled` enables the bridge;
+- `simpleClaimsEnabled` (Enable Claim Integration) is the master switch;
+- `provider` (Claim Mod) picks the claim mod: `Automatic` (default),
+  `SimpleClaims` or `QuestLinesClaims`. Automatic uses SimpleClaims when it is
+  installed, otherwise QuestLines Claims when that is installed. A settings
+  file without this key, or with an unknown value, uses Automatic, so a server
+  that already used SimpleClaims keeps working as before;
 - breeding can require a claim;
 - taming and breeding use configured per-claim-chunk and total-claim live
   limits; and
-- `ProtectTamedFromNonMembers` enables SimpleClaims' native tamed-target
-  damage policy.
+- `protectTamedFromNonMembers` (Use the Claim Mod's Damage Rules) applies the
+  claim mod's tamed-target damage rules: SimpleClaims' native policy, or
+  QuestLines Claims' rule for hurting creatures.
 
-There is no claim-provider dropdown or QuestLines Claims fallback.
+The choice is read at each check, so installing or switching a claim mod needs
+no restart. An explicitly chosen claim mod that is not installed makes claim
+checks fail safely: breeding and limited taming are refused, damage is allowed.
 
 ## Where companions can come out
 
@@ -322,9 +330,9 @@ minute, or at once when the network mod sends a notice.
   loaded or not. Nearby loaded NPCs are not the complete count. A companion
   stuck in a capture item that no longer exists can be resolved with Recall or
   Forget in the panel, or `/tw companions forget|restore`.
-- If breeding is denied, verify the SimpleClaims claim and configured breeding
-  limits.
-- SimpleClaims damage integration errors fail open; they do not make a target
+- If breeding is denied, verify the Claim Mod setting, the claim in that claim
+  mod, and the configured breeding limits.
+- Claim damage integration errors fail open; they do not make a target
   invulnerable.
 - Tamework 5.0 has no `/tw debug persistence` command; all its subcommands were
   removed. Collect the server log when you report a problem.
