@@ -2184,7 +2184,6 @@ tamework.ui.sharing.add.button=Compartir
 tamework.ui.sharing.add.tooltip=Comparte todos tus animales con el jugador conectado que elijas, con el nivel elegido.
 tamework.ui.sharing.level.tooltip=Cuidador: alimentar, dar de beber, acariciar, curar y ver su estado.\nAdiestrador: además cosechar, montar, dar órdenes, llamar y criar.\nAdministrador: además renombrar, sacrificar y usar corrales.\nSolo el propietario puede capturar, liberar, revivir, cambiar talentos, transferir o compartir animales.
 tamework.ui.sharing.groups.section=Grupos
-tamework.ui.sharing.groups.none=No hay grupos disponibles en este servidor.
 tamework.share.builtInGroup.simpleClaimsParty=Mi grupo (SimpleClaims)
 tamework.share.builtInGroup.partyProParty=Mi grupo (PartyPro)
 tamework.share.builtInGroup.questLinesClaimMembers=Miembros de mis terrenos (QuestLines Claims)

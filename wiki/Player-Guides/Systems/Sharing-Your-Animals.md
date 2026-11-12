@@ -43,7 +43,8 @@ Open your companions window with your command item and press **Sharing** in the 
 The page has three lists:
 
 - **Players you share with**: each player's level and a **Remove** button, plus a row to add a player.
-- **Groups**: the groups other mods offer, such as a guild, each with its own level or **Off**.
+- **Groups**: the groups other mods offer, such as a guild, each with its own level or **Off**. This list appears
+  only on servers with such a mod.
 - **Shared with you**: the players who share their animals with you and your level on each.
 
 The top of the page says the highest level this server allows. A line near the bottom says what happened after each
@@ -80,7 +81,7 @@ everyone in the group, including players who join it later.
 3. Pick **Off** to turn the group off again.
 
 If a player is both named and in a group you share with, they get the higher of the two levels. If no mod on the
-server offers a group, the Groups list says so.
+server offers a group, the Sharing page has no Groups list.
 
 Tamework itself offers a group for each of these mods when the server has it installed:
 

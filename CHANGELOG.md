@@ -13,6 +13,8 @@
 
 - The Sharing page shows four players and four groups before its lists scroll, and three players who share with you.
   The Groups list used to fit only two rows and cut the third in half.
+- The Sharing page hides its Groups section, and gets shorter, on a server where no mod offers a group. It still
+  shows it while you have a group share saved, so you can turn that off.
 - Tamework accepts any version of QuestLines Claims as an optional dependency. It used to name only 1.3.1.
 
 ## 5.11.1 - Sharing Level Help - 2026-11-11

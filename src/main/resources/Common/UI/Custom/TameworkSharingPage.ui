@@ -27,93 +27,108 @@ $C.@PageOverlay {
     Label #TameworkSharingStatus { Anchor: (Top: 48, Left: 22, Right: 22, Height: 34); Text: ""; Style: @Note; }
     Label #TameworkSharingPrivate { Anchor: (Top: 82, Left: 22, Right: 22, Height: 16); Text: ""; Style: @Note; }
 
-    Label #TameworkSharingPlayersLabel { Anchor: (Top: 106, Left: 22, Right: 22, Height: 18); Text: ""; Style: @Caps; }
-    Group {
-      Anchor: (Top: 128, Left: 22, Right: 22, Height: 148);
-      Background: $A.@SlateTray;
-      Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
+    // The sections stack, so a hidden Groups section takes no space. TameworkSharingPage hides it and
+    // shortens the page when the server offers no groups and the viewer has none saved.
+    Group #TameworkSharingSections {
+      Anchor: (Top: 106, Left: 22, Right: 22, Bottom: 104);
+      LayoutMode: Top;
+
       Group {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-        LayoutMode: TopScrolling;
-        KeepScrollPosition: true;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-        Padding: (Right: 2);
-        Group #TameworkSharingPlayerList { LayoutMode: Top; Anchor: (Bottom: 0); }
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 216);
+        Label #TameworkSharingPlayersLabel { Anchor: (Top: 0, Left: 0, Right: 0, Height: 18); Text: ""; Style: @Caps; }
+        Group {
+          Anchor: (Top: 22, Left: 0, Right: 0, Height: 148);
+          Background: $A.@SlateTray;
+          Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
+          Group {
+            Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+            LayoutMode: TopScrolling;
+            KeepScrollPosition: true;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 2);
+            Group #TameworkSharingPlayerList { LayoutMode: Top; Anchor: (Bottom: 0); }
+          }
+          Label #TameworkSharingPlayersEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.share.list.players.none; Style: @Empty; Visible: false; }
+        }
+        Group #TameworkSharingAddRow {
+          Anchor: (Top: 178, Left: 0, Right: 0, Height: 28);
+          LayoutMode: Left;
+          DropdownBox #TameworkSharingAddPlayer {
+            Anchor: (Width: 280, Height: 28);
+            Style: $A.@GroupDropdown;
+            MaxSelection: 1;
+            NoItemsText: %server.tamework.ui.sharing.add.noPlayers;
+          }
+          Group { Anchor: (Width: 8); }
+          DropdownBox #TameworkSharingAddLevel {
+            Anchor: (Width: 160, Height: 28);
+            TooltipText: %server.tamework.ui.sharing.level.tooltip;
+            TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+            Style: $A.@GroupDropdown;
+            MaxSelection: 1;
+          }
+          Group { Anchor: (Width: 8); }
+          TextButton #TameworkSharingAddButton {
+            Anchor: (Width: 120, Height: 28);
+            Text: %server.tamework.ui.sharing.add.button;
+            TooltipText: %server.tamework.ui.sharing.add.tooltip;
+            TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+            Style: $A.@PanelButtonPrimary;
+          }
+        }
       }
-      Label #TameworkSharingPlayersEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.share.list.players.none; Style: @Empty; Visible: false; }
-    }
 
-    Group #TameworkSharingAddRow {
-      Anchor: (Top: 284, Left: 22, Right: 22, Height: 28);
-      LayoutMode: Left;
-      DropdownBox #TameworkSharingAddPlayer {
-        Anchor: (Width: 280, Height: 28);
-        Style: $A.@GroupDropdown;
-        MaxSelection: 1;
-        NoItemsText: %server.tamework.ui.sharing.add.noPlayers;
+      Group #TameworkSharingGroupsSection {
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 180);
+        Label { Anchor: (Top: 0, Left: 0, Right: 0, Height: 18); Text: %server.tamework.ui.sharing.groups.section; Style: @Caps; }
+        Group {
+          Anchor: (Top: 22, Left: 0, Right: 0, Height: 148);
+          Background: $A.@SlateTray;
+          Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
+          Group {
+            Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+            LayoutMode: TopScrolling;
+            KeepScrollPosition: true;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 2);
+            Group #TameworkSharingGroupList { LayoutMode: Top; Anchor: (Bottom: 0); }
+          }
+        }
       }
-      Group { Anchor: (Width: 8); }
-      DropdownBox #TameworkSharingAddLevel {
-        Anchor: (Width: 160, Height: 28);
-        TooltipText: %server.tamework.ui.sharing.level.tooltip;
-        TextTooltipStyle: $C.@DefaultTextTooltipStyle;
-        Style: $A.@GroupDropdown;
-        MaxSelection: 1;
-      }
-      Group { Anchor: (Width: 8); }
-      TextButton #TameworkSharingAddButton {
-        Anchor: (Width: 120, Height: 28);
-        Text: %server.tamework.ui.sharing.add.button;
-        TooltipText: %server.tamework.ui.sharing.add.tooltip;
-        TextTooltipStyle: $C.@DefaultTextTooltipStyle;
-        Style: $A.@PanelButtonPrimary;
-      }
-    }
 
-    Label { Anchor: (Top: 322, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.groups.section; Style: @Caps; }
-    Group {
-      Anchor: (Top: 344, Left: 22, Right: 22, Height: 148);
-      Background: $A.@SlateTray;
-      Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
       Group {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-        LayoutMode: TopScrolling;
-        KeepScrollPosition: true;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-        Padding: (Right: 2);
-        Group #TameworkSharingGroupList { LayoutMode: Top; Anchor: (Bottom: 0); }
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 136);
+        Label { Anchor: (Top: 0, Left: 0, Right: 0, Height: 18); Text: %server.tamework.ui.sharing.sharedWithYou.section; Style: @Caps; }
+        Group {
+          Anchor: (Top: 22, Left: 0, Right: 0, Height: 114);
+          Background: $A.@SlateTray;
+          Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
+          Group {
+            Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+            LayoutMode: TopScrolling;
+            KeepScrollPosition: true;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 2);
+            Group #TameworkSharingInboundList { LayoutMode: Top; Anchor: (Bottom: 0); }
+          }
+          Label #TameworkSharingInboundEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.share.list.sharedWithYou.none; Style: @Empty; Visible: false; }
+        }
       }
-      Label #TameworkSharingGroupsEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.ui.sharing.groups.none; Style: @Empty; Visible: false; }
     }
 
-    Label { Anchor: (Top: 502, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.sharedWithYou.section; Style: @Caps; }
-    Group {
-      Anchor: (Top: 524, Left: 22, Right: 22, Height: 114);
-      Background: $A.@SlateTray;
-      Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
-      Group {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-        LayoutMode: TopScrolling;
-        KeepScrollPosition: true;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-        Padding: (Right: 2);
-        Group #TameworkSharingInboundList { LayoutMode: Top; Anchor: (Bottom: 0); }
-      }
-      Label #TameworkSharingInboundEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.share.list.sharedWithYou.none; Style: @Empty; Visible: false; }
-    }
-
-    Label #TameworkSharingFeedback { Anchor: (Top: 646, Left: 22, Right: 22, Height: 44); Text: ""; Style: @Feedback; }
-    TextButton #TameworkSharingDoneButton { Anchor: (Top: 698, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
+    Label #TameworkSharingFeedback { Anchor: (Bottom: 52, Left: 22, Right: 22, Height: 44); Text: ""; Style: @Feedback; }
+    TextButton #TameworkSharingDoneButton { Anchor: (Bottom: 14, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
 
     // The warning shown before a new player or group is shared with.
     Group #TameworkSharingConfirm {
       Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
       Background: #05080b(0.82);
       Visible: false;
+      LayoutMode: Middle;
 
       Group {
         // Tall enough for the warning plus the level's paragraph in the longest locale (German, group share).
-        Anchor: (Top: 191, Left: 60, Width: 500, Height: 360);
+        Anchor: (Width: 500, Height: 360);
         Background: $A.@SlateModal;
         Label { Anchor: (Top: 14, Left: 18, Right: 18, Height: 30); Text: %server.tamework.ui.sharing.confirm.title; Style: (FontSize: 17, FontName: "Secondary", TextColor: #f2c66d, HorizontalAlignment: Start, VerticalAlignment: Center); }
         Label #TameworkSharingConfirmText { Anchor: (Top: 50, Left: 18, Right: 18, Height: 250); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); }

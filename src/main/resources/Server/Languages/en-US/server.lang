@@ -2240,7 +2240,6 @@ tamework.ui.sharing.add.button=Share
 tamework.ui.sharing.add.tooltip=Share all your animals with the chosen online player at the chosen level.
 tamework.ui.sharing.level.tooltip=Caretaker: feed, water, pet and heal, and see status.\nHandler: also harvest, mount, command, recall and breed.\nManager: also rename, cull and use coops.\nOnly the owner can capture, release, revive, change talents, transfer or share animals.
 tamework.ui.sharing.groups.section=Groups
-tamework.ui.sharing.groups.none=No groups are available on this server.
 tamework.share.builtInGroup.simpleClaimsParty=My party (SimpleClaims)
 tamework.share.builtInGroup.partyProParty=My party (PartyPro)
 tamework.share.builtInGroup.questLinesClaimMembers=My claim members (QuestLines Claims)
