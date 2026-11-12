@@ -739,6 +739,8 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
         com.alechilles.alecstamework.access.SharedAccessService.get().start(runtimeDataDirectory);
+        com.alechilles.alecstamework.access.groups.BuiltInAccessGroups.registerInstalled(
+                com.alechilles.alecstamework.access.SharedAccessService.get());
         com.alechilles.alecstamework.npc.progression.SharedPresenceService.get().start();
         openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
