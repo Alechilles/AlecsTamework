@@ -25,6 +25,8 @@ Group {
 
   DropdownBox #Level {
     Anchor: (Top: 3, Right: 96, Width: 160, Height: 24);
+    TooltipText: %server.tamework.ui.sharing.level.tooltip;
+    TextTooltipStyle: $C.@DefaultTextTooltipStyle;
     Style: $A.@GroupDropdown;
     MaxSelection: 1;
     Visible: false;

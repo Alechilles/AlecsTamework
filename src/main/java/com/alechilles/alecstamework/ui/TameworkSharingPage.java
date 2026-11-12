@@ -500,9 +500,12 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
             return;
         }
         String level = levelName(pending.level());
-        commands.set("#TameworkSharingConfirmText.Text", pending.group()
+        String warning = pending.group()
                 ? text("tamework.ui.sharing.confirm.group", pending.name(), level)
-                : text("tamework.ui.sharing.confirm.player", pending.name(), level));
+                : text("tamework.ui.sharing.confirm.player", pending.name(), level);
+        // What the level allows follows as its own paragraph, so the owner reads it before confirming.
+        commands.set("#TameworkSharingConfirmText.Text",
+                warning + "\n\n" + text(TameworkShareRules.levelAllowsKey(pending.level())));
         bind(events, "#TameworkSharingConfirmButton", ACTION_CONFIRM);
         bind(events, "#TameworkSharingConfirmCancel", ACTION_CANCEL);
     }

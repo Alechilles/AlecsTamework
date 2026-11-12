@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The Sharing page now explains the sharing levels. Hover a level picker to see what Caretaker, Handler and Manager
+  can do, and the share confirmation says what the chosen level allows. `/tw share add` and `/tw share group` add
+  the same line to their confirmation, and a player who is given a level is told what it lets them do.
+
 ## 5.11.0 - Sharing - 2026-11-11
 
 ### Added

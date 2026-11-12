@@ -55,6 +55,8 @@ $C.@PageOverlay {
       Group { Anchor: (Width: 8); }
       DropdownBox #TameworkSharingAddLevel {
         Anchor: (Width: 160, Height: 28);
+        TooltipText: %server.tamework.ui.sharing.level.tooltip;
+        TextTooltipStyle: $C.@DefaultTextTooltipStyle;
         Style: $A.@GroupDropdown;
         MaxSelection: 1;
       }
@@ -110,12 +112,13 @@ $C.@PageOverlay {
       Visible: false;
 
       Group {
-        Anchor: (Top: 190, Left: 60, Width: 500, Height: 280);
+        // Tall enough for the warning plus the level's paragraph in the longest locale (German, group share).
+        Anchor: (Top: 150, Left: 60, Width: 500, Height: 360);
         Background: $A.@SlateModal;
         Label { Anchor: (Top: 14, Left: 18, Right: 18, Height: 30); Text: %server.tamework.ui.sharing.confirm.title; Style: (FontSize: 17, FontName: "Secondary", TextColor: #f2c66d, HorizontalAlignment: Start, VerticalAlignment: Center); }
-        Label #TameworkSharingConfirmText { Anchor: (Top: 50, Left: 18, Right: 18, Height: 170); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); }
-        TextButton #TameworkSharingConfirmCancel { Anchor: (Top: 232, Right: 140, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.cancel; Style: $A.@PanelButton; }
-        TextButton #TameworkSharingConfirmButton { Anchor: (Top: 232, Right: 18, Width: 112, Height: 30); Text: %server.tamework.ui.sharing.confirm.button; Style: $A.@PanelButtonPrimary; }
+        Label #TameworkSharingConfirmText { Anchor: (Top: 50, Left: 18, Right: 18, Height: 250); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); }
+        TextButton #TameworkSharingConfirmCancel { Anchor: (Top: 312, Right: 140, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.cancel; Style: $A.@PanelButton; }
+        TextButton #TameworkSharingConfirmButton { Anchor: (Top: 312, Right: 18, Width: 112, Height: 30); Text: %server.tamework.ui.sharing.confirm.button; Style: $A.@PanelButtonPrimary; }
       }
     }
   }
