@@ -21,8 +21,9 @@ Cases (each sets the grant, private flag and settings it needs at its start; non
 How it judges: hunger from `tw debug get needs --entity UUID` (console); harvest from the Harvest_Ready alarm (the
 console's `tw debug set harvestready` reply names the state before it set it again) and the milk items dropped near
 the cow; damage from bot.py hit() (one swing, only with the crosshair on the cow; healthBefore / healthAfter);
-command replies from RuneTestKit /messages. Feeding uses a real F with Tw_Feed_Herbivore held (the cow is set not
-harvest-ready first, so F cannot pick the harvest); harvest a real F with a Container_Bucket. Needs Rune_Professions'
+command replies from RuneTestKit /messages. Feeding uses a real F with Tw_Feed_Herbivore held; a harvest-ready cow
+takes that F as the harvest, so the cow is made not ready first (the owner's harvest hint reads readiness, and the
+owner harvests it with a real F when it is ready); harvest a real F with a Container_Bucket. Needs Rune_Professions'
 Husbandry level on both players (set with `/prof admin setlevel`, kept in RuneCore's database), because
 Rune_Husbandry's feed and harvest require it. Needs a Tamework build with `tw debug needs advance`.
 
@@ -133,10 +134,59 @@ class Ctx:
         time.sleep(1.0)
         return sel, r
 
-    def feed(self, bot, nid, uuid, start=50.0):
-        """Hunger before and after one F with feed held, from `start`. The cow is set not harvest-ready first: a
-        ready cow can take F as the harvest (seen in a failed run)."""
+    def hold_bucket(self, bot):
+        """Select a bucket; when none is in the hotbar (harvests use them up), give one and select again."""
+        self.use(bot)
+        sel = self.B.select(BUCKET)
+        if not sel.get("ok"):
+            self.give(bot, BUCKET, 1)
+            time.sleep(0.5)
+            sel = self.B.select(BUCKET)
+        return sel
+
+    def owner_hint(self, nid):
+        """(crosshair on the cow, hint) the OWNER sees on cow `nid` with a bucket held. The server picks the hint
+        (ActionTameworkInteractPrompt): the harvest hint shows only while the cow's Harvest_Ready alarm is ready, and
+        the owner may always harvest, so it reads readiness without changing it."""
+        self.hold_bucket(OWNER)
+        if not self.look_at_cow(OWNER, nid):
+            return False, None
+        hint = None
+        for _ in range(2):              # the prompt is cached for 0.5 s per player
+            time.sleep(0.8)
+            it = self.B.obs().get("interaction") or {}
+            if it.get("entityNetworkId") != nid:
+                return False, None
+            hint = it.get("hint") or ""
+        return True, hint
+
+    def ensure_not_ready(self, nid, uuid):
+        """Before a feed: make the cow not harvest-ready, so F cannot pick the harvest. First the debug clear
+        (`--mode=false`; on Rune_Husbandry cows it answers "no valid HarvestTimeout" and changes nothing), else the
+        owner's hint as the readiness read and, when ready, a real owner harvest with a bucket, read again after.
+        Returns {notReady, clearedBy: "debug" | "ownerHarvest" | None, readyBefore, probe}."""
         cleared = self.set_ready(uuid, False)
+        if cleared is not None and cleared[1] is False:
+            return {"notReady": True, "clearedBy": "debug", "readyBefore": cleared[0], "probe": None}
+        aimed, hint = self.owner_hint(nid)
+        if not aimed:
+            return {"notReady": False, "clearedBy": None, "readyBefore": None,
+                    "probe": "the owner's crosshair was not on the cow"}
+        if not HARVEST_HINT.search(hint):
+            return {"notReady": True, "clearedBy": None, "readyBefore": False, "probe": hint}
+        sel = self.hold_bucket(OWNER)
+        r = self.B.interact(nid)
+        time.sleep(1.0)
+        aimed2, hint2 = self.owner_hint(nid)
+        done = aimed2 and not HARVEST_HINT.search(hint2 or "")
+        return {"notReady": done, "clearedBy": "ownerHarvest" if done else None, "readyBefore": True,
+                "probe": [hint, hint2 if aimed2 else "the owner's crosshair was not on the cow"],
+                "ownerBucketHeld": bool(sel.get("ok")), "ownerPressed": bool(r.get("pressedOnTarget"))}
+
+    def feed(self, bot, nid, uuid, start=50.0):
+        """Hunger before and after one F with feed held, from `start`. The cow is made not harvest-ready first
+        (ensure_not_ready): a ready cow takes F as the harvest even with feed held (seen in two runs)."""
+        clear = self.ensure_not_ready(nid, uuid)
         self.set_hunger(uuid, start)
         before = self.hunger(uuid)
         sel, r = self.press_f(bot, nid, FEED)
@@ -145,19 +195,25 @@ class Ctx:
         hint = r.get("hint") or ""
         return {"held": bool(sel.get("ok")), "selectTries": sel.get("tries"), "before": before, "after": after,
                 "gain": gain, "pressed": bool(r.get("pressedOnTarget")), "landed": r.get("landed"), "hint": hint,
-                "notReady": cleared is not None and cleared[1] is False,
+                "notReady": clear["notReady"], "clearedBy": clear["clearedBy"], "clear": clear,
                 "harvestHint": bool(HARVEST_HINT.search(hint))}
 
     def harvest(self, bot, nid, uuid):
-        """One F with a bucket on a harvest-ready cow. harvested = the Harvest_Ready alarm was used."""
+        """One F with a bucket on a harvest-ready cow. harvested = the Harvest_Ready alarm was used: `--mode=true`
+        makes it ready (clears the alarm) before the F, and the same command after the F reports the state it found,
+        false only when the F started the harvest cooldown. Dropped items and the harvester's inventory change are
+        kept as notes only: the bot standing beside the cow can pick the milk up before the second count."""
         self.set_ready(uuid, True)
         items0 = self.items_near(nid)
-        sel, r = self.press_f(bot, nid, BUCKET)
-        time.sleep(0.5)
+        sel = self.hold_bucket(bot)
+        r = self.B.interact(nid)
+        time.sleep(1.5)
         items1 = self.items_near(nid)
         again = self.set_ready(uuid, True)      # reads the state before setting it again
+        inv = [ch["inventory"] for ch in r.get("changes") or [] if "inventory" in ch]
         return {"held": bool(sel.get("ok")), "harvested": again is not None and again[0] is False,
-                "itemsDropped": items1 - items0, "pressed": bool(r.get("pressedOnTarget")), "hint": r.get("hint")}
+                "itemsDropped": items1 - items0, "inventoryChange": inv, "pressed": bool(r.get("pressedOnTarget")),
+                "hint": r.get("hint")}
 
     def cycle(self, bot, nid):
         """One F with the sword held (players chose /tw card cycle): state before and after."""
@@ -227,8 +283,8 @@ def judge_feed(t, f, fed, what):
     if not f["pressed"]:
         return t.unjudged(what, f"F was never pressed with the crosshair on the cow: {f}")
     if f["harvestHint"] or (fed and not f["notReady"]):
-        return t.unjudged(what, f"F may have chosen the harvest, not the feed (hint {f['hint']!r}, cow cleared of "
-                                f"harvest-ready {f['notReady']}): {f}")
+        return t.unjudged(what, f"F may have chosen the harvest, not the feed (hint {f['hint']!r}, cow shown not "
+                                f"harvest-ready {f['notReady']}, cleared by {f['clearedBy']}): {f}")
     if fed:
         return t.check(False, what, f)
     return t.check(gain is not None and gain < 1, what, f)
