@@ -133,6 +133,23 @@ final class TameworkTraitCommandSupport {
         return String.format(Locale.ROOT, "%.3f", value);
     }
 
+    /** The traits as one token for a machine-readable reply: {@code Id:1.000,Other:0.500}, or {@code none}. */
+    @Nonnull
+    static String formatTraitPairs(@Nullable TameworkTraitsComponent traits) {
+        if (traits == null || traits.getTraitValues().length == 0) {
+            return "none";
+        }
+        StringBuilder values = new StringBuilder();
+        for (TameworkTraitsComponent.TraitValue value : traits.getTraitValues()) {
+            if (!values.isEmpty()) {
+                values.append(',');
+            }
+            String id = value != null && value.getId() != null && !value.getId().isBlank() ? value.getId() : "?";
+            values.append(id).append(':').append(formatDouble(value != null ? value.getValue() : 0.0));
+        }
+        return values.toString();
+    }
+
     @Nonnull
     static String buildKnownTraitsText(@Nonnull Map<String, TwTraitConfig.TraitDefinition> definitionMap) {
         if (definitionMap.isEmpty()) {

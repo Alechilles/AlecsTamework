@@ -30,11 +30,13 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -74,15 +76,58 @@ public final class NpcSpawnCommandService {
                                      @Nullable Map<String, String> attachmentOverrides,
                                      @Nonnull Consumer<SpawnBatchResult> completion) {
         Objects.requireNonNull(completion, "completion");
-        SpawnPreparation preparation = prepareSpawn(player, roleId, quantity);
+        SpawnOwner owner = new SpawnOwner(player.getUuid(), OwnerNameUtil.resolve(player), player, playerRef);
+        spawnBatch(owner, store, world, () -> spawnPositionService.resolveSpawnPosition(player, null),
+                roleId, quantity, spawnRadius, attachmentOverrides, completion);
+    }
+
+    /**
+     * Spawns an owned, tamed batch at {@code base} for an owner who need not be online or in this
+     * world, as an admin or test command does. It runs the same steps as the player batch (owner caps,
+     * the owner component write that the ownership systems register and admit, then the tamed state),
+     * without a held command item to link. World thread only.
+     *
+     * @param ownerName the owner's name when known (an online owner), else null
+     * @param ownerRef  the owner's entity in {@code store} when it is there, so the companions face and
+     *                  mark it as a player's spawn does; null otherwise
+     */
+    public void spawnTamedOwnedBatchAt(@Nonnull UUID ownerId,
+                                       @Nullable String ownerName,
+                                       @Nullable Ref<EntityStore> ownerRef,
+                                       @Nonnull Store<EntityStore> store,
+                                       @Nonnull World world,
+                                       @Nonnull Vector3d base,
+                                       @Nonnull String roleId,
+                                       int quantity,
+                                       @Nullable Double spawnRadius,
+                                       @Nullable Map<String, String> attachmentOverrides,
+                                       @Nonnull Consumer<SpawnBatchResult> completion) {
+        Objects.requireNonNull(completion, "completion");
+        Ref<EntityStore> sameStoreOwner = ownerRef != null && ownerRef.isValid() && ownerRef.getStore() == store
+                ? ownerRef : null;
+        SpawnOwner owner = new SpawnOwner(ownerId, ownerName, null, sameStoreOwner);
+        spawnBatch(owner, store, world, () -> new Vector3d(base),
+                roleId, quantity, spawnRadius, attachmentOverrides, completion);
+    }
+
+    private void spawnBatch(SpawnOwner owner,
+                            Store<EntityStore> store,
+                            World world,
+                            Supplier<Vector3d> base,
+                            String roleId,
+                            int quantity,
+                            @Nullable Double spawnRadius,
+                            @Nullable Map<String, String> attachmentOverrides,
+                            Consumer<SpawnBatchResult> completion) {
+        SpawnPreparation preparation = prepareSpawn(owner.ownerId(), base, roleId, quantity);
         if (preparation.failure() != null) {
             completion.accept(SpawnBatchResult.failure(preparation.failure()));
             return;
         }
-        BatchTracker tracker = newBatchTracker(quantity, player, completion);
+        BatchTracker tracker = newBatchTracker(quantity, owner.player(), completion);
         for (int index = 0; index < quantity; index++) {
             if (!spawnOne(
-                    player, store, playerRef, world, preparation,
+                    owner, store, world, preparation,
                     offsetSpawnPosition(preparation.base(), index, spawnRadius),
                     attachmentOverrides, tracker
             )) {
@@ -93,7 +138,8 @@ public final class NpcSpawnCommandService {
     }
 
     @Nonnull
-    private SpawnPreparation prepareSpawn(Player player, String roleId, int quantity) {
+    private SpawnPreparation prepareSpawn(@Nullable UUID ownerId, Supplier<Vector3d> baseSource,
+                                          String roleId, int quantity) {
         if (quantity <= 0) {
             return SpawnPreparation.failure("Quantity must be greater than zero.");
         }
@@ -105,11 +151,10 @@ public final class NpcSpawnCommandService {
         if (roleIndex < 0) {
             return SpawnPreparation.failure("Unknown role '" + roleId + "'.");
         }
-        UUID ownerId = player.getUuid();
         if (ownerId == null) {
             return SpawnPreparation.failure("Player UUID not available.");
         }
-        Vector3d base = spawnPositionService.resolveSpawnPosition(player, null);
+        Vector3d base = baseSource.get();
         return base == null
                 ? SpawnPreparation.failure("Unable to resolve a spawn position.")
                 : new SpawnPreparation(
@@ -118,9 +163,8 @@ public final class NpcSpawnCommandService {
     }
 
     private boolean spawnOne(
-            Player player,
+            SpawnOwner owner,
             Store<EntityStore> store,
-            Ref<EntityStore> playerRef,
             World world,
             SpawnPreparation preparation,
             Vector3d position,
@@ -132,12 +176,14 @@ public final class NpcSpawnCommandService {
                         store, preparation.ownerId(), preparation.roleId()
                 );
         if (!cap.allowed()) {
-            OwnerMessageUtil.sendAcquisitionDenied(player, cap);
+            if (owner.player() != null) {
+                OwnerMessageUtil.sendAcquisitionDenied(owner.player(), cap);
+            }
             tracker.stop("Owner population cap reached.");
             return false;
         }
         Rotation3f rotation = spawnPositionService.resolveSpawnRotation(
-                store, playerRef, position
+                store, owner.ownerRef(), position
         );
         var spawned = preparation.npcPlugin().spawnEntity(
                 store, preparation.roleIndex(), position, rotation, null, null
@@ -147,32 +193,28 @@ public final class NpcSpawnCommandService {
             return false;
         }
         AppliedSpawn applied = applySpawnedState(
-                player,
+                owner,
                 store,
-                playerRef,
                 world,
                 spawned.first(),
                 spawned.second(),
-                preparation.ownerId(),
                 attachmentOverrides
         );
         if (applied == null) {
             tracker.stop("Spawn failed while applying owned companion state.");
             return false;
         }
-        tracker.applied(applied.linked(), applied.attachments());
+        tracker.applied(applied.linked(), applied.attachments(), spawned.second().getUuid());
         return true;
     }
 
     @Nullable
     private AppliedSpawn applySpawnedState(
-            Player player,
+            SpawnOwner owner,
             Store<EntityStore> store,
-            Ref<EntityStore> playerRef,
             World world,
             Ref<EntityStore> npcRef,
             NPCEntity npc,
-            UUID ownerId,
             @Nullable Map<String, String> attachmentOverrides
     ) {
         var ownerType = TameworkOwnerComponent.getComponentType();
@@ -183,19 +225,22 @@ public final class NpcSpawnCommandService {
         store.putComponent(
                 npcRef,
                 ownerType,
-                new TameworkOwnerComponent(ownerId, OwnerNameUtil.resolve(player))
+                new TameworkOwnerComponent(owner.ownerId(), owner.ownerName())
         );
         AttachmentResolution resolution =
                 resolveAttachmentOverrides(npcRef, store, attachmentOverrides);
-        applyPostAdmissionState(store, world, playerRef, npcRef, npc, resolution);
+        applyPostAdmissionState(store, world, owner.ownerRef(), npcRef, npc, resolution);
         if (store.getComponent(npcRef, ownerType) == null) {
             // The admission gate refused the tame and stripped the owner; it has told the owner why.
             npc.setToDespawn();
             return null;
         }
-        AutoLinkContext autoLink = resolveHeldCommandItem(player);
+        if (owner.player() == null) {
+            return new AppliedSpawn(false, resolution);
+        }
+        AutoLinkContext autoLink = resolveHeldCommandItem(owner.player());
         boolean linked = linkHeldCommandItem(
-                autoLink, player, store, npcRef, npc
+                autoLink, owner.player(), store, npcRef, npc
         );
         if (autoLink != null && autoLink.changed
                 && !updateHeldItem(autoLink)) {
@@ -237,9 +282,10 @@ public final class NpcSpawnCommandService {
         );
     }
 
+    /** {@code masterRef} is the owner's entity in this store, or null when the owner is not here. */
     void applyPostAdmissionState(Store<EntityStore> store,
                                  World world,
-                                 Ref<EntityStore> playerRef,
+                                 @Nullable Ref<EntityStore> masterRef,
                                  Ref<EntityStore> npcRef,
                                  NPCEntity npc,
                                  @Nullable AttachmentResolution attachmentResolution) {
@@ -250,14 +296,16 @@ public final class NpcSpawnCommandService {
         if (attachmentResolution != null && !attachmentResolution.appliedSelections.isEmpty()) {
             attachmentService.applyAttachments(attachmentResolution.appliedSelections, npcRef, npc, store);
         }
-        Ref<EntityStore> masterRef = playerRef;
-        if (npc.getRole() != null) {
+        if (masterRef != null && npc.getRole() != null) {
             npc.getRole().setMarkedTarget(npcRef, store, "MasterTarget", masterRef);
         }
     }
 
     @Nullable
-    private AutoLinkContext resolveHeldCommandItem(Player player) {
+    private AutoLinkContext resolveHeldCommandItem(@Nullable Player player) {
+        if (player == null) {
+            return null;
+        }
         Tamework plugin = Tamework.getInstance();
         CommandItemRegistry registry = plugin != null ? plugin.getCommandItemRegistry() : null;
         if (registry == null) {
@@ -445,7 +493,7 @@ public final class NpcSpawnCommandService {
     }
 
     BatchTracker newBatchTracker(int requestedCount,
-                                 Player player,
+                                 @Nullable Player player,
                                  Consumer<SpawnBatchResult> completion) {
         return new BatchTracker(
                 requestedCount,
@@ -465,6 +513,7 @@ public final class NpcSpawnCommandService {
         private String stoppedReason;
         @Nullable
         private AttachmentResolution attachmentResolution;
+        private final List<UUID> spawnedNpcIds = new ArrayList<>();
 
         private BatchTracker(int requestedCount,
                              boolean hadHeldCommandItem,
@@ -480,9 +529,12 @@ public final class NpcSpawnCommandService {
             }
         }
 
-        void applied(boolean linked, @Nullable AttachmentResolution resolution) {
+        void applied(boolean linked, @Nullable AttachmentResolution resolution, @Nullable UUID npcId) {
             if (attachmentResolution == null && resolution != null) {
                 attachmentResolution = resolution;
+            }
+            if (npcId != null) {
+                spawnedNpcIds.add(npcId);
             }
             spawnedCount++;
             if (linked) {
@@ -499,7 +551,8 @@ public final class NpcSpawnCommandService {
                     hadHeldCommandItem,
                     stoppedReason,
                     attachmentResolution == null ? null : attachmentResolution.appliedSelections,
-                    attachmentResolution == null ? List.of() : attachmentResolution.invalidSelections
+                    attachmentResolution == null ? List.of() : attachmentResolution.invalidSelections,
+                    spawnedNpcIds
             ));
         }
     }
@@ -517,6 +570,8 @@ public final class NpcSpawnCommandService {
         private final Map<String, String> appliedAttachments;
         @Nonnull
         private final List<String> invalidAttachments;
+        @Nonnull
+        private final List<UUID> spawnedNpcIds;
 
         SpawnBatchResult(@Nullable String failureMessage,
                                  int requestedCount,
@@ -525,7 +580,8 @@ public final class NpcSpawnCommandService {
                                  boolean hadHeldCommandItem,
                                  @Nullable String stoppedReason,
                                  @Nullable Map<String, String> appliedAttachments,
-                                 @Nullable List<String> invalidAttachments) {
+                                 @Nullable List<String> invalidAttachments,
+                                 @Nullable List<UUID> spawnedNpcIds) {
             this.failureMessage = failureMessage;
             this.requestedCount = requestedCount;
             this.spawnedCount = spawnedCount;
@@ -534,11 +590,18 @@ public final class NpcSpawnCommandService {
             this.stoppedReason = stoppedReason;
             this.appliedAttachments = appliedAttachments;
             this.invalidAttachments = invalidAttachments != null ? List.copyOf(invalidAttachments) : List.of();
+            this.spawnedNpcIds = spawnedNpcIds != null ? List.copyOf(spawnedNpcIds) : List.of();
         }
 
         @Nonnull
         static SpawnBatchResult failure(@Nonnull String failureMessage) {
-            return new SpawnBatchResult(failureMessage, 0, 0, 0, false, null, null, List.of());
+            return new SpawnBatchResult(failureMessage, 0, 0, 0, false, null, null, List.of(), List.of());
+        }
+
+        /** The UUIDs of the NPCs this batch spawned and kept, in spawn order. */
+        @Nonnull
+        public List<UUID> getSpawnedNpcIds() {
+            return spawnedNpcIds;
         }
 
         @Nullable
@@ -641,6 +704,18 @@ public final class NpcSpawnCommandService {
                     null, -1, null, null, null, reason
             );
         }
+    }
+
+    /**
+     * Who a batch is spawned for. {@code player} is the online player who ran it (null for an admin
+     * spawn for any owner); {@code ownerRef} is the owner's entity in the spawn store, or null.
+     */
+    private record SpawnOwner(
+            @Nullable UUID ownerId,
+            @Nullable String ownerName,
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> ownerRef
+    ) {
     }
 
     private record AppliedSpawn(

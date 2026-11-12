@@ -8,10 +8,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
@@ -19,31 +18,26 @@ import javax.annotation.Nonnull;
  * Command to display the role, tamed status and owner of the targeted NPC in one line. Support
  * uses it to spot a companion that is tamed but still runs its untamed role.
  */
-public final class TameworkGetRoleCommand extends AbstractPlayerCommand {
+public final class TameworkGetRoleCommand extends AbstractTameworkNpcTargetCommand {
 
     public TameworkGetRoleCommand() {
-        super("role", "server.tamework.commands.getRole.description");
+        super("role", "server.tamework.commands.getRole.description",
+                "server.tamework.commands.getRole.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getRole.no.npc.found.in.view"));
-            return;
-        }
-
-        String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-        boolean tamed = TamedStateResolver.isTamed(candidate.ref, store);
+                           @Nonnull Ref<EntityStore> npcRef) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        boolean tamed = TamedStateResolver.isTamed(npcRef, store);
 
         String ownerText = "-";
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        TameworkOwnerComponent owner = type == null ? null : store.getComponent(candidate.ref, type);
+        TameworkOwnerComponent owner = type == null ? null : store.getComponent(npcRef, type);
         UUID ownerUuid = owner == null ? null : owner.getOwnerId();
         if (ownerUuid != null) {
             String ownerName = owner.getOwnerName();
@@ -53,7 +47,7 @@ public final class TameworkGetRoleCommand extends AbstractPlayerCommand {
         }
 
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getRole.role.for.npc.is")
-                .param("0", String.valueOf(candidate.npcUuid))
+                .param("0", String.valueOf(npc.getUuid()))
                 .param("1", roleId == null || roleId.isBlank() ? "?" : roleId)
                 .param("2", String.valueOf(tamed))
                 .param("3", ownerText));

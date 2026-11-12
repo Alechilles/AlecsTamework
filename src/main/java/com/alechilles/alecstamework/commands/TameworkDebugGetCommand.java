@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 public final class TameworkDebugGetCommand extends AbstractCommandCollection {
     public TameworkDebugGetCommand() {
         super("get", "server.tamework.commands.debugGet.description");
+        addSubCommand(new TameworkGetCompanionCommand());
         addSubCommand(new TameworkGetNeedsCommand());
         addSubCommand(new TameworkGetHappinessCommand());
         addSubCommand(new TameworkGetLifeStageCommand());

@@ -14,8 +14,22 @@
   is saved. It works from the server console.
 - `/tw debug log xp-events on` now also logs tame, revive, summon, recall, summon expiry, avatar flight and combat
   activities, in the same `activity=...` line.
+- For admins and test scripts: `/tw debug get companion [--entity <uuid>]` prints one `ok ...` line with a
+  companion's role, tamed state, owner, the players it is shared with, life stage, level and XP, happiness, needs,
+  harvest and breeding readiness and traits, and changes nothing. Level and XP had no read before.
+- For admins and test scripts: `/tw npc spawn tamed <Role> [count] --owner <uuid|name> --at <x> <y> <z>` spawns
+  owned, tamed animals for an owner from the server console, through the same limits and ownership steps as a
+  player's spawn. The owner may be offline when given by UUID.
+- For admins and test scripts: `/tw debug share add|remove|list ... --owner <uuid|name>` shares an owner's animals
+  for them from the server console, without the owner's confirmation. Each change is written to the server log
+  with the admin who made it.
 
 ### Changed
+
+- `/tw debug get happiness|lifestage|owner|role|tamed|traits` and
+  `/tw debug set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>`, so they work from the server
+  console; in game they still act on the NPC you look at. From the console the setters reply with one `ok ...` line. `/tw debug set owner` also takes an
+  online player's name.
 
 - `/tw debug get alarm [AlarmName] [NpcUuid]` reads Tamework's own harvest alarm on the animal's own time and
   changes nothing. Its reply is now one line, `ok entity=... alarm=... source=tamework ready=... untilMs=...

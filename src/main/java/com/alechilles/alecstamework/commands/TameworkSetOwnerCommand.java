@@ -1,60 +1,62 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
- * Command to set or clear owner on the targeted NPC.
+ * Command to set or clear owner on the targeted NPC. The owner is a UUID (online or not), an online
+ * player's name, or {@code clear}; a player who names no owner becomes the owner. The owner component
+ * write goes through the same ownership systems as a tame (companion index and admission).
  */
-public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
+public final class TameworkSetOwnerCommand extends AbstractTameworkNpcTargetCommand {
 
     public TameworkSetOwnerCommand() {
-        super("owner", "server.tamework.commands.setOwner.description");
+        super("owner", "server.tamework.commands.setOwner.description",
+                "server.tamework.commands.setOwner.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        Player player = store.getComponent(ref, Player.getComponentType());
-        if (player == null) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.no.player.context"));
-            return;
-        }
-
-        // Default: set owner to the executing player when no argument is provided.
+                           @Nonnull Ref<EntityStore> npcRef) {
+        boolean console = !commandContext.isPlayer();
         String raw = getFirstArg(commandContext.getInputString());
-        UUID newOwner = parseOwner(raw, player.getUuid());
-        if (newOwner == null && raw != null && !raw.isBlank() && !isClear(raw)) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.invalid.uuid.use.clear.or.a.valid"));
-            return;
-        }
-
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.no.npc.found.in.view"));
-            return;
-        }
-
+        UUID newOwner;
         String ownerName = null;
-        if (newOwner != null && newOwner.equals(player.getUuid())) {
-            // Only resolve a name for self; external UUIDs remain anonymous.
-            ownerName = OwnerNameUtil.resolve(player);
+        if (raw == null || raw.isBlank()) {
+            if (console) {
+                commandContext.sendMessage(Message.raw("refused reason=owner-required usage=<ownerUuid|name|clear>"));
+                return;
+            }
+            // Default: the executing player owns it.
+            TameworkCommandPlayers.Named self = TameworkCommandPlayers.resolve(commandContext.sender().getUuid().toString());
+            newOwner = commandContext.sender().getUuid();
+            ownerName = self != null ? self.name() : null;
+        } else if (isClear(raw)) {
+            newOwner = null;
+        } else {
+            TameworkCommandPlayers.Named named = TameworkCommandPlayers.resolve(raw);
+            if (named == null) {
+                commandContext.sendMessage(console
+                        ? Message.raw("refused reason=unknown-owner value=" + raw.trim())
+                        : Message.translation("server.tamework.commands.setOwner.invalid.uuid.use.clear.or.a.valid"));
+                return;
+            }
+            newOwner = named.uuid();
+            // An offline owner given by UUID stays anonymous until a body sighting or tame names it.
+            ownerName = named.name();
         }
 
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
@@ -62,23 +64,14 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.componentUnavailable"));
             return;
         }
-        store.putComponent(candidate.ref, type, new TameworkOwnerComponent(newOwner, ownerName));
+        store.putComponent(npcRef, type, new TameworkOwnerComponent(newOwner, ownerName));
         String ownerText = newOwner == null ? "null" : newOwner.toString();
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.set.owner.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(ownerText)));
-    }
-
-    static UUID parseOwner(String raw, UUID defaultOwner) {
-        if (raw == null || raw.isBlank()) {
-            return defaultOwner;
+        if (console) {
+            commandContext.sendMessage(Message.raw("ok entity=" + npc.getUuid()
+                    + " owner=" + (newOwner == null ? "none" : newOwner.toString())));
+            return;
         }
-        if (isClear(raw)) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (Exception ex) {
-            return null;
-        }
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.set.owner.for.npc.to").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(ownerText)));
     }
 
     static String getFirstArg(String input) {

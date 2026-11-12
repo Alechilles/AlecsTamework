@@ -16,10 +16,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -29,39 +28,35 @@ import javax.annotation.Nullable;
 /**
  * Command to display shared happiness status for the targeted NPC.
  */
-public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
+public final class TameworkGetHappinessCommand extends AbstractTameworkNpcTargetCommand {
     private static final String FERTILITY_MULTIPLIER_KEY = "FertilityMultiplier";
     private static final String BREED_COOLDOWN_MULTIPLIER_KEY = "BreedCooldownMultiplier";
 
     public TameworkGetHappinessCommand() {
-        super("happiness", "server.tamework.commands.getHappiness.description");
+        super("happiness", "server.tamework.commands.getHappiness.description",
+                "server.tamework.commands.getHappiness.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getHappiness.no.npc.found.in.view"));
-            return;
-        }
-
-        HappinessSnapshot snapshot = resolveHappinessSnapshot(candidate.ref, store);
+                           @Nonnull Ref<EntityStore> npcRef) {
+        HappinessSnapshot snapshot = resolveHappinessSnapshot(npcRef, store);
         if (snapshot == null) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getHappiness.npc.has.no.tracked.happiness.state").param("0", String.valueOf(candidate.npcUuid)));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getHappiness.npc.has.no.tracked.happiness.state").param("0", String.valueOf(npc.getUuid())));
             return;
         }
 
-        BreedingSnapshot breeding = resolveBreedingSnapshot(candidate.ref, store, snapshot.value());
-        commandContext.sender().sendMessage(buildLocalizedMessage(candidate.npcUuid, snapshot, breeding));
+        BreedingSnapshot breeding = resolveBreedingSnapshot(npcRef, store, snapshot.value());
+        commandContext.sender().sendMessage(buildLocalizedMessage(npc.getUuid(), snapshot, breeding));
     }
 
+    /** The NPC's happiness from its components, else the computed equilibrium; null when it has none. */
     @Nullable
-    private static HappinessSnapshot resolveHappinessSnapshot(@Nonnull Ref<EntityStore> npcRef,
+    static HappinessSnapshot resolveHappinessSnapshot(@Nonnull Ref<EntityStore> npcRef,
                                                               @Nonnull Store<EntityStore> store) {
         HappinessSnapshot sourceSnapshot = resolveSnapshotFromComponents(npcRef, store);
         CompanionHappinessService.HappinessSnapshot equilibriumSnapshot =
@@ -280,7 +275,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         );
     }
 
-    private record HappinessSnapshot(double value,
+    record HappinessSnapshot(double value,
                                      @Nullable String configId,
                                      long lastUpdateMs,
                                      String source,

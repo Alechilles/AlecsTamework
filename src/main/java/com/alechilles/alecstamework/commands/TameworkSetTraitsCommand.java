@@ -10,10 +10,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -21,30 +20,26 @@ import javax.annotation.Nonnull;
 /**
  * Replaces the targeted NPC's trait list with explicit trait/value pairs.
  */
-public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
+public final class TameworkSetTraitsCommand extends AbstractTameworkNpcTargetCommand {
     public TameworkSetTraitsCommand() {
-        super("traits", "server.tamework.commands.setTraits.description");
+        super("traits", "server.tamework.commands.setTraits.description",
+                "server.tamework.commands.setTraits.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull Ref<EntityStore> npcRef) {
         TameworkTraitCommandInputParser.ParseResult parseResult =
                 TameworkTraitCommandInputParser.parseSetTraits(commandContext.getInputString());
         if (!parseResult.isSuccess()) {
             commandContext.sender().sendMessage(TameworkTraitCommandSupport.parseErrorMessage(parseResult.errorMessage()));
             return;
         }
-
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.no.npc.found.in.view"));
-            return;
-        }
+        TameworkCommandTargeting.Candidate candidate = new TameworkCommandTargeting.Candidate(npcRef, npc.getUuid());
 
         ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
         if (traitsType == null) {
@@ -111,6 +106,12 @@ public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
         );
 
         String values = formatTraitValues(updated);
+        if (!commandContext.isPlayer()) {
+            commandContext.sendMessage(Message.raw("ok entity=" + candidate.npcUuid
+                    + " traits=" + TameworkTraitCommandSupport.formatTraitPairs(updated)
+                    + " clamped=" + clampedAny));
+            return;
+        }
         if (!clampedAny) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.result")
                     .param("0", String.valueOf(candidate.npcUuid))

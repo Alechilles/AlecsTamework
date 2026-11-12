@@ -9,38 +9,33 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import javax.annotation.Nonnull;
 
 /**
  * Command to inspect the targeted NPC life-stage state.
  */
-public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
+public final class TameworkGetLifeStageCommand extends AbstractTameworkNpcTargetCommand {
     public TameworkGetLifeStageCommand() {
-        super("lifestage", "server.tamework.commands.getLifeStage.description");
+        super("lifestage", "server.tamework.commands.getLifeStage.description",
+                "server.tamework.commands.getLifeStage.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.no.npc.found.in.view"));
-            return;
-        }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
+                           @Nonnull Ref<EntityStore> npcRef) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
-        TameworkLifeStageComponent component = type != null ? store.getComponent(candidate.ref, type) : null;
-        String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
+        TameworkLifeStageComponent component = type != null ? store.getComponent(npcRef, type) : null;
+        String stage = CompanionLifeStageService.resolveCurrentStage(npcRef, store, roleId);
         if (component == null) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(stage)));
             return;
         }
         AnimalProgressionService.Presentation presentation =
@@ -48,6 +43,6 @@ public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
         if (presentation != null) {
             stage = presentation.stage();
         }
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)).param("2", String.valueOf(component.getBornAtMs())).param("3", String.valueOf(component.getAdolescentAtMs())).param("4", String.valueOf(component.getAdultAtMs())).param("5", String.valueOf(component.isGrowthScalingEnabled())).param("6", String.valueOf(component.getAgeProgressMs())));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(stage)).param("2", String.valueOf(component.getBornAtMs())).param("3", String.valueOf(component.getAdolescentAtMs())).param("4", String.valueOf(component.getAdultAtMs())).param("5", String.valueOf(component.isGrowthScalingEnabled())).param("6", String.valueOf(component.getAgeProgressMs())));
     }
 }

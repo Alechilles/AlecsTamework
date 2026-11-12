@@ -13,10 +13,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -24,32 +23,28 @@ import javax.annotation.Nullable;
 /**
  * Command to set shared companion happiness for the targeted NPC.
  */
-public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
+public final class TameworkSetHappinessCommand extends AbstractTameworkNpcTargetCommand {
     private static final double DEFAULT_HAPPINESS_MIN = 0.0;
     private static final double DEFAULT_HAPPINESS_MAX = 100.0;
 
     public TameworkSetHappinessCommand() {
-        super("happiness", "server.tamework.commands.setHappiness.description");
+        super("happiness", "server.tamework.commands.setHappiness.description",
+                "server.tamework.commands.setHappiness.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull Ref<EntityStore> npcRef) {
         Double requested = parseRequestedValue(commandContext);
         if (requested == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.usage.tw.sethappiness.value"));
             return;
         }
-
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.no.npc.found.in.view"));
-            return;
-        }
+        TameworkCommandTargeting.Candidate candidate = new TameworkCommandTargeting.Candidate(npcRef, npc.getUuid());
 
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
@@ -115,6 +110,13 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
             store.putComponent(candidate.ref, breedingType, breeding);
         }
 
+        if (!commandContext.isPlayer()) {
+            commandContext.sendMessage(Message.raw("ok entity=" + candidate.npcUuid
+                    + " requested=" + formatDouble(requested)
+                    + " happiness=" + formatDouble(clamped)
+                    + (ready != null ? " breedingReady=" + ready : "")));
+            return;
+        }
         commandContext.sender().sendMessage(buildLocalizedResultMessage(
                 candidate.npcUuid.toString(), requested, clamped, clampRules, ready));
     }

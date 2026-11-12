@@ -141,21 +141,21 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             }
             context.sendMessage(Message.translation(KEY + "remove.done").param("0", grantName(grant)));
         }
+    }
 
-        /**
-         * The owner's grant to the player named by {@code value}: the name saved with the grant, so
-         * it works while that player is offline, then the player's UUID, then their current name.
-         */
-        @Nullable
-        private static OwnerGrants.PlayerGrant namedGrant(@Nonnull OwnerGrants grants, @Nonnull String value) {
-            for (OwnerGrants.PlayerGrant grant : grants.players().values()) {
-                if (value.equalsIgnoreCase(grant.playerName()) || value.equalsIgnoreCase(grant.playerId().toString())) {
-                    return grant;
-                }
+    /**
+     * The owner's grant to the player named by {@code value}: the name saved with the grant, so
+     * it works while that player is offline, then the player's UUID, then their current name.
+     */
+    @Nullable
+    static OwnerGrants.PlayerGrant namedGrant(@Nonnull OwnerGrants grants, @Nonnull String value) {
+        for (OwnerGrants.PlayerGrant grant : grants.players().values()) {
+            if (value.equalsIgnoreCase(grant.playerName()) || value.equalsIgnoreCase(grant.playerId().toString())) {
+                return grant;
             }
-            PlayerRef online = onlinePlayer(value);
-            return online == null ? null : grants.players().get(online.getUuid());
         }
+        PlayerRef online = onlinePlayer(value);
+        return online == null ? null : grants.players().get(online.getUuid());
     }
 
     private static final class Group extends Leaf {

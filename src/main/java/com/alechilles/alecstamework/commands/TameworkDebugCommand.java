@@ -20,6 +20,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugNeedsCommand());
         addSubCommand(new TameworkDebugGrowthCommand());
         addSubCommand(new TameworkDebugOwnerCommand());
+        addSubCommand(new TameworkDebugShareCommand());
         addSubCommand(new TameworkDebugLogCommand());
         addSubCommand(new TameworkDebugViewCommand(spawnBeaconVisualizationService));
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());

@@ -8,10 +8,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
@@ -23,38 +22,33 @@ import javax.annotation.Nullable;
 /**
  * Command to display rolled trait values for the targeted NPC.
  */
-public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
+public final class TameworkGetTraitsCommand extends AbstractTameworkNpcTargetCommand {
     public TameworkGetTraitsCommand() {
-        super("traits", "server.tamework.commands.getTraits.description");
+        super("traits", "server.tamework.commands.getTraits.description",
+                "server.tamework.commands.getTraits.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.no.npc.found.in.view"));
-            return;
-        }
-
+                           @Nonnull Ref<EntityStore> npcRef) {
         ComponentType<EntityStore, TameworkTraitsComponent> type = TameworkTraitsComponent.getComponentType();
         if (type == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.traits.component.is.not.available"));
             return;
         }
 
-        TameworkTraitsComponent traits = store.getComponent(candidate.ref, type);
+        TameworkTraitsComponent traits = store.getComponent(npcRef, type);
         if (traits == null) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.npc.has.no.tracked.trait.state").param("0", String.valueOf(candidate.npcUuid)));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.npc.has.no.tracked.trait.state").param("0", String.valueOf(npc.getUuid())));
             return;
         }
 
-        TwTraitConfig config = resolveTraitConfig(candidate.ref, store, traits);
-        commandContext.sender().sendMessage(buildLocalizedMessage(candidate.npcUuid, traits, config));
+        TwTraitConfig config = resolveTraitConfig(npcRef, store, traits);
+        commandContext.sender().sendMessage(buildLocalizedMessage(npc.getUuid(), traits, config));
     }
 
     @Nullable

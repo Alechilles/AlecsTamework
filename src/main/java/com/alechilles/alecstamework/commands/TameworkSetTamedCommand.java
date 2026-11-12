@@ -6,34 +6,28 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import javax.annotation.Nonnull;
 
 /**
  * Command to set or toggle tamed status on the targeted NPC.
  */
-public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
+public final class TameworkSetTamedCommand extends AbstractTameworkNpcTargetCommand {
 
     public TameworkSetTamedCommand() {
-        super("tamed", "server.tamework.commands.setTamed.description");
+        super("tamed", "server.tamework.commands.setTamed.description",
+                "server.tamework.commands.setTamed.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.no.npc.found.in.view"));
-            return;
-        }
-
+                           @Nonnull Ref<EntityStore> npcRef) {
         ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
         if (type == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.tamed.component.is.not.available"));
@@ -41,7 +35,7 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
         }
 
         boolean current = false;
-        TameworkTamedComponent existing = store.getComponent(candidate.ref, type);
+        TameworkTamedComponent existing = store.getComponent(npcRef, type);
         if (existing != null) {
             current = existing.isTamed();
         }
@@ -53,8 +47,12 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
             return;
         }
 
-        store.putComponent(candidate.ref, type, new TameworkTamedComponent(next));
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.set.tamed.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(next)));
+        store.putComponent(npcRef, type, new TameworkTamedComponent(next));
+        if (!commandContext.isPlayer()) {
+            commandContext.sendMessage(Message.raw("ok entity=" + npc.getUuid() + " tamed=" + current + "->" + next));
+            return;
+        }
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.set.tamed.for.npc.to").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(next)));
     }
 
     static Boolean resolveRequestedState(String raw, boolean current) {

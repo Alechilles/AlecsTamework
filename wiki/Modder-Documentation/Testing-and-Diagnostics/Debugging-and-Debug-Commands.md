@@ -189,6 +189,21 @@ Additional runtime diagnostics include:
   reaches the owner-offline grace without waiting. It affects all of that owner's animals and is saved.
 - `/tw debug get alarm [AlarmName] [NpcUuid]` prints one `ok ... ready=... remainingMs=...` line. Without a name
   it reads Tamework's harvest alarm on the animal's own time, as harvesting does, and changes nothing.
+- `/tw debug get companion [--entity <uuid>]` prints one `ok ...` line with the companion's role, tamed state,
+  owner, the players it is shared with, life stage, level and XP, happiness, needs, harvest and breeding readiness
+  and traits, read from memory. Keys the animal has no state for are left out.
+- The NPC getters and setters `get companion|happiness|lifestage|owner|role|tamed|traits` and
+  `set happiness|level|owner|tamed|traits|trait` take `--entity <uuid>` (and `--world <name>` outside the default
+  world), so they work from the server console; put `--entity` after the command's own arguments. In game, without
+  `--entity`, they still act on the NPC you look at. `set owner` takes an owner UUID (the owner may be offline), an
+  online player's name, or `clear`.
+- `/tw npc spawn tamed <Role> [count] --owner <uuid|name> --at <x> <y> <z> [--world <name>]` spawns owned, tamed
+  animals for that owner without a player, through the same limits and ownership steps as a player's spawn. The
+  reply is one `ok ... entity=<uuid>[,<uuid>...]` line.
+- `/tw debug share add <player> <caretaker|handler|manager> --owner <uuid|name>`,
+  `/tw debug share remove <player> --owner <uuid|name>` and `/tw debug share list --owner <uuid|name>` share an
+  owner's animals for them, without the owner's confirmation, from the console too. Each change is written to the server log with the admin who
+  made it.
 - `/tw debug avatar input [on|off|status]`
 - `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
 

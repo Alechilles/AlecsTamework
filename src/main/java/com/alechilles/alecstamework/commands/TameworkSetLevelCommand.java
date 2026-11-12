@@ -5,10 +5,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -16,43 +15,46 @@ import javax.annotation.Nullable;
 /**
  * Command to set companion level for the targeted NPC.
  */
-public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
+public final class TameworkSetLevelCommand extends AbstractTameworkNpcTargetCommand {
     public TameworkSetLevelCommand() {
-        super("level", "server.tamework.commands.setLevel.description");
+        super("level", "server.tamework.commands.setLevel.description",
+                "server.tamework.commands.setLevel.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull Ref<EntityStore> npcRef) {
         Integer requestedLevel = parseRequestedLevel(commandContext);
         if (requestedLevel == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.usage.tw.setlevel.level"));
             return;
         }
 
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.no.npc.found.in.view"));
-            return;
-        }
-
         CompanionLevelingService.SetLevelResult result = CompanionLevelingService.setLevel(
-                candidate.ref,
+                npcRef,
                 store,
                 requestedLevel
         );
         if (!result.applied()) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.unavailable")
-                    .param("0", String.valueOf(candidate.npcUuid)));
+                    .param("0", String.valueOf(npc.getUuid())));
             return;
         }
 
+        if (!commandContext.isPlayer()) {
+            commandContext.sendMessage(Message.raw("ok entity=" + npc.getUuid()
+                    + " requested=" + requestedLevel
+                    + " level=" + result.previousLevel() + "->" + result.currentLevel()
+                    + " maxLevel=" + result.maxLevel()
+                    + " totalXp=" + formatXp(result.totalXp())));
+            return;
+        }
         commandContext.sender().sendMessage(buildLocalizedResultMessage(
-                candidate.npcUuid.toString(), requestedLevel, result));
+                npc.getUuid().toString(), requestedLevel, result));
     }
 
     @Nullable

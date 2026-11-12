@@ -7,41 +7,35 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
  * Command to display owner info for the targeted NPC.
  */
-public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
+public final class TameworkGetOwnerCommand extends AbstractTameworkNpcTargetCommand {
 
     public TameworkGetOwnerCommand() {
-        super("owner", "server.tamework.commands.getOwner.description");
+        super("owner", "server.tamework.commands.getOwner.description",
+                "server.tamework.commands.getOwner.no.npc.found.in.view");
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getOwner.no.npc.found.in.view"));
-            return;
-        }
-
+                           @Nonnull Ref<EntityStore> npcRef) {
         UUID ownerUuid = null;
         String ownerName = null;
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
         if (type != null) {
-            TameworkOwnerComponent component = store.getComponent(candidate.ref, type);
+            TameworkOwnerComponent component = store.getComponent(npcRef, type);
             if (component != null) {
                 ownerUuid = component.getOwnerId();
                 ownerName = component.getOwnerName();
@@ -64,6 +58,6 @@ public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
         } else {
             ownerText = ownerUuid.toString();
         }
-        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getOwner.owner.for.npc.is").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(ownerText)));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getOwner.owner.for.npc.is").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(ownerText)));
     }
 }
