@@ -8,6 +8,7 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -57,6 +58,32 @@ public final class CompanionXpEventDebugLogService implements AutoCloseable {
             return;
         }
         infoLogger.accept("[Tamework XP Event Debug] harvestDrop " + message);
+    }
+
+    /**
+     * Logs one published activity with the companion's owner and the player credited as its actor.
+     * Builds no text while the switch is off. Ids are comma-joined when an activity has several
+     * participants (a breeding pair).
+     */
+    public void logActivity(@Nonnull String kind,
+                            @Nullable UUID operationId,
+                            @Nullable String companionUuids,
+                            @Nullable String ownerUuids,
+                            @Nullable UUID actorUuid,
+                            @Nullable String profileId,
+                            @Nullable String roleIds,
+                            @Nullable String toolItemId) {
+        if (!isEnabled()) {
+            return;
+        }
+        infoLogger.accept("[Tamework XP Event Debug] activity=" + kind
+                + " operationId=" + valueOrNull(operationId)
+                + " companionUuid=" + valueOrNull(companionUuids)
+                + " ownerUuid=" + valueOrNull(ownerUuids)
+                + " actorUuid=" + valueOrNull(actorUuid)
+                + " profileId=" + valueOrNull(profileId)
+                + " roleId=" + valueOrNull(roleIds)
+                + " toolId=" + valueOrNull(toolItemId));
     }
 
     private boolean enable() {

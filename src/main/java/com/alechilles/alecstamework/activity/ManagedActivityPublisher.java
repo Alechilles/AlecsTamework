@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.activity;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
@@ -14,6 +15,7 @@ import com.alechilles.alecstamework.api.TroughFillActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
+import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -330,7 +333,11 @@ public final class ManagedActivityPublisher {
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the already committed need change.
+            return;
         }
+        logPublished(ActivityIds.NEED_SATISFIED, operationId,
+                List.of(participant(resolution, ownerId, companionId)), null,
+                resolution.profile().profileId(), null);
     }
 
     /** Publishes one player putting food or water in a feed trough. */
@@ -338,44 +345,53 @@ public final class ManagedActivityPublisher {
         if (playerId == null || roleId == null || roleId.isBlank()) {
             return;
         }
+        UUID operationId = UUID.randomUUID();
         try {
             publisher.publish(new CompanionCaptureActivityView(
-                    new ActivityHeader(UUID.randomUUID(), ActivityIds.COMPANION_CAPTURE, Instant.now()),
+                    new ActivityHeader(operationId, ActivityIds.COMPANION_CAPTURE, Instant.now()),
                     playerId,
                     roleId
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the capture that already committed.
+            return;
         }
+        logPlayerActivity(ActivityIds.COMPANION_CAPTURE, operationId, playerId, roleId);
     }
 
     public void publishCommandPanelOpen(@Nullable UUID playerId) {
         if (playerId == null) {
             return;
         }
+        UUID operationId = UUID.randomUUID();
         try {
             publisher.publish(new CommandPanelOpenActivityView(
-                    new ActivityHeader(UUID.randomUUID(), ActivityIds.COMMAND_PANEL_OPEN, Instant.now()),
+                    new ActivityHeader(operationId, ActivityIds.COMMAND_PANEL_OPEN, Instant.now()),
                     playerId
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the panel that already opened.
+            return;
         }
+        logPlayerActivity(ActivityIds.COMMAND_PANEL_OPEN, operationId, playerId, null);
     }
 
     public void publishTroughFill(@Nullable UUID playerId, @Nonnull String resource) {
         if (playerId == null) {
             return;
         }
+        UUID operationId = UUID.randomUUID();
         try {
             publisher.publish(new TroughFillActivityView(
-                    new ActivityHeader(UUID.randomUUID(), ActivityIds.TROUGH_FILL, Instant.now()),
+                    new ActivityHeader(operationId, ActivityIds.TROUGH_FILL, Instant.now()),
                     playerId,
                     resource
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the already committed fill.
+            return;
         }
+        logPlayerActivity(ActivityIds.TROUGH_FILL, operationId, playerId, null);
     }
 
     private void publish(
@@ -434,7 +450,51 @@ public final class ManagedActivityPublisher {
             publisher.publish(activity);
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the already committed action.
+            return;
         }
+        logPublished(actionId, operationId, participants, actorId, profile.profileId(), tool);
+    }
+
+    /** Logs a published activity under {@code /tw debug log xp-events}; does nothing while it is off. */
+    private static void logPublished(
+            @Nonnull String actionId,
+            @Nullable UUID operationId,
+            @Nonnull List<ActivityParticipantView> participants,
+            @Nullable UUID actorId,
+            @Nullable String profileId,
+            @Nullable HusbandryToolContext tool
+    ) {
+        CompanionXpEventDebugLogService debugLog = activeDebugLog();
+        if (debugLog == null) {
+            return;
+        }
+        StringJoiner companions = new StringJoiner(",");
+        StringJoiner owners = new StringJoiner(",");
+        StringJoiner roles = new StringJoiner(",");
+        for (ActivityParticipantView participant : participants) {
+            companions.add(participant.companionId().toString());
+            owners.add(participant.ownerId() == null ? "<null>" : participant.ownerId().toString());
+            roles.add(participant.roleId() == null ? "<null>" : participant.roleId());
+        }
+        debugLog.logActivity(actionId, operationId, companions.toString(), owners.toString(), actorId,
+                profileId, roles.toString(), tool != null && tool.present() ? tool.itemId() : null);
+    }
+
+    /** Logs a published activity that names only the player who acted. */
+    private static void logPlayerActivity(@Nonnull String actionId, @Nullable UUID operationId,
+                                          @Nullable UUID playerId, @Nullable String roleId) {
+        CompanionXpEventDebugLogService debugLog = activeDebugLog();
+        if (debugLog != null) {
+            debugLog.logActivity(actionId, operationId, null, null, playerId, null, roleId, null);
+        }
+    }
+
+    @Nullable
+    private static CompanionXpEventDebugLogService activeDebugLog() {
+        Tamework instance = Tamework.getInstance();
+        CompanionXpEventDebugLogService debugLog =
+                instance == null ? null : instance.getCompanionXpEventDebugLogService();
+        return debugLog != null && debugLog.isEnabled() ? debugLog : null;
     }
 
     @Nullable

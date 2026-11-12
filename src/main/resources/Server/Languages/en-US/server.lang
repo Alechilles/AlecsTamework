@@ -1508,6 +1508,11 @@ tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=No enabled 
 tamework.commands.setHunger.set.hunger.for.npc=Set hunger for NPC {0}: {1}.
 tamework.commands.setHunger.argument.value=Hunger value to apply.
 tamework.commands.setHunger.description=Set hunger for selected NPCs.
+tamework.commands.debugNeeds.description=Needs debug commands.
+tamework.commands.advanceNeeds.description=Fast-forward hunger and thirst of selected NPCs by a number of seconds.
+tamework.commands.advanceNeeds.argument.seconds=Seconds to fast-forward.
+tamework.commands.advanceNeeds.invalid.seconds=Seconds must be above 0 and at most {0}.
+tamework.commands.advanceNeeds.advanced.needs.for.npc=Advanced needs for NPC {0}: requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
 tamework.commands.setLevel.usage.tw.setlevel.level=Usage: /tw debug set level <level>
 tamework.commands.setLevel.no.npc.found.in.view=No NPC found in view.
 tamework.commands.setLevel.could.not.set.level.for.npc=Could not set level for NPC {0}: {1}.

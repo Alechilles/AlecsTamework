@@ -221,6 +221,31 @@ can produce several lines per player attempt.
 hit, including source, owner UUID, tool ids, XP, and level delta.
 When enabled, it also logs `TameworkHarvestDrop` attempts before the public event exists so rejected harvest
 XP can be diagnosed with a reason such as not tamed or owned, disabled harvest XP, or missing drop output.
+It also logs one line for every activity the managed activity publisher sends (feed, harvest, cull, breeding,
+need satisfied, capture, trough fill, command panel open), with the player credited as its actor:
+
+```
+[Tamework XP Event Debug] activity=tamework:harvest operationId=<uuid> companionUuid=<uuid> ownerUuid=<uuid> actorUuid=<uuid> profileId=<id> roleId=<id> toolId=<itemId>
+```
+
+A missing value prints as `<null>`; `toolId` is `<null>` for a harvest with no tool. A breeding lists both
+parents, comma-joined, in `companionUuid`, `ownerUuid` and `roleId`. Player-only activities (capture, trough
+fill, command panel open) name only the actor.
+
+## Fast-forwarding needs
+
+`/tw debug needs advance <seconds> [NPC selectors]` decays the hunger and thirst of the selected NPCs as if
+`<seconds>` had passed, so a test does not wait in real time. It works from the console with
+`--entity <uuid>`. The owner-presence gate still decides how much of the time counts: the window starts now
+and runs forward with the owner's presence as it is now, so an online owner's companion counts all of it and
+an offline owner's companion counts only what falls after the offline grace. The per-update catch-up cap does
+not apply, needs damage and regen suppression follow as in a normal update, and no clock moves. Seconds are on
+the needs config's timer (scaled world time for `WorldTimeScaled` configs) and must be above 0 and at most one
+year. The reply, one line per NPC, keeps its `key=value` tokens in every language:
+
+```
+Advanced needs for NPC <uuid>: requestedSeconds=600.000 countedSeconds=600.000 hunger=80.000->75.000 thirst=90.000->84.000
+```
 
 ## Useful quick checks
 - `/tw debug get owner`, `/tw debug set owner`

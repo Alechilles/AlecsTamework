@@ -37,6 +37,16 @@ class OwnerPresenceTimelineServiceTest {
     }
 
     @Test
+    void debugAdvanceCountsInFullForAnOwnerWhoJustConnected() {
+        UUID ownerId = UUID.randomUUID();
+        service.markOnlineForTests(ownerId, 50_000L);
+
+        long effective = service.resolveAdvanceElapsedMs(ownerId, 60_000L, HOUR_MS, policy(72.0, 1.0));
+
+        assertEquals(HOUR_MS, effective);
+    }
+
+    @Test
     void ownerOfflineWithinGraceCountsZeroWindow() {
         UUID ownerId = UUID.randomUUID();
         service.markOfflineForTests(ownerId, 0L);

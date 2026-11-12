@@ -147,6 +147,26 @@ public final class OwnerPresenceTimelineService {
         return clampToWindow(onlineWindowMs + offlineEffectiveMs, totalWindowMs);
     }
 
+    /**
+     * Debug fast-forward: how much of {@code advanceMs} counts if it passed from {@code nowMs} on,
+     * with the owner's presence as it is now (online counts all of it; offline counts only what
+     * falls after the offline grace). The window lies ahead of now, so presence history before now
+     * cannot clip it. An owner not seen yet is first recorded at {@code nowMs}, never at a future
+     * instant.
+     */
+    long resolveAdvanceElapsedMs(@Nullable UUID ownerId,
+                                 long nowMs,
+                                 long advanceMs,
+                                 @Nullable TwNeedsConfig.TickPolicySettings tickPolicy) {
+        if (advanceMs <= 0L) {
+            return 0L;
+        }
+        if (ownerId != null) {
+            resolveOwnerState(ownerId, nowMs);
+        }
+        return resolveEffectiveElapsedMs(ownerId, nowMs, saturatingAdd(nowMs, advanceMs), tickPolicy);
+    }
+
     /** Applies the current runtime owner policy to one loaded world-time tick. */
     long resolveWorldTimeElapsedMs(@Nullable UUID ownerId,
                                    long totalWindowMs,

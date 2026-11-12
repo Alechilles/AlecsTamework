@@ -1455,6 +1455,11 @@ tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Ninguna con
 tamework.commands.setHunger.set.hunger.for.npc=Establecer hambre para NPC {0}: {1}.
 tamework.commands.setHunger.argument.value=Valor del hambre a aplicar.
 tamework.commands.setHunger.description=Establece el hambre para los NPC seleccionados.
+tamework.commands.debugNeeds.description=Comandos de depuración de necesidades.
+tamework.commands.advanceNeeds.description=Adelanta el hambre y la sed de los NPC seleccionados un número de segundos.
+tamework.commands.advanceNeeds.argument.seconds=Segundos que adelantar.
+tamework.commands.advanceNeeds.invalid.seconds=Los segundos deben ser mayores que 0 y como máximo {0}.
+tamework.commands.advanceNeeds.advanced.needs.for.npc=Necesidades adelantadas para el NPC {0}: requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
 tamework.commands.setLevel.usage.tw.setlevel.level=Uso: /tw debug set level <nivel>
 tamework.commands.setLevel.no.npc.found.in.view=No se encontró ningún NPC a la vista.
 tamework.commands.setLevel.could.not.set.level.for.npc=No se pudo establecer el nivel para NPC {0}: {1}.

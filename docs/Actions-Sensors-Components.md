@@ -402,6 +402,7 @@ combat target that is the owner or a player with access.
 - `/tw debug set needs <hunger> <thirst> [NPC selectors]`
 - `/tw debug set hunger <value> [NPC selectors]`
 - `/tw debug set thirst <value> [NPC selectors]`
+- `/tw debug needs advance <seconds> [NPC selectors]`
 - `/tw debug set breedingready [--mode=true|false|toggle] [NPC selectors]`
 - `/tw npc spawn tamed <role> [--count=<quantity>] [--radius=<blocks>] [--attachment=<slot:value>]`
 - `/tw debug get traits`

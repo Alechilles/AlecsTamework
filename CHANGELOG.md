@@ -38,8 +38,17 @@
   follows the damage rule above. `ManagedActivityView.actorId` now names the player who fed, harvested or culled;
   the owner stays the owner. On a server network with a settings store, grants follow the network under the key
   `shared-access`. The API version stays `3.0.0`.
+- For admins and test scripts: `/tw debug needs advance <seconds> [NPC selectors]` fast-forwards the hunger and
+  thirst of the selected NPCs, so a test does not wait in real time. The owner-offline grace still decides how much
+  of the time counts, and no clock moves. The reply line gives the seconds asked for, the seconds that counted, and
+  hunger and thirst before and after. It works from the server console with `--entity <uuid>`.
+- For admins and test scripts: while `/tw debug log xp-events on` is set, every published feed, harvest, cull,
+  breeding, need, capture, trough fill and command panel activity logs one `[Tamework XP Event Debug] activity=...`
+  line with its operation id, companion, owner and the player credited as its actor.
 
 ### Fixed
+
+- `/tw debug log xp-events on` turns on again. Since 5.0.0 it always answered that API events were unavailable.
 
 - Baby animals can no longer be harvested (milked, sheared and so on), and their companion card no longer shows a
   harvest meter. Species that grow up in their adult role, with no separate baby role, such as Mosshorns, used to

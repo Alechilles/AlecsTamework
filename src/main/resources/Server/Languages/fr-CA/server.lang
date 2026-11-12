@@ -1540,6 +1540,11 @@ tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Aucune conf
 tamework.commands.setHunger.set.hunger.for.npc=Faim définie pour le PNJ {0} : {1}.
 tamework.commands.setHunger.argument.value=Valeur de faim à appliquer.
 tamework.commands.setHunger.description=Définir la faim des PNJ sélectionnés.
+tamework.commands.debugNeeds.description=Commandes de débogage des besoins.
+tamework.commands.advanceNeeds.description=Avance la faim et la soif des PNJ sélectionnés d'un nombre de secondes.
+tamework.commands.advanceNeeds.argument.seconds=Secondes à avancer.
+tamework.commands.advanceNeeds.invalid.seconds=Les secondes doivent être supérieures à 0 et au plus {0}.
+tamework.commands.advanceNeeds.advanced.needs.for.npc=Besoins avancés pour le PNJ {0} : requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
 tamework.commands.setLevel.usage.tw.setlevel.level=Utilisation : /tw debug set level <level>
 tamework.commands.setLevel.no.npc.found.in.view=Aucun PNJ trouvé dans le champ de vision.
 tamework.commands.setLevel.could.not.set.level.for.npc=Impossible de définir le niveau du PNJ {0} : {1}.

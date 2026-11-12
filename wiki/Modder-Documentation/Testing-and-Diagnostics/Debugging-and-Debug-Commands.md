@@ -176,7 +176,11 @@ still requires Tamework telemetry to be enabled.
 Additional runtime diagnostics include:
 
 - `/tw debug log target-hud [on|off]`
-- `/tw debug log xp-events [on|off]`
+- `/tw debug log xp-events [on|off]`: companion XP transitions, harvest drop attempts, and one
+  `activity=...` line per published activity with its owner and the player credited as its actor
+- `/tw debug needs advance <seconds> [NPC selectors]`: fast-forwards hunger and thirst of the selected NPCs.
+  The owner-offline grace still decides how much of the time counts. The reply gives `requestedSeconds`,
+  `countedSeconds`, and hunger and thirst before and after.
 - `/tw debug avatar input [on|off|status]`
 - `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
 

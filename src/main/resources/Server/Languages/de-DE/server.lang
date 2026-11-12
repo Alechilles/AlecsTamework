@@ -1599,6 +1599,11 @@ tamework.commands.setHappiness.npc.has.no.tracked.happiness.or.breeding=NPC {0} 
 tamework.commands.setHappiness.usage.tw.sethappiness.value=Verwendung: /tw debug set happiness <value>
 tamework.commands.setHunger.argument.value=Anzuwendender Hungerwert.
 tamework.commands.setHunger.description=Lege den Hunger der ausgewählten NPCs fest.
+tamework.commands.debugNeeds.description=Debug-Befehle für Bedürfnisse.
+tamework.commands.advanceNeeds.description=Spule Hunger und Durst der ausgewählten NPCs um eine Anzahl Sekunden vor.
+tamework.commands.advanceNeeds.argument.seconds=Vorzuspulende Sekunden.
+tamework.commands.advanceNeeds.invalid.seconds=Die Sekunden müssen größer als 0 und höchstens {0} sein.
+tamework.commands.advanceNeeds.advanced.needs.for.npc=Bedürfnisse für NPC {0} vorgespult: requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
 tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Für NPC {0} wurde keine aktivierte Bedürfniskonfiguration aufgelöst.
 tamework.commands.setHunger.set.hunger.for.npc=Hunger für NPC {0} festgelegt: {1}.
 tamework.commands.setLevel.could.not.set.level.for.npc=Die Stufe für NPC {0} konnte nicht gesetzt werden: {1}.

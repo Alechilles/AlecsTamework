@@ -218,7 +218,58 @@ public final class CompanionNeedsService {
                 true,
                 null,
                 null,
-                true
+                true,
+                0L
+        );
+    }
+
+    /** What one debug fast-forward did to a companion's needs. Durations are on the needs config's timer. */
+    public record NeedsAdvanceResult(long requestedMs,
+                                     long countedMs,
+                                     double hungerBefore,
+                                     double hungerAfter,
+                                     double thirstBefore,
+                                     double thirstAfter) {
+    }
+
+    /**
+     * Debug fast-forward for tests: decays hunger and thirst as if {@code advanceMs} had passed.
+     * The same owner-presence gate as a normal update decides how much of it counts (an offline
+     * owner's grace still stops decay), but the per-update catch-up cap does not apply. Needs
+     * damage and regen suppression follow the decayed values as in a normal update. No clock
+     * moves: {@code lastUpdateMs} ends at now. Call on the NPC's world thread.
+     *
+     * @return the outcome, or null when the NPC has no enabled needs
+     */
+    @Nullable
+    public static NeedsAdvanceResult advanceNeedsForDebug(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          @Nullable String roleId,
+                                                          long advanceMs) {
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (npcRef == null || store == null || !npcRef.isValid() || needsType == null || advanceMs <= 0L) {
+            return null;
+        }
+        // Settle the time owed since the last update first, so the advance step decays only the advance.
+        runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, null, null, false, 0L);
+        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
+        if (component == null || !CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+            return null;
+        }
+        double hungerBefore = component.getHunger();
+        double thirstBefore = component.getThirst();
+        long countedMs = resolveAdvanceElapsedMs(
+                config, resolvePresenceId(npcRef, store), resolveNowMs(config, store), advanceMs);
+        runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, null, null, false, countedMs);
+        TameworkNeedsComponent after = store.getComponent(npcRef, needsType);
+        return new NeedsAdvanceResult(
+                advanceMs,
+                countedMs,
+                hungerBefore,
+                after == null ? hungerBefore : after.getHunger(),
+                thirstBefore,
+                after == null ? thirstBefore : after.getThirst()
         );
     }
 
@@ -595,10 +646,15 @@ public final class CompanionNeedsService {
                 reconcileHappiness,
                 commandBuffer,
                 heldItemId,
-                false
+                false,
+                0L
         );
     }
 
+    /**
+     * @param debugAdvanceMs already gated time a debug fast-forward adds to this update, outside
+     *                       the loaded-tick catch-up cap; 0 for every normal update
+     */
     private static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
                                           @Nullable Store<EntityStore> store,
                                           @Nullable String roleId,
@@ -608,7 +664,8 @@ public final class CompanionNeedsService {
                                           boolean reconcileHappiness,
                                           @Nullable CommandBuffer<EntityStore> commandBuffer,
                                           @Nullable String heldItemId,
-                                          boolean markPassiveSweep) {
+                                          boolean markPassiveSweep,
+                                          long debugAdvanceMs) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -635,7 +692,7 @@ public final class CompanionNeedsService {
         UUID presenceId = resolvePresenceId(npcRef, store);
         long effectiveElapsedMs = capLoadedTickElapsedMs(
                 resolveEffectiveElapsedMs(config, presenceId, lastUpdateMs, nowMs)
-        );
+        ) + Math.max(0L, debugAdvanceMs);
         boolean diagnosticsEnabled = isNeedsDamageDiagnosticsEnabled();
         String npcId = diagnosticsEnabled ? resolveNpcId(npcRef, store) : "<disabled>";
         double healthBeforeTick = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
@@ -902,6 +959,18 @@ public final class CompanionNeedsService {
             return nowMs - lastUpdateMs;
         }
         return OwnerPresenceTimelineService.get().resolveEffectiveElapsedMs(ownerId, lastUpdateMs, nowMs, tickPolicy);
+    }
+
+    /** The part of a debug fast-forward of {@code advanceMs} from {@code nowMs} that the owner-presence gate lets count. */
+    static long resolveAdvanceElapsedMs(@Nonnull TwNeedsConfig config,
+                                        @Nullable UUID ownerId,
+                                        long nowMs,
+                                        long advanceMs) {
+        TwNeedsConfig.TickPolicySettings tickPolicy = CompanionNeedsRuntimePolicy.resolveTickPolicy(config);
+        if (config.getTiming().getTimerBasis() == TwNeedsConfig.TimerBasis.WORLD_TIME_SCALED) {
+            return OwnerPresenceTimelineService.get().resolveWorldTimeElapsedMs(ownerId, advanceMs, tickPolicy);
+        }
+        return OwnerPresenceTimelineService.get().resolveAdvanceElapsedMs(ownerId, nowMs, advanceMs, tickPolicy);
     }
 
     static long resolveNeedsTimestamp(long storedTimestampMs,
