@@ -409,7 +409,7 @@ commands refuse in words, and `growth advance` counts 0 seconds while the progre
 | Read needs | `tw debug get needs --entity <uuid>` | `Needs for NPC <uuid>: hunger=72.00, thirst=70.00, ...` |
 | Read NPC state, position, leash | `tw debug get wander <role filter>` | `<uuid> role=Cow state=Idle pos=1.0,64.0,2.0 leash=... inWater=false` |
 | Read role, stage, position | `tw npc find <uuid>` | `NPC <uuid> found: role=..., pos=..., stage=Adult, ...` |
-| Force needs (setup) | `tw debug set hunger\|thirst\|needs ... --entity <uuid>` | |
+| Force needs (setup) | `tw debug set hunger <value> --entity <uuid>`, `tw debug set thirst <value> --entity <uuid>`, `tw debug set needs <hunger> <thirst> --entity <uuid>` | |
 | Force harvest readiness (setup: a step reached this way is UNTESTED) | `tw debug set harvestready --mode=true\|false\|toggle --entity <uuid>` | `Set harvest readiness for NPC <uuid>: false -> true (alarm Harvest_Ready).` |
 | Force breeding readiness, life stage (setup) | `tw debug set breedingready --entity <uuid>`, `tw debug set lifestage <stage> --entity <uuid>` | `Set life stage for NPC <uuid>: Baby -> Adult.` |
 | Force NPC state (setup) | `tw debug set state <uuid> <State>` | `Set NPC <uuid> to state <State>.` |
