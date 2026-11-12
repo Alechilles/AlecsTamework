@@ -179,7 +179,7 @@ public final class NpcSpawnCommandService {
             if (owner.player() != null) {
                 OwnerMessageUtil.sendAcquisitionDenied(owner.player(), cap);
             }
-            tracker.stop("Owner population cap reached.");
+            tracker.stopForPopulationCap(cap);
             return false;
         }
         Rotation3f rotation = spawnPositionService.resolveSpawnRotation(
@@ -513,6 +513,8 @@ public final class NpcSpawnCommandService {
         private String stoppedReason;
         @Nullable
         private AttachmentResolution attachmentResolution;
+        @Nullable
+        private OwnerPopulationCapService.Decision populationDecision;
         private final List<UUID> spawnedNpcIds = new ArrayList<>();
 
         private BatchTracker(int requestedCount,
@@ -526,6 +528,13 @@ public final class NpcSpawnCommandService {
         void stop(@Nonnull String reason) {
             if (stoppedReason == null) {
                 stoppedReason = reason;
+            }
+        }
+
+        void stopForPopulationCap(@Nonnull OwnerPopulationCapService.Decision decision) {
+            if (stoppedReason == null) {
+                stoppedReason = "Owner population cap reached.";
+                populationDecision = decision;
             }
         }
 
@@ -552,7 +561,8 @@ public final class NpcSpawnCommandService {
                     stoppedReason,
                     attachmentResolution == null ? null : attachmentResolution.appliedSelections,
                     attachmentResolution == null ? List.of() : attachmentResolution.invalidSelections,
-                    spawnedNpcIds
+                    spawnedNpcIds,
+                    populationDecision
             ));
         }
     }
@@ -572,6 +582,8 @@ public final class NpcSpawnCommandService {
         private final List<String> invalidAttachments;
         @Nonnull
         private final List<UUID> spawnedNpcIds;
+        @Nullable
+        private final OwnerPopulationCapService.Decision populationDecision;
 
         SpawnBatchResult(@Nullable String failureMessage,
                                  int requestedCount,
@@ -581,7 +593,9 @@ public final class NpcSpawnCommandService {
                                  @Nullable String stoppedReason,
                                  @Nullable Map<String, String> appliedAttachments,
                                  @Nullable List<String> invalidAttachments,
-                                 @Nullable List<UUID> spawnedNpcIds) {
+                                 @Nullable List<UUID> spawnedNpcIds,
+                                 @Nullable OwnerPopulationCapService.Decision populationDecision) {
+            this.populationDecision = populationDecision;
             this.failureMessage = failureMessage;
             this.requestedCount = requestedCount;
             this.spawnedCount = spawnedCount;
@@ -595,7 +609,13 @@ public final class NpcSpawnCommandService {
 
         @Nonnull
         static SpawnBatchResult failure(@Nonnull String failureMessage) {
-            return new SpawnBatchResult(failureMessage, 0, 0, 0, false, null, null, List.of(), List.of());
+            return new SpawnBatchResult(failureMessage, 0, 0, 0, false, null, null, List.of(), List.of(), null);
+        }
+
+        /** The population pre-check's refusal that stopped the batch, or null when it did not stop there. */
+        @Nullable
+        public OwnerPopulationCapService.Decision getPopulationDecision() {
+            return populationDecision;
         }
 
         /** The UUIDs of the NPCs this batch spawned and kept, in spawn order. */

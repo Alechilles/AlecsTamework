@@ -19,7 +19,8 @@
   harvest and breeding readiness and traits, and changes nothing. Level and XP had no read before.
 - For admins and test scripts: `/tw npc spawn tamed <Role> [--count=<n>] --owner <uuid|name> --at <x> <y> <z>` spawns
   owned, tamed animals for an owner from the server console, through the same limits and ownership steps as a
-  player's spawn. The owner may be offline when given by UUID.
+  player's spawn. The owner may be offline when given by UUID. A refusal by those limits says which check refused
+  (`detail=owned-limit`, `provider-denied`, `provider-decision-pending`, ...) and the limit it used.
 - For admins and test scripts: `/tw debug share add|remove|list ... --owner <uuid|name>` shares an owner's animals
   for them from the server console, without the owner's confirmation. Each change is written to the server log
   with the admin who made it.

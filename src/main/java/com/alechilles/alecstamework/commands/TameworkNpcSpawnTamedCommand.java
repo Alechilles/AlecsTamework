@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.items.NpcSpawnCommandService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -185,6 +187,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
         }
         if (result.getSpawnedNpcIds().isEmpty()) {
             return "refused reason=" + reasonToken(result.getStoppedReasonKey(), "spawn-failed")
+                    + populationCapDetail(result.getPopulationDecision())
                     + " role=" + roleId + " owner=" + owner + " spawned=0 requested=" + result.getRequestedCount();
         }
         StringBuilder reply = new StringBuilder("ok role=").append(roleId)
@@ -197,6 +200,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
                 .append(" z=").append(format(position.z));
         if (result.getStoppedReason() != null) {
             reply.append(" stopped=").append(reasonToken(result.getStoppedReasonKey(), "spawn-failed"))
+                    .append(populationCapDetail(result.getPopulationDecision()))
                     .append(" spawned=").append(result.getSpawnedCount())
                     .append(" requested=").append(result.getRequestedCount());
         }
@@ -204,6 +208,48 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
             reply.append(" invalidAttachments=").append(String.join(",", result.getInvalidAttachments()));
         }
         return reply.toString();
+    }
+
+    /**
+     * Why the population pre-check refused, as reply pairs that start with a space: {@code detail=}
+     * (owned-limit, deployed-limit, group-limit, provider-denied, provider-unavailable,
+     * provider-decision-pending, deploy-blocked, or the check's own reason), the provider's or
+     * domain limit's message {@code key=} when it names one, and the numbers the check used:
+     * {@code cap=} for the owned and deployed limits, {@code owned=} when the check counted. Empty
+     * without a refusal. A pending decision is the first managed-role check after the cached
+     * provider answer expired; the same check started the provider call, so a retry a moment later
+     * gets its answer, as a player's own retry does.
+     */
+    @Nonnull
+    static String populationCapDetail(@Nullable OwnerPopulationCapService.Decision decision) {
+        if (decision == null || decision.allowed()) {
+            return "";
+        }
+        String key = decision.messageKey();
+        if (ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(key)) {
+            return " detail=provider-decision-pending";
+        }
+        String reason = decision.reason();
+        boolean limitRefusal = "owner-cap-reached".equals(reason)
+                || OwnerPopulationCapService.REASON_DEPLOYED_CAP.equals(reason);
+        StringBuilder detail = new StringBuilder(" detail=").append(switch (reason) {
+            case "owner-cap-reached" -> "owned-limit";
+            case OwnerPopulationCapService.REASON_DEPLOYED_CAP -> "deployed-limit";
+            case OwnerPopulationCapService.REASON_GROUP_CAP -> "group-limit";
+            case OwnerPopulationCapService.REASON_PROVIDER_DENIED -> "provider-denied";
+            case OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE -> "provider-unavailable";
+            default -> reason;
+        });
+        if (key != null && !key.isBlank()) {
+            detail.append(" key=").append(key);
+        }
+        if (decision.currentCount() >= 0) {
+            detail.append(" owned=").append(decision.currentCount());
+        }
+        if (limitRefusal && decision.limit() > 0) {
+            detail.append(" cap=").append(decision.limit());
+        }
+        return detail.toString();
     }
 
     /** The last part of a result's presentation key in kebab case, e.g. {@code population-cap}. */
