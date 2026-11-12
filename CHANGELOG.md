@@ -9,6 +9,12 @@
   **My region members (OrbisGuard)** from the Sharing page or with `/tw share group`. Membership follows the other
   mod, and allies do not count. Like every group, each one grants nothing until an owner turns it on.
 
+### Changed
+
+- The Sharing page shows four players and four groups before its lists scroll, and three players who share with you.
+  The Groups list used to fit only two rows and cut the third in half.
+- Tamework accepts any version of QuestLines Claims as an optional dependency. It used to name only 1.3.1.
+
 ## 5.11.1 - Sharing Level Help - 2026-11-11
 
 ### Changed

@@ -14,7 +14,7 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkSharingRoot {
-    Anchor: (Width: 620, Height: 680);
+    Anchor: (Width: 620, Height: 742);
     Background: $A.@SlateModal;
 
     Label #TameworkSharingTitle { Anchor: (Top: 14, Left: 22, Right: 60, Height: 30); Text: %server.tamework.ui.sharing.title; Style: $A.@SlateTitle; }
@@ -29,7 +29,7 @@ $C.@PageOverlay {
 
     Label #TameworkSharingPlayersLabel { Anchor: (Top: 106, Left: 22, Right: 22, Height: 18); Text: ""; Style: @Caps; }
     Group {
-      Anchor: (Top: 128, Left: 22, Right: 22, Height: 140);
+      Anchor: (Top: 128, Left: 22, Right: 22, Height: 148);
       Background: $A.@SlateTray;
       Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
       Group {
@@ -44,7 +44,7 @@ $C.@PageOverlay {
     }
 
     Group #TameworkSharingAddRow {
-      Anchor: (Top: 276, Left: 22, Right: 22, Height: 28);
+      Anchor: (Top: 284, Left: 22, Right: 22, Height: 28);
       LayoutMode: Left;
       DropdownBox #TameworkSharingAddPlayer {
         Anchor: (Width: 280, Height: 28);
@@ -70,9 +70,9 @@ $C.@PageOverlay {
       }
     }
 
-    Label { Anchor: (Top: 316, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.groups.section; Style: @Caps; }
+    Label { Anchor: (Top: 322, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.groups.section; Style: @Caps; }
     Group {
-      Anchor: (Top: 338, Left: 22, Right: 22, Height: 92);
+      Anchor: (Top: 344, Left: 22, Right: 22, Height: 148);
       Background: $A.@SlateTray;
       Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
       Group {
@@ -86,9 +86,9 @@ $C.@PageOverlay {
       Label #TameworkSharingGroupsEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.ui.sharing.groups.none; Style: @Empty; Visible: false; }
     }
 
-    Label { Anchor: (Top: 440, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.sharedWithYou.section; Style: @Caps; }
+    Label { Anchor: (Top: 502, Left: 22, Right: 22, Height: 18); Text: %server.tamework.ui.sharing.sharedWithYou.section; Style: @Caps; }
     Group {
-      Anchor: (Top: 462, Left: 22, Right: 22, Height: 112);
+      Anchor: (Top: 524, Left: 22, Right: 22, Height: 114);
       Background: $A.@SlateTray;
       Padding: (Left: 6, Right: 4, Top: 6, Bottom: 6);
       Group {
@@ -102,8 +102,8 @@ $C.@PageOverlay {
       Label #TameworkSharingInboundEmpty { Anchor: (Top: 4, Left: 6, Right: 6, Height: 22); Text: %server.tamework.share.list.sharedWithYou.none; Style: @Empty; Visible: false; }
     }
 
-    Label #TameworkSharingFeedback { Anchor: (Top: 582, Left: 22, Right: 22, Height: 44); Text: ""; Style: @Feedback; }
-    TextButton #TameworkSharingDoneButton { Anchor: (Top: 634, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
+    Label #TameworkSharingFeedback { Anchor: (Top: 646, Left: 22, Right: 22, Height: 44); Text: ""; Style: @Feedback; }
+    TextButton #TameworkSharingDoneButton { Anchor: (Top: 698, Right: 22, Width: 104, Height: 30); Text: %server.tamework.ui.shared.button.done; Style: $A.@PanelButtonPrimary; }
 
     // The warning shown before a new player or group is shared with.
     Group #TameworkSharingConfirm {
@@ -113,7 +113,7 @@ $C.@PageOverlay {
 
       Group {
         // Tall enough for the warning plus the level's paragraph in the longest locale (German, group share).
-        Anchor: (Top: 150, Left: 60, Width: 500, Height: 360);
+        Anchor: (Top: 191, Left: 60, Width: 500, Height: 360);
         Background: $A.@SlateModal;
         Label { Anchor: (Top: 14, Left: 18, Right: 18, Height: 30); Text: %server.tamework.ui.sharing.confirm.title; Style: (FontSize: 17, FontName: "Secondary", TextColor: #f2c66d, HorizontalAlignment: Start, VerticalAlignment: Center); }
         Label #TameworkSharingConfirmText { Anchor: (Top: 50, Left: 18, Right: 18, Height: 250); Text: ""; Style: (FontSize: 12, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true); }
