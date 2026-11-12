@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.12.0 - Sharing Groups and Claim Mods - 2026-11-12
 
 ### Added
 
