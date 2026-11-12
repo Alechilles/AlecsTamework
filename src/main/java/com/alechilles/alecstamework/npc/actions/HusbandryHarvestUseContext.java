@@ -82,8 +82,8 @@ public final class HusbandryHarvestUseContext {
 
     /**
      * Ends a use once its drops are paid. Only the player's id stays, until the use expires or the
-     * next harvest begins: one press can run the harvest state twice, and the second drop must name
-     * the same player without reusing the tool, roll or prepared output.
+     * next harvest begins: a role may run more than one drop for a harvest, and a later drop must
+     * name the same player without reusing the tool, roll or prepared output.
      */
     static void finish(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
         UUID npcId = npcId(npcRef, store);

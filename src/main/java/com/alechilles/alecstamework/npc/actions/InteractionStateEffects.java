@@ -36,6 +36,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.asset.builder.StateMappingHelper;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -109,14 +110,29 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         return true;
     }
 
-    // Starts the harvest state using the default substate if available.
+    /**
+     * Starts the harvest state using the default substate if available.
+     *
+     * <p>Enters the state without the engine's "clear once" reset. That reset runs at the start of
+     * the next tick, after the role has already run the state's {@code Once} instructions in this
+     * tick, so it re-armed them and one press harvested twice (two drop rolls, two XP payments).
+     * Leaving {@code $Harvest} through a {@code State} action still clears them for the next harvest.</p>
+     */
     boolean applyStartHarvest(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
         StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
         if (role == null || stateSupport == null) {
             return false;
         }
         String subState = resolveDefaultSubState(role);
-        stateSupport.setState(npcRef, "$Harvest", subState, store);
+        StateMappingHelper helper = stateSupport.getStateHelper();
+        int state = helper == null ? -1 : helper.getStateIndex("$Harvest");
+        int subStateIndex = state < 0 ? -1 : helper.getSubStateIndex(state, subState);
+        if (subStateIndex >= 0) {
+            stateSupport.setState(state, subStateIndex, false, false);
+        } else {
+            // Lets the engine report the missing state the way it does for every other caller.
+            stateSupport.setState(npcRef, "$Harvest", subState, store);
+        }
         return true;
     }
 

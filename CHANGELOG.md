@@ -49,6 +49,9 @@
   playing never got hungry. Their animals now start getting hungry and thirsty once the grace is used up, the same
   way aging and production already worked. The grace still counts server uptime only, and its length is still set
   with `/tw settings`.
+- One harvest (milking, shearing and so on) now drops its items once. Before, a single use ran the harvest twice: it
+  rolled the drop list twice and reported two harvests to mods that reward them. Harvests now give half of what they
+  gave before; raise a species' harvest drop list if you balanced around the old amount.
 
 ## 5.10.1 - Trough and Aging Fixes - 2026-11-11
 
