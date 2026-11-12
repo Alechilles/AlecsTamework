@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.11.1 - Sharing Level Help - 2026-11-11
 
 ### Changed
 
