@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.alechilles.alecstamework.npc.params.RoleParameterScopes;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.component.Ref;
@@ -11,7 +12,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
-import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -365,20 +365,22 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (npcPlugin == null) {
             return 0.0;
         }
-        Builder<Role> roleBuilder = npcPlugin.tryGetCachedValidRole(roleIndex);
-        if (roleBuilder == null) {
-            return 0.0;
-        }
-        BuilderParameters builderParameters = roleBuilder.getBuilderParameters();
-        if (builderParameters == null) {
-            return 0.0;
-        }
         try {
-            StdScope scope = builderParameters.createScope();
-            return HarvestAlarmTimeBasis.resolveHarvestTimeoutSeconds(scope, HARVEST_TIMEOUT_PARAMETER, random);
-        } catch (Exception ignored) {
+            return resolveHarvestTimeoutSeconds(npcPlugin.tryGetCachedValidRole(roleIndex), random);
+        } catch (RuntimeException | LinkageError ignored) {
             return 0.0;
         }
+    }
+
+    /**
+     * The role's {@code HarvestTimeout} as the role was built. For a variant that is its
+     * {@code Modify} value over its template's default, the same value the harvest interaction
+     * reads; the variant's own declared parameters do not hold it.
+     */
+    static double resolveHarvestTimeoutSeconds(@Nullable Builder<Role> roleBuilder,
+                                               @Nonnull DoubleSupplier random) {
+        return HarvestAlarmTimeBasis.resolveHarvestTimeoutSeconds(
+                RoleParameterScopes.resolve(roleBuilder), HARVEST_TIMEOUT_PARAMETER, random);
     }
 
     private static double resolveHarvestTimeoutSeconds(@Nullable Role role, @Nonnull DoubleSupplier random) {

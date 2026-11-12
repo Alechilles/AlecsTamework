@@ -49,7 +49,9 @@
 ### Fixed
 
 - `/tw debug log xp-events on` turns on again. Since 5.0.0 it always answered that API events were unavailable.
-
+- `/tw debug set harvestready --mode=false` now restarts the harvest cooldown of a Variant role that sets
+  `HarvestTimeout` in its `Modify` (such as a role built on a shared template). It used to answer that the NPC had no
+  valid HarvestTimeout and leave the animal ready. The `TameworkHarvestAlarm` action reads the timeout the same way.
 - Baby animals can no longer be harvested (milked, sheared and so on), and their companion card no longer shows a
   harvest meter. Species that grow up in their adult role, with no separate baby role, such as Mosshorns, used to
   inherit the adult's harvest.

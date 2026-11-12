@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.params.RoleParameterScopes;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -17,12 +18,8 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
-import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.builders.BuilderRoleVariant;
-import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
-import com.hypixel.hytale.server.npc.util.expression.Scope;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import javax.annotation.Nullable;
 
@@ -134,20 +131,7 @@ public final class CommandLinkedPanelCooldownSnapshotService {
 
     @Nullable
     static StdScope resolveRoleParameterScope(@Nullable Builder<Role> builder) {
-        try {
-            // Computed Modify values read the variant's execution parameters first.
-            if (builder instanceof BuilderRoleVariant variant) {
-                ExecutionContext context = new ExecutionContext();
-                context.setScope(variant.createExecutionScope());
-                Scope scope = variant.createModifierScope(context);
-                return scope instanceof StdScope standard ? standard : scope != null ? new StdScope(scope) : null;
-            }
-            BuilderParameters parameters = builder != null ? builder.getBuilderParameters() : null;
-            return parameters != null ? parameters.createScope() : null;
-        } catch (RuntimeException exception) {
-            // Optional presentation data must not terminate the owning world's tick.
-            return null;
-        }
+        return RoleParameterScopes.resolve(builder);
     }
 
     @Nullable
