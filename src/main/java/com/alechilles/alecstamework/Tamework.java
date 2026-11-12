@@ -888,7 +888,7 @@ public class Tamework extends JavaPlugin {
             ActivityRuntime.install(LiveActivityFeed.standalonePublisher(), managedActivityConfigRegistry);
         }
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
-                () -> null,
+                () -> api,
                 message -> getLogger().at(Level.INFO).log(message),
                 companionProgressionSignalBus
         );
