@@ -82,6 +82,18 @@ everyone in the group, including players who join it later.
 If a player is both named and in a group you share with, they get the higher of the two levels. If no mod on the
 server offers a group, the Groups list says so.
 
+Tamework itself offers a group for each of these mods when the server has it installed:
+
+| Group | Who is in it |
+| --- | --- |
+| My party (SimpleClaims) | The players in your SimpleClaims party. |
+| My party (PartyPro) | The players in your PartyPro party. PartyPro may remove a member who stays offline too long. |
+| My claim members (QuestLines Claims) | The players you added as members of your own claims, except members you put in the "untrusted" group. |
+| My region members (OrbisGuard) | The players added as members or owners of an OrbisGuard region you own. |
+
+Membership follows the other mod: when someone joins or leaves your party, or you add or remove a claim or region
+member, their access changes with it. Allies in those mods do not count.
+
 **With commands:** `/tw share list` shows the groups you can turn on and their ids. Then run
 `/tw share group <groupId> <caretaker|handler|manager>`, read the reply, and run it again with `confirm` at the end.
 `/tw share group <groupId> off` turns it off.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Built-in sharing groups for popular party and claim mods. When the server has the mod, owners can share their
+  animals with **My party (SimpleClaims)**, **My party (PartyPro)**, **My claim members (QuestLines Claims)** or
+  **My region members (OrbisGuard)** from the Sharing page or with `/tw share group`. Membership follows the other
+  mod, and allies do not count. Like every group, each one grants nothing until an owner turns it on.
+
 ## 5.11.1 - Sharing Level Help - 2026-11-11
 
 ### Changed
