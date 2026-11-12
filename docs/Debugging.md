@@ -374,6 +374,12 @@ refused reason=not-shared owner=<uuid> value=<value>
 
 ## Test hooks
 
+Keep a player near any animal a test acts on. An animal spawned from the console where no player is near is
+parked with its unloaded land at once: `tw npc spawn tamed ... --owner ... --at ...` still answers `ok entity=<uuid>`,
+but `tw npc find` then says it is not valid in-world and every `--entity` command answers "Target not found" (run on
+the local rig, 2026-11-12). With no content pack that turns on needs, growth or leveling for a role, the matching
+commands refuse in words, and `growth advance` counts 0 seconds while the progression clock is stopped.
+
 | What | Command | Example reply |
 |---|---|---|
 | Fast-forward growth and aging, through the owner clock's offline rule (also moves harvest and breeding deadlines) | `tw debug growth advance <seconds> --entity <uuid>` | `ok entity=<uuid> requestedSeconds=3600.000 countedSeconds=3600.000 stage=Baby->Adult role=Cow_Calf roleChange=requested oldAgeDeath=false` |
