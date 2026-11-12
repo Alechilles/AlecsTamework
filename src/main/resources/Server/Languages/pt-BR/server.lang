@@ -1463,8 +1463,6 @@ tamework.commands.findNpc.entity.exists.but.has.no.npc.component=A entidade {0} 
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} encontrado: função={1}, posição={2}, distância={3}, estágio={4}, escala={5}, marcado={6}.
 tamework.commands.findNpc.npc.is.not.currently.valid.in.world=O NPC {0} não é válido no mundo no momento.
 tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Uso: /tw npc find <uuid> [on|off]
-tamework.commands.getAlarm.alarm.for.npc.is=O alarme {0} do NPC {1} está {2}.
-tamework.commands.getAlarm.alarm.for.npc.is.remaining=O alarme {0} do NPC {1} está {2}. Restante: {3}.
 tamework.commands.getAlarm.description=Obter o estado de alarme do NPC para o qual você está olhando.
 tamework.commands.getAlarm.no.npc.found.in.view=Nenhum NPC encontrado à vista.
 tamework.commands.getAlarm.no.npc.resolved.console.usage.requires.an=Nenhum NPC resolvido. O uso pelo console exige o UUID de um NPC.
@@ -1582,6 +1580,13 @@ tamework.commands.advanceNeeds.description=Avança a fome e a sede dos NPCs sele
 tamework.commands.advanceNeeds.argument.seconds=Segundos a avançar.
 tamework.commands.advanceNeeds.invalid.seconds=Os segundos devem ser maiores que 0 e no máximo {0}.
 tamework.commands.advanceNeeds.advanced.needs.for.npc=Necessidades avançadas para o NPC {0}: requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
+tamework.commands.debugGrowth.description=Comandos de depuração de crescimento e envelhecimento.
+tamework.commands.advanceGrowth.description=Avança o crescimento e o envelhecimento dos NPCs selecionados em um número de segundos, pela regra de desconexão do dono.
+tamework.commands.advanceGrowth.argument.seconds=Segundos a avançar.
+tamework.commands.debugOwner.description=Comandos de depuração dos relógios de um dono.
+tamework.commands.ownerOfflineAge.description=Recua o início da desconexão de um dono desconectado em um número de segundos. Afeta todos os animais desse dono e é salvo.
+tamework.commands.ownerOfflineAge.argument.owner=UUID do dono.
+tamework.commands.ownerOfflineAge.argument.seconds=Segundos para recuar o início da desconexão.
 tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Nenhuma configuração de necessidades ativada foi resolvida para o NPC {0}.
 tamework.commands.setHunger.set.hunger.for.npc=Fome definida para o NPC {0}: {1}.
 tamework.commands.setLevel.could.not.set.level.for.npc=Não foi possível definir o nível do NPC {0}: {1}.

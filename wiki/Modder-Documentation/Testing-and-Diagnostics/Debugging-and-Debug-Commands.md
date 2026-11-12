@@ -181,6 +181,14 @@ Additional runtime diagnostics include:
 - `/tw debug needs advance <seconds> [NPC selectors]`: fast-forwards hunger and thirst of the selected NPCs.
   The owner-offline grace still decides how much of the time counts. The reply gives `requestedSeconds`,
   `countedSeconds`, and hunger and thirst before and after.
+- `/tw debug growth advance <seconds> [NPC selectors]`: fast-forwards growth and aging of the selected NPCs under
+  the same owner-offline rule. Their harvest alarm and breeding cooldown move with it, and old-age death and the
+  stage role change happen as they would. The reply is one `ok ...` line with the seconds asked for and counted
+  and the stage before and after. Needs do not decay; use `needs advance` for that.
+- `/tw debug owner offline-age <ownerUuid> <seconds>`: moves an offline owner's offline start back, so a test
+  reaches the owner-offline grace without waiting. It affects all of that owner's animals and is saved.
+- `/tw debug get alarm [AlarmName] [NpcUuid]` prints one `ok ... ready=... remainingMs=...` line. Without a name
+  it reads Tamework's harvest alarm on the animal's own time, as harvesting does, and changes nothing.
 - `/tw debug avatar input [on|off|status]`
 - `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
 

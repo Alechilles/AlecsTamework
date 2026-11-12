@@ -95,7 +95,10 @@ public final class LifecycleActivityPublisher {
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the committed revival.
+            return;
         }
+        ActivityDebugLog.entities(ActivityIds.REVIVE_SUCCESS, operationId, companionId, ownerId, null, null,
+                actorId, profileId, resolvedRoleId);
     }
 
     @Nullable
@@ -134,7 +137,10 @@ public final class LifecycleActivityPublisher {
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the committed lifecycle transition.
+            return;
         }
+        ActivityDebugLog.entities(actionId, operationId, companionId, ownerId, null, null,
+                null, profileId, null);
     }
 
     private static boolean isSummoningAction(String actionId) {

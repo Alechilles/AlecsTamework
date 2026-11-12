@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.activity;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CommandPanelOpenActivityView;
@@ -15,7 +14,6 @@ import com.alechilles.alecstamework.api.TroughFillActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
-import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -23,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -464,37 +461,13 @@ public final class ManagedActivityPublisher {
             @Nullable String profileId,
             @Nullable HusbandryToolContext tool
     ) {
-        CompanionXpEventDebugLogService debugLog = activeDebugLog();
-        if (debugLog == null) {
-            return;
-        }
-        StringJoiner companions = new StringJoiner(",");
-        StringJoiner owners = new StringJoiner(",");
-        StringJoiner roles = new StringJoiner(",");
-        for (ActivityParticipantView participant : participants) {
-            companions.add(participant.companionId().toString());
-            owners.add(participant.ownerId() == null ? "<null>" : participant.ownerId().toString());
-            roles.add(participant.roleId() == null ? "<null>" : participant.roleId());
-        }
-        debugLog.logActivity(actionId, operationId, companions.toString(), owners.toString(), actorId,
-                profileId, roles.toString(), tool != null && tool.present() ? tool.itemId() : null);
+        ActivityDebugLog.participants(actionId, operationId, participants, actorId, profileId, tool);
     }
 
     /** Logs a published activity that names only the player who acted. */
     private static void logPlayerActivity(@Nonnull String actionId, @Nullable UUID operationId,
                                           @Nullable UUID playerId, @Nullable String roleId) {
-        CompanionXpEventDebugLogService debugLog = activeDebugLog();
-        if (debugLog != null) {
-            debugLog.logActivity(actionId, operationId, null, null, playerId, null, roleId, null);
-        }
-    }
-
-    @Nullable
-    private static CompanionXpEventDebugLogService activeDebugLog() {
-        Tamework instance = Tamework.getInstance();
-        CompanionXpEventDebugLogService debugLog =
-                instance == null ? null : instance.getCompanionXpEventDebugLogService();
-        return debugLog != null && debugLog.isEnabled() ? debugLog : null;
+        ActivityDebugLog.player(actionId, operationId, playerId, null, roleId);
     }
 
     @Nullable

@@ -167,6 +167,41 @@ public final class OwnerPresenceTimelineService {
         return resolveEffectiveElapsedMs(ownerId, nowMs, saturatingAdd(nowMs, advanceMs), tickPolicy);
     }
 
+    /** Offline time of one presence id in both owner clocks after a debug offline-age. */
+    public record OfflineAge(long presenceOfflineMs, long progressionOfflineMs) {
+    }
+
+    /**
+     * Debug hook: moves an offline presence id's offline start {@code ms} earlier in both owner clocks,
+     * this timeline (needs, memory only) and {@link AnimalProgressionClock} (growth, aging, production;
+     * checkpointed to disk), so the offline grace runs out sooner. Each clock changes under its own
+     * lock; time either clock already counted stays as it was. An id not seen yet is seeded first, as
+     * a normal read does.
+     *
+     * @return the offline time afterwards, or null when the id is online in either clock or the
+     *         progression clock is stopped (nothing changes then)
+     */
+    @Nullable
+    public OfflineAge ageOfflineStartForDebug(UUID ownerId, long ms) {
+        long nowMs = CompanionRuntimeClock.nowMs();
+        // Seed before the progression clock moves: a new entry here copies its saved offline start.
+        PresenceState state = resolveOwnerState(ownerId, nowMs);
+        if (state == null || state.online || AnimalProgressionClock.get().offlineStartedAtMs(ownerId) == null) {
+            return null;
+        }
+        Long progressionMs = AnimalProgressionClock.get().ageOfflineStartForDebug(ownerId, ms);
+        if (progressionMs == null) {
+            return null;
+        }
+        PresenceState aged = presenceByOwner.computeIfPresent(ownerId,
+                (uuid, existing) -> existing.online ? existing : existing.offlineStartMovedBack(ms));
+        if (aged == null || aged.online) {
+            // The owner connected in between; the connect settled the progression clock as usual.
+            return null;
+        }
+        return new OfflineAge(nowMs - aged.lastDisconnectedAtMs, progressionMs);
+    }
+
     /** Applies the current runtime owner policy to one loaded world-time tick. */
     long resolveWorldTimeElapsedMs(@Nullable UUID ownerId,
                                    long totalWindowMs,
@@ -347,6 +382,13 @@ public final class OwnerPresenceTimelineService {
                 return new PresenceState(true, atMs, atMs, lastDisconnectedAtMs);
             }
             return new PresenceState(false, atMs, lastConnectedAtMs, atMs);
+        }
+
+        /** An offline state whose disconnect happened {@code ms} earlier. */
+        private PresenceState offlineStartMovedBack(long ms) {
+            long disconnectedAtMs = lastDisconnectedAtMs != UNSET_MS ? lastDisconnectedAtMs : lastStatusChangeMs;
+            long movedMs = disconnectedAtMs < Long.MIN_VALUE + 1L + ms ? Long.MIN_VALUE + 1L : disconnectedAtMs - ms;
+            return new PresenceState(false, movedMs, lastConnectedAtMs, movedMs);
         }
     }
 }

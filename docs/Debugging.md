@@ -47,7 +47,7 @@ player-scoped. In particular, `/tw config open`, `/tw settings`, `/tw news`,
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
 - If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.
 - Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist and have expected values.
-- Use `/tw debug get alarm` for harvest/cooldown alarm state. Use
+- Use `/tw debug get alarm` for harvest/cooldown alarm state (see "Reading an alarm"). Use
   `/tw debug set harvestready [--mode=true|false|toggle] [NPC selectors]` to clear
   the configured harvest alarm or restart the role's normal `HarvestTimeout`.
 - If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debug log prompt`.
@@ -221,8 +221,9 @@ can produce several lines per player attempt.
 hit, including source, owner UUID, tool ids, XP, and level delta.
 When enabled, it also logs `TameworkHarvestDrop` attempts before the public event exists so rejected harvest
 XP can be diagnosed with a reason such as not tamed or owned, disabled harvest XP, or missing drop output.
-It also logs one line for every activity the managed activity publisher sends (feed, harvest, cull, breeding,
-need satisfied, capture, trough fill, command panel open), with the player credited as its actor:
+It also logs one line for every published activity (feed, harvest, cull, breeding, need satisfied, capture,
+trough fill, command panel open, tame, revive, summon, recall, summon expiry, avatar flight, combat damage and
+combat defeat), with the player credited as its actor:
 
 ```
 [Tamework XP Event Debug] activity=tamework:harvest operationId=<uuid> companionUuid=<uuid> ownerUuid=<uuid> actorUuid=<uuid> profileId=<id> roleId=<id> toolId=<itemId>
@@ -230,7 +231,11 @@ need satisfied, capture, trough fill, command panel open), with the player credi
 
 A missing value prints as `<null>`; `toolId` is `<null>` for a harvest with no tool. A breeding lists both
 parents, comma-joined, in `companionUuid`, `ownerUuid` and `roleId`. Player-only activities (capture, trough
-fill, command panel open) name only the actor.
+fill, command panel open, avatar flight) name only the actor; an avatar flight line carries its flight config id
+as `profileId`. A revive names the reviving player as actor. Combat damage lists the source and the target,
+comma-joined, in `companionUuid` and `ownerUuid`; a combat defeat names the defeated entity and its owner, with
+the player credited for the defeat as actor. Avatar flight and combat activities are published, and so logged,
+only while something subscribes to them (another mod or the API test fixture).
 
 ## Fast-forwarding needs
 
@@ -246,6 +251,76 @@ year. The reply, one line per NPC, keeps its `key=value` tokens in every languag
 ```
 Advanced needs for NPC <uuid>: requestedSeconds=600.000 countedSeconds=600.000 hunger=80.000->75.000 thirst=90.000->84.000
 ```
+
+## Fast-forwarding growth and aging
+
+`/tw debug growth advance <seconds> [NPC selectors]` lets `<seconds>` of real time pass for the growth and aging
+of the selected NPCs. It works from the console with `--entity <uuid>`. The owner progression clock's offline rule
+decides how much counts, as for the needs fast-forward: an online owner (or an unowned animal) counts all of it,
+an offline owner counts only what falls after the offline grace. The counted time is then applied as a growth tick
+applies the time owed since its last checkpoint: growth at the animal's current hunger and thirst, adult aging,
+and the animal's own progression time. That time is also what Tamework's harvest alarm and breeding cooldown are
+judged on, so both move by the same amount. Old-age death and the lifecycle role change at a stage change happen
+as they would in real time, and the result is saved with the entity. Needs do not decay; run
+`/tw debug needs advance` as well when a test needs both. Seconds must be above 0 and at most one year. One line
+per NPC:
+
+```
+ok entity=<uuid> requestedSeconds=3600.000 countedSeconds=3600.000 stage=Baby->Adult role=Cow_Calf roleChange=requested oldAgeDeath=false
+refused reason=no-life-stage entity=<uuid>
+refused reason=invalid-seconds max=31536000.000
+```
+
+`role` is the role before the change: a requested role change lands on a later tick (check it with
+`/tw npc find <uuid>`). The engine's own `Breeding_Cooldown` NPC alarm runs on world time and does not move.
+
+## Moving an owner's offline grace
+
+`/tw debug owner offline-age <ownerUuid> <seconds>` moves an offline owner's offline start `<seconds>` earlier in
+both owner clocks: the needs presence timeline and the progression clock that drives growth, aging and production.
+A test can then reach the offline grace (72 hours by default) without waiting. Time already counted stays as it
+was, and the moved-back span is never credited. Both clocks are shared by all of that owner's animals, and the
+progression clock is saved to disk, so the change survives a restart. When the owner shares animals, the owner's
+shared presence id, which drives the shared ones, moves too while no player it covers is online. Works from the
+console:
+
+```
+ok owner=<uuid> movedSeconds=259200.000 presenceOfflineSeconds=259260.000 progressionOfflineSeconds=259260.000
+ok owner=<uuid> movedSeconds=259200.000 presenceOfflineSeconds=... progressionOfflineSeconds=... sharedId=<uuid> shared=online
+refused reason=owner-online owner=<uuid>
+```
+
+## Reading an alarm
+
+`/tw debug get alarm [AlarmName] [NpcUuid]` prints one line and changes nothing. Without a name it reads the
+configured harvest alarm (`TwGlobalConfig` `HarvestAlarmName`, `Harvest_Ready` by default). Tamework's own alarm
+is read first and judged on the animal's progression time, as harvest readiness is (`source=tamework`;
+`exists=false` means no alarm was set, so it is ready). Alarms Tamework does not keep come from the engine's NPC
+alarm store on world game time (`source=engine`). From the console give the NPC UUID (and `--world` when it is not
+in the default world).
+
+```
+ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=1234567 nowMs=1200000 remainingMs=34567
+```
+
+## Test hooks
+
+| What | Command | Example reply |
+|---|---|---|
+| Fast-forward growth and aging, through the owner clock's offline rule (also moves harvest and breeding deadlines) | `tw debug growth advance <seconds> --entity <uuid>` | `ok entity=<uuid> requestedSeconds=3600.000 countedSeconds=3600.000 stage=Baby->Adult role=Cow_Calf roleChange=requested oldAgeDeath=false` |
+| Fast-forward needs, through the owner-presence gate | `tw debug needs advance <seconds> --entity <uuid>` | `Advanced needs for NPC <uuid>: requestedSeconds=600.000 countedSeconds=600.000 hunger=80.000->72.000 thirst=90.000->84.000` |
+| Move an offline owner's offline start back (shared by all that owner's animals, saved) | `tw debug owner offline-age <ownerUuid> <seconds>` | `ok owner=<uuid> movedSeconds=259200.000 presenceOfflineSeconds=259260.000 progressionOfflineSeconds=259260.000` |
+| Read harvest readiness without changing it | `tw debug get alarm <uuid> [AlarmName]` | `ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=... nowMs=... remainingMs=34567` |
+| Read needs | `tw debug get needs --entity <uuid>` | `Needs for NPC <uuid>: hunger=72.00, thirst=70.00, ...` |
+| Read NPC state, position, leash | `tw debug get wander <role filter>` | `<uuid> role=Cow state=Idle pos=1.0,64.0,2.0 leash=... inWater=false` |
+| Read role, stage, position | `tw npc find <uuid>` | `NPC <uuid> found: role=..., pos=..., stage=Adult, ...` |
+| Force needs (setup) | `tw debug set hunger\|thirst\|needs ... --entity <uuid>` | |
+| Force harvest readiness (setup: a step reached this way is UNTESTED) | `tw debug set harvestready --mode=true\|false\|toggle --entity <uuid>` | `Set harvest readiness for NPC <uuid>: false -> true (alarm Harvest_Ready).` |
+| Force breeding readiness, life stage (setup) | `tw debug set breedingready --entity <uuid>`, `tw debug set lifestage <stage> --entity <uuid>` | `Set life stage for NPC <uuid>: Baby -> Adult.` |
+| Force NPC state (setup) | `tw debug set state <uuid> <State>` | `Set NPC <uuid> to state <State>.` |
+| Grant a stored bonded companion (player online) | `tw bonded grant <player\|uuid> <rosterId> <roleId> [name]` | |
+| Log published activities | `tw debug log xp-events on` | one `[Tamework XP Event Debug] activity=...` log line per activity, with owner and actor |
+| Player sender only (send as a bot) | `tw npc spawn tamed <Role>`, `tw debug set happiness\|level\|owner\|tamed\|traits`, `tw debug get happiness\|lifestage\|owner\|tamed\|traits`, `tw share ...` | console: `Sender must be a player or provide the --player option!` |
 
 ## Useful quick checks
 - `/tw debug get owner`, `/tw debug set owner`

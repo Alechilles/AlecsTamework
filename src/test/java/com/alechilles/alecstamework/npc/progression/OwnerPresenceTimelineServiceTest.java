@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import java.lang.reflect.Field;
@@ -115,6 +116,44 @@ class OwnerPresenceTimelineServiceTest {
             long effective = service.resolveEffectiveElapsedMs(ownerId, 0L, HOUR_MS, policy(72.0, 1.0));
 
             assertEquals(HOUR_MS, effective);
+        } finally {
+            clock.clearForTests();
+        }
+    }
+
+    @Test
+    void offlineAgeUsesUpTheGraceInBothOwnerClocks(@TempDir Path dataDirectory) {
+        AnimalProgressionClock clock = AnimalProgressionClock.get();
+        clock.clearForTests();
+        try {
+            clock.start(dataDirectory);
+            clock.onPolicyChanged(TwNeedsConfig.TickPolicySettings.of(
+                    TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY, 1.0, 1.0));
+            UUID ownerId = UUID.randomUUID();
+            service.markOfflineForTests(ownerId, 0L);
+
+            OwnerPresenceTimelineService.OfflineAge aged = service.ageOfflineStartForDebug(ownerId, HOUR_MS);
+
+            assertEquals(HOUR_MS, aged.presenceOfflineMs());
+            assertEquals(HOUR_MS, aged.progressionOfflineMs());
+            assertEquals(30L * 60_000L,
+                    service.resolveAdvanceElapsedMs(ownerId, 0L, 30L * 60_000L, policy(1.0, 1.0)));
+            assertEquals(30L * 60_000L, clock.eligibleAdvance(ownerId, 30L * 60_000L));
+        } finally {
+            clock.clearForTests();
+        }
+    }
+
+    @Test
+    void offlineAgeRefusesAnOnlineOwner(@TempDir Path dataDirectory) {
+        AnimalProgressionClock clock = AnimalProgressionClock.get();
+        clock.clearForTests();
+        try {
+            clock.start(dataDirectory);
+            UUID ownerId = UUID.randomUUID();
+            service.markOnlineForTests(ownerId, 0L);
+
+            assertNull(service.ageOfflineStartForDebug(ownerId, HOUR_MS));
         } finally {
             clock.clearForTests();
         }

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- For admins and test scripts: `/tw debug growth advance <seconds> [NPC selectors]` fast-forwards growth and aging
+  of the selected NPCs through the owner-offline rule real time uses. It also moves their harvest alarm and
+  breeding cooldown, and old-age death and the stage role change happen as they would. It works from the server
+  console with `--entity <uuid>`; the reply is one `ok ...` line with the seconds asked for and counted and the
+  stage before and after.
+- For admins and test scripts: `/tw debug owner offline-age <ownerUuid> <seconds>` moves an offline owner's offline
+  start back, so a test reaches the owner-offline grace without waiting. It affects all of that owner's animals and
+  is saved. It works from the server console.
+- `/tw debug log xp-events on` now also logs tame, revive, summon, recall, summon expiry, avatar flight and combat
+  activities, in the same `activity=...` line.
+
+### Changed
+
+- `/tw debug get alarm [AlarmName] [NpcUuid]` reads Tamework's own harvest alarm on the animal's own time and
+  changes nothing. Its reply is now one line, `ok entity=... alarm=... source=tamework ready=... untilMs=...
+  nowMs=... remainingMs=...`; alarms Tamework does not keep come from the engine with `source=engine`. Without a
+  name it reads the configured harvest alarm.
+
 ## 5.11.0 - Sharing - 2026-11-11
 
 ### Added

@@ -1485,8 +1485,6 @@ tamework.commands.findNpc.entity.exists.but.has.no.npc.component=Entität {0} ex
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} gefunden: Rolle={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
 tamework.commands.findNpc.npc.is.not.currently.valid.in.world=NPC {0} ist derzeit in der Welt nicht gültig.
 tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Verwendung: /tw npc find <uuid> [on|off]
-tamework.commands.getAlarm.alarm.for.npc.is=Alarm {0} für NPC {1} ist {2}.
-tamework.commands.getAlarm.alarm.for.npc.is.remaining=Alarm {0} für NPC {1} ist {2}. Verbleibend: {3}.
 tamework.commands.getAlarm.description=Zeige den Alarmstatus des NPC an, den du ansiehst.
 tamework.commands.getAlarm.no.npc.found.in.view=Kein NPC im Blickfeld gefunden.
 tamework.commands.getAlarm.no.npc.resolved.console.usage.requires.an=Es wurde kein NPC aufgelöst. Die Konsole benötigt eine NPC-UUID.
@@ -1604,6 +1602,13 @@ tamework.commands.advanceNeeds.description=Spule Hunger und Durst der ausgewähl
 tamework.commands.advanceNeeds.argument.seconds=Vorzuspulende Sekunden.
 tamework.commands.advanceNeeds.invalid.seconds=Die Sekunden müssen größer als 0 und höchstens {0} sein.
 tamework.commands.advanceNeeds.advanced.needs.for.npc=Bedürfnisse für NPC {0} vorgespult: requestedSeconds={1} countedSeconds={2} hunger={3}->{4} thirst={5}->{6}
+tamework.commands.debugGrowth.description=Debug-Befehle für Wachstum und Altern.
+tamework.commands.advanceGrowth.description=Spule Wachstum und Altern der ausgewählten NPCs um eine Anzahl Sekunden vor, nach der Offline-Regel des Besitzers.
+tamework.commands.advanceGrowth.argument.seconds=Vorzuspulende Sekunden.
+tamework.commands.debugOwner.description=Debug-Befehle für die Uhren eines Besitzers.
+tamework.commands.ownerOfflineAge.description=Verlege den Offline-Beginn eines Besitzers, der offline ist, um eine Anzahl Sekunden nach vorne. Betrifft alle Tiere dieses Besitzers und wird gespeichert.
+tamework.commands.ownerOfflineAge.argument.owner=UUID des Besitzers.
+tamework.commands.ownerOfflineAge.argument.seconds=Sekunden, um die der Offline-Beginn früher liegen soll.
 tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Für NPC {0} wurde keine aktivierte Bedürfniskonfiguration aufgelöst.
 tamework.commands.setHunger.set.hunger.for.npc=Hunger für NPC {0} festgelegt: {1}.
 tamework.commands.setLevel.could.not.set.level.for.npc=Die Stufe für NPC {0} konnte nicht gesetzt werden: {1}.

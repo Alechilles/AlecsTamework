@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import java.nio.file.Path;
@@ -109,6 +110,59 @@ class AnimalProgressionClockTest {
         advance(12_000L);
 
         assertEquals(12_000L, clock.current(null));
+    }
+
+    @Test
+    void debugAdvanceCountsAllOfItForAnOnlineOwner() {
+        UUID ownerId = UUID.randomUUID();
+        clock.onOwnerConnected(ownerId);
+
+        assertEquals(2L * HOUR_MS, clock.eligibleAdvance(ownerId, 2L * HOUR_MS));
+    }
+
+    @Test
+    void debugAdvanceForAnOfflineOwnerCountsOnlyTimeAfterTheGrace() {
+        UUID ownerId = UUID.randomUUID();
+        clock.onPolicyChanged(TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY, 1.0, 1.0
+        ));
+        clock.onOwnerConnected(ownerId);
+        clock.onOwnerDisconnected(ownerId);
+        advance(30L * 60_000L);
+
+        assertEquals(0L, clock.eligibleAdvance(ownerId, 30L * 60_000L));
+        assertEquals(30L * 60_000L, clock.eligibleAdvance(ownerId, HOUR_MS));
+    }
+
+    @Test
+    void agedOfflineStartUsesUpTheGraceWithoutCreditingThePastAndSurvivesARestart() {
+        UUID ownerId = UUID.randomUUID();
+        clock.onPolicyChanged(TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY, 1.0, 1.0
+        ));
+        clock.onOwnerConnected(ownerId);
+        clock.onOwnerDisconnected(ownerId);
+
+        assertEquals(HOUR_MS, clock.ageOfflineStartForDebug(ownerId, HOUR_MS));
+        assertEquals(0L, clock.current(ownerId));
+
+        clock.close();
+        CompanionRuntimeClock.resetForTests();
+        clock.start(tempDir);
+        clock.onPolicyChanged(TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY, 1.0, 1.0
+        ));
+        advance(10L * 60_000L);
+
+        assertEquals(10L * 60_000L, clock.current(ownerId));
+    }
+
+    @Test
+    void agingTheOfflineStartRefusesAnOnlineOwner() {
+        UUID ownerId = UUID.randomUUID();
+        clock.onOwnerConnected(ownerId);
+
+        assertNull(clock.ageOfflineStartForDebug(ownerId, HOUR_MS));
     }
 
     private static void advance(long millis) {

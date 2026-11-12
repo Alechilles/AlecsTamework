@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.items.CommandLinkedPanelCooldownSnapshotService;
+import com.alechilles.alecstamework.npc.actions.HarvestAlarmTimeBasis;
+import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -12,17 +15,17 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.lang.reflect.Field;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
- * Command to display alarm status for the targeted NPC.
+ * Prints one machine-readable line with the state of a named alarm of the targeted NPC, without
+ * changing it. Tamework's own alarm (harvest) is read first, judged on the animal's progression time
+ * as gameplay judges it; the engine's alarm store is the fallback for alarms Tamework does not keep.
+ * The default name is the configured harvest alarm.
  */
 public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
-    private static final String DEFAULT_ALARM_NAME = "Harvest_Ready";
-
     public TameworkGetAlarmCommand() {
         super("alarm", "server.tamework.commands.getAlarm.description");
         setAllowsExtraArguments(true);
@@ -48,43 +51,36 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
 
         String alarmName = args.alarmName != null && !args.alarmName.isBlank()
                 ? args.alarmName
-                : DEFAULT_ALARM_NAME;
+                : CommandLinkedPanelCooldownSnapshotService.resolveHarvestAlarmName();
+        String prefix = "ok entity=" + npc.getUuid() + " alarm=" + alarmName;
+        TameworkAlarmService.Snapshot tamework = TameworkAlarmService.snapshot(npcRef, store, alarmName);
         Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
+        // Harvest readiness is Tamework's alarm alone; other names use Tamework's when it has one.
+        if (tamework.valid
+                && (tamework.exists || alarm == null || HarvestAlarmTimeBasis.isHarvestAlarmName(alarmName))) {
+            long remainingMs = tamework.active ? Math.max(0L, tamework.untilMs - tamework.nowMs) : 0L;
+            commandContext.sender().sendMessage(Message.raw(prefix + " source=tamework"
+                    + " ready=" + tamework.ready
+                    + " exists=" + tamework.exists
+                    + " untilMs=" + tamework.untilMs
+                    + " nowMs=" + tamework.nowMs
+                    + " remainingMs=" + remainingMs));
+            return;
+        }
         if (alarm == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getAlarm.npc.has.no.alarm.store"));
             return;
         }
         Instant now = resolveGameTime(store);
-        String status;
-        if (!alarm.isSet()) {
-            status = "unset";
-        } else if (alarm.hasPassed(now)) {
-            status = "passed";
-        } else {
-            status = "active";
-        }
-
-        UUID npcUuid = npc.getUuid();
-        String remainingText = null;
-        if (alarm.isSet()) {
-            Instant alarmInstant = readAlarmInstant(alarm);
-            if (alarmInstant != null) {
-                Duration remaining = Duration.between(now, alarmInstant);
-                if (!remaining.isNegative()) {
-                    remainingText = formatDuration(remaining);
-                }
-            }
-        }
-        Message message = Message.translation(remainingText == null
-                        ? "server.tamework.commands.getAlarm.alarm.for.npc.is"
-                        : "server.tamework.commands.getAlarm.alarm.for.npc.is.remaining")
-                .param("0", String.valueOf(alarmName))
-                .param("1", String.valueOf(npcUuid))
-                .param("2", String.valueOf(status));
-        if (remainingText != null) {
-            message = message.param("3", remainingText);
-        }
-        commandContext.sender().sendMessage(message);
+        Instant until = alarm.isSet() ? readAlarmInstant(alarm) : null;
+        long nowMs = now.toEpochMilli();
+        long untilMs = until != null ? until.toEpochMilli() : 0L;
+        commandContext.sender().sendMessage(Message.raw(prefix + " source=engine"
+                + " ready=" + (!alarm.isSet() || alarm.hasPassed(now))
+                + " exists=" + alarm.isSet()
+                + " untilMs=" + untilMs
+                + " nowMs=" + nowMs
+                + " remainingMs=" + (until != null ? Math.max(0L, untilMs - nowMs) : 0L)));
     }
 
     private static Ref<EntityStore> resolveTarget(Store<EntityStore> store,
@@ -122,29 +118,6 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
             return null;
         }
         return null;
-    }
-
-    private static String formatDuration(Duration duration) {
-        long seconds = Math.max(0, duration.getSeconds());
-        long days = seconds / 86400;
-        seconds %= 86400;
-        long hours = seconds / 3600;
-        seconds %= 3600;
-        long minutes = seconds / 60;
-        seconds %= 60;
-
-        StringBuilder sb = new StringBuilder();
-        if (days > 0) {
-            sb.append(days).append("d ");
-        }
-        if (hours > 0 || days > 0) {
-            sb.append(hours).append("h ");
-        }
-        if (minutes > 0 || hours > 0 || days > 0) {
-            sb.append(minutes).append("m ");
-        }
-        sb.append(seconds).append("s");
-        return sb.toString().trim();
     }
 
     private static ParsedArgs parseArgs(CommandContext commandContext) {

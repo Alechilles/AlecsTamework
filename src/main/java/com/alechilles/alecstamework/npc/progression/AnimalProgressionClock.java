@@ -167,6 +167,61 @@ public final class AnimalProgressionClock implements AutoCloseable {
         }
     }
 
+    /**
+     * Debug fast-forward: how much of {@code advanceMs} this clock would count if it passed from now
+     * on, with the owner's presence and the policy as they are now. An online owner (or the server
+     * clock, a null owner) counts all of it; an offline owner counts only what falls after the
+     * offline grace, at the offline rate. Returns 0 while the clock is stopped. Moves nothing.
+     */
+    public long eligibleAdvance(@Nullable UUID ownerId, long advanceMs) {
+        if (advanceMs <= 0L) {
+            return 0L;
+        }
+        if (ownerId == null) {
+            return advanceMs;
+        }
+        synchronized (lock) {
+            if (!started) {
+                return 0L;
+            }
+            long nowMs = CompanionRuntimeClock.nowMs();
+            OwnerClock ownerClock = ownerClocks.computeIfAbsent(
+                    ownerId, ignored -> OwnerClock.offlineAt(0L, nowMs, 0L)
+            );
+            settle(ownerClock, nowMs);
+            return eligibleElapsed(ownerClock, nowMs, saturatingAdd(nowMs, advanceMs), advanceMs);
+        }
+    }
+
+    /**
+     * Debug hook: moves an offline owner's offline start {@code ms} earlier, so the offline grace runs
+     * out sooner. Time already settled stays as it was and the moved-back span is never credited.
+     * The owner clock is shared by all of the owner's animals and the change is checkpointed to disk.
+     * Use {@link OwnerPresenceTimelineService#ageOfflineStartForDebug}, which moves both owner clocks.
+     *
+     * @return the owner's offline milliseconds afterwards, or null when the clock is stopped or the
+     *         owner is online (nothing changes then)
+     */
+    @Nullable
+    Long ageOfflineStartForDebug(@Nonnull UUID ownerId, long ms) {
+        synchronized (lock) {
+            if (!started) {
+                return null;
+            }
+            long nowMs = CompanionRuntimeClock.nowMs();
+            OwnerClock ownerClock = ownerClocks.computeIfAbsent(
+                    ownerId, ignored -> OwnerClock.offlineAt(0L, nowMs, 0L)
+            );
+            if (ownerClock.online) {
+                return null;
+            }
+            settle(ownerClock, nowMs);
+            ownerClock.offlineStartedAtMs = saturatingSubtract(ownerClock.offlineStartedAtMs, ms);
+            scheduleCheckpoint(nowMs, true);
+            return nowMs - ownerClock.offlineStartedAtMs;
+        }
+    }
+
     @Override
     public void close() {
         ExecutorService executor;
@@ -386,6 +441,13 @@ public final class AnimalProgressionClock implements AutoCloseable {
             return left;
         }
         return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private static long saturatingSubtract(long left, long right) {
+        if (right <= 0L) {
+            return left;
+        }
+        return left < Long.MIN_VALUE + right ? Long.MIN_VALUE : left - right;
     }
 
     private static final class OwnerClock {

@@ -575,15 +575,16 @@ public final class CompanionLifeStageService {
         }
     }
 
-    private static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
-                                        @Nullable NPCEntity npc,
-                                        @Nullable Store<EntityStore> store,
-                                        boolean loaded) {
-        if (npcRef == null || !npcRef.isValid() || store == null) return;
+    /** @return true when this refresh requested a lifecycle role change (it lands on a later tick) */
+    private static boolean refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
+                                            @Nullable NPCEntity npc,
+                                            @Nullable Store<EntityStore> store,
+                                            boolean loaded) {
+        if (npcRef == null || !npcRef.isValid() || store == null) return false;
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
-        if (type == null) return;
+        if (type == null) return false;
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        if (stage == null) return;
+        if (stage == null) return false;
 
         String previousStage = normalizeStage(stage.getStage());
         boolean changed = normalizeComponentDefaults(stage, npcRef, store);
@@ -611,7 +612,8 @@ public final class CompanionLifeStageService {
             }
         }
 
-        if (applyLifecycleRoleForStage(npcRef, npc, store, resolvedStage, stage)) {
+        boolean roleChangeRequested = applyLifecycleRoleForStage(npcRef, npc, store, resolvedStage, stage);
+        if (roleChangeRequested) {
             changed = true;
         }
 
@@ -631,6 +633,86 @@ public final class CompanionLifeStageService {
                                 cause, Float.MAX_VALUE));
             }
         }
+        return roleChangeRequested;
+    }
+
+    /** What one growth and aging fast-forward did. Durations are real milliseconds on the owner clock. */
+    public record GrowthAdvanceResult(long requestedMs,
+                                      long countedMs,
+                                      @Nonnull String stageBefore,
+                                      @Nonnull String stageAfter,
+                                      boolean roleChangeRequested,
+                                      boolean oldAgeDeath) {
+    }
+
+    /**
+     * Debug fast-forward for tests: lets {@code advanceMs} of time pass for one animal through the rules
+     * real time uses. The owner progression clock's offline rule decides how much of it counts. The
+     * counted time is then applied as a growth tick of a loaded animal applies time owed since its last
+     * checkpoint: growth at the current care rate, adult aging, and the animal's progression time, which
+     * also moves its Tamework harvest alarm and breeding cooldown deadlines. Old-age death and a lifecycle
+     * role change follow as they would in real time, and the result is saved with the entity. Needs do not
+     * decay here ({@link CompanionNeedsService#advanceNeedsForDebug} does that). No clock moves. Call on the
+     * NPC's world thread.
+     *
+     * @return the outcome, or null when the NPC has no life-stage component
+     */
+    @Nullable
+    public static GrowthAdvanceResult advanceGrowthForDebug(@Nullable Ref<EntityStore> npcRef,
+                                                            @Nullable NPCEntity npc,
+                                                            @Nullable Store<EntityStore> store,
+                                                            long advanceMs) {
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (npcRef == null || !npcRef.isValid() || store == null || type == null || advanceMs <= 0L
+                || store.getComponent(npcRef, type) == null) {
+            return null;
+        }
+        // Settle the time owed since the last tick first, so the jump applies only the advance.
+        boolean roleChangeRequested = refreshLifeStage(npcRef, npc, store, true);
+        TameworkLifeStageComponent settled = store.getComponent(npcRef, type);
+        if (settled == null) {
+            return null;
+        }
+        String roleId = debugConfigRoleId(settled, CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        String stageBefore = resolveDebugDisplayStage(settled, roleId, store);
+        long countedMs = 0L;
+        UUID clockOwner = null;
+        boolean clockOwnerValid = true;
+        if (settled.getProgressionOwnerId() != null) {
+            try {
+                clockOwner = UUID.fromString(settled.getProgressionOwnerId());
+            } catch (IllegalArgumentException ignored) {
+                // An unreadable clock id earns no time in real play either (pending time is zero).
+                clockOwnerValid = false;
+            }
+        }
+        if (clockOwnerValid && settled.isProgressionInitialized() && !settled.isStoredProgressionPaused()) {
+            countedMs = AnimalProgressionClock.get().eligibleAdvance(clockOwner, advanceMs);
+        }
+        if (countedMs > 0L) {
+            // The next refresh reads the counted time as owed since the last checkpoint.
+            TameworkLifeStageComponent moved = settled.clone();
+            moved.setProgressionClockMs(BreedingTimeService.saturatingSubtract(moved.getProgressionClockMs(), countedMs));
+            store.putComponent(npcRef, type, moved);
+            roleChangeRequested |= refreshLifeStage(npcRef, npc, store, true);
+        }
+        TameworkLifeStageComponent after = store.getComponent(npcRef, type);
+        String stageAfter = after == null ? stageBefore : resolveDebugDisplayStage(after, roleId, store);
+        AnimalAgingPolicy.Progress age = AnimalProgressionService.aging(npcRef, store,
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        ensureGrowthTickScheduled(npcRef, npc, store);
+        return new GrowthAdvanceResult(advanceMs, countedMs, stageBefore, stageAfter, roleChangeRequested,
+                age != null && age.dead());
+    }
+
+    /** The role whose breeding config describes this animal: its own, else its adult role's. */
+    @Nullable
+    private static String debugConfigRoleId(@Nonnull TameworkLifeStageComponent component, @Nullable String roleId) {
+        if ((roleId == null || TwBreedingConfig.resolveForRole(roleId) == null)
+                && component.getAdultRoleId() != null && !component.getAdultRoleId().isBlank()) {
+            return component.getAdultRoleId();
+        }
+        return roleId;
     }
 
     /**

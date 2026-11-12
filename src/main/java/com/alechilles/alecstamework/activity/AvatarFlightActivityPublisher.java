@@ -39,17 +39,21 @@ public final class AvatarFlightActivityPublisher {
                 || flightConfigId == null || flightConfigId.isBlank()) {
             return;
         }
+        UUID operationId = UUID.randomUUID();
         try {
             publisher.publish(new AvatarFlightActivityView(
                     new ActivityHeader(
-                            UUID.randomUUID(), actionId, Instant.now()),
+                            operationId, actionId, Instant.now()),
                     playerId,
                     flightConfigId,
                     abilitySlot,
                     rootInteractionId));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the accepted flight action.
+            return;
         }
+        // The flight config id goes in the profile slot of the shared line.
+        ActivityDebugLog.player(actionId, operationId, playerId, flightConfigId, null);
     }
 
     private static boolean isFlightAction(String actionId) {

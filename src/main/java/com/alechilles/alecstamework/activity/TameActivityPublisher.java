@@ -68,6 +68,9 @@ public final class TameActivityPublisher {
             ));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the committed acquisition.
+            return;
         }
+        ActivityDebugLog.entities(ActivityIds.TAME_SUCCESS, operationId, companionId, ownerId, null, null,
+                null, resolution.profile().profileId(), resolution.roleId());
     }
 }

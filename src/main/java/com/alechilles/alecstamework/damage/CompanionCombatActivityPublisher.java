@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.activity.ActivityDebugLog;
 import com.alechilles.alecstamework.api.ActivityDomain;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
@@ -61,7 +62,10 @@ public final class CompanionCombatActivityPublisher {
                     targetXpOutcome));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the final damage or XP results.
+            return;
         }
+        ActivityDebugLog.entities(ActivityIds.COMBAT_DAMAGE, operationId, source.entityId(), source.ownerId(),
+                target.entityId(), target.ownerId(), null, null, null);
     }
 
     /** Publishes one removed defeat-credit entry. */
@@ -88,6 +92,10 @@ public final class CompanionCombatActivityPublisher {
                     ownerCredit));
         } catch (RuntimeException | LinkageError ignored) {
             // Publication cannot undo the confirmed death.
+            return;
         }
+        // The defeated entity and its owner; the actor is the player credited with the defeat.
+        ActivityDebugLog.entities(ActivityIds.COMBAT_DEFEAT, operationId, target.entityId(), target.ownerId(),
+                null, null, ownerCredit, null, null);
     }
 }
