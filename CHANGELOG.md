@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.11.0 - Sharing - 2026-11-11
 
 ### Added
 
