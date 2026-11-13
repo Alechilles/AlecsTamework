@@ -32,7 +32,7 @@ public final class CompanionAdmissionGate {
     public static final String GROUP_LIMIT_MESSAGE_KEY = "tamework.ui.population.groupLimit";
 
     private final Supplier<CompanionAdmission.Rules> rules;
-    @Nullable private final ProviderAdmission providers;
+    private final ProviderAdmission providers;
     /** The records an owner's limits count: the index's, or the network's (see {@link #useOwnerRecords}). */
     private volatile Function<UUID, List<CompanionRecord>> recordsOf;
     /** Whether owned companions may come out in a world (see {@link #useDeployRule}); everywhere by default. */
@@ -40,21 +40,22 @@ public final class CompanionAdmissionGate {
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
-     * {@code providers} asks a managed role's admission provider; null means no role is managed.
+     * {@code providers} asks a managed role's admission provider; null means no role is managed
+     * ({@link ProviderAdmission#none()}).
      */
     public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups,
                                   @Nullable ProviderAdmission providers) {
         Objects.requireNonNull(groups, "groups");
         this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = () -> configuredRules(groups.get());
-        this.providers = providers;
+        this.providers = providers == null ? ProviderAdmission.none() : providers;
     }
 
     private CompanionAdmissionGate(Supplier<CompanionAdmission.Rules> rules, CompanionIndex index,
                                    @Nullable ProviderAdmission providers) {
         this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = Objects.requireNonNull(rules, "rules");
-        this.providers = providers;
+        this.providers = providers == null ? ProviderAdmission.none() : providers;
     }
 
     /**
@@ -146,9 +147,6 @@ public final class CompanionAdmissionGate {
                 CompanionAdmission.Provided.none());
         if (caps != null) {
             return new Admission(Denial.of(caps), after);
-        }
-        if (providers == null) {
-            return new Admission(null, after);
         }
         ProviderAdmission.Outcome decision = providers.decide(before, after);
         if (!decision.admitted()) {

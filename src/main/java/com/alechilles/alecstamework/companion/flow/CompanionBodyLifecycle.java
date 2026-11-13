@@ -84,7 +84,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
 
     /**
      * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
-     * checks a new record against the population caps and the cached admission provider decision
+     * checks a new record against the population caps and the admission provider's decision
      * under the index lock ({@link CompanionAdmissionGate#admit}); a null answer admits it.
      * {@code bondedFamilies} gives a bonded companion's roster family, whose revive cooldown its
      * death uses (plan 6 R18). {@code legacyAliases} is the imported world's alias table, empty on

@@ -348,8 +348,6 @@ public class Tamework extends JavaPlugin {
     private Supplier<CompanionPersistenceModule.FreshStart> companionStartFresh;
     @Nullable
     private volatile AdmissionCache captureAdmissionCache;
-    /** Cached admission provider decisions for the synchronous sites; closed in {@link #closeApiComposition}. */
-    @Nullable
     private volatile CaptureItemHolderSystems.Transfers captureItemTransfers;
     private ReleaseFlow companionReleaseFlow;
     /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */

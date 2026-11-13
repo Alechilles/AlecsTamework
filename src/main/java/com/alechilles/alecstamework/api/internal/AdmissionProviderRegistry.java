@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 public final class AdmissionProviderRegistry implements AdmissionProviderApi, AutoCloseable {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     /** A call slower than this is logged: providers run on world threads and under the index lock. */
-    static final long SLOW_CALL_NANOS = TimeUnit.MILLISECONDS.toNanos(5);
+    static final long SLOW_CALL_NANOS = TimeUnit.MILLISECONDS.toNanos(20);
 
     private final AtomicBoolean closed = new AtomicBoolean();
     private final ConcurrentMap<String, Registration> registrations = new ConcurrentHashMap<>();
@@ -53,7 +53,6 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
             throw new IllegalStateException("Provider is already registered: " + id);
         }
         if (closed.get()) {
-            registration.active.set(false);
             registrations.remove(id, registration);
             throw new IllegalStateException("Admission provider registry is closed");
         }
@@ -65,7 +64,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
     public ProviderReadiness readiness(@Nonnull String providerId, int contractVersion) {
         String id = canonical(providerId);
         Registration registration = registrations.get(id);
-        if (registration == null || !registration.active.get() || closed.get()) {
+        if (registration == null || closed.get()) {
             return ProviderReadiness.unavailable(id, contractVersion, "provider-not-registered");
         }
         if (registration.contractVersion != contractVersion) {
@@ -79,7 +78,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
     public Map<String, ProviderReadiness> snapshot() {
         java.util.LinkedHashMap<String, ProviderReadiness> result = new java.util.LinkedHashMap<>();
         registrations.forEach((id, registration) -> {
-            if (registration.active.get() && !closed.get()) {
+            if (!closed.get()) {
                 result.put(id, new ProviderReadiness(
                         id, registration.contractVersion, registration.generationToken, true, "ready"));
             }
@@ -98,8 +97,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         }
         String id = canonical(request.providerId());
         Registration registration = registrations.get(id);
-        if (registration == null || !registration.active.get()
-                || request.contractVersion() != registration.contractVersion) {
+        if (registration == null || request.contractVersion() != registration.contractVersion) {
             return unavailable("provider-not-ready");
         }
         long started = System.nanoTime();
@@ -124,7 +122,6 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
-            registrations.values().forEach(registration -> registration.active.set(false));
             registrations.clear();
         }
     }
@@ -155,7 +152,6 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         @Override
         public void close() {
             if (closed.compareAndSet(false, true)) {
-                registration.active.set(false);
                 registrations.remove(id, registration);
             }
         }
@@ -166,7 +162,6 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         private final int contractVersion;
         private final SynchronousPopulationAdmissionProvider provider;
         private final String generationToken;
-        private final AtomicBoolean active = new AtomicBoolean(true);
 
         private Registration(String id, int contractVersion, SynchronousPopulationAdmissionProvider provider,
                              String generationToken) {
