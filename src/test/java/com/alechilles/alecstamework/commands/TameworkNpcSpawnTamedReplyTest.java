@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.commands;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import org.junit.jupiter.api.Test;
@@ -10,14 +9,6 @@ import org.junit.jupiter.api.Test;
 /** The console spawn's population refusal says which check refused and with what numbers. */
 class TameworkNpcSpawnTamedReplyTest {
     private static final TwGlobalConfig.PerPlayerLimitScope SCOPE = TwGlobalConfig.PerPlayerLimitScope.GLOBAL;
-
-    @Test
-    void aPendingProviderDecisionIsNotReportedAsAReachedLimit() {
-        var pending = new OwnerPopulationCapService.Decision(false, true, 20, -1, 0, SCOPE,
-                OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE, ProviderDecisionCache.CHECKING_MESSAGE_KEY);
-
-        assertEquals(" detail=provider-decision-pending", TameworkNpcSpawnTamedCommand.populationCapDetail(pending));
-    }
 
     @Test
     void aReachedOwnedLimitGivesTheNumbersTheCheckUsed() {

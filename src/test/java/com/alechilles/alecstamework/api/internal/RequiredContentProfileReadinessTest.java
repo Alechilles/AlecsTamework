@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.RequiredContentProfileStatus;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +27,7 @@ class RequiredContentProfileReadinessTest {
     }
 
     private AutoCloseable register(int contractVersion) {
-        return providers.register(PROVIDER, contractVersion, request -> CompletableFuture.completedFuture(null));
+        return providers.register(PROVIDER, contractVersion, request -> null);
     }
 
     @Test

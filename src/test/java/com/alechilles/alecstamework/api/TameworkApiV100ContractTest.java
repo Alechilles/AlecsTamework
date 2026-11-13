@@ -44,7 +44,7 @@ class TameworkApiV100ContractTest {
         TameworkEventBus events = new TameworkEventBus(null);
         TameworkApiImpl api = newBaseApi(events);
         try {
-            assertEquals("3.0.0", api.getApiVersion());
+            assertEquals("4.0.0", api.getApiVersion());
             assertTrue(api.getCapabilities().containsAll(EnumSet.of(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS,
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS)));

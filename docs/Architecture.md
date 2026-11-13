@@ -46,7 +46,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - One-time import of 3.x and 4.x saves, a background locate pass for bodies 4.x
   left in unloaded chunks, and a refund of unfinished 4.x revive payments
   (`companion/migrate`). 2.x saves are refused.
-- Public API 3.0 surfaces for companion profiles, profile extension data,
+- Public API 4.0 surfaces for companion profiles, profile extension data,
   bonded companions, capture policy, progression, command links, population
   groups, admission providers, diagnostics, and interaction extensions
   (`api/internal/Index*Api.java`); see the

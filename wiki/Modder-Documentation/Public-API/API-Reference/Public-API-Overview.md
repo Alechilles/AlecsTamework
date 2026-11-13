@@ -6,9 +6,9 @@ draft: false
 ---
 # Public API Overview
 
-> **API `3.0.0`**
-> `getApiVersion()` returns `"3.0.0"`. This version ships with Tamework 5.0.0
-> and is not compatible with API 2.x. See "Changes from 2.x" below.
+> **API `4.0.0`**
+> `getApiVersion()` returns `"4.0.0"`. It is not compatible with API 3.x or
+> 2.x. See "Changes from 3.x" and "Changes from 2.x" below.
 
 Obtain the API from the loaded Tamework plugin:
 
@@ -77,6 +77,16 @@ In the enum but not advertised in 3.0.0: `LOADED_POPULATION_GROUP_COUNTS` and
 
 An unadvertised capability is unavailable. Do not infer support from the API
 version or from DTO classes being present.
+
+## Changes from 3.x
+
+Admission providers answer synchronously. `PopulationAdmissionProvider`, whose
+`evaluate` returned a `CompletionStage`, is removed. Implement
+`SynchronousPopulationAdmissionProvider` instead: `decide(request)` returns the
+`PopulationAdmissionProviderDecision` directly, from memory, on whatever thread
+Tamework calls it. `admissionProviders().register(...)` takes the new type. The
+request, decision and contract versions are unchanged. See
+[Admission Providers API Reference](/mod/alecs-tamework/admission-providers-api-reference).
 
 ## Changes from 2.x
 

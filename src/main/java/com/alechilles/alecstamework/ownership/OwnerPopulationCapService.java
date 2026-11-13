@@ -24,8 +24,7 @@ import javax.annotation.Nullable;
  *
  * <p>Reads are in-memory index reads. They never enter another world thread, block on futures,
  * or create durable reservations. A role managed by an admission provider is checked against the
- * provider's cached decision; while that decision is being fetched the acquisition is refused
- * with the "checking requirements" message.
+ * provider's answer, which it gives at once from memory.
  */
 public final class OwnerPopulationCapService {
     /** Reason of a {@link Decision} refused by the per-player deployed limit. */
@@ -112,8 +111,7 @@ public final class OwnerPopulationCapService {
     /**
      * Pre-checks a whole litter (spec 8.11): would adding {@code candidates} to {@code ownerId}'s
      * companions pass the owned limit, the deployed limit, a group limit or, for a managed role,
-     * the cached provider
-     * decision and its domain limits? A refusal has the reasons of {@link #evaluateAcquisition}.
+     * the provider's decision and its domain limits? A refusal has the reasons of {@link #evaluateAcquisition}.
      * Allowed when there is no owner, no candidate, no gate or no index. Like the other pre-checks
      * it is lock-free; each child's tame stamping still re-checks under the index lock.
      */
@@ -255,7 +253,7 @@ public final class OwnerPopulationCapService {
 
     /**
      * {@code messageKey} is the translation key to show for a refusal that names one (a provider's
-     * own key, a domain limit, or "checking requirements"); null means the message of
+     * own key or a domain limit); null means the message of
      * {@code reason}.
      */
     public record Decision(boolean allowed,

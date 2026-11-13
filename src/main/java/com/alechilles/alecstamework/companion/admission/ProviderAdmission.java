@@ -25,11 +25,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -39,11 +36,9 @@ import javax.annotation.Nullable;
  * with a managed profile, it asks the profile's provider and turns the decision into the claims
  * and domain limits the under-lock check uses, or into a refusal with a message key.
  *
- * <p>{@link #evaluate} never blocks and never touches the companion index, so call it before the
- * index lock. Its stage completes on the caller's thread when no provider is asked, otherwise on
- * the thread that completes the provider's decision (a provider callback or timeout thread);
- * continuations must not touch live entities there. A managed role whose provider is missing,
- * slow or failing is refused: the stage fails closed.</p>
+ * <p>{@link #decide} calls the provider on the caller's thread. Providers answer from memory and
+ * never touch the companion index, so it may be called under the index lock. A managed role whose
+ * provider is missing or failing is refused: the stage fails closed.</p>
  */
 public final class ProviderAdmission {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -51,8 +46,8 @@ public final class ProviderAdmission {
     private static final int CHUNK_SHIFT = 5;
     static final Outcome NOT_ASKED = new Outcome(CompanionAdmission.Provided.none(), null, null, false);
     private static final ProviderAdmission NONE =
-            new ProviderAdmission(roleId -> null, request -> CompletableFuture.completedFuture(
-                    PopulationAdmissionProviderDecision.unavailable("provider-not-ready")));
+            new ProviderAdmission(roleId -> null,
+                    request -> PopulationAdmissionProviderDecision.unavailable("provider-not-ready"));
 
     /** What a role's managed profile gives the provider request. */
     public record Managed(@Nonnull String providerId, int contractVersion, @Nonnull String managedProfileId,
@@ -60,7 +55,7 @@ public final class ProviderAdmission {
                           int weight, long configRevision) {
         /**
          * A role that is managed, but whose managed config is stale (it no longer matches the
-         * population groups). It is compared by identity; {@link #evaluate} refuses it as
+         * population groups). It is compared by identity; {@link #decide} refuses it as
          * unavailable without asking a provider.
          */
         public static final Managed STALE = new Managed("", 0, "", "", Set.of(), "", 0, -1L);
@@ -81,39 +76,23 @@ public final class ProviderAdmission {
     }
 
     private final Function<String, Managed> managedForRole;
-    private final Function<PopulationAdmissionProviderRequest, CompletionStage<PopulationAdmissionProviderDecision>> providers;
-    private final Supplier<List<String>> familyRoles;
-    private final Supplier<Object> registrations;
+    private final Function<PopulationAdmissionProviderRequest, PopulationAdmissionProviderDecision> providers;
     /**
-     * One WARN a minute per provider (and claimed domain): the cached decisions are asked again
-     * every few seconds per owner and family, and a broken provider or config fails every time.
+     * One WARN a minute per provider (and claimed domain): a broken provider or config fails on
+     * every tame, pickup and litter.
      */
     private final ThrottledWarnings warnings = new ThrottledWarnings(System::currentTimeMillis, 60_000L);
 
     /**
      * @param managedForRole the managed profile data of a role id, null when the role is not
      *                       managed, or {@link Managed#STALE}
-     * @param providers      evaluates one request without blocking; fails closed to UNAVAILABLE
+     * @param providers      decides one request on the caller's thread; fails closed to UNAVAILABLE
      */
     public ProviderAdmission(@Nonnull Function<String, Managed> managedForRole,
                              @Nonnull Function<PopulationAdmissionProviderRequest,
-                                     CompletionStage<PopulationAdmissionProviderDecision>> providers) {
-        this(managedForRole, providers, List::of, () -> "");
-    }
-
-    /**
-     * @param familyRoles   one role id of each managed family, for warming cached decisions
-     * @param registrations a value that changes (by {@code equals}) when a provider registers or
-     *                      unregisters
-     */
-    public ProviderAdmission(@Nonnull Function<String, Managed> managedForRole,
-                             @Nonnull Function<PopulationAdmissionProviderRequest,
-                                     CompletionStage<PopulationAdmissionProviderDecision>> providers,
-                             @Nonnull Supplier<List<String>> familyRoles, @Nonnull Supplier<Object> registrations) {
+                                     PopulationAdmissionProviderDecision> providers) {
         this.managedForRole = Objects.requireNonNull(managedForRole, "managedForRole");
         this.providers = Objects.requireNonNull(providers, "providers");
-        this.familyRoles = Objects.requireNonNull(familyRoles, "familyRoles");
-        this.registrations = Objects.requireNonNull(registrations, "registrations");
     }
 
     /**
@@ -146,46 +125,14 @@ public final class ProviderAdmission {
                                 request.admission().managedProfileId(), ready.providerId(),
                                 request.contractVersion(), ready.detail());
                     }
-                    return registry.evaluate(request);
-                },
-                () -> {
-                    List<String> roles = new ArrayList<>();
-                    managed.snapshot().profiles().values().forEach(profile -> profile.families().values().forEach(
-                            family -> family.roleIds().stream().findFirst().ifPresent(roles::add)));
-                    return roles;
-                },
-                registry::snapshot);
+                    return registry.decide(request);
+                });
     }
 
     /** A stage with no managed roles: every change passes without claims. */
     @Nonnull
     public static ProviderAdmission none() {
         return NONE;
-    }
-
-    /**
-     * The managed profile, family and config revision of a role, as one key for cached decisions,
-     * or null when the role is not managed. The family is part of it because a provider gates and
-     * weighs each family on its own; the revision, so a decision made against replaced managed
-     * config is not reused.
-     */
-    @Nullable
-    public String familyKey(@Nonnull String roleId) {
-        Managed managed = managedForRole.apply(roleId);
-        return managed == null ? null
-                : managed.managedProfileId() + '/' + managed.familyGroupId() + '@' + managed.configRevision();
-    }
-
-    /** One role id of each managed family in the loaded config. */
-    @Nonnull
-    public List<String> familyRoles() {
-        return familyRoles.get();
-    }
-
-    /** A value that changes (by {@code equals}) when a provider registers or unregisters. */
-    @Nonnull
-    public Object registrations() {
-        return registrations.get();
     }
 
     /**
@@ -203,34 +150,33 @@ public final class ProviderAdmission {
 
     /**
      * Asks the provider about the change from {@code before} (null for a new record) to
-     * {@code after}. Completes at once, not asked, when the change needs no admission or the role
-     * is not managed. Never completes exceptionally.
+     * {@code after}, on this thread. Not asked when the change needs no admission or the role is
+     * not managed. Never throws.
      */
     @Nonnull
-    public CompletionStage<Outcome> evaluate(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+    public Outcome decide(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
         if (!needsAdmission(before, after)) {
-            return CompletableFuture.completedFuture(NOT_ASKED);
+            return NOT_ASKED;
         }
         Managed managed = managedForRole.apply(after.roleId());
         if (managed == null) {
-            return CompletableFuture.completedFuture(NOT_ASKED);
+            return NOT_ASKED;
         }
         if (managed == Managed.STALE) {
-            return CompletableFuture.completedFuture(unavailable());
+            return unavailable();
         }
-        CompletionStage<PopulationAdmissionProviderDecision> decided;
+        PopulationAdmissionProviderDecision decision;
         try {
-            decided = providers.apply(request(managed, before, after));
+            decision = providers.apply(request(managed, before, after));
         } catch (RuntimeException failure) {
             if (warnings.shouldLog("ask " + managed.providerId())) {
                 LOGGER.at(Level.WARNING).withCause(failure).log(
                         "Admission provider %s could not be asked about companion %s", managed.providerId(),
                         after.profileId());
             }
-            return CompletableFuture.completedFuture(unavailable());
+            return unavailable();
         }
-        return decided.handle((decision, error) -> error != null || decision == null
-                ? unavailable() : outcome(managed, decision));
+        return decision == null ? unavailable() : outcome(managed, decision);
     }
 
     private Outcome outcome(Managed managed, PopulationAdmissionProviderDecision decision) {
@@ -275,8 +221,8 @@ public final class ProviderAdmission {
     /**
      * Contract v1 request: the old and new owner, where the companion is and where it will be.
      * A record with no body (held in an item or stored) that changes owner is put to the provider
-     * as a new companion of the new owner, the request the decision cache also asks with: an
-     * owner transfer must name the current NPC, and such a record has none.
+     * as a new companion of the new owner: an owner transfer must name the current NPC, and such a
+     * record has none.
      */
     private static PopulationAdmissionProviderRequest request(Managed managed, @Nullable CompanionRecord before,
                                                               CompanionRecord after) {

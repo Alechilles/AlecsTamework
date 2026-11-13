@@ -8,9 +8,10 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **API `3.0.0`**
-> Providers replace the removed `policies().populationAdmissions()`
-> reservations and the `NAMED_CAPACITY_RESERVATIONS` capability.
+> **API `4.0.0`**
+> Providers answer synchronously through
+> `SynchronousPopulationAdmissionProvider`. The asynchronous
+> `PopulationAdmissionProvider` of API 3.x is removed.
 
 Capabilities: `EXTERNAL_ADMISSION_PROVIDERS` and `REQUIRED_CONTENT_PROFILES`.
 
@@ -29,11 +30,14 @@ AutoCloseable handle = api.policies().admissionProviders()
         .register("example:husbandry", 1, request -> decide(request));
 ```
 
+`decide` returns a `PopulationAdmissionProviderDecision` at once. See
+"Threading" below for what it may and may not do.
+
 - `providerId` is trimmed and lower-cased. One provider per ID. A second
   registration under the same ID throws `IllegalStateException`.
 - `contractVersion` must be positive and must equal the version the managed
   profile asks for.
-- Closing the handle stops new evaluations. One already in flight may finish.
+- Closing the handle stops new calls. One already running finishes.
 - Close the handle when your plugin unloads.
 
 `requiredContentProfiles().status(profileId)` reports whether a managed profile
@@ -51,9 +55,7 @@ Tamework fails closed. A managed role is refused when:
 - no provider is registered under the profile's ID;
 - the registered contract version differs;
 - the managed config is stale (it no longer matches the population groups);
-- the provider throws, returns null, completes exceptionally, or takes longer
-  than 2 seconds;
-- the provider's work queue is full; or
+- the provider throws or returns null; or
 - an `ALLOW` names a `configRevision` other than the one the server has
   loaded.
 
@@ -103,49 +105,41 @@ Tamework shows the `DENY` decision's `messageKey` to the player. Ship that key
 in your own language files. When Tamework cannot resolve the key it falls back
 to its own text, `tamework.ui.population.providerDenied`.
 
-## Two kinds of request
+## What the request describes
 
-### Exact requests
+Tamework asks about each change when it happens, and does not cache answers.
+The request carries the operation, old owner, new owner, and locations of the
+change: a tame, a restore (summon, recall, revive, release from an item), a
+capture, a capture item changing holder, an item pickup, a litter, or a spawn.
 
-Restores of every kind (for example summon, recall, revive, and release from
-an item) and captures are already asynchronous. For these Tamework asks the
-provider about the exact change before it saves, and does not cache the
-answer. The request carries the real operation, old owner, new owner, and
-locations.
+- A companion with no body (held in an item or stored) that changes owner is
+  described as a new companion of the new owner, with operation
+  `NEW_OWNERSHIP`.
+- A pre-check before the companion exists (before a tame spends food, or
+  before a spawn) describes a new companion of the owner with a random
+  profile ID at chunk `0,0` of the world. The binding check that follows
+  describes the real companion.
 
-A companion with no body (held in an item or stored) that changes owner is
-described as a new companion of the new owner, with operation `NEW_OWNERSHIP`.
-
-### Cached requests
-
-Taming, a capture item changing holder, item pickup, and litters run
-synchronously on a world thread and cannot wait. For these Tamework uses a
-cached decision per owner and managed family.
-
-- The request always has the same shape: operation `NEW_OWNERSHIP`, no old
-  owner, and a destination that names the world with chunk `0,0`. Do not base
-  a decision on the operation, old owner, or chunk of such a request.
-- An `ALLOW` or `DENY` is reused for up to 30 seconds. An unavailable answer is
-  reused for 5 seconds.
-- The owner's cached decisions are dropped when the owner's counts change,
-  when the owner disconnects, on a config reload, and when a provider
-  registers or unregisters.
-- Decisions are fetched when a player joins. With no cached decision the
-  action is refused once with `tamework.ui.population.checkingRequirements`
-  and the evaluation starts. The player can try again a moment later.
-
-Within the reuse window Tamework holds an allowed owner only to the claims and
-limits of the cached decision. A provider that counts companions on its own
-and returns no claims can be overshot in that window. Return claims and limits
+Tamework counts the claims of an `ALLOW` itself, in the step that saves the
+change. A provider that counts companions on its own and returns no claims can
+be overshot by two changes decided at the same time. Return claims and limits
 so Tamework can enforce them.
 
 ## Threading
 
-`evaluate` runs on Tamework's provider threads (at most 4 at once, with 8
-waiting). It has no world-thread guarantee and may run for several requests at
-once, in any order. Implementations must be thread-safe, must not block, and
-must decide only from the request and their own policy snapshot. They must not
-read or change live entities.
+`decide` runs inline wherever Tamework needs an answer: on a world thread
+during a tame, pickup, holder change, litter or spawn, on other threads during
+captures and restores, and sometimes while Tamework holds its companion index
+lock. It may run for several requests at once, in any order.
+
+- Answer from memory. Do not block, wait on a future, do I/O, enter a world
+  thread, or call Tamework APIs.
+- Be thread-safe. Do not read or change live entities.
+- When your state for the owner is not ready yet (for example a profile still
+  loading after join), return `UNAVAILABLE`.
+
+Tamework cannot interrupt a call. It logs a warning, at most once a minute per
+provider, when a call takes longer than 20 ms.
 
 ## Request types
 

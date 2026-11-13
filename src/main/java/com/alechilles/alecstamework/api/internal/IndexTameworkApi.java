@@ -35,7 +35,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The public API root (3.0.0) over the companion index. It exists only while the companion
+ * The public API root (4.0.0) over the companion index. It exists only while the companion
  * module is ready. Profile, command link, progression, policy and config reads come from
  * {@link TameworkApiImpl} over {@link IndexNpcProfilesApi}, which also forwards profile data and
  * diagnostics to the index-backed delegates given here; this class adds population group reads,

@@ -27,6 +27,8 @@ Use each applicable row before editing a public contract.
 - **New sub-API version:** use when semantics cannot be added compatibly.
 - **Breaking method:** use only with explicit version and migration approval.
   API 3.0.0 was such a break: it removed six capabilities and their accessors.
+  API 4.0.0 was another: admission providers became synchronous
+  (`SynchronousPopulationAdmissionProvider`) and the async interface was removed.
 - **Removed capability:** consumers that resolve capability names by text stop
   becoming ready. List the removal in the consumer checklists.
 
@@ -35,7 +37,7 @@ Use each applicable row before editing a public contract.
 Verify all names in current source:
 
 - `TameworkApi`, domain sub-interfaces, and `TameworkApiCapability`
-- `IndexTameworkApi` (the API root, version 3.0.0) and `TameworkApiImpl` (the
+- `IndexTameworkApi` (the API root, version 4.0.0) and `TameworkApiImpl` (the
   base it delegates to and the `API_VERSION` constant)
 - the index-backed delegates in `api/internal`: `IndexNpcProfilesApi`,
   `IndexProfileDataApi`, `IndexDiagnosticsApi`, `IndexPopulationGroupApi`,

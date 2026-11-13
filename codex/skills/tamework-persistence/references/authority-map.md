@@ -14,11 +14,11 @@ current commit.
 | `companion/flow` | Record transitions and the flows that move companions: tame and adoption, capture, restore (recall, recover, revive, summon), store, death, loss, world removal, owner release, summon expiry, spawning from a snapshot | `CompanionTransitions`, `CompanionBodyLifecycle`, `CompanionRegistration`, `CaptureFlow`, `RestoreFlow`, `RestoreRules`, `StoreFlow`, `ReleaseFlow`, `RosterSummons`, `SummonExpiryScheduler`, `SnapshotPatch`, `HytaleCompanionSpawner` |
 | `companion/item` | Capture items: identity keys, ownership mode decisions, Forget, Recall and destroyed items, pickup admission cache | `CaptureItemKeys`, `CaptureItemOwnership`, `CaptureItemFlows`, `AdmissionCache` |
 | `companion/coop` | Coop slots on the block, intake, release, block break, schedule, imported residents | `TameworkCoopSlotsComponent`, `CoopSlots`, `CoopIntakeFlow`, `CoopRelease`, `CoopBreakSystem`, `CoopScheduleSystem` |
-| `companion/admission` | Owned, deployed and group caps under the index lock; external admission providers | `CompanionAdmission`, `CompanionAdmissionGate`, `ProviderAdmission`, `ProviderDecisionCache` |
+| `companion/admission` | Owned, deployed and group caps under the index lock; external admission providers | `CompanionAdmission`, `CompanionAdmissionGate`, `ProviderAdmission` |
 | `companion/bonded` | Bonded companions as index records; the bonded API over the index | `IndexBondedCompanionApi`, `BondedRecords`, `BondedAdmission` |
 | `companion/migrate` | 3.x/4.x import and the lazy handling of old bodies, items, coops and players | `package-info.java` first, then `CompanionImporter`, `LegacyReader`, `LegacyMapper`, `LegacyBodyResolution`, `LegacyItemAdoption`, `LegacyBodyLocator` |
 | `companion/runtime` | Module that opens the store, owns the index, writer, threads and loaded map; lock-free queries | `CompanionPersistenceModule`, `CompanionQueries` |
-| `api/internal` | Public API 3.0.0 over the index | `IndexTameworkApi`, `IndexNpcProfilesApi`, `IndexProfileDataApi`, `IndexPopulationGroupApi`, `IndexDiagnosticsApi` |
+| `api/internal` | Public API 4.0.0 over the index | `IndexTameworkApi`, `IndexNpcProfilesApi`, `IndexProfileDataApi`, `IndexPopulationGroupApi`, `IndexDiagnosticsApi` |
 | `settings` | Server settings, the settings announcement, the progression clock, data-path resolution. Not companion state | `TameworkSettingsStore`, `TameworkSettingsAnnouncementStore`, `AnimalProgressionClockStore`, `TameworkDataPathService`, `TameworkDataPathLayout` |
 
 `companion/{identity,capture,lifecycle,placement,population,snapshot}` hold

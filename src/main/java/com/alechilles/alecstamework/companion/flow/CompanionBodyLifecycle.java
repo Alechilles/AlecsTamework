@@ -84,7 +84,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
 
     /**
      * {@code clock} is the wall clock used for death, revive and snapshot times. {@code admission}
-     * checks a new record against the population caps and the cached admission provider decision
+     * checks a new record against the population caps and the admission provider's decision
      * under the index lock ({@link CompanionAdmissionGate#admit}); a null answer admits it.
      * {@code bondedFamilies} gives a bonded companion's roster family, whose revive cooldown its
      * death uses (plan 6 R18). {@code legacyAliases} is the imported world's alias table, empty on
@@ -331,7 +331,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
 
     /**
      * Queues the refusal notification for the owner, resolved in the owner's language: {@code key}
-     * is the refusal's message key (a limit, a provider's answer, or "checking requirements").
+     * is the refusal's message key (a limit or a provider's answer).
      * Runs as a world task so the ECS callback only queues it; the owner is looked up by UUID when
      * it runs.
      */
@@ -353,8 +353,7 @@ public final class CompanionBodyLifecycle implements CompanionBodyCallbacks {
      * The owner component of a stamped body changed (for example the set-owner command). The
      * body already has its new owner, so this cannot refuse. The old owner's domain claims never
      * move with the companion: the new owner gets the claims the gate's check admits for them
-     * (the cached provider decision of a managed role), and none when that check denies or has
-     * no decision yet.
+     * (the provider's decision for a managed role), and none when that check denies.
      */
     public void ownerChanged(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                              @Nullable UUID owner, @Nullable String ownerName) {

@@ -678,7 +678,7 @@ public final class SpawnerFeatureHandler {
     }
 
     private boolean refusedByCaps(Player player, UUID owner, String roleId, String world, boolean deployed) {
-        // The denial carries its own key: "checking requirements" or an admission provider's message.
+        // The denial carries its own key, such as an admission provider's message.
         CompanionAdmissionGate.Denial denial = admissionGate.precheckDenial(owner, roleId, world, deployed);
         if (denial != null) {
             showPopulationLimit(player, denial.messageKey());

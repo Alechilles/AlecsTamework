@@ -164,17 +164,13 @@ class OwnerPopulationCapServiceTest {
         OwnerPopulationCapService.Decision denied = OwnerPopulationCapService.fromPrecheck(
                 new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,
                         "runeteria.husbandry.locked"), rules);
-        OwnerPopulationCapService.Decision checking = OwnerPopulationCapService.fromPrecheck(
-                new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE,
-                        "tamework.ui.population.checkingRequirements"), rules);
         OwnerPopulationCapService.Decision unavailable = OwnerPopulationCapService.fromPrecheck(
                 CompanionAdmissionGate.Denial.of(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE), rules);
 
         assertFalse(denied.allowed());
         assertEquals(OwnerPopulationCapService.REASON_PROVIDER_DENIED, denied.reason());
         assertEquals("runeteria.husbandry.locked", OwnerMessageUtil.acquisitionDeniedKey(denied));
-        assertEquals(OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE, checking.reason());
-        assertEquals("tamework.ui.population.checkingRequirements", OwnerMessageUtil.acquisitionDeniedKey(checking));
+        assertEquals(OwnerPopulationCapService.REASON_PROVIDER_UNAVAILABLE, unavailable.reason());
         assertEquals("tamework.ui.population.providerUnavailable", OwnerMessageUtil.acquisitionDeniedKey(unavailable));
     }
 

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,23 +140,26 @@ class CompanionAdmissionGateTest {
         assertEquals(CompanionAdmission.Refusal.GROUP_OWNED, gate.denyBatch(owner, List.of(one, two, three)).refusal());
     }
 
-    // --- Cached provider decisions at the synchronous sites (plan 6 R11) ---
+    // --- Admission providers at the synchronous sites ---
 
     private static final String PASTURE = "runeteria:husbandry_deployable";
     private static final DomainClaim PASTURE_CLAIM = new DomainClaim(PASTURE, 1, false, true);
 
-    /** What the provider answers next; null leaves the question open, as a slow provider does. */
+    /** What the provider answers; null makes it throw. */
     private PopulationAdmissionProviderDecision answer;
     private int asked;
-    private final ProviderDecisionCache decisions = new ProviderDecisionCache(new ProviderAdmission(
+    private final ProviderAdmission providers = new ProviderAdmission(
             role -> role.equals("Cow") ? new ProviderAdmission.Managed("runeteria:husbandry", 1,
                     "runeteria:husbandry", "cattle", Set.of("cattle"), "husbandry.cattle", 1, 7L) : null,
             request -> {
                 asked++;
-                return answer == null ? new CompletableFuture<>() : CompletableFuture.completedFuture(answer);
-            }), System::currentTimeMillis);
+                if (answer == null) {
+                    throw new IllegalStateException("provider failed");
+                }
+                return answer;
+            });
     private final CompanionAdmissionGate managedGate = CompanionAdmissionGate.withRules(index,
-            () -> new CompanionAdmission.Rules(3, false, role -> List.of()), decisions);
+            () -> new CompanionAdmission.Rules(3, false, role -> List.of()), providers);
 
     private static PopulationAdmissionProviderDecision allow(int pastureLimit) {
         return new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.ALLOW, "ok",
@@ -169,29 +171,33 @@ class CompanionAdmissionGateTest {
                 .ownerUuid(owner).homeWorld("w").currentNpcUuid(UUID.randomUUID()).build();
     }
 
-    /** Review Focus 2: a slow provider never holds the check; the change is refused and nothing is stored. */
+    /** The first tame of a managed role is decided at once: no "try again" while a provider is asked. */
     @Test
-    void aManagedRoleIsRefusedWithCheckingWhileItsDecisionIsFetched() {
+    void theFirstCheckOfAManagedRoleGetsTheProvidersAnswer() {
+        answer = allow(2);
+
+        assertNull(managedGate.precheck(owner, "Cow", "w"));
         CompanionAdmissionGate.Admission admission = managedGate.admit(null, live("Cow"));
 
-        assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE,
-                ProviderDecisionCache.CHECKING_MESSAGE_KEY), admission.denial());
-        assertEquals(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE, managedGate.precheck(owner, "Cow", "w"));
-        assertEquals(1, asked, "the precheck did not start a second evaluation");
-        assertNull(managedGate.admit(null, live("Sheep")).denial(), "an unmanaged role does not wait for a provider");
+        assertTrue(admission.admitted());
+        assertEquals(List.of(PASTURE_CLAIM), admission.record().domainClaims());
+        assertNull(managedGate.admit(null, live("Sheep")).denial(), "an unmanaged role asks no provider");
+        assertEquals(2, asked);
     }
 
     @Test
-    void aCachedDenialOrUnavailableProviderRefusesWithItsOwnMessage() {
+    void aDenialOrUnavailableOrFailingProviderRefusesWithItsMessage() {
         answer = new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.DENY,
                 "runeteria.husbandry.locked", Set.of(), Map.of(), 1L, 7L);
         assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,
                 "runeteria.husbandry.locked"), managedGate.precheckDenial(owner, "Cow", "w", true));
 
-        decisions.clear();
-        answer = PopulationAdmissionProviderDecision.unavailable("provider-timeout");
-        assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE,
-                CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY), managedGate.admit(null, live("Cow")).denial());
+        CompanionAdmissionGate.Denial unavailable = new CompanionAdmissionGate.Denial(
+                CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE, CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY);
+        answer = PopulationAdmissionProviderDecision.unavailable("profile-not-loaded");
+        assertEquals(unavailable, managedGate.admit(null, live("Cow")).denial());
+        answer = null;
+        assertEquals(unavailable, managedGate.admit(null, live("Cow")).denial());
     }
 
     @Test
@@ -204,9 +210,9 @@ class CompanionAdmissionGateTest {
         assertEquals(0, asked);
     }
 
-    /** The tame re-check: the record that is registered carries the claims of the cached allow. */
+    /** The tame re-check: the record that is registered carries the claims of the allow. */
     @Test
-    void aTameOfAManagedRoleWithACachedAllowStoresTheClaimsOnTheRecord() {
+    void aTameOfAManagedRoleStoresTheProvidersClaimsOnTheRecord() {
         answer = allow(2);
         CompanionRecord cow = live("Cow");
 
@@ -218,7 +224,7 @@ class CompanionAdmissionGateTest {
     }
 
     @Test
-    void aCachedAllowIsStillHeldToItsDomainLimitUnderTheLock() {
+    void anAllowIsHeldToItsDomainLimitUnderTheLock() {
         answer = allow(1);
         CompanionRecord first = live("Cow");
         CompanionRecord second = live("Cow");
@@ -235,13 +241,9 @@ class CompanionAdmissionGateTest {
         assertNull(index.get(second.profileId()));
     }
 
-    /** A litter of a managed role counts each child's claim; a miss refuses the whole litter. */
+    /** A litter of a managed role counts each child's claim; one child over the limit refuses the litter. */
     @Test
-    void aLitterOfAManagedRoleUsesTheCachedDecisionAndItsDomainLimit() {
-        assertEquals(ProviderDecisionCache.CHECKING_MESSAGE_KEY,
-                managedGate.denyBatch(owner, List.of(live("Cow"), live("Cow"))).messageKey());
-
-        decisions.clear();
+    void aLitterOfAManagedRoleIsHeldToTheProvidersDomainLimit() {
         answer = allow(2);
         assertNull(managedGate.denyBatch(owner, List.of(live("Cow"), live("Cow"))));
         assertEquals(new CompanionAdmissionGate.Denial(CompanionAdmission.Refusal.PROVIDER_DENIED,

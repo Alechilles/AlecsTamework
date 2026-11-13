@@ -1137,7 +1137,6 @@ tamework.ui.ownership.mustTameWithFoods={0} aún no está domado. Debes domarlo 
 tamework.ui.population.providerUnavailable=Los requisitos de este compañero no están disponibles temporalmente. Vuelve a intentarlo en breve.
 tamework.ui.population.deployBlocked=Los compañeros no pueden salir aquí.
 tamework.ui.population.providerDenied=No cumples los requisitos para este compañero.
-tamework.ui.population.checkingRequirements=Comprobando los requisitos de este compañero. Vuelve a intentarlo en un momento.
 tamework.ui.population.slot=espacio
 tamework.ui.population.slots=espacios
 tamework.ui.linkedLocation.copyHint=Selecciona el texto para copiarlo

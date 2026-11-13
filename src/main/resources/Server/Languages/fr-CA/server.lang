@@ -1248,7 +1248,6 @@ tamework.ui.population.familyUnknown=Cette famille de compagnons n'est pas confi
 tamework.ui.population.providerUnavailable=Les exigences pour ce compagnon sont temporairement indisponibles. Réessayez dans un instant.
 tamework.ui.population.deployBlocked=Les compagnons ne peuvent pas sortir ici.
 tamework.ui.population.providerDenied=Vous ne remplissez pas les exigences pour ce compagnon.
-tamework.ui.population.checkingRequirements=Vérification des exigences pour ce compagnon en cours. Réessayez dans un instant.
 tamework.ui.notifications.spawner.captureFailed=La capture n'a pas pu être terminée.
 tamework.ui.notifications.spawner.commandItemRequired=Vous devez avoir {0} dans votre inventaire pour capturer avec cet objet.
 tamework.ui.notifications.spawner.releaseFailed=La libération du compagnon n'a pas pu être terminée.

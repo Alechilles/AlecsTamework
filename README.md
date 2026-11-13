@@ -46,7 +46,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
   travel, and restarts. Direct SimpleClaims checks can still limit breeding by
   claim and apply its native tamed-companion damage rules.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
-- **Stable integration data**: Public API 3.0 exposes companion profiles,
+- **Stable integration data**: Public API 4.0 exposes companion profiles,
   bonded companions, population groups, admission providers, and namespaced
   profile extension data, including revision-fenced compare-and-set writes for
   integrations that need restart-safe custom state. Command rosters, timed

@@ -128,7 +128,7 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "3.0.0";
+    static final String API_VERSION = "4.0.0";
     private volatile AdmissionProviderApi admissionProviders = AdmissionProviderApi.unavailable();
     private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {
             CompanionRecordApiMapper.SNAPSHOT_CAPTURE,

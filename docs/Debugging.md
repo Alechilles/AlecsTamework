@@ -354,23 +354,18 @@ before. The reply lists every spawned NPC:
 ```
 ok role=Cow owner=<uuid> entity=<uuid>,<uuid> world=default x=10.00 y=64.00 z=-4.00
 ok role=Cow owner=<uuid> entity=<uuid> world=default x=10.00 y=64.00 z=-4.00 stopped=population-cap detail=owned-limit key=tamework.ui.population.ownedLimit cap=5 spawned=1 requested=3
-refused reason=population-cap detail=provider-decision-pending role=Tamed_Cow_Calf owner=<uuid> spawned=0 requested=1
 refused reason=population-cap detail=provider-denied key=runehusbandry.admission.family_locked role=Tamed_Cow_Calf owner=<uuid> spawned=0 requested=1
 refused reason=owner-required option=--owner
 refused reason=position-required option=--at
 ```
 
 `detail` names the check that refused: `owned-limit` or `deployed-limit` (with `cap=`, the limit), `group-limit`,
-`provider-denied` or `provider-unavailable` (with the provider's message `key=`), `deploy-blocked`, or
-`provider-decision-pending`. `owned=` appears only when the check counted the owner's animals; the admission
+`provider-denied` or `provider-unavailable` (with the provider's message `key=`), or `deploy-blocked`. `owned=` appears only when the check counted the owner's animals; the admission
 pre-check does not, so it is usually absent.
 
-`provider-decision-pending` is not a limit. A role managed by an admission provider (Rune_Husbandry animals with
-Rune_Professions) is checked against the provider's cached answer for that owner and family. The answer is kept 30
-seconds (an unavailable one 5 seconds) and is fetched when the owner enters a world, so the first spawn or tame of a
-family after that is refused while the refusal starts the fetch. A player's own `/tw npc spawn tamed` and a real
-tame are refused the same way ("checking requirements"). Retry after about a second; a test should retry once on this
-detail and treat any other `detail` as the real answer.
+A role managed by an admission provider (Rune_Husbandry animals with Rune_Professions) asks the provider at once.
+`provider-unavailable` for an online owner usually means the owner's profession profile has not loaded yet, or the
+provider is not registered (the server log says which).
 
 `/tw debug share add <player> <caretaker|handler|manager> --owner <uuid|name>`,
 `/tw debug share remove <player> --owner <uuid|name>` and `/tw debug share list --owner <uuid|name>` are admin
@@ -415,7 +410,7 @@ morning.
 | Read harvest readiness without changing it | `tw debug get alarm <uuid> [AlarmName]` | `ok entity=<uuid> alarm=Harvest_Ready source=tamework ready=false exists=true untilMs=... nowMs=... remainingMs=34567` |
 | Read a companion: owner, sharers, stage, level, XP, happiness, needs, harvest and breeding readiness, traits | `tw debug get companion --entity <uuid>` | `ok entity=<uuid> role=Cow tamed=true owner=<uuid> sharers=none stage=Adult level=3 xp=12.00 totalXp=112.00 happiness=72.50 hunger=80.00 thirst=64.00 harvestReady=true harvestRemainingMs=0 breedingReady=false breedingCooldownRemainingMs=420000 traits=none` |
 | Read happiness, life stage, owner, role, tamed, traits (human-readable lines) | `tw debug get happiness\|lifestage\|owner\|role\|tamed\|traits --entity <uuid>` | `Owner for NPC <uuid> is <uuid>` |
-| Own an animal without a player (setup; offline owner allowed by UUID; retry once on `detail=provider-decision-pending`, see "Console setup of owned and shared animals") | `tw npc spawn tamed <Role> [--count=<n>] --owner <uuid\|name> --at <x> <y> <z> [--world <name>]` | `ok role=Cow owner=<uuid> entity=<uuid> world=default x=10.00 y=64.00 z=-4.00` |
+| Own an animal without a player (setup; offline owner allowed by UUID; see "Console setup of owned and shared animals") | `tw npc spawn tamed <Role> [--count=<n>] --owner <uuid\|name> --at <x> <y> <z> [--world <name>]` | `ok role=Cow owner=<uuid> entity=<uuid> world=default x=10.00 y=64.00 z=-4.00` |
 | Set or clear an owner (setup) | `tw debug set owner <ownerUuid\|name\|clear> --entity <uuid>` | `ok entity=<uuid> owner=<uuid>` |
 | Force happiness, level, tamed, traits (setup) | `tw debug set happiness <value>\|level <level>\|tamed [true\|false]\|traits <Id> <Value> ...\|trait <Id> <Value> --entity <uuid>` | `ok entity=<uuid> requested=5 level=1->5 maxLevel=25 totalXp=400` |
 | Share an owner's animals with a player (setup, no confirm step; logged with the admin) | `tw debug share add <player> <caretaker\|handler\|manager> --owner <uuid\|name>`, `tw debug share remove <player> --owner ...` | `ok owner=<uuid> player=<uuid> level=handler result=changed new=true` |

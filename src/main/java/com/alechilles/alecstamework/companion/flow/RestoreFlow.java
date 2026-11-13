@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
  * (plan 6 R10). Its claims and domain limits are checked again with the built-in caps under the
  * index lock, and the claims are stored on the committed record.
  *
- * <p>Continuations run on whichever thread completes the snapshot read, the provider's decision,
+ * <p>Continuations run on whichever thread completes the snapshot read,
  * the flush or the spawn (usually the writer thread). {@code removeOldBody} and the {@link Spawner} must therefore hand
  * their entity work to the owning world thread themselves; they must not touch live entities on
  * the calling thread.
@@ -250,17 +250,14 @@ public final class RestoreFlow<R> {
             return done(map(snapshotVerdict));
         }
         UnaryOperator<CompanionRecord.Builder> change = commitChange(before, request, UUID.randomUUID());
-        return providers.evaluate(before, change.apply(before.toBuilder()).build()).toCompletableFuture()
-                .thenCompose(provider -> {
-                    if (!provider.admitted()) {
-                        return CompletableFuture.completedFuture(
-                                new Outcome(map(provider.refusal()), provider.messageKey()));
-                    }
-                    CompanionAdmission.Provided provided = provider.provided();
-                    UnaryOperator<CompanionRecord.Builder> withClaims = !provider.asked() ? change
-                            : b -> change.apply(b).domainClaims(provided.claims());
-                    return commitAndSpawn(before, snapshot, request, withClaims, provided);
-                });
+        ProviderAdmission.Outcome provider = providers.decide(before, change.apply(before.toBuilder()).build());
+        if (!provider.admitted()) {
+            return CompletableFuture.completedFuture(new Outcome(map(provider.refusal()), provider.messageKey()));
+        }
+        CompanionAdmission.Provided provided = provider.provided();
+        UnaryOperator<CompanionRecord.Builder> withClaims = !provider.asked() ? change
+                : b -> change.apply(b).domainClaims(provided.claims());
+        return commitAndSpawn(before, snapshot, request, withClaims, provided);
     }
 
     private CompletableFuture<Outcome> commitAndSpawn(CompanionRecord before, SnapshotEnvelope snapshot,

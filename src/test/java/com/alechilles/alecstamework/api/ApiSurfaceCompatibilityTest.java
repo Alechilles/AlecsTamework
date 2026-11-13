@@ -185,7 +185,7 @@ class ApiSurfaceCompatibilityTest {
 
     @Test
     void theInspectorReadsTheVersionCapabilitiesAndPersistenceDiagnostics() {
-        assertEquals("3.0.0", inspector(api, "getApiVersion"));
+        assertEquals("4.0.0", inspector(api, "getApiVersion"));
         assertTrue(((Collection<?>) inspector(api, "getCapabilities")).contains(TameworkApiCapability.DIAGNOSTICS));
 
         Object diagnostics = inspector(inspector(api, "diagnostics"), "getPersistenceDiagnostics");
@@ -233,7 +233,7 @@ class ApiSurfaceCompatibilityTest {
 
     @Test
     void runeteriaReadsTheVersionCapabilitiesAndReadiness() {
-        assertEquals("3.0.0", runeteria("TameworkApi", api, "getApiVersion"));
+        assertEquals("4.0.0", runeteria("TameworkApi", api, "getApiVersion"));
         Object capabilities = runeteria("TameworkApi", api, "getCapabilities");
         assertTrue(((Iterable<?>) capabilities).iterator().next() instanceof Enum<?>);
         assertTrue(((Collection<?>) capabilities).containsAll(Set.of(
@@ -269,9 +269,9 @@ class ApiSurfaceCompatibilityTest {
 
     @Test
     void runeteriaRegistersAnAdmissionProviderThroughAProxyAndUnregistersIt() throws Exception {
-        Class<?> providerType = Class.forName(API_PACKAGE + "PopulationAdmissionProvider");
+        Class<?> providerType = Class.forName(API_PACKAGE + "SynchronousPopulationAdmissionProvider");
         Object provider = Proxy.newProxyInstance(providerType.getClassLoader(), new Class<?>[] {providerType},
-                (proxy, method, args) -> CompletableFuture.completedFuture(null));
+                (proxy, method, args) -> null);
         // Both lookups: the API types Runeteria loads by name, and the returned objects' own classes.
         Object registry = runeteria("PolicyApi", runeteria("TameworkApi", api, "policies"), "admissionProviders");
         assertEquals(registry, inspector(inspector(api, "policies"), "admissionProviders"));

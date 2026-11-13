@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.function.Function;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
@@ -336,11 +337,11 @@ class CaptureFlowTest {
     }
 
     /** A flow whose every role is managed by a provider that answers with {@code decision}. */
-    private CaptureFlow<String> managedFlow(CompletableFuture<PopulationAdmissionProviderDecision> decision) {
+    private CaptureFlow<String> managedFlow(Supplier<PopulationAdmissionProviderDecision> decision) {
         ProviderAdmission providers = new ProviderAdmission(
                 role -> new ProviderAdmission.Managed("husbandry", 1, "husbandry", "sheep", Set.of("sheep"),
                         "husbandry.sheep", 1, 0L),
-                request -> { events.add("provider"); return decision; });
+                request -> { events.add("provider"); return decision.get(); });
         CompanionAdmissionGate.Check domainLimits = (before, after, provided) -> {
             CompanionAdmission.DomainRefusal refused = CompanionAdmission.checkDomains(
                     index.fileRecords(after.ownerUuid()), before, after, provided);
@@ -357,17 +358,15 @@ class CaptureFlowTest {
     }
 
     @Test
-    void anAllowedCaptureWaitsForTheProviderAndStoresItsClaimsOnTheNewRecord() {
+    void anAllowedCaptureAsksTheProviderFirstAndStoresItsClaimsOnTheNewRecord() {
         UUID npc = UUID.randomUUID();
-        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
 
-        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(wild(npc));
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(() -> {
+            assertNull(index.byNpcUuid(npc), "nothing is committed before the provider answers");
+            return allowBarn(1);
+        }).capture(wild(npc));
 
-        assertEquals(List.of("provider"), events, "nothing is committed before the provider answers");
-        assertNull(index.byNpcUuid(npc));
-
-        decision.complete(allowBarn(1));
-
+        assertEquals("provider", events.getFirst());
         assertEquals(CaptureFlow.Result.CAPTURED, pending.join().result());
         CompanionRecord created = index.get(pending.join().itemRef().profileId());
         assertEquals(LocationKind.ITEM, created.location().kind());
@@ -378,7 +377,7 @@ class CaptureFlowTest {
     void aCaptureOfTheOwnersOwnCompanionDoesNotAskTheProvider() {
         CompanionRecord live = insertLive(2);
 
-        CaptureFlow.Outcome outcome = managedFlow(new CompletableFuture<>()).capture(stamped(live, owner)).join();
+        CaptureFlow.Outcome outcome = managedFlow(() -> allowBarn(5)).capture(stamped(live, owner)).join();
 
         assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());
         assertEquals(List.of("snapshot", "flush"), events);
@@ -389,11 +388,11 @@ class CaptureFlowTest {
         UUID npc = UUID.randomUUID();
         CompanionRecord live = insertLive(1);
 
-        CaptureFlow.Outcome denied = managedFlow(CompletableFuture.completedFuture(
+        CaptureFlow.Outcome denied = managedFlow(() ->
                 new PopulationAdmissionProviderDecision(PopulationAdmissionProviderStatus.DENY,
-                        "runeteria.husbandry.levelTooLow", Set.of(), Map.of(), 1L, 0L))).capture(wild(npc)).join();
-        CaptureFlow.Outcome unavailable = managedFlow(CompletableFuture.completedFuture(
-                PopulationAdmissionProviderDecision.unavailable("provider-timeout")))
+                        "runeteria.husbandry.levelTooLow", Set.of(), Map.of(), 1L, 0L)).capture(wild(npc)).join();
+        CaptureFlow.Outcome unavailable = managedFlow(() ->
+                PopulationAdmissionProviderDecision.unavailable("profile-not-loaded"))
                 .capture(stamped(live, UUID.randomUUID())).join();
 
         assertEquals(new CaptureFlow.Outcome(CaptureFlow.Result.PROVIDER_DENIED, null,
@@ -409,13 +408,12 @@ class CaptureFlowTest {
     @Test
     void aDomainLimitFilledWhileTheProviderWasAskedRefusesUnderTheLock() {
         UUID npc = UUID.randomUUID();
-        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
-        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(wild(npc));
-        // Another of the owner's companions takes the last barn slot before the provider answers.
-        index.insert(CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.item())
-                .ownerUuid(owner).domainClaims(List.of(new DomainClaim(BARN, 1, true, false))).build());
-
-        decision.complete(allowBarn(1));
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(() -> {
+            // Another thread gives the owner a companion that takes the last barn slot.
+            index.insert(CompanionRecord.builder(UUID.randomUUID(), "Tamed_Sheep", CompanionLocation.item())
+                    .ownerUuid(owner).domainClaims(List.of(new DomainClaim(BARN, 1, true, false))).build());
+            return allowBarn(1);
+        }).capture(wild(npc));
 
         assertEquals(new CaptureFlow.Outcome(CaptureFlow.Result.PROVIDER_DENIED, null,
                 CompanionAdmission.OWNED_LIMIT_MESSAGE_KEY), pending.join());
@@ -426,12 +424,11 @@ class CaptureFlowTest {
     @Test
     void anOwnerChangeWhileTheProviderWasAskedMakesTheCaptureAConflict() {
         CompanionRecord live = insertLive(1);
-        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
-        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(stamped(live, UUID.randomUUID()));
         UUID third = UUID.randomUUID();
-        index.update(live.profileId(), live.revision(), CompanionTransitions.ownerChanged(third, "Cy"));
-
-        decision.complete(allowBarn(5));
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(() -> {
+            index.update(live.profileId(), live.revision(), CompanionTransitions.ownerChanged(third, "Cy"));
+            return allowBarn(5);
+        }).capture(stamped(live, UUID.randomUUID()));
 
         assertEquals(CaptureFlow.Result.CONFLICT, pending.join().result());
         assertEquals(third, index.get(live.profileId()).ownerUuid());
@@ -441,12 +438,11 @@ class CaptureFlowTest {
     @Test
     void aRoleChangeWhileTheProviderWasAskedMakesTheCaptureAConflict() {
         CompanionRecord live = insertLive(1);
-        CompletableFuture<PopulationAdmissionProviderDecision> decision = new CompletableFuture<>();
-        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(decision).capture(stamped(live, UUID.randomUUID()));
-        // The body grew up: the claims the provider allows were computed for the old role.
-        index.update(live.profileId(), live.revision(), b -> b.roleId("Tamed_Ram"));
-
-        decision.complete(allowBarn(5));
+        CompletableFuture<CaptureFlow.Outcome> pending = managedFlow(() -> {
+            // The body grew up: the claims the provider allows were computed for the old role.
+            index.update(live.profileId(), live.revision(), b -> b.roleId("Tamed_Ram"));
+            return allowBarn(5);
+        }).capture(stamped(live, UUID.randomUUID()));
 
         assertEquals(CaptureFlow.Result.CONFLICT, pending.join().result());
         CompanionRecord after = index.get(live.profileId());
@@ -573,7 +569,7 @@ class CaptureFlowTest {
     void aBondedCaptureOfAManagedRoleAsksTheProviderAndStoresItsClaims() {
         UUID npc = UUID.randomUUID();
 
-        CaptureFlow.Outcome outcome = managedFlow(CompletableFuture.completedFuture(allowBarn(1)))
+        CaptureFlow.Outcome outcome = managedFlow(() -> allowBarn(1))
                 .capture(wildIntoRoster(npc)).join();
 
         assertEquals(CaptureFlow.Result.CAPTURED, outcome.result());

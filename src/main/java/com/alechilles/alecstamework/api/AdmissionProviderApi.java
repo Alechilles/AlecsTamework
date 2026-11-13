@@ -6,15 +6,17 @@ import javax.annotation.Nonnull;
 /** Public registration surface for external population-admission policy providers. */
 public interface AdmissionProviderApi {
     /**
-     * Registers a provider and returns an idempotent handle for unregistering it. Closing the
-     * handle prevents new evaluations for that registration; an evaluation already in flight may
-     * finish.
+     * Registers a provider and returns an idempotent handle for unregistering it. One provider
+     * may be registered per id. Closing the handle stops new calls; a call already running
+     * finishes. See {@link SynchronousPopulationAdmissionProvider} for the threading contract.
+     *
+     * @throws IllegalStateException when the id is already registered or Tamework is shutting down
      */
     @Nonnull
     AutoCloseable register(
             @Nonnull String providerId,
             int contractVersion,
-            @Nonnull PopulationAdmissionProvider provider
+            @Nonnull SynchronousPopulationAdmissionProvider provider
     );
 
     /** Returns a singleton registry that fails closed while preserving safe lifecycle calls. */
@@ -30,7 +32,7 @@ public interface AdmissionProviderApi {
             public AutoCloseable register(
                     String providerId,
                     int contractVersion,
-                    PopulationAdmissionProvider provider
+                    SynchronousPopulationAdmissionProvider provider
             ) {
                 requireText(providerId, "providerId");
                 if (contractVersion <= 0) {

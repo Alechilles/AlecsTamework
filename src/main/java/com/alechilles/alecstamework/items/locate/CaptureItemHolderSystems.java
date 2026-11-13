@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items.locate;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
-import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.companion.flow.CompanionTransitions;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
@@ -172,11 +171,7 @@ public final class CaptureItemHolderSystems {
         private static volatile ComponentType<EntityStore, ? extends InventoryComponent>[] holderTypes;
 
         /** The decision taken under the index lock and the record it was taken on. */
-        /** {@code checking}: refused only because the admission provider's decision is still being fetched. */
-        private record Attempt(@Nonnull Decision decision, @Nullable CompanionRecord before, boolean checking) {
-            private Attempt(@Nonnull Decision decision, @Nullable CompanionRecord before) {
-                this(decision, before, false);
-            }
+        private record Attempt(@Nonnull Decision decision, @Nullable CompanionRecord before) {
         }
 
         /**
@@ -377,8 +372,7 @@ public final class CaptureItemHolderSystems {
                                 .domainClaims(admission.record().domainClaims())).applied()) {
                     return new Attempt(Decision.IGNORE, record);
                 }
-                return new Attempt(decided, record, admission != null && admission.denial() != null
-                        && ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(admission.denial().messageKey()));
+                return new Attempt(decided, record);
             });
             if (attempt.decision() == Decision.TRANSFER) {
                 // One write for the owner id, the owner name and the tooltip. It fires another change
@@ -388,7 +382,7 @@ public final class CaptureItemHolderSystems {
                 writer.flushNow(holder);
                 writer.flushNow(attempt.before().ownerUuid());
             } else if (attempt.decision() == Decision.REFUSE) {
-                noticeRefused(player, item.profileId(), attempt.before(), attempt.checking());
+                noticeRefused(player, item.profileId(), attempt.before());
             }
         }
 
@@ -401,13 +395,8 @@ public final class CaptureItemHolderSystems {
             }
         }
 
-        private void noticeRefused(Player player, UUID profileId, CompanionRecord record, boolean checking) {
+        private void noticeRefused(Player player, UUID profileId, CompanionRecord record) {
             if (!cache.noticeDue(player.getUuid(), profileId)) {
-                return;
-            }
-            if (checking) {
-                // Not a refusal of this player: the decision arrives shortly and the next attempt uses it.
-                messages.showKey(player, NotificationStyle.Warning, ProviderDecisionCache.CHECKING_MESSAGE_KEY);
                 return;
             }
             messages.showKey(player, NotificationStyle.Warning, TRANSFER_REFUSED_KEY, ownerLabel(player, record));
