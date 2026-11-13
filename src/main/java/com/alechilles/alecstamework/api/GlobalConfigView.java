@@ -87,9 +87,19 @@ public record GlobalConfigView(@Nullable String id,
         }
     }
 
+    /**
+     * Claim integration settings. {@code claimMod} is the chosen claim mod as saved:
+     * {@code Automatic}, {@code SimpleClaims} or {@code QuestLinesClaims}.
+     */
     public record SimpleClaimsView(boolean enabled,
                                    @Nonnull BreedingView breeding,
-                                   @Nonnull DamageView damage) {
+                                   @Nonnull DamageView damage,
+                                   @Nonnull String claimMod) {
+        /** Compatibility constructor for callers compiled before the claim mod choice: Automatic. */
+        public SimpleClaimsView(boolean enabled, @Nonnull BreedingView breeding, @Nonnull DamageView damage) {
+            this(enabled, breeding, damage, "Automatic");
+        }
+
         public record BreedingView(int limitPerClaimChunk,
                                    int limitPerClaimTotal,
                                    boolean requiresClaim) {

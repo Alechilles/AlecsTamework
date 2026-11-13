@@ -16,8 +16,10 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -67,6 +69,10 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
     private static final String PLAYER_LIST = "#TameworkSharingPlayerList";
     private static final String GROUP_LIST = "#TameworkSharingGroupList";
     private static final String INBOUND_LIST = "#TameworkSharingInboundList";
+    /** The page's size in TameworkSharingPage.ui, and the height of its Groups section. */
+    private static final int ROOT_WIDTH = 620;
+    private static final int ROOT_HEIGHT = 742;
+    private static final int GROUPS_SECTION_HEIGHT = 180;
 
     @Nullable
     private final Runnable returnTo;
@@ -430,6 +436,14 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
                         .append(KEY_ADD_LEVEL, "#TameworkSharingAddLevel.Value"), false);
     }
 
+    @Nonnull
+    private static Anchor rootAnchor(boolean showGroups) {
+        Anchor anchor = new Anchor();
+        anchor.setWidth(Value.of(ROOT_WIDTH));
+        anchor.setHeight(Value.of(showGroups ? ROOT_HEIGHT : ROOT_HEIGHT - GROUPS_SECTION_HEIGHT));
+        return anchor;
+    }
+
     private void bindGroups(UICommandBuilder commands, UIEventBuilder events, SharedAccessService service,
                             OwnerGrants grants, boolean enabled, List<AccessLevel> levels) {
         commands.clear(GROUP_LIST);
@@ -439,7 +453,10 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
                 .sorted(Comparator.comparing(AccessGroupProvider::id))
                 .forEach(provider -> groupIds.add(provider.id()));
         grants.groups().keySet().stream().filter(id -> !groupIds.contains(id)).sorted().forEach(groupIds::add);
-        commands.set("#TameworkSharingGroupsEmpty.Visible", groupIds.isEmpty());
+        // A server with no groups shows no Groups section; the page shortens by the section's height.
+        boolean showGroups = !groupIds.isEmpty();
+        commands.set("#TameworkSharingGroupsSection.Visible", showGroups);
+        commands.setObject("#TameworkSharingRoot.Anchor", rootAnchor(showGroups));
         for (int i = 0; i < groupIds.size(); i++) {
             String groupId = groupIds.get(i);
             AccessLevel current = grants.groups().get(groupId);
@@ -500,9 +517,12 @@ public final class TameworkSharingPage extends InteractiveCustomUIPage<TameworkS
             return;
         }
         String level = levelName(pending.level());
-        commands.set("#TameworkSharingConfirmText.Text", pending.group()
+        String warning = pending.group()
                 ? text("tamework.ui.sharing.confirm.group", pending.name(), level)
-                : text("tamework.ui.sharing.confirm.player", pending.name(), level));
+                : text("tamework.ui.sharing.confirm.player", pending.name(), level);
+        // What the level allows follows as its own paragraph, so the owner reads it before confirming.
+        commands.set("#TameworkSharingConfirmText.Text",
+                warning + "\n\n" + text(TameworkShareRules.levelAllowsKey(pending.level())));
         bind(events, "#TameworkSharingConfirmButton", ACTION_CONFIRM);
         bind(events, "#TameworkSharingConfirmCancel", ACTION_CANCEL);
     }

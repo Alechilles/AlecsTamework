@@ -54,11 +54,16 @@ way of getting a companion. There is no admin bypass.
 `admissionProviders()` returns the registry for external admission policy. See
 [Admission Providers API Reference](/mod/alecs-tamework/admission-providers-api-reference).
 
-## SimpleClaims
+## Claim mods
 
-Claim access, direct breeding limits, and tamed-NPC damage use the SimpleClaims
-bridge. Damage integration errors fail open. QuestLines Claims is not a
-supported policy provider.
+Claim access, direct breeding limits, and tamed-NPC damage use the claim mod
+picked by the Claim Mod setting: SimpleClaims or QuestLines Claims (Automatic
+uses SimpleClaims when installed, otherwise QuestLines Claims). The runtime
+damage filter and these API calls use the same choice. Damage integration
+errors fail open. For a QuestLines claim, `ClaimAccessDecisionView.claimPartyId`
+is null because QuestLines claims have no SimpleClaims party.
+`GlobalConfigView.SimpleClaimsView.claimMod` reports the saved choice
+(`Automatic`, `SimpleClaims` or `QuestLinesClaims`).
 
 `evaluateClaimAccess` and `evaluateDamage` return explicit unavailable,
 skipped, and fail-open states. Honor the returned `allowed` value as the

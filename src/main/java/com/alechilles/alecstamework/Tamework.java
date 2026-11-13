@@ -93,6 +93,7 @@ import com.alechilles.alecstamework.damage.ExpiryDismountFallDamageProtectionSys
 import com.alechilles.alecstamework.damage.ExpiryDismountLandingProtectionSystem;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsProvider;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -444,6 +445,7 @@ public class Tamework extends JavaPlugin {
             new BreedingPairAdmissionRegistry();
     private final SimpleClaimsCapabilityRuntime simpleClaimsCapabilityRuntime =
             new SimpleClaimsCapabilityRuntime();
+    private final QuestLinesClaimsProvider questLinesClaimsProvider = new QuestLinesClaimsProvider();
     private int overrideAssetEventSuppressionDepth;
     private boolean globalReconcilePendingAfterOverrideReload;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
@@ -739,6 +741,8 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = dataPaths.targetDirectory();
         com.alechilles.alecstamework.npc.progression.AnimalProgressionClock.get().start(runtimeDataDirectory);
         com.alechilles.alecstamework.access.SharedAccessService.get().start(runtimeDataDirectory);
+        com.alechilles.alecstamework.access.groups.BuiltInAccessGroups.registerInstalled(
+                com.alechilles.alecstamework.access.SharedAccessService.get());
         com.alechilles.alecstamework.npc.progression.SharedPresenceService.get().start();
         openCompanionPersistence(dataPaths.persistenceSourceDirectories());
         ReleaseFlow releaseFlow = null;
@@ -855,7 +859,7 @@ public class Tamework extends JavaPlugin {
                     commandLinkedNpcStateSnapshotService,
                     interactionExtensionRegistry,
                     traitEffectRegistry,
-                    new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime),
+                    new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime, questLinesClaimsProvider),
                     new CommandUiRegistry(),
                     new CommandHudRegistry(),
                     itemFeatureRegistry,
@@ -1320,7 +1324,7 @@ public class Tamework extends JavaPlugin {
                 "expiry-dismount-landing-protection", ExpiryDismountLandingProtectionSystem::new);
         deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
                 "owner-damage-filter", () -> new OwnerDamageFilterSystem(
-                        getLogger(), new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime)));
+                        getLogger(), new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime, questLinesClaimsProvider)));
         deferEntitySystem(TameworkRuntimeModule.TRAITS,
                 "trait-damage-modifier", TraitDamageModifierSystem::new);
         deferEntitySystem(TameworkRuntimeModule.HAPPINESS,
@@ -2225,6 +2229,7 @@ public class Tamework extends JavaPlugin {
                     this::closeRuntimeApiDependents,
                     this::closeApiComposition);
             simpleClaimsCapabilityRuntime.close();
+            questLinesClaimsProvider.close();
             if (commandNpcRelocationService != null) {
                 commandNpcRelocationService.close();
                 commandNpcRelocationService = null;
@@ -2492,6 +2497,12 @@ public class Tamework extends JavaPlugin {
     @Nonnull
     public SimpleClaimsCapabilityRuntime getSimpleClaimsCapabilityRuntime() {
         return simpleClaimsCapabilityRuntime;
+    }
+
+    /** The QuestLines Claims reader shared by claim limits, breeding and tamed damage rules. */
+    @Nonnull
+    public QuestLinesClaimsProvider getQuestLinesClaimsProvider() {
+        return questLinesClaimsProvider;
     }
 
     public TranslationRegistry getTranslationRegistry() {

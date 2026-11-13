@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
 import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
 import com.alechilles.alecstamework.settings.AnimalAgingMode;
+import com.alechilles.alecstamework.settings.ClaimModChoice;
 import com.alechilles.alecstamework.settings.CaptureItemOwnershipMode;
 import com.alechilles.alecstamework.settings.DeployPlaces;
 import com.alechilles.alecstamework.settings.DeployPlacesStore;
@@ -94,6 +95,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_POP_SCOPE = "@PopulationScope";
     private static final String KEY_COMMAND_PANEL_CARDS_PER_PAGE = "@CommandPanelCardsPerPage";
     private static final String KEY_SIMPLE_CLAIMS_ENABLED = "@SimpleClaimsEnabled";
+    private static final String KEY_CLAIM_MOD = "@ClaimMod";
     private static final String KEY_CLAIM_LIMIT_CHUNK = "@ClaimLimitChunk";
     private static final String KEY_CLAIM_LIMIT_TOTAL = "@ClaimLimitTotal";
     private static final String KEY_BREEDING_REQUIRES_CLAIM = "@BreedingRequiresClaim";
@@ -491,6 +493,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_POP_SCOPE, "#TwSettingsPopulationScopeDropdown.Value")
                 .append(KEY_COMMAND_PANEL_CARDS_PER_PAGE, "#TwSettingsCommandPanelCardsPerPageInput.Value")
                 .append(KEY_SIMPLE_CLAIMS_ENABLED, "#TwSettingsSimpleClaimsEnabledCheck.Value")
+                .append(KEY_CLAIM_MOD, "#TwSettingsClaimModDropdown.Value")
                 .append(KEY_CLAIM_LIMIT_CHUNK, "#TwSettingsClaimLimitChunkInput.Value")
                 .append(KEY_CLAIM_LIMIT_TOTAL, "#TwSettingsClaimLimitTotalInput.Value")
                 .append(KEY_BREEDING_REQUIRES_CLAIM, "#TwSettingsBreedingRequiresClaimCheck.Value")
@@ -560,6 +563,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
         commandBuilder.set("#TwSettingsCommandPanelCardsPerPageInput.Value", String.valueOf(currentValues.commandPanelCardsPerPage()));
         commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled());
+        commandBuilder.set("#TwSettingsClaimModDropdown.Entries", claimModEntries());
+        commandBuilder.set("#TwSettingsClaimModDropdown.Value", currentValues.claimMod().toConfigValue());
         commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk()));
         commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal()));
         commandBuilder.set("#TwSettingsBreedingRequiresClaimCheck.Value", currentValues.simpleClaimsBreedingRequiresClaim());
@@ -1113,6 +1118,24 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         return entries;
     }
 
+    /** Automatic first, then the claim mods by their proper names. */
+    private List<DropdownEntryInfo> claimModEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimMod.automatic")),
+                        ClaimModChoice.AUTOMATIC.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimMod.simpleClaims")),
+                        ClaimModChoice.SIMPLE_CLAIMS.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimMod.questLinesClaims")),
+                        ClaimModChoice.QUESTLINES_CLAIMS.toConfigValue()
+                )
+        );
+    }
+
     private List<DropdownEntryInfo> animalAgingModeEntries() {
         return List.of(
                 new DropdownEntryInfo(
@@ -1223,6 +1246,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_POP_SCOPE, Codec.STRING), (x, v) -> x.populationScope = v, x -> x.populationScope).add()
                 .<String>append(new KeyedCodec<>(KEY_COMMAND_PANEL_CARDS_PER_PAGE, Codec.STRING), (x, v) -> x.commandPanelCardsPerPage = v, x -> x.commandPanelCardsPerPage).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_SIMPLE_CLAIMS_ENABLED, Codec.BOOLEAN), (x, v) -> x.simpleClaimsEnabled = v, x -> x.simpleClaimsEnabled).add()
+                .<String>append(new KeyedCodec<>(KEY_CLAIM_MOD, Codec.STRING), (x, v) -> x.claimMod = v, x -> x.claimMod).add()
                 .<String>append(new KeyedCodec<>(KEY_CLAIM_LIMIT_CHUNK, Codec.STRING), (x, v) -> x.claimLimitChunk = v, x -> x.claimLimitChunk).add()
                 .<String>append(new KeyedCodec<>(KEY_CLAIM_LIMIT_TOTAL, Codec.STRING), (x, v) -> x.claimLimitTotal = v, x -> x.claimLimitTotal).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_CLAIM, Codec.BOOLEAN), (x, v) -> x.breedingRequiresClaim = v, x -> x.breedingRequiresClaim).add()
@@ -1283,6 +1307,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String populationScope;
         String commandPanelCardsPerPage;
         Boolean simpleClaimsEnabled;
+        String claimMod;
         String claimLimitChunk;
         String claimLimitTotal;
         Boolean breedingRequiresClaim;

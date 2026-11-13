@@ -105,6 +105,7 @@ public final class TameworkShareRules {
                                      boolean isNew) {
         target.sendMessage(Message.translation("server.tamework.share." + (isNew ? "add.notify" : "add.notifyChanged"))
                 .param("0", ownerName).param("1", levelName(level)));
+        target.sendMessage(levelAllows(level));
     }
 
     /** The level as typed in a command and used as a page value. */
@@ -117,6 +118,18 @@ public final class TameworkShareRules {
     @Nonnull
     public static String levelKey(@Nonnull AccessLevel level) {
         return "tamework.share.level." + levelToken(level);
+    }
+
+    /** The translation key, without the {@code server.} prefix, of what a grantable level lets a player do. */
+    @Nonnull
+    public static String levelAllowsKey(@Nonnull AccessLevel level) {
+        return levelKey(level) + ".allows";
+    }
+
+    /** The translated sentence saying what a grantable level lets a player do, for chat. */
+    @Nonnull
+    public static Message levelAllows(@Nonnull AccessLevel level) {
+        return Message.translation("server." + levelAllowsKey(level));
     }
 
     /** The translated name of a grantable level, for chat. */

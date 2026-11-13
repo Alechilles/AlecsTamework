@@ -43,6 +43,37 @@
   nowMs=... remainingMs=...`; alarms Tamework does not keep come from the engine with `source=engine`. Without a
   name it reads the configured harvest alarm.
 
+## 5.12.0 - Sharing Groups and Claim Mods - 2026-11-12
+
+### Added
+
+- Built-in sharing groups for popular party and claim mods. When the server has the mod, owners can share their
+  animals with **My party (SimpleClaims)**, **My party (PartyPro)**, **My claim members (QuestLines Claims)** or
+  **My region members (OrbisGuard)** from the Sharing page or with `/tw share group`. Membership follows the other
+  mod, and allies do not count. Like every group, each one grants nothing until an owner turns it on.
+- QuestLines Claims now works with Claim Integration: claim limits for taming and breeding, Breeding Requires
+  Claim, and tamed damage rules, where players may hurt a tamed animal only where QuestLines lets them hurt
+  creatures (its claims, regions and wilderness rule). Claim limits and Breeding Requires Claim count QuestLines'
+  chunk claims only. A new **Claim Mod** setting in `/tw settings` > Claim Integration picks SimpleClaims,
+  QuestLines Claims or Automatic (the default: SimpleClaims when installed, otherwise QuestLines Claims). Servers
+  that already use SimpleClaims need no change. The damage toggle is now called **Use the Claim Mod's Damage Rules**.
+
+### Changed
+
+- The Sharing page shows four players and four groups before its lists scroll, and three players who share with you.
+  The Groups list used to fit only two rows and cut the third in half.
+- The Sharing page hides its Groups section, and gets shorter, on a server where no mod offers a group. It still
+  shows it while you have a group share saved, so you can turn that off.
+- Tamework accepts any version of QuestLines Claims as an optional dependency. It used to name only 1.3.1.
+
+## 5.11.1 - Sharing Level Help - 2026-11-11
+
+### Changed
+
+- The Sharing page now explains the sharing levels. Hover a level picker to see what Caretaker, Handler and Manager
+  can do, and the share confirmation says what the chosen level allows. `/tw share add` and `/tw share group` add
+  the same line to their confirmation, and a player who is given a level is told what it lets them do.
+
 ## 5.11.0 - Sharing - 2026-11-11
 
 ### Added

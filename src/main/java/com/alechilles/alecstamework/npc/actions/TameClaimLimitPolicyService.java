@@ -2,8 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
-import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimModProvider;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -15,7 +14,8 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Evaluates SimpleClaims population caps when a wild NPC is tamed into player ownership.
+ * Evaluates the claim limit, through the selected claim mod, when a wild NPC is tamed into player
+ * ownership.
  */
 public final class TameClaimLimitPolicyService {
     private static final long WARNING_THROTTLE_MS = 60_000L;
@@ -40,43 +40,43 @@ public final class TameClaimLimitPolicyService {
             return BreedingClaimLimitPolicyService.Decision.allowNoPopulationChecks();
         }
         if (store == null || tamePosition == null) {
-            warnFailClosed("SimpleClaims tame limit check failed: target/store context was missing.");
+            warnFailClosed("Claim tame limit check failed: target/store context was missing.");
             return BreedingClaimLimitPolicyService.Decision.deny("missing-tame-context");
         }
         String worldName = resolveWorldName(store);
         if (worldName == null || worldName.isBlank()) {
-            warnFailClosed("SimpleClaims tame limit check failed: world name was missing.");
+            warnFailClosed("Claim tame limit check failed: world name was missing.");
             return BreedingClaimLimitPolicyService.Decision.deny("missing-world-name");
         }
-        SimpleClaimsCapabilityRuntime.BridgeResolution bridgeResolution =
-                claimPolicyService.resolveBridge();
-        if (!bridgeResolution.available()) {
+        ClaimProviderResolver.Resolution resolution = claimPolicyService.resolveProvider(simpleClaimsConfig);
+        if (!resolution.available()) {
             warnFailClosed(
-                    "SimpleClaims tame limit check failed: dependency unavailable ("
-                            + bridgeResolution.reason()
+                    "Claim tame limit check failed: claim mod unavailable ("
+                            + resolution.reason()
                             + ")."
             );
             return BreedingClaimLimitPolicyService.Decision.deny("simpleclaims-unavailable");
         }
-        SimpleClaimsBreedingBridge bridge = bridgeResolution.bridge();
+        ClaimModProvider provider = resolution.provider();
         BreedingClaimLimitPolicyService.ResolvedClaim resolvedClaim =
-                BreedingClaimLimitPolicyService.resolveClaim(bridge, worldName, tamePosition);
+                BreedingClaimLimitPolicyService.resolveClaim(provider, worldName, tamePosition);
         if (resolvedClaim.status() == BreedingClaimLimitPolicyService.ClaimResolutionStatus.NO_CLAIM) {
             return BreedingClaimLimitPolicyService.Decision.allowWithoutCap(null, List.of(), "outside-claim");
         }
         if (resolvedClaim.status() == BreedingClaimLimitPolicyService.ClaimResolutionStatus.UNAVAILABLE
                 || resolvedClaim.status() == BreedingClaimLimitPolicyService.ClaimResolutionStatus.ERROR
                 || resolvedClaim.key() == null) {
-            warnFailClosed("SimpleClaims tame limit check failed: could not resolve claim context.");
+            warnFailClosed("Claim tame limit check failed: could not resolve claim context ("
+                    + resolvedClaim.message() + ").");
             return BreedingClaimLimitPolicyService.Decision.deny("simpleclaims-lookup-error");
         }
         BreedingClaimLimitPolicyService.CountResult countResult =
                 claimPolicyService.countOwnedPopulationInClaim(
-                        bridge, store, worldName, resolvedClaim.key().partyId()
+                        provider, store, worldName, resolvedClaim.key().claimKey()
                 );
         if (!countResult.success()) {
             warnFailClosed(
-                    "SimpleClaims tame limit check failed: could not count claim population ("
+                    "Claim tame limit check failed: could not count claim population ("
                             + countResult.message()
                             + ")."
             );

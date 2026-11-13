@@ -15,7 +15,7 @@ Use `TwGlobalConfig` for:
 - interaction parameter names and cooldown alarm naming
 - shared command relocation infrastructure and linked-panel safety rules
 - bundled asset-set gates
-- SimpleClaims permission-key integration details
+- claim integration (SimpleClaims or QuestLines Claims) permission-key details
 - legacy compatibility fields that older packs may still contain
 
 Do not use it for role-specific companion policy. That belongs in [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
@@ -101,12 +101,14 @@ These toggles opt bundled Tamework assets into the live game. Any loaded active 
 - `CarnivoreFeed`
 
 ### `SimpleClaims`
-This optional integration directly controls breeding claim limits and
-SimpleClaims-native tamed-companion damage protection.
+This optional claim integration controls claim limits for taming and breeding,
+the breeding claim rule, and tamed-companion damage rules. The section keeps
+its historical name, but it works with either supported claim mod: SimpleClaims
+or QuestLines Claims.
 
-- `Damage.AllowDamagePermissionKey`: Hytale server permission that bypasses SimpleClaims tamed-target damage restriction before native policy runs. The shipped default is `tamework.damage_tamed_claim_npc`.
+- `Damage.AllowDamagePermissionKey`: Hytale server permission that bypasses the claim mod's tamed-target damage rules. It applies to both claim mods. The shipped default is `tamework.damage_tamed_claim_npc`.
 
-For the current compatibility release only, the same configured key is also checked through the old raw SimpleClaims claim-party permission route using the attacker's player UUID. A grant logs a throttled deprecation warning; migrate it to the Hytale server permission because the raw-party route is scheduled for removal in the next major release. This custom key is not SimpleClaims' native `simpleclaims.party.protection.tamed_damage` permission.
+For the current compatibility release only, and only with SimpleClaims, the same configured key is also checked through the old raw SimpleClaims claim-party permission route using the attacker's player UUID. A grant logs a throttled deprecation warning; migrate it to the Hytale server permission because the raw-party route is scheduled for removal in the next major release. This custom key is not SimpleClaims' native `simpleclaims.party.protection.tamed_damage` permission.
 
 ### Settings-owned population and SimpleClaims fields
 
@@ -125,13 +127,21 @@ written by `/tw settings` (`limitPerPlayerOwnedTotal`,
 `limitPerPlayerDeployedTotal`) wins at runtime; see
 [Tamework Settings UI and Persistence](../Testing-and-Diagnostics/Tamework-Settings-UI-and-Persistence.md).
 - `SimpleClaims.SimpleClaimsEnabled`: backward-compatible master claim-integration gate.
+- `SimpleClaims.Provider`: the claim mod to use. `Automatic` (default) uses
+  SimpleClaims when it is installed, otherwise QuestLines Claims when that is
+  installed. `SimpleClaims` and `QuestLinesClaims` pick one mod; if it is not
+  installed, its claim checks report it unavailable. Values are read in any
+  letter case, ignoring spaces, dashes and underscores; a missing or unknown
+  value (including the retired `Auto` and `Off`) means `Automatic`. The
+  settings file stores the same choice as `simpleClaims.provider`.
 - `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: live
-  SimpleClaims capacity limits used by taming and breeding.
+  claim capacity limits used by taming and breeding. The per-chunk limit is
+  multiplied by the number of chunks the claim covers.
 - `SimpleClaims.Breeding.BreedingRequiresClaim`: requires breeding to occur in
-  a SimpleClaims claim.
-- `SimpleClaims.Damage.ProtectTamedFromNonMembers`: enables SimpleClaims native damage policy for eligible live tamed targets.
-
-There is no provider selector or QuestLines Claims bridge.
+  a claim of the selected claim mod.
+- `SimpleClaims.Damage.ProtectTamedFromNonMembers`: applies the selected claim
+  mod's damage rules to eligible live tamed targets: SimpleClaims' native
+  policy, or QuestLines Claims' `PVE` (hurting creatures) rule for the attacker.
 
 ## Legacy Settings-Owned Fields Accepted
 Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config open` hides them, and `/tw settings` wins at runtime.
@@ -194,10 +204,11 @@ Older packs may still contain ownership protection, ownership requirement, popul
 - `AssetSets` are global gates, not per-role toggles.
 - Explicit maps and arrays replace parent values. Do not expect append behavior.
 - Use `TwCompanionConfig` for role-scoped command distances and travel behavior. `TwGlobalConfig` is the shared infrastructure layer.
-- SimpleClaims capacity limits gate eligible taming and breeding. They do not
+- Claim capacity limits gate eligible taming and breeding. They do not
   gate filled-spawner release, Recall, direct-live coop release, or natural
   movement.
-- SimpleClaims damage integration failures fail open.
+- Claim damage integration failures fail open. Claim lookups for taming and
+  breeding fail closed.
 
 ## Related Pages
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)

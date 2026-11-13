@@ -1,9 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimModProvider;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
+import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,7 +77,7 @@ class BreedingClaimLimitPolicyServiceTest {
     void chunkScaledCapUsesClaimSize() throws Exception {
         TwGlobalConfig global = globalSettings(true, 3, 0, false);
         BreedingClaimLimitPolicyService.ClaimReservationKey key =
-                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", UUID.randomUUID());
+                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", "simpleclaims:" + UUID.randomUUID());
         BreedingClaimLimitPolicyService.Decision decision = BreedingClaimLimitPolicyService.evaluateResolved(
                 global,
                 new BreedingClaimLimitPolicyService.ResolvedClaim(
@@ -171,10 +174,45 @@ class BreedingClaimLimitPolicyServiceTest {
         assertEquals("simpleclaims-lookup-error", errorDecision.reason());
     }
 
+    /** A claim from any claim mod is keyed by its world and claim key and capped by its own size. */
+    @Test
+    void claimModLookupIsKeyedByClaimKeyAndCappedByItsChunkCount() throws Exception {
+        ClaimModProvider questLines = (world, position) -> ClaimLookupResult.found("questlines:7", 4);
+        BreedingClaimLimitPolicyService.ResolvedClaim resolved =
+                BreedingClaimLimitPolicyService.resolveClaim(questLines, "world", new Vector3d(1.5, 64.0, 1.5));
+
+        BreedingClaimLimitPolicyService.Decision decision = BreedingClaimLimitPolicyService.evaluateResolved(
+                globalSettings(true, 3, 0, false), resolved, 10, 2);
+
+        BreedingClaimLimitPolicyService.ClaimReservationKey expectedKey =
+                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", "questlines:7");
+        assertEquals(expectedKey, resolved.key());
+        assertFalse(decision.allowed());
+        assertEquals("claim-cap-reached", decision.reason());
+        assertEquals(12, decision.effectiveCap());
+        assertEquals(expectedKey, decision.claimReservationKey());
+    }
+
+    /** A claim mod that throws is treated as a lookup error, so breeding fails closed. */
+    @Test
+    void failingClaimModLookupDeniesBreeding() throws Exception {
+        ClaimModProvider failing = (world, position) -> {
+            throw new IllegalStateException("claim data is reloading");
+        };
+        BreedingClaimLimitPolicyService.ResolvedClaim resolved =
+                BreedingClaimLimitPolicyService.resolveClaim(failing, "world", new Vector3d(0.0, 64.0, 0.0));
+
+        BreedingClaimLimitPolicyService.Decision decision = BreedingClaimLimitPolicyService.evaluateResolved(
+                globalSettings(true, 0, 0, false), resolved, 0, 0);
+
+        assertFalse(decision.allowed());
+        assertEquals("simpleclaims-lookup-error", decision.reason());
+    }
+
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {
         return new BreedingClaimLimitPolicyService.ResolvedClaim(
                 BreedingClaimLimitPolicyService.ClaimResolutionStatus.CLAIM_FOUND,
-                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", UUID.randomUUID()),
+                new BreedingClaimLimitPolicyService.ClaimReservationKey("world", "simpleclaims:" + UUID.randomUUID()),
                 chunkCount,
                 null
         );

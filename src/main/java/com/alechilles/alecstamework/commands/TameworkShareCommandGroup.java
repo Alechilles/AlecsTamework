@@ -97,9 +97,13 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             if (isNew && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
                 AccessChangeResult refused = TameworkShareRules.addRefusal(service, owner, targetId, level);
-                context.sendMessage(refused != null ? refusal(refused, null)
-                        : Message.translation(KEY + "add.confirm").param("0", targetName)
+                if (refused != null) {
+                    context.sendMessage(refusal(refused, null));
+                    return;
+                }
+                context.sendMessage(Message.translation(KEY + "add.confirm").param("0", targetName)
                         .param("1", levelName(level)).param("2", levelToken(level)));
+                context.sendMessage(TameworkShareRules.levelAllows(level));
                 return;
             }
             AccessChangeResult result = service.grantPlayer(owner, targetId, targetName, level);
@@ -191,9 +195,13 @@ public final class TameworkShareCommandGroup extends AbstractCommandCollection {
             if (!grants.groups().containsKey(groupId) && args.length < 3) {
                 // What the confirmed run would refuse is said now, so nobody confirms in vain.
                 AccessChangeResult refused = TameworkShareRules.groupRefusal(service, groupId, level);
-                context.sendMessage(refused != null ? refusal(refused, groupId)
-                        : Message.translation(KEY + "group.confirm").param("0", name)
+                if (refused != null) {
+                    context.sendMessage(refusal(refused, groupId));
+                    return;
+                }
+                context.sendMessage(Message.translation(KEY + "group.confirm").param("0", name)
                         .param("1", levelName(level)).param("2", groupId).param("3", levelToken(level)));
+                context.sendMessage(TameworkShareRules.levelAllows(level));
                 return;
             }
             AccessChangeResult result = service.setGroup(owner, groupId, level);

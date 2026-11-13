@@ -152,12 +152,14 @@ animals"). `/tw share ...` acts for the calling player; `/tw debug share ...` is
   Imported companions that 5.0 has not seen yet do not count as deployed. If a
   result looks wrong, check the companion's location in the linked panel
   rather than only nearby live NPCs.
-- SimpleClaims affects breeding only through its direct claim-required,
-  per-chunk, and total-claim settings.
-- SimpleClaims damage protection uses its native tamed-NPC policy. Integration
-  errors fail open rather than making companions invulnerable.
-- There is no QuestLines bridge. Owner, group, and admission-provider limits
-  are checked inside the companion index, not by SimpleClaims.
+- The claim mod (SimpleClaims or QuestLines Claims, picked by the Claim Mod
+  setting) affects breeding only through the claim-required, per-chunk, and
+  total-claim settings.
+- Claim damage protection uses SimpleClaims' native tamed-NPC policy or
+  QuestLines Claims' `PVE` rule. Integration errors fail open rather than
+  making companions invulnerable; the warning names the claim mod.
+- Owner, group, and admission-provider limits are checked inside the companion
+  index, not by the claim mod.
 
 ## Debug toggles
 

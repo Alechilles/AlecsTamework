@@ -196,6 +196,24 @@ if (guildHandle != null) {
 }
 ```
 
+### Built-in groups
+
+Tamework registers its own provider for these mods when they are installed, so
+their authors and server owners need no code:
+
+| Group id | Mod | Member when |
+| --- | --- | --- |
+| `simpleclaims:party` | SimpleClaims | The actor is in the owner's party. |
+| `partypro:party` | PartyPro | The two players are in the same party. |
+| `questlinesclaims:members` | QuestLines Claims | The actor is a member of a claim the owner owns as a player, and not in its `untrusted` group. |
+| `orbisguard:members` | OrbisGuard | The actor is a member or owner of a region the owner owns, in a world OrbisGuard has loaded. |
+
+Tamework reads these mods by reflection and does not need them to load. If a
+mod's API changes, its group answers `UNKNOWN` (no access) and Tamework logs
+one warning naming the group. Allies in these mods are not members. If one of
+these mods registers the same group id itself, its own provider is used and
+Tamework's is skipped.
+
 ## Presence and progression
 
 A shared companion's needs, aging and readiness timers follow its owner or

@@ -349,7 +349,8 @@ final class ApiMapper {
                                         config.isSimpleClaimsDamageProtectTamedFromNonMembers()
                                 ),
                                 config.getSimpleClaimsDamageAllowDamagePermissionKey()
-                        )
+                        ),
+                        TameworkRuntimeSettings.claimMod(config.getSimpleClaimsProvider()).toConfigValue()
                 )
         );
     }

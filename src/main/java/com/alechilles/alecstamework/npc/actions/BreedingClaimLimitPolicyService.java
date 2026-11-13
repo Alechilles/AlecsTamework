@@ -1,10 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
-import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimModProvider;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -27,24 +26,23 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Evaluates the released SimpleClaims land and space rule for breeding.
+ * Evaluates the claim limit and breeding claim rule for breeding, through the selected claim mod
+ * (SimpleClaims or QuestLines Claims). The historical {@code simpleclaims-*} reason codes are kept
+ * for every claim mod.
  */
 final class BreedingClaimLimitPolicyService {
-    private final SimpleClaimsCapabilityRuntime capabilityRuntime;
+    private final ClaimProviderResolver providers;
 
     BreedingClaimLimitPolicyService() {
-        this(resolveCapabilityRuntime());
+        this(ClaimProviderResolver.live());
     }
 
-    BreedingClaimLimitPolicyService(
-            @Nonnull SimpleClaimsCapabilityRuntime capabilityRuntime
-    ) {
-        this.capabilityRuntime = capabilityRuntime;
+    BreedingClaimLimitPolicyService(@Nonnull ClaimProviderResolver providers) {
+        this.providers = providers;
     }
 
     /**
-     * Evaluates the released SimpleClaims rule. Durable admission owns all
-     * owner and weighted population limits.
+     * Evaluates the claim rule. Durable admission owns all owner and weighted population limits.
      */
     @Nonnull
     Decision evaluate(@Nullable Store<EntityStore> store,
@@ -101,28 +99,28 @@ final class BreedingClaimLimitPolicyService {
         if (store == null || spawnPosition == null || worldName == null) {
             return Decision.deny("missing-spawn-context");
         }
-        SimpleClaimsCapabilityRuntime.BridgeResolution bridgeResolution = resolveBridge();
-        if (!bridgeResolution.available()) {
+        ClaimProviderResolver.Resolution resolution = resolveProvider(globalConfig);
+        if (!resolution.available()) {
             return evaluateResolved(
                     globalConfig,
                     new ResolvedClaim(
                             ClaimResolutionStatus.UNAVAILABLE,
                             null,
                             0,
-                            bridgeResolution.reason()
+                            resolution.reason()
                     ),
                     0,
                     0
             );
         }
-        SimpleClaimsBreedingBridge bridge = bridgeResolution.bridge();
-        ResolvedClaim resolved = resolveClaim(bridge, worldName, spawnPosition);
+        ClaimModProvider provider = resolution.provider();
+        ResolvedClaim resolved = resolveClaim(provider, worldName, spawnPosition);
         if (resolved.status() != ClaimResolutionStatus.CLAIM_FOUND
                 || resolved.key() == null) {
             return evaluateResolved(globalConfig, resolved, 0, 0);
         }
         CountResult count = countOwnedPopulationInClaim(
-                bridge, store, worldName, resolved.key().partyId()
+                provider, store, worldName, resolved.key().claimKey()
         );
         int pending = pendingClaims == null
                 ? 0
@@ -132,35 +130,24 @@ final class BreedingClaimLimitPolicyService {
                 : Decision.deny("simpleclaims-population-count-error");
     }
 
+    /** The claim mod to read for this check, chosen from the settings in {@code globalConfig}. */
     @Nonnull
-    ResolvedClaim resolveClaim(@Nullable String worldName, @Nullable Vector3d position) {
-        if (worldName == null || worldName.isBlank() || position == null) {
-            return new ResolvedClaim(
-                    ClaimResolutionStatus.ERROR, null, 0, "missing-world-or-position"
-            );
-        }
-        SimpleClaimsCapabilityRuntime.BridgeResolution resolution = resolveBridge();
-        if (!resolution.available()) {
-            return new ResolvedClaim(
-                    ClaimResolutionStatus.UNAVAILABLE, null, 0, resolution.reason()
-            );
-        }
-        return resolveClaim(resolution.bridge(), worldName, position);
-    }
-
-    @Nonnull
-    SimpleClaimsCapabilityRuntime.BridgeResolution resolveBridge() {
-        return capabilityRuntime.resolveBridge();
+    ClaimProviderResolver.Resolution resolveProvider(@Nonnull TwGlobalConfig globalConfig) {
+        return providers.resolve(TameworkRuntimeSettings.claimMod(globalConfig.getSimpleClaimsProvider()));
     }
 
     @Nonnull
     static ResolvedClaim resolveClaim(
-            @Nonnull SimpleClaimsBreedingBridge bridge,
+            @Nonnull ClaimModProvider provider,
             @Nonnull String worldName,
             @Nonnull Vector3d position
     ) {
-        SimpleClaimsBreedingBridge.LookupResult lookup =
-                bridge.lookupSimpleClaimsClaim(worldName, position);
+        ClaimLookupResult lookup;
+        try {
+            lookup = provider.lookupClaim(worldName, position);
+        } catch (RuntimeException | LinkageError failed) {
+            return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "claim lookup failed: " + failed);
+        }
         if (lookup == null) {
             return new ResolvedClaim(
                     ClaimResolutionStatus.ERROR, null, 0, "lookup-result-null"
@@ -169,36 +156,13 @@ final class BreedingClaimLimitPolicyService {
         return mapLookup(worldName, lookup);
     }
 
-    @Nonnull
-    CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
-                                            @Nonnull String worldName,
-                                            @Nonnull ClaimReservationKey targetClaim) {
-        return countOwnedPopulationInClaim(
-                store, worldName, targetClaim.partyId()
-        );
-    }
-
+    /** Counts owned companions standing inside the claim {@code claimKey}; world thread only. */
     @Nonnull
     CountResult countOwnedPopulationInClaim(
+            @Nonnull ClaimModProvider provider,
             @Nonnull Store<EntityStore> store,
             @Nonnull String worldName,
-            @Nonnull UUID claimPartyId
-    ) {
-        SimpleClaimsCapabilityRuntime.BridgeResolution resolution = resolveBridge();
-        if (!resolution.available()) {
-            return new CountResult(false, 0, resolution.reason());
-        }
-        return countOwnedPopulationInClaim(
-                resolution.bridge(), store, worldName, claimPartyId
-        );
-    }
-
-    @Nonnull
-    CountResult countOwnedPopulationInClaim(
-            @Nonnull SimpleClaimsBreedingBridge bridge,
-            @Nonnull Store<EntityStore> store,
-            @Nonnull String worldName,
-            @Nonnull UUID claimPartyId
+            @Nonnull String claimKey
     ) {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType =
@@ -215,7 +179,7 @@ final class BreedingClaimLimitPolicyService {
                 (ArchetypeChunk<EntityStore> chunk,
                  CommandBuffer<EntityStore> commandBuffer) -> countChunk(
                         chunk, npcType, transformType, ownerType,
-                        bridge, worldName, claimPartyId, count, cache
+                        provider, worldName, claimKey, count, cache
                 )
         );
         return count.failure == null
@@ -228,9 +192,9 @@ final class BreedingClaimLimitPolicyService {
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-            @Nonnull SimpleClaimsBreedingBridge bridge,
+            @Nonnull ClaimModProvider provider,
             @Nonnull String worldName,
-            @Nonnull UUID claimPartyId,
+            @Nonnull String claimKey,
             @Nonnull ClaimCount count,
             @Nonnull Map<String, ResolvedClaim> cache
     ) {
@@ -252,7 +216,7 @@ final class BreedingClaimLimitPolicyService {
             }
             ResolvedClaim claim = cache.computeIfAbsent(
                     chunkCacheKey(worldName, position),
-                    ignored -> resolveClaim(bridge, worldName, position)
+                    ignored -> resolveClaim(provider, worldName, position)
             );
             if (claim.status() == ClaimResolutionStatus.UNAVAILABLE
                     || claim.status() == ClaimResolutionStatus.ERROR) {
@@ -263,7 +227,7 @@ final class BreedingClaimLimitPolicyService {
             }
             if (claim.status() == ClaimResolutionStatus.CLAIM_FOUND
                     && claim.key() != null
-                    && claimPartyId.equals(claim.key().partyId())) {
+                    && claimKey.equals(claim.key().claimKey())) {
                 count.value++;
             }
         }
@@ -348,14 +312,6 @@ final class BreedingClaimLimitPolicyService {
         return TameworkRuntimeSettings.simpleClaimsEnabled(config.isSimpleClaimsEnabled());
     }
 
-    @Nonnull
-    private static SimpleClaimsCapabilityRuntime resolveCapabilityRuntime() {
-        Tamework plugin = Tamework.getInstance();
-        return plugin == null
-                ? new SimpleClaimsCapabilityRuntime()
-                : plugin.getSimpleClaimsCapabilityRuntime();
-    }
-
     private static int multiplyCap(int perChunk, int claimChunkCount) {
         if (perChunk <= 0) {
             return 0;
@@ -367,23 +323,17 @@ final class BreedingClaimLimitPolicyService {
     @Nonnull
     private static ResolvedClaim mapLookup(
             @Nonnull String worldName,
-            @Nonnull SimpleClaimsBreedingBridge.LookupResult lookup
+            @Nonnull ClaimLookupResult lookup
     ) {
         return switch (lookup.status()) {
-            case CLAIM_FOUND -> {
-                SimpleClaimsBreedingBridge.ClaimInfo info = lookup.claimInfo();
-                if (info == null || info.partyId() == null) {
-                    yield new ResolvedClaim(
-                            ClaimResolutionStatus.ERROR, null, 0, "claim-info-missing"
+            case CLAIM_FOUND -> lookup.claimKey() == null || lookup.claimKey().isBlank()
+                    ? new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "claim-info-missing")
+                    : new ResolvedClaim(
+                            ClaimResolutionStatus.CLAIM_FOUND,
+                            new ClaimReservationKey(worldName, lookup.claimKey()),
+                            lookup.claimChunkCount(),
+                            lookup.message()
                     );
-                }
-                yield new ResolvedClaim(
-                        ClaimResolutionStatus.CLAIM_FOUND,
-                        new ClaimReservationKey(worldName, info.partyId()),
-                        info.claimChunkCount(),
-                        lookup.message()
-                );
-            }
             case NO_CLAIM -> new ResolvedClaim(
                     ClaimResolutionStatus.NO_CLAIM, null, 0, lookup.message()
             );
@@ -434,7 +384,8 @@ final class BreedingClaimLimitPolicyService {
         }
     }
 
-    record ClaimReservationKey(String worldName, UUID partyId) {
+    /** One claim in one world; {@code claimKey} is unique across claim mods. */
+    record ClaimReservationKey(String worldName, String claimKey) {
     }
 
     record PlayerReservationKey(TwGlobalConfig.PerPlayerLimitScope scope,

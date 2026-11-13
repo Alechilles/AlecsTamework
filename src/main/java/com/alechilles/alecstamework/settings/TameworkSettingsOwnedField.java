@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 public final class TameworkSettingsOwnedField {
     private static final Set<String> GLOBAL_EXACT_PATHS = Set.of(
             "simpleclaims.simpleclaimsenabled",
+            "simpleclaims.provider",
             "simpleclaims.damage.protecttamedfromnonmembers",
             "command.deadrespawnenabled"
     );

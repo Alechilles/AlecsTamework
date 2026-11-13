@@ -1,13 +1,17 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimModDamageProvider;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.settings.ClaimModChoice;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
@@ -281,6 +285,124 @@ class SimpleClaimsTamedDamagePolicyTest {
         assertEquals(TamedDamageDecision.Status.DENY_CLAIM, ready.status());
     }
 
+    @Test
+    void questLinesChoiceUsesItsDamageRuleAndFailsOpenOnErrors() throws Exception {
+        FakeClaimMod questLines = new FakeClaimMod();
+        AtomicInteger simpleClaimsResolutions = new AtomicInteger();
+        List<String> warnings = new ArrayList<>();
+        SimpleClaimsTamedDamagePolicy policy = claimModPolicy(
+                questLines, simpleClaimsResolutions, mod -> true, false, warnings);
+        TwGlobalConfig config = config(true, true, "QuestLinesClaims");
+
+        questLines.damage = ClaimModDamageProvider.DamageResult.Status.DENIED;
+        TamedDamageDecision denied = evaluateEligible(policy, config);
+        questLines.damage = ClaimModDamageProvider.DamageResult.Status.ERROR;
+        TamedDamageDecision failedOpen = evaluateEligible(policy, config);
+
+        assertEquals(TamedDamageDecision.Status.DENY_CLAIM, denied.status());
+        assertEquals(TamedDamageDecision.Status.ALLOW_FAIL_OPEN, failedOpen.status());
+        assertEquals(2, questLines.damageCalls.get());
+        assertEquals(0, simpleClaimsResolutions.get());
+        assertEquals(1, warnings.size());
+    }
+
+    @Test
+    void serverPermissionBypassAppliesBeforeQuestLines() throws Exception {
+        FakeClaimMod questLines = new FakeClaimMod();
+        questLines.damage = ClaimModDamageProvider.DamageResult.Status.DENIED;
+        SimpleClaimsTamedDamagePolicy policy = claimModPolicy(
+                questLines, new AtomicInteger(), mod -> true, true, new ArrayList<>());
+
+        TamedDamageDecision decision = evaluateEligible(policy, config(true, true, "QuestLinesClaims"));
+
+        assertEquals("server-permission-bypass", decision.reason());
+        assertEquals(0, questLines.damageCalls.get());
+    }
+
+    @Test
+    void automaticChoiceUsesQuestLinesOnlyWhenSimpleClaimsIsNotInstalled() throws Exception {
+        FakeClaimMod questLines = new FakeClaimMod();
+        questLines.damage = ClaimModDamageProvider.DamageResult.Status.DENIED;
+        AtomicInteger simpleClaimsResolutions = new AtomicInteger();
+        SimpleClaimsTamedDamagePolicy questLinesOnly = claimModPolicy(questLines, simpleClaimsResolutions,
+                mod -> mod == ClaimModChoice.QUESTLINES_CLAIMS, false, new ArrayList<>());
+        SimpleClaimsTamedDamagePolicy bothInstalled = claimModPolicy(questLines, simpleClaimsResolutions,
+                mod -> true, false, new ArrayList<>());
+
+        TamedDamageDecision viaQuestLines = evaluateEligible(questLinesOnly, config(true, true, null));
+        TamedDamageDecision viaSimpleClaims = evaluateEligible(bothInstalled, config(true, true, null));
+
+        assertEquals(TamedDamageDecision.Status.DENY_CLAIM, viaQuestLines.status());
+        assertEquals(1, questLines.damageCalls.get());
+        assertEquals(TamedDamageDecision.Status.ALLOW_ENFORCED, viaSimpleClaims.status());
+        assertEquals(1, simpleClaimsResolutions.get());
+    }
+
+    @Test
+    void rawClaimAccessFollowsTheQuestLinesClaimAndDamageRule() throws Exception {
+        FakeClaimMod questLines = new FakeClaimMod();
+        SimpleClaimsTamedDamagePolicy policy = claimModPolicy(
+                questLines, new AtomicInteger(), mod -> true, false, new ArrayList<>());
+        TwGlobalConfig config = config(true, true, "QuestLinesClaims");
+
+        questLines.lookup = ClaimLookupResult.noClaim();
+        SimpleClaimsRawAccessDecision outside = policy.evaluateRawClaimAccess("world", POSITION, ATTACKER, config);
+        questLines.lookup = ClaimLookupResult.found("questlines:3", 2);
+        questLines.damage = ClaimModDamageProvider.DamageResult.Status.DENIED;
+        SimpleClaimsRawAccessDecision denied = policy.evaluateRawClaimAccess("world", POSITION, ATTACKER, config);
+
+        assertEquals(SimpleClaimsRawAccessDecision.Status.ALLOWED, outside.status());
+        assertEquals("outside-claim", outside.reason());
+        assertEquals(SimpleClaimsRawAccessDecision.Status.DENIED, denied.status());
+        assertFalse(denied.allowed());
+    }
+
+    private static SimpleClaimsTamedDamagePolicy claimModPolicy(FakeClaimMod questLines,
+                                                                AtomicInteger simpleClaimsResolutions,
+                                                                Predicate<ClaimModChoice> installed,
+                                                                boolean serverPermissionGranted,
+                                                                List<String> warnings) {
+        SimpleClaimsDamageCapabilityResolver.Resolution simpleClaims = SimpleClaimsDamageCapabilityResolver.Resolution.ready(
+                new SimpleClaimsPluginGeneration("plugin-a", "loader-a", 1L),
+                "1.0.38",
+                policyGeneration(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, UUID.randomUUID())
+        );
+        return new SimpleClaimsTamedDamagePolicy(
+                new TamedDamageTargetEligibilityResolver(),
+                () -> {
+                    simpleClaimsResolutions.incrementAndGet();
+                    return simpleClaims;
+                },
+                (attacker, permission) -> serverPermissionGranted,
+                (category, message) -> warnings.add(message),
+                questLines,
+                installed
+        );
+    }
+
+    /** A claim mod read through the plain claim and damage-rule seam, as QuestLines Claims is. */
+    private static final class FakeClaimMod implements ClaimModDamageProvider {
+        private final AtomicInteger damageCalls = new AtomicInteger();
+        private ClaimLookupResult lookup = ClaimLookupResult.noClaim();
+        private DamageResult.Status damage = DamageResult.Status.ALLOWED;
+
+        @Override
+        public String unavailableReason() {
+            return null;
+        }
+
+        @Override
+        public ClaimLookupResult lookupClaim(String worldName, Vector3d position) {
+            return lookup;
+        }
+
+        @Override
+        public DamageResult evaluateTamedDamage(String worldName, Vector3d position, UUID attackerPlayerUuid) {
+            damageCalls.incrementAndGet();
+            return new DamageResult(damage, damage.name());
+        }
+    }
+
     private static SimpleClaimsDamageGeneration policyGeneration(
             SimpleClaimsBreedingBridge.DamageAccessStatus status,
             UUID partyId) {
@@ -301,13 +423,18 @@ class SimpleClaimsTamedDamagePolicyTest {
     }
 
     private static TamedDamageDecision evaluateEligible(SimpleClaimsTamedDamagePolicy policy) throws Exception {
+        return evaluateEligible(policy, config(true, true));
+    }
+
+    private static TamedDamageDecision evaluateEligible(SimpleClaimsTamedDamagePolicy policy,
+                                                        TwGlobalConfig config) {
         return policy.evaluateResolvedEligibility(
                 TamedDamageOwnerPolicy.unowned(),
                 TamedDamageTargetEligibilityResolver.Status.ELIGIBLE,
                 "world",
                 POSITION,
                 ATTACKER,
-                config(true, true)
+                config
         );
     }
 
@@ -341,10 +468,15 @@ class SimpleClaimsTamedDamagePolicyTest {
     }
 
     private static TwGlobalConfig config(boolean enabled, boolean protect) throws Exception {
+        return config(enabled, protect, null);
+    }
+
+    private static TwGlobalConfig config(boolean enabled, boolean protect, String claimMod) throws Exception {
         TwGlobalConfig config = TwGlobalConfig.defaultConfig();
         setField(config, "simpleClaimsEnabled", enabled);
         setField(config, "simpleClaimsDamageProtectTamedFromNonMembers", protect);
         setField(config, "simpleClaimsDamageAllowDamagePermissionKey", "tamework.damage_tamed_claim_npc");
+        setField(config, "simpleClaimsProvider", claimMod);
         return config;
     }
 

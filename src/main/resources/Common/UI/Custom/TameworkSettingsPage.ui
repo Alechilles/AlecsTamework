@@ -1532,6 +1532,31 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 34);
 
+              Label #TwSettingsClaimModLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.claimMod;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsClaimModTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.claimMod;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsClaimModDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: %server.tamework.ui.settings.noItems.claimMod;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
               Label #TwSettingsClaimLimitChunkLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: %server.tamework.ui.settings.label.claimLimitChunk;

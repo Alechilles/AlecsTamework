@@ -217,6 +217,36 @@ class TameworkSettingsStoreTest {
         assertEquals(2, saved.populationLimitPerPlayerDeployedTotal());
     }
 
+    /** A settings file written before the claim mod choice must keep today's automatic behaviour. */
+    @Test
+    void claimModReadsOldAndUnknownValuesAsAutomaticAndSurvivesASave() throws Exception {
+        String[][] cases = {
+                {"{\"version\":2,\"simpleClaims\":{\"simpleClaimsEnabled\":true}}", "AUTOMATIC"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"Auto\"}}", "AUTOMATIC"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"Off\"}}", "AUTOMATIC"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"Towny\"}}", "AUTOMATIC"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"simpleclaims\"}}", "SIMPLE_CLAIMS"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"QuestLinesClaims\"}}", "QUESTLINES_CLAIMS"},
+                {"{\"version\":2,\"simpleClaims\":{\"provider\":\"QuestLines Claims\"}}", "QUESTLINES_CLAIMS"},
+        };
+        for (String[] entry : cases) {
+            assertEquals(entry[1], TameworkSettingsStore.parse(entry[0]).claimModChoice().name(), entry[0]);
+        }
+
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("claimMod").resolve("Tamework"));
+        Files.createDirectories(settingsFile.getParent());
+        Files.writeString(settingsFile, "{\"version\":2,\"simpleClaims\":{\"provider\":\"questlines_claims\"}}");
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        ResolvedTameworkSettings loaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(ClaimModChoice.QUESTLINES_CLAIMS, loaded.claimModChoice());
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, loaded.toSnapshot(), null));
+        TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+        assertEquals("QuestLinesClaims", TameworkSettingsStore.loadGlobalOverrides(settingsFile, null).claimMod());
+        assertEquals(ClaimModChoice.QUESTLINES_CLAIMS,
+                TameworkSettingsStore.loadGlobalSettings(settingsFile, null).claimModChoice());
+    }
+
     @Test
     void aFreshSettingsFileHasNoOwnedOrDeployedLimit() {
         Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("fresh").resolve("Tamework"));
