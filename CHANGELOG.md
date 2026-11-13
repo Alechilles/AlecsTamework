@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.13.0 - Instant Taming Checks - 2026-11-13
 
 ### Added
 
