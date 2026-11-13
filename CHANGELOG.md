@@ -43,6 +43,10 @@
   nowMs=... remainingMs=...`; alarms Tamework does not keep come from the engine with `source=engine`. Without a
   name it reads the configured harvest alarm.
 
+### Fixed
+
+- The arrows that turn the Companion Inspect view now turn it the way they point.
+
 ## 5.12.0 - Sharing Groups and Claim Mods - 2026-11-12
 
 ### Added

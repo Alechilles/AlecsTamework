@@ -106,9 +106,12 @@ final class CompanionInspectCamera {
         return look;
     }
 
-    /** The yaw after one rotate click: -1 moves the camera left around the companion, +1 right. */
+    /**
+     * The yaw after one rotate click: -1 for the left button, +1 for the right. Engine yaw grows counter-clockwise
+     * seen from above, so the left button lowers it and the view turns the way its arrow points.
+     */
     static float turned(float yaw, int direction) {
-        return yaw - Integer.signum(direction) * TURN;
+        return yaw + Integer.signum(direction) * TURN;
     }
 
     /** Engine yaw: forward is (-sin yaw, 0, -cos yaw). Looks from {@code from} towards {@code to}. */
