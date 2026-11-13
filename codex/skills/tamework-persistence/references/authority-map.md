@@ -18,7 +18,7 @@ current commit.
 | `companion/bonded` | Bonded companions as index records; the bonded API over the index | `IndexBondedCompanionApi`, `BondedRecords`, `BondedAdmission` |
 | `companion/migrate` | 3.x/4.x import and the lazy handling of old bodies, items, coops and players | `package-info.java` first, then `CompanionImporter`, `LegacyReader`, `LegacyMapper`, `LegacyBodyResolution`, `LegacyItemAdoption`, `LegacyBodyLocator` |
 | `companion/runtime` | Module that opens the store, owns the index, writer, threads and loaded map; lock-free queries | `CompanionPersistenceModule`, `CompanionQueries` |
-| `api/internal` | Public API 3.0.0 over the index | `IndexTameworkApi`, `IndexNpcProfilesApi`, `IndexProfileDataApi`, `IndexPopulationGroupApi`, `IndexDiagnosticsApi` |
+| `api/internal` | Public API 4.0.0 over the index | `IndexTameworkApi`, `IndexNpcProfilesApi`, `IndexProfileDataApi`, `IndexPopulationGroupApi`, `IndexDiagnosticsApi` |
 | `settings` | Server settings, the settings announcement, the progression clock, data-path resolution. Not companion state | `TameworkSettingsStore`, `TameworkSettingsAnnouncementStore`, `AnimalProgressionClockStore`, `TameworkDataPathService`, `TameworkDataPathLayout` |
 
 `companion/{identity,capture,lifecycle,placement,population,snapshot}` hold

@@ -139,7 +139,7 @@ lock. It may run for several requests at once, in any order.
   loading after join), return `UNAVAILABLE`.
 
 Tamework cannot interrupt a call. It logs a warning, at most once a minute per
-provider, when a call takes longer than 5 ms.
+provider, when a call takes longer than 20 ms.
 
 ## Request types
 
