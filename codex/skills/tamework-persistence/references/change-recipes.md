@@ -102,8 +102,8 @@ Releasing a companion clears its extensions.
 
 Built-in owned, deployed and group caps are checked under the index lock in
 the step that changes the record (`CompanionAdmission`,
-`CompanionAdmissionGate`). Providers are asked before the lock; synchronous
-sites use `ProviderDecisionCache`, which refuses while a decision is fetched.
+`CompanionAdmissionGate`). Providers answer synchronously from memory; the
+async flows ask before the lock, the synchronous sites ask inside the gate.
 Counts walk one owner's records; do not add counters.
 
 ## Change the Importer or Legacy Handling

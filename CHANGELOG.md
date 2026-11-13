@@ -20,7 +20,7 @@
 - For admins and test scripts: `/tw npc spawn tamed <Role> [--count=<n>] --owner <uuid|name> --at <x> <y> <z>` spawns
   owned, tamed animals for an owner from the server console, through the same limits and ownership steps as a
   player's spawn. The owner may be offline when given by UUID. A refusal by those limits says which check refused
-  (`detail=owned-limit`, `provider-denied`, `provider-decision-pending`, ...) and the limit it used.
+  (`detail=owned-limit`, `provider-denied`, ...) and the limit it used.
 - For admins and test scripts: `/tw debug share add|remove|list ... --owner <uuid|name>` shares an owner's animals
   for them from the server console, without the owner's confirmation. Each change is written to the server log
   with the admin who made it.
@@ -42,6 +42,18 @@
   changes nothing. Its reply is now one line, `ok entity=... alarm=... source=tamework ready=... untilMs=...
   nowMs=... remainingMs=...`; alarms Tamework does not keep come from the engine with `source=engine`. Without a
   name it reads the configured harvest alarm.
+- Taming an animal whose taming another mod limits (such as Rune Husbandry with Rune Professions) is decided at
+  once. The "checking the requirements, try again" refusal is gone, and so is the short wait before a litter of
+  such animals is born.
+
+### Breaking (public API 4.0.0)
+
+- Admission providers answer synchronously. `PopulationAdmissionProvider` (whose `evaluate` returned a
+  `CompletionStage`) is removed; implement `SynchronousPopulationAdmissionProvider` and return the decision from
+  `decide(request)`. `policies().admissionProviders().register(...)` takes the new type. Tamework calls it inline,
+  on world threads and sometimes under its companion lock, so it must answer from memory without blocking. The
+  request and decision types and the provider contract version are unchanged. Tamework no longer caches provider
+  decisions, so a request now describes the exact change at every site.
 
 ## 5.12.0 - Sharing Groups and Claim Mods - 2026-11-12
 
