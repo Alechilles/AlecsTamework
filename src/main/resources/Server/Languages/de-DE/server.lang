@@ -1255,7 +1255,6 @@ tamework.ui.population.familyUnknown=Diese Begleiterfamilie ist nicht für Tierh
 tamework.ui.population.providerUnavailable=Die Anforderungen für diesen Begleiter sind vorübergehend nicht verfügbar. Versuche es gleich erneut.
 tamework.ui.population.deployBlocked=Begleiter dürfen hier nicht herauskommen.
 tamework.ui.population.providerDenied=Du erfüllst die Anforderungen für diesen Begleiter nicht.
-tamework.ui.population.checkingRequirements=Die Anforderungen für diesen Begleiter werden geprüft. Versuche es gleich erneut.
 tamework.ui.notifications.spawner.captureFailed=Das Fangen konnte nicht abgeschlossen werden.
 tamework.ui.notifications.spawner.commandItemRequired=Du brauchst {0} in deinem Inventar, um mit diesem Gegenstand einzufangen.
 tamework.ui.notifications.spawner.releaseFailed=Das Freilassen des Begleiters konnte nicht abgeschlossen werden.

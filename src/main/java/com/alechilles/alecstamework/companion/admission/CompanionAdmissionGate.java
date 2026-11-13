@@ -24,16 +24,15 @@ import javax.annotation.Nullable;
  * in-memory config, so a reload applies to the next change.
  *
  * <p>The asynchronous flows ask the admission provider themselves and call {@link #deny} with its
- * answer. The synchronous sites cannot wait for a provider: {@link #admit}, {@link #refuse},
- * {@link #precheckDenial} and {@link #denyBatch} use the decision in the
- * {@link ProviderDecisionCache} (plan 6 R11) and refuse while it is being fetched.</p>
+ * answer. {@link #admit}, {@link #refuse}, {@link #precheckDenial} and {@link #denyBatch} ask it
+ * inline through {@link ProviderAdmission#decide}; providers answer synchronously from memory.</p>
  */
 public final class CompanionAdmissionGate {
     /** Message key of a refused group limit. */
     public static final String GROUP_LIMIT_MESSAGE_KEY = "tamework.ui.population.groupLimit";
 
     private final Supplier<CompanionAdmission.Rules> rules;
-    @Nullable private final ProviderDecisionCache providerDecisions;
+    @Nullable private final ProviderAdmission providers;
     /** The records an owner's limits count: the index's, or the network's (see {@link #useOwnerRecords}). */
     private volatile Function<UUID, List<CompanionRecord>> recordsOf;
     /** Whether owned companions may come out in a world (see {@link #useDeployRule}); everywhere by default. */
@@ -41,22 +40,21 @@ public final class CompanionAdmissionGate {
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
-     * {@code providerDecisions} gives the synchronous sites the cached provider decision; null
-     * means no role is managed.
+     * {@code providers} asks a managed role's admission provider; null means no role is managed.
      */
     public CompanionAdmissionGate(@Nonnull CompanionIndex index, @Nonnull Supplier<PopulationGroupConfigIndex> groups,
-                                  @Nullable ProviderDecisionCache providerDecisions) {
+                                  @Nullable ProviderAdmission providers) {
         Objects.requireNonNull(groups, "groups");
         this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = () -> configuredRules(groups.get());
-        this.providerDecisions = providerDecisions;
+        this.providers = providers;
     }
 
     private CompanionAdmissionGate(Supplier<CompanionAdmission.Rules> rules, CompanionIndex index,
-                                   @Nullable ProviderDecisionCache providerDecisions) {
+                                   @Nullable ProviderAdmission providers) {
         this.recordsOf = Objects.requireNonNull(index, "index")::fileRecords;
         this.rules = Objects.requireNonNull(rules, "rules");
-        this.providerDecisions = providerDecisions;
+        this.providers = providers;
     }
 
     /**
@@ -98,12 +96,12 @@ public final class CompanionAdmissionGate {
         return new CompanionAdmissionGate(rules, index, null);
     }
 
-    /** As {@link #withRules(CompanionIndex, Supplier)}, with cached provider decisions. */
+    /** As {@link #withRules(CompanionIndex, Supplier)}, with admission providers. */
     @Nonnull
     static CompanionAdmissionGate withRules(@Nonnull CompanionIndex index,
                                             @Nonnull Supplier<CompanionAdmission.Rules> rules,
-                                            @Nonnull ProviderDecisionCache providerDecisions) {
-        return new CompanionAdmissionGate(rules, index, providerDecisions);
+                                            @Nonnull ProviderAdmission providers) {
+        return new CompanionAdmissionGate(rules, index, providers);
     }
 
     /**
@@ -125,10 +123,9 @@ public final class CompanionAdmissionGate {
 
     /**
      * The synchronous check: may {@code after} replace {@code before} (null for a new record)?
-     * The built-in caps come first. A managed role that needs admission then uses the cached
-     * provider decision: a denial or an unavailable provider refuses with its message key, no
-     * decision yet refuses with the checking message and starts the evaluation, and an allow is
-     * checked against its domain limits. The caller stores {@link Admission#record}, so the claims
+     * The built-in caps come first. A managed role that needs admission then asks its provider:
+     * a denial or an unavailable provider refuses with its message key, and an allow is checked
+     * against its domain limits. The caller stores {@link Admission#record}, so the claims
      * are written in the step that was checked. Call it under the index lock, in that step.
      */
     @Nonnull
@@ -150,10 +147,10 @@ public final class CompanionAdmissionGate {
         if (caps != null) {
             return new Admission(Denial.of(caps), after);
         }
-        if (providerDecisions == null) {
+        if (providers == null) {
             return new Admission(null, after);
         }
-        ProviderAdmission.Outcome decision = providerDecisions.decide(before, after);
+        ProviderAdmission.Outcome decision = providers.decide(before, after);
         if (!decision.admitted()) {
             Denial builtIn = Denial.of(decision.refusal());
             return new Admission(decision.messageKey() == null ? builtIn

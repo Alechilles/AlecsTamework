@@ -248,7 +248,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
 import com.alechilles.alecstamework.companion.admission.ProviderAdmission;
-import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.items.locate.CaptureItemHolderSystems;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.companion.flow.CompanionBodyLifecycle;
@@ -351,7 +350,6 @@ public class Tamework extends JavaPlugin {
     private volatile AdmissionCache captureAdmissionCache;
     /** Cached admission provider decisions for the synchronous sites; closed in {@link #closeApiComposition}. */
     @Nullable
-    private volatile ProviderDecisionCache providerDecisionCache;
     private volatile CaptureItemHolderSystems.Transfers captureItemTransfers;
     private ReleaseFlow companionReleaseFlow;
     /** Forget, Recall and destroyed capture items (spec 8.14); null unless the companion module is ready. */
@@ -767,9 +765,8 @@ public class Tamework extends JavaPlugin {
             });
             admissionProviderRegistry = new AdmissionProviderRegistry();
             providerAdmission = ProviderAdmission.of(managedActivityConfigRegistry, admissionProviderRegistry);
-            ProviderDecisionCache providerDecisions = startProviderDecisionCache(providerAdmission);
             admissionGate = new CompanionAdmissionGate(companionModule.index(), populationGroupConfigRegistry::snapshot,
-                    providerDecisions);
+                    providerAdmission);
             PortableSync network = startPortableSync(companionModule);
             portableSync = network;
             // Owner limits count the companions other servers of a network hold too.
@@ -1794,54 +1791,6 @@ public class Tamework extends JavaPlugin {
     }
 
     /**
-     * The admission provider decisions the synchronous sites read (plan 6 R11). An owner's are
-     * dropped when the owner's counts change (index listener, after the lock) and on disconnect,
-     * all on config reload and on shutdown; they are warmed when a player enters a world. The
-     * listeners only pass the player id and the world name on; the provider is asked on the
-     * provider registry's threads.
-     */
-    private ProviderDecisionCache startProviderDecisionCache(ProviderAdmission providerAdmission) {
-        ProviderDecisionCache cache = new ProviderDecisionCache(providerAdmission, System::currentTimeMillis);
-        providerDecisionCache = cache;
-        companionModule.addAfterUnlockListener(cache::onRecordChanged);
-        deferGlobalListener(
-                TameworkRuntimeModule.CORE_OWNERSHIP,
-                "admission-provider-decision-warm",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this,
-                        AddPlayerToWorldEvent.class,
-                        event -> {
-                            if (event == null || event.getWorld() == null || event.getHolder() == null) {
-                                return;
-                            }
-                            PlayerRef player = event.getHolder().getComponent(PlayerRef.getComponentType());
-                            String world = event.getWorld().getName();
-                            if (player != null && player.getUuid() != null && world != null && !world.isBlank()) {
-                                cache.warm(player.getUuid(), world);
-                            }
-                        },
-                        "admission provider decision warm-up"
-                )
-        );
-        deferGlobalListener(
-                TameworkRuntimeModule.CORE_OWNERSHIP,
-                "admission-provider-decision-disconnect",
-                () -> TameworkEventRegistrationSupport.registerGlobal(
-                        this,
-                        PlayerDisconnectEvent.class,
-                        event -> {
-                            PlayerRef player = event == null ? null : event.getPlayerRef();
-                            if (player != null && player.getUuid() != null) {
-                                cache.forgetOwner(player.getUuid());
-                            }
-                        },
-                        "admission provider decision cleanup"
-                )
-        );
-        return cache;
-    }
-
-    /**
      * Capture item ownership follows the holder, and ineligible players cannot pick the item up
      * (spec 8.14). The pickup filters read cached admission decisions: a player's are dropped when
      * their counts change (index listener) and all on config reload.
@@ -2370,11 +2319,6 @@ public class Tamework extends JavaPlugin {
         if (closingEffects != null) {
             closingEffects.close();
         }
-        ProviderDecisionCache closingDecisions = providerDecisionCache;
-        providerDecisionCache = null;
-        if (closingDecisions != null) {
-            closingDecisions.close();
-        }
         AdmissionProviderRegistry closingProviders = admissionProviderRegistry;
         admissionProviderRegistry = null;
         if (closingProviders != null) {
@@ -2553,10 +2497,6 @@ public class Tamework extends JavaPlugin {
         if (admissionCache != null) {
             // Limits, limit scope and the capture item ownership mode decide the cached pickup admissions.
             admissionCache.clear();
-        }
-        ProviderDecisionCache providerDecisions = providerDecisionCache;
-        if (providerDecisions != null) {
-            providerDecisions.clear();
         }
         refreshCapturePickupFilters();
     }
@@ -3756,11 +3696,6 @@ public class Tamework extends JavaPlugin {
         if (admissionCache != null) {
             // Every config reload, so a changed limit or population group applies to pickup filters at once.
             admissionCache.clear();
-        }
-        ProviderDecisionCache providerDecisions = providerDecisionCache;
-        if (providerDecisions != null) {
-            // A provider decided against the config that was loaded; a reload asks again.
-            providerDecisions.clear();
         }
         refreshCapturePickupFilters();
         if (apiEventBus == null || changedIds == null) {

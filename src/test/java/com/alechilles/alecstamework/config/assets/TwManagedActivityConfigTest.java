@@ -556,10 +556,10 @@ class TwManagedActivityConfigTest {
             assertTrue(groups.replace(List.of(), 2L).applied());
 
             ProviderAdmission.Outcome stale =
-                    admission.evaluate(null, managed).toCompletableFuture().join();
+                    admission.decide(null, managed);
             assertEquals(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE, stale.refusal());
             assertEquals(CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY, stale.messageKey());
-            assertTrue(admission.evaluate(null, unmanaged).toCompletableFuture().join().admitted());
+            assertTrue(admission.decide(null, unmanaged).admitted());
         }
     }
 

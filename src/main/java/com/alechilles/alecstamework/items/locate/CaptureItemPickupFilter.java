@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items.locate;
 
 import com.alechilles.alecstamework.companion.admission.CompanionAdmission;
 import com.alechilles.alecstamework.companion.admission.CompanionAdmissionGate;
-import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.item.AdmissionCache;
@@ -194,18 +193,16 @@ public final class CaptureItemPickupFilter implements SlotFilter {
         }
     }
 
-    /** {@code PENDING}: the admission provider's decision is being fetched; a later attempt finds it. */
-    private enum Check { ADMITTED, REFUSED, PENDING }
+    private enum Check { ADMITTED, REFUSED }
 
     /**
      * The cached decision, or a new one taken under the index lock and cached there, so an index
      * change cannot invalidate the player between the count and the put. Admitted when the item
      * no longer moves its companion to this player.
      *
-     * <p>The gate reads the admission provider's cached decision for a managed role. A provider
-     * that gave no decision (still being fetched, or unavailable) is not cached here: the
-     * {@link ProviderDecisionCache} asks again within seconds, and this cache would hold the
-     * refusal for its whole life.</p>
+     * <p>The gate asks the admission provider of a managed role. An unavailable provider is not
+     * cached here: its state (for example a profile still loading) changes within seconds, and
+     * this cache would hold the refusal for its whole life.</p>
      */
     private Check check(CaptureItemKeys.Ref item) {
         Check checked = shared.index.atomically(() -> {
@@ -221,8 +218,7 @@ public final class CaptureItemPickupFilter implements SlotFilter {
             CompanionAdmissionGate.Denial denial =
                     shared.gate.admit(record, CaptureItemOwnership.asOwnedBy(record, player, null)).denial();
             if (denial != null && denial.refusal() == CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE) {
-                return ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(denial.messageKey())
-                        ? Check.PENDING : Check.REFUSED;
+                return Check.REFUSED;
             }
             shared.cache.put(player, family, denial == null);
             return denial == null ? Check.ADMITTED : Check.REFUSED;

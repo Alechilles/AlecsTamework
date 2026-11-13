@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -202,10 +201,7 @@ class TameworkApiV011ContractTest {
         AutoCloseable registration = policy.admissionProviders().register(
                 "provider:test",
                 1,
-                request -> CompletableFuture.completedFuture(
-                        PopulationAdmissionProviderDecision.unavailable(
-                                "test-unavailable")
-                )
+                request -> PopulationAdmissionProviderDecision.unavailable("test-unavailable")
         );
         registration.close();
         registration.close();

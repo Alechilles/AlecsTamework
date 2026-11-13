@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.companion.admission.ProviderDecisionCache;
 import com.alechilles.alecstamework.items.NpcSpawnCommandService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.Ref;
@@ -213,12 +212,9 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
     /**
      * Why the population pre-check refused, as reply pairs that start with a space: {@code detail=}
      * (owned-limit, deployed-limit, group-limit, provider-denied, provider-unavailable,
-     * provider-decision-pending, deploy-blocked, or the check's own reason), the provider's or
-     * domain limit's message {@code key=} when it names one, and the numbers the check used:
-     * {@code cap=} for the owned and deployed limits, {@code owned=} when the check counted. Empty
-     * without a refusal. A pending decision is the first managed-role check after the cached
-     * provider answer expired; the same check started the provider call, so a retry a moment later
-     * gets its answer, as a player's own retry does.
+     * deploy-blocked, or the check's own reason), the provider's or domain limit's message
+     * {@code key=} when it names one, and the numbers the check used: {@code cap=} for the owned
+     * and deployed limits, {@code owned=} when the check counted. Empty without a refusal.
      */
     @Nonnull
     static String populationCapDetail(@Nullable OwnerPopulationCapService.Decision decision) {
@@ -226,9 +222,6 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
             return "";
         }
         String key = decision.messageKey();
-        if (ProviderDecisionCache.CHECKING_MESSAGE_KEY.equals(key)) {
-            return " detail=provider-decision-pending";
-        }
         String reason = decision.reason();
         boolean limitRefusal = "owner-cap-reached".equals(reason)
                 || OwnerPopulationCapService.REASON_DEPLOYED_CAP.equals(reason);

@@ -11,13 +11,11 @@ import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +36,7 @@ class ProviderAdmissionTest {
             role -> role.equals("Cow") ? COWS : null,
             request -> {
                 asked.add(request);
-                return CompletableFuture.completedFuture(decision);
+                return decision;
             });
 
     private static PopulationAdmissionProviderDecision allow(Set<PopulationDomainClaim> claims,
@@ -53,7 +51,7 @@ class ProviderAdmissionTest {
     }
 
     private ProviderAdmission.Outcome evaluate(CompanionRecord before, CompanionRecord after) {
-        return admission.evaluate(before, after).toCompletableFuture().join();
+        return admission.decide(before, after);
     }
 
     @Test
@@ -190,16 +188,18 @@ class ProviderAdmissionTest {
     }
 
     @Test
-    void aManagedRoleWhoseProviderIsMissingOrNeverAnswersIsRefusedAsUnavailable() {
-        try (AdmissionProviderRegistry registry = new AdmissionProviderRegistry(Duration.ofMillis(50))) {
-            ProviderAdmission real = new ProviderAdmission(role -> COWS, registry::evaluate);
+    void aManagedRoleWhoseProviderIsMissingOrFailsIsRefusedAsUnavailable() {
+        try (AdmissionProviderRegistry registry = new AdmissionProviderRegistry()) {
+            ProviderAdmission real = new ProviderAdmission(role -> COWS, registry::decide);
             CompanionRecord tamed = cow(CompanionLocation.live("w", 0, 0, 0));
 
-            ProviderAdmission.Outcome missing = real.evaluate(null, tamed).toCompletableFuture().join();
-            registry.register("runeteria:husbandry", 1, request -> new CompletableFuture<>());
-            ProviderAdmission.Outcome timedOut = real.evaluate(null, tamed).toCompletableFuture().join();
+            ProviderAdmission.Outcome missing = real.decide(null, tamed);
+            registry.register("runeteria:husbandry", 1, request -> {
+                throw new IllegalStateException("profile store broken");
+            });
+            ProviderAdmission.Outcome failed = real.decide(null, tamed);
 
-            for (ProviderAdmission.Outcome outcome : List.of(missing, timedOut)) {
+            for (ProviderAdmission.Outcome outcome : List.of(missing, failed)) {
                 assertEquals(CompanionAdmission.Refusal.PROVIDER_UNAVAILABLE, outcome.refusal());
                 assertEquals(CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY, outcome.messageKey());
             }

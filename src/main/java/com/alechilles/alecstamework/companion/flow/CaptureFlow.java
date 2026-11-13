@@ -45,7 +45,7 @@ import org.bson.BsonDocument;
  * are checked again with the built-in caps under the lock, and the claims are stored on the
  * committed record. Every other capture commits before {@link #capture} returns.
  *
- * <p>Continuations run on whichever thread completes the provider's decision or the flush, so
+ * <p>Continuations run on the calling thread or on whichever thread completes the flush, so
  * the caller hands its entity work back to the owning world thread. The flow touches no live
  * entities; {@code R} is only a registry key for the body.
  *
@@ -188,10 +188,11 @@ public final class CaptureFlow<R> {
         }
         CompanionRecord created = stamped != null ? null : created(capture, UUID.randomUUID());
         CompanionRecord preview = created != null ? created : captured(capture, seen).apply(seen.toBuilder()).build();
-        return providers.evaluate(seen, preview).toCompletableFuture().thenCompose(provider -> provider.admitted()
+        ProviderAdmission.Outcome provider = providers.decide(seen, preview);
+        return provider.admitted()
                 ? commitAndFlush(capture, seen, created, provider)
                 : CompletableFuture.completedFuture(
-                        new Outcome(result(provider.refusal()), null, provider.messageKey())));
+                        new Outcome(result(provider.refusal()), null, provider.messageKey()));
     }
 
     private CompletableFuture<Outcome> commitAndFlush(Capture<R> capture, @Nullable CompanionRecord seen,
