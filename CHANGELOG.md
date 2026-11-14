@@ -6,8 +6,7 @@
 
 - The flute menu lists your own companions above the ones other players share with you, under every sort.
   Selected companions still come first.
-- The flute menu's **+ Filter** offers **My companions only** and **Shared with me only** once someone shares a
-  companion with you. The filter shows as a chip you can remove, and saved views keep it.
+- The flute menu's **+ Filter** offers **My companions only** and **Shared with me only**. The filter shows as a chip you can remove, and saved views keep it.
 
 ## 5.13.0 - Instant Taming Checks - 2026-11-13
 
