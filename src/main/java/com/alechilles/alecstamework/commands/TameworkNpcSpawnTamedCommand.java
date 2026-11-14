@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.NpcSpawnCommandService;
+import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -116,7 +118,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
         }
         new NpcSpawnCommandService(plugin).spawnTamedOwnedBatch(
                 player, store, ref, world, roleId, count, radius, attachments,
-                result -> sendSpawnResult(commandContext, roleId, result)
+                result -> sendSpawnResult(commandContext, player, roleId, result)
         );
     }
 
@@ -277,6 +279,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
     }
 
     private static void sendSpawnResult(@Nonnull CommandContext context,
+                                        @Nonnull Player player,
                                         @Nonnull String roleId,
                                         @Nonnull NpcSpawnCommandService.SpawnBatchResult result) {
         if (result.getFailureMessage() != null) {
@@ -306,7 +309,13 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractWorldCommand {
                     "server.tamework.commands.npcSpawnTamed.result.invalidAttachments")
                     .param("attachments", String.join(", ", result.getInvalidAttachments())));
         }
-        if (result.getStoppedReason() != null) {
+        OwnerPopulationCapService.Decision refusal = result.getPopulationDecision();
+        if (refusal != null && !refusal.allowed()) {
+            // The admission check's own text, as the toast shows it: a limit, a provider's refusal or an
+            // unavailable provider, never a generic "cap reached" for all of them.
+            message.insert(" ").insert(Message.raw(
+                    LocalizedText.resolve(player, OwnerMessageUtil.acquisitionDeniedKey(refusal))));
+        } else if (result.getStoppedReason() != null) {
             message.insert(" ").insert(resultMessage(
                     result.getStoppedReasonKey(), result.getStoppedReason(), roleId));
         }

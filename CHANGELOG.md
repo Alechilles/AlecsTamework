@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- `/tw npc spawn tamed` says why a spawn was refused (a limit, an unmet requirement, or an admission provider
+  such as Husbandry that is not available) instead of always "Owner population cap reached."
+
 ## 5.14.0 - Your Companions First - 2026-11-14
 
 ### Added

@@ -91,7 +91,7 @@ public final class OwnerMessageUtil {
     }
 
     /** The translation key {@link #sendAcquisitionDenied} shows for a refused decision. */
-    static String acquisitionDeniedKey(OwnerPopulationCapService.Decision decision) {
+    public static String acquisitionDeniedKey(OwnerPopulationCapService.Decision decision) {
         if (decision.messageKey() != null && !decision.messageKey().isBlank()) {
             return decision.messageKey();
         }
