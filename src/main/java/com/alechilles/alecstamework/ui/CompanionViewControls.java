@@ -261,10 +261,16 @@ final class CompanionViewControls {
         c.set("#CompanionViewNameEditor.Visible", false);
         c.set("#CompanionViewIconEditor.Visible", false);
         c.set("#CompanionViewError.Text", "");
-        c.set("#CompanionViewType.Entries", List.of(
+        var types = new ArrayList<>(List.of(
                 option(text("chooseFilterType"), "choose"), option(text("species"), "species"),
-                option(text("groups"), "groups"), option(text("selectedOnly"), "selected"),
-                option(text("mineOnly"), "mine"), option(text("sharedOnly"), "shared")));
+                option(text("groups"), "groups"), option(text("selectedOnly"), "selected")));
+        // Owner choices matter only once someone shares a companion with this viewer.
+        if (!"All".equals(current.owner())
+                || Arrays.stream(page.rosterSummaries()).anyMatch(entry -> entry.sharedAccess() != null)) {
+            types.add(option(text("mineOnly"), "mine"));
+            types.add(option(text("sharedOnly"), "shared"));
+        }
+        c.set("#CompanionViewType.Entries", types);
         c.set("#CompanionViewType.Value", type);
         populate(c, "#CompanionViewSpecies", speciesNames(), species);
         populate(c, "#CompanionViewGroups", groupNames(), groups);
