@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
 import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
@@ -48,6 +49,9 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -136,6 +140,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_CARD_DEFAULT_F_BEHAVIOUR = "@CompanionCardDefaultFBehaviour";
     private static final String KEY_CARD_ALLOW_PLAYER_CHOICE = "@CompanionCardAllowPlayerChoice";
     private static final String KEY_CARD_RENAME_MODE = "@CompanionCardRenameMode";
+    private static final String KEY_CARD_FREE_NAME_LISTS = "@CompanionCardFreeNameLists";
+    private static final String KEY_CARD_FREE_REGIONS = "@CompanionCardFreeRegions";
+    private static final String CARD_FREE_NAME_LISTS = "#TwSettingsCardFreeNameListsDropdown";
+    private static final String CARD_FREE_REGIONS = "#TwSettingsCardFreeRegionsDropdown";
+    private static final int CAPTION_MAX_LENGTH = 40;
 
     private final Tamework plugin;
     private final World world;
@@ -243,7 +252,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 draftPayload = data;
                 warningLine = "";
                 updateUnsavedChanges();
-                refreshFeedback();
+                UICommandBuilder commandBuilder = new UICommandBuilder();
+                // Only the captions: re-sending Entries or SelectedValues would reset an open dropdown.
+                renderFreeRenameCaptions(commandBuilder, companionCardFrom(data));
+                appendFeedback(commandBuilder);
+                sendUpdate(commandBuilder, null, false);
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data, store);
@@ -298,7 +311,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         for (var binding : editEvent.events().entrySet()) {
             if (ACTION.equals(binding.getKey()) || KEY_PRESET.equals(binding.getKey())) continue;
             String valueSelector = binding.getValue();
-            String selector = valueSelector.substring(0, valueSelector.length() - ".Value".length());
+            String selector = valueSelector.substring(0, valueSelector.lastIndexOf('.'));
             eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, selector, editEvent, false);
         }
         eventBuilder.addEventBinding(
@@ -540,7 +553,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_DEPLOY_PLACES, "#TwSettingsDeployPlacesInput.Value")
                 .append(KEY_CARD_DEFAULT_F_BEHAVIOUR, "#TwSettingsCardDefaultFBehaviourDropdown.Value")
                 .append(KEY_CARD_ALLOW_PLAYER_CHOICE, "#TwSettingsCardAllowPlayerChoiceCheck.Value")
-                .append(KEY_CARD_RENAME_MODE, "#TwSettingsCardRenameModeDropdown.Value");
+                .append(KEY_CARD_RENAME_MODE, "#TwSettingsCardRenameModeDropdown.Value")
+                .append(KEY_CARD_FREE_NAME_LISTS, CARD_FREE_NAME_LISTS + ".SelectedValues")
+                .append(KEY_CARD_FREE_REGIONS, CARD_FREE_REGIONS + ".SelectedValues");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
@@ -627,6 +642,61 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsCardAllowPlayerChoiceCheck.Value", currentCompanionCard.allowPlayerChoice());
         commandBuilder.set("#TwSettingsCardRenameModeDropdown.Entries", companionCardRenameModeEntries());
         commandBuilder.set("#TwSettingsCardRenameModeDropdown.Value", currentCompanionCard.renameMode().toConfigValue());
+        List<String> lists = currentCompanionCard.freeRenameNameLists();
+        commandBuilder.set(CARD_FREE_NAME_LISTS + ".Entries", freeRenameNameListEntries(lists));
+        commandBuilder.set(CARD_FREE_NAME_LISTS + ".SelectedValues",
+                lists.stream().map(LocalizableString::fromString).toList());
+        commandBuilder.set(CARD_FREE_REGIONS + ".Entries", freeRenameRegionLabels().entrySet().stream()
+                .map(entry -> new DropdownEntryInfo(LocalizableString.fromString(entry.getValue()), entry.getKey()))
+                .toList());
+        commandBuilder.set(CARD_FREE_REGIONS + ".SelectedValues", currentCompanionCard.freeRenameRegions().stream()
+                .map(region -> LocalizableString.fromString(region.toConfigValue()))
+                .toList());
+        renderFreeRenameCaptions(commandBuilder, currentCompanionCard);
+    }
+
+    /** The loaded name lists, plus any saved list that is no longer loaded so it can still be unticked. */
+    @Nonnull
+    private List<DropdownEntryInfo> freeRenameNameListEntries(@Nonnull List<String> selected) {
+        LinkedHashMap<String, String> options = new LinkedHashMap<>();
+        for (String id : TwNamesConfig.listIds()) {
+            options.put(id, id);
+        }
+        for (String id : selected) {
+            options.putIfAbsent(id, formatText("tamework.ui.settings.freeRenameNameLists.missing", id));
+        }
+        return options.entrySet().stream()
+                .map(entry -> new DropdownEntryInfo(LocalizableString.fromString(entry.getValue()), entry.getKey()))
+                .toList();
+    }
+
+    /** Region config values mapped to their labels in the viewer's language, in display order. */
+    @Nonnull
+    private Map<String, String> freeRenameRegionLabels() {
+        LinkedHashMap<String, String> labels = new LinkedHashMap<>();
+        for (TwNamesConfig.Region region : TwNamesConfig.Region.values()) {
+            labels.put(region.toConfigValue(),
+                    resolveText("tamework.ui.settings.freeRenameRegion." + region.toConfigValue()));
+        }
+        return labels;
+    }
+
+    /** A multi-select dropdown shows no label of its own, so a caption over it lists what is ticked. */
+    private void renderFreeRenameCaptions(@Nonnull UICommandBuilder commandBuilder,
+                                          @Nonnull CompanionCardSettingsStore.Settings settings) {
+        commandBuilder.set(CARD_FREE_NAME_LISTS + "Caption.Text", caption(settings.freeRenameNameLists()));
+        Map<String, String> regionLabels = freeRenameRegionLabels();
+        commandBuilder.set(CARD_FREE_REGIONS + "Caption.Text", caption(settings.freeRenameRegions().stream()
+                .map(region -> regionLabels.get(region.toConfigValue()))
+                .toList()));
+    }
+
+    @Nonnull
+    private String caption(@Nonnull Collection<String> labels) {
+        String text = labels.isEmpty()
+                ? resolveText("tamework.ui.settings.freeRenameNameLists.none")
+                : String.join(", ", labels);
+        return text.length() > CAPTION_MAX_LENGTH ? text.substring(0, CAPTION_MAX_LENGTH - 1) + "\u2026" : text;
     }
 
     /** The companion card settings the form holds; a control missing from the payload keeps its value. */
@@ -640,7 +710,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         : currentCompanionCard.allowPlayerChoice(),
                 payload.cardRenameMode != null
                         ? CompanionCardRenameMode.fromConfigValue(payload.cardRenameMode)
-                        : currentCompanionCard.renameMode());
+                        : currentCompanionCard.renameMode(),
+                payload.cardFreeNameLists != null
+                        ? Arrays.asList(payload.cardFreeNameLists)
+                        : currentCompanionCard.freeRenameNameLists(),
+                payload.cardFreeRegions != null
+                        ? CompanionCardSettingsStore.regionsFrom(Arrays.asList(payload.cardFreeRegions))
+                        : currentCompanionCard.freeRenameRegions());
     }
 
     private List<DropdownEntryInfo> companionCardFBehaviourEntries() {
@@ -1294,6 +1370,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_CARD_DEFAULT_F_BEHAVIOUR, Codec.STRING), (x, v) -> x.cardDefaultFBehaviour = v, x -> x.cardDefaultFBehaviour).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_CARD_ALLOW_PLAYER_CHOICE, Codec.BOOLEAN), (x, v) -> x.cardAllowPlayerChoice = v, x -> x.cardAllowPlayerChoice).add()
                 .<String>append(new KeyedCodec<>(KEY_CARD_RENAME_MODE, Codec.STRING), (x, v) -> x.cardRenameMode = v, x -> x.cardRenameMode).add()
+                .<String[]>append(new KeyedCodec<>(KEY_CARD_FREE_NAME_LISTS, Codec.STRING_ARRAY), (x, v) -> x.cardFreeNameLists = v, x -> x.cardFreeNameLists).add()
+                .<String[]>append(new KeyedCodec<>(KEY_CARD_FREE_REGIONS, Codec.STRING_ARRAY), (x, v) -> x.cardFreeRegions = v, x -> x.cardFreeRegions).add()
                 .<String>append(new KeyedCodec<>(KEY_TAB, Codec.STRING), (x, v) -> x.tab = v, x -> x.tab).add()
                 .<String>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_ID, Codec.STRING), (x, v) -> x.modSettingId = v, x -> x.modSettingId).add()
                 .<Boolean>append(new KeyedCodec<>(TameworkSettingsModTab.KEY_BOOL, Codec.BOOLEAN), (x, v) -> x.modSettingBool = v, x -> x.modSettingBool).add()
@@ -1355,6 +1433,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         String cardDefaultFBehaviour;
         Boolean cardAllowPlayerChoice;
         String cardRenameMode;
+        String[] cardFreeNameLists;
+        String[] cardFreeRegions;
         String tab;
         String modSettingId;
         Boolean modSettingBool;

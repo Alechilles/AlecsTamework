@@ -74,6 +74,8 @@ Custom regex is supported via `AllowedChars: "Regex:<pattern>"`.
 ## Name input flow
 When the interaction succeeds, the player gets a naming UI with a text field and `Apply` / `Cancel` buttons.
 - If `RandomNamesId` resolves to a valid `TwNames` pool, a `Random` button is shown.
+- A free rename from Companion Inspect has no item, so its `Random` button uses the name lists and regions chosen in
+  `/tw settings` instead (`TwNamesDefault` with every region by default).
 - Clicking `Random` replaces the text in the input field only (it does not apply the name).
 - Enter the desired name and click `Apply` to submit.
 - Click `Cancel` to cancel the request.

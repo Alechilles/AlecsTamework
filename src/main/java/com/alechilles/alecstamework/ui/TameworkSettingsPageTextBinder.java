@@ -85,6 +85,8 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsCardDefaultFBehaviourLabel", "tamework.ui.settings.label.companionCardDefaultFBehaviour"},
             {"#TwSettingsCardAllowPlayerChoiceLabel", "tamework.ui.settings.label.companionCardAllowPlayerChoice"},
             {"#TwSettingsCardRenameModeLabel", "tamework.ui.settings.label.companionCardRenameMode"},
+            {"#TwSettingsCardFreeNameListsLabel", "tamework.ui.settings.label.companionCardFreeNameLists"},
+            {"#TwSettingsCardFreeRegionsLabel", "tamework.ui.settings.label.companionCardFreeRegions"},
             {"#TwSettingsTelemetrySectionLabel", "tamework.ui.settings.label.telemetrySection"},
             {"#TwSettingsTelemetryConsentInstructionLabel", "tamework.ui.settings.note.telemetryConsentCommand"}
     };
@@ -160,6 +162,8 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsCardDefaultFBehaviourTooltip", "tamework.ui.settings.tooltip.companionCardDefaultFBehaviour"},
             {"#TwSettingsCardAllowPlayerChoiceTooltip", "tamework.ui.settings.tooltip.companionCardAllowPlayerChoice"},
             {"#TwSettingsCardRenameModeTooltip", "tamework.ui.settings.tooltip.companionCardRenameMode"},
+            {"#TwSettingsCardFreeNameListsTooltip", "tamework.ui.settings.tooltip.companionCardFreeNameLists"},
+            {"#TwSettingsCardFreeRegionsTooltip", "tamework.ui.settings.tooltip.companionCardFreeRegions"},
             {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"}
     };
 
@@ -174,6 +178,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsDeployModeDropdown", "tamework.ui.settings.noItems.deployMode"},
             {"#TwSettingsCardDefaultFBehaviourDropdown", "tamework.ui.settings.noItems.companionCardFBehaviour"},
             {"#TwSettingsCardRenameModeDropdown", "tamework.ui.settings.noItems.companionCardRenameMode"},
+            {"#TwSettingsCardFreeNameListsDropdown", "tamework.ui.settings.noItems.companionCardFreeNameLists"},
             {"#TwSettingsNeedsDamageModelDropdown", "tamework.ui.settings.noItems.model"},
             {"#TwSettingsNeedsDamageDualNeedRuleDropdown", "tamework.ui.settings.noItems.rule"},
             {"#TwSettingsPopulationScopeDropdown", "tamework.ui.settings.noItems.scope"}

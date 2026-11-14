@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- When **Rename from Inspect** is set to **Free**, the naming window now has a **Random** button, even with no
+  other mods installed. In `/tw settings`, **Free rename name lists** picks which name lists it draws from, and
+  **Free rename name regions** picks North American, German, Spanish or Brazilian Portuguese names. By default it
+  uses Tamework's built-in list with every region.
+
 ## 5.14.0 - Your Companions First - 2026-11-14
 
 ### Added

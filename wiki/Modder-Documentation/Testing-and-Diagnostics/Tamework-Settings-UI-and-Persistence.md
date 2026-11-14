@@ -192,6 +192,13 @@ These settings are saved in `tamework-companion-card.json` next to the settings 
 - **Rename from Inspect** controls the panel's rename pencil. **Needs a naming item** (default) requires an item with
   a naming config, such as a nametag, anywhere in the player's inventory, and uses that item's rules, consumption and
   cooldown. **Free** renames with the default naming rules. **Off** hides the pencil.
+- **Free rename name lists** and **Free rename name regions** choose where a free rename's **Random** button gets its
+  names. The first lists every loaded `TwNames` asset (Tamework ships `TwNamesDefault`; packs can add more). The second
+  picks the regional sets inside them: North American, German, Spanish and Brazilian Portuguese. Both default to
+  `TwNamesDefault` with every region, so Random works with Tamework alone. Untick everything in either one to hide
+  Random. In the file they are `freeRenameNameLists` (asset ids) and `freeRenameRegions` (`NorthAmerica`, `German`,
+  `Spanish`, `BrazilianPortuguese`); leaving a key out keeps its default. Renaming with a naming item still uses that
+  item's `RandomNamesId`.
 
 ## Companion HUD
 

@@ -9,10 +9,14 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -152,6 +156,35 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
         return asset.getMergedPool(gender);
     }
 
+    /**
+     * Names from several lists, limited to the given regions and gender, without duplicates. Unknown ids are skipped.
+     */
+    @Nonnull
+    public static String[] resolveMergedPool(@Nonnull Collection<String> ids,
+                                             @Nullable String gender,
+                                             @Nonnull Set<Region> regions) {
+        DefaultAssetMap<String, TwNamesConfig> assetMap = ids.isEmpty() || regions.isEmpty() ? null : getAssetMap();
+        if (assetMap == null) {
+            return new String[0];
+        }
+        ArrayList<String> out = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
+        for (String id : ids) {
+            TwNamesConfig asset = id == null ? null : assetMap.getAsset(id);
+            if (asset != null) {
+                asset.appendPool(out, seen, gender, regions);
+            }
+        }
+        return out.toArray(String[]::new);
+    }
+
+    /** The ids of every loaded name list, sorted. */
+    @Nonnull
+    public static List<String> listIds() {
+        DefaultAssetMap<String, TwNamesConfig> assetMap = getAssetMap();
+        return assetMap == null ? List.of() : List.copyOf(new TreeSet<>(assetMap.getAssetMap().keySet()));
+    }
+
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwNamesConfig> assetMap) {
         INHERITANCE_GATE.repairIfDirty(assetMap);
     }
@@ -244,18 +277,72 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     @Nonnull
     public String[] getMergedPool(@Nullable String gender) {
         ArrayList<String> out = new ArrayList<>();
-        HashSet<String> seen = new HashSet<>();
+        appendPool(out, new HashSet<>(), gender, EnumSet.allOf(Region.class));
+        return out.toArray(String[]::new);
+    }
+
+    private void appendPool(@Nonnull ArrayList<String> out,
+                            @Nonnull HashSet<String> seen,
+                            @Nullable String gender,
+                            @Nonnull Set<Region> regions) {
         boolean maleOnly = isGender(gender, "Male");
         boolean femaleOnly = isGender(gender, "Female");
-        if (!femaleOnly) appendUnique(out, seen, northAmericaMale);
-        if (!maleOnly) appendUnique(out, seen, northAmericaFemale);
-        if (!femaleOnly) appendUnique(out, seen, germanMale);
-        if (!maleOnly) appendUnique(out, seen, germanFemale);
-        if (!femaleOnly) appendUnique(out, seen, spanishMale);
-        if (!maleOnly) appendUnique(out, seen, spanishFemale);
-        if (!femaleOnly) appendUnique(out, seen, brazilianPortugueseMale);
-        if (!maleOnly) appendUnique(out, seen, brazilianPortugueseFemale);
-        return out.toArray(String[]::new);
+        for (Region region : regions) {
+            if (!femaleOnly) appendUnique(out, seen, region.male(this));
+            if (!maleOnly) appendUnique(out, seen, region.female(this));
+        }
+    }
+
+    /** The regional name sets each list holds; the config value matches the JSON key prefix. */
+    public enum Region {
+        NORTH_AMERICA("NorthAmerica"),
+        GERMAN("German"),
+        SPANISH("Spanish"),
+        BRAZILIAN_PORTUGUESE("BrazilianPortuguese");
+
+        private final String configValue;
+
+        Region(@Nonnull String configValue) {
+            this.configValue = configValue;
+        }
+
+        @Nonnull
+        public String toConfigValue() {
+            return configValue;
+        }
+
+        /** The region a config value names, ignoring case, or null when it names none. */
+        @Nullable
+        public static Region fromConfigValueOrNull(@Nullable String value) {
+            if (value != null) {
+                for (Region region : values()) {
+                    if (region.configValue.equalsIgnoreCase(value.trim())) {
+                        return region;
+                    }
+                }
+            }
+            return null;
+        }
+
+        @Nonnull
+        private String[] male(@Nonnull TwNamesConfig names) {
+            return switch (this) {
+                case NORTH_AMERICA -> names.northAmericaMale;
+                case GERMAN -> names.germanMale;
+                case SPANISH -> names.spanishMale;
+                case BRAZILIAN_PORTUGUESE -> names.brazilianPortugueseMale;
+            };
+        }
+
+        @Nonnull
+        private String[] female(@Nonnull TwNamesConfig names) {
+            return switch (this) {
+                case NORTH_AMERICA -> names.northAmericaFemale;
+                case GERMAN -> names.germanFemale;
+                case SPANISH -> names.spanishFemale;
+                case BRAZILIAN_PORTUGUESE -> names.brazilianPortugueseFemale;
+            };
+        }
     }
 
     private static boolean isGender(@Nullable String value, @Nonnull String expected) {
