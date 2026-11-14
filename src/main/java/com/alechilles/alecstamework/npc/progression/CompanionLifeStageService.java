@@ -925,6 +925,42 @@ public final class CompanionLifeStageService {
         return true;
     }
 
+    /**
+     * Replaces stored baby and adolescent roles that are not in the NPC's current role family with that family's.
+     *
+     * <p>A role change outside the lifecycle (a renamed role whose old id now only changes into the new one, or a
+     * wild juvenile tamed into its tamed role) keeps the life-stage component. While the NPC is a baby or adolescent,
+     * the lifecycle switches it to the stored juvenile role, so a stored role from another family would switch it
+     * straight back. The stored adult role is left alone: it keeps the adult chosen at birth, and
+     * {@link #adoptCurrentAdultRole} replaces a stale one once the NPC is in an adult role of the family.
+     *
+     * @return true when a stored juvenile role changed
+     */
+    static boolean adoptCurrentJuvenileRoles(@Nonnull TameworkLifeStageComponent component,
+                                             @Nullable String roleId,
+                                             @Nonnull TwBreedingConfig.RoleFamily family) {
+        if (!family.matchesRole(roleId)) {
+            return false;
+        }
+        boolean changed = false;
+        String baby = component.getBabyRoleId();
+        if (baby != null && !baby.isBlank() && !family.matchesRole(baby)) {
+            component.setBabyRoleId(blankToNull(family.getBabyRoleId()));
+            changed = true;
+        }
+        String adolescent = component.getAdolescentRoleId();
+        if (adolescent != null && !adolescent.isBlank() && !family.matchesRole(adolescent)) {
+            component.setAdolescentRoleId(blankToNull(family.getAdolescentRoleId()));
+            changed = true;
+        }
+        return changed;
+    }
+
+    @Nullable
+    private static String blankToNull(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
     private static boolean normalizeComponentDefaults(TameworkLifeStageComponent component,
                                                       Ref<EntityStore> npcRef,
                                                       Store<EntityStore> store) {
@@ -969,6 +1005,7 @@ public final class CompanionLifeStageService {
             TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForProgression(config, roleId);
             if (family != null) {
                 changed |= adoptCurrentAdultRole(component, roleId, family);
+                changed |= adoptCurrentJuvenileRoles(component, roleId, family);
                 if ((component.getAdultRoleId() == null || component.getAdultRoleId().isBlank())
                         && family.getAdultRoleId() != null
                         && !family.getAdultRoleId().isBlank()) {

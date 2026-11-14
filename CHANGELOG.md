@@ -2,12 +2,20 @@
 
 ## Unreleased
 
+## 5.14.0 - Your Companions First - 2026-11-14
+
 ### Added
 
 - The flute menu lists your own companions above the ones other players share with you, under every sort.
   Selected companions still come first.
 - The flute menu's **+ Filter** offers **My companions only** and **Shared with me only** once someone shares a
   companion with you. The filter shows as a chip you can remove, and saved views keep it.
+
+### Fixed
+
+- A baby or adolescent whose role is changed outside its growth, for example a content pack's renamed role that
+  changes into the new one when it loads, no longer switches straight back to the role it was born with. Its saved
+  juvenile roles now follow the role family of its current role, and it grows up as that family.
 
 ## 5.13.0 - Instant Taming Checks - 2026-11-13
 
