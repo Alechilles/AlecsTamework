@@ -2022,6 +2022,69 @@ $C.@PageOverlay {
               }
             }
 
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsCardFreeNameListsLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.companionCardFreeNameLists;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsCardFreeNameListsTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.companionCardFreeNameLists;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsCardFreeNameListsDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 0;
+                ShowLabel: false;
+                NoItemsText: %server.tamework.ui.settings.noItems.companionCardFreeNameLists;
+              }
+
+              Label #TwSettingsCardFreeNameListsDropdownCaption {
+                Anchor: (Left: 364, Width: 254, Height: 28);
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                HitTestVisible: false;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 34);
+
+              Label #TwSettingsCardFreeRegionsLabel {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: %server.tamework.ui.settings.label.companionCardFreeRegions;
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsCardFreeRegionsTooltip {
+                Anchor: (Left: 0, Width: 340, Height: 28);
+                Text: "";
+                TooltipText: %server.tamework.ui.settings.tooltip.companionCardFreeRegions;
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsCardFreeRegionsDropdown {
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
+                MaxSelection: 0;
+                ShowLabel: false;
+              }
+
+              Label #TwSettingsCardFreeRegionsDropdownCaption {
+                Anchor: (Left: 364, Width: 254, Height: 28);
+                Style: (FontSize: 13, TextColor: #bfcdd5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                HitTestVisible: false;
+              }
+            }
+
             Group { Anchor: (Height: 8); }
 
             Group {

@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateCompo
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.settings.CompanionCardSettingsStore;
 import com.alechilles.alecstamework.ui.TameworkNameInputPage;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -262,7 +263,9 @@ public final class NamingFeatureHandler {
                 itemId,
                 null,
                 null,
-                resolveRandomNamePool(config, gender),
+                source == RequestSource.CARD_FREE
+                        ? resolveFreeRenameNamePool(gender)
+                        : resolveRandomNamePool(config, gender),
                 System.currentTimeMillis(),
                 InputMode.Ui,
                 UUID.randomUUID(),
@@ -944,6 +947,13 @@ public final class NamingFeatureHandler {
     @Nonnull
     private String[] resolveRandomNamePool(@Nullable TwNameItemConfig config) {
         return resolveRandomNamePool(config, null);
+    }
+
+    /** A free rename has no naming item, so the server's companion card settings choose its Random names. */
+    @Nonnull
+    private static String[] resolveFreeRenameNamePool(@Nullable String gender) {
+        CompanionCardSettingsStore.Settings settings = CompanionCardSettingsStore.current();
+        return TwNamesConfig.resolveMergedPool(settings.freeRenameNameLists(), gender, settings.freeRenameRegions());
     }
 
     @Nonnull

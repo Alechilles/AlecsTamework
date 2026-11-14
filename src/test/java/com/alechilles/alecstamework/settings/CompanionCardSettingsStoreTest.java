@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.companioncard.CompanionCardRenameMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,8 +20,10 @@ class CompanionCardSettingsStoreTest {
     @Test
     void savedSettingsLoadBack() {
         Path file = directory.resolve(CompanionCardSettingsStore.FILE_NAME);
+        // No regions ticked must stay empty (it hides the Random button) rather than fall back to all of them.
         CompanionCardSettingsStore.Settings settings = new CompanionCardSettingsStore.Settings(
-                CompanionCardFBehaviour.CYCLE, false, CompanionCardRenameMode.OFF);
+                CompanionCardFBehaviour.CYCLE, false, CompanionCardRenameMode.OFF,
+                List.of("Pack_Names", "TwNamesDefault"), Set.of());
 
         CompanionCardSettingsStore.save(file, settings, null);
 
