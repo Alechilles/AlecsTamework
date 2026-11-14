@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import java.util.ArrayList;
@@ -15,6 +16,23 @@ class CommandPanelCareSortTest {
                 CommandPanelPreferenceService.PanelSort.Hunger, CommandPanelPreferenceService.PanelSort.Thirst)) {
             assertCareOrder(sort);
         }
+    }
+
+    @Test
+    void ownCompanionsListBeforeSharedOnesWithinEachSelectionState() {
+        for (var sort : CommandPanelPreferenceService.PanelSort.values()) {
+            var rows = new ArrayList<>(List.of(
+                    shared(entry("A shared", 50, 100, false, sort)),
+                    entry("Z mine", 50, 100, false, sort),
+                    shared(entry("Selected shared", 50, 100, true, sort))));
+            rows.sort(CommandPanelEntrySourceService.buildComparator(sort));
+            assertEquals(List.of("Selected shared", "Z mine", "A shared"),
+                    rows.stream().map(LinkedNpcEntry::displayName).toList(), sort.name());
+        }
+    }
+
+    private static LinkedNpcEntry shared(LinkedNpcEntry entry) {
+        return entry.withSharedAccess(new LinkedNpcEntry.SharedAccess("Guildmate", AccessLevel.HANDLER));
     }
 
     private void assertCareOrder(CommandPanelPreferenceService.PanelSort sort) {

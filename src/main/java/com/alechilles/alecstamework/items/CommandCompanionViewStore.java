@@ -26,6 +26,7 @@ final class CommandCompanionViewStore {
     private static final String SELECTED_ONLY = "selectedOnly";
     private static final String SPECIES_IDS = "speciesIds";
     private static final String GROUP_IDS = "groupIds";
+    private static final String OWNER = "owner";
 
     private CommandCompanionViewStore() { }
 
@@ -88,6 +89,7 @@ final class CommandCompanionViewStore {
         document.put(SELECTED_ONLY, new BsonBoolean(settings.selectedOnly()));
         document.put(SPECIES_IDS, array(settings.speciesIds()));
         document.put(GROUP_IDS, array(settings.groupIds()));
+        document.put(OWNER, new BsonString(settings.owner()));
         return document;
     }
 
@@ -99,7 +101,7 @@ final class CommandCompanionViewStore {
                 string(document.get(STATE)), bool(document.get(NEARBY)),
                 string(document.get(SEARCH)), string(document.get(SORT)),
                 bool(document.get(SELECTED_ONLY)), strings(document.get(SPECIES_IDS)),
-                strings(document.get(GROUP_IDS)));
+                strings(document.get(GROUP_IDS)), string(document.get(OWNER)));
     }
 
     private static CompanionViewSettings legacyCurrent(@Nullable ItemStack stack) {

@@ -825,27 +825,26 @@ final class CommandPanelEntrySourceService {
             filtered.add(entry);
         }
         CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
-        if (sort == CommandPanelPreferenceService.PanelSort.Default) {
-            filtered.sort(Comparator.comparingInt((LinkedNpcEntry entry) -> entry.active() ? 0 : 1)
-                    .thenComparingInt(entry -> entry.dead() ? 5 : entry.lost() ? 4
-                            : entry.captured() || entry.inCoop() ? 3 : entry.loaded() ? 0 : 1));
-            return filtered;
-        }
-        Comparator<LinkedNpcEntry> comparator = buildComparator(sort);
-        filtered.sort(comparator);
+        filtered.sort(buildComparator(sort));
         return filtered;
     }
 
     static Comparator<LinkedNpcEntry> buildComparator(CommandPanelPreferenceService.PanelSort sort) {
+        // Selected companions come first, then the viewer's own before ones others share with them.
         Comparator<LinkedNpcEntry> base =
-                Comparator.comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1);
+                Comparator.comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1)
+                        .thenComparingInt(value -> value.sharedAccess() == null ? 0 : 1);
         Comparator<LinkedNpcEntry> byName = Comparator
                 .comparing((LinkedNpcEntry value) -> safe(value.displayName()), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(value -> value.npcUuid().toString());
         if (sort == null) {
             return base.thenComparing(byName);
         }
-        // Selected companions remain first for every sort.
+        if (sort == CommandPanelPreferenceService.PanelSort.Default) {
+            // A stable sort keeps the source order within each status.
+            return base.thenComparingInt(entry -> entry.dead() ? 5 : entry.lost() ? 4
+                    : entry.captured() || entry.inCoop() ? 3 : entry.loaded() ? 0 : 1);
+        }
         if (sort == CommandPanelPreferenceService.PanelSort.Happiness) {
             return base.thenComparingDouble((LinkedNpcEntry value) ->
                     careRatio(value.currentHappiness(), value.maxHappiness())).thenComparing(byName);

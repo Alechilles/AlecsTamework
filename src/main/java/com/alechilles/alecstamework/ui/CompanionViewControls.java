@@ -72,6 +72,14 @@ final class CompanionViewControls {
         set(c, values, "#CompanionChipSelected.Visible", current.selectedOnly());
         if (current.selectedOnly() && (values == null || values.changed("#CompanionChipSelected.left", left)))
             c.setObject("#CompanionChipSelected.Anchor", anchor(left, 0, 156, 28));
+        if (current.selectedOnly()) left += 162;
+        boolean ownerFilter = !"All".equals(current.owner());
+        set(c, values, "#CompanionChipOwner.Visible", ownerFilter);
+        if (ownerFilter) {
+            set(c, values, "#CompanionChipOwnerEdit.Text", text("Mine".equals(current.owner()) ? "mineChip" : "sharedChip"));
+            if (values == null || values.changed("#CompanionChipOwner.left", left))
+                c.setObject("#CompanionChipOwner.Anchor", anchor(left, 0, 156, 28));
+        }
         var roster = page.rosterSummaries();
         long selectedTotal = Arrays.stream(roster).filter(LinkedNpcEntry::active).count();
         long matchingSelected = Arrays.stream(current.filter(roster)).filter(LinkedNpcEntry::active).count();
@@ -90,7 +98,7 @@ final class CompanionViewControls {
         bindButton(e, "#CompanionViewManage", "manage");
         bindButton(e, "#CompanionViewIconButton", "icon");
         bindButton(e, "#CompanionAddFilter", "addFilter");
-        for (String type : List.of("Groups", "Species", "Selected")) {
+        for (String type : List.of("Groups", "Species", "Selected", "Owner")) {
             bindButton(e, "#CompanionChip" + type + "Edit", "edit" + type);
             bindButton(e, "#CompanionChip" + type + "Remove", "clear" + type);
         }
@@ -150,7 +158,7 @@ final class CompanionViewControls {
         }
         if (data.viewType != null || data.viewSpecies != null || data.viewGroups != null) {
             if (editor != Editor.FILTER) return true;
-            if (data.viewType != null && List.of("choose", "species", "groups", "selected").contains(data.viewType)) {
+            if (data.viewType != null && List.of("choose", "species", "groups", "selected", "mine", "shared").contains(data.viewType)) {
                 filterType = data.viewType;
                 showFilterType();
             }
@@ -173,6 +181,7 @@ final class CompanionViewControls {
                 case "editGroups" -> { openFilter("groups"); return true; }
                 case "editSpecies" -> { openFilter("species"); return true; }
                 case "editSelected" -> { openFilter("selected"); return true; }
+                case "editOwner" -> { openFilter("Shared".equals(current.owner()) ? "shared" : "mine"); return true; }
                 case "manage" -> { openName(); return true; }
                 case "icon" -> { if (!b.iconOptions().get().isEmpty()) openIcon(); return true; }
                 case "saveView" -> {
@@ -182,6 +191,7 @@ final class CompanionViewControls {
                 case "clearGroups" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), current.speciesIds(), List.of()));
                 case "clearSpecies" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), List.of(), current.groupIds()));
                 case "clearSelected" -> b.edit().accept(current.withExtraFilters(false, current.speciesIds(), current.groupIds()));
+                case "clearOwner" -> b.edit().accept(current.withOwner("All"));
                 case "select" -> b.selectMatching().run();
                 case "cancel" -> { close(); return true; }
                 case "filterSave" -> {
@@ -190,6 +200,8 @@ final class CompanionViewControls {
                         case "species" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), species, current.groupIds()));
                         case "groups" -> b.edit().accept(current.withExtraFilters(current.selectedOnly(), current.speciesIds(), groups));
                         case "selected" -> b.edit().accept(current.withExtraFilters(true, current.speciesIds(), current.groupIds()));
+                        case "mine" -> b.edit().accept(current.withOwner("Mine"));
+                        case "shared" -> b.edit().accept(current.withOwner("Shared"));
                         default -> { error("chooseFilterType"); return true; }
                     }
                     close();
@@ -249,9 +261,16 @@ final class CompanionViewControls {
         c.set("#CompanionViewNameEditor.Visible", false);
         c.set("#CompanionViewIconEditor.Visible", false);
         c.set("#CompanionViewError.Text", "");
-        c.set("#CompanionViewType.Entries", List.of(
+        var types = new ArrayList<>(List.of(
                 option(text("chooseFilterType"), "choose"), option(text("species"), "species"),
                 option(text("groups"), "groups"), option(text("selectedOnly"), "selected")));
+        // Owner choices matter only once someone shares a companion with this viewer.
+        if (!"All".equals(current.owner())
+                || Arrays.stream(page.rosterSummaries()).anyMatch(entry -> entry.sharedAccess() != null)) {
+            types.add(option(text("mineOnly"), "mine"));
+            types.add(option(text("sharedOnly"), "shared"));
+        }
+        c.set("#CompanionViewType.Entries", types);
         c.set("#CompanionViewType.Value", type);
         populate(c, "#CompanionViewSpecies", speciesNames(), species);
         populate(c, "#CompanionViewGroups", groupNames(), groups);
@@ -310,6 +329,9 @@ final class CompanionViewControls {
         c.set("#CompanionViewSpeciesRow.Visible", "species".equals(filterType));
         c.set("#CompanionViewGroupsRow.Visible", "groups".equals(filterType));
         c.set("#CompanionViewSelectedHint.Visible", "selected".equals(filterType));
+        boolean owner = "mine".equals(filterType) || "shared".equals(filterType);
+        c.set("#CompanionViewOwnerHint.Visible", owner);
+        if (owner) c.set("#CompanionViewOwnerHint.Text", text("mine".equals(filterType) ? "mineOnly" : "sharedOnly"));
     }
 
     private void populate(UICommandBuilder c, String selector, Map<String, String> names, List<String> chosen) {

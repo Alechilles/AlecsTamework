@@ -8,7 +8,9 @@ import java.util.Set;
 /**
  * Immutable presentation settings. Null text/lists resolve to empty values; unknown state/sort
  * choices use the defaults. Choices within a dimension are ORed and dimensions are ANDed.
- * Species and group IDs remain stable across display-name or language changes.
+ * Species and group IDs remain stable across display-name or language changes. {@code owner} is
+ * {@code All}, {@code Mine} (the viewer's own companions) or {@code Shared} (ones other owners
+ * share with the viewer).
  */
 public record CompanionViewSettings(String state,
                                     boolean nearby,
@@ -16,10 +18,12 @@ public record CompanionViewSettings(String state,
                                     String sort,
                                     boolean selectedOnly,
                                     List<String> speciesIds,
-                                    List<String> groupIds) {
+                                    List<String> groupIds,
+                                    String owner) {
     private static final Set<String> STATES = Set.of("InWorld", "Stored", "LostDead", "All");
     private static final Set<String> SORTS = Set.of(
             "Default", "Name", "Species", "Group", "Happiness", "Hunger", "Thirst");
+    private static final Set<String> OWNERS = Set.of("All", "Mine", "Shared");
     private static final int MAX_TEXT_LENGTH = 120;
     private static final int MAX_FILTER_IDS = 128;
 
@@ -29,6 +33,13 @@ public record CompanionViewSettings(String state,
         sort = normalizeChoice(sort, SORTS, "Default");
         speciesIds = normalizeIds(speciesIds);
         groupIds = normalizeIds(groupIds);
+        owner = normalizeChoice(owner, OWNERS, "All");
+    }
+
+    /** Settings that show companions of every owner. */
+    public CompanionViewSettings(String state, boolean nearby, String search, String sort,
+                                 boolean selectedOnly, List<String> speciesIds, List<String> groupIds) {
+        this(state, nearby, search, sort, selectedOnly, speciesIds, groupIds, "All");
     }
 
     public static CompanionViewSettings defaults() {
@@ -36,27 +47,31 @@ public record CompanionViewSettings(String state,
     }
 
     public CompanionViewSettings withState(String value) {
-        return new CompanionViewSettings(value, nearby, search, sort, selectedOnly, speciesIds, groupIds);
+        return new CompanionViewSettings(value, nearby, search, sort, selectedOnly, speciesIds, groupIds, owner);
     }
 
     public CompanionViewSettings withNearby(boolean value) {
-        return new CompanionViewSettings(state, value, search, sort, selectedOnly, speciesIds, groupIds);
+        return new CompanionViewSettings(state, value, search, sort, selectedOnly, speciesIds, groupIds, owner);
     }
 
     public CompanionViewSettings withSearch(String value) {
-        return new CompanionViewSettings(state, nearby, value, sort, selectedOnly, speciesIds, groupIds);
+        return new CompanionViewSettings(state, nearby, value, sort, selectedOnly, speciesIds, groupIds, owner);
     }
 
     public CompanionViewSettings withSort(String value) {
-        return new CompanionViewSettings(state, nearby, search, value, selectedOnly, speciesIds, groupIds);
+        return new CompanionViewSettings(state, nearby, search, value, selectedOnly, speciesIds, groupIds, owner);
     }
 
     public CompanionViewSettings withExtraFilters(boolean selected, List<String> species, List<String> groups) {
-        return new CompanionViewSettings(state, nearby, search, sort, selected, species, groups);
+        return new CompanionViewSettings(state, nearby, search, sort, selected, species, groups, owner);
+    }
+
+    public CompanionViewSettings withOwner(String value) {
+        return new CompanionViewSettings(state, nearby, search, sort, selectedOnly, speciesIds, groupIds, value);
     }
 
     public boolean hasExtraFilters() {
-        return selectedOnly || !speciesIds.isEmpty() || !groupIds.isEmpty();
+        return selectedOnly || !speciesIds.isEmpty() || !groupIds.isEmpty() || !"All".equals(owner);
     }
 
     public LinkedNpcEntry[] filter(LinkedNpcEntry[] entries) {
@@ -64,6 +79,11 @@ public record CompanionViewSettings(String state,
                 entries == null ? new LinkedNpcEntry[0] : entries, state, nearby, search);
         return Arrays.stream(base)
                 .filter(entry -> !selectedOnly || entry.active())
+                .filter(entry -> switch (owner) {
+                    case "Mine" -> entry.sharedAccess() == null;
+                    case "Shared" -> entry.sharedAccess() != null;
+                    default -> true;
+                })
                 .filter(entry -> speciesIds.isEmpty()
                         || entry.speciesId() != null && speciesIds.contains(entry.speciesId()))
                 .filter(entry -> groupIds.isEmpty()

@@ -60,7 +60,7 @@ class CommandCompanionViewStoreTest {
     @Test
     void playerComponentRoundTripPreservesSharedViews() {
         var settings = new CompanionViewSettings("Stored", true, "chicken", "Species", false,
-                List.of("Chicken"), List.of("barn"));
+                List.of("Chicken"), List.of("barn")).withOwner("Shared");
         var saved = List.of(new CommandCompanionViews.View(UUID.randomUUID().toString(), "Farm", settings));
         var component = new TameworkCompanionViewsComponent();
         component.views(CommandCompanionViews.encode(saved));

@@ -77,6 +77,8 @@ final class CommandCompanionViewItemDisplay {
                     .map(id -> Message.raw(groups.getOrDefault(id, id))).toList())));
         }
         if (settings.selectedOnly()) lines.add(Message.translation(PREFIX + "selected"));
+        if ("Mine".equals(settings.owner())) lines.add(Message.translation(PREFIX + "mine"));
+        if ("Shared".equals(settings.owner())) lines.add(Message.translation(PREFIX + "shared"));
         if (!settings.search().isEmpty()) lines.add(line("search", Message.raw(settings.search())));
 
         if (lines.isEmpty()) {

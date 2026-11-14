@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.access.AccessLevel;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,21 @@ class CompanionViewSettingsTest {
         assertEquals(List.of("barn"), settings.groupIds());
         assertFalse(CompanionViewSettings.defaults().hasExtraFilters());
         assertEquals("All", settings.withState("all").state());
+    }
+
+    @Test
+    void ownerFilterSeparatesOwnCompanionsFromSharedOnes() {
+        LinkedNpcEntry mine = entry("Mine", "Chicken", false, false);
+        LinkedNpcEntry shared = entry("Shared", "Chicken", false, false)
+                .withSharedAccess(new LinkedNpcEntry.SharedAccess("Guildmate", AccessLevel.HANDLER));
+        LinkedNpcEntry[] roster = {mine, shared};
+        CompanionViewSettings all = CompanionViewSettings.defaults().withState("All");
+
+        assertArrayEquals(roster, all.filter(roster));
+        assertArrayEquals(new LinkedNpcEntry[]{mine}, all.withOwner("Mine").filter(roster));
+        assertArrayEquals(new LinkedNpcEntry[]{shared}, all.withOwner("Shared").filter(roster));
+        assertTrue(all.withOwner("Shared").hasExtraFilters());
+        assertEquals("All", all.withOwner("bad").owner());
     }
 
     @Test

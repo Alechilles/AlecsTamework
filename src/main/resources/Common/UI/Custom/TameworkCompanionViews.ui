@@ -39,6 +39,12 @@ Group #CompanionFilterChips {
     TextButton #CompanionChipSelectedRemove { Anchor: (Right: 0, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.removeFilter; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
     Group { Anchor: (Right: 3, Top: 3, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f2877b); HitTestVisible: false; }
   }
+  Group #CompanionChipOwner {
+    Anchor: (Left: 538, Width: 156, Height: 28);
+    TextButton #CompanionChipOwnerEdit { Anchor: (Left: 0, Right: 32, Height: 28); Text: %server.tamework.ui.views.mineChip; Style: $A.@PanelButtonQuiet; }
+    TextButton #CompanionChipOwnerRemove { Anchor: (Right: 0, Width: 28, Height: 28); Text: ""; Style: $A.@Remove; TooltipText: %server.tamework.ui.views.removeFilter; TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+    Group { Anchor: (Right: 3, Top: 3, Width: 22, Height: 22); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png", Color: #f2877b); HitTestVisible: false; }
+  }
   Label #CompanionHiddenSelection { Anchor: (Right: 0, Width: 280, Height: 28); Style: (FontSize: 11, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center); }
 }
 Group #CompanionViewOverlay {
@@ -66,6 +72,7 @@ Group #CompanionViewOverlay {
       Label #CompanionViewGroupsLabel { Anchor: (Top: 24, Left: 10, Right: 30, Height: 30); Style: (FontSize: 12, TextColor: #bfcdd5, VerticalAlignment: Center); HitTestVisible: false; }
     }
     Label #CompanionViewSelectedHint { Anchor: (Top: 129, Left: 20, Right: 20, Height: 30); Text: %server.tamework.ui.views.selectedOnly; Style: (FontSize: 13, TextColor: #bfcdd5); Visible: false; }
+    Label #CompanionViewOwnerHint { Anchor: (Top: 129, Left: 20, Right: 20, Height: 30); Text: %server.tamework.ui.views.mineOnly; Style: (FontSize: 13, TextColor: #bfcdd5); Visible: false; }
     Label #CompanionViewError { Anchor: (Top: 179, Left: 20, Right: 20, Height: 20); Style: (FontSize: 12, TextColor: #f2877b); }
     TextButton #CompanionViewFilterSave { Anchor: (Top: 202, Right: 20, Width: 125, Height: 28); Text: %server.tamework.ui.views.saveFilter; Style: $A.@PanelButtonPrimary; }
   }
