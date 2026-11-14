@@ -217,6 +217,30 @@ class CompanionLifeStageServiceTest {
     }
 
     @Test
+    void storedJuvenileRolesFollowRoleChangeToAnotherFamily() throws Exception {
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        setPrivateField(family, "adultRoleId", "Tamed_Hushstrider");
+        setPrivateField(family, "babyRoleId", "Tamed_Hushstrider_Young");
+
+        // A renamed baby: its old role only changes into the new one, and the stored old baby role would switch
+        // it back while it is a baby.
+        TameworkLifeStageComponent renamed = new TameworkLifeStageComponent();
+        renamed.setAdultRoleId("Tamed_Shadowhorn");
+        renamed.setBabyRoleId("Tamed_Shadowhorn_Calf");
+        renamed.setAdolescentRoleId("Tamed_Shadowhorn_Yearling");
+        assertTrue(CompanionLifeStageService.adoptCurrentJuvenileRoles(renamed, "Tamed_Hushstrider_Young", family));
+        assertEquals("Tamed_Hushstrider_Young", renamed.getBabyRoleId());
+        assertNull(renamed.getAdolescentRoleId());
+        assertEquals("Tamed_Shadowhorn", renamed.getAdultRoleId());   // the adult chosen at birth is kept
+
+        // Roles of the current family stay, and a body outside every family changes nothing.
+        TameworkLifeStageComponent current = new TameworkLifeStageComponent();
+        current.setBabyRoleId("Tamed_Hushstrider_Young");
+        assertFalse(CompanionLifeStageService.adoptCurrentJuvenileRoles(current, "Tamed_Hushstrider_Young", family));
+        assertFalse(CompanionLifeStageService.adoptCurrentJuvenileRoles(renamed, "Empty_Role", family));
+    }
+
+    @Test
     void isUninitializedAdultComponentDetectsDefaultAdultShell() throws Exception {
         TameworkLifeStageComponent uninitialized = new TameworkLifeStageComponent(
                 CompanionLifeStageService.STAGE_ADULT,

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A baby or adolescent whose role is changed outside its growth, for example a content pack's renamed role that
+  changes into the new one when it loads, no longer switches straight back to the role it was born with. Its saved
+  juvenile roles now follow the role family of its current role, and it grows up as that family.
+
 ## 5.13.0 - Instant Taming Checks - 2026-11-13
 
 ### Added
