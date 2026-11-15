@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 5.15.0 - Random Names Without a Nametag - 2026-11-14
+
 ### Added
 
 - When **Rename from Inspect** is set to **Free**, the naming window now has a **Random** button, even with no
