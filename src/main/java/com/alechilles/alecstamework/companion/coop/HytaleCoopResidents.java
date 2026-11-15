@@ -239,8 +239,12 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
         for (DirectLiveCoopProduceService.Resident resident : residents) {
             TameworkCoopSlotsComponent.Slot entry = resident.entry();
             if (release.releasableNow(at, entry)) {
-                release.release(at, entry, destination(world, resident.roleId(), b, coop.rotationIndex(), coop.config()))
-                        .thenAccept(outcome -> morningOutcome(at, entry, resident.roleId(), outcome));
+                RestoreFlow.Destination to = destination(world, resident.roleId(), b, coop.rotationIndex(), coop.config());
+                if (!HytaleChunkAccess.parksEntitiesAt(world, to.x(), to.y(), to.z())) {
+                    release.release(at, entry, to)
+                            .thenAccept(outcome -> morningOutcome(at, entry, resident.roleId(), outcome));
+                }
+                // Else the coop is loaded but out of the simulated range: its residents wait inside.
                 return;
             }
         }
@@ -392,6 +396,10 @@ public final class HytaleCoopResidents implements CoopRelease.Port {
             return false;
         }
         RestoreFlow.Destination at = destination(world, roleId, coop.block(), coop.rotationIndex(), coop.config());
+        if (HytaleChunkAccess.parksEntitiesAt(world, at.x(), at.y(), at.z())) {
+            // The engine would park the body and report no spawn; the next sweep would add another.
+            return false;
+        }
         NPCPlugin plugin = NPCPlugin.get();
         return plugin.spawnEntity(entities, plugin.getIndex(roleId), new Vector3d(at.x(), at.y(), at.z()),
                 Rotation3f.IDENTITY, null, null) != null;

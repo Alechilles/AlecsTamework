@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.live.CompanionSnapshots;
 import com.alechilles.alecstamework.companion.live.SnapshotProgressionClock;
 import com.alechilles.alecstamework.companion.live.TameworkCompanionComponent;
 import com.alechilles.alecstamework.companion.store.SnapshotEnvelope;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateRestorer;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
@@ -165,6 +166,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                                               UUID npcUuid, Runnable onAdded) {
         Ref<EntityStore> ref = null;
         try {
+            if (parks(world, destination, npcUuid)) {
+                return false;
+            }
             Store<EntityStore> store = world.getEntityStore().getStore();
             Holder<EntityStore> holder = EntityStore.REGISTRY.deserialize(CompanionRespawn.stripDocument(entity));
             if (holder == null) {
@@ -225,6 +229,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             }
             if (npcUuid == null) {
                 warn(profileId, "committed record has no NPC UUID", null);
+                return false;
+            }
+            if (parks(world, destination, profileId)) {
                 return false;
             }
             Store<EntityStore> store = world.getEntityStore().getStore();
@@ -317,6 +324,9 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
                         + committed.roleId() + ")", null);
                 return false;
             }
+            if (parks(world, destination, profileId)) {
+                return false;
+            }
             Store<EntityStore> store = world.getEntityStore().getStore();
             worldGameTimeMs = CompanionWorldTime.gameTimeMs(store);
             Vector3d position = new Vector3d(destination.x(), destination.y(), destination.z());
@@ -398,6 +408,21 @@ public final class HytaleCompanionSpawner implements RestoreFlow.Spawner {
             CompanionModelAttachmentService.applyAttachments(ref, store.getComponent(ref, NPCEntity.getComponentType()),
                     store, work.attachments().getAttachmentIds());
         }
+    }
+
+    /**
+     * True, with a warning, when the destination chunk is loaded but not ticking. The engine would
+     * park a body added there with its chunk and report the add as failed
+     * ({@link HytaleChunkAccess#parksEntitiesAt}), which breaks the contract with
+     * {@link RestoreFlow}: the caller would revert and retry, and every attempt would leave a saved
+     * copy. So nothing is added and the spawn fails cleanly.
+     */
+    private static boolean parks(World world, RestoreFlow.Destination destination, UUID profileId) {
+        if (!HytaleChunkAccess.parksEntitiesAt(world, destination.x(), destination.y(), destination.z())) {
+            return false;
+        }
+        warn(profileId, "the destination chunk is loaded but not ticking", null);
+        return true;
     }
 
     /** An unowned body is untracked: no later recall or Recover may restore its profile from a snapshot. */

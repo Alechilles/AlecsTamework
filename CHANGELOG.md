@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Coop animals no longer duplicate while their coop is in view distance of a player but too far away to be
+  simulated. Each failed morning release left a hidden copy that appeared when someone walked up. Residents now
+  wait inside until the coop is in range. Copies made before this fix stay in the world as ordinary animals.
+
 ## 5.15.0 - Random Names Without a Nametag - 2026-11-14
 
 ### Added

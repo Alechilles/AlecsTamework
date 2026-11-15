@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.compat;
 
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -47,6 +48,31 @@ public final class HytaleChunkAccess {
             return CompletableFuture.supplyAsync(() -> chunkIfInMemory(world, index), world).join();
         }
         return ref.isValid() ? chunkStore.getStore().getComponent(ref, WorldChunk.getComponentType()) : null;
+    }
+
+    /**
+     * True when the chunk at the position is loaded but not ticking (in a player's view distance,
+     * outside the range the world simulates). The engine does not keep an entity added there in
+     * the store: it parks the entity with its chunk section, to load when the section ticks, and
+     * {@code Store#addEntity} returns null as for a refused add. A caller that takes that null as
+     * "nothing was added" and tries again leaves one saved copy per attempt, so check this first.
+     * False for a ticking chunk and for one that is not loaded. World thread only.
+     */
+    public static boolean parksEntitiesAt(@Nonnull World world, double x, double y, double z) {
+        ChunkStore chunkStore = world.getChunkStore();
+        if (chunkStore == null) {
+            return false;
+        }
+        int blockX = (int) Math.floor(x);
+        int blockY = (int) Math.floor(y);
+        int blockZ = (int) Math.floor(z);
+        return nonTicking(chunkStore, chunkStore.getChunkSectionReferenceAtBlock(blockX, blockY, blockZ))
+                || nonTicking(chunkStore, chunkStore.getChunkReference(ChunkUtil.indexChunkFromBlock(blockX, blockZ)));
+    }
+
+    private static boolean nonTicking(ChunkStore chunkStore, @Nullable Ref<ChunkStore> ref) {
+        return ref != null && ref.isValid()
+                && chunkStore.getStore().getArchetype(ref).contains(ChunkStore.REGISTRY.getNonTickingComponentType());
     }
 
     /** Loads the chunk as ticking, replacing {@code World.getChunkAsync} which Update 7 removed. */
