@@ -150,6 +150,8 @@ tasks.named('shadowJar', ShadowJar) {
         skipStringConstants = true
     }
     relocate 'org.slf4j', 'com.alechilles.alecstamework.shadow.slf4j'
+    // Blockbench project files are editor sources kept next to the models; the game never reads them.
+    exclude '**/*.bbmodel'
     // The SQLite driver is only used by the one-time importer. Ship natives for the platforms
     // Hytale servers run on (Windows, Linux, Mac on x86_64/aarch64, plus Alpine/musl containers)
     // and drop the rest. Do not relocate org.sqlite: the JNI symbols in the natives are bound to
