@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Embeds Patchwork 1.5.2. A short Windows file lock at startup no longer leaves a world with no Patchwork
+  patches for that session (recipes, saddles and spawn changes from every mod), and Patchwork's `Diagnostics`
+  folder keeps only its newest copies instead of growing forever.
+
 ## 5.15.1 - Coop Duplication Fix - 2026-11-15
 
 ### Fixed
