@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 5.15.1 - Coop Duplication Fix - 2026-11-15
+
 ### Fixed
 
 - Coop animals no longer duplicate while their coop is in view distance of a player but too far away to be
