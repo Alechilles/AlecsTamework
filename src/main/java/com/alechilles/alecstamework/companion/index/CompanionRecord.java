@@ -84,12 +84,14 @@ public record CompanionRecord(
     }
 
     /**
-     * True when this record counts toward its owner's deployed limits: out in the world and seen.
-     * A {@link #neverSighted() never-seen import} may have no body at all, so it is left out until
-     * its body is matched. It still counts as owned.
+     * True when this record counts toward its owner's deployed limits: out in the world and seen,
+     * or resting in a coop. A coop resident comes out again each morning, so it keeps its slot
+     * overnight; otherwise the slot it frees at night could be filled, here or on another server,
+     * before the morning release is checked. A {@link #neverSighted() never-seen import} may have
+     * no body at all, so it is left out until its body is matched. It still counts as owned.
      */
     public boolean countsAsDeployed() {
-        return isDeployed() && !neverSighted();
+        return isDeployed() ? !neverSighted() : location.kind() == LocationKind.COOP;
     }
 
     @Nonnull

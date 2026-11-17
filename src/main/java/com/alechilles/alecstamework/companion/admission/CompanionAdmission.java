@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.admission;
 
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
 import com.alechilles.alecstamework.companion.index.DomainClaim;
+import com.alechilles.alecstamework.companion.index.LocationKind;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import java.util.Collection;
@@ -24,8 +25,10 @@ import javax.annotation.Nullable;
  * {@link CompanionRecord#countsAsOwned() counts as owned}: out in the world, stored, in an item,
  * in a coop, dead or lost. The deployed limit counts the records that
  * {@link CompanionRecord#countsAsDeployed() count as deployed}: out in the world (LIVE), loaded or
- * not, except an import whose body has not been seen yet. Population groups count their deployed
- * records the same way.</p>
+ * not, except an import whose body has not been seen yet, and resting in a coop. Population groups
+ * count their deployed records the same way. Only a change that puts a record out (LIVE) is
+ * checked, so a coop resident's morning release is checked against the others, coop residents
+ * included, while going into a coop never is.</p>
  *
  * <p>A per-world limit counts a record in {@link #scopeWorld its world}. A record that has been in
  * no world yet (a provisioned companion before its first summon, which has no home world) was
@@ -148,7 +151,8 @@ public final class CompanionAdmission {
 
     /**
      * The provider domain limit that refuses the change, or null. An owned claim counts on every
-     * record of the owner that counts as owned, a deployable claim on the deployed (LIVE) ones;
+     * record of the owner that counts as owned, a deployable claim on the deployed (LIVE) ones and
+     * the coop residents;
      * the claims already stored on the owner's other records are summed by weight. {@code before}
      * is read with the claims stored on it: a bucket is checked only when the record's weight in
      * it grows, so a move that adds nothing passes. A claim whose domain has no limit is refused.
@@ -168,11 +172,12 @@ public final class CompanionAdmission {
                 return new DomainRefusal(claim.domainId(),
                         claim.owned() ? OWNED_LIMIT_MESSAGE_KEY : DEPLOYED_LIMIT_MESSAGE_KEY);
             }
-            if (claim.owned() && claim.weight() > claimWeight(prior, claim.domainId(), false)
+            if (claim.owned() && claim.weight() > claimWeight(prior, claim.domainId(), false, false)
                     && claim.weight() + claimed(ownerRecords, after, claim.domainId(), false) > limit) {
                 return new DomainRefusal(claim.domainId(), OWNED_LIMIT_MESSAGE_KEY);
             }
-            if (claim.deployable() && after.isDeployed() && claim.weight() > claimWeight(prior, claim.domainId(), true)
+            if (claim.deployable() && after.isDeployed()
+                    && claim.weight() > claimWeight(prior, claim.domainId(), true, false)
                     && claim.weight() + claimed(ownerRecords, after, claim.domainId(), true) > limit) {
                 return new DomainRefusal(claim.domainId(), DEPLOYED_LIMIT_MESSAGE_KEY);
             }
@@ -216,15 +221,24 @@ public final class CompanionAdmission {
         long sum = 0;
         for (CompanionRecord record : records) {
             if (!record.profileId().equals(self.profileId())) {
-                sum += claimWeight(record, domainId, deployed);
+                sum += claimWeight(record, domainId, deployed, true);
             }
         }
         return sum;
     }
 
-    /** What {@code record} holds in a domain's owned or deployed bucket; 0 when it is not counted there. */
-    private static long claimWeight(@Nullable CompanionRecord record, String domainId, boolean deployed) {
-        if (record == null || !record.countsAsOwned() || (deployed && !record.isDeployed())) {
+    /**
+     * What {@code record} holds in a domain's owned or deployed bucket; 0 when it is not counted there.
+     * {@code coopCounts}: a coop resident holds its deployed weight. True for the owner's other
+     * records; false for the record being changed, so its release from a coop is checked.
+     */
+    private static long claimWeight(@Nullable CompanionRecord record, String domainId, boolean deployed,
+                                    boolean coopCounts) {
+        if (record == null || !record.countsAsOwned()) {
+            return 0;
+        }
+        if (deployed && !record.isDeployed()
+                && !(coopCounts && record.location().kind() == LocationKind.COOP)) {
             return 0;
         }
         long sum = 0;
