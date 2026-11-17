@@ -58,13 +58,13 @@ def chickens(t, r=48):
             OWNED: sum(1 for e in rows if e.get("role") == OWNED)}
 
 
-def advance(t, seconds, at=None):
+def advance(t, seconds, at=None, side=HUB):
     at = at or t.ctx["coop"]
-    return t.hook(f"tw debug coop advance {seconds} --at {at[0]} {at[1]} {at[2]} {W}")
+    return t.hook(f"tw debug coop advance {seconds} --at {at[0]} {at[1]} {at[2]} {W}", side=side)
 
 
-def set_hour(t, hour):
-    t.note(f"time {hour}: {t.console(HUB, f'time {hour} {W}')[:1]}")
+def set_hour(t, hour, side=HUB):
+    t.note(f"time {hour} on {side}: {t.console(side, f'time {hour} {W}')[:1]}")
 
 
 def sleep(t, seconds, what):
@@ -73,19 +73,19 @@ def sleep(t, seconds, what):
     t.note(f"waited {seconds} s: {what}")
 
 
-def find_coop(t):
-    rows = tk(t, f"/blocks?world=default&x={SPOT[0]}&y={FEET}&z={SPOT[1]}&r=3&filter=Coop_Chicken")
+def find_coop(t, side=HUB):
+    rows = t.B.tk(f"/blocks?world=default&x={SPOT[0]}&y={FEET}&z={SPOT[1]}&r=3&filter=Coop_Chicken", side=side)
     cells = sorted({(r["x"], r["y"], r["z"]) for r in rows}) if isinstance(rows, list) else []
     for cell in cells:
-        r = advance(t, 1, at=cell)
-        if not (r.refused and r.reason == "no-coop"):
+        r = advance(t, 1, at=cell, side=side)
+        if r.ok or (r.refused and r.reason == "roaming-now"):
             return cell
     return None
 
 
-def place_coop(t):
+def place_coop(t, side=HUB):
     B = t.B
-    t.console(HUB, f"give {OWNER} Coop_Chicken --quantity=1")
+    t.console(side, f"give {OWNER} Coop_Chicken --quantity=1")
     B.tp(BOT_AT_PLACE[0], FEET, BOT_AT_PLACE[1])
     if not B.select("Coop_Chicken").get("ok"):
         return None
@@ -93,7 +93,7 @@ def place_coop(t):
         return None
     u = B.use_item(hold=0.25)
     t.note(f"place: landed={u.get('landed')} changes={u.get('changes')}")
-    return t.wait(lambda: find_coop(t), 10)
+    return t.wait(lambda: find_coop(t, side), 10)
 
 
 def spawn_wild(t, role, x, z):
@@ -102,10 +102,10 @@ def spawn_wild(t, role, x, z):
     t.note(f"npc spawn {role} at {x},{z}: {r.lines[:1]}")
 
 
-def spawn_owned(t, x, z):
+def spawn_owned(t, x, z, side=HUB):
     end = time.time() + 40
     while True:
-        r = t.hook(f"tw npc spawn tamed {OWNED} --owner {OWNER} --at {x} {FEET} {z}")
+        r = t.hook(f"tw npc spawn tamed {OWNED} --owner {OWNER} --at {x} {FEET} {z}", side=side)
         if not (r.refused and r.get("detail") == "provider-decision-pending") or time.time() > end:
             break
         time.sleep(1.5)
