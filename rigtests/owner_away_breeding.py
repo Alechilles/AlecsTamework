@@ -13,13 +13,18 @@ ADULT, CALF = "Tamed_Cow", "Tamed_Cow_Calf"
 
 def travel(t, dest, server_id, owner=OWNER):
     t.B.use(owner)
-    t.say(f"/server {server_id}")
 
     def arrived():
         player = t.B.tk(f"/player?name={owner}", side=dest)
         return isinstance(player, dict) and player.get("world")
 
-    return t.check(bool(t.wait(arrived, 120)), f"The owner arrived on {dest}")
+    for _ in range(2):
+        t.B.ensure_ready()
+        sent = t.say(f"/server {server_id}")
+        t.note(sent)
+        if sent.get("ok") and t.wait(arrived, 60):
+            return t.check(True, f"The owner arrived on {dest}")
+    return t.check(False, f"The owner arrived on {dest}", sent)
 
 
 def enable_parent(t, entity, x):
