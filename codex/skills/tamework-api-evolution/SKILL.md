@@ -53,7 +53,5 @@ implementations and consumers.
 3. Compile and test Tamework plus available sibling/downstream consumers.
 4. Update the public reference, recipe when useful, capability guidance,
    compatibility note, and changelog.
-5. Do not add tests that only assert method presence, enum membership, or
-   implementation structure.
-6. Report source/API versions, compatibility strategy, capabilities, adapters,
+5. Report source/API versions, compatibility strategy, capabilities, adapters,
    results, events, self-test coverage, downstream checks, and evidence gaps.

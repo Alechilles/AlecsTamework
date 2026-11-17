@@ -11,21 +11,16 @@ Keep interaction prompts and interaction execution perfectly aligned.
 
 1. Read `references/interaction-checklist.md`.
 2. Read `references/prompt-state-matrix.md`.
-3. Use `$hytale-asset-tools` and lock the exact project profile. Inspect the
-   full sensor -> prompt -> action -> state change -> cooldown/reset path with
-   declared/effective provenance, references, findings, and actionable
-   advisories.
+3. Follow the `hytale-asset-tools` skill (exact profile, `author options`
+   instead of a static type list, affected-scope candidate validation). Inspect
+   the full sensor -> prompt -> action -> state change -> cooldown/reset path,
+   and build the config and role wiring as one candidate.
 4. Use `$hytale-asset-inheritance-contract` for every `TwInteractionConfig`
    parent/fallback change. Do not flatten inherited values into children.
-5. Use `author options` for role action/sensor/filter/state shapes and
-   same-profile reviewed examples for orientation. Never author from a static
-   type list.
-6. Use `hytale-workshop-mcp` when command or interaction behavior depends on
-   vanilla Hytale prompt, item interaction, sensor, action, target, cooldown, or
-   role semantics not established by repo/profile evidence.
-7. Build the config and role wiring as one read-only candidate. Run `author
-   validate --scope affected` before materialization.
-8. Generate verification for prompt visibility, executable action, denied
+5. When command or interaction behavior depends on vanilla prompt, item
+   interaction, sensor, action, target, cooldown, or role semantics that repo
+   and profile evidence do not settle, look it up in rune-kb.
+6. Generate verification for prompt visibility, executable action, denied
    conditions, mode cycle, cooldown, reset, target loss, and ownership where
    applicable. Use logs and live behavior only as additional runtime evidence.
 

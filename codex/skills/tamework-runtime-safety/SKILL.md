@@ -35,25 +35,14 @@ boundary.
   not current authority.
 - Every delayed task, executor, cache, retry, and listener needs an ownership
   scope, cancellation or closure path, and bounded failure behavior.
-
-## Optimize Deliberately
-
-- Prefer dirty signals, indexes, bounded batches, cache keys, and adaptive
-  backoff over frequent global scans.
 - Separate discovery cadence, target-refresh cadence, and presentation cadence.
   Do not reduce all intervals to improve one visible response.
-- Avoid streams, reflection, repeated parsing, collection copies, and object
-  construction in tick paths when a simple loop or cached immutable value is
-  clear.
-- Keep logs out of per-tick paths unless debug-gated and throttled.
 - Do not expand architecture-guard allowlists to make a shortcut pass.
 
 ## Route Related Work
 
 - Use the owning domain skill as well: command runtime, progression, avatar
   flight, persistence, or API evolution.
-- Use `$tamework-test-authoring` only for a behavior regression or a documented
-  high-impact static safety invariant that cannot be exercised reliably.
 
 ## Verify
 

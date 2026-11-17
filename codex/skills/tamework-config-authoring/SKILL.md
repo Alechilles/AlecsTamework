@@ -41,7 +41,7 @@ Treat each config family as a runtime contract, not as one Java codec.
   restoration, migration, or override persistence.
 - Use `$tamework-test-authoring` only after the test-value gate identifies an
   observable production regression.
-- Use `hytale-workshop-mcp` when the contract depends on base-game semantics
+- Check rune-kb when the contract depends on base-game semantics
   that current Tamework source does not establish.
 
 ## Verify
@@ -56,12 +56,4 @@ Treat each config family as a runtime contract, not as one Java codec.
 
 ## Localize Player-Facing Text
 
-Follow `AGENTS.md` → **Player-Facing Localization** for every UI, HUD, tooltip,
-notification, prompt, command response, help description, and validation message.
-Use language keys and whole-sentence placeholders, resolve for the recipient,
-and supply actual translations in every supported locale in the same change
-(`en-US`, `de-DE`, `es-ES`, `fr-FR`, `fr-CA`, `pt-BR`). English fallback copies
-and key parity alone do not complete localization. Preserve player names,
-command syntax, IDs, and placeholders. Check the current language directories
-when adding support; do not assume Spanish is exempt because legacy content
-was partial.
+Follow `AGENTS.md` -> **Player-Facing Localization** for all player-facing text (language keys, real translations in every locale in the same change, `es-ES` included).

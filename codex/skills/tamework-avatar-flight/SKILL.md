@@ -18,7 +18,7 @@ NPC state, visuals, and cleanup must agree on the same lifecycle.
    animation, VFX/audio, HUD, and teardown.
 4. Identify the current owner and clock for every timer. Do not add a timer to
    a tick system when a component or focused service already owns the state.
-5. Use `hytale-workshop-mcp` before designing behavior that depends on
+5. Check rune-kb before designing behavior that depends on
    base-game packet order, mounting, player transfer, model, equipment, or
    entity-lifetime semantics not proven by current repo evidence.
 
@@ -68,4 +68,4 @@ NPC state, visuals, and cleanup must agree on the same lifecycle.
 4. Verify player-visible model, equipment, rider, HUD, audio, and source NPC
    state in a live server when static tests cannot prove the result.
 5. Report session identity, input ordering, world ownership, reconstruction,
-   all cleanup surfaces, Workshop evidence, and remaining live gaps.
+   all cleanup surfaces, rune-kb evidence, and remaining live gaps.

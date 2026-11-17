@@ -57,12 +57,9 @@ Load more than one focused skill when a change crosses boundaries.
 
 ## Execute Change Pattern
 
-1. For NPC JSON work, also use `$hytale-asset-tools`:
-   - lock the intended release profile and plugin set;
-   - inspect declared/effective assets, references, findings, and actionable
-     advisories;
-   - use `author options` rather than remembered builder IDs;
-   - retain profile, knowledge, and snapshot identity.
+1. For NPC JSON or asset changes, follow the `hytale-asset-tools` skill (exact
+   profile, `author options` over remembered builder IDs, affected-scope
+   candidate validation).
 2. Edit all required layers, not just one file.
    - For new NPC action/sensor/filter types, update the builder class, runtime
      class, builder registrar, and docs.
@@ -73,19 +70,17 @@ Load more than one focused skill when a change crosses boundaries.
      names, and asset paths as API.
    - Avoid renaming existing IDs unless explicitly requested as a breaking
      change.
-4. For asset changes, build a read-only candidate and run `author validate
-   --scope affected`. Generate verification for behavior-sensitive builders,
-   role changes, ownership, lifecycle, target-loss, and downstream consumers.
 
 ## Apply Tamework-Specific Rules
 
-- When a change depends on vanilla Hytale semantics, APIs, gamedata, client UI, or javadocs, use `hytale-workshop-mcp` for the base-game evidence before designing the Tamework-side edit.
+- When a change depends on vanilla Hytale semantics, APIs, gamedata, client UI,
+  or javadocs, get the base-game evidence from rune-kb (`kb_search`,
+  `kb_symbol`, `kb_asset`; `kb_ui` for `.ui`) before designing the
+  Tamework-side edit.
 - For runtime reports, compare source repo and `Modding\run\mods` before assuming the game loaded the edited files. Use `UserData\Mods` only when diagnosing a legacy/manual install.
 - Treat current Java registration plus the exact project profile as authority.
   A skill reference, old asset, shipped example, runtime copy, or remembered ID
   is discovery evidence only.
-- Keep knowledge heuristics review-only. Do not auto-remove fallbacks, flatten
-  inherited defaults, or reorder catch-all behavior without explicit review.
 
 ## Validate Before Finalizing
 
@@ -94,30 +89,16 @@ Load more than one focused skill when a change crosses boundaries.
    Use `bash ../gradlew -p .. stageAllModAssets` to stage configured Java mods
    and linked asset packs into `Modding\run\mods`; do not use `runAllMods` for
    staging, because it launches a Hytale server.
-   Launch `runAllMods` only when live-server verification is explicitly needed.
-   Before launching, verify that no existing test server owns the target port,
-   record the launched process tree, and terminate that exact tree immediately
-   after collecting the required evidence. Never stop a server that Codex did
-   not launch.
-2. Confirm JSON paths and IDs against current registration/source, then run
-   exact-profile affected-scope candidate validation.
-3. Execute the generated verification plan to the available static/live level;
-   report unsupported claims as gaps.
-4. Report code edits, asset follow-up, project/knowledge/snapshot identity,
-   candidate outcome, and verification evidence.
-5. If runtime or tick code changed, use `$tamework-runtime-safety` and run its
+   Launch `runAllMods` only when live-server verification is explicitly needed,
+   with the port and process ownership rules in `$tamework-runtime-safety`.
+   Never stop a server that you did not launch in this session.
+2. Confirm JSON paths and IDs against current registration and source.
+3. If runtime or tick code changed, use `$tamework-runtime-safety` and run its
    current guard checks.
-6. If base-game evidence was used, cite the Workshop corpus/version plus FQCN,
-   method, asset path, or UI path that drove the Tamework decision.
+4. Report code edits, asset follow-up, and verification evidence. If base-game
+   evidence was used, cite the rune-kb view and snapshot plus the FQCN, method,
+   asset path, or UI path that drove the Tamework decision.
 
 ## Localize Player-Facing Text
 
-Follow `AGENTS.md` → **Player-Facing Localization** for every UI, HUD, tooltip,
-notification, prompt, command response, help description, and validation message.
-Use language keys and whole-sentence placeholders, resolve for the recipient,
-and supply actual translations in every supported locale in the same change
-(`en-US`, `de-DE`, `es-ES`, `fr-FR`, `fr-CA`, `pt-BR`). English fallback copies
-and key parity alone do not complete localization. Preserve player names,
-command syntax, IDs, and placeholders. Check the current language directories
-when adding support; do not assume Spanish is exempt because legacy content
-was partial.
+Follow `AGENTS.md` -> **Player-Facing Localization** for all player-facing text (language keys, real translations in every locale in the same change, `es-ES` included).

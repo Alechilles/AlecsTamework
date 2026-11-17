@@ -8,7 +8,7 @@ Use this map before broad repo searches. It routes common Tamework tasks to the 
 - The normal development runtime is under `C:\Users\22ale\AppData\Roaming\Hytale\Modding\run\mods`. Treat `UserData\Mods\alecstamework` as a legacy/manual runtime copy. Use the runtime checklist to identify the loaded artifact.
 - Check `git status --short` before edits and keep unrelated dirty files isolated.
 - Prefer fixed-string `rg` searches for asset IDs, interaction type names, and class names before using broad regexes.
-- If base-game behavior is unclear, use `hytale-workshop-mcp` and Hytale Workshop MCP. Verify the indexed version and separate evidence from inference. Inspect Tamework source or logs first for mod-specific questions.
+- If base-game behavior is unclear, use rune-kb, note the view and snapshot it read, and separate evidence from inference. Inspect Tamework source or logs first for mod-specific questions.
 - Repository-owned Codex skills live under `codex/skills`. Run
   `bash scripts/tools/link-codex-skills.sh` after adding or renaming one.
 
