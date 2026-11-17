@@ -67,7 +67,7 @@ companion index, in their configured global or per-world scope:
 `limitPerPlayerOwnedTotal` counts every owned companion (out in the world,
 stored, in capture items, in coops, dead and lost), and
 `limitPerPlayerDeployedTotal` counts the companions out in the world, loaded or
-not. Both are checked in the same locked step that changes the companion.
+not, and coop residents. Both are checked in the same locked step that changes the companion.
 
 Tamework shares reflected SimpleClaims capabilities for the current live
 plugin generation. A stopped or replaced SimpleClaims instance is detected

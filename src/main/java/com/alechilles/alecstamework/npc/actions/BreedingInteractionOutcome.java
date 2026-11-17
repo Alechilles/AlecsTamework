@@ -24,6 +24,7 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
         CLAIM_REQUIRED,
         INTEGRATION_UNAVAILABLE,
         BIRTH_PENDING,
+        OWNER_AWAY,
         UNAVAILABLE
     }
 
@@ -77,6 +78,10 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
         return new BreedingInteractionOutcome(Status.BIRTH_PENDING, 0);
     }
 
+    static BreedingInteractionOutcome ownerAway() {
+        return new BreedingInteractionOutcome(Status.OWNER_AWAY, 0);
+    }
+
     static BreedingInteractionOutcome unavailable() {
         return new BreedingInteractionOutcome(Status.UNAVAILABLE, 0);
     }
@@ -109,6 +114,7 @@ record BreedingInteractionOutcome(Status status, int requiredHappiness) {
             case CLAIM_REQUIRED -> text("claimRequired");
             case INTEGRATION_UNAVAILABLE -> text("integrationUnavailable");
             case BIRTH_PENDING -> text("birthPending");
+            case OWNER_AWAY -> text("ownerAway");
             case UNAVAILABLE -> text("unavailable");
         };
     }

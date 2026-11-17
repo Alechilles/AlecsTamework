@@ -126,7 +126,7 @@ public final class CompanionIndex {
     }
 
     public int deployedCount(@Nonnull UUID owner) {
-        return count(owner, r -> r.countsAsOwned() && r.isDeployed());
+        return count(owner, r -> r.countsAsOwned() && r.countsAsDeployed());
     }
 
     @Nullable

@@ -278,4 +278,40 @@ class CompanionAdmissionTest {
         CompanionRecord wild = CompanionRecord.builder(UUID.randomUUID(), "Sheep", CompanionLocation.live("w", 1, 64, 1)).build();
         assertNull(CompanionAdmission.check(List.of(), null, wild, rules(0, false), NONE));
     }
+
+    // --- Coop residents hold their deployed slot overnight ---
+
+    private static final CompanionLocation COOP = CompanionLocation.coop("w", 4, 64, 4, 0);
+
+    @Test
+    void aCoopResidentKeepsItsDeployedSlotSoItsNightCannotBeUsedToTameMore() {
+        CompanionRecord out = rec("Sheep", LIVE);
+        CompanionRecord asleep = rec("Chicken", COOP);
+        List<CompanionRecord> mine = List.of(out, asleep);
+
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.check(mine, null, rec("Cow", LIVE), limits(0, 2, false), NONE));
+        // Its morning release takes back its own slot.
+        assertNull(CompanionAdmission.check(mine, asleep, movedTo(asleep, LIVE), limits(0, 2, false), NONE));
+        // Walking into the coop at night is never refused.
+        assertNull(CompanionAdmission.check(mine, out, movedTo(out, COOP), limits(0, 1, false), NONE));
+        // An owner over the limit keeps the resident in the coop.
+        List<CompanionRecord> over = List.of(out, rec("Sheep", LIVE), asleep);
+        assertEquals(CompanionAdmission.Refusal.DEPLOYED,
+                CompanionAdmission.check(over, asleep, movedTo(asleep, LIVE), limits(0, 2, false), NONE));
+    }
+
+    @Test
+    void aCoopResidentKeepsItsDeployableClaimSoAProviderLimitCountsIt() {
+        CompanionRecord asleep = claiming(COOP, deployable(1));
+        List<CompanionRecord> mine = List.of(claiming(LIVE, deployable(1)), asleep);
+        CompanionAdmission.Provided two = provided(deployable(1), 2);
+
+        assertEquals(CompanionAdmission.Refusal.PROVIDER_DENIED,
+                CompanionAdmission.check(mine, null, rec("Cow", LIVE), rules(0, false), two));
+        assertNull(CompanionAdmission.check(mine, asleep, movedTo(asleep, LIVE), rules(0, false), two));
+        assertEquals(CompanionAdmission.Refusal.PROVIDER_DENIED, CompanionAdmission.check(
+                List.of(claiming(LIVE, deployable(1)), claiming(LIVE, deployable(1)), asleep),
+                asleep, movedTo(asleep, LIVE), rules(0, false), two));
+    }
 }

@@ -288,4 +288,22 @@ class PortableSyncTest {
         a.sync.ownerLeft(ALICE);
         assertFalse(a.sync.refresh(cow).get(5, TimeUnit.SECONDS), "once they left, no longer");
     }
+
+    /**
+     * Only the server an owner is on adds to their limits. A join counts at once, before its read
+     * of the network finishes or even when the network is down: until then the copies from the
+     * owner's last visit are counted.
+     */
+    @Test
+    void anOwnerIsHereFromTheirJoinUntilTheyLeaveEvenWhileTheNetworkIsDown() {
+        Server a = new Server("A");
+        assertFalse(a.sync.ownerHere(ALICE));
+
+        network.down = true;
+        a.sync.ownerJoined(ALICE);
+        assertTrue(a.sync.ownerHere(ALICE));
+
+        a.sync.ownerLeft(ALICE);
+        assertFalse(a.sync.ownerHere(ALICE));
+    }
 }

@@ -129,6 +129,11 @@ public final class ProviderAdmission {
                 });
     }
 
+    /** True when an admission provider manages {@code roleId} (its answer may be stale). */
+    public boolean manages(@Nonnull String roleId) {
+        return managedForRole.apply(roleId) != null;
+    }
+
     /** A stage with no managed roles: every change passes without claims. */
     @Nonnull
     public static ProviderAdmission none() {

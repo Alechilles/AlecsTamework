@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -126,6 +127,10 @@ final class BreedingHytalePairingService {
                     : BreedingInteractionOutcome.integrationUnavailable();
         }
         BreedingPairContext context = createContext(candidate, config);
+        if (ownerAway(context)) {
+            // On a server network a litter is only admitted where its owner is; the pair waits for them.
+            return BreedingInteractionOutcome.ownerAway();
+        }
         BreedingPairAdmissionRegistry.Lease admission =
                 admissionRegistry.tryAcquire(
                         candidate.store(),
@@ -163,6 +168,12 @@ final class BreedingHytalePairingService {
             return BreedingInteractionOutcome.unavailable();
         }
         return scheduleOrdinaryBirth(candidate.world(), context, litter, admission);
+    }
+
+    /** True when a parent's owner is on another server of a network and their limits count this role. */
+    private static boolean ownerAway(BreedingPairContext context) {
+        return OwnerPopulationCapService.ownerAway(context.parentAOwner().ownerId(), context.parentARoleId())
+                || OwnerPopulationCapService.ownerAway(context.parentBOwner().ownerId(), context.parentBRoleId());
     }
 
     private BreedingInteractionOutcome scheduleOrdinaryBirth(

@@ -41,13 +41,14 @@ There are two per-player limits. Both use `perPlayerLimitScope` (`PerWorld` or
 
 | Setting | Key in `tamework-settings.json` | Counts |
 | --- | --- | --- |
-| Max companions out in the world per player | `population.limitPerPlayerDeployedTotal` | Companions that are out in the world, loaded or not. |
+| Max companions out in the world per player | `population.limitPerPlayerDeployedTotal` | Companions that are out in the world, loaded or not, and coop residents. |
 | Max companions owned per player | `population.limitPerPlayerOwnedTotal` | Every owned companion: out, stored, in items, in coops, dead and lost. |
 
 - The deployed limit is checked when a change puts a companion out in the world:
   a tame, a summon, a release from a capture item, a revive, a recover, a coop
   release, a birth, or a tamed spawn. Storing or capturing a companion frees a
-  place.
+  place. A coop resident keeps its place overnight, so its morning release
+  takes back its own place and a coop's night never frees one.
 - The owned limit is checked when a player gets one more companion: a tame, a
   capture, a provision or a claim. Summoning a companion the player already owns
   is not an owned-limit change.
@@ -334,7 +335,7 @@ minute, or at once when the network mod sends a notice.
 - If a limit appears wrong, remember what each one counts. The owned limit
   counts every owned companion, including those stored, in capture items, in
   coops, dead and lost. The deployed limit counts companions out in the world,
-  loaded or not. Nearby loaded NPCs are not the complete count. A companion
+  loaded or not, and coop residents. Nearby loaded NPCs are not the complete count. A companion
   stuck in a capture item that no longer exists can be resolved with Recall or
   Forget in the panel, or `/tw companions forget|restore`.
 - If breeding is denied, verify the Claim Mod setting, the claim in that claim

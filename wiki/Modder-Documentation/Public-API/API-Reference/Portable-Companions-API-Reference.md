@@ -95,4 +95,11 @@ carry and trade lanterns there. Without a store, only world names match.
 - Durability is best effort, like the rest of the store. A crash right after a
   change can lose it.
 - Counts of companions held on other servers refresh when the owner joins.
+  Until that read finishes, the counts from the owner's last visit apply.
+- Only the server the owner is on adds to their limits. Where an owner is not
+  connected, a change that would give them one more companion that a limit
+  counts (a tame, a birth, a tamed spawn) is refused, and breeding pairs of
+  theirs wait until they are back. Coop releases, moves and changes to
+  companions they already have still happen. Companions no limit counts are not
+  affected.
 - Deploy the same Tamework build to every server of the network.

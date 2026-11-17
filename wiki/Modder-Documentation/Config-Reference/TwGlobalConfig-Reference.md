@@ -118,7 +118,8 @@ These legacy fields are still decoded but `/tw settings` is authoritative:
   counting every owned companion (out in the world, stored, in items, in coops,
   dead and lost); `0` means no limit.
 - `Population.LimitPerPlayerDeployedTotal`: maximum companions a player can have
-  out in the world, loaded or not; `0` means no limit. Default `0`.
+  out in the world, loaded or not, counting coop residents; `0` means no limit.
+  Default `0`.
 - `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for both
   limits.
 

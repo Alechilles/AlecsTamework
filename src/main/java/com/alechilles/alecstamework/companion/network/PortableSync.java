@@ -94,6 +94,8 @@ public final class PortableSync implements AutoCloseable {
     private final Map<UUID, Map<UUID, CompanionRecord>> elsewhere = new ConcurrentHashMap<>();
     /** Owners whose entries were read since they joined: this server's copies of them are current. */
     private final Set<UUID> loadedOwners = ConcurrentHashMap.newKeySet();
+    /** Owners connected to this server now, whether or not their entries were read yet. */
+    private final Set<UUID> presentOwners = ConcurrentHashMap.newKeySet();
     private long backoffMs;
     private long nextPushAtMs;
     private long nextWarnAtMs = Long.MIN_VALUE;
@@ -322,6 +324,7 @@ public final class PortableSync implements AutoCloseable {
     /** Reads an owner's entries in the background (call when they join). */
     public void ownerJoined(@Nonnull UUID owner) {
         Objects.requireNonNull(owner, "owner");
+        presentOwners.add(owner);
         loadedOwners.remove(owner);
         if (active()) {
             submitLoad(owner, 0);
@@ -334,6 +337,17 @@ public final class PortableSync implements AutoCloseable {
      */
     public void ownerLeft(@Nonnull UUID owner) {
         loadedOwners.remove(Objects.requireNonNull(owner, "owner"));
+        presentOwners.remove(owner);
+    }
+
+    /**
+     * Whether additions to {@code owner}'s limits may be admitted here: always without a store,
+     * otherwise only while the owner is connected to this server. Only the server the owner is on
+     * adds to their limits, so the other servers' companions it counts (read when they joined) stay
+     * exact. Until that read finishes, the copies from the owner's last visit are counted. Lock-free.
+     */
+    public boolean ownerHere(@Nonnull UUID owner) {
+        return !active() || presentOwners.contains(owner);
     }
 
     private void submitLoad(UUID owner, int attempt) {

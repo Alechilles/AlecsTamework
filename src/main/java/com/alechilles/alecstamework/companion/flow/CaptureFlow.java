@@ -352,7 +352,8 @@ public final class CaptureFlow<R> {
             case OWNED, DEPLOYED -> Result.OWNED_LIMIT;
             case GROUP_OWNED, GROUP_DEPLOYED -> Result.GROUP_LIMIT;
             case PROVIDER_DENIED, DEPLOY_BLOCKED -> Result.PROVIDER_DENIED;
-            case PROVIDER_UNAVAILABLE -> Result.PROVIDER_UNAVAILABLE;
+            // The new owner is on another server: like an unavailable provider, it may pass later.
+            case PROVIDER_UNAVAILABLE, OWNER_AWAY -> Result.PROVIDER_UNAVAILABLE;
         };
     }
 

@@ -54,8 +54,9 @@ public interface PopulationGroupApi {
     }
 
     /**
-     * Counts LIVE companions only: those with a body in a world, loaded or not.
-     * Captured, housed, stored, dead, lost and released companions do not count.
+     * Counts LIVE companions, those with a body in a world, loaded or not, and coop
+     * residents, which keep their place overnight. Captured, stored, dead,
+     * lost and released companions do not count.
      * This read is a prompt precheck, not a capacity reservation.
      */
     @Nonnull

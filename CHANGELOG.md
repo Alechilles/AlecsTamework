@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 5.15.2 - Coop and Network Population Limits - 2026-11-17
+
+### Fixed
+
+- Animals keep their deployed slots while they sleep in a coop, including slots counted by Husbandry.
+  Players who are already over a limit keep their animals. A resident waits in the coop until it can come out within the limit.
+- On networks that share companion records, sleeping residents count across servers toward network-wide limits.
+  Breeding pairs wait for their owner to return, and a server declines tamed spawns for an absent owner when a population limit applies.
+
 ## 5.15.1 - Coop Duplication Fix - 2026-11-15
 
 ### Fixed
