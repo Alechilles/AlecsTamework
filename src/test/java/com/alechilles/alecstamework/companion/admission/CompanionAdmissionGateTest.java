@@ -250,4 +250,43 @@ class CompanionAdmissionGateTest {
                         CompanionAdmission.DEPLOYED_LIMIT_MESSAGE_KEY),
                 managedGate.denyBatch(owner, List.of(live("Cow"), live("Cow"), live("Cow"))));
     }
+
+    /**
+     * Server networks: another server's companions are counted as they were when the owner joined
+     * here, so only the server the owner is on may add to their limits. A litter or a tamed spawn
+     * for an owner on another server would otherwise pass a limit that server has already filled.
+     */
+    @Test
+    void anOwnerOnAnotherServerGetsNoNewCompanionHereButTheirCoopStillOpens() {
+        CompanionAdmissionGate limited = CompanionAdmissionGate.withRules(index,
+                () -> new CompanionAdmission.Rules(0, 5, false, role -> List.of()));
+        limited.useOwnerHere(o -> false);
+        CompanionRecord asleep = CompanionRecord.builder(UUID.randomUUID(), "Chicken",
+                CompanionLocation.coop("w", 4, 64, 4, 0)).ownerUuid(owner).homeWorld("w").build();
+        index.insert(asleep);
+        CompanionRecord out = CompanionRecord.builder(UUID.randomUUID(), "Sheep",
+                CompanionLocation.live("w", 1, 64, 1)).ownerUuid(owner).homeWorld("w").build();
+        index.insert(out);
+
+        assertEquals(CompanionAdmission.Refusal.OWNER_AWAY, limited.precheck(owner, "Sheep", "w"));
+        assertTrue(limited.ownerAway(owner, "Sheep"));
+        assertNull(limited.refuse(asleep, asleep.toBuilder().location(CompanionLocation.live("w", 4, 64, 5)).build()),
+                "a coop's morning release adds nothing");
+        assertNull(limited.refuse(out, out.toBuilder().location(CompanionLocation.live("w", 9, 64, 9)).build()));
+
+        limited.useOwnerHere(o -> true);
+        assertNull(limited.precheck(owner, "Sheep", "w"));
+        assertFalse(limited.ownerAway(owner, "Sheep"));
+    }
+
+    /** Nothing counts a companion no limit applies to, so it may be added for an absent owner. */
+    @Test
+    void anUnlimitedCompanionIsAddedForAnOwnerOnAnotherServer() {
+        CompanionAdmissionGate unlimited = CompanionAdmissionGate.withRules(index,
+                () -> new CompanionAdmission.Rules(0, 0, false, role -> List.of()));
+        unlimited.useOwnerHere(o -> false);
+
+        assertNull(unlimited.precheck(owner, "Sheep", "w"));
+        assertFalse(unlimited.ownerAway(owner, "Sheep"));
+    }
 }

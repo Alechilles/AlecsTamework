@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.admission;
 import com.alechilles.alecstamework.companion.index.CompanionIndex;
 import com.alechilles.alecstamework.companion.index.CompanionLocation;
 import com.alechilles.alecstamework.companion.index.CompanionRecord;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -37,6 +38,8 @@ public final class CompanionAdmissionGate {
     private volatile Function<UUID, List<CompanionRecord>> recordsOf;
     /** Whether owned companions may come out in a world (see {@link #useDeployRule}); everywhere by default. */
     private volatile Predicate<String> deployRule = world -> true;
+    /** Whether an owner is on this server (see {@link #useOwnerHere}); always, without a network. */
+    private volatile Predicate<UUID> ownerHere = owner -> true;
 
     /**
      * {@code groups} returns the current population-group config; null is read as no groups.
@@ -75,6 +78,52 @@ public final class CompanionAdmissionGate {
      */
     public void useDeployRule(@Nonnull Predicate<String> worldAllowed) {
         deployRule = Objects.requireNonNull(worldAllowed, "worldAllowed");
+    }
+
+    /**
+     * Server networks: {@code here} answers whether an owner is on this server. Another server's
+     * companions are counted as they were when the owner joined here (see {@link #useOwnerRecords}),
+     * so that view is exact only while every change that adds to the owner's limits happens on the
+     * server the owner is on. A change that {@link CompanionAdmission#addsToOwner adds} to a limited
+     * owner who is elsewhere is refused with {@link CompanionAdmission.Refusal#OWNER_AWAY}. It must be
+     * lock-free and do no I/O: the gate calls it under the index lock.
+     */
+    public void useOwnerHere(@Nonnull Predicate<UUID> here) {
+        ownerHere = Objects.requireNonNull(here, "here");
+    }
+
+    /**
+     * True when a change for {@code owner} that adds a companion of {@code roleId} would be refused
+     * because the owner is not on this server and something limits that companion. Callers that can
+     * wait for the owner, such as breeding, ask this before they start. Lock-free.
+     */
+    public boolean ownerAway(@Nonnull UUID owner, @Nonnull String roleId) {
+        return !ownerHere.test(owner) && limited(rules.get(), roleId);
+    }
+
+    /** The refusal of a change that adds to a limited owner who is not on this server, or null. */
+    @Nullable
+    private Denial awayDenial(@Nullable CompanionRecord before, @Nonnull CompanionRecord after,
+                              @Nonnull CompanionAdmission.Rules current) {
+        UUID owner = after.ownerUuid();
+        if (owner == null || ownerHere.test(owner) || !CompanionAdmission.addsToOwner(before, after)
+                || !limited(current, after.roleId())) {
+            return null;
+        }
+        return Denial.of(CompanionAdmission.Refusal.OWNER_AWAY);
+    }
+
+    /** True when a built-in limit, a population-group limit or an admission provider counts {@code roleId}. */
+    private boolean limited(CompanionAdmission.Rules current, String roleId) {
+        if (current.ownedLimit() > 0 || current.deployedLimit() > 0 || providers.manages(roleId)) {
+            return true;
+        }
+        for (PopulationGroupPolicy group : current.groupsForRole().apply(roleId)) {
+            if (group.maxOwnedPerOwner() > 0 || group.maxActivePerOwner() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The deploy-rule refusal of the change, or null: only an owned record coming out in a new world is checked. */
@@ -143,7 +192,12 @@ public final class CompanionAdmissionGate {
         if (blocked != null) {
             return new Admission(blocked, after);
         }
-        CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
+        CompanionAdmission.Rules current = rules.get();
+        Denial away = awayDenial(before, after, current);
+        if (away != null) {
+            return new Admission(away, after);
+        }
+        CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, current,
                 CompanionAdmission.Provided.none());
         if (caps != null) {
             return new Admission(Denial.of(caps), after);
@@ -205,6 +259,7 @@ public final class CompanionAdmissionGate {
                 case PROVIDER_DENIED -> CompanionAdmission.PROVIDER_DENIED_MESSAGE_KEY;
                 case PROVIDER_UNAVAILABLE -> CompanionAdmission.PROVIDER_UNAVAILABLE_MESSAGE_KEY;
                 case DEPLOY_BLOCKED -> CompanionAdmission.DEPLOY_BLOCKED_MESSAGE_KEY;
+                case OWNER_AWAY -> CompanionAdmission.OWNER_AWAY_MESSAGE_KEY;
             });
         }
     }
@@ -232,8 +287,13 @@ public final class CompanionAdmissionGate {
         if (blocked != null) {
             return blocked;
         }
+        CompanionAdmission.Rules current = rules.get();
+        Denial away = awayDenial(before, after, current);
+        if (away != null) {
+            return away;
+        }
         var ownerRecords = recordsOf.apply(after.ownerUuid());
-        CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, rules.get(),
+        CompanionAdmission.Refusal caps = CompanionAdmission.check(ownerRecords, before, after, current,
                 CompanionAdmission.Provided.none());
         if (caps != null) {
             return Denial.of(caps);

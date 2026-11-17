@@ -35,6 +35,8 @@ public final class OwnerPopulationCapService {
     public static final String REASON_PROVIDER_DENIED = "owner-provider-denied";
     /** Reason of a {@link Decision} refused because the admission provider gave no decision (yet). */
     public static final String REASON_PROVIDER_UNAVAILABLE = "owner-provider-unavailable";
+    /** Reason of a {@link Decision} refused because the owner is on another server of a network. */
+    public static final String REASON_OWNER_AWAY = "owner-away";
 
     private static volatile CompanionAdmissionGate admissionGate;
 
@@ -72,6 +74,17 @@ public final class OwnerPopulationCapService {
         return fromPrecheck(gate.precheckDenial(ownerId, roleId, world, world != null), gate.rules());
     }
 
+    /**
+     * True when a new companion of {@code roleId} for {@code ownerId} would be refused because the
+     * owner is on another server of a network (see {@link CompanionAdmissionGate#ownerAway}). False
+     * without a gate, owner or role. Lock-free.
+     */
+    public static boolean ownerAway(@Nullable UUID ownerId, @Nullable String roleId) {
+        CompanionAdmissionGate gate = admissionGate;
+        return gate != null && ownerId != null && roleId != null && !roleId.isBlank()
+                && gate.ownerAway(ownerId, roleId);
+    }
+
     /** Maps an admission pre-check result to a {@link Decision}; the owner's companions are not counted. */
     @Nonnull
     static Decision fromPrecheck(@Nullable CompanionAdmissionGate.Denial denial,
@@ -96,6 +109,7 @@ public final class OwnerPopulationCapService {
             case PROVIDER_DENIED -> REASON_PROVIDER_DENIED;
             case PROVIDER_UNAVAILABLE -> REASON_PROVIDER_UNAVAILABLE;
             case DEPLOY_BLOCKED -> "deploy-blocked";
+            case OWNER_AWAY -> REASON_OWNER_AWAY;
         };
         int limit = denial.refusal() == CompanionAdmission.Refusal.DEPLOYED
                 ? rules.deployedLimit() : rules.ownedLimit();

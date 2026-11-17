@@ -50,14 +50,19 @@ public final class CompanionAdmission {
     public static final String PROVIDER_UNAVAILABLE_MESSAGE_KEY = "tamework.ui.population.providerUnavailable";
     /** Message key of {@link Refusal#DEPLOY_BLOCKED}. */
     public static final String DEPLOY_BLOCKED_MESSAGE_KEY = "tamework.ui.population.deployBlocked";
+    /** Message key of {@link Refusal#OWNER_AWAY}. */
+    public static final String OWNER_AWAY_MESSAGE_KEY = "tamework.ui.population.ownerAway";
 
     /**
      * {@code OWNED} and {@code DEPLOYED}: the owner's built-in owned or deployed limit is reached.
      * {@code PROVIDER_DENIED}: an admission provider denied the change, or one of its domain
      * limits is reached ({@link #checkDomains} names the message key). {@code PROVIDER_UNAVAILABLE}:
-     * the provider gave no decision; {@link #check} never returns it.
+     * the provider gave no decision; {@link #check} never returns it. {@code OWNER_AWAY}: on a
+     * server network, the change would add to the limits of an owner who is not on this server
+     * (see {@link CompanionAdmissionGate#useOwnerHere}); {@link #check} never returns it.
      */
-    public enum Refusal { OWNED, DEPLOYED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOY_BLOCKED }
+    public enum Refusal { OWNED, DEPLOYED, GROUP_OWNED, GROUP_DEPLOYED, PROVIDER_DENIED, PROVIDER_UNAVAILABLE, DEPLOY_BLOCKED,
+        OWNER_AWAY }
 
     /**
      * What an admission provider allowed for the record being changed: the domain claims the
@@ -183,6 +188,23 @@ public final class CompanionAdmission {
             }
         }
         return null;
+    }
+
+    /**
+     * True when the change makes {@code after}'s owner count one more companion: a record new to
+     * that owner, or one put out (LIVE) that held no deployed slot before (it was not out and not
+     * in a coop). A move between worlds, a coop release and a never-seen import's first sighting
+     * add nothing.
+     */
+    public static boolean addsToOwner(@Nullable CompanionRecord before, @Nonnull CompanionRecord after) {
+        UUID owner = after.ownerUuid();
+        if (owner == null || !after.countsAsOwned()) {
+            return false;
+        }
+        if (before == null || !owner.equals(before.ownerUuid()) || !before.countsAsOwned()) {
+            return true;
+        }
+        return after.isDeployed() && !before.isDeployed() && before.location().kind() != LocationKind.COOP;
     }
 
     /** The world a record counts in: where it is (LIVE, COOP), else where it was tamed. Never null. */
