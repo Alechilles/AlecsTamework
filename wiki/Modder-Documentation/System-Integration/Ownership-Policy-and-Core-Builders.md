@@ -146,7 +146,7 @@ timers, or persistent player state. It does not enforce ownership by itself.
 `TameworkSetOwner` and Tame check the owner's companion limits before
 assigning a non-null owner. The owned limit counts every companion the player
 owns in the configured global or per-world scope, and the deployed limit counts
-those out in the world. The check and the ownership change happen in one locked
+those out in the world or resting in a coop. The check and the ownership change happen in one locked
 step, so two tames at once cannot both pass a limit. It remains independent from
 SimpleClaims claim-placement policy.
 

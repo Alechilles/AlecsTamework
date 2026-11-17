@@ -33,7 +33,7 @@ group.
 - `Limits.MaxOwnedPerOwner`: maximum owned companions in the group; `0` is
   unlimited.
 - `Limits.MaxActivePerOwner`: maximum companions of the group out in the
-  world; `0` is unlimited.
+  world, counting coop residents; `0` is unlimited.
 - `Limits.Scope`: `Global` or `PerWorld`.
 
 Counts come straight from the companion index; group membership is read from

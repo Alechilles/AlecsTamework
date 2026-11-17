@@ -96,7 +96,7 @@ tamed-companion damage decision.
 
 The ordinary Tamework owner limits are separate. `limitPerPlayerOwnedTotal`
 counts every owned companion and `limitPerPlayerDeployedTotal` counts summoned
-companions; both are checked inside the companion index and do not use claims. There is no
+companions and coop residents; both are checked inside the companion index and do not use claims. There is no
 provider-neutral claims bridge. Tamework resolves the live SimpleClaims plugin
 before each policy use and shares one reflected capability set for that plugin
 generation. A stop, replacement, or Tamework shutdown invalidates the cached

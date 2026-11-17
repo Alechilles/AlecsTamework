@@ -148,7 +148,8 @@ animals"). `/tw share ...` acts for the calling player; `/tw debug share ...` is
 
 - `limitPerPlayerOwnedTotal` counts every owned companion: out in a world,
   in capture items, rosters, and coops, dead, and lost.
-  `limitPerPlayerDeployedTotal` counts summoned companions, loaded or not.
+  `limitPerPlayerDeployedTotal` counts summoned companions, loaded or not, and
+  coop residents, which keep their place overnight.
   Imported companions that 5.0 has not seen yet do not count as deployed. If a
   result looks wrong, check the companion's location in the linked panel
   rather than only nearby live NPCs.

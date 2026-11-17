@@ -87,7 +87,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Ownership/damage behavior resolves effective policy through `TwCompanionConfig` with `TwGlobalConfig` fallback.
 - `limitPerPlayerOwnedTotal` counts every owned companion (out, in items,
   rosters, coops, dead, and lost). `limitPerPlayerDeployedTotal` counts
-  summoned companions, loaded or not. Both are checked inside the index lock.
+  summoned companions, loaded or not, and coop residents. Both are checked inside the index lock.
 - Item-linked companions keep free death/Lost restoration. Roster companions
   use the role's paid-revival quote: payment is charged, then refunded if the
   revive fails. Both paths restore the same profile from its snapshot.

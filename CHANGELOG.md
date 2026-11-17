@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- Animals resting in a coop now keep their place in the limit of companions out in the world, and in
+  admission provider limits such as Husbandry's. Before, a coop's night freed those places, so players could
+  tame more animals at night, or on another server of a network, and the residents still came out in the
+  morning. Players already over a limit keep their animals; residents that would pass it stay in the coop.
+
 ## 5.15.1 - Coop Duplication Fix - 2026-11-15
 
 ### Fixed

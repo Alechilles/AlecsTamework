@@ -60,7 +60,7 @@ API 0.9 capture views:
 - `limitPerPlayerOwnedTotal()`: every companion the player owns (out in the
   world, stored, in items, in coops, dead and lost).
 - `limitPerPlayerDeployedTotal()`: the player's companions out in the world,
-  loaded or not. Added in 5.0. The two-argument `PopulationView` constructor
+  loaded or not, and in coops. Added in 5.0. The two-argument `PopulationView` constructor
   remains and sets it to `0`.
 
 ## Notes
