@@ -8,6 +8,10 @@
   admission provider limits such as Husbandry's. Before, a coop's night freed those places, so players could
   tame more animals at night, or on another server of a network, and the residents still came out in the
   morning. Players already over a limit keep their animals; residents that would pass it stay in the coop.
+- On a server network, a server only adds to a player's limits while that player is on it. Before, a litter
+  born on one server while its owner played on another was checked against old counts, so the owner could
+  pass their limits. Breeding pairs now wait until their owner is on their server, and a tamed spawn for an
+  owner who is elsewhere is refused. Single servers are not affected.
 
 ## 5.15.1 - Coop Duplication Fix - 2026-11-15
 
