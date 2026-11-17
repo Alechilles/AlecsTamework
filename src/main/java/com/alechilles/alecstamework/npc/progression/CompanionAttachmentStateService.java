@@ -85,7 +85,10 @@ public final class CompanionAttachmentStateService {
         }
     }
 
-    /** Resolves a loaded appearance: saved choices win, then migrations, then normal model weights. */
+    /**
+     * Resolves a loaded appearance: saved choices win, then migrations, then normal model weights. Linked
+     * migration rules run last so their target slots always follow the final source selection.
+     */
     @Nonnull
     static Map<String, String> resolveLoadSelections(@Nullable ModelAsset modelAsset,
                                                     @Nullable Map<String, String> stored,
@@ -101,6 +104,11 @@ public final class CompanionAttachmentStateService {
             Map<String, String> rolled = CompanionModelAttachmentService.filterAttachmentSelections(
                     modelAsset.generateRandomAttachmentIds(), options);
             rolled.forEach(selections::putIfAbsent);
+            if (migrationConfig != null && migrationConfig.hasLinkedRules()) {
+                // A freshly rolled source slot must still drive its linked target slot.
+                selections.putAll(CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                        migrationConfig, selections, options));
+            }
         }
         return Map.copyOf(selections);
     }

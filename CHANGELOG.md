@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- `TwAttachmentMigrationConfig` rules can set `"Mode": "Linked"` to keep one attachment slot matched to another,
+  for example a sheep's `Wool` following its `Fluff` color. A linked rule always sets the target slot from the
+  source slot, not only when the target is missing. The pair stays matched on fresh spawns, offspring, reloads
+  and after shearing, and existing animals are corrected the next time they load. Rules without `Mode` work as
+  before.
+
 ### Fixed
 
 - Embeds Patchwork 1.5.2. A short Windows file lock at startup no longer leaves a world with no Patchwork

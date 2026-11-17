@@ -67,6 +67,16 @@ class CompanionProgressionBootstrapOnLoadSystemTest {
     }
 
     @Test
+    void queuesAttachmentRepairForFreshSpawnOnlyWhenRoleHasLinkedSlots() {
+        assertTrue(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentSpawnBootstrap(
+                AddReason.SPAWN, true));
+        assertFalse(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentSpawnBootstrap(
+                AddReason.SPAWN, false));
+        assertFalse(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentSpawnBootstrap(
+                AddReason.LOAD, true));
+    }
+
+    @Test
     void negativeNeedsTimestampsDoNotRequireBootstrap() {
         TameworkNeedsComponent needs = new TameworkNeedsComponent(
                 "Needs_Config",
