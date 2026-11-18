@@ -267,12 +267,15 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         boolean hasStoredAttachments = attachments != null
                 && attachments.getAttachmentIds() != null
                 && !attachments.getAttachmentIds().isEmpty();
-        boolean hasMigrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId) != null;
+        TwAttachmentMigrationConfig migrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId);
+        boolean hasMigrationConfig = migrationConfig != null;
+        boolean hasLinkedRules = migrationConfig != null && migrationConfig.isEnabled() && migrationConfig.hasLinkedRules();
         boolean missingSelections = reason == AddReason.LOAD
                 && !CompanionModelAttachmentService.resolveCurrentAttachments(reference, store).keySet().containsAll(
                         CompanionModelAttachmentService.resolveAttachmentOptionIds(
                                 CompanionModelAttachmentService.resolveModelAsset(reference, store)).keySet());
-        return shouldRunAttachmentLoadBootstrap(reason, missingSelections, hasStoredAttachments, hasMigrationConfig);
+        return shouldRunAttachmentLoadBootstrap(reason, missingSelections, hasStoredAttachments, hasMigrationConfig)
+                || shouldRunAttachmentSpawnBootstrap(reason, hasLinkedRules);
     }
 
     static boolean shouldRunAttachmentLoadBootstrap(@Nonnull AddReason reason,
@@ -280,6 +283,14 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
                                                     boolean hasStoredAttachments,
                                                     boolean hasMigrationConfig) {
         return reason == AddReason.LOAD && (missingSelections || hasStoredAttachments || hasMigrationConfig);
+    }
+
+    /**
+     * Fresh spawns roll each attachment slot independently, so roles with linked attachment slots are
+     * resolved and saved right away instead of showing a mismatched pair until something else saves them.
+     */
+    static boolean shouldRunAttachmentSpawnBootstrap(@Nonnull AddReason reason, boolean hasLinkedRules) {
+        return reason == AddReason.SPAWN && hasLinkedRules;
     }
 
     static boolean isJuvenileLifecycleRole(@Nullable String roleId,

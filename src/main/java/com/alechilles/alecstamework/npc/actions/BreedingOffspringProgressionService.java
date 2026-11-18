@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -12,6 +13,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentInheritanceService;
+import com.alechilles.alecstamework.npc.progression.CompanionAttachmentMigrationService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -175,6 +177,12 @@ final class BreedingOffspringProgressionService {
         if (inheritedSelections.isEmpty()) {
             return;
         }
+        // Slots inherit independently, so linked slots (such as Wool following Fluff) are re-matched here.
+        inheritedSelections = CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                TwAttachmentMigrationConfig.resolveForRole(childRoleId),
+                inheritedSelections,
+                attachmentOptions
+        );
 
         CompanionModelAttachmentService.applyAttachments(childRef, childNpc, store, inheritedSelections);
         ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =

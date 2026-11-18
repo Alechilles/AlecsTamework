@@ -51,6 +51,14 @@ public final class TwAttachmentMigrationConfig
             )
             .documentation("Mapping from SourceSlot values to TargetSlot values. Explicit maps replace parent values.")
             .add()
+            .<String>append(
+                    new KeyedCodec<>("Mode", Codec.STRING),
+                    (rule, value) -> rule.mode = value,
+                    rule -> rule.mode
+            )
+            .documentation("Backfill (default) only fills a missing TargetSlot. Linked always sets TargetSlot from"
+                    + " SourceSlot, so the two slots stay matched through spawns, breeding, and reloads.")
+            .add()
             .build();
 
     private static final ArrayCodec<Rule> RULE_ARRAY_CODEC = new ArrayCodec<>(RULE_CODEC, Rule[]::new);
@@ -229,13 +237,31 @@ public final class TwAttachmentMigrationConfig
         return rules == null ? EMPTY_RULES : rules;
     }
 
+    /** True when any rule keeps its target slot linked to its source slot. */
+    public boolean hasLinkedRules() {
+        for (Rule rule : getRules()) {
+            if (rule != null && rule.isLinked()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Single source-slot to target-slot migration rule. */
     public static final class Rule {
+        private static final String LINKED_MODE = "Linked";
+
         private String sourceSlot;
         private String targetSlot;
         private Map<String, String> sourceToTarget = Map.of();
+        private String mode;
 
         public Rule() {
+        }
+
+        /** True when TargetSlot always follows SourceSlot instead of only being filled when missing. */
+        public boolean isLinked() {
+            return mode != null && LINKED_MODE.equalsIgnoreCase(mode.trim());
         }
 
         @Nullable

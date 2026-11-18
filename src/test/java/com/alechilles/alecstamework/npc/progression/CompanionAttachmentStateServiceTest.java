@@ -43,6 +43,51 @@ class CompanionAttachmentStateServiceTest {
         assertEquals(Map.of("Coat", "Black", "Eyes", "Orange", "Equipment", "None"), repaired);
     }
 
+    @Test
+    void linkedTargetFollowsSavedSourceOverVanillaRoll() {
+        TwAttachmentMigrationConfig linked = linkedFluffWool();
+
+        Map<String, String> resolved = CompanionAttachmentStateService.resolveLoadSelections(
+                sheepModel(), Map.of("Fluff", "Brown", "Wool", "White"), Map.of(), linked);
+
+        assertEquals(Map.of("Fluff", "Brown", "Wool", "Brown"), resolved);
+    }
+
+    @Test
+    void linkedTargetFollowsCurrentSourceOnFreshSpawn() {
+        Map<String, String> resolved = CompanionAttachmentStateService.resolveLoadSelections(
+                sheepModel(), null, Map.of("Fluff", "Grey", "Wool", "White"), linkedFluffWool());
+
+        assertEquals(Map.of("Fluff", "Grey", "Wool", "Grey"), resolved);
+    }
+
+    @Test
+    void linkedTargetFollowsSourceRolledDuringRepair() {
+        // Only Wool is saved; Fluff is rolled from model weights (Brown) and Wool must follow it.
+        Map<String, String> resolved = CompanionAttachmentStateService.resolveLoadSelections(
+                sheepModel(), Map.of("Wool", "White"), Map.of(), linkedFluffWool());
+
+        assertEquals(Map.of("Fluff", "Brown", "Wool", "Brown"), resolved);
+    }
+
+    private static TwAttachmentMigrationConfig linkedFluffWool() {
+        return TwAttachmentMigrationConfig.CODEC.decode(BsonDocument.parse("""
+                {"Rules":[{"SourceSlot":"Fluff","TargetSlot":"Wool","Mode":"Linked",
+                 "SourceToTarget":{"White":"White","Brown":"Brown","Grey":"Grey"}}]}
+                """), new ExtraInfo());
+    }
+
+    private static ModelAsset sheepModel() {
+        return ModelAsset.CODEC.decode(BsonDocument.parse("""
+                {"Id":"LinkedAttachmentTest",
+                 "HitBox":{"Min":{"X":-0.5,"Y":0,"Z":-0.5},"Max":{"X":0.5,"Y":1,"Z":0.5}},
+                 "RandomAttachmentSets":{
+                  "Fluff":{"White":{"Weight":0},"Brown":{"Weight":1},"Grey":{"Weight":0}},
+                  "Wool":{"White":{"Weight":1},"Brown":{"Weight":0},"Grey":{"Weight":0}}
+                }}
+                """), new ExtraInfo());
+    }
+
     private static ModelAsset appearanceModel() {
         // Zero-weight choices remain valid saved selections; None deliberately has no geometry.
         return ModelAsset.CODEC.decode(BsonDocument.parse("""

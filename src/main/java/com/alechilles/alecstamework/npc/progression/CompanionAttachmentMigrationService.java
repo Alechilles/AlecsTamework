@@ -8,7 +8,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
- * Applies configured legacy attachment migrations without overwriting already selected target slots.
+ * Applies configured attachment migrations. Backfill rules only fill missing target slots; linked rules
+ * always set the target slot from the source slot so paired attachments (such as Fluff and Wool) match.
  */
 public final class CompanionAttachmentMigrationService {
     private CompanionAttachmentMigrationService() {
@@ -34,10 +35,13 @@ public final class CompanionAttachmentMigrationService {
             }
             String sourceSlot = rule.getSourceSlot();
             String targetSlot = rule.getTargetSlot();
-            if (sourceSlot == null || targetSlot == null || baseSelections.containsKey(targetSlot)) {
+            boolean linked = rule.isLinked();
+            if (sourceSlot == null || targetSlot == null || (!linked && baseSelections.containsKey(targetSlot))) {
                 continue;
             }
-            String sourceValue = baseSelections.get(sourceSlot);
+            // Linked rules read earlier results so a chain of links resolves in declaration order.
+            Map<String, String> sourceSelections = linked && migrated != null ? migrated : baseSelections;
+            String sourceValue = sourceSelections.get(sourceSlot);
             if (sourceValue == null || sourceValue.isBlank()) {
                 continue;
             }
@@ -51,6 +55,10 @@ public final class CompanionAttachmentMigrationService {
             }
             Set<String> targetOptions = attachmentOptions.get(targetSlot);
             if (targetOptions == null || !targetOptions.contains(targetValue)) {
+                continue;
+            }
+            Map<String, String> currentSelections = migrated != null ? migrated : baseSelections;
+            if (targetValue.equals(currentSelections.get(targetSlot))) {
                 continue;
             }
             if (migrated == null) {

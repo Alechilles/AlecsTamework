@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- `TwAttachmentMigrationConfig` rules can set `"Mode": "Linked"` to keep one attachment slot matched to another,
+  for example a sheep's `Wool` following its `Fluff` color. A linked rule always sets the target slot from the
+  source slot, not only when the target is missing. The pair stays matched on fresh spawns, offspring, reloads
+  and after shearing, and existing animals are corrected the next time they load. Rules without `Mode` work as
+  before.
+
 ### Fixed
 
 - Flute groups and saved views, HUD and Inspect card positions, F behaviour and Inspect options now stay after
