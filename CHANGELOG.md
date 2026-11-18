@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.15.3 - Saved Player Preferences - 2026-11-18
 
 ### Added
 
