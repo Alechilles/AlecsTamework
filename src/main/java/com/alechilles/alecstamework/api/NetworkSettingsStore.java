@@ -8,8 +8,9 @@ import javax.annotation.Nullable;
  * {@link NetworkSettingsApi#register}. With one installed, the settings an admin publishes on one
  * server apply on every server of the network, and each server may still override single settings.
  *
- * <p>The store holds opaque JSON documents by key. Tamework uses the key {@link #SERVER_KEY} today;
- * keys that start with {@code player/} are reserved. An implementation must accept any key.</p>
+ * <p>The store holds opaque JSON documents by key: {@link #SERVER_KEY} for settings, {@code shared-access}
+ * for shared access grants and {@code player/<uuid>} for each player's preferences. An implementation must
+ * accept any key.</p>
  *
  * <p>Tamework calls every method on its own {@code tamework-network-settings} thread, one call at a
  * time, never on a world thread. Calls may block on I/O. A call that throws is retried at the next

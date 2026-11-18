@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.components;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -15,7 +16,8 @@ import javax.annotation.Nullable;
 /**
  * A player's Companion Inspect choices: whether the inspect camera is off, and whether a command from the panel
  * closes it. Players who keep both defaults (camera on, panel stays open) have no component. Read and write it on the
- * player's world thread; engine player saving owns durability.
+ * player's world thread.
+ * The write helpers below report each change to PlayerSettingsSync, which saves it.
  */
 public final class TameworkInspectPreferencesComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkInspectPreferencesComponent> CODEC = BuilderCodec
@@ -32,6 +34,11 @@ public final class TameworkInspectPreferencesComponent implements Component<Enti
     public static void register(Tamework plugin) {
         type = plugin.getEntityStoreRegistry().registerComponent(TameworkInspectPreferencesComponent.class,
                 "TameworkInspectPreferences", CODEC);
+    }
+
+    @Nullable
+    public static ComponentType<EntityStore, TameworkInspectPreferencesComponent> getComponentType() {
+        return type;
     }
 
     /** Whether the inspect camera is on for this player; true when unknown. Read only. */
@@ -74,12 +81,14 @@ public final class TameworkInspectPreferencesComponent implements Component<Enti
         }
         if (!cameraOff && !closeAfterCommand) {
             store.tryRemoveComponent(playerRef, type);
+            PlayerSettingsSync.changed(playerRef, store, TameworkInspectPreferencesComponent.class);
             return;
         }
         TameworkInspectPreferencesComponent next = new TameworkInspectPreferencesComponent();
         next.cameraOff = cameraOff;
         next.closeAfterCommand = closeAfterCommand;
         store.putComponent(playerRef, type, next);
+        PlayerSettingsSync.changed(playerRef, store, TameworkInspectPreferencesComponent.class);
     }
 
     @Override

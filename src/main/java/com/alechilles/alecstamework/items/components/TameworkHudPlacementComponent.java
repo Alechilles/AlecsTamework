@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.components;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.settings.CompanionHudDefaultsStore;
 import com.alechilles.alecstamework.ui.CompanionHudPlacement;
@@ -16,7 +17,8 @@ import javax.annotation.Nullable;
 
 /**
  * Player-saved position of the companion target HUD. It changes only that player's screen; a player without one
- * follows the server default. Read and write it on the player's world thread; engine player saving owns durability.
+ * follows the server default. Read and write it on the player's world thread.
+ * The write helpers below report each change to PlayerSettingsSync, which saves it.
  */
 public final class TameworkHudPlacementComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkHudPlacementComponent> CODEC = BuilderCodec
@@ -62,6 +64,7 @@ public final class TameworkHudPlacementComponent implements Component<EntityStor
     public static void clear(@Nullable Ref<EntityStore> playerRef, @Nullable Store<EntityStore> store) {
         if (type != null && playerRef != null && playerRef.isValid() && store != null) {
             store.tryRemoveComponent(playerRef, type);
+            PlayerSettingsSync.changed(playerRef, store, TameworkHudPlacementComponent.class);
         }
     }
 
@@ -77,6 +80,7 @@ public final class TameworkHudPlacementComponent implements Component<EntityStor
         next.x = placement.x();
         next.y = placement.y();
         store.putComponent(playerRef, type, next);
+        PlayerSettingsSync.changed(playerRef, store, TameworkHudPlacementComponent.class);
         return true;
     }
 

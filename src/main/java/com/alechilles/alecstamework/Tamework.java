@@ -192,6 +192,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.settings.NetworkSettingsRuntime;
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.settings.NetworkSettingsSync;
 import com.alechilles.alecstamework.settings.TameworkDataPathService;
 import com.alechilles.alecstamework.settings.mods.ModSettingsService;
@@ -338,6 +339,7 @@ public class Tamework extends JavaPlugin {
     /** Server network settings; serves the saved network layer and is otherwise inert until a network mod installs a store. */
     @Nullable
     private volatile NetworkSettingsSync networkSettingsSync;
+    private volatile PlayerSettingsSync playerSettingsSync;
     /** Whether an NPC UUID is a body an imported world knew for a live record; set with the companion runtime. */
     private java.util.function.Predicate<java.util.UUID> companionLegacyBody = npcUuid -> false;
     /** Drops a cleared name from the companion record; a no-op until the companion index is registered. */
@@ -870,6 +872,7 @@ public class Tamework extends JavaPlugin {
             }
             NetworkSettingsSync settingsSync = NetworkSettingsRuntime.start(this, modSettingsService);
             networkSettingsSync = settingsSync;
+            startPlayerSettingsSync(settingsSync);
             indexApi.useNetworkSettings(new NetworkSettingsFacade(settingsSync));
             indexApi.useSharedAccess(new com.alechilles.alecstamework.api.internal.SharedAccessFacade(
                     com.alechilles.alecstamework.access.SharedAccessService.get(), apiModule.queries()::get));
@@ -1687,6 +1690,51 @@ public class Tamework extends JavaPlugin {
         return sync;
     }
 
+    /**
+     * Keeps player preferences outside the engine's player save, so servers that turn it off keep them
+     * and a network can carry them between servers.
+     */
+    private void startPlayerSettingsSync(@Nonnull NetworkSettingsSync settingsSync) {
+        PlayerSettingsSync sync = new PlayerSettingsSync(settingsSync,
+                () -> com.alechilles.alecstamework.settings.TameworkSettingsStore.resolveTameworkUniverseRoot(this),
+                getLogger());
+        sync.start();
+        playerSettingsSync = sync;
+        // Asynchronous: the login waits (briefly) for the read, so the document goes on the holder before it
+        // enters a world.
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "player-settings-connect",
+                () -> getEventRegistry().registerAsyncGlobal(PlayerConnectEvent.class,
+                        connecting -> connecting.thenCompose(event -> {
+                            java.util.UUID player = event == null || event.getPlayerRef() == null
+                                    ? null : event.getPlayerRef().getUuid();
+                            if (player == null || event.getHolder() == null) {
+                                return java.util.concurrent.CompletableFuture.completedFuture(event);
+                            }
+                            return sync.playerConnecting(player, event.getHolder()).thenApply(ignored -> event);
+                        }))
+        );
+        // After worlds shut down and before the network mod closes its store: the last saves still reach it.
+        getEventRegistry().register((short) -28, ShutdownEvent.class, event -> sync.close());
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "player-settings-disconnect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> {
+                            java.util.UUID player = event == null || event.getPlayerRef() == null
+                                    ? null : event.getPlayerRef().getUuid();
+                            if (player != null) {
+                                sync.playerDisconnected(player);
+                            }
+                        },
+                        "player settings session end"
+                )
+        );
+    }
+
     /** The server network settings sync, or null when the API is not ready. */
     @Nullable
     public NetworkSettingsSync getNetworkSettingsSync() {
@@ -2250,6 +2298,12 @@ public class Tamework extends JavaPlugin {
         if (network != null) {
             // Does nothing when the -28 ShutdownEvent handler already sent and stopped it.
             network.shutdown(1_000L);
+        }
+        PlayerSettingsSync playerSettings = playerSettingsSync;
+        playerSettingsSync = null;
+        if (playerSettings != null) {
+            // Before the settings sync closes: its thread does the last saves.
+            playerSettings.close();
         }
         NetworkSettingsSync settingsSync = networkSettingsSync;
         networkSettingsSync = null;

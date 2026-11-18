@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.components.TameworkCompanionGroupsComponent;
 import com.hypixel.hytale.codec.Codec;
@@ -8,7 +9,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
-/** Owner-wide organization, accessed only on the player's world thread. Engine player saving owns durability. */
+/** Owner-wide organization, accessed only on the player's world thread. PlayerSettingsSync saves it after each write. */
 final class CommandCompanionGroups {
     private static final CommandGroupService CODEC = new CommandGroupService();
 
@@ -33,7 +34,9 @@ final class CommandCompanionGroups {
         var ref = world.getEntityRef(player.getUuid());
         if (ref == null || !ref.isValid()) return false;
         // Called from menu/item interaction callbacks, never an ECS system iteration.
-        world.getEntityStore().getStore().putComponent(ref, type, next);
+        var store = world.getEntityStore().getStore();
+        store.putComponent(ref, type, next);
+        PlayerSettingsSync.changed(ref, store, TameworkCompanionGroupsComponent.class);
         return true;
     }
 

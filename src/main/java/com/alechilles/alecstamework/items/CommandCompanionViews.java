@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.items.components.TameworkCompanionViewsComponent;
 import com.alechilles.alecstamework.ui.CompanionViewSettings;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -101,6 +102,7 @@ final class CommandCompanionViews {
         next.views(encode(views));
         // Called from menu/item interaction callbacks, never inside an ECS system iteration.
         store.putComponent(ref, type, next);
+        PlayerSettingsSync.changed(ref, store, TameworkCompanionViewsComponent.class);
         return true;
     }
 

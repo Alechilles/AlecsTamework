@@ -46,6 +46,13 @@ public final class NetworkSettingsSync implements AutoCloseable {
         void run(@Nonnull NetworkSettingsStore store) throws Exception;
     }
 
+    /** Work run on this object's thread whether or not a store is installed. */
+    @FunctionalInterface
+    public interface OptionalStoreTask {
+        /** @param store the registered store, or null when none is installed */
+        void run(@Nullable NetworkSettingsStore store) throws Exception;
+    }
+
     /** How a {@link #publish} ended. */
     public enum PublishResult {
         /** The network now has this server's settings. */
@@ -180,6 +187,39 @@ public final class NetworkSettingsSync implements AutoCloseable {
             executor.execute(work);
         } catch (RejectedExecutionException shuttingDown) {
             // Closed between the check and the submit.
+        }
+    }
+
+    /**
+     * Runs {@code task} once on this object's thread, for documents read on demand rather than at
+     * each check. The future fails when the task throws, and completes at once without running it
+     * once this object is closed.
+     */
+    @Nonnull
+    public CompletableFuture<Void> run(@Nonnull OptionalStoreTask task) {
+        Objects.requireNonNull(task, "task");
+        try {
+            return CompletableFuture.runAsync(() -> {
+                try {
+                    task.run(closed ? null : store);
+                } catch (RuntimeException failure) {
+                    throw failure;
+                } catch (Exception failure) {
+                    throw new java.util.concurrent.CompletionException(failure);
+                }
+            }, executor);
+        } catch (RejectedExecutionException shuttingDown) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    /** Runs {@code task} once on this object's thread after {@code delayMs}. Failures are the task's to handle. */
+    public void runLater(@Nonnull Runnable task, long delayMs) {
+        Objects.requireNonNull(task, "task");
+        try {
+            executor.schedule(task, delayMs, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException shuttingDown) {
+            // Closed: nothing left to retry for.
         }
     }
 

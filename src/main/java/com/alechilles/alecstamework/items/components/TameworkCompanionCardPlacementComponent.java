@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.components;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ui.CompanionHudPlacement;
 import com.hypixel.hytale.codec.Codec;
@@ -16,7 +17,8 @@ import javax.annotation.Nullable;
 /**
  * Player-saved position of the companion card, in the same snap point and offset terms as the companion HUD. A
  * player without one sees the card beside the crosshair ({@link CompanionHudPlacement#CARD_DEFAULT}). Read and write
- * it on the player's world thread; engine player saving owns durability.
+ * it on the player's world thread.
+ * The write helpers below report each change to PlayerSettingsSync, which saves it.
  */
 public final class TameworkCompanionCardPlacementComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkCompanionCardPlacementComponent> CODEC = BuilderCodec
@@ -63,6 +65,7 @@ public final class TameworkCompanionCardPlacementComponent implements Component<
         }
         if (placement.equals(CompanionHudPlacement.CARD_DEFAULT)) {
             store.tryRemoveComponent(playerRef, type);
+            PlayerSettingsSync.changed(playerRef, store, TameworkCompanionCardPlacementComponent.class);
             return;
         }
         TameworkCompanionCardPlacementComponent next = new TameworkCompanionCardPlacementComponent();
@@ -70,6 +73,7 @@ public final class TameworkCompanionCardPlacementComponent implements Component<
         next.x = placement.x();
         next.y = placement.y();
         store.putComponent(playerRef, type, next);
+        PlayerSettingsSync.changed(playerRef, store, TameworkCompanionCardPlacementComponent.class);
     }
 
     @Override

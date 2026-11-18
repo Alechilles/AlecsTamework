@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Flute groups and saved views, HUD and Inspect card positions, F behaviour and Inspect options now stay after
+  players leave and rejoin servers that turn off the game's own player save, such as Runeteria. Tamework now saves
+  them itself, and on server networks with a Tamework settings store they follow the player between servers.
+
 ## 5.15.2 - Coop and Network Population Limits - 2026-11-17
 
 ### Fixed

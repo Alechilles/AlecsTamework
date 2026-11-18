@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.components;
 
+import com.alechilles.alecstamework.settings.PlayerSettingsSync;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companioncard.CompanionCardFBehaviour;
 import com.hypixel.hytale.codec.Codec;
@@ -16,7 +17,8 @@ import javax.annotation.Nullable;
 
 /**
  * A player's own choice of what F on a companion does. A player without one follows the server default. Read and
- * write it on the player's world thread; engine player saving owns durability. Use
+ * write it on the player's world thread.
+ * The write helpers below report each change to PlayerSettingsSync, which saves it. Use
  * {@link com.alechilles.alecstamework.companioncard.CompanionCardPreferences} rather than this class directly.
  */
 public final class TameworkCompanionCardPreferenceComponent implements Component<EntityStore> {
@@ -55,6 +57,7 @@ public final class TameworkCompanionCardPreferenceComponent implements Component
     public static void clear(@Nullable Ref<EntityStore> playerRef, @Nullable Store<EntityStore> store) {
         if (type != null && playerRef != null && playerRef.isValid() && store != null) {
             store.tryRemoveComponent(playerRef, type);
+            PlayerSettingsSync.changed(playerRef, store, TameworkCompanionCardPreferenceComponent.class);
         }
     }
 
@@ -68,6 +71,7 @@ public final class TameworkCompanionCardPreferenceComponent implements Component
         TameworkCompanionCardPreferenceComponent next = new TameworkCompanionCardPreferenceComponent();
         next.fBehaviour = behaviour.toConfigValue();
         store.putComponent(playerRef, type, next);
+        PlayerSettingsSync.changed(playerRef, store, TameworkCompanionCardPreferenceComponent.class);
         return true;
     }
 
