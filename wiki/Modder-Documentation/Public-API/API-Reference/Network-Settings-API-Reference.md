@@ -25,7 +25,8 @@ a network may install either or both.
 Everything `/tw settings` saves on a server, except the welcome announcement
 switch: the main settings, the Companion Inspect settings, the default HUD
 position, where companions can come out, the name filter and mod settings.
-Player settings are not part of it.
+Each player's own preferences travel too, as separate documents (see
+[Player preferences](#player-preferences)).
 
 Each setting resolves on its own: this server's override, then the network's
 value, then the built-in default. Lists (places, filter words) override as a
@@ -43,10 +44,10 @@ in the background.
 ## The store
 
 The store holds opaque JSON documents by key. Tamework writes and reads the
-JSON; keep it as text. Tamework uses two keys today:
-`NetworkSettingsStore.SERVER_KEY` (`"server"`) for the settings and
-`"shared-access"` for shared access grants (see below). Keys that start with
-`player/` are reserved, so accept any key.
+JSON; keep it as text. Tamework uses these keys:
+`NetworkSettingsStore.SERVER_KEY` (`"server"`) for the settings,
+`"shared-access"` for shared access grants and `player/<uuid>` for each
+player's preferences (both below). Accept any key.
 
 Tamework calls both methods on its own `tamework-network-settings` thread, one
 call at a time, never on a world thread. Calls may block on I/O. A call that
@@ -102,6 +103,33 @@ within a minute.
   owner when it reads the store again.
 - **Leave network** on the settings page concerns settings only. Grants keep
   following the store while one is registered.
+
+## Player preferences
+
+A registered store also carries each player's own Tamework preferences under
+`player/<uuid>`: their flute groups and saved views, where they moved the
+companion HUD and the Inspect card, their F behaviour and their Inspect
+options. There is nothing more to register.
+
+- Tamework reads the player's document while they connect (the login waits
+  up to two seconds for it) and puts it on the player. It saves the document
+  when the player changes one of these preferences, against the revision it
+  last read or wrote. If another server saved since, this server's save wins
+  only while the player is still on it, so a late retry never undoes a newer
+  change. Keys a newer Tamework added are kept.
+- A server that has no document for a player yet offers the one in its own
+  file, or what the player carries, as the first one.
+- Until the read succeeds nothing is saved for that player, so a store that is
+  down at join cannot be overwritten with defaults. After a failed call
+  Tamework leaves the store alone for 30 seconds, then tries again while the
+  player stays online. A player read before the store was registered is read
+  again before anything is saved.
+- Each server also keeps a copy in `universe/Tamework/Players/<uuid>.json`.
+  Without a store that file is the only copy, which keeps preferences on
+  servers that turn the engine's player save off.
+- These keys are not read on a timer, and `notifyChanged` ignores them. A
+  change is sent to the store as soon as the player makes it, so it normally
+  lands long before the player moves to another server.
 
 ## Limits
 

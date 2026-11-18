@@ -292,6 +292,17 @@ companions recovered. Role-scoped `TwCompanionConfig.Command.Revive` supplies
 the gameplay cooldown, the exact AND item-cost recipe, and the optional
 insufficient-cost message for a revive. Recover is free.
 
+## Player preferences
+
+Each player's own choices are saved by Tamework in
+`universe/Tamework/Players/<uuid>.json`: their flute groups and saved views,
+where they moved the companion HUD and the Inspect card, their F behaviour and
+their Inspect options. They are saved when the player changes one and put back
+when the player connects, so they survive servers that turn the engine's player
+save off. On a network with a settings store they follow the player from server
+to server. Deleting a player's file resets their preferences on a server without
+a store.
+
 ## Network settings
 
 On a server network whose network mod installs a settings store (see the
@@ -301,7 +312,8 @@ without saved network settings, do not show it.
 
 Each setting resolves on its own: this server's override, then the network's
 value, then the built-in default. Lists override as a whole. The welcome
-announcement switch and player settings stay per server.
+announcement switch stays per server. Player preferences are not settings and
+follow the player instead (see [Player preferences](#player-preferences)).
 
 - **Publish settings** makes the settings in effect on this server the
   settings of the whole network. Use it once on the server that is set up
